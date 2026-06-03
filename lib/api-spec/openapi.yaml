@@ -3,20 +3,24 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: CoopDigital — API de gestion des coopératives cacaoyères
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: membres
+  - name: avances
+  - name: livraisons
+  - name: dashboard
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +28,696 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Connexion utilisateur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Identifiants invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /membres:
+    get:
+      operationId: getMembres
+      tags: [membres]
+      summary: Liste paginée des membres
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: statut
+          in: query
+          schema: { type: string, enum: [actif, inactif] }
+      responses:
+        "200":
+          description: Liste des membres
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembrePagination"
+    post:
+      operationId: createMembre
+      tags: [membres]
+      summary: Créer un membre
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MembreInput"
+      responses:
+        "201":
+          description: Membre créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membre"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /membres/qr/{token}:
+    get:
+      operationId: getMembreByQr
+      tags: [membres]
+      summary: Lookup membre par QR code
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Membre trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membre"
+        "404":
+          description: Non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /membres/{id}:
+    get:
+      operationId: getMembreById
+      tags: [membres]
+      summary: Fiche complète d'un membre
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Membre trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membre"
+        "404":
+          description: Non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateMembre
+      tags: [membres]
+      summary: Modifier un membre
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MembreUpdate"
+      responses:
+        "200":
+          description: Membre modifié
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membre"
+
+  /membres/{id}/historique:
+    get:
+      operationId: getMembreHistorique
+      tags: [membres]
+      summary: Historique livraisons, avances et paiements d'un membre
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Historique du membre
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembreHistorique"
+
+  /avances:
+    get:
+      operationId: getAvances
+      tags: [avances]
+      summary: Liste des avances
+      parameters:
+        - name: statut
+          in: query
+          schema: { type: string, enum: [en_cours, rembourse, en_retard] }
+        - name: membre_id
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Liste des avances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvancePagination"
+    post:
+      operationId: createAvance
+      tags: [avances]
+      summary: Octroyer une avance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AvanceInput"
+      responses:
+        "201":
+          description: Avance octroyée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Avance"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /avances/encours:
+    get:
+      operationId: getAvancesEncours
+      tags: [avances]
+      summary: Tableau de bord avances en cours
+      responses:
+        "200":
+          description: Résumé avances en cours
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvancesEncours"
+
+  /avances/{id}/rembourser:
+    put:
+      operationId: rembourserAvance
+      tags: [avances]
+      summary: Remboursement partiel ou total d'une avance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemboursementInput"
+      responses:
+        "200":
+          description: Avance mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Avance"
+        "404":
+          description: Non trouvée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /livraisons:
+    get:
+      operationId: getLivraisons
+      tags: [livraisons]
+      summary: Liste des livraisons
+      parameters:
+        - name: membre_id
+          in: query
+          schema: { type: integer }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: Liste des livraisons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LivraisonDetail"
+    post:
+      operationId: createLivraison
+      tags: [livraisons]
+      summary: Enregistrer une livraison avec déduction d'avance automatique
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LivraisonInput"
+      responses:
+        "201":
+          description: Livraison enregistrée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LivraisonResult"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: KPIs du tableau de bord
+      responses:
+        "200":
+          description: Indicateurs clés
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardKpi"
+
+  /dashboard/livraisons:
+    get:
+      operationId: getDashboardLivraisons
+      tags: [dashboard]
+      summary: Dernières livraisons (5)
+      responses:
+        "200":
+          description: Dernières livraisons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LivraisonDetail"
+
+  /dashboard/avances-retard:
+    get:
+      operationId: getDashboardAvancesRetard
+      tags: [dashboard]
+      summary: Avances en retard
+      responses:
+        "200":
+          description: Avances en retard
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Avance"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    ErrorResponse:
+      type: object
+      required: [erreur]
+      properties:
+        erreur:
+          type: string
+
+    LoginInput:
+      type: object
+      required: [email, motDePasse]
+      properties:
+        email:
+          type: string
+          format: email
+        motDePasse:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [token, utilisateur]
+      properties:
+        token:
+          type: string
+        utilisateur:
+          $ref: "#/components/schemas/UserProfile"
+
+    UserProfile:
+      type: object
+      required: [id, nom, prenoms, role]
+      properties:
+        id:
+          type: integer
+        nom:
+          type: string
+        prenoms:
+          type: string
+        role:
+          type: string
+        cooperativeId:
+          type: ["integer", "null"]
+
+    Membre:
+      type: object
+      required: [id, cooperativeId, nom, prenoms, telephone, superficieHa, statut, qrCodeToken, dateAdhesion, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        nom:
+          type: string
+        prenoms:
+          type: string
+        numeroCni:
+          type: ["string", "null"]
+        telephone:
+          type: string
+        village:
+          type: ["string", "null"]
+        groupement:
+          type: ["string", "null"]
+        superficieHa:
+          type: string
+        statut:
+          type: string
+          enum: [actif, inactif]
+        qrCodeToken:
+          type: string
+        dateAdhesion:
+          type: string
+        photoUrl:
+          type: ["string", "null"]
+        parcelleLat:
+          type: ["string", "null"]
+        parcelleLng:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    MembreInput:
+      type: object
+      required: [cooperativeId, nom, prenoms, telephone, superficieHa, dateAdhesion]
+      properties:
+        cooperativeId:
+          type: integer
+        nom:
+          type: string
+        prenoms:
+          type: string
+        numeroCni:
+          type: string
+        telephone:
+          type: string
+        village:
+          type: string
+        groupement:
+          type: string
+        superficieHa:
+          type: string
+        statut:
+          type: string
+          enum: [actif, inactif]
+        dateAdhesion:
+          type: string
+        photoUrl:
+          type: string
+        parcelleLat:
+          type: string
+        parcelleLng:
+          type: string
+
+    MembreUpdate:
+      type: object
+      properties:
+        nom:
+          type: string
+        prenoms:
+          type: string
+        numeroCni:
+          type: string
+        telephone:
+          type: string
+        village:
+          type: string
+        groupement:
+          type: string
+        superficieHa:
+          type: string
+        statut:
+          type: string
+          enum: [actif, inactif]
+        photoUrl:
+          type: string
+        parcelleLat:
+          type: string
+        parcelleLng:
+          type: string
+
+    MembrePagination:
+      type: object
+      required: [membres, total, page, limit]
+      properties:
+        membres:
+          type: array
+          items:
+            $ref: "#/components/schemas/Membre"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    MembreHistorique:
+      type: object
+      required: [livraisons, avances, paiements]
+      properties:
+        livraisons:
+          type: array
+          items:
+            $ref: "#/components/schemas/LivraisonDetail"
+        avances:
+          type: array
+          items:
+            $ref: "#/components/schemas/Avance"
+        paiements:
+          type: array
+          items:
+            $ref: "#/components/schemas/Paiement"
+
+    Avance:
+      type: object
+      required: [id, membreId, montantOctroyeFcfa, montantRembourseFcfa, soldeRestantFcfa, dateOctroi, statut, createdAt]
+      properties:
+        id:
+          type: integer
+        membreId:
+          type: integer
+        montantOctroyeFcfa:
+          type: integer
+        montantRembourseFcfa:
+          type: integer
+        soldeRestantFcfa:
+          type: integer
+        dateOctroi:
+          type: string
+        dateEcheance:
+          type: ["string", "null"]
+        motif:
+          type: ["string", "null"]
+        statut:
+          type: string
+          enum: [en_cours, rembourse, en_retard]
+        agentId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        membreNom:
+          type: ["string", "null"]
+        membrePrenoms:
+          type: ["string", "null"]
+
+    AvanceInput:
+      type: object
+      required: [membreId, montantOctroyeFcfa, dateOctroi]
+      properties:
+        membreId:
+          type: integer
+        montantOctroyeFcfa:
+          type: integer
+        dateOctroi:
+          type: string
+        dateEcheance:
+          type: string
+        motif:
+          type: string
+
+    RemboursementInput:
+      type: object
+      required: [montantFcfa]
+      properties:
+        montantFcfa:
+          type: integer
+
+    AvancePagination:
+      type: object
+      required: [avances, total]
+      properties:
+        avances:
+          type: array
+          items:
+            $ref: "#/components/schemas/Avance"
+        total:
+          type: integer
+
+    AvancesEncours:
+      type: object
+      required: [totalOctroye, totalRembourse, soldeToral, count, avances]
+      properties:
+        totalOctroye:
+          type: integer
+        totalRembourse:
+          type: integer
+        soldeToral:
+          type: integer
+        count:
+          type: integer
+        avances:
+          type: array
+          items:
+            $ref: "#/components/schemas/Avance"
+
+    LivraisonInput:
+      type: object
+      required: [membreId, poidsKg, prixUnitaireFcfa, dateLivraison]
+      properties:
+        membreId:
+          type: integer
+        poidsKg:
+          type: number
+        prixUnitaireFcfa:
+          type: integer
+        dateLivraison:
+          type: string
+        modePaiement:
+          type: string
+          enum: [orange_money, mtn_momo, especes]
+
+    LivraisonDetail:
+      type: object
+      required: [id, membreId, poidsKg, prixUnitaireFcfa, montantBrutFcfa, avanceDeduiteFcfa, montantNetFcfa, dateLivraison, createdAt]
+      properties:
+        id:
+          type: integer
+        membreId:
+          type: integer
+        poidsKg:
+          type: string
+        prixUnitaireFcfa:
+          type: integer
+        montantBrutFcfa:
+          type: integer
+        avanceDeduiteFcfa:
+          type: integer
+        montantNetFcfa:
+          type: integer
+        dateLivraison:
+          type: string
+        agentId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        membreNom:
+          type: ["string", "null"]
+        membrePrenoms:
+          type: ["string", "null"]
+
+    LivraisonResult:
+      type: object
+      required: [livraison, paiement]
+      properties:
+        livraison:
+          $ref: "#/components/schemas/LivraisonDetail"
+        paiement:
+          $ref: "#/components/schemas/Paiement"
+        avanceMiseAJour:
+          $ref: "#/components/schemas/Avance"
+
+    Paiement:
+      type: object
+      required: [id, livraisonId, membreId, montantFcfa, modePaiement, statut, recuEnvoyeWhatsapp, createdAt]
+      properties:
+        id:
+          type: integer
+        livraisonId:
+          type: integer
+        membreId:
+          type: integer
+        montantFcfa:
+          type: integer
+        modePaiement:
+          type: string
+          enum: [orange_money, mtn_momo, especes]
+        referenceTransaction:
+          type: ["string", "null"]
+        statut:
+          type: string
+          enum: [en_attente, confirme, echec]
+        recuEnvoyeWhatsapp:
+          type: boolean
+        createdAt:
+          type: string
+
+    DashboardKpi:
+      type: object
+      required: [membresActifs, avancesEnCoursMontant, tonnageMois, paiementsMois]
+      properties:
+        membresActifs:
+          type: integer
+        avancesEnCoursMontant:
+          type: integer
+        tonnageMois:
+          type: number
+        paiementsMois:
+          type: integer

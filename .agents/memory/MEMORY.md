@@ -1,0 +1,1 @@
+- [Express 5 req.params typing](express5-params-typing.md) — req.params[key] is string | string[], wrap with String() before parseInt or eq().
