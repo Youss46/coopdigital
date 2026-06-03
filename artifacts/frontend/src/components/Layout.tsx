@@ -18,6 +18,7 @@ import {
   MessageSquare,
   BarChart3,
   ShieldCheck,
+  Banknote,
 } from "lucide-react";
 
 const navItems = [
@@ -74,6 +75,12 @@ const navItems = [
     label: "Comptabilité",
     icon: BarChart3,
     roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
+  },
+  {
+    href: "/salaires",
+    label: "Salaires",
+    icon: Banknote,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
     href: "/communication",

@@ -22,6 +22,7 @@ tags:
   - name: etats-financiers
   - name: rapports
   - name: users
+  - name: salaires
 
 paths:
   /healthz:
@@ -1190,6 +1191,252 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /salaires/employes:
+    get:
+      operationId: getEmployes
+      tags: [salaires]
+      summary: Liste des employés
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Liste des employés
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Employe"
+    post:
+      operationId: createEmploye
+      tags: [salaires]
+      summary: Créer un employé
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeInput"
+      responses:
+        "201":
+          description: Employé créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employe"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /salaires/employes/{id}:
+    get:
+      operationId: getEmployeById
+      tags: [salaires]
+      summary: Détail d'un employé
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Employé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employe"
+        "404":
+          description: Introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateEmploye
+      tags: [salaires]
+      summary: Modifier un employé
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmployeInput"
+      responses:
+        "200":
+          description: Employé mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employe"
+    delete:
+      operationId: desactiverEmploye
+      tags: [salaires]
+      summary: Désactiver un employé
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Employé désactivé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employe"
+
+  /salaires/fiches:
+    get:
+      operationId: getFichesPaie
+      tags: [salaires]
+      summary: Liste des fiches de paie
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: mois
+          in: query
+          schema: { type: integer }
+        - name: annee
+          in: query
+          schema: { type: integer }
+        - name: employeId
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Liste des fiches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FichePaieAvecEmploye"
+    post:
+      operationId: createFichePaie
+      tags: [salaires]
+      summary: Créer une fiche de paie
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFichePaieInput"
+      responses:
+        "201":
+          description: Fiche créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FichePaie"
+        "409":
+          description: Doublon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /salaires/recap:
+    get:
+      operationId: getRecapSalaires
+      tags: [salaires]
+      summary: Récapitulatif mensuel des salaires
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: mois
+          in: query
+          schema: { type: integer }
+        - name: annee
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Récapitulatif
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecapSalaires"
+
+  /salaires/fiches/{id}:
+    get:
+      operationId: getFichePaieById
+      tags: [salaires]
+      summary: Détail d'une fiche de paie
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Fiche de paie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FichePaieAvecEmploye"
+    delete:
+      operationId: deleteFichePaie
+      tags: [salaires]
+      summary: Supprimer une fiche (brouillon uniquement)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Supprimé
+
+  /salaires/fiches/{id}/valider:
+    put:
+      operationId: validerFichePaie
+      tags: [salaires]
+      summary: Valider une fiche de paie
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Fiche validée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FichePaie"
+
+  /salaires/fiches/{id}/payer:
+    put:
+      operationId: payerFichePaie
+      tags: [salaires]
+      summary: Marquer une fiche comme payée
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Fiche marquée payée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FichePaie"
+
 components:
   schemas:
     HealthStatus:
@@ -2147,3 +2394,195 @@ components:
       properties:
         actif:
           type: boolean
+
+    Employe:
+      type: object
+      required: [id, cooperativeId, nom, prenoms, poste, dateEmbauche, salaireBaseFcfa, statut, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        nom:
+          type: string
+        prenoms:
+          type: string
+        poste:
+          type: string
+        telephone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        dateEmbauche:
+          type: string
+        salaireBaseFcfa:
+          type: integer
+        statut:
+          type: string
+          enum: [actif, inactif]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateEmployeInput:
+      type: object
+      required: [nom, prenoms, poste, dateEmbauche, salaireBaseFcfa]
+      properties:
+        nom:
+          type: string
+        prenoms:
+          type: string
+        poste:
+          type: string
+        telephone:
+          type: string
+        email:
+          type: string
+        dateEmbauche:
+          type: string
+        salaireBaseFcfa:
+          type: integer
+
+    UpdateEmployeInput:
+      type: object
+      properties:
+        nom:
+          type: string
+        prenoms:
+          type: string
+        poste:
+          type: string
+        telephone:
+          type: string
+        email:
+          type: string
+        dateEmbauche:
+          type: string
+        salaireBaseFcfa:
+          type: integer
+        statut:
+          type: string
+          enum: [actif, inactif]
+
+    FichePaie:
+      type: object
+      required: [id, cooperativeId, employeId, mois, annee, salaireBaseFcfa, primesFcfa, indemnitésFcfa, heuresSupFcfa, deductionCnpsFcfa, deductionImpotFcfa, avanceSurSalaireFcfa, netAPayerFcfa, statut, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        employeId:
+          type: integer
+        mois:
+          type: integer
+        annee:
+          type: integer
+        salaireBaseFcfa:
+          type: integer
+        primesFcfa:
+          type: integer
+        indemnitésFcfa:
+          type: integer
+        heuresSupFcfa:
+          type: integer
+        deductionCnpsFcfa:
+          type: integer
+        deductionImpotFcfa:
+          type: integer
+        avanceSurSalaireFcfa:
+          type: integer
+        netAPayerFcfa:
+          type: integer
+        statut:
+          type: string
+          enum: [brouillon, valide, paye]
+        datePaiement:
+          type: string
+          format: date-time
+          nullable: true
+        observations:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FichePaieAvecEmploye:
+      type: object
+      required: [fiche, employe]
+      properties:
+        fiche:
+          $ref: "#/components/schemas/FichePaie"
+        employe:
+          type: object
+          required: [id, nom, prenoms, poste]
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+            prenoms:
+              type: string
+            poste:
+              type: string
+
+    CreateFichePaieInput:
+      type: object
+      required: [employeId, mois, annee, salaireBaseFcfa]
+      properties:
+        employeId:
+          type: integer
+        mois:
+          type: integer
+        annee:
+          type: integer
+        salaireBaseFcfa:
+          type: integer
+        primesFcfa:
+          type: integer
+        indemnitésFcfa:
+          type: integer
+        heuresSupFcfa:
+          type: integer
+        deductionCnpsFcfa:
+          type: integer
+        deductionImpotFcfa:
+          type: integer
+        avanceSurSalaireFcfa:
+          type: integer
+        observations:
+          type: string
+
+    RecapSalaires:
+      type: object
+      required: [mois, annee, nbEmployesActifs, nbFiches, nbPayees, nbValidees, nbBrouillons, masseSalarialeBrute, masseSalarialeNette, totalCnps]
+      properties:
+        mois:
+          type: integer
+        annee:
+          type: integer
+        nbEmployesActifs:
+          type: integer
+        nbFiches:
+          type: integer
+        nbPayees:
+          type: integer
+        nbValidees:
+          type: integer
+        nbBrouillons:
+          type: integer
+        masseSalarialeBrute:
+          type: integer
+        masseSalarialeNette:
+          type: integer
+        totalCnps:
+          type: integer

@@ -665,6 +665,127 @@ export interface ToggleActifInput {
   actif: boolean;
 }
 
+export type EmployeStatut = typeof EmployeStatut[keyof typeof EmployeStatut];
+
+
+export const EmployeStatut = {
+  actif: 'actif',
+  inactif: 'inactif',
+} as const;
+
+export interface Employe {
+  id: number;
+  cooperativeId: number;
+  nom: string;
+  prenoms: string;
+  poste: string;
+  telephone?: string | null;
+  email?: string | null;
+  dateEmbauche: string;
+  salaireBaseFcfa: number;
+  statut: EmployeStatut;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmployeInput {
+  nom: string;
+  prenoms: string;
+  poste: string;
+  telephone?: string;
+  email?: string;
+  dateEmbauche: string;
+  salaireBaseFcfa: number;
+}
+
+export type UpdateEmployeInputStatut = typeof UpdateEmployeInputStatut[keyof typeof UpdateEmployeInputStatut];
+
+
+export const UpdateEmployeInputStatut = {
+  actif: 'actif',
+  inactif: 'inactif',
+} as const;
+
+export interface UpdateEmployeInput {
+  nom?: string;
+  prenoms?: string;
+  poste?: string;
+  telephone?: string;
+  email?: string;
+  dateEmbauche?: string;
+  salaireBaseFcfa?: number;
+  statut?: UpdateEmployeInputStatut;
+}
+
+export type FichePaieStatut = typeof FichePaieStatut[keyof typeof FichePaieStatut];
+
+
+export const FichePaieStatut = {
+  brouillon: 'brouillon',
+  valide: 'valide',
+  paye: 'paye',
+} as const;
+
+export interface FichePaie {
+  id: number;
+  cooperativeId: number;
+  employeId: number;
+  mois: number;
+  annee: number;
+  salaireBaseFcfa: number;
+  primesFcfa: number;
+  indemnitésFcfa: number;
+  heuresSupFcfa: number;
+  deductionCnpsFcfa: number;
+  deductionImpotFcfa: number;
+  avanceSurSalaireFcfa: number;
+  netAPayerFcfa: number;
+  statut: FichePaieStatut;
+  datePaiement?: string | null;
+  observations?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type FichePaieAvecEmployeEmploye = {
+  id: number;
+  nom: string;
+  prenoms: string;
+  poste: string;
+};
+
+export interface FichePaieAvecEmploye {
+  fiche: FichePaie;
+  employe: FichePaieAvecEmployeEmploye;
+}
+
+export interface CreateFichePaieInput {
+  employeId: number;
+  mois: number;
+  annee: number;
+  salaireBaseFcfa: number;
+  primesFcfa?: number;
+  indemnitésFcfa?: number;
+  heuresSupFcfa?: number;
+  deductionCnpsFcfa?: number;
+  deductionImpotFcfa?: number;
+  avanceSurSalaireFcfa?: number;
+  observations?: string;
+}
+
+export interface RecapSalaires {
+  mois: number;
+  annee: number;
+  nbEmployesActifs: number;
+  nbFiches: number;
+  nbPayees: number;
+  nbValidees: number;
+  nbBrouillons: number;
+  masseSalarialeBrute: number;
+  masseSalarialeNette: number;
+  totalCnps: number;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -770,5 +891,16 @@ exercice?: number;
 
 export type ResetUserPassword200 = {
   message?: string;
+};
+
+export type GetFichesPaieParams = {
+mois?: number;
+annee?: number;
+employeId?: number;
+};
+
+export type GetRecapSalairesParams = {
+mois?: number;
+annee?: number;
 };
 

@@ -10,3 +10,4 @@ export * from "./stocks";
 export * from "./exportateurs";
 export * from "./communication";
 export * from "./comptabilite";
+export * from "./salaires";

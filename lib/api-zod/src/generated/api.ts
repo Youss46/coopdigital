@@ -1199,3 +1199,300 @@ export const ToggleUserActifResponse = zod.object({
 })
 
 
+/**
+ * @summary Liste des employés
+ */
+export const GetEmployesResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "poste": zod.string(),
+  "telephone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "dateEmbauche": zod.string(),
+  "salaireBaseFcfa": zod.number(),
+  "statut": zod.enum(['actif', 'inactif']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const GetEmployesResponse = zod.array(GetEmployesResponseItem)
+
+
+/**
+ * @summary Créer un employé
+ */
+export const CreateEmployeBody = zod.object({
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "poste": zod.string(),
+  "telephone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "dateEmbauche": zod.string(),
+  "salaireBaseFcfa": zod.number()
+})
+
+
+/**
+ * @summary Détail d'un employé
+ */
+export const GetEmployeByIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEmployeByIdResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "poste": zod.string(),
+  "telephone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "dateEmbauche": zod.string(),
+  "salaireBaseFcfa": zod.number(),
+  "statut": zod.enum(['actif', 'inactif']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Modifier un employé
+ */
+export const UpdateEmployeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateEmployeBody = zod.object({
+  "nom": zod.string().optional(),
+  "prenoms": zod.string().optional(),
+  "poste": zod.string().optional(),
+  "telephone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "dateEmbauche": zod.string().optional(),
+  "salaireBaseFcfa": zod.number().optional(),
+  "statut": zod.enum(['actif', 'inactif']).optional()
+})
+
+export const UpdateEmployeResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "poste": zod.string(),
+  "telephone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "dateEmbauche": zod.string(),
+  "salaireBaseFcfa": zod.number(),
+  "statut": zod.enum(['actif', 'inactif']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Désactiver un employé
+ */
+export const DesactiverEmployeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DesactiverEmployeResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "poste": zod.string(),
+  "telephone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "dateEmbauche": zod.string(),
+  "salaireBaseFcfa": zod.number(),
+  "statut": zod.enum(['actif', 'inactif']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Liste des fiches de paie
+ */
+export const GetFichesPaieQueryParams = zod.object({
+  "mois": zod.coerce.number().optional(),
+  "annee": zod.coerce.number().optional(),
+  "employeId": zod.coerce.number().optional()
+})
+
+export const GetFichesPaieResponseItem = zod.object({
+  "fiche": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "employeId": zod.number(),
+  "mois": zod.number(),
+  "annee": zod.number(),
+  "salaireBaseFcfa": zod.number(),
+  "primesFcfa": zod.number(),
+  "indemnitésFcfa": zod.number(),
+  "heuresSupFcfa": zod.number(),
+  "deductionCnpsFcfa": zod.number(),
+  "deductionImpotFcfa": zod.number(),
+  "avanceSurSalaireFcfa": zod.number(),
+  "netAPayerFcfa": zod.number(),
+  "statut": zod.enum(['brouillon', 'valide', 'paye']),
+  "datePaiement": zod.coerce.date().nullish(),
+  "observations": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "employe": zod.object({
+  "id": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "poste": zod.string()
+})
+})
+export const GetFichesPaieResponse = zod.array(GetFichesPaieResponseItem)
+
+
+/**
+ * @summary Créer une fiche de paie
+ */
+export const CreateFichePaieBody = zod.object({
+  "employeId": zod.number(),
+  "mois": zod.number(),
+  "annee": zod.number(),
+  "salaireBaseFcfa": zod.number(),
+  "primesFcfa": zod.number().optional(),
+  "indemnitésFcfa": zod.number().optional(),
+  "heuresSupFcfa": zod.number().optional(),
+  "deductionCnpsFcfa": zod.number().optional(),
+  "deductionImpotFcfa": zod.number().optional(),
+  "avanceSurSalaireFcfa": zod.number().optional(),
+  "observations": zod.string().optional()
+})
+
+
+/**
+ * @summary Récapitulatif mensuel des salaires
+ */
+export const GetRecapSalairesQueryParams = zod.object({
+  "mois": zod.coerce.number().optional(),
+  "annee": zod.coerce.number().optional()
+})
+
+export const GetRecapSalairesResponse = zod.object({
+  "mois": zod.number(),
+  "annee": zod.number(),
+  "nbEmployesActifs": zod.number(),
+  "nbFiches": zod.number(),
+  "nbPayees": zod.number(),
+  "nbValidees": zod.number(),
+  "nbBrouillons": zod.number(),
+  "masseSalarialeBrute": zod.number(),
+  "masseSalarialeNette": zod.number(),
+  "totalCnps": zod.number()
+})
+
+
+/**
+ * @summary Détail d'une fiche de paie
+ */
+export const GetFichePaieByIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetFichePaieByIdResponse = zod.object({
+  "fiche": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "employeId": zod.number(),
+  "mois": zod.number(),
+  "annee": zod.number(),
+  "salaireBaseFcfa": zod.number(),
+  "primesFcfa": zod.number(),
+  "indemnitésFcfa": zod.number(),
+  "heuresSupFcfa": zod.number(),
+  "deductionCnpsFcfa": zod.number(),
+  "deductionImpotFcfa": zod.number(),
+  "avanceSurSalaireFcfa": zod.number(),
+  "netAPayerFcfa": zod.number(),
+  "statut": zod.enum(['brouillon', 'valide', 'paye']),
+  "datePaiement": zod.coerce.date().nullish(),
+  "observations": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "employe": zod.object({
+  "id": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "poste": zod.string()
+})
+})
+
+
+/**
+ * @summary Supprimer une fiche (brouillon uniquement)
+ */
+export const DeleteFichePaieParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Valider une fiche de paie
+ */
+export const ValiderFichePaieParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ValiderFichePaieResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "employeId": zod.number(),
+  "mois": zod.number(),
+  "annee": zod.number(),
+  "salaireBaseFcfa": zod.number(),
+  "primesFcfa": zod.number(),
+  "indemnitésFcfa": zod.number(),
+  "heuresSupFcfa": zod.number(),
+  "deductionCnpsFcfa": zod.number(),
+  "deductionImpotFcfa": zod.number(),
+  "avanceSurSalaireFcfa": zod.number(),
+  "netAPayerFcfa": zod.number(),
+  "statut": zod.enum(['brouillon', 'valide', 'paye']),
+  "datePaiement": zod.coerce.date().nullish(),
+  "observations": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Marquer une fiche comme payée
+ */
+export const PayerFichePaieParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PayerFichePaieResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "employeId": zod.number(),
+  "mois": zod.number(),
+  "annee": zod.number(),
+  "salaireBaseFcfa": zod.number(),
+  "primesFcfa": zod.number(),
+  "indemnitésFcfa": zod.number(),
+  "heuresSupFcfa": zod.number(),
+  "deductionCnpsFcfa": zod.number(),
+  "deductionImpotFcfa": zod.number(),
+  "avanceSurSalaireFcfa": zod.number(),
+  "netAPayerFcfa": zod.number(),
+  "statut": zod.enum(['brouillon', 'valide', 'paye']),
+  "datePaiement": zod.coerce.date().nullish(),
+  "observations": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+

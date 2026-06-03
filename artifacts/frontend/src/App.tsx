@@ -14,6 +14,7 @@ import StocksPage from "@/pages/StocksPage";
 import ExportateursPage from "@/pages/ExportateursPage";
 import CreancesPage from "@/pages/CreancesPage";
 import CommunicationPage from "@/pages/CommunicationPage";
+import SalairesPage from "@/pages/SalairesPage";
 import ReportingPage from "@/pages/ReportingPage";
 import ComptesPage from "@/pages/ComptesPage";
 import Layout from "@/components/Layout";
@@ -70,6 +71,9 @@ function AppRoutes() {
       </Route>
       <Route path="/creances">
         <ProtectedRoute component={CreancesPage} />
+      </Route>
+      <Route path="/salaires">
+        <ProtectedRoute component={SalairesPage} />
       </Route>
       <Route path="/communication">
         <ProtectedRoute component={CommunicationPage} />

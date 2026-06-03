@@ -13,6 +13,7 @@ import comptabiliteRouter from "./comptabilite";
 import etatsFinanciersRouter from "./etatsFinanciers";
 import rapportsRouter from "./rapports";
 import usersRouter from "./users";
+import salairesRouter from "./salaires";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(comptabiliteRouter);
 router.use(etatsFinanciersRouter);
 router.use(rapportsRouter);
 router.use(usersRouter);
+router.use(salairesRouter);
 
 export default router;

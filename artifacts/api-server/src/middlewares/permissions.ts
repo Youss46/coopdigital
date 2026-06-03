@@ -100,6 +100,17 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     exporter_donnees_bailleurs:   ["pca", "directeur", "auditeur"],
   },
 
+  // MODULE M08 — SALAIRES
+  salaires: {
+    lire:             ["pca", "directeur", "comptable", "auditeur"],
+    creer_employe:    ["pca", "directeur"],
+    modifier_employe: ["pca", "directeur", "comptable"],
+    creer_fiche:      ["pca", "directeur", "comptable"],
+    valider_fiche:    ["pca", "directeur"],
+    marquer_paye:     ["pca", "directeur", "comptable"],
+    supprimer_fiche:  ["pca", "directeur"],
+  },
+
   // MODULE M07 — COMMUNICATION
   communication: {
     lire_historique:    ["pca", "directeur", "comptable"],

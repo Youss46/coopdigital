@@ -98,4 +98,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     envoyer_whatsapp:   ["pca", "directeur"],
     configurer_alertes: ["pca", "directeur"],
   },
+
+  salaires: {
+    lire:             ["pca", "directeur", "comptable", "auditeur"],
+    creer_employe:    ["pca", "directeur"],
+    modifier_employe: ["pca", "directeur", "comptable"],
+    creer_fiche:      ["pca", "directeur", "comptable"],
+    valider_fiche:    ["pca", "directeur"],
+    marquer_paye:     ["pca", "directeur", "comptable"],
+    supprimer_fiche:  ["pca", "directeur"],
+  },
 };
