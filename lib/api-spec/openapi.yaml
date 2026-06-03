@@ -1191,39 +1191,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /salaires/employes:
+  /salaires/personnel:
     get:
-      operationId: getEmployes
+      operationId: getPersonnel
       tags: [salaires]
-      summary: Liste des employés
+      summary: Liste du personnel
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Liste des employés
+          description: Liste du personnel
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Employe"
+                  $ref: "#/components/schemas/Personnel"
     post:
-      operationId: createEmploye
+      operationId: createPersonnel
       tags: [salaires]
-      summary: Créer un employé
+      summary: Créer un membre du personnel
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateEmployeInput"
+              $ref: "#/components/schemas/CreatePersonnelInput"
       responses:
         "201":
-          description: Employé créé
+          description: Personnel créé
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Employe"
+                $ref: "#/components/schemas/Personnel"
         "400":
           description: Données invalides
           content:
@@ -1231,11 +1231,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /salaires/employes/{id}:
+  /salaires/personnel/{id}:
     get:
-      operationId: getEmployeById
+      operationId: getPersonnelById
       tags: [salaires]
-      summary: Détail d'un employé
+      summary: Détail d'un membre du personnel
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1244,11 +1244,11 @@ paths:
           schema: { type: integer }
       responses:
         "200":
-          description: Employé
+          description: Personnel
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Employe"
+                $ref: "#/components/schemas/Personnel"
         "404":
           description: Introuvable
           content:
@@ -1256,9 +1256,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
     put:
-      operationId: updateEmploye
+      operationId: updatePersonnel
       tags: [salaires]
-      summary: Modifier un employé
+      summary: Modifier un membre du personnel
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1270,18 +1270,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateEmployeInput"
+              $ref: "#/components/schemas/UpdatePersonnelInput"
       responses:
         "200":
-          description: Employé mis à jour
+          description: Personnel mis à jour
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Employe"
+                $ref: "#/components/schemas/Personnel"
     delete:
-      operationId: desactiverEmploye
+      operationId: archiverPersonnel
       tags: [salaires]
-      summary: Désactiver un employé
+      summary: Archiver un membre du personnel (statut = sorti)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1290,67 +1290,74 @@ paths:
           schema: { type: integer }
       responses:
         "200":
-          description: Employé désactivé
+          description: Personnel archivé
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Employe"
+                $ref: "#/components/schemas/Personnel"
 
-  /salaires/fiches:
+  /salaires/personnel/{id}/historique:
     get:
-      operationId: getFichesPaie
+      operationId: getPersonnelHistorique
       tags: [salaires]
-      summary: Liste des fiches de paie
+      summary: Historique bulletins + avances d'un membre du personnel
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: mois
-          in: query
-          schema: { type: integer }
-        - name: annee
-          in: query
-          schema: { type: integer }
-        - name: employeId
-          in: query
+        - name: id
+          in: path
+          required: true
           schema: { type: integer }
       responses:
         "200":
-          description: Liste des fiches
+          description: Historique
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonnelHistorique"
+
+  /salaires/composantes:
+    get:
+      operationId: getComposantesSalaire
+      tags: [salaires]
+      summary: Catalogue des composantes de salaire
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Composantes
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/FichePaieAvecEmploye"
+                  $ref: "#/components/schemas/ComposanteSalaire"
+
+  /salaires/bulletins/generer:
     post:
-      operationId: createFichePaie
+      operationId: genererBulletins
       tags: [salaires]
-      summary: Créer une fiche de paie
+      summary: Générer les bulletins de paie (masse ou sélection)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateFichePaieInput"
+              $ref: "#/components/schemas/GenererBulletinsInput"
       responses:
-        "201":
-          description: Fiche créée
+        "200":
+          description: Résultats de génération
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FichePaie"
-        "409":
-          description: Doublon
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                type: array
+                items:
+                  $ref: "#/components/schemas/GenerationResult"
 
-  /salaires/recap:
+  /salaires/bulletins:
     get:
-      operationId: getRecapSalaires
+      operationId: getBulletins
       tags: [salaires]
-      summary: Récapitulatif mensuel des salaires
+      summary: Liste des bulletins de paie
       security: [{ bearerAuth: [] }]
       parameters:
         - name: mois
@@ -1359,19 +1366,26 @@ paths:
         - name: annee
           in: query
           schema: { type: integer }
+        - name: statut
+          in: query
+          schema:
+            type: string
+            enum: [brouillon, valide, paye]
       responses:
         "200":
-          description: Récapitulatif
+          description: Liste des bulletins
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/RecapSalaires"
+                type: array
+                items:
+                  $ref: "#/components/schemas/BulletinAvecPersonnel"
 
-  /salaires/fiches/{id}:
+  /salaires/bulletins/{id}:
     get:
-      operationId: getFichePaieById
+      operationId: getBulletinById
       tags: [salaires]
-      summary: Détail d'une fiche de paie
+      summary: Détail d'un bulletin de paie avec lignes
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1380,15 +1394,21 @@ paths:
           schema: { type: integer }
       responses:
         "200":
-          description: Fiche de paie
+          description: Bulletin détaillé
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FichePaieAvecEmploye"
+                $ref: "#/components/schemas/BulletinDetail"
+        "404":
+          description: Introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     delete:
-      operationId: deleteFichePaie
+      operationId: deleteBulletin
       tags: [salaires]
-      summary: Supprimer une fiche (brouillon uniquement)
+      summary: Supprimer un bulletin (brouillon uniquement)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1399,11 +1419,11 @@ paths:
         "204":
           description: Supprimé
 
-  /salaires/fiches/{id}/valider:
+  /salaires/bulletins/{id}/valider:
     put:
-      operationId: validerFichePaie
+      operationId: validerBulletin
       tags: [salaires]
-      summary: Valider une fiche de paie
+      summary: Valider un bulletin de paie
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1412,17 +1432,41 @@ paths:
           schema: { type: integer }
       responses:
         "200":
-          description: Fiche validée
+          description: Bulletin validé
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FichePaie"
+                $ref: "#/components/schemas/BulletinPaie"
 
-  /salaires/fiches/{id}/payer:
+  /salaires/bulletins/{id}/payer:
     put:
-      operationId: payerFichePaie
+      operationId: payerBulletin
       tags: [salaires]
-      summary: Marquer une fiche comme payée
+      summary: Marquer un bulletin comme payé
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayerBulletinInput"
+      responses:
+        "200":
+          description: Bulletin payé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulletinPaie"
+
+  /salaires/bulletins/{id}/pdf:
+    get:
+      operationId: getBulletinPdf
+      tags: [salaires]
+      summary: Télécharger le bulletin en PDF
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1431,11 +1475,118 @@ paths:
           schema: { type: integer }
       responses:
         "200":
-          description: Fiche marquée payée
+          description: PDF du bulletin
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /salaires/avances:
+    get:
+      operationId: getAvancesPersonnel
+      tags: [salaires]
+      summary: Liste des avances personnel
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: personnelId
+          in: query
+          schema: { type: integer }
+        - name: statut
+          in: query
+          schema:
+            type: string
+            enum: [en_cours, rembourse]
+      responses:
+        "200":
+          description: Liste des avances
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FichePaie"
+                type: array
+                items:
+                  $ref: "#/components/schemas/AvanceAvecPersonnel"
+    post:
+      operationId: createAvancePersonnel
+      tags: [salaires]
+      summary: Octroyer une avance à un membre du personnel
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAvancePersonnelInput"
+      responses:
+        "201":
+          description: Avance créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvancePersonnel"
+
+  /salaires/avances/{id}/rembourser:
+    put:
+      operationId: rembourserAvancePersonnel
+      tags: [salaires]
+      summary: Enregistrer un remboursement d'avance
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemboursementAvancePersonnelInput"
+      responses:
+        "200":
+          description: Avance mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvancePersonnel"
+
+  /salaires/rapport-mensuel/{mois}/{annee}:
+    get:
+      operationId: getRapportMensuel
+      tags: [salaires]
+      summary: Rapport de masse salariale mensuel
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: mois
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: annee
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Rapport mensuel
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RapportMensuel"
+
+  /salaires/historique-masse:
+    get:
+      operationId: getHistoriqueMasse
+      tags: [salaires]
+      summary: Évolution de la masse salariale sur 12 mois
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Historique masse salariale
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HistoriqueMasse"
 
 components:
   schemas:
@@ -2395,9 +2546,9 @@ components:
         actif:
           type: boolean
 
-    Employe:
+    Personnel:
       type: object
-      required: [id, cooperativeId, nom, prenoms, poste, dateEmbauche, salaireBaseFcfa, statut, createdAt, updatedAt]
+      required: [id, cooperativeId, nom, prenoms, poste, typeContrat, dateEmbauche, salaireBaseFcfa, sursalaireFcfa, modePaiement, statut, createdAt, updatedAt]
       properties:
         id:
           type: integer
@@ -2409,19 +2560,33 @@ components:
           type: string
         poste:
           type: string
-        telephone:
+        roleSysteme:
+          type: ["string", "null"]
+        typeContrat:
           type: string
-          nullable: true
-        email:
-          type: string
-          nullable: true
+          enum: [cdi, cdd, journalier, stagiaire]
         dateEmbauche:
           type: string
+        dateFinContrat:
+          type: ["string", "null"]
         salaireBaseFcfa:
           type: integer
+        sursalaireFcfa:
+          type: integer
+        numeroCnps:
+          type: ["string", "null"]
+        numeroCni:
+          type: ["string", "null"]
+        modePaiement:
+          type: string
+          enum: [orange_money, mtn_momo, virement, especes]
+        telephonePaiement:
+          type: ["string", "null"]
+        ribBanque:
+          type: ["string", "null"]
         statut:
           type: string
-          enum: [actif, inactif]
+          enum: [actif, suspendu, sorti]
         createdAt:
           type: string
           format: date-time
@@ -2429,7 +2594,7 @@ components:
           type: string
           format: date-time
 
-    CreateEmployeInput:
+    CreatePersonnelInput:
       type: object
       required: [nom, prenoms, poste, dateEmbauche, salaireBaseFcfa]
       properties:
@@ -2439,16 +2604,32 @@ components:
           type: string
         poste:
           type: string
-        telephone:
+        roleSysteme:
           type: string
-        email:
+        typeContrat:
           type: string
+          enum: [cdi, cdd, journalier, stagiaire]
         dateEmbauche:
+          type: string
+        dateFinContrat:
           type: string
         salaireBaseFcfa:
           type: integer
+        sursalaireFcfa:
+          type: integer
+        numeroCnps:
+          type: string
+        numeroCni:
+          type: string
+        modePaiement:
+          type: string
+          enum: [orange_money, mtn_momo, virement, especes]
+        telephonePaiement:
+          type: string
+        ribBanque:
+          type: string
 
-    UpdateEmployeInput:
+    UpdatePersonnelInput:
       type: object
       properties:
         nom:
@@ -2457,72 +2638,235 @@ components:
           type: string
         poste:
           type: string
-        telephone:
+        roleSysteme:
           type: string
-        email:
+        typeContrat:
           type: string
+          enum: [cdi, cdd, journalier, stagiaire]
         dateEmbauche:
+          type: string
+        dateFinContrat:
           type: string
         salaireBaseFcfa:
           type: integer
+        sursalaireFcfa:
+          type: integer
+        numeroCnps:
+          type: string
+        numeroCni:
+          type: string
+        modePaiement:
+          type: string
+          enum: [orange_money, mtn_momo, virement, especes]
+        telephonePaiement:
+          type: string
+        ribBanque:
+          type: string
         statut:
           type: string
-          enum: [actif, inactif]
+          enum: [actif, suspendu, sorti]
 
-    FichePaie:
+    PersonnelHistorique:
       type: object
-      required: [id, cooperativeId, employeId, mois, annee, salaireBaseFcfa, primesFcfa, indemnitésFcfa, heuresSupFcfa, deductionCnpsFcfa, deductionImpotFcfa, avanceSurSalaireFcfa, netAPayerFcfa, statut, createdAt, updatedAt]
+      required: [personnel, bulletins, avances]
+      properties:
+        personnel:
+          $ref: "#/components/schemas/Personnel"
+        bulletins:
+          type: array
+          items:
+            $ref: "#/components/schemas/BulletinPaie"
+        avances:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvancePersonnel"
+
+    ComposanteSalaire:
+      type: object
+      required: [id, cooperativeId, libelle, type, calcul, valeur, obligatoire]
       properties:
         id:
           type: integer
         cooperativeId:
           type: integer
-        employeId:
+        libelle:
+          type: string
+        type:
+          type: string
+          enum: [avantage, retenue]
+        calcul:
+          type: string
+          enum: [fixe, pourcentage]
+        valeur:
+          type: integer
+        obligatoire:
+          type: boolean
+
+    BulletinPaie:
+      type: object
+      required: [id, personnelId, cooperativeId, mois, annee, periode, salaireBaseFcfa, totalAvantagesFcfa, totalRetenuesFcfa, salaireBrutFcfa, salaireNetFcfa, coutTotalEmployeurFcfa, statut, createdAt]
+      properties:
+        id:
+          type: integer
+        personnelId:
+          type: integer
+        cooperativeId:
           type: integer
         mois:
           type: integer
         annee:
           type: integer
+        periode:
+          type: string
         salaireBaseFcfa:
           type: integer
-        primesFcfa:
+        totalAvantagesFcfa:
           type: integer
-        indemnitésFcfa:
+        totalRetenuesFcfa:
           type: integer
-        heuresSupFcfa:
+        salaireBrutFcfa:
           type: integer
-        deductionCnpsFcfa:
+        salaireNetFcfa:
           type: integer
-        deductionImpotFcfa:
+        chargesCnpsPatronaleFcfa:
           type: integer
-        avanceSurSalaireFcfa:
+        chargesTaxeApprentissageFcfa:
           type: integer
-        netAPayerFcfa:
+        chargesFpcFcfa:
+          type: integer
+        coutTotalEmployeurFcfa:
           type: integer
         statut:
           type: string
           enum: [brouillon, valide, paye]
-        datePaiement:
-          type: string
+        dateValidation:
+          type: ["string", "null"]
           format: date-time
-          nullable: true
-        observations:
-          type: string
-          nullable: true
+        datePaiement:
+          type: ["string", "null"]
+          format: date-time
+        referencePaiement:
+          type: ["string", "null"]
+        payePar:
+          type: ["integer", "null"]
         createdAt:
           type: string
           format: date-time
-        updatedAt:
+
+    LigneBulletin:
+      type: object
+      required: [id, bulletinId, libelle, type, montantFcfa]
+      properties:
+        id:
+          type: integer
+        bulletinId:
+          type: integer
+        libelle:
+          type: string
+        type:
+          type: string
+          enum: [avantage, retenue]
+        montantFcfa:
+          type: integer
+
+    BulletinAvecPersonnel:
+      type: object
+      required: [bulletin, personnel]
+      properties:
+        bulletin:
+          $ref: "#/components/schemas/BulletinPaie"
+        personnel:
+          type: object
+          required: [id, nom, prenoms, poste]
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+            prenoms:
+              type: string
+            poste:
+              type: string
+            modePaiement:
+              type: string
+            telephonePaiement:
+              type: ["string", "null"]
+
+    BulletinDetail:
+      type: object
+      required: [bulletin, personnel, lignes]
+      properties:
+        bulletin:
+          $ref: "#/components/schemas/BulletinPaie"
+        personnel:
+          $ref: "#/components/schemas/Personnel"
+        lignes:
+          type: array
+          items:
+            $ref: "#/components/schemas/LigneBulletin"
+
+    GenererBulletinsInput:
+      type: object
+      required: [mois, annee]
+      properties:
+        mois:
+          type: integer
+        annee:
+          type: integer
+        personnelIds:
+          type: array
+          items:
+            type: integer
+
+    PayerBulletinInput:
+      type: object
+      properties:
+        referencePaiement:
+          type: string
+
+    GenerationResult:
+      type: object
+      required: [personnelId, bulletinId]
+      properties:
+        personnelId:
+          type: integer
+        bulletinId:
+          type: integer
+        erreur:
+          type: ["string", "null"]
+
+    AvancePersonnel:
+      type: object
+      required: [id, personnelId, cooperativeId, montantFcfa, dateOctroi, statut, montantRembourse, createdAt]
+      properties:
+        id:
+          type: integer
+        personnelId:
+          type: integer
+        cooperativeId:
+          type: integer
+        montantFcfa:
+          type: integer
+        dateOctroi:
+          type: string
+        motif:
+          type: ["string", "null"]
+        statut:
+          type: string
+          enum: [en_cours, rembourse]
+        montantRembourse:
+          type: integer
+        createdAt:
           type: string
           format: date-time
 
-    FichePaieAvecEmploye:
+    AvanceAvecPersonnel:
       type: object
-      required: [fiche, employe]
+      required: [avance, personnel]
       properties:
-        fiche:
-          $ref: "#/components/schemas/FichePaie"
-        employe:
+        avance:
+          $ref: "#/components/schemas/AvancePersonnel"
+        personnel:
           type: object
           required: [id, nom, prenoms, poste]
           properties:
@@ -2535,54 +2879,79 @@ components:
             poste:
               type: string
 
-    CreateFichePaieInput:
+    CreateAvancePersonnelInput:
       type: object
-      required: [employeId, mois, annee, salaireBaseFcfa]
+      required: [personnelId, montantFcfa, dateOctroi]
       properties:
-        employeId:
+        personnelId:
           type: integer
-        mois:
+        montantFcfa:
           type: integer
-        annee:
-          type: integer
-        salaireBaseFcfa:
-          type: integer
-        primesFcfa:
-          type: integer
-        indemnitésFcfa:
-          type: integer
-        heuresSupFcfa:
-          type: integer
-        deductionCnpsFcfa:
-          type: integer
-        deductionImpotFcfa:
-          type: integer
-        avanceSurSalaireFcfa:
-          type: integer
-        observations:
+        dateOctroi:
+          type: string
+        motif:
           type: string
 
-    RecapSalaires:
+    RapportMensuel:
       type: object
-      required: [mois, annee, nbEmployesActifs, nbFiches, nbPayees, nbValidees, nbBrouillons, masseSalarialeBrute, masseSalarialeNette, totalCnps]
+      required: [mois, annee, nbPersonnelActifs, nbBulletins, nbPayes, nbValides, nbBrouillons, totalBrut, totalNet, totalChargesPatronales, coutTotalEmployeur, detailsParPoste]
       properties:
         mois:
           type: integer
         annee:
           type: integer
-        nbEmployesActifs:
+        nbPersonnelActifs:
           type: integer
-        nbFiches:
+        nbBulletins:
           type: integer
-        nbPayees:
+        nbPayes:
           type: integer
-        nbValidees:
+        nbValides:
           type: integer
         nbBrouillons:
           type: integer
-        masseSalarialeBrute:
+        totalBrut:
           type: integer
-        masseSalarialeNette:
+        totalNet:
           type: integer
-        totalCnps:
+        totalChargesPatronales:
+          type: integer
+        coutTotalEmployeur:
+          type: integer
+        detailsParPoste:
+          type: array
+          items:
+            type: object
+            required: [poste, nbPersonnel, totalNet]
+            properties:
+              poste:
+                type: string
+              nbPersonnel:
+                type: integer
+              totalNet:
+                type: integer
+
+    HistoriqueMasse:
+      type: object
+      required: [mois, annee, periode, totalBrut, totalNet, coutTotalEmployeur, nbBulletins]
+      properties:
+        mois:
+          type: integer
+        annee:
+          type: integer
+        periode:
+          type: string
+        totalBrut:
+          type: integer
+        totalNet:
+          type: integer
+        coutTotalEmployeur:
+          type: integer
+        nbBulletins:
+          type: integer
+
+    RemboursementAvancePersonnelInput:
+      type: object
+      properties:
+        montantRembourse:
           type: integer

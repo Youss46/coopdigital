@@ -6,10 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UpdateEmployeInputStatut = typeof UpdateEmployeInputStatut[keyof typeof UpdateEmployeInputStatut];
+export type PersonnelStatut = typeof PersonnelStatut[keyof typeof PersonnelStatut];
 
 
-export const UpdateEmployeInputStatut = {
+export const PersonnelStatut = {
   actif: 'actif',
-  inactif: 'inactif',
+  suspendu: 'suspendu',
+  sorti: 'sorti',
 } as const;

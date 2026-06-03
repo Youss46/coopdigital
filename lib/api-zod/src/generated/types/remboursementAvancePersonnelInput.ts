@@ -6,10 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type EmployeStatut = typeof EmployeStatut[keyof typeof EmployeStatut];
-
-
-export const EmployeStatut = {
-  actif: 'actif',
-  inactif: 'inactif',
-} as const;
+export interface RemboursementAvancePersonnelInput {
+  montantRembourse?: number;
+}

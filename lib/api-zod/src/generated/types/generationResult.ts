@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetRecapSalairesParams = {
-mois?: number;
-annee?: number;
-};
+export interface GenerationResult {
+  personnelId: number;
+  bulletinId: number;
+  /** @nullable */
+  erreur?: string | null;
+}

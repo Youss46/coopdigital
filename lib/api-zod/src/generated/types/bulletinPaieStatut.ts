@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FichePaieStatut = typeof FichePaieStatut[keyof typeof FichePaieStatut];
+export type BulletinPaieStatut = typeof BulletinPaieStatut[keyof typeof BulletinPaieStatut];
 
 
-export const FichePaieStatut = {
+export const BulletinPaieStatut = {
   brouillon: 'brouillon',
   valide: 'valide',
   paye: 'paye',

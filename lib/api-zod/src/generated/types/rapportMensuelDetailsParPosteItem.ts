@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetFichesPaieParams = {
-mois?: number;
-annee?: number;
-employeId?: number;
+export type RapportMensuelDetailsParPosteItem = {
+  poste: string;
+  nbPersonnel: number;
+  totalNet: number;
 };

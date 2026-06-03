@@ -1,743 +1,1406 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
-  useGetEmployes,
-  useCreateEmploye,
-  useDesactiverEmploye,
-  useGetFichesPaie,
-  useCreateFichePaie,
-  useValiderFichePaie,
-  usePayerFichePaie,
-  useDeleteFichePaie,
-  useGetRecapSalaires,
+  Users, FileText, BarChart2, CreditCard,
+  Plus, RefreshCw, CheckCircle, Banknote,
+  Loader2, ChevronDown, TrendingUp, Building2,
+  UserCheck, AlertCircle,
+} from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from "recharts";
+import {
+  useGetPersonnel,
+  useCreatePersonnel,
+  useUpdatePersonnel,
+  useArchiverPersonnel,
+  useGenererBulletins,
+  useGetBulletins,
+  useValiderBulletin,
+  usePayerBulletin,
+  useDeleteBulletin,
+  useGetAvancesPersonnel,
+  useCreateAvancePersonnel,
+  useRembourserAvancePersonnel,
+  useGetRapportMensuel,
+  useGetHistoriqueMasse,
+  Personnel,
+  BulletinAvecPersonnel,
+  AvanceAvecPersonnel,
+  CreatePersonnelInput,
+  UpdatePersonnelInput,
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Users, Banknote, CheckCircle2, Clock, Plus, Trash2,
-  ShieldCheck, ChevronDown, X, AlertCircle,
-} from "lucide-react";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
-const MOIS_LABELS = [
-  "Janvier","Février","Mars","Avril","Mai","Juin",
-  "Juillet","Août","Septembre","Octobre","Novembre","Décembre",
+const MOIS_NOMS = [
+  "", "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
 
-const ANNEES = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
-
-function formatFcfa(n: number | null | undefined): string {
-  if (n == null) return "—";
-  return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
-}
-
-// ─── Badges ───────────────────────────────────────────────────────────────────
-
-const STATUT_STYLE: Record<string, { bg: string; text: string; label: string }> = {
-  brouillon: { bg: "#f3f4f6", text: "#6b7280", label: "Brouillon" },
-  valide:    { bg: "#dbeafe", text: "#1d4ed8", label: "Validé" },
-  paye:      { bg: "#d1fae5", text: "#065f46", label: "Payé" },
+const CONTRAT_LABELS: Record<string, string> = {
+  cdi: "CDI", cdd: "CDD", journalier: "Journalier", stagiaire: "Stagiaire",
 };
 
-function StatutBadge({ statut }: { statut: string }) {
-  const s = STATUT_STYLE[statut] ?? STATUT_STYLE["brouillon"]!;
-  return (
-    <span
-      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-      style={{ backgroundColor: s.bg, color: s.text }}
-    >
-      {s.label}
-    </span>
-  );
+const STATUT_COLORS_BULLETIN: Record<string, string> = {
+  brouillon: "bg-gray-100 text-gray-600",
+  valide: "bg-blue-100 text-blue-700",
+  paye: "bg-green-100 text-green-700",
+};
+
+const STATUT_LABELS_BULLETIN: Record<string, string> = {
+  brouillon: "Brouillon", valide: "Validé", paye: "Payé",
+};
+
+const PIE_COLORS = ["#16a34a", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
+
+const INPUT_CLS =
+  "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white";
+
+function formatFcfa(n: number): string {
+  return new Intl.NumberFormat("fr-CI").format(n) + " FCFA";
 }
 
-function Initiales({ nom, prenoms }: { nom: string; prenoms: string }) {
-  const l = `${prenoms[0] ?? ""}${nom[0] ?? ""}`.toUpperCase();
-  return (
-    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-      style={{ backgroundColor: "#1a4731" }}>
-      {l}
-    </div>
-  );
+function formatFcfaShort(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + " M";
+  if (n >= 1_000) return (n / 1_000).toFixed(0) + " K";
+  return String(n);
 }
 
-// ─── KPI Card ─────────────────────────────────────────────────────────────────
-
-function KpiCard({ label, value, icon: Icon, color }: {
-  label: string; value: string | number; icon: React.ElementType; color: string;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-4 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: color + "20" }}>
-        <Icon size={18} style={{ color }} />
-      </div>
-      <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className="text-base font-bold text-gray-900">{value}</p>
-      </div>
-    </div>
-  );
+function toDate(d: Date | string | null | undefined): Date | null {
+  if (!d) return null;
+  return d instanceof Date ? d : new Date(d);
 }
 
-// ─── Modal création employé ───────────────────────────────────────────────────
+// ─── Onglets ─────────────────────────────────────────────────────────────────
 
-interface ModalEmployeProps { onClose: () => void; onSuccess: () => void; }
+type Tab = "personnel" | "paie" | "masse" | "avances";
 
-function ModalCreateEmploye({ onClose, onSuccess }: ModalEmployeProps) {
-  const { toast } = useToast();
-  const mutation = useCreateEmploye();
-  const [form, setForm] = useState({
-    nom: "", prenoms: "", poste: "", telephone: "", email: "",
-    dateEmbauche: new Date().toISOString().slice(0, 10),
-    salaireBaseFcfa: "",
-  });
+const TABS: { id: Tab; label: string; icon: typeof Users }[] = [
+  { id: "personnel", label: "Personnel", icon: Users },
+  { id: "paie", label: "Génération de la paie", icon: FileText },
+  { id: "masse", label: "Masse salariale", icon: BarChart2 },
+  { id: "avances", label: "Avances personnel", icon: CreditCard },
+];
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    mutation.mutate({
-      data: {
-        nom: form.nom,
-        prenoms: form.prenoms,
-        poste: form.poste,
-        telephone: form.telephone || undefined,
-        email: form.email || undefined,
-        dateEmbauche: form.dateEmbauche,
-        salaireBaseFcfa: parseInt(form.salaireBaseFcfa),
-      },
-    }, {
-      onSuccess: () => { toast({ title: "Employé ajouté" }); onSuccess(); onClose(); },
-      onError: (err) => {
-        const msg = err instanceof Error ? err.message : "Erreur";
-        toast({ title: "Erreur", description: msg, variant: "destructive" });
-      },
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-bold text-gray-900">Ajouter un employé</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "Prénom(s)", key: "prenoms", placeholder: "Kouassi" },
-              { label: "Nom", key: "nom", placeholder: "KOFFI" },
-            ].map(({ label, key, placeholder }) => (
-              <div key={key}>
-                <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
-                <input
-                  required
-                  value={form[key as keyof typeof form]}
-                  onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                  placeholder={placeholder}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-            ))}
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Poste</label>
-            <input
-              required value={form.poste}
-              onChange={(e) => setForm({ ...form, poste: e.target.value })}
-              placeholder="Comptable, Gardien, Secrétaire…"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Téléphone</label>
-              <input value={form.telephone}
-                onChange={(e) => setForm({ ...form, telephone: e.target.value })}
-                placeholder="+225 07…"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Date d'embauche</label>
-              <input type="date" required value={form.dateEmbauche}
-                onChange={(e) => setForm({ ...form, dateEmbauche: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Salaire de base (FCFA)</label>
-            <input
-              type="number" required min={0} value={form.salaireBaseFcfa}
-              onChange={(e) => setForm({ ...form, salaireBaseFcfa: e.target.value })}
-              placeholder="150000"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-              Annuler
-            </button>
-            <button type="submit" disabled={mutation.isPending}
-              className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
-              style={{ backgroundColor: "#1a4731" }}>
-              {mutation.isPending ? "Ajout…" : "Ajouter"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ─── Modal création fiche de paie ─────────────────────────────────────────────
-
-interface ModalFicheProps {
-  employes: Array<{ id: number; nom: string; prenoms: string; poste: string; salaireBaseFcfa: number }>;
-  moisDefaut: number;
-  anneeDefaut: number;
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-function ModalCreateFiche({ employes, moisDefaut, anneeDefaut, onClose, onSuccess }: ModalFicheProps) {
-  const { toast } = useToast();
-  const mutation = useCreateFichePaie();
-
-  const [employeId, setEmployeId] = useState<string>("");
-  const [mois, setMois] = useState(moisDefaut);
-  const [annee, setAnnee] = useState(anneeDefaut);
-  const [salaireBase, setSalaireBase] = useState("");
-  const [primes, setPrimes] = useState("0");
-  const [indemnites, setIndemnites] = useState("0");
-  const [heuresSup, setHeuresSup] = useState("0");
-  const [avance, setAvance] = useState("0");
-  const [observations, setObservations] = useState("");
-
-  // Sélection employé → pré-remplir salaire de base
-  const handleSelectEmploye = (id: string) => {
-    setEmployeId(id);
-    const emp = employes.find((e) => e.id === parseInt(id));
-    if (emp) setSalaireBase(String(emp.salaireBaseFcfa));
-  };
-
-  // Calcul automatique
-  const base = parseInt(salaireBase) || 0;
-  const cnps = Math.round(base * 0.063); // 6,3 % taux salarié CNPS Côte d'Ivoire
-  const net = base + (parseInt(primes) || 0) + (parseInt(indemnites) || 0)
-    + (parseInt(heuresSup) || 0) - cnps - (parseInt(avance) || 0);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!employeId) return;
-    mutation.mutate({
-      data: {
-        employeId: parseInt(employeId),
-        mois, annee,
-        salaireBaseFcfa: base,
-        primesFcfa: parseInt(primes) || 0,
-        "indemnitésFcfa": parseInt(indemnites) || 0,
-        heuresSupFcfa: parseInt(heuresSup) || 0,
-        deductionCnpsFcfa: cnps,
-        deductionImpotFcfa: 0,
-        avanceSurSalaireFcfa: parseInt(avance) || 0,
-        observations: observations || undefined,
-      },
-    }, {
-      onSuccess: () => { toast({ title: "Fiche créée" }); onSuccess(); onClose(); },
-      onError: (err) => {
-        const msg = err instanceof Error ? err.message : "Erreur";
-        toast({ title: "Erreur", description: msg, variant: "destructive" });
-      },
-    });
-  };
-
-  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500";
-
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg my-4">
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-bold text-gray-900">Nouvelle fiche de paie</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          {/* Employé */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Employé</label>
-            <div className="relative">
-              <select required value={employeId} onChange={(e) => handleSelectEmploye(e.target.value)}
-                className={inputCls + " appearance-none pr-8 bg-white"}>
-                <option value="">Sélectionner un employé…</option>
-                {employes.filter(e => e.id).map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.prenoms} {e.nom} — {e.poste}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Mois / Année */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Mois</label>
-              <select value={mois} onChange={(e) => setMois(parseInt(e.target.value))}
-                className={inputCls + " bg-white"}>
-                {MOIS_LABELS.map((m, i) => (
-                  <option key={i + 1} value={i + 1}>{m}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Année</label>
-              <select value={annee} onChange={(e) => setAnnee(parseInt(e.target.value))}
-                className={inputCls + " bg-white"}>
-                {ANNEES.map((a) => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Composantes du salaire */}
-          <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Éléments de rémunération</p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Salaire de base (FCFA)", val: salaireBase, set: setSalaireBase, required: true },
-                { label: "Primes (FCFA)", val: primes, set: setPrimes },
-                { label: "Indemnités (FCFA)", val: indemnites, set: setIndemnites },
-                { label: "Heures sup (FCFA)", val: heuresSup, set: setHeuresSup },
-                { label: "Avance sur salaire (FCFA)", val: avance, set: setAvance },
-              ].map(({ label, val, set, required }) => (
-                <div key={label}>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
-                  <input
-                    type="number" min={0} required={required}
-                    value={val} onChange={(e) => set(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-              ))}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">CNPS (6,3% auto)</label>
-                <input
-                  type="number" readOnly value={cnps}
-                  className="w-full px-3 py-2 border border-gray-100 rounded-lg text-sm bg-gray-100 text-gray-500 cursor-not-allowed"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Résumé net */}
-          <div
-            className="flex items-center justify-between px-4 py-3 rounded-xl"
-            style={{ backgroundColor: net >= 0 ? "#d1fae5" : "#fee2e2" }}
-          >
-            <span className="text-sm font-semibold" style={{ color: net >= 0 ? "#065f46" : "#991b1b" }}>
-              Net à payer
-            </span>
-            <span className="text-lg font-bold" style={{ color: net >= 0 ? "#1a4731" : "#dc2626" }}>
-              {formatFcfa(Math.max(0, net))}
-            </span>
-          </div>
-
-          {/* Observations */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Observations (optionnel)</label>
-            <textarea value={observations} onChange={(e) => setObservations(e.target.value)}
-              rows={2} placeholder="Note interne…"
-              className={inputCls + " resize-none"} />
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-              Annuler
-            </button>
-            <button type="submit" disabled={mutation.isPending || !employeId}
-              className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
-              style={{ backgroundColor: "#1a4731" }}>
-              {mutation.isPending ? "Création…" : "Créer la fiche"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ─── Page principale ──────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+//  Page principale
+// ══════════════════════════════════════════════════════════════════════════════
 
 export default function SalairesPage() {
-  const { toast } = useToast();
-  const canRead         = usePermission("salaires", "lire");
-  const canCreerEmploye = usePermission("salaires", "creer_employe");
-  const canCreerFiche   = usePermission("salaires", "creer_fiche");
-  const canValider      = usePermission("salaires", "valider_fiche");
-  const canPayer        = usePermission("salaires", "marquer_paye");
-  const canSupprimer    = usePermission("salaires", "supprimer_fiche");
+  const [activeTab, setActiveTab] = useState<Tab>("personnel");
+  const canLire = usePermission("salaires", "lire");
 
-  const now = new Date();
-  const [tab, setTab] = useState<"fiches" | "employes">("fiches");
-  const [moisFiltre, setMoisFiltre] = useState(now.getMonth() + 1);
-  const [anneeFiltre, setAnneeFiltre] = useState(now.getFullYear());
-  const [showCreateEmploye, setShowCreateEmploye] = useState(false);
-  const [showCreateFiche, setShowCreateFiche] = useState(false);
-
-  const { data: employes, refetch: refetchEmployes, isLoading: loadingEmployes } = useGetEmployes();
-  const { data: fiches, refetch: refetchFiches, isLoading: loadingFiches } = useGetFichesPaie(
-    { mois: moisFiltre, annee: anneeFiltre },
-    { query: { queryKey: ["fiches", moisFiltre, anneeFiltre] } },
-  );
-  const { data: recap, refetch: refetchRecap } = useGetRecapSalaires(
-    { mois: moisFiltre, annee: anneeFiltre },
-    { query: { queryKey: ["recap", moisFiltre, anneeFiltre] } },
-  );
-
-  const validerMutation = useValiderFichePaie();
-  const payerMutation = usePayerFichePaie();
-  const supprimerMutation = useDeleteFichePaie();
-  const desactiverMutation = useDesactiverEmploye();
-
-  const refetchAll = () => { void refetchFiches(); void refetchRecap(); };
-
-  // Filtrer les fiches par mois/année côté client (backup si params non passés)
-  const fichesFiltrees = useMemo(() =>
-    (fiches ?? []).filter((f) => f.fiche.mois === moisFiltre && f.fiche.annee === anneeFiltre),
-    [fiches, moisFiltre, anneeFiltre]);
-
-  const employesActifs = useMemo(() =>
-    (employes ?? []).filter((e) => e.statut === "actif"),
-    [employes]);
-
-  if (!canRead) {
+  if (!canLire) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-64 text-center">
-        <ShieldCheck className="w-12 h-12 text-gray-300 mb-3" />
-        <p className="text-gray-500 font-medium">Accès réservé à la direction, comptabilité et audit</p>
+      <div className="flex items-center justify-center h-64 text-gray-500">
+        Accès refusé
       </div>
     );
   }
 
-  function handleValider(id: number) {
-    validerMutation.mutate({ id }, {
-      onSuccess: () => { toast({ title: "Fiche validée" }); refetchAll(); },
-      onError: (err) => toast({ title: "Erreur", description: err instanceof Error ? err.message : "", variant: "destructive" }),
-    });
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-green-100 rounded-lg">
+          <Banknote className="h-6 w-6 text-green-700" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Salaires & Paie</h1>
+          <p className="text-sm text-gray-500">
+            Gestion du personnel, bulletins de paie et masse salariale
+          </p>
+        </div>
+      </div>
+
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-1 -mb-px overflow-x-auto">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
+                  ${active
+                    ? "border-green-600 text-green-700"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
+              >
+                <Icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {activeTab === "personnel" && <TabPersonnel />}
+      {activeTab === "paie" && <TabPaie />}
+      {activeTab === "masse" && <TabMasse />}
+      {activeTab === "avances" && <TabAvances />}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  ONGLET 1 — Personnel
+// ══════════════════════════════════════════════════════════════════════════════
+
+function TabPersonnel() {
+  const { toast } = useToast();
+  const [showCreate, setShowCreate] = useState(false);
+  const [editPersonnel, setEditPersonnel] = useState<Personnel | null>(null);
+  const [search, setSearch] = useState("");
+
+  const canCreer = usePermission("salaires", "creer_personnel");
+  const canModifier = usePermission("salaires", "modifier_personnel");
+  const canSupprimer = usePermission("salaires", "supprimer_personnel");
+
+  const { data: personnel, refetch, isLoading } = useGetPersonnel();
+  const archiver = useArchiverPersonnel();
+
+  const list: Personnel[] = personnel ?? [];
+  const filtered = list.filter((p: Personnel) =>
+    [p.nom, p.prenoms, p.poste].join(" ").toLowerCase().includes(search.toLowerCase()),
+  );
+  const actifs = filtered.filter((p: Personnel) => p.statut === "actif");
+  const inactifs = filtered.filter((p: Personnel) => p.statut !== "actif");
+
+  async function handleArchiver(id: number, nom: string) {
+    if (!confirm(`Archiver ${nom} ? Cette action est irréversible.`)) return;
+    try {
+      await archiver.mutateAsync({ id });
+      toast({ title: "Personnel archivé" });
+      refetch();
+    } catch {
+      toast({ title: "Erreur lors de l'archivage", variant: "destructive" });
+    }
   }
 
-  function handlePayer(id: number) {
-    payerMutation.mutate({ id }, {
-      onSuccess: () => { toast({ title: "Fiche marquée payée" }); refetchAll(); },
-      onError: (err) => toast({ title: "Erreur", description: err instanceof Error ? err.message : "", variant: "destructive" }),
-    });
-  }
-
-  function handleSupprimer(id: number) {
-    if (!confirm("Supprimer cette fiche de paie ?")) return;
-    supprimerMutation.mutate({ id }, {
-      onSuccess: () => { toast({ title: "Fiche supprimée" }); refetchAll(); },
-      onError: (err) => toast({ title: "Erreur", description: err instanceof Error ? err.message : "", variant: "destructive" }),
-    });
-  }
-
-  function handleDesactiver(id: number, nom: string) {
-    if (!confirm(`Désactiver l'employé ${nom} ?`)) return;
-    desactiverMutation.mutate({ id }, {
-      onSuccess: () => { toast({ title: "Employé désactivé" }); void refetchEmployes(); },
-      onError: (err) => toast({ title: "Erreur", description: err instanceof Error ? err.message : "", variant: "destructive" }),
-    });
-  }
-
-  const moisLabel = MOIS_LABELS[(moisFiltre - 1)] ?? "";
+  const initiales = (p: Personnel) =>
+    (p.nom[0] ?? "") + (p.prenoms[0] ?? "");
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestion des salaires</h1>
-          <p className="text-sm text-gray-500 mt-1">{moisLabel} {anneeFiltre}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Filtre mois */}
-          <select value={moisFiltre} onChange={(e) => setMoisFiltre(parseInt(e.target.value))}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
-            {MOIS_LABELS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-          </select>
-          <select value={anneeFiltre} onChange={(e) => setAnneeFiltre(parseInt(e.target.value))}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
-            {ANNEES.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
-          label="Employés actifs"
-          value={recap?.nbEmployesActifs ?? employesActifs.length}
-          icon={Users}
-          color="#1a4731"
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3 justify-between">
+        <input
+          className={INPUT_CLS + " sm:w-72"}
+          placeholder="Rechercher par nom, prénom, poste…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
-        <KpiCard
-          label="Masse salariale brute"
-          value={formatFcfa(recap?.masseSalarialeBrute ?? 0)}
-          icon={Banknote}
-          color="#c4962a"
-        />
-        <KpiCard
-          label="Masse salariale nette"
-          value={formatFcfa(recap?.masseSalarialeNette ?? 0)}
-          icon={Banknote}
-          color="#1d4ed8"
-        />
-        <KpiCard
-          label={`Fiches payées / ${recap?.nbFiches ?? 0}`}
-          value={`${recap?.nbPayees ?? 0} / ${recap?.nbFiches ?? 0}`}
-          icon={CheckCircle2}
-          color="#059669"
-        />
-      </div>
-
-      {/* Onglets */}
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
-        {(["fiches", "employes"] as const).map((t) => (
+        <div className="flex gap-2">
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={tab === t ? { backgroundColor: "white", color: "#1a4731", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : { color: "#6b7280" }}
+            onClick={() => refetch()}
+            className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50"
           >
-            {t === "fiches" ? "Fiches de paie" : "Employés"}
+            <RefreshCw className="h-4 w-4 text-gray-500" />
           </button>
+          {canCreer && (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+            >
+              <Plus className="h-4 w-4" /> Ajouter un employé
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Personnel actif", value: list.filter((p: Personnel) => p.statut === "actif").length, color: "text-green-700" },
+          { label: "CDI", value: list.filter((p: Personnel) => p.typeContrat === "cdi" && p.statut === "actif").length, color: "text-blue-700" },
+          { label: "CDD", value: list.filter((p: Personnel) => p.typeContrat === "cdd" && p.statut === "actif").length, color: "text-amber-700" },
+          {
+            label: "Masse de base",
+            value: formatFcfaShort(list.filter((p: Personnel) => p.statut === "actif").reduce((s: number, p: Personnel) => s + p.salaireBaseFcfa, 0)),
+            color: "text-purple-700",
+          },
+        ].map((k) => (
+          <div key={k.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <p className="text-xs text-gray-500 mb-1">{k.label}</p>
+            <p className={`text-xl font-bold ${k.color}`}>{k.value}</p>
+          </div>
         ))}
       </div>
 
-      {/* ── TAB FICHES DE PAIE ─────────────────────────────────────── */}
-      {tab === "fiches" && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700">
-              {fichesFiltrees.length} fiche{fichesFiltrees.length !== 1 ? "s" : ""} — {moisLabel} {anneeFiltre}
-            </p>
-            {canCreerFiche && (
-              <button onClick={() => setShowCreateFiche(true)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-white text-sm font-medium"
-                style={{ backgroundColor: "#1a4731" }}>
-                <Plus size={15} />
-                Nouvelle fiche
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-green-600" />
+        </div>
+      ) : (
+        <>
+          <PersonnelTable
+            title="Actifs"
+            rows={actifs}
+            canModifier={canModifier}
+            canSupprimer={canSupprimer}
+            onEdit={setEditPersonnel}
+            onArchiver={handleArchiver}
+            initiales={initiales}
+          />
+          {inactifs.length > 0 && (
+            <PersonnelTable
+              title="Archivés"
+              rows={inactifs}
+              canModifier={false}
+              canSupprimer={false}
+              onEdit={() => {}}
+              onArchiver={() => {}}
+              initiales={initiales}
+              collapsed
+            />
+          )}
+        </>
+      )}
+
+      {(showCreate || editPersonnel) && (
+        <PersonnelModal
+          personnel={editPersonnel}
+          onClose={() => { setShowCreate(false); setEditPersonnel(null); }}
+          onSaved={() => { setShowCreate(false); setEditPersonnel(null); refetch(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Sous-composant tableau personnel ────────────────────────────────────────
+
+function PersonnelTable({
+  title, rows, canModifier, canSupprimer, onEdit, onArchiver, initiales, collapsed = false,
+}: {
+  title: string;
+  rows: Personnel[];
+  canModifier: boolean;
+  canSupprimer: boolean;
+  onEdit: (p: Personnel) => void;
+  onArchiver: (id: number, nom: string) => void;
+  initiales: (p: Personnel) => string;
+  collapsed?: boolean;
+}) {
+  const [open, setOpen] = useState(!collapsed);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <button
+        className="w-full flex items-center justify-between px-4 py-3 border-b border-gray-100 hover:bg-gray-50"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="text-sm font-semibold text-gray-700">
+          {title} — {rows.length} personne{rows.length !== 1 ? "s" : ""}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+              <tr>
+                <th className="px-4 py-3 text-left">Nom</th>
+                <th className="px-4 py-3 text-left">Poste</th>
+                <th className="px-4 py-3 text-left">Contrat</th>
+                <th className="px-4 py-3 text-right">Salaire base</th>
+                <th className="px-4 py-3 text-center">Statut</th>
+                {(canModifier || canSupprimer) && (
+                  <th className="px-4 py-3 text-center">Actions</th>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 text-gray-400 text-sm">
+                    Aucun résultat
+                  </td>
+                </tr>
+              ) : (
+                rows.map((p) => (
+                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold uppercase">
+                          {initiales(p)}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {p.prenoms} {p.nom}
+                          </p>
+                          {p.telephonePaiement && (
+                            <p className="text-xs text-gray-400">{p.telephonePaiement}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{p.poste}</td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">
+                        {CONTRAT_LABELS[p.typeContrat] ?? p.typeContrat}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-gray-900">
+                      {formatFcfa(p.salaireBaseFcfa)}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        p.statut === "actif"
+                          ? "bg-green-100 text-green-700"
+                          : p.statut === "suspendu"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-gray-100 text-gray-500"
+                      }`}>
+                        {p.statut}
+                      </span>
+                    </td>
+                    {(canModifier || canSupprimer) && (
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          {canModifier && (
+                            <button
+                              onClick={() => onEdit(p)}
+                              className="text-xs text-blue-600 hover:text-blue-800 underline"
+                            >
+                              Modifier
+                            </button>
+                          )}
+                          {canSupprimer && p.statut === "actif" && (
+                            <button
+                              onClick={() => onArchiver(p.id, `${p.prenoms} ${p.nom}`)}
+                              className="text-xs text-red-500 hover:text-red-700 underline"
+                            >
+                              Archiver
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  ONGLET 2 — Génération de la paie
+// ══════════════════════════════════════════════════════════════════════════════
+
+function TabPaie() {
+  const { toast } = useToast();
+  const now = new Date();
+  const [mois, setMois] = useState(now.getMonth() + 1);
+  const [annee, setAnnee] = useState(now.getFullYear());
+  const [showPayer, setShowPayer] = useState<BulletinAvecPersonnel | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  const canGenerer = usePermission("salaires", "generer_bulletins");
+  const canValider = usePermission("salaires", "valider_bulletins");
+  const canPayer = usePermission("salaires", "payer_bulletins");
+  const canSupprimer = usePermission("salaires", "supprimer_bulletin");
+
+  const { data: bulletins, refetch, isLoading } = useGetBulletins(
+    { mois, annee },
+    { query: { queryKey: ["bulletins", mois, annee] } },
+  );
+  const generer = useGenererBulletins();
+  const valider = useValiderBulletin();
+  const payer = usePayerBulletin();
+  const supprimer = useDeleteBulletin();
+
+  async function handleGenerer() {
+    if (!confirm(`Générer les bulletins de paie pour ${MOIS_NOMS[mois]} ${annee} ?`)) return;
+    setGenerating(true);
+    try {
+      const res = await generer.mutateAsync({ data: { mois, annee } });
+      const count = Array.isArray(res) ? res.length : 0;
+      toast({ title: `${count} bulletin(s) généré(s)` });
+      refetch();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { erreur?: string } } })?.response?.data?.erreur ?? "Erreur";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleValider(id: number) {
+    try {
+      await valider.mutateAsync({ id });
+      toast({ title: "Bulletin validé" });
+      refetch();
+    } catch {
+      toast({ title: "Erreur lors de la validation", variant: "destructive" });
+    }
+  }
+
+  async function handlePayer(id: number, reference: string) {
+    try {
+      await payer.mutateAsync({ id, data: { referencePaiement: reference || undefined } });
+      toast({ title: "Bulletin marqué payé" });
+      setShowPayer(null);
+      refetch();
+    } catch {
+      toast({ title: "Erreur lors du paiement", variant: "destructive" });
+    }
+  }
+
+  async function handleSupprimer(id: number) {
+    if (!confirm("Supprimer ce bulletin brouillon ?")) return;
+    try {
+      await supprimer.mutateAsync({ id });
+      toast({ title: "Bulletin supprimé" });
+      refetch();
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  }
+
+  async function handleValiderTous() {
+    const brouillons = (bulletins ?? [] as BulletinAvecPersonnel[]).filter((b: BulletinAvecPersonnel) => b.bulletin.statut === "brouillon");
+    if (brouillons.length === 0) return;
+    if (!confirm(`Valider les ${brouillons.length} bulletins en brouillon ?`)) return;
+    for (const b of brouillons) {
+      try { await valider.mutateAsync({ id: b.bulletin.id }); } catch { /* skip */ }
+    }
+    toast({ title: `${brouillons.length} bulletin(s) validé(s)` });
+    refetch();
+  }
+
+  const list: BulletinAvecPersonnel[] = bulletins ?? [];
+  const nbBrouillons = list.filter((b: BulletinAvecPersonnel) => b.bulletin.statut === "brouillon").length;
+  const nbValides = list.filter((b: BulletinAvecPersonnel) => b.bulletin.statut === "valide").length;
+  const nbPayes = list.filter((b: BulletinAvecPersonnel) => b.bulletin.statut === "paye").length;
+  const totalNet = list.reduce((s: number, b: BulletinAvecPersonnel) => s + b.bulletin.salaireNetFcfa, 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Sélecteur période */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Mois</label>
+            <select
+              value={mois}
+              onChange={(e) => setMois(Number(e.target.value))}
+              className={INPUT_CLS + " w-auto"}
+            >
+              {MOIS_NOMS.slice(1).map((m, i) => (
+                <option key={i + 1} value={i + 1}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Année</label>
+            <select
+              value={annee}
+              onChange={(e) => setAnnee(Number(e.target.value))}
+              className={INPUT_CLS + " w-auto"}
+            >
+              {[2023, 2024, 2025, 2026].map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {canGenerer && (
+              <button
+                onClick={handleGenerer}
+                disabled={generating}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-60"
+              >
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Générer la paie du mois
+              </button>
+            )}
+            {canValider && nbBrouillons > 0 && (
+              <button
+                onClick={handleValiderTous}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Valider tous ({nbBrouillons})
               </button>
             )}
           </div>
+        </div>
+      </div>
 
-          {loadingFiches ? (
-            <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Chargement…</div>
-          ) : fichesFiltrees.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Clock className="w-10 h-10 text-gray-200 mb-3" />
-              <p className="text-gray-500 text-sm">Aucune fiche pour {moisLabel} {anneeFiltre}</p>
-              {canCreerFiche && (
-                <button onClick={() => setShowCreateFiche(true)}
-                  className="mt-3 text-sm font-medium underline"
-                  style={{ color: "#1a4731" }}>
-                  Créer les fiches du mois
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Employé</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-600">Brut</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Déductions</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-600">Net à payer</th>
-                    <th className="text-center px-4 py-3 font-medium text-gray-600">Statut</th>
-                    <th className="px-4 py-3" />
+      {/* KPI */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Brouillons", value: nbBrouillons, color: "text-gray-600" },
+          { label: "Validés", value: nbValides, color: "text-blue-700" },
+          { label: "Payés", value: nbPayes, color: "text-green-700" },
+          { label: "Total net", value: formatFcfaShort(totalNet), color: "text-purple-700" },
+        ].map((k) => (
+          <div key={k.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <p className="text-xs text-gray-500 mb-1">{k.label}</p>
+            <p className={`text-xl font-bold ${k.color}`}>{k.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Tableau bulletins */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-green-600" />
+          </div>
+        ) : list.length === 0 ? (
+          <div className="text-center py-12 text-gray-400 text-sm">
+            <FileText className="h-8 w-8 mx-auto mb-3 text-gray-200" />
+            Aucun bulletin pour cette période.
+            {canGenerer && (
+              <p className="mt-1">Cliquez sur « Générer la paie du mois » pour démarrer.</p>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-left">Employé</th>
+                  <th className="px-4 py-3 text-right">Brut</th>
+                  <th className="px-4 py-3 text-right">Retenues</th>
+                  <th className="px-4 py-3 text-right font-bold">Net</th>
+                  <th className="px-4 py-3 text-center">Statut</th>
+                  <th className="px-4 py-3 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {list.map(({ bulletin, personnel }: BulletinAvecPersonnel) => (
+                  <tr key={bulletin.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-900">
+                        {personnel.prenoms} {personnel.nom}
+                      </p>
+                      <p className="text-xs text-gray-400">{personnel.poste}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-700">
+                      {formatFcfa(bulletin.salaireBrutFcfa)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-red-600">
+                      − {formatFcfa(bulletin.totalRetenuesFcfa)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-green-700 text-base">
+                      {formatFcfa(bulletin.salaireNetFcfa)}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUT_COLORS_BULLETIN[bulletin.statut] ?? ""}`}>
+                        {STATUT_LABELS_BULLETIN[bulletin.statut] ?? bulletin.statut}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {canValider && bulletin.statut === "brouillon" && (
+                          <button
+                            onClick={() => handleValider(bulletin.id)}
+                            className="text-xs text-blue-600 hover:text-blue-800 underline"
+                          >
+                            Valider
+                          </button>
+                        )}
+                        {canPayer && bulletin.statut === "valide" && (
+                          <button
+                            onClick={() => setShowPayer({ bulletin, personnel })}
+                            className="text-xs text-green-600 hover:text-green-800 underline"
+                          >
+                            Payer
+                          </button>
+                        )}
+                        {canSupprimer && bulletin.statut === "brouillon" && (
+                          <button
+                            onClick={() => handleSupprimer(bulletin.id)}
+                            className="text-xs text-red-500 hover:text-red-700 underline"
+                          >
+                            Supprimer
+                          </button>
+                        )}
+                        {bulletin.statut === "paye" && (
+                          <span className="text-xs text-gray-400">
+                            {toDate(bulletin.datePaiement)?.toLocaleDateString("fr-CI") ?? "—"}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {fichesFiltrees.map(({ fiche, employe }) => {
-                    const brut = fiche.salaireBaseFcfa + fiche.primesFcfa
-                      + fiche.indemnitésFcfa
-                      + fiche.heuresSupFcfa;
-                    const deductions = fiche.deductionCnpsFcfa + fiche.deductionImpotFcfa
-                      + fiche.avanceSurSalaireFcfa;
-                    return (
-                      <tr key={fiche.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <Initiales nom={employe.nom} prenoms={employe.prenoms} />
-                            <div>
-                              <p className="font-medium text-gray-900">{employe.prenoms} {employe.nom}</p>
-                              <p className="text-xs text-gray-400">{employe.poste}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-medium text-gray-900">
-                          {new Intl.NumberFormat("fr-FR").format(brut)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-red-600 text-xs hidden sm:table-cell">
-                          − {new Intl.NumberFormat("fr-FR").format(deductions)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold" style={{ color: "#1a4731" }}>
-                          {new Intl.NumberFormat("fr-FR").format(fiche.netAPayerFcfa)}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <StatutBadge statut={fiche.statut} />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1">
-                            {canValider && fiche.statut === "brouillon" && (
-                              <button
-                                onClick={() => handleValider(fiche.id)}
-                                className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
-                              >
-                                Valider
-                              </button>
-                            )}
-                            {canPayer && fiche.statut === "valide" && (
-                              <button
-                                onClick={() => handlePayer(fiche.id)}
-                                className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-white transition-colors"
-                                style={{ backgroundColor: "#1a4731" }}
-                              >
-                                Payer
-                              </button>
-                            )}
-                            {canSupprimer && fiche.statut === "brouillon" && (
-                              <button
-                                onClick={() => handleSupprimer(fiche.id)}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-green-50 font-semibold">
+                  <td className="px-4 py-3 text-sm text-gray-700">Total</td>
+                  <td className="px-4 py-3 text-right text-sm">
+                    {formatFcfa(list.reduce((s: number, b: BulletinAvecPersonnel) => s + b.bulletin.salaireBrutFcfa, 0))}
+                  </td>
+                  <td className="px-4 py-3 text-right text-sm text-red-600">
+                    − {formatFcfa(list.reduce((s: number, b: BulletinAvecPersonnel) => s + b.bulletin.totalRetenuesFcfa, 0))}
+                  </td>
+                  <td className="px-4 py-3 text-right text-green-700">
+                    {formatFcfa(totalNet)}
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
 
-          {/* Ligne total */}
-          {fichesFiltrees.length > 0 && (
-            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex justify-between items-center text-sm">
-              <span className="text-gray-500">Total masse salariale nette</span>
-              <span className="font-bold text-gray-900">{formatFcfa(recap?.masseSalarialeNette ?? 0)}</span>
+      {showPayer && (
+        <PayerModal
+          bulletin={showPayer}
+          onClose={() => setShowPayer(null)}
+          onPayer={handlePayer}
+        />
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  ONGLET 3 — Masse salariale
+// ══════════════════════════════════════════════════════════════════════════════
+
+function TabMasse() {
+  const now = new Date();
+  const [mois, setMois] = useState(now.getMonth() + 1);
+  const [annee, setAnnee] = useState(now.getFullYear());
+
+  const { data: rapport, isLoading } = useGetRapportMensuel(mois, annee, {
+    query: { queryKey: ["rapport", mois, annee] },
+  });
+  const { data: historique } = useGetHistoriqueMasse();
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Mois</label>
+            <select
+              value={mois}
+              onChange={(e) => setMois(Number(e.target.value))}
+              className={INPUT_CLS + " w-auto"}
+            >
+              {MOIS_NOMS.slice(1).map((m, i) => (
+                <option key={i + 1} value={i + 1}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Année</label>
+            <select
+              value={annee}
+              onChange={(e) => setAnnee(Number(e.target.value))}
+              className={INPUT_CLS + " w-auto"}
+            >
+              {[2023, 2024, 2025, 2026].map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-green-600" />
+        </div>
+      ) : rapport ? (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { label: "Masse salariale brute", value: formatFcfa(rapport.totalBrut), Icon: TrendingUp, cls: "bg-blue-50 text-blue-700 border-blue-100" },
+              { label: "Masse salariale nette", value: formatFcfa(rapport.totalNet), Icon: Banknote, cls: "bg-green-50 text-green-700 border-green-100" },
+              { label: "Charges patronales", value: formatFcfa(rapport.totalChargesPatronales), Icon: Building2, cls: "bg-amber-50 text-amber-700 border-amber-100" },
+              { label: "Coût total employeur", value: formatFcfa(rapport.coutTotalEmployeur), Icon: UserCheck, cls: "bg-purple-50 text-purple-700 border-purple-100" },
+            ].map(({ label, value, Icon, cls }) => (
+              <div key={label} className={`bg-white rounded-xl border p-4 shadow-sm ${cls}`}>
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-xs font-medium opacity-80">{label}</p>
+                  <Icon className="h-4 w-4 opacity-60" />
+                </div>
+                <p className="text-lg font-bold">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Personnel actif", value: rapport.nbPersonnelActifs },
+              { label: "Bulletins générés", value: rapport.nbBulletins },
+              { label: "Bulletins validés", value: rapport.nbValides },
+              { label: "Bulletins payés", value: rapport.nbPayes },
+            ].map((k) => (
+              <div key={k.label} className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm text-center">
+                <p className="text-2xl font-bold text-gray-900">{k.value}</p>
+                <p className="text-xs text-gray-500 mt-1">{k.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {rapport.detailsParPoste.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Répartition par poste</h3>
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={rapport.detailsParPoste}
+                      dataKey="totalNet"
+                      nameKey="poste"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={({ poste, percent }: { poste: string; percent: number }) =>
+                        `${poste} ${(percent * 100).toFixed(0)}%`
+                      }
+                    >
+                      {rapport.detailsParPoste.map((_: unknown, i: number) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => [formatFcfa(v), "Net"]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Détail par poste</h3>
+                <div className="space-y-2">
+                  {rapport.detailsParPoste.map((d: { poste: string; nbPersonnel: number; totalNet: number }, i: number) => (
+                    <div key={d.poste} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+                        />
+                        <span className="text-gray-700">{d.poste}</span>
+                        <span className="text-gray-400 text-xs">({d.nbPersonnel})</span>
+                      </div>
+                      <span className="font-medium text-gray-900">{formatFcfa(d.totalNet)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
+        </>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm text-center py-12 text-gray-400 text-sm">
+          Aucune donnée pour cette période. Générez d'abord les bulletins.
         </div>
       )}
 
-      {/* ── TAB EMPLOYÉS ──────────────────────────────────────────── */}
-      {tab === "employes" && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700">
-              {employes?.length ?? 0} employé{(employes?.length ?? 0) !== 1 ? "s" : ""}
-            </p>
-            {canCreerEmploye && (
-              <button onClick={() => setShowCreateEmploye(true)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-white text-sm font-medium"
-                style={{ backgroundColor: "#1a4731" }}>
-                <Plus size={15} />
-                Ajouter un employé
-              </button>
-            )}
-          </div>
+      {(historique ?? []).length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">
+            Évolution de la masse salariale (12 mois)
+          </h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={historique} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis
+                dataKey="periode"
+                tick={{ fontSize: 11, fill: "#6b7280" }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "#6b7280" }}
+                tickFormatter={(v: number) => formatFcfaShort(v)}
+                tickLine={false}
+                axisLine={false}
+              />
+              <Tooltip
+                formatter={(v: number, name: string) => [
+                  formatFcfa(v),
+                  name === "totalNet" ? "Net" : name === "totalBrut" ? "Brut" : "Coût employeur",
+                ]}
+                labelStyle={{ fontWeight: 600, color: "#111827" }}
+              />
+              <Legend
+                formatter={(value: string) =>
+                  value === "totalNet" ? "Net" : value === "totalBrut" ? "Brut" : "Coût employeur"
+                }
+              />
+              <Bar dataKey="totalBrut" fill="#bfdbfe" name="totalBrut" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="totalNet" fill="#16a34a" name="totalNet" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
 
-          {loadingEmployes ? (
-            <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Chargement…</div>
-          ) : !employes || employes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <AlertCircle className="w-10 h-10 text-gray-200 mb-3" />
-              <p className="text-gray-500 text-sm">Aucun employé enregistré</p>
-              {canCreerEmploye && (
-                <button onClick={() => setShowCreateEmploye(true)}
-                  className="mt-3 text-sm font-medium underline" style={{ color: "#1a4731" }}>
-                  Ajouter le premier employé
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Employé</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Poste</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-600">Salaire de base</th>
-                    <th className="text-center px-4 py-3 font-medium text-gray-600">Statut</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {employes.map((emp) => (
-                    <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
+// ══════════════════════════════════════════════════════════════════════════════
+//  ONGLET 4 — Avances personnel
+// ══════════════════════════════════════════════════════════════════════════════
+
+function TabAvances() {
+  const { toast } = useToast();
+  const [showCreate, setShowCreate] = useState(false);
+  const canGerer = usePermission("salaires", "gerer_avances");
+
+  const { data: avances, refetch, isLoading } = useGetAvancesPersonnel({ statut: "en_cours" });
+  const rembourser = useRembourserAvancePersonnel();
+
+  async function handleRembourser(id: number) {
+    if (!confirm("Marquer cette avance comme entièrement remboursée ?")) return;
+    try {
+      await rembourser.mutateAsync({ id, data: {} });
+      toast({ title: "Avance remboursée" });
+      refetch();
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  }
+
+  const list: AvanceAvecPersonnel[] = avances ?? [];
+  const totalEncours = list.reduce(
+    (s: number, a: AvanceAvecPersonnel) => s + (a.avance.montantFcfa - a.avance.montantRembourse),
+    0,
+  );
+  const now = Date.now();
+  const deuxMoisMs = 2 * 30 * 24 * 3600 * 1000;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+          <p className="text-xs text-gray-500 mb-1">Avances en cours</p>
+          <p className="text-2xl font-bold text-amber-600">{list.length}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+          <p className="text-xs text-gray-500 mb-1">Montant total encours</p>
+          <p className="text-xl font-bold text-red-600">{formatFcfa(totalEncours)}</p>
+        </div>
+        {canGerer && (
+          <div className="flex items-center sm:justify-start">
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+            >
+              <Plus className="h-4 w-4" /> Nouvelle avance
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-green-600" />
+          </div>
+        ) : list.length === 0 ? (
+          <div className="text-center py-12 text-gray-400 text-sm">
+            <CreditCard className="h-8 w-8 mx-auto mb-3 text-gray-200" />
+            Aucune avance en cours
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-left">Employé</th>
+                  <th className="px-4 py-3 text-right">Montant</th>
+                  <th className="px-4 py-3 text-right">Remboursé</th>
+                  <th className="px-4 py-3 text-right">Restant</th>
+                  <th className="px-4 py-3 text-left">Date octroi</th>
+                  <th className="px-4 py-3 text-left">Motif</th>
+                  {canGerer && <th className="px-4 py-3 text-center">Actions</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {list.map(({ avance, personnel }: AvanceAvecPersonnel) => {
+                  const restant = avance.montantFcfa - avance.montantRembourse;
+                  const octroiDate = toDate(avance.createdAt);
+                  const isOld = octroiDate ? (now - octroiDate.getTime() > deuxMoisMs) : false;
+                  return (
+                    <tr key={avance.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <Initiales nom={emp.nom} prenoms={emp.prenoms} />
+                        <div className="flex items-center gap-2">
+                          {isOld && (
+                            <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" aria-label="Avance > 2 mois" />
+                          )}
                           <div>
-                            <p className="font-medium text-gray-900">{emp.prenoms} {emp.nom}</p>
-                            <p className="text-xs text-gray-400 sm:hidden">{emp.poste}</p>
-                            {emp.telephone && <p className="text-xs text-gray-400">{emp.telephone}</p>}
+                            <p className="font-medium text-gray-900">
+                              {personnel.prenoms} {personnel.nom}
+                            </p>
+                            <p className="text-xs text-gray-400">{personnel.poste}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{emp.poste}</td>
-                      <td className="px-4 py-3 text-right font-medium text-gray-900">
-                        {formatFcfa(emp.salaireBaseFcfa)}
+                      <td className="px-4 py-3 text-right font-medium">
+                        {formatFcfa(avance.montantFcfa)}
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          emp.statut === "actif" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                        }`}>
-                          {emp.statut === "actif" ? "Actif" : "Inactif"}
-                        </span>
+                      <td className="px-4 py-3 text-right text-green-600">
+                        {formatFcfa(avance.montantRembourse)}
                       </td>
-                      <td className="px-4 py-3">
-                        {canCreerEmploye && emp.statut === "actif" && (
-                          <button
-                            onClick={() => handleDesactiver(emp.id, `${emp.prenoms} ${emp.nom}`)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Désactiver"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                      <td className="px-4 py-3 text-right font-bold text-red-600">
+                        {formatFcfa(restant)}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {toDate(avance.dateOctroi)?.toLocaleDateString("fr-CI") ?? avance.dateOctroi}
+                        {isOld && (
+                          <span className="ml-1 text-xs bg-red-100 text-red-600 px-1 rounded">
+                            &gt; 2 mois
+                          </span>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        {avance.motif ?? "—"}
+                      </td>
+                      {canGerer && (
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleRembourser(avance.id)}
+                            className="text-xs text-green-600 hover:text-green-800 underline"
+                          >
+                            Rembourser
+                          </button>
+                        </td>
+                      )}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-      {/* Modals */}
-      {showCreateEmploye && (
-        <ModalCreateEmploye
-          onClose={() => setShowCreateEmploye(false)}
-          onSuccess={() => void refetchEmployes()}
+      {showCreate && (
+        <AvanceModal
+          onClose={() => setShowCreate(false)}
+          onSaved={() => { setShowCreate(false); refetch(); }}
         />
       )}
-      {showCreateFiche && (
-        <ModalCreateFiche
-          employes={employesActifs}
-          moisDefaut={moisFiltre}
-          anneeDefaut={anneeFiltre}
-          onClose={() => setShowCreateFiche(false)}
-          onSuccess={refetchAll}
-        />
-      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  MODALES
+// ══════════════════════════════════════════════════════════════════════════════
+
+function PersonnelModal({
+  personnel,
+  onClose,
+  onSaved,
+}: {
+  personnel: Personnel | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const create = useCreatePersonnel();
+  const update = useUpdatePersonnel();
+
+  const [form, setForm] = useState({
+    nom: personnel?.nom ?? "",
+    prenoms: personnel?.prenoms ?? "",
+    poste: personnel?.poste ?? "",
+    typeContrat: (personnel?.typeContrat ?? "cdi") as CreatePersonnelInput["typeContrat"],
+    dateEmbauche: personnel?.dateEmbauche ?? "",
+    salaireBaseFcfa: personnel?.salaireBaseFcfa ?? 0,
+    sursalaireFcfa: personnel?.sursalaireFcfa ?? 0,
+    numeroCnps: personnel?.numeroCnps ?? "",
+    numeroCni: personnel?.numeroCni ?? "",
+    modePaiement: (personnel?.modePaiement ?? "especes") as CreatePersonnelInput["modePaiement"],
+    telephonePaiement: personnel?.telephonePaiement ?? "",
+    ribBanque: personnel?.ribBanque ?? "",
+  });
+
+  function f<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
+    setForm((prev) => ({ ...prev, [k]: v }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const payload = {
+      nom: form.nom,
+      prenoms: form.prenoms,
+      poste: form.poste,
+      typeContrat: form.typeContrat,
+      dateEmbauche: form.dateEmbauche,
+      salaireBaseFcfa: Number(form.salaireBaseFcfa),
+      sursalaireFcfa: Number(form.sursalaireFcfa) || undefined,
+      numeroCnps: form.numeroCnps || undefined,
+      numeroCni: form.numeroCni || undefined,
+      modePaiement: form.modePaiement,
+      telephonePaiement: form.telephonePaiement || undefined,
+      ribBanque: form.ribBanque || undefined,
+    };
+    try {
+      if (personnel) {
+        await update.mutateAsync({ id: personnel.id, data: payload as UpdatePersonnelInput });
+        toast({ title: "Personnel mis à jour" });
+      } else {
+        await create.mutateAsync({ data: payload as CreatePersonnelInput });
+        toast({ title: "Personnel créé" });
+      }
+      onSaved();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { erreur?: string } } })?.response?.data?.erreur ?? "Erreur";
+      toast({ title: msg, variant: "destructive" });
+    }
+  }
+
+  const isPending = create.isPending || update.isPending;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-900">
+            {personnel ? "Modifier le personnel" : "Ajouter un employé"}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Prénom(s)" required>
+              <input
+                className={INPUT_CLS}
+                value={form.prenoms}
+                onChange={(e) => f("prenoms", e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Nom" required>
+              <input
+                className={INPUT_CLS}
+                value={form.nom}
+                onChange={(e) => f("nom", e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Poste" required>
+              <input
+                className={INPUT_CLS}
+                value={form.poste}
+                onChange={(e) => f("poste", e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Type de contrat">
+              <select
+                className={INPUT_CLS}
+                value={form.typeContrat}
+                onChange={(e) => f("typeContrat", e.target.value as CreatePersonnelInput["typeContrat"])}
+              >
+                <option value="cdi">CDI</option>
+                <option value="cdd">CDD</option>
+                <option value="journalier">Journalier</option>
+                <option value="stagiaire">Stagiaire</option>
+              </select>
+            </Field>
+            <Field label="Date d'embauche" required>
+              <input
+                type="date"
+                className={INPUT_CLS}
+                value={form.dateEmbauche}
+                onChange={(e) => f("dateEmbauche", e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Salaire de base (FCFA)" required>
+              <input
+                type="number"
+                min="0"
+                className={INPUT_CLS}
+                value={form.salaireBaseFcfa}
+                onChange={(e) => f("salaireBaseFcfa", Number(e.target.value))}
+                required
+              />
+            </Field>
+            <Field label="Sursalaire (FCFA)">
+              <input
+                type="number"
+                min="0"
+                className={INPUT_CLS}
+                value={form.sursalaireFcfa}
+                onChange={(e) => f("sursalaireFcfa", Number(e.target.value))}
+              />
+            </Field>
+            <Field label="Mode de paiement">
+              <select
+                className={INPUT_CLS}
+                value={form.modePaiement}
+                onChange={(e) => f("modePaiement", e.target.value as CreatePersonnelInput["modePaiement"])}
+              >
+                <option value="especes">Espèces</option>
+                <option value="orange_money">Orange Money</option>
+                <option value="mtn_momo">MTN MoMo</option>
+                <option value="virement">Virement bancaire</option>
+              </select>
+            </Field>
+            {(form.modePaiement === "orange_money" || form.modePaiement === "mtn_momo") && (
+              <Field label="Téléphone de paiement">
+                <input
+                  className={INPUT_CLS}
+                  value={form.telephonePaiement}
+                  onChange={(e) => f("telephonePaiement", e.target.value)}
+                  placeholder="07 XX XX XX XX"
+                />
+              </Field>
+            )}
+            {form.modePaiement === "virement" && (
+              <Field label="RIB Bancaire">
+                <input
+                  className={INPUT_CLS}
+                  value={form.ribBanque}
+                  onChange={(e) => f("ribBanque", e.target.value)}
+                  placeholder="CI XX XXXX…"
+                />
+              </Field>
+            )}
+            <Field label="N° CNPS">
+              <input
+                className={INPUT_CLS}
+                value={form.numeroCnps}
+                onChange={(e) => f("numeroCnps", e.target.value)}
+              />
+            </Field>
+            <Field label="N° CNI">
+              <input
+                className={INPUT_CLS}
+                value={form.numeroCni}
+                onChange={(e) => f("numeroCni", e.target.value)}
+              />
+            </Field>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-60 flex items-center gap-2"
+            >
+              {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {personnel ? "Enregistrer" : "Créer"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function PayerModal({
+  bulletin,
+  onClose,
+  onPayer,
+}: {
+  bulletin: BulletinAvecPersonnel;
+  onClose: () => void;
+  onPayer: (id: number, reference: string) => Promise<void>;
+}) {
+  const [reference, setReference] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    await onPayer(bulletin.bulletin.id, reference);
+    setLoading(false);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-900">Confirmer le paiement</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="bg-green-50 rounded-xl p-4 text-center">
+            <p className="text-sm text-gray-600 mb-1">
+              {bulletin.personnel.prenoms} {bulletin.personnel.nom}
+            </p>
+            <p className="text-2xl font-bold text-green-700">
+              {formatFcfa(bulletin.bulletin.salaireNetFcfa)}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">{bulletin.bulletin.periode}</p>
+          </div>
+          <Field label="Référence de paiement (optionnel)">
+            <input
+              className={INPUT_CLS}
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              placeholder="N° transaction, référence virement…"
+            />
+          </Field>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-60 flex items-center gap-2"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              Confirmer le paiement
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AvanceModal({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const { data: personnel } = useGetPersonnel();
+  const create = useCreateAvancePersonnel();
+
+  const [form, setForm] = useState({
+    personnelId: "",
+    montantFcfa: "",
+    dateOctroi: new Date().toISOString().slice(0, 10),
+    motif: "",
+  });
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.personnelId || !form.montantFcfa) {
+      toast({ title: "Renseignez tous les champs obligatoires", variant: "destructive" });
+      return;
+    }
+    try {
+      await create.mutateAsync({
+        data: {
+          personnelId: Number(form.personnelId),
+          montantFcfa: Number(form.montantFcfa),
+          dateOctroi: form.dateOctroi,
+          motif: form.motif || undefined,
+        },
+      });
+      toast({ title: "Avance enregistrée" });
+      onSaved();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { erreur?: string } } })?.response?.data?.erreur ?? "Erreur";
+      toast({ title: msg, variant: "destructive" });
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-900">Nouvelle avance personnel</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <Field label="Employé" required>
+            <select
+              className={INPUT_CLS}
+              value={form.personnelId}
+              onChange={(e) => setForm((f) => ({ ...f, personnelId: e.target.value }))}
+              required
+            >
+              <option value="">-- Sélectionner --</option>
+              {(personnel ?? []).filter((p: Personnel) => p.statut === "actif").map((p: Personnel) => (
+                <option key={p.id} value={p.id}>
+                  {p.prenoms} {p.nom} — {p.poste}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Montant (FCFA)" required>
+            <input
+              type="number"
+              min="1000"
+              className={INPUT_CLS}
+              value={form.montantFcfa}
+              onChange={(e) => setForm((f) => ({ ...f, montantFcfa: e.target.value }))}
+              required
+            />
+          </Field>
+          <Field label="Date d'octroi" required>
+            <input
+              type="date"
+              className={INPUT_CLS}
+              value={form.dateOctroi}
+              onChange={(e) => setForm((f) => ({ ...f, dateOctroi: e.target.value }))}
+              required
+            />
+          </Field>
+          <Field label="Motif">
+            <input
+              className={INPUT_CLS}
+              value={form.motif}
+              onChange={(e) => setForm((f) => ({ ...f, motif: e.target.value }))}
+              placeholder="Raison de l'avance…"
+            />
+          </Field>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={create.isPending}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-60 flex items-center gap-2"
+            >
+              {create.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Enregistrer
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Composant utilitaire ────────────────────────────────────────────────────
+
+function Field({
+  label, required, children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-gray-600">
+        {label}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      {children}
     </div>
   );
 }

@@ -2,38 +2,134 @@ import { Router, type IRouter } from "express";
 import { authMiddleware } from "../middlewares/auth";
 import { checkPermission } from "../middlewares/permissions";
 import {
-  listEmployes,
-  getEmployeById,
-  createEmploye,
-  updateEmploye,
-  desactiverEmploye,
-  listFichesPaie,
-  getFichePaieById,
-  createFichePaie,
-  validerFichePaie,
-  payerFichePaie,
-  deleteFichePaie,
-  getRecapSalaires,
+  listPersonnel,
+  getPersonnelById,
+  createPersonnel,
+  updatePersonnel,
+  archiverPersonnel,
+  getPersonnelHistorique,
+  listComposantes,
+  genererBulletins,
+  listBulletins,
+  getBulletinById,
+  validerBulletin,
+  payerBulletin,
+  deleteBulletin,
+  getBulletinPdf,
+  listAvancesPersonnel,
+  createAvancePersonnel,
+  rembourserAvance,
+  getRapportMensuel,
+  getHistoriqueMasse,
 } from "../controllers/salairesController";
 
 const router: IRouter = Router();
 
 router.use(authMiddleware);
 
-// ─── Employés ────────────────────────────────────────────────────────────────
-router.get("/salaires/employes", checkPermission("salaires", "lire"), listEmployes);
-router.post("/salaires/employes", checkPermission("salaires", "creer_employe"), createEmploye);
-router.get("/salaires/employes/:id", checkPermission("salaires", "lire"), getEmployeById);
-router.put("/salaires/employes/:id", checkPermission("salaires", "modifier_employe"), updateEmploye);
-router.delete("/salaires/employes/:id", checkPermission("salaires", "modifier_employe"), desactiverEmploye);
+// ─── Personnel ────────────────────────────────────────────────────────────────
+router.get(
+  "/salaires/personnel",
+  checkPermission("salaires", "lire"),
+  listPersonnel,
+);
+router.post(
+  "/salaires/personnel",
+  checkPermission("salaires", "creer_personnel"),
+  createPersonnel,
+);
+router.get(
+  "/salaires/personnel/:id/historique",
+  checkPermission("salaires", "lire"),
+  getPersonnelHistorique,
+);
+router.get(
+  "/salaires/personnel/:id",
+  checkPermission("salaires", "lire"),
+  getPersonnelById,
+);
+router.put(
+  "/salaires/personnel/:id",
+  checkPermission("salaires", "modifier_personnel"),
+  updatePersonnel,
+);
+router.delete(
+  "/salaires/personnel/:id",
+  checkPermission("salaires", "supprimer_personnel"),
+  archiverPersonnel,
+);
 
-// ─── Fiches de paie ──────────────────────────────────────────────────────────
-router.get("/salaires/fiches", checkPermission("salaires", "lire"), listFichesPaie);
-router.post("/salaires/fiches", checkPermission("salaires", "creer_fiche"), createFichePaie);
-router.get("/salaires/recap", checkPermission("salaires", "lire"), getRecapSalaires);
-router.get("/salaires/fiches/:id", checkPermission("salaires", "lire"), getFichePaieById);
-router.put("/salaires/fiches/:id/valider", checkPermission("salaires", "valider_fiche"), validerFichePaie);
-router.put("/salaires/fiches/:id/payer", checkPermission("salaires", "marquer_paye"), payerFichePaie);
-router.delete("/salaires/fiches/:id", checkPermission("salaires", "supprimer_fiche"), deleteFichePaie);
+// ─── Composantes ─────────────────────────────────────────────────────────────
+router.get(
+  "/salaires/composantes",
+  checkPermission("salaires", "lire"),
+  listComposantes,
+);
+
+// ─── Bulletins ────────────────────────────────────────────────────────────────
+router.post(
+  "/salaires/bulletins/generer",
+  checkPermission("salaires", "generer_bulletins"),
+  genererBulletins,
+);
+router.get(
+  "/salaires/bulletins",
+  checkPermission("salaires", "lire"),
+  listBulletins,
+);
+router.get(
+  "/salaires/bulletins/:id/pdf",
+  checkPermission("salaires", "lire"),
+  getBulletinPdf,
+);
+router.get(
+  "/salaires/bulletins/:id",
+  checkPermission("salaires", "lire"),
+  getBulletinById,
+);
+router.put(
+  "/salaires/bulletins/:id/valider",
+  checkPermission("salaires", "valider_bulletins"),
+  validerBulletin,
+);
+router.put(
+  "/salaires/bulletins/:id/payer",
+  checkPermission("salaires", "payer_bulletins"),
+  payerBulletin,
+);
+router.delete(
+  "/salaires/bulletins/:id",
+  checkPermission("salaires", "supprimer_bulletin"),
+  deleteBulletin,
+);
+
+// ─── Avances personnel ───────────────────────────────────────────────────────
+router.get(
+  "/salaires/avances",
+  checkPermission("salaires", "lire"),
+  listAvancesPersonnel,
+);
+router.post(
+  "/salaires/avances",
+  checkPermission("salaires", "gerer_avances"),
+  createAvancePersonnel,
+);
+router.put(
+  "/salaires/avances/:id/rembourser",
+  checkPermission("salaires", "gerer_avances"),
+  rembourserAvance,
+);
+
+// ─── Rapports ────────────────────────────────────────────────────────────────
+router.get(
+  "/salaires/rapport-mensuel/:mois/:annee",
+  checkPermission("salaires", "lire"),
+  getRapportMensuel,
+);
+router.get(
+  "/salaires/historique-masse",
+  checkPermission("salaires", "lire"),
+  getHistoriqueMasse,
+);
 
 export default router;

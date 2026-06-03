@@ -6,12 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface CreateEmployeInput {
+export type AvanceAvecPersonnelPersonnel = {
+  id: number;
   nom: string;
   prenoms: string;
   poste: string;
-  telephone?: string;
-  email?: string;
-  dateEmbauche: string;
-  salaireBaseFcfa: number;
-}
+};

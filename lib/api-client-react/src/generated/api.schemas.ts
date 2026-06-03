@@ -665,125 +665,343 @@ export interface ToggleActifInput {
   actif: boolean;
 }
 
-export type EmployeStatut = typeof EmployeStatut[keyof typeof EmployeStatut];
+export type PersonnelTypeContrat = typeof PersonnelTypeContrat[keyof typeof PersonnelTypeContrat];
 
 
-export const EmployeStatut = {
-  actif: 'actif',
-  inactif: 'inactif',
+export const PersonnelTypeContrat = {
+  cdi: 'cdi',
+  cdd: 'cdd',
+  journalier: 'journalier',
+  stagiaire: 'stagiaire',
 } as const;
 
-export interface Employe {
+export type PersonnelModePaiement = typeof PersonnelModePaiement[keyof typeof PersonnelModePaiement];
+
+
+export const PersonnelModePaiement = {
+  orange_money: 'orange_money',
+  mtn_momo: 'mtn_momo',
+  virement: 'virement',
+  especes: 'especes',
+} as const;
+
+export type PersonnelStatut = typeof PersonnelStatut[keyof typeof PersonnelStatut];
+
+
+export const PersonnelStatut = {
+  actif: 'actif',
+  suspendu: 'suspendu',
+  sorti: 'sorti',
+} as const;
+
+export interface Personnel {
   id: number;
   cooperativeId: number;
   nom: string;
   prenoms: string;
   poste: string;
-  telephone?: string | null;
-  email?: string | null;
+  /** @nullable */
+  roleSysteme?: string | null;
+  typeContrat: PersonnelTypeContrat;
   dateEmbauche: string;
+  /** @nullable */
+  dateFinContrat?: string | null;
   salaireBaseFcfa: number;
-  statut: EmployeStatut;
+  sursalaireFcfa: number;
+  /** @nullable */
+  numeroCnps?: string | null;
+  /** @nullable */
+  numeroCni?: string | null;
+  modePaiement: PersonnelModePaiement;
+  /** @nullable */
+  telephonePaiement?: string | null;
+  /** @nullable */
+  ribBanque?: string | null;
+  statut: PersonnelStatut;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateEmployeInput {
+export type CreatePersonnelInputTypeContrat = typeof CreatePersonnelInputTypeContrat[keyof typeof CreatePersonnelInputTypeContrat];
+
+
+export const CreatePersonnelInputTypeContrat = {
+  cdi: 'cdi',
+  cdd: 'cdd',
+  journalier: 'journalier',
+  stagiaire: 'stagiaire',
+} as const;
+
+export type CreatePersonnelInputModePaiement = typeof CreatePersonnelInputModePaiement[keyof typeof CreatePersonnelInputModePaiement];
+
+
+export const CreatePersonnelInputModePaiement = {
+  orange_money: 'orange_money',
+  mtn_momo: 'mtn_momo',
+  virement: 'virement',
+  especes: 'especes',
+} as const;
+
+export interface CreatePersonnelInput {
   nom: string;
   prenoms: string;
   poste: string;
-  telephone?: string;
-  email?: string;
+  roleSysteme?: string;
+  typeContrat?: CreatePersonnelInputTypeContrat;
   dateEmbauche: string;
+  dateFinContrat?: string;
   salaireBaseFcfa: number;
+  sursalaireFcfa?: number;
+  numeroCnps?: string;
+  numeroCni?: string;
+  modePaiement?: CreatePersonnelInputModePaiement;
+  telephonePaiement?: string;
+  ribBanque?: string;
 }
 
-export type UpdateEmployeInputStatut = typeof UpdateEmployeInputStatut[keyof typeof UpdateEmployeInputStatut];
+export type UpdatePersonnelInputTypeContrat = typeof UpdatePersonnelInputTypeContrat[keyof typeof UpdatePersonnelInputTypeContrat];
 
 
-export const UpdateEmployeInputStatut = {
-  actif: 'actif',
-  inactif: 'inactif',
+export const UpdatePersonnelInputTypeContrat = {
+  cdi: 'cdi',
+  cdd: 'cdd',
+  journalier: 'journalier',
+  stagiaire: 'stagiaire',
 } as const;
 
-export interface UpdateEmployeInput {
+export type UpdatePersonnelInputModePaiement = typeof UpdatePersonnelInputModePaiement[keyof typeof UpdatePersonnelInputModePaiement];
+
+
+export const UpdatePersonnelInputModePaiement = {
+  orange_money: 'orange_money',
+  mtn_momo: 'mtn_momo',
+  virement: 'virement',
+  especes: 'especes',
+} as const;
+
+export type UpdatePersonnelInputStatut = typeof UpdatePersonnelInputStatut[keyof typeof UpdatePersonnelInputStatut];
+
+
+export const UpdatePersonnelInputStatut = {
+  actif: 'actif',
+  suspendu: 'suspendu',
+  sorti: 'sorti',
+} as const;
+
+export interface UpdatePersonnelInput {
   nom?: string;
   prenoms?: string;
   poste?: string;
-  telephone?: string;
-  email?: string;
+  roleSysteme?: string;
+  typeContrat?: UpdatePersonnelInputTypeContrat;
   dateEmbauche?: string;
+  dateFinContrat?: string;
   salaireBaseFcfa?: number;
-  statut?: UpdateEmployeInputStatut;
+  sursalaireFcfa?: number;
+  numeroCnps?: string;
+  numeroCni?: string;
+  modePaiement?: UpdatePersonnelInputModePaiement;
+  telephonePaiement?: string;
+  ribBanque?: string;
+  statut?: UpdatePersonnelInputStatut;
 }
 
-export type FichePaieStatut = typeof FichePaieStatut[keyof typeof FichePaieStatut];
+export type BulletinPaieStatut = typeof BulletinPaieStatut[keyof typeof BulletinPaieStatut];
 
 
-export const FichePaieStatut = {
+export const BulletinPaieStatut = {
   brouillon: 'brouillon',
   valide: 'valide',
   paye: 'paye',
 } as const;
 
-export interface FichePaie {
+export interface BulletinPaie {
   id: number;
+  personnelId: number;
   cooperativeId: number;
-  employeId: number;
   mois: number;
   annee: number;
+  periode: string;
   salaireBaseFcfa: number;
-  primesFcfa: number;
-  indemnitésFcfa: number;
-  heuresSupFcfa: number;
-  deductionCnpsFcfa: number;
-  deductionImpotFcfa: number;
-  avanceSurSalaireFcfa: number;
-  netAPayerFcfa: number;
-  statut: FichePaieStatut;
+  totalAvantagesFcfa: number;
+  totalRetenuesFcfa: number;
+  salaireBrutFcfa: number;
+  salaireNetFcfa: number;
+  chargesCnpsPatronaleFcfa?: number;
+  chargesTaxeApprentissageFcfa?: number;
+  chargesFpcFcfa?: number;
+  coutTotalEmployeurFcfa: number;
+  statut: BulletinPaieStatut;
+  /** @nullable */
+  dateValidation?: string | null;
+  /** @nullable */
   datePaiement?: string | null;
-  observations?: string | null;
+  /** @nullable */
+  referencePaiement?: string | null;
+  /** @nullable */
+  payePar?: number | null;
   createdAt: string;
-  updatedAt: string;
 }
 
-export type FichePaieAvecEmployeEmploye = {
+export type AvancePersonnelStatut = typeof AvancePersonnelStatut[keyof typeof AvancePersonnelStatut];
+
+
+export const AvancePersonnelStatut = {
+  en_cours: 'en_cours',
+  rembourse: 'rembourse',
+} as const;
+
+export interface AvancePersonnel {
+  id: number;
+  personnelId: number;
+  cooperativeId: number;
+  montantFcfa: number;
+  dateOctroi: string;
+  /** @nullable */
+  motif?: string | null;
+  statut: AvancePersonnelStatut;
+  montantRembourse: number;
+  createdAt: string;
+}
+
+export interface PersonnelHistorique {
+  personnel: Personnel;
+  bulletins: BulletinPaie[];
+  avances: AvancePersonnel[];
+}
+
+export type ComposanteSalaireType = typeof ComposanteSalaireType[keyof typeof ComposanteSalaireType];
+
+
+export const ComposanteSalaireType = {
+  avantage: 'avantage',
+  retenue: 'retenue',
+} as const;
+
+export type ComposanteSalaireCalcul = typeof ComposanteSalaireCalcul[keyof typeof ComposanteSalaireCalcul];
+
+
+export const ComposanteSalaireCalcul = {
+  fixe: 'fixe',
+  pourcentage: 'pourcentage',
+} as const;
+
+export interface ComposanteSalaire {
+  id: number;
+  cooperativeId: number;
+  libelle: string;
+  type: ComposanteSalaireType;
+  calcul: ComposanteSalaireCalcul;
+  valeur: number;
+  obligatoire: boolean;
+}
+
+export type LigneBulletinType = typeof LigneBulletinType[keyof typeof LigneBulletinType];
+
+
+export const LigneBulletinType = {
+  avantage: 'avantage',
+  retenue: 'retenue',
+} as const;
+
+export interface LigneBulletin {
+  id: number;
+  bulletinId: number;
+  libelle: string;
+  type: LigneBulletinType;
+  montantFcfa: number;
+}
+
+export type BulletinAvecPersonnelPersonnel = {
+  id: number;
+  nom: string;
+  prenoms: string;
+  poste: string;
+  modePaiement?: string;
+  /** @nullable */
+  telephonePaiement?: string | null;
+};
+
+export interface BulletinAvecPersonnel {
+  bulletin: BulletinPaie;
+  personnel: BulletinAvecPersonnelPersonnel;
+}
+
+export interface BulletinDetail {
+  bulletin: BulletinPaie;
+  personnel: Personnel;
+  lignes: LigneBulletin[];
+}
+
+export interface GenererBulletinsInput {
+  mois: number;
+  annee: number;
+  personnelIds?: number[];
+}
+
+export interface PayerBulletinInput {
+  referencePaiement?: string;
+}
+
+export interface GenerationResult {
+  personnelId: number;
+  bulletinId: number;
+  /** @nullable */
+  erreur?: string | null;
+}
+
+export type AvanceAvecPersonnelPersonnel = {
   id: number;
   nom: string;
   prenoms: string;
   poste: string;
 };
 
-export interface FichePaieAvecEmploye {
-  fiche: FichePaie;
-  employe: FichePaieAvecEmployeEmploye;
+export interface AvanceAvecPersonnel {
+  avance: AvancePersonnel;
+  personnel: AvanceAvecPersonnelPersonnel;
 }
 
-export interface CreateFichePaieInput {
-  employeId: number;
-  mois: number;
-  annee: number;
-  salaireBaseFcfa: number;
-  primesFcfa?: number;
-  indemnitésFcfa?: number;
-  heuresSupFcfa?: number;
-  deductionCnpsFcfa?: number;
-  deductionImpotFcfa?: number;
-  avanceSurSalaireFcfa?: number;
-  observations?: string;
+export interface CreateAvancePersonnelInput {
+  personnelId: number;
+  montantFcfa: number;
+  dateOctroi: string;
+  motif?: string;
 }
 
-export interface RecapSalaires {
+export type RapportMensuelDetailsParPosteItem = {
+  poste: string;
+  nbPersonnel: number;
+  totalNet: number;
+};
+
+export interface RapportMensuel {
   mois: number;
   annee: number;
-  nbEmployesActifs: number;
-  nbFiches: number;
-  nbPayees: number;
-  nbValidees: number;
+  nbPersonnelActifs: number;
+  nbBulletins: number;
+  nbPayes: number;
+  nbValides: number;
   nbBrouillons: number;
-  masseSalarialeBrute: number;
-  masseSalarialeNette: number;
-  totalCnps: number;
+  totalBrut: number;
+  totalNet: number;
+  totalChargesPatronales: number;
+  coutTotalEmployeur: number;
+  detailsParPoste: RapportMensuelDetailsParPosteItem[];
+}
+
+export interface HistoriqueMasse {
+  mois: number;
+  annee: number;
+  periode: string;
+  totalBrut: number;
+  totalNet: number;
+  coutTotalEmployeur: number;
+  nbBulletins: number;
+}
+
+export interface RemboursementAvancePersonnelInput {
+  montantRembourse?: number;
 }
 
 export type GetMembresParams = {
@@ -893,14 +1111,31 @@ export type ResetUserPassword200 = {
   message?: string;
 };
 
-export type GetFichesPaieParams = {
+export type GetBulletinsParams = {
 mois?: number;
 annee?: number;
-employeId?: number;
+statut?: GetBulletinsStatut;
 };
 
-export type GetRecapSalairesParams = {
-mois?: number;
-annee?: number;
+export type GetBulletinsStatut = typeof GetBulletinsStatut[keyof typeof GetBulletinsStatut];
+
+
+export const GetBulletinsStatut = {
+  brouillon: 'brouillon',
+  valide: 'valide',
+  paye: 'paye',
+} as const;
+
+export type GetAvancesPersonnelParams = {
+personnelId?: number;
+statut?: GetAvancesPersonnelStatut;
 };
+
+export type GetAvancesPersonnelStatut = typeof GetAvancesPersonnelStatut[keyof typeof GetAvancesPersonnelStatut];
+
+
+export const GetAvancesPersonnelStatut = {
+  en_cours: 'en_cours',
+  rembourse: 'rembourse',
+} as const;
 

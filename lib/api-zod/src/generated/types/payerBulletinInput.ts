@@ -6,9 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FichePaieAvecEmployeEmploye = {
-  id: number;
-  nom: string;
-  prenoms: string;
-  poste: string;
-};
+export interface PayerBulletinInput {
+  referencePaiement?: string;
+}

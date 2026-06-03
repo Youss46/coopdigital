@@ -1,347 +1,737 @@
 import { type Request, type Response } from "express";
-import { db, employesTable, fichesPaieTable } from "@workspace/db";
+import {
+  db,
+  personnelTable,
+  composantesSalaireTable,
+  bulletinsPaieTable,
+  lignesBulletinTable,
+  avancesPersonnelTable,
+} from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { generateBulletin, generateMasse } from "../services/paieService";
 
 const COOP_ID = 1;
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function parseId(raw: unknown): number {
   return parseInt(String(raw ?? "0"), 10);
 }
 
-// ─── EMPLOYÉS ────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+//  PERSONNEL
+// ══════════════════════════════════════════════════════════════════════════════
 
-export async function listEmployes(req: Request, res: Response): Promise<void> {
+export async function listPersonnel(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
-    const employes = await db
+    const rows = await db
       .select()
-      .from(employesTable)
-      .where(eq(employesTable.cooperativeId, COOP_ID))
-      .orderBy(employesTable.nom);
-    res.json(employes);
+      .from(personnelTable)
+      .where(eq(personnelTable.cooperativeId, COOP_ID))
+      .orderBy(personnelTable.nom);
+    res.json(rows);
   } catch (err) {
-    req.log.error({ err }, "listEmployes");
+    req.log.error({ err }, "listPersonnel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
-export async function getEmployeById(req: Request, res: Response): Promise<void> {
+export async function getPersonnelById(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const id = parseId(req.params["id"]);
-    const [employe] = await db
+    const [row] = await db
       .select()
-      .from(employesTable)
-      .where(and(eq(employesTable.id, id), eq(employesTable.cooperativeId, COOP_ID)))
+      .from(personnelTable)
+      .where(
+        and(
+          eq(personnelTable.id, id),
+          eq(personnelTable.cooperativeId, COOP_ID),
+        ),
+      )
       .limit(1);
-    if (!employe) { res.status(404).json({ erreur: "Employé introuvable" }); return; }
-    res.json(employe);
+    if (!row) {
+      res.status(404).json({ erreur: "Personnel introuvable" });
+      return;
+    }
+    res.json(row);
   } catch (err) {
-    req.log.error({ err }, "getEmployeById");
+    req.log.error({ err }, "getPersonnelById");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
-export async function createEmploye(req: Request, res: Response): Promise<void> {
+export async function createPersonnel(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
-    const { nom, prenoms, poste, telephone, email, dateEmbauche, salaireBaseFcfa } = req.body as Record<string, unknown>;
-    if (!nom || !prenoms || !poste || !dateEmbauche || !salaireBaseFcfa) {
+    const body = req.body as Record<string, unknown>;
+    const {
+      nom, prenoms, poste, roleSysteme, typeContrat,
+      dateEmbauche, dateFinContrat, salaireBaseFcfa, sursalaireFcfa,
+      numeroCnps, numeroCni, modePaiement, telephonePaiement, ribBanque,
+    } = body;
+
+    if (!nom || !prenoms || !poste || !dateEmbauche || salaireBaseFcfa === undefined) {
       res.status(400).json({ erreur: "Champs obligatoires manquants" });
       return;
     }
-    const [employe] = await db
-      .insert(employesTable)
+
+    const [row] = await db
+      .insert(personnelTable)
       .values({
         cooperativeId: COOP_ID,
         nom: String(nom),
         prenoms: String(prenoms),
         poste: String(poste),
-        telephone: telephone ? String(telephone) : null,
-        email: email ? String(email) : null,
+        roleSysteme: roleSysteme ? String(roleSysteme) : null,
+        typeContrat: (typeContrat as "cdi" | "cdd" | "journalier" | "stagiaire") ?? "cdi",
         dateEmbauche: String(dateEmbauche),
+        dateFinContrat: dateFinContrat ? String(dateFinContrat) : null,
         salaireBaseFcfa: Number(salaireBaseFcfa),
+        sursalaireFcfa: sursalaireFcfa ? Number(sursalaireFcfa) : 0,
+        numeroCnps: numeroCnps ? String(numeroCnps) : null,
+        numeroCni: numeroCni ? String(numeroCni) : null,
+        modePaiement: (modePaiement as "orange_money" | "mtn_momo" | "virement" | "especes") ?? "especes",
+        telephonePaiement: telephonePaiement ? String(telephonePaiement) : null,
+        ribBanque: ribBanque ? String(ribBanque) : null,
       })
       .returning();
-    res.status(201).json(employe);
+
+    res.status(201).json(row);
   } catch (err) {
-    req.log.error({ err }, "createEmploye");
+    req.log.error({ err }, "createPersonnel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
-export async function updateEmploye(req: Request, res: Response): Promise<void> {
+export async function updatePersonnel(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const id = parseId(req.params["id"]);
-    const { nom, prenoms, poste, telephone, email, dateEmbauche, salaireBaseFcfa, statut } = req.body as Record<string, unknown>;
-    const updates: Partial<typeof employesTable.$inferInsert> = { updatedAt: new Date() };
-    if (nom !== undefined) updates.nom = String(nom);
-    if (prenoms !== undefined) updates.prenoms = String(prenoms);
-    if (poste !== undefined) updates.poste = String(poste);
-    if (telephone !== undefined) updates.telephone = telephone ? String(telephone) : null;
-    if (email !== undefined) updates.email = email ? String(email) : null;
-    if (dateEmbauche !== undefined) updates.dateEmbauche = String(dateEmbauche);
-    if (salaireBaseFcfa !== undefined) updates.salaireBaseFcfa = Number(salaireBaseFcfa);
-    if (statut !== undefined) updates.statut = statut as "actif" | "inactif";
+    const body = req.body as Record<string, unknown>;
+    const updates: Partial<typeof personnelTable.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+
+    if (body["nom"] !== undefined) updates.nom = String(body["nom"]);
+    if (body["prenoms"] !== undefined) updates.prenoms = String(body["prenoms"]);
+    if (body["poste"] !== undefined) updates.poste = String(body["poste"]);
+    if (body["roleSysteme"] !== undefined) updates.roleSysteme = body["roleSysteme"] ? String(body["roleSysteme"]) : null;
+    if (body["typeContrat"] !== undefined) updates.typeContrat = body["typeContrat"] as "cdi" | "cdd" | "journalier" | "stagiaire";
+    if (body["dateEmbauche"] !== undefined) updates.dateEmbauche = String(body["dateEmbauche"]);
+    if (body["dateFinContrat"] !== undefined) updates.dateFinContrat = body["dateFinContrat"] ? String(body["dateFinContrat"]) : null;
+    if (body["salaireBaseFcfa"] !== undefined) updates.salaireBaseFcfa = Number(body["salaireBaseFcfa"]);
+    if (body["sursalaireFcfa"] !== undefined) updates.sursalaireFcfa = Number(body["sursalaireFcfa"]);
+    if (body["numeroCnps"] !== undefined) updates.numeroCnps = body["numeroCnps"] ? String(body["numeroCnps"]) : null;
+    if (body["numeroCni"] !== undefined) updates.numeroCni = body["numeroCni"] ? String(body["numeroCni"]) : null;
+    if (body["modePaiement"] !== undefined) updates.modePaiement = body["modePaiement"] as "orange_money" | "mtn_momo" | "virement" | "especes";
+    if (body["telephonePaiement"] !== undefined) updates.telephonePaiement = body["telephonePaiement"] ? String(body["telephonePaiement"]) : null;
+    if (body["ribBanque"] !== undefined) updates.ribBanque = body["ribBanque"] ? String(body["ribBanque"]) : null;
+    if (body["statut"] !== undefined) updates.statut = body["statut"] as "actif" | "suspendu" | "sorti";
 
     const [updated] = await db
-      .update(employesTable)
+      .update(personnelTable)
       .set(updates)
-      .where(and(eq(employesTable.id, id), eq(employesTable.cooperativeId, COOP_ID)))
+      .where(
+        and(
+          eq(personnelTable.id, id),
+          eq(personnelTable.cooperativeId, COOP_ID),
+        ),
+      )
       .returning();
-    if (!updated) { res.status(404).json({ erreur: "Employé introuvable" }); return; }
+
+    if (!updated) {
+      res.status(404).json({ erreur: "Personnel introuvable" });
+      return;
+    }
     res.json(updated);
   } catch (err) {
-    req.log.error({ err }, "updateEmploye");
+    req.log.error({ err }, "updatePersonnel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
-export async function desactiverEmploye(req: Request, res: Response): Promise<void> {
+export async function archiverPersonnel(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const id = parseId(req.params["id"]);
     const [updated] = await db
-      .update(employesTable)
-      .set({ statut: "inactif", updatedAt: new Date() })
-      .where(and(eq(employesTable.id, id), eq(employesTable.cooperativeId, COOP_ID)))
+      .update(personnelTable)
+      .set({ statut: "sorti", updatedAt: new Date() })
+      .where(
+        and(
+          eq(personnelTable.id, id),
+          eq(personnelTable.cooperativeId, COOP_ID),
+        ),
+      )
       .returning();
-    if (!updated) { res.status(404).json({ erreur: "Employé introuvable" }); return; }
+    if (!updated) {
+      res.status(404).json({ erreur: "Personnel introuvable" });
+      return;
+    }
     res.json(updated);
   } catch (err) {
-    req.log.error({ err }, "desactiverEmploye");
+    req.log.error({ err }, "archiverPersonnel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
-// ─── FICHES DE PAIE ───────────────────────────────────────────────────────────
+export async function getPersonnelHistorique(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const id = parseId(req.params["id"]);
 
-export async function listFichesPaie(req: Request, res: Response): Promise<void> {
+    const [emp] = await db
+      .select()
+      .from(personnelTable)
+      .where(
+        and(
+          eq(personnelTable.id, id),
+          eq(personnelTable.cooperativeId, COOP_ID),
+        ),
+      )
+      .limit(1);
+    if (!emp) {
+      res.status(404).json({ erreur: "Personnel introuvable" });
+      return;
+    }
+
+    const bulletins = await db
+      .select()
+      .from(bulletinsPaieTable)
+      .where(eq(bulletinsPaieTable.personnelId, id))
+      .orderBy(desc(bulletinsPaieTable.annee), desc(bulletinsPaieTable.mois))
+      .limit(12);
+
+    const avances = await db
+      .select()
+      .from(avancesPersonnelTable)
+      .where(eq(avancesPersonnelTable.personnelId, id))
+      .orderBy(desc(avancesPersonnelTable.createdAt));
+
+    res.json({ personnel: emp, bulletins, avances });
+  } catch (err) {
+    req.log.error({ err }, "getPersonnelHistorique");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  COMPOSANTES SALAIRE
+// ══════════════════════════════════════════════════════════════════════════════
+
+export async function listComposantes(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const rows = await db
+      .select()
+      .from(composantesSalaireTable)
+      .where(eq(composantesSalaireTable.cooperativeId, COOP_ID));
+    res.json(rows);
+  } catch (err) {
+    req.log.error({ err }, "listComposantes");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  BULLETINS DE PAIE
+// ══════════════════════════════════════════════════════════════════════════════
+
+export async function genererBulletins(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const { mois, annee, personnelIds } = req.body as {
+      mois?: number;
+      annee?: number;
+      personnelIds?: number[];
+    };
+
+    if (!mois || !annee) {
+      res.status(400).json({ erreur: "mois et annee sont obligatoires" });
+      return;
+    }
+
+    let results;
+    if (personnelIds && personnelIds.length > 0) {
+      results = await Promise.allSettled(
+        personnelIds.map((pid) =>
+          generateBulletin(pid, mois, annee, COOP_ID),
+        ),
+      );
+      const mapped = personnelIds.map((pid, i) => {
+        const r = results[i];
+        if (r && r.status === "fulfilled") return { personnelId: pid, bulletinId: r.value };
+        return { personnelId: pid, bulletinId: -1, erreur: r?.status === "rejected" ? String(r.reason) : "Inconnu" };
+      });
+      res.json(mapped);
+    } else {
+      const masse = await generateMasse(COOP_ID, mois, annee);
+      res.json(masse);
+    }
+  } catch (err) {
+    req.log.error({ err }, "genererBulletins");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function listBulletins(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const mois = req.query["mois"] ? parseInt(String(req.query["mois"])) : undefined;
     const annee = req.query["annee"] ? parseInt(String(req.query["annee"])) : undefined;
-    const employeId = req.query["employeId"] ? parseInt(String(req.query["employeId"])) : undefined;
+    const statut = req.query["statut"] ? String(req.query["statut"]) : undefined;
 
-    const conditions = [eq(fichesPaieTable.cooperativeId, COOP_ID)];
-    if (mois) conditions.push(eq(fichesPaieTable.mois, mois));
-    if (annee) conditions.push(eq(fichesPaieTable.annee, annee));
-    if (employeId) conditions.push(eq(fichesPaieTable.employeId, employeId));
+    const conditions = [eq(bulletinsPaieTable.cooperativeId, COOP_ID)];
+    if (mois) conditions.push(eq(bulletinsPaieTable.mois, mois));
+    if (annee) conditions.push(eq(bulletinsPaieTable.annee, annee));
+    if (statut) conditions.push(eq(bulletinsPaieTable.statut, statut as "brouillon" | "valide" | "paye"));
 
-    const fiches = await db
+    const rows = await db
       .select({
-        fiche: fichesPaieTable,
-        employe: {
-          id: employesTable.id,
-          nom: employesTable.nom,
-          prenoms: employesTable.prenoms,
-          poste: employesTable.poste,
+        bulletin: bulletinsPaieTable,
+        personnel: {
+          id: personnelTable.id,
+          nom: personnelTable.nom,
+          prenoms: personnelTable.prenoms,
+          poste: personnelTable.poste,
+          modePaiement: personnelTable.modePaiement,
+          telephonePaiement: personnelTable.telephonePaiement,
         },
       })
-      .from(fichesPaieTable)
-      .innerJoin(employesTable, eq(fichesPaieTable.employeId, employesTable.id))
+      .from(bulletinsPaieTable)
+      .innerJoin(
+        personnelTable,
+        eq(bulletinsPaieTable.personnelId, personnelTable.id),
+      )
       .where(and(...conditions))
-      .orderBy(desc(fichesPaieTable.annee), desc(fichesPaieTable.mois));
+      .orderBy(desc(bulletinsPaieTable.annee), desc(bulletinsPaieTable.mois), personnelTable.nom);
 
-    res.json(fiches);
+    res.json(rows);
   } catch (err) {
-    req.log.error({ err }, "listFichesPaie");
+    req.log.error({ err }, "listBulletins");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
-export async function getFichePaieById(req: Request, res: Response): Promise<void> {
+export async function getBulletinById(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const id = parseId(req.params["id"]);
+
     const [row] = await db
       .select({
-        fiche: fichesPaieTable,
-        employe: employesTable,
+        bulletin: bulletinsPaieTable,
+        personnel: personnelTable,
       })
-      .from(fichesPaieTable)
-      .innerJoin(employesTable, eq(fichesPaieTable.employeId, employesTable.id))
-      .where(and(eq(fichesPaieTable.id, id), eq(fichesPaieTable.cooperativeId, COOP_ID)))
+      .from(bulletinsPaieTable)
+      .innerJoin(
+        personnelTable,
+        eq(bulletinsPaieTable.personnelId, personnelTable.id),
+      )
+      .where(
+        and(
+          eq(bulletinsPaieTable.id, id),
+          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+        ),
+      )
       .limit(1);
-    if (!row) { res.status(404).json({ erreur: "Fiche introuvable" }); return; }
-    res.json(row);
+
+    if (!row) {
+      res.status(404).json({ erreur: "Bulletin introuvable" });
+      return;
+    }
+
+    const lignes = await db
+      .select()
+      .from(lignesBulletinTable)
+      .where(eq(lignesBulletinTable.bulletinId, id));
+
+    res.json({ ...row, lignes });
   } catch (err) {
-    req.log.error({ err }, "getFichePaieById");
+    req.log.error({ err }, "getBulletinById");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
-export async function createFichePaie(req: Request, res: Response): Promise<void> {
+export async function validerBulletin(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
-    const {
-      employeId, mois, annee,
-      salaireBaseFcfa, primesFcfa, indemnitésFcfa, heuresSupFcfa,
-      deductionCnpsFcfa, deductionImpotFcfa, avanceSurSalaireFcfa,
-      observations,
-    } = req.body as Record<string, unknown>;
+    const id = parseId(req.params["id"]);
+    const [b] = await db
+      .select()
+      .from(bulletinsPaieTable)
+      .where(
+        and(
+          eq(bulletinsPaieTable.id, id),
+          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+        ),
+      )
+      .limit(1);
+    if (!b) {
+      res.status(404).json({ erreur: "Bulletin introuvable" });
+      return;
+    }
+    if (b.statut !== "brouillon") {
+      res.status(400).json({ erreur: "Seuls les bulletins en brouillon peuvent être validés" });
+      return;
+    }
+    const [updated] = await db
+      .update(bulletinsPaieTable)
+      .set({ statut: "valide", dateValidation: new Date() })
+      .where(eq(bulletinsPaieTable.id, id))
+      .returning();
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "validerBulletin");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
 
-    if (!employeId || !mois || !annee || salaireBaseFcfa === undefined) {
+export async function payerBulletin(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const id = parseId(req.params["id"]);
+    const { referencePaiement } = req.body as { referencePaiement?: string };
+
+    const [b] = await db
+      .select()
+      .from(bulletinsPaieTable)
+      .where(
+        and(
+          eq(bulletinsPaieTable.id, id),
+          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+        ),
+      )
+      .limit(1);
+    if (!b) {
+      res.status(404).json({ erreur: "Bulletin introuvable" });
+      return;
+    }
+    if (b.statut !== "valide") {
+      res.status(400).json({ erreur: "Seuls les bulletins validés peuvent être marqués payés" });
+      return;
+    }
+    const [updated] = await db
+      .update(bulletinsPaieTable)
+      .set({
+        statut: "paye",
+        datePaiement: new Date(),
+        referencePaiement: referencePaiement ?? null,
+        payePar: req.user?.id ?? null,
+      })
+      .where(eq(bulletinsPaieTable.id, id))
+      .returning();
+
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "payerBulletin");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function deleteBulletin(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const id = parseId(req.params["id"]);
+    const [b] = await db
+      .select()
+      .from(bulletinsPaieTable)
+      .where(
+        and(
+          eq(bulletinsPaieTable.id, id),
+          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+        ),
+      )
+      .limit(1);
+    if (!b) {
+      res.status(404).json({ erreur: "Bulletin introuvable" });
+      return;
+    }
+    if (b.statut !== "brouillon") {
+      res.status(400).json({ erreur: "Seuls les brouillons peuvent être supprimés" });
+      return;
+    }
+    await db
+      .delete(bulletinsPaieTable)
+      .where(eq(bulletinsPaieTable.id, id));
+    res.status(204).send();
+  } catch (err) {
+    req.log.error({ err }, "deleteBulletin");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function getBulletinPdf(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  res.status(501).json({ erreur: "Export PDF disponible prochainement" });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  AVANCES PERSONNEL
+// ══════════════════════════════════════════════════════════════════════════════
+
+export async function listAvancesPersonnel(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const personnelId = req.query["personnelId"]
+      ? parseInt(String(req.query["personnelId"]))
+      : undefined;
+    const statut = req.query["statut"] ? String(req.query["statut"]) : undefined;
+
+    const conditions = [eq(avancesPersonnelTable.cooperativeId, COOP_ID)];
+    if (personnelId) conditions.push(eq(avancesPersonnelTable.personnelId, personnelId));
+    if (statut) conditions.push(eq(avancesPersonnelTable.statut, statut as "en_cours" | "rembourse"));
+
+    const rows = await db
+      .select({
+        avance: avancesPersonnelTable,
+        personnel: {
+          id: personnelTable.id,
+          nom: personnelTable.nom,
+          prenoms: personnelTable.prenoms,
+          poste: personnelTable.poste,
+        },
+      })
+      .from(avancesPersonnelTable)
+      .innerJoin(
+        personnelTable,
+        eq(avancesPersonnelTable.personnelId, personnelTable.id),
+      )
+      .where(and(...conditions))
+      .orderBy(desc(avancesPersonnelTable.createdAt));
+
+    res.json(rows);
+  } catch (err) {
+    req.log.error({ err }, "listAvancesPersonnel");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function createAvancePersonnel(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const { personnelId, montantFcfa, dateOctroi, motif } =
+      req.body as Record<string, unknown>;
+
+    if (!personnelId || !montantFcfa || !dateOctroi) {
       res.status(400).json({ erreur: "Champs obligatoires manquants" });
       return;
     }
 
-    // Vérifier doublon mois/employé
-    const [existing] = await db
-      .select({ id: fichesPaieTable.id })
-      .from(fichesPaieTable)
+    // Vérifier que le personnel appartient à la coop
+    const [emp] = await db
+      .select({ id: personnelTable.id })
+      .from(personnelTable)
       .where(
         and(
-          eq(fichesPaieTable.cooperativeId, COOP_ID),
-          eq(fichesPaieTable.employeId, Number(employeId)),
-          eq(fichesPaieTable.mois, Number(mois)),
-          eq(fichesPaieTable.annee, Number(annee)),
+          eq(personnelTable.id, Number(personnelId)),
+          eq(personnelTable.cooperativeId, COOP_ID),
         ),
       )
       .limit(1);
-    if (existing) {
-      res.status(409).json({ erreur: "Une fiche existe déjà pour cet employé ce mois-ci" });
+    if (!emp) {
+      res.status(404).json({ erreur: "Personnel introuvable" });
       return;
     }
 
-    const base = Number(salaireBaseFcfa);
-    const primes = Number(primesFcfa ?? 0);
-    const indemnites = Number(indemnitésFcfa ?? 0);
-    const heuresSup = Number(heuresSupFcfa ?? 0);
-    const cnps = Number(deductionCnpsFcfa ?? 0);
-    const impot = Number(deductionImpotFcfa ?? 0);
-    const avance = Number(avanceSurSalaireFcfa ?? 0);
-    const net = base + primes + indemnites + heuresSup - cnps - impot - avance;
-
-    const [fiche] = await db
-      .insert(fichesPaieTable)
+    const [row] = await db
+      .insert(avancesPersonnelTable)
       .values({
+        personnelId: Number(personnelId),
         cooperativeId: COOP_ID,
-        employeId: Number(employeId),
-        mois: Number(mois),
-        annee: Number(annee),
-        salaireBaseFcfa: base,
-        primesFcfa: primes,
-        indemnitésFcfa: indemnites,
-        heuresSupFcfa: heuresSup,
-        deductionCnpsFcfa: cnps,
-        deductionImpotFcfa: impot,
-        avanceSurSalaireFcfa: avance,
-        netAPayerFcfa: Math.max(0, net),
-        observations: observations ? String(observations) : null,
-        createdById: req.user?.id ?? null,
+        montantFcfa: Number(montantFcfa),
+        dateOctroi: String(dateOctroi),
+        motif: motif ? String(motif) : null,
       })
       .returning();
-    res.status(201).json(fiche);
+    res.status(201).json(row);
   } catch (err) {
-    req.log.error({ err }, "createFichePaie");
+    req.log.error({ err }, "createAvancePersonnel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
-export async function validerFichePaie(req: Request, res: Response): Promise<void> {
+export async function rembourserAvance(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const id = parseId(req.params["id"]);
-    const [fiche] = await db
+    const { montantRembourse } = req.body as { montantRembourse?: number };
+
+    const [av] = await db
       .select()
-      .from(fichesPaieTable)
-      .where(and(eq(fichesPaieTable.id, id), eq(fichesPaieTable.cooperativeId, COOP_ID)))
+      .from(avancesPersonnelTable)
+      .where(eq(avancesPersonnelTable.id, id))
       .limit(1);
-    if (!fiche) { res.status(404).json({ erreur: "Fiche introuvable" }); return; }
-    if (fiche.statut !== "brouillon") {
-      res.status(400).json({ erreur: "Seules les fiches en brouillon peuvent être validées" });
+    if (!av) {
+      res.status(404).json({ erreur: "Avance introuvable" });
       return;
     }
+    if (av.statut === "rembourse") {
+      res.status(400).json({ erreur: "Cette avance est déjà remboursée" });
+      return;
+    }
+
+    const nouveauMontant = montantRembourse ?? av.montantFcfa;
+    const nouveauStatut =
+      nouveauMontant >= av.montantFcfa ? "rembourse" : "en_cours";
+
     const [updated] = await db
-      .update(fichesPaieTable)
-      .set({ statut: "valide", updatedAt: new Date() })
-      .where(eq(fichesPaieTable.id, id))
+      .update(avancesPersonnelTable)
+      .set({ montantRembourse: nouveauMontant, statut: nouveauStatut })
+      .where(eq(avancesPersonnelTable.id, id))
       .returning();
     res.json(updated);
   } catch (err) {
-    req.log.error({ err }, "validerFichePaie");
+    req.log.error({ err }, "rembourserAvance");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
-export async function payerFichePaie(req: Request, res: Response): Promise<void> {
-  try {
-    const id = parseId(req.params["id"]);
-    const [fiche] = await db
-      .select()
-      .from(fichesPaieTable)
-      .where(and(eq(fichesPaieTable.id, id), eq(fichesPaieTable.cooperativeId, COOP_ID)))
-      .limit(1);
-    if (!fiche) { res.status(404).json({ erreur: "Fiche introuvable" }); return; }
-    if (fiche.statut !== "valide") {
-      res.status(400).json({ erreur: "Seules les fiches validées peuvent être marquées payées" });
-      return;
-    }
-    const [updated] = await db
-      .update(fichesPaieTable)
-      .set({ statut: "paye", datePaiement: new Date(), updatedAt: new Date() })
-      .where(eq(fichesPaieTable.id, id))
-      .returning();
-    res.json(updated);
-  } catch (err) {
-    req.log.error({ err }, "payerFichePaie");
-    res.status(500).json({ erreur: "Erreur interne" });
-  }
-}
+// ══════════════════════════════════════════════════════════════════════════════
+//  RAPPORT MENSUEL
+// ══════════════════════════════════════════════════════════════════════════════
 
-export async function deleteFichePaie(req: Request, res: Response): Promise<void> {
+export async function getRapportMensuel(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
-    const id = parseId(req.params["id"]);
-    const [fiche] = await db
-      .select()
-      .from(fichesPaieTable)
-      .where(and(eq(fichesPaieTable.id, id), eq(fichesPaieTable.cooperativeId, COOP_ID)))
-      .limit(1);
-    if (!fiche) { res.status(404).json({ erreur: "Fiche introuvable" }); return; }
-    if (fiche.statut !== "brouillon") {
-      res.status(400).json({ erreur: "Seules les fiches en brouillon peuvent être supprimées" });
-      return;
-    }
-    await db.delete(fichesPaieTable).where(eq(fichesPaieTable.id, id));
-    res.status(204).send();
-  } catch (err) {
-    req.log.error({ err }, "deleteFichePaie");
-    res.status(500).json({ erreur: "Erreur interne" });
-  }
-}
-
-export async function getRecapSalaires(req: Request, res: Response): Promise<void> {
-  try {
-    const mois = req.query["mois"] ? parseInt(String(req.query["mois"])) : new Date().getMonth() + 1;
-    const annee = req.query["annee"] ? parseInt(String(req.query["annee"])) : new Date().getFullYear();
+    const mois = parseId(req.params["mois"]);
+    const annee = parseId(req.params["annee"]);
 
     const [recap] = await db
       .select({
-        nbFiches: sql<number>`count(*)::int`,
-        nbPayees: sql<number>`count(*) filter (where ${fichesPaieTable.statut} = 'paye')::int`,
-        nbValidees: sql<number>`count(*) filter (where ${fichesPaieTable.statut} = 'valide')::int`,
-        nbBrouillons: sql<number>`count(*) filter (where ${fichesPaieTable.statut} = 'brouillon')::int`,
-        masseSalarialeBrute: sql<number>`coalesce(sum(${fichesPaieTable.salaireBaseFcfa} + ${fichesPaieTable.primesFcfa} + ${fichesPaieTable.indemnitésFcfa} + ${fichesPaieTable.heuresSupFcfa}), 0)::int`,
-        masseSalarialeNette: sql<number>`coalesce(sum(${fichesPaieTable.netAPayerFcfa}), 0)::int`,
-        totalCnps: sql<number>`coalesce(sum(${fichesPaieTable.deductionCnpsFcfa}), 0)::int`,
+        nbBulletins: sql<number>`count(*)::int`,
+        nbPayes: sql<number>`count(*) filter (where ${bulletinsPaieTable.statut} = 'paye')::int`,
+        nbValides: sql<number>`count(*) filter (where ${bulletinsPaieTable.statut} = 'valide')::int`,
+        nbBrouillons: sql<number>`count(*) filter (where ${bulletinsPaieTable.statut} = 'brouillon')::int`,
+        totalBrut: sql<number>`coalesce(sum(${bulletinsPaieTable.salaireBrutFcfa}), 0)::int`,
+        totalNet: sql<number>`coalesce(sum(${bulletinsPaieTable.salaireNetFcfa}), 0)::int`,
+        totalChargesPatronales: sql<number>`coalesce(sum(${bulletinsPaieTable.chargesCnpsPatronaleFcfa} + ${bulletinsPaieTable.chargesTaxeApprentissageFcfa} + ${bulletinsPaieTable.chargesFpcFcfa}), 0)::int`,
+        coutTotalEmployeur: sql<number>`coalesce(sum(${bulletinsPaieTable.coutTotalEmployeurFcfa}), 0)::int`,
       })
-      .from(fichesPaieTable)
+      .from(bulletinsPaieTable)
       .where(
         and(
-          eq(fichesPaieTable.cooperativeId, COOP_ID),
-          eq(fichesPaieTable.mois, mois),
-          eq(fichesPaieTable.annee, annee),
+          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+          eq(bulletinsPaieTable.mois, mois),
+          eq(bulletinsPaieTable.annee, annee),
         ),
       );
 
-    const nbEmployesActifs = await db
+    // Répartition par poste
+    const parPoste = await db
+      .select({
+        poste: personnelTable.poste,
+        nbPersonnel: sql<number>`count(*)::int`,
+        totalNet: sql<number>`coalesce(sum(${bulletinsPaieTable.salaireNetFcfa}), 0)::int`,
+      })
+      .from(bulletinsPaieTable)
+      .innerJoin(
+        personnelTable,
+        eq(bulletinsPaieTable.personnelId, personnelTable.id),
+      )
+      .where(
+        and(
+          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+          eq(bulletinsPaieTable.mois, mois),
+          eq(bulletinsPaieTable.annee, annee),
+        ),
+      )
+      .groupBy(personnelTable.poste);
+
+    const [{ count: nbPersonnelActifs }] = await db
       .select({ count: sql<number>`count(*)::int` })
-      .from(employesTable)
-      .where(and(eq(employesTable.cooperativeId, COOP_ID), eq(employesTable.statut, "actif")));
+      .from(personnelTable)
+      .where(
+        and(
+          eq(personnelTable.cooperativeId, COOP_ID),
+          eq(personnelTable.statut, "actif"),
+        ),
+      );
 
     res.json({
       mois,
       annee,
-      nbEmployesActifs: nbEmployesActifs[0]?.count ?? 0,
-      ...(recap ?? { nbFiches: 0, nbPayees: 0, nbValidees: 0, nbBrouillons: 0, masseSalarialeBrute: 0, masseSalarialeNette: 0, totalCnps: 0 }),
+      nbPersonnelActifs: nbPersonnelActifs ?? 0,
+      ...(recap ?? {
+        nbBulletins: 0, nbPayes: 0, nbValides: 0, nbBrouillons: 0,
+        totalBrut: 0, totalNet: 0, totalChargesPatronales: 0, coutTotalEmployeur: 0,
+      }),
+      detailsParPoste: parPoste,
     });
   } catch (err) {
-    req.log.error({ err }, "getRecapSalaires");
+    req.log.error({ err }, "getRapportMensuel");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  HISTORIQUE MASSE SALARIALE (12 mois)
+// ══════════════════════════════════════════════════════════════════════════════
+
+export async function getHistoriqueMasse(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const rows = await db
+      .select({
+        mois: bulletinsPaieTable.mois,
+        annee: bulletinsPaieTable.annee,
+        periode: bulletinsPaieTable.periode,
+        totalBrut: sql<number>`coalesce(sum(${bulletinsPaieTable.salaireBrutFcfa}), 0)::int`,
+        totalNet: sql<number>`coalesce(sum(${bulletinsPaieTable.salaireNetFcfa}), 0)::int`,
+        coutTotalEmployeur: sql<number>`coalesce(sum(${bulletinsPaieTable.coutTotalEmployeurFcfa}), 0)::int`,
+        nbBulletins: sql<number>`count(*)::int`,
+      })
+      .from(bulletinsPaieTable)
+      .where(eq(bulletinsPaieTable.cooperativeId, COOP_ID))
+      .groupBy(
+        bulletinsPaieTable.mois,
+        bulletinsPaieTable.annee,
+        bulletinsPaieTable.periode,
+      )
+      .orderBy(desc(bulletinsPaieTable.annee), desc(bulletinsPaieTable.mois))
+      .limit(12);
+
+    res.json(rows.reverse());
+  } catch (err) {
+    req.log.error({ err }, "getHistoriqueMasse");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

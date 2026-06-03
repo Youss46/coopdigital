@@ -1200,299 +1200,555 @@ export const ToggleUserActifResponse = zod.object({
 
 
 /**
- * @summary Liste des employés
+ * @summary Liste du personnel
  */
-export const GetEmployesResponseItem = zod.object({
+export const GetPersonnelResponseItem = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "nom": zod.string(),
   "prenoms": zod.string(),
   "poste": zod.string(),
-  "telephone": zod.string().nullish(),
-  "email": zod.string().nullish(),
+  "roleSysteme": zod.string().nullish(),
+  "typeContrat": zod.enum(['cdi', 'cdd', 'journalier', 'stagiaire']),
   "dateEmbauche": zod.string(),
+  "dateFinContrat": zod.string().nullish(),
   "salaireBaseFcfa": zod.number(),
-  "statut": zod.enum(['actif', 'inactif']),
+  "sursalaireFcfa": zod.number(),
+  "numeroCnps": zod.string().nullish(),
+  "numeroCni": zod.string().nullish(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "telephonePaiement": zod.string().nullish(),
+  "ribBanque": zod.string().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'sorti']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
-export const GetEmployesResponse = zod.array(GetEmployesResponseItem)
+export const GetPersonnelResponse = zod.array(GetPersonnelResponseItem)
 
 
 /**
- * @summary Créer un employé
+ * @summary Créer un membre du personnel
  */
-export const CreateEmployeBody = zod.object({
+export const CreatePersonnelBody = zod.object({
   "nom": zod.string(),
   "prenoms": zod.string(),
   "poste": zod.string(),
-  "telephone": zod.string().optional(),
-  "email": zod.string().optional(),
+  "roleSysteme": zod.string().optional(),
+  "typeContrat": zod.enum(['cdi', 'cdd', 'journalier', 'stagiaire']).optional(),
   "dateEmbauche": zod.string(),
-  "salaireBaseFcfa": zod.number()
+  "dateFinContrat": zod.string().optional(),
+  "salaireBaseFcfa": zod.number(),
+  "sursalaireFcfa": zod.number().optional(),
+  "numeroCnps": zod.string().optional(),
+  "numeroCni": zod.string().optional(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']).optional(),
+  "telephonePaiement": zod.string().optional(),
+  "ribBanque": zod.string().optional()
 })
 
 
 /**
- * @summary Détail d'un employé
+ * @summary Détail d'un membre du personnel
  */
-export const GetEmployeByIdParams = zod.object({
+export const GetPersonnelByIdParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const GetEmployeByIdResponse = zod.object({
+export const GetPersonnelByIdResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "nom": zod.string(),
   "prenoms": zod.string(),
   "poste": zod.string(),
-  "telephone": zod.string().nullish(),
-  "email": zod.string().nullish(),
+  "roleSysteme": zod.string().nullish(),
+  "typeContrat": zod.enum(['cdi', 'cdd', 'journalier', 'stagiaire']),
   "dateEmbauche": zod.string(),
+  "dateFinContrat": zod.string().nullish(),
   "salaireBaseFcfa": zod.number(),
-  "statut": zod.enum(['actif', 'inactif']),
+  "sursalaireFcfa": zod.number(),
+  "numeroCnps": zod.string().nullish(),
+  "numeroCni": zod.string().nullish(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "telephonePaiement": zod.string().nullish(),
+  "ribBanque": zod.string().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'sorti']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
 
 
 /**
- * @summary Modifier un employé
+ * @summary Modifier un membre du personnel
  */
-export const UpdateEmployeParams = zod.object({
+export const UpdatePersonnelParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const UpdateEmployeBody = zod.object({
+export const UpdatePersonnelBody = zod.object({
   "nom": zod.string().optional(),
   "prenoms": zod.string().optional(),
   "poste": zod.string().optional(),
-  "telephone": zod.string().optional(),
-  "email": zod.string().optional(),
+  "roleSysteme": zod.string().optional(),
+  "typeContrat": zod.enum(['cdi', 'cdd', 'journalier', 'stagiaire']).optional(),
   "dateEmbauche": zod.string().optional(),
+  "dateFinContrat": zod.string().optional(),
   "salaireBaseFcfa": zod.number().optional(),
-  "statut": zod.enum(['actif', 'inactif']).optional()
+  "sursalaireFcfa": zod.number().optional(),
+  "numeroCnps": zod.string().optional(),
+  "numeroCni": zod.string().optional(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']).optional(),
+  "telephonePaiement": zod.string().optional(),
+  "ribBanque": zod.string().optional(),
+  "statut": zod.enum(['actif', 'suspendu', 'sorti']).optional()
 })
 
-export const UpdateEmployeResponse = zod.object({
+export const UpdatePersonnelResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "nom": zod.string(),
   "prenoms": zod.string(),
   "poste": zod.string(),
-  "telephone": zod.string().nullish(),
-  "email": zod.string().nullish(),
+  "roleSysteme": zod.string().nullish(),
+  "typeContrat": zod.enum(['cdi', 'cdd', 'journalier', 'stagiaire']),
   "dateEmbauche": zod.string(),
+  "dateFinContrat": zod.string().nullish(),
   "salaireBaseFcfa": zod.number(),
-  "statut": zod.enum(['actif', 'inactif']),
+  "sursalaireFcfa": zod.number(),
+  "numeroCnps": zod.string().nullish(),
+  "numeroCni": zod.string().nullish(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "telephonePaiement": zod.string().nullish(),
+  "ribBanque": zod.string().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'sorti']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
 
 
 /**
- * @summary Désactiver un employé
+ * @summary Archiver un membre du personnel (statut = sorti)
  */
-export const DesactiverEmployeParams = zod.object({
+export const ArchiverPersonnelParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const DesactiverEmployeResponse = zod.object({
+export const ArchiverPersonnelResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "nom": zod.string(),
   "prenoms": zod.string(),
   "poste": zod.string(),
-  "telephone": zod.string().nullish(),
-  "email": zod.string().nullish(),
+  "roleSysteme": zod.string().nullish(),
+  "typeContrat": zod.enum(['cdi', 'cdd', 'journalier', 'stagiaire']),
   "dateEmbauche": zod.string(),
+  "dateFinContrat": zod.string().nullish(),
   "salaireBaseFcfa": zod.number(),
-  "statut": zod.enum(['actif', 'inactif']),
+  "sursalaireFcfa": zod.number(),
+  "numeroCnps": zod.string().nullish(),
+  "numeroCni": zod.string().nullish(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "telephonePaiement": zod.string().nullish(),
+  "ribBanque": zod.string().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'sorti']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
 
 
 /**
- * @summary Liste des fiches de paie
+ * @summary Historique bulletins + avances d'un membre du personnel
  */
-export const GetFichesPaieQueryParams = zod.object({
+export const GetPersonnelHistoriqueParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPersonnelHistoriqueResponse = zod.object({
+  "personnel": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "poste": zod.string(),
+  "roleSysteme": zod.string().nullish(),
+  "typeContrat": zod.enum(['cdi', 'cdd', 'journalier', 'stagiaire']),
+  "dateEmbauche": zod.string(),
+  "dateFinContrat": zod.string().nullish(),
+  "salaireBaseFcfa": zod.number(),
+  "sursalaireFcfa": zod.number(),
+  "numeroCnps": zod.string().nullish(),
+  "numeroCni": zod.string().nullish(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "telephonePaiement": zod.string().nullish(),
+  "ribBanque": zod.string().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'sorti']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "bulletins": zod.array(zod.object({
+  "id": zod.number(),
+  "personnelId": zod.number(),
+  "cooperativeId": zod.number(),
+  "mois": zod.number(),
+  "annee": zod.number(),
+  "periode": zod.string(),
+  "salaireBaseFcfa": zod.number(),
+  "totalAvantagesFcfa": zod.number(),
+  "totalRetenuesFcfa": zod.number(),
+  "salaireBrutFcfa": zod.number(),
+  "salaireNetFcfa": zod.number(),
+  "chargesCnpsPatronaleFcfa": zod.number().optional(),
+  "chargesTaxeApprentissageFcfa": zod.number().optional(),
+  "chargesFpcFcfa": zod.number().optional(),
+  "coutTotalEmployeurFcfa": zod.number(),
+  "statut": zod.enum(['brouillon', 'valide', 'paye']),
+  "dateValidation": zod.coerce.date().nullish(),
+  "datePaiement": zod.coerce.date().nullish(),
+  "referencePaiement": zod.string().nullish(),
+  "payePar": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "avances": zod.array(zod.object({
+  "id": zod.number(),
+  "personnelId": zod.number(),
+  "cooperativeId": zod.number(),
+  "montantFcfa": zod.number(),
+  "dateOctroi": zod.string(),
+  "motif": zod.string().nullish(),
+  "statut": zod.enum(['en_cours', 'rembourse']),
+  "montantRembourse": zod.number(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Catalogue des composantes de salaire
+ */
+export const GetComposantesSalaireResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "libelle": zod.string(),
+  "type": zod.enum(['avantage', 'retenue']),
+  "calcul": zod.enum(['fixe', 'pourcentage']),
+  "valeur": zod.number(),
+  "obligatoire": zod.boolean()
+})
+export const GetComposantesSalaireResponse = zod.array(GetComposantesSalaireResponseItem)
+
+
+/**
+ * @summary Générer les bulletins de paie (masse ou sélection)
+ */
+export const GenererBulletinsBody = zod.object({
+  "mois": zod.number(),
+  "annee": zod.number(),
+  "personnelIds": zod.array(zod.number()).optional()
+})
+
+export const GenererBulletinsResponseItem = zod.object({
+  "personnelId": zod.number(),
+  "bulletinId": zod.number(),
+  "erreur": zod.string().nullish()
+})
+export const GenererBulletinsResponse = zod.array(GenererBulletinsResponseItem)
+
+
+/**
+ * @summary Liste des bulletins de paie
+ */
+export const GetBulletinsQueryParams = zod.object({
   "mois": zod.coerce.number().optional(),
   "annee": zod.coerce.number().optional(),
-  "employeId": zod.coerce.number().optional()
+  "statut": zod.enum(['brouillon', 'valide', 'paye']).optional()
 })
 
-export const GetFichesPaieResponseItem = zod.object({
-  "fiche": zod.object({
+export const GetBulletinsResponseItem = zod.object({
+  "bulletin": zod.object({
   "id": zod.number(),
+  "personnelId": zod.number(),
   "cooperativeId": zod.number(),
-  "employeId": zod.number(),
   "mois": zod.number(),
   "annee": zod.number(),
+  "periode": zod.string(),
   "salaireBaseFcfa": zod.number(),
-  "primesFcfa": zod.number(),
-  "indemnitésFcfa": zod.number(),
-  "heuresSupFcfa": zod.number(),
-  "deductionCnpsFcfa": zod.number(),
-  "deductionImpotFcfa": zod.number(),
-  "avanceSurSalaireFcfa": zod.number(),
-  "netAPayerFcfa": zod.number(),
+  "totalAvantagesFcfa": zod.number(),
+  "totalRetenuesFcfa": zod.number(),
+  "salaireBrutFcfa": zod.number(),
+  "salaireNetFcfa": zod.number(),
+  "chargesCnpsPatronaleFcfa": zod.number().optional(),
+  "chargesTaxeApprentissageFcfa": zod.number().optional(),
+  "chargesFpcFcfa": zod.number().optional(),
+  "coutTotalEmployeurFcfa": zod.number(),
   "statut": zod.enum(['brouillon', 'valide', 'paye']),
+  "dateValidation": zod.coerce.date().nullish(),
   "datePaiement": zod.coerce.date().nullish(),
-  "observations": zod.string().nullish(),
+  "referencePaiement": zod.string().nullish(),
+  "payePar": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+}),
+  "personnel": zod.object({
+  "id": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "poste": zod.string(),
+  "modePaiement": zod.string().optional(),
+  "telephonePaiement": zod.string().nullish()
+})
+})
+export const GetBulletinsResponse = zod.array(GetBulletinsResponseItem)
+
+
+/**
+ * @summary Détail d'un bulletin de paie avec lignes
+ */
+export const GetBulletinByIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBulletinByIdResponse = zod.object({
+  "bulletin": zod.object({
+  "id": zod.number(),
+  "personnelId": zod.number(),
+  "cooperativeId": zod.number(),
+  "mois": zod.number(),
+  "annee": zod.number(),
+  "periode": zod.string(),
+  "salaireBaseFcfa": zod.number(),
+  "totalAvantagesFcfa": zod.number(),
+  "totalRetenuesFcfa": zod.number(),
+  "salaireBrutFcfa": zod.number(),
+  "salaireNetFcfa": zod.number(),
+  "chargesCnpsPatronaleFcfa": zod.number().optional(),
+  "chargesTaxeApprentissageFcfa": zod.number().optional(),
+  "chargesFpcFcfa": zod.number().optional(),
+  "coutTotalEmployeurFcfa": zod.number(),
+  "statut": zod.enum(['brouillon', 'valide', 'paye']),
+  "dateValidation": zod.coerce.date().nullish(),
+  "datePaiement": zod.coerce.date().nullish(),
+  "referencePaiement": zod.string().nullish(),
+  "payePar": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+}),
+  "personnel": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "poste": zod.string(),
+  "roleSysteme": zod.string().nullish(),
+  "typeContrat": zod.enum(['cdi', 'cdd', 'journalier', 'stagiaire']),
+  "dateEmbauche": zod.string(),
+  "dateFinContrat": zod.string().nullish(),
+  "salaireBaseFcfa": zod.number(),
+  "sursalaireFcfa": zod.number(),
+  "numeroCnps": zod.string().nullish(),
+  "numeroCni": zod.string().nullish(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "telephonePaiement": zod.string().nullish(),
+  "ribBanque": zod.string().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'sorti']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }),
-  "employe": zod.object({
+  "lignes": zod.array(zod.object({
+  "id": zod.number(),
+  "bulletinId": zod.number(),
+  "libelle": zod.string(),
+  "type": zod.enum(['avantage', 'retenue']),
+  "montantFcfa": zod.number()
+}))
+})
+
+
+/**
+ * @summary Supprimer un bulletin (brouillon uniquement)
+ */
+export const DeleteBulletinParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Valider un bulletin de paie
+ */
+export const ValiderBulletinParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ValiderBulletinResponse = zod.object({
+  "id": zod.number(),
+  "personnelId": zod.number(),
+  "cooperativeId": zod.number(),
+  "mois": zod.number(),
+  "annee": zod.number(),
+  "periode": zod.string(),
+  "salaireBaseFcfa": zod.number(),
+  "totalAvantagesFcfa": zod.number(),
+  "totalRetenuesFcfa": zod.number(),
+  "salaireBrutFcfa": zod.number(),
+  "salaireNetFcfa": zod.number(),
+  "chargesCnpsPatronaleFcfa": zod.number().optional(),
+  "chargesTaxeApprentissageFcfa": zod.number().optional(),
+  "chargesFpcFcfa": zod.number().optional(),
+  "coutTotalEmployeurFcfa": zod.number(),
+  "statut": zod.enum(['brouillon', 'valide', 'paye']),
+  "dateValidation": zod.coerce.date().nullish(),
+  "datePaiement": zod.coerce.date().nullish(),
+  "referencePaiement": zod.string().nullish(),
+  "payePar": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Marquer un bulletin comme payé
+ */
+export const PayerBulletinParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PayerBulletinBody = zod.object({
+  "referencePaiement": zod.string().optional()
+})
+
+export const PayerBulletinResponse = zod.object({
+  "id": zod.number(),
+  "personnelId": zod.number(),
+  "cooperativeId": zod.number(),
+  "mois": zod.number(),
+  "annee": zod.number(),
+  "periode": zod.string(),
+  "salaireBaseFcfa": zod.number(),
+  "totalAvantagesFcfa": zod.number(),
+  "totalRetenuesFcfa": zod.number(),
+  "salaireBrutFcfa": zod.number(),
+  "salaireNetFcfa": zod.number(),
+  "chargesCnpsPatronaleFcfa": zod.number().optional(),
+  "chargesTaxeApprentissageFcfa": zod.number().optional(),
+  "chargesFpcFcfa": zod.number().optional(),
+  "coutTotalEmployeurFcfa": zod.number(),
+  "statut": zod.enum(['brouillon', 'valide', 'paye']),
+  "dateValidation": zod.coerce.date().nullish(),
+  "datePaiement": zod.coerce.date().nullish(),
+  "referencePaiement": zod.string().nullish(),
+  "payePar": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Télécharger le bulletin en PDF
+ */
+export const GetBulletinPdfParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Liste des avances personnel
+ */
+export const GetAvancesPersonnelQueryParams = zod.object({
+  "personnelId": zod.coerce.number().optional(),
+  "statut": zod.enum(['en_cours', 'rembourse']).optional()
+})
+
+export const GetAvancesPersonnelResponseItem = zod.object({
+  "avance": zod.object({
+  "id": zod.number(),
+  "personnelId": zod.number(),
+  "cooperativeId": zod.number(),
+  "montantFcfa": zod.number(),
+  "dateOctroi": zod.string(),
+  "motif": zod.string().nullish(),
+  "statut": zod.enum(['en_cours', 'rembourse']),
+  "montantRembourse": zod.number(),
+  "createdAt": zod.coerce.date()
+}),
+  "personnel": zod.object({
   "id": zod.number(),
   "nom": zod.string(),
   "prenoms": zod.string(),
   "poste": zod.string()
 })
 })
-export const GetFichesPaieResponse = zod.array(GetFichesPaieResponseItem)
+export const GetAvancesPersonnelResponse = zod.array(GetAvancesPersonnelResponseItem)
 
 
 /**
- * @summary Créer une fiche de paie
+ * @summary Octroyer une avance à un membre du personnel
  */
-export const CreateFichePaieBody = zod.object({
-  "employeId": zod.number(),
-  "mois": zod.number(),
-  "annee": zod.number(),
-  "salaireBaseFcfa": zod.number(),
-  "primesFcfa": zod.number().optional(),
-  "indemnitésFcfa": zod.number().optional(),
-  "heuresSupFcfa": zod.number().optional(),
-  "deductionCnpsFcfa": zod.number().optional(),
-  "deductionImpotFcfa": zod.number().optional(),
-  "avanceSurSalaireFcfa": zod.number().optional(),
-  "observations": zod.string().optional()
+export const CreateAvancePersonnelBody = zod.object({
+  "personnelId": zod.number(),
+  "montantFcfa": zod.number(),
+  "dateOctroi": zod.string(),
+  "motif": zod.string().optional()
 })
 
 
 /**
- * @summary Récapitulatif mensuel des salaires
+ * @summary Enregistrer un remboursement d'avance
  */
-export const GetRecapSalairesQueryParams = zod.object({
-  "mois": zod.coerce.number().optional(),
-  "annee": zod.coerce.number().optional()
+export const RembourserAvancePersonnelParams = zod.object({
+  "id": zod.coerce.number()
 })
 
-export const GetRecapSalairesResponse = zod.object({
+export const RembourserAvancePersonnelBody = zod.object({
+  "montantRembourse": zod.number().optional()
+})
+
+export const RembourserAvancePersonnelResponse = zod.object({
+  "id": zod.number(),
+  "personnelId": zod.number(),
+  "cooperativeId": zod.number(),
+  "montantFcfa": zod.number(),
+  "dateOctroi": zod.string(),
+  "motif": zod.string().nullish(),
+  "statut": zod.enum(['en_cours', 'rembourse']),
+  "montantRembourse": zod.number(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Rapport de masse salariale mensuel
+ */
+export const GetRapportMensuelParams = zod.object({
+  "mois": zod.coerce.number(),
+  "annee": zod.coerce.number()
+})
+
+export const GetRapportMensuelResponse = zod.object({
   "mois": zod.number(),
   "annee": zod.number(),
-  "nbEmployesActifs": zod.number(),
-  "nbFiches": zod.number(),
-  "nbPayees": zod.number(),
-  "nbValidees": zod.number(),
+  "nbPersonnelActifs": zod.number(),
+  "nbBulletins": zod.number(),
+  "nbPayes": zod.number(),
+  "nbValides": zod.number(),
   "nbBrouillons": zod.number(),
-  "masseSalarialeBrute": zod.number(),
-  "masseSalarialeNette": zod.number(),
-  "totalCnps": zod.number()
+  "totalBrut": zod.number(),
+  "totalNet": zod.number(),
+  "totalChargesPatronales": zod.number(),
+  "coutTotalEmployeur": zod.number(),
+  "detailsParPoste": zod.array(zod.object({
+  "poste": zod.string(),
+  "nbPersonnel": zod.number(),
+  "totalNet": zod.number()
+}))
 })
 
 
 /**
- * @summary Détail d'une fiche de paie
+ * @summary Évolution de la masse salariale sur 12 mois
  */
-export const GetFichePaieByIdParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const GetFichePaieByIdResponse = zod.object({
-  "fiche": zod.object({
-  "id": zod.number(),
-  "cooperativeId": zod.number(),
-  "employeId": zod.number(),
+export const GetHistoriqueMasseResponseItem = zod.object({
   "mois": zod.number(),
   "annee": zod.number(),
-  "salaireBaseFcfa": zod.number(),
-  "primesFcfa": zod.number(),
-  "indemnitésFcfa": zod.number(),
-  "heuresSupFcfa": zod.number(),
-  "deductionCnpsFcfa": zod.number(),
-  "deductionImpotFcfa": zod.number(),
-  "avanceSurSalaireFcfa": zod.number(),
-  "netAPayerFcfa": zod.number(),
-  "statut": zod.enum(['brouillon', 'valide', 'paye']),
-  "datePaiement": zod.coerce.date().nullish(),
-  "observations": zod.string().nullish(),
-  "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
-}),
-  "employe": zod.object({
-  "id": zod.number(),
-  "nom": zod.string(),
-  "prenoms": zod.string(),
-  "poste": zod.string()
+  "periode": zod.string(),
+  "totalBrut": zod.number(),
+  "totalNet": zod.number(),
+  "coutTotalEmployeur": zod.number(),
+  "nbBulletins": zod.number()
 })
-})
-
-
-/**
- * @summary Supprimer une fiche (brouillon uniquement)
- */
-export const DeleteFichePaieParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-
-/**
- * @summary Valider une fiche de paie
- */
-export const ValiderFichePaieParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const ValiderFichePaieResponse = zod.object({
-  "id": zod.number(),
-  "cooperativeId": zod.number(),
-  "employeId": zod.number(),
-  "mois": zod.number(),
-  "annee": zod.number(),
-  "salaireBaseFcfa": zod.number(),
-  "primesFcfa": zod.number(),
-  "indemnitésFcfa": zod.number(),
-  "heuresSupFcfa": zod.number(),
-  "deductionCnpsFcfa": zod.number(),
-  "deductionImpotFcfa": zod.number(),
-  "avanceSurSalaireFcfa": zod.number(),
-  "netAPayerFcfa": zod.number(),
-  "statut": zod.enum(['brouillon', 'valide', 'paye']),
-  "datePaiement": zod.coerce.date().nullish(),
-  "observations": zod.string().nullish(),
-  "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
-})
-
-
-/**
- * @summary Marquer une fiche comme payée
- */
-export const PayerFichePaieParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const PayerFichePaieResponse = zod.object({
-  "id": zod.number(),
-  "cooperativeId": zod.number(),
-  "employeId": zod.number(),
-  "mois": zod.number(),
-  "annee": zod.number(),
-  "salaireBaseFcfa": zod.number(),
-  "primesFcfa": zod.number(),
-  "indemnitésFcfa": zod.number(),
-  "heuresSupFcfa": zod.number(),
-  "deductionCnpsFcfa": zod.number(),
-  "deductionImpotFcfa": zod.number(),
-  "avanceSurSalaireFcfa": zod.number(),
-  "netAPayerFcfa": zod.number(),
-  "statut": zod.enum(['brouillon', 'valide', 'paye']),
-  "datePaiement": zod.coerce.date().nullish(),
-  "observations": zod.string().nullish(),
-  "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
-})
+export const GetHistoriqueMasseResponse = zod.array(GetHistoriqueMasseResponseItem)
 
 
