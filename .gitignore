@@ -47,3 +47,16 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Environnements locaux
+.env
+.env.local
+.env.*.local
+
+# Logs applicatifs
+pnpm-debug.log*
+*.log
+
+# Builds applicatifs
+artifacts/*/dist/
+
