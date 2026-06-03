@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useGetUsers,
@@ -7,7 +7,27 @@ import {
   useToggleUserActif,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Trash2, ToggleLeft, ToggleRight, ShieldCheck } from "lucide-react";
+import { UserPlus, Trash2, ToggleLeft, ToggleRight, ShieldCheck, Copy, RefreshCw, CheckCheck, Share2 } from "lucide-react";
+
+// ——— Génération de mot de passe sécurisé ———
+function genererMotDePasse(): string {
+  const maj = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const min = "abcdefghjkmnpqrstuvwxyz";
+  const chiffres = "23456789";
+  const speciaux = "!@#$";
+  const pick = (s: string) => s[Math.floor(Math.random() * s.length)];
+  const chars = [
+    pick(maj), pick(maj),
+    pick(min), pick(min), pick(min),
+    pick(chiffres), pick(chiffres), pick(chiffres),
+    pick(speciaux),
+  ];
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j]!, chars[i]!];
+  }
+  return chars.join("");
+}
 
 // ——— Rôles ———
 type UserRole =
@@ -90,21 +110,50 @@ interface CreateModalProps {
 function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
   const { toast } = useToast();
   const createMutation = useCreateUser();
+  const [phase, setPhase] = useState<"form" | "succes">("form");
+  const [motDePasse, setMotDePasse] = useState(() => genererMotDePasse());
+  const [copie, setCopie] = useState(false);
   const [form, setForm] = useState({
     nom: "",
     prenoms: "",
     email: "",
     telephone: "",
     role: "" as UserRole | "",
-    motDePasse: "",
   });
 
   const rolesDisponibles = getRolesCreables(requesterRole);
 
+  const regenerer = useCallback(() => {
+    setMotDePasse(genererMotDePasse());
+    setCopie(false);
+  }, []);
+
+  const copierMDP = useCallback(async () => {
+    await navigator.clipboard.writeText(motDePasse);
+    setCopie(true);
+    setTimeout(() => setCopie(false), 2000);
+  }, [motDePasse]);
+
+  const partagerWhatsApp = useCallback(() => {
+    const appUrl = window.location.origin + (import.meta.env.BASE_URL ?? "/");
+    const ligne = (label: string, val: string) => `${label} : ${val}`;
+    const msg = [
+      `Bonjour ${form.prenoms || ""},`,
+      "",
+      "Voici vos informations de connexion CoopDigital :",
+      ligne("🌐 Adresse", appUrl),
+      ligne("📧 Email", form.email || "—"),
+      ligne("🔑 Mot de passe temporaire", motDePasse),
+      "",
+      "Merci de changer votre mot de passe dès la première connexion.",
+      "— CoopDigital",
+    ].join("\n");
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  }, [form.prenoms, form.email, motDePasse]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.role) return;
-
     createMutation.mutate(
       {
         data: {
@@ -113,18 +162,16 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
           email: form.email,
           telephone: form.telephone || undefined,
           role: form.role as UserRole,
-          motDePasse: form.motDePasse,
+          motDePasse,
         },
       },
       {
         onSuccess: () => {
-          toast({ title: "Compte créé avec succès" });
           onSuccess();
-          onClose();
+          setPhase("succes");
         },
         onError: (err: unknown) => {
-          const msg =
-            err instanceof Error ? err.message : "Erreur lors de la création";
+          const msg = err instanceof Error ? err.message : "Erreur lors de la création";
           toast({ title: "Erreur", description: msg, variant: "destructive" });
         },
       },
@@ -134,117 +181,204 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: "#1a4731" }}
-          >
-            <UserPlus className="w-5 h-5 text-white" />
-          </div>
-          <h3 className="font-bold text-gray-900">Créer un compte</h3>
-        </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Prénom(s)</label>
-              <input
-                type="text"
-                required
-                value={form.prenoms}
-                onChange={(e) => setForm({ ...form, prenoms: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Jean-Baptiste"
-              />
+        {/* ——— Phase succès ——— */}
+        {phase === "succes" ? (
+          <>
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div
+                className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+                style={{ backgroundColor: "#d1fae5" }}
+              >
+                <CheckCheck className="w-6 h-6" style={{ color: "#1a4731" }} />
+              </div>
+              <h3 className="font-bold text-gray-900 text-lg">Compte créé !</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {form.prenoms} {form.nom} · <RoleBadge role={form.role || "agent_terrain"} />
+              </p>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Nom</label>
-              <input
-                type="text"
-                required
-                value={form.nom}
-                onChange={(e) => setForm({ ...form, nom: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="KOUASSI"
-              />
+
+            <div className="mx-6 mb-4 rounded-xl border border-gray-100 bg-gray-50 divide-y divide-gray-100">
+              <div className="px-4 py-3 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Email</p>
+                  <p className="text-sm font-medium text-gray-800 break-all">{form.email}</p>
+                </div>
+              </div>
+              <div className="px-4 py-3 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Mot de passe temporaire</p>
+                  <p className="text-sm font-mono font-bold text-gray-900 tracking-wider">{motDePasse}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={copierMDP}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                  style={copie
+                    ? { backgroundColor: "#d1fae5", color: "#1a4731" }
+                    : { backgroundColor: "#f3f4f6", color: "#374151" }}
+                >
+                  {copie ? <CheckCheck size={13} /> : <Copy size={13} />}
+                  {copie ? "Copié !" : "Copier"}
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Adresse email</label>
-            <input
-              type="email"
-              required
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="prenom.nom@coopdigital.ci"
-            />
-          </div>
+            <div className="px-6 pb-6 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={partagerWhatsApp}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-medium"
+                style={{ backgroundColor: "#25D366" }}
+              >
+                <Share2 size={15} />
+                Partager sur WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Fermer
+              </button>
+            </div>
+          </>
+        ) : (
+          /* ——— Phase formulaire ——— */
+          <>
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: "#1a4731" }}
+              >
+                <UserPlus className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="font-bold text-gray-900">Créer un compte</h3>
+            </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Téléphone <span className="text-gray-400">(optionnel)</span>
-            </label>
-            <input
-              type="tel"
-              value={form.telephone}
-              onChange={(e) => setForm({ ...form, telephone: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="+225 07 00 00 00 00"
-            />
-          </div>
+            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Prénom(s)</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.prenoms}
+                    onChange={(e) => setForm({ ...form, prenoms: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Jean-Baptiste"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Nom</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.nom}
+                    onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="KOUASSI"
+                  />
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Rôle</label>
-            <select
-              required
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-            >
-              <option value="">Sélectionner un rôle…</option>
-              {rolesDisponibles.map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABELS[r]}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Adresse email</label>
+                <input
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="prenom.nom@coopdigital.ci"
+                />
+              </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Mot de passe temporaire
-            </label>
-            <input
-              type="password"
-              required
-              minLength={8}
-              value={form.motDePasse}
-              onChange={(e) => setForm({ ...form, motDePasse: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Min. 8 caractères"
-            />
-          </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Téléphone <span className="text-gray-400">(optionnel)</span>
+                </label>
+                <input
+                  type="tel"
+                  value={form.telephone}
+                  onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="+225 07 00 00 00 00"
+                />
+              </div>
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={createMutation.isPending}
-              className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
-              style={{ backgroundColor: "#1a4731" }}
-            >
-              {createMutation.isPending ? "Création…" : "Créer le compte"}
-            </button>
-          </div>
-        </form>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Rôle</label>
+                <select
+                  required
+                  value={form.role}
+                  onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                >
+                  <option value="">Sélectionner un rôle…</option>
+                  {rolesDisponibles.map((r) => (
+                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Mot de passe auto-généré */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-gray-700">Mot de passe temporaire</label>
+                  <button
+                    type="button"
+                    onClick={regenerer}
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    <RefreshCw size={11} />
+                    Régénérer
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1 flex items-center px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
+                    <span className="text-sm font-mono font-semibold text-gray-800 tracking-wider flex-1">
+                      {motDePasse}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={copierMDP}
+                    title="Copier le mot de passe"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors"
+                    style={copie
+                      ? { backgroundColor: "#d1fae5", borderColor: "#6ee7b7", color: "#1a4731" }
+                      : { backgroundColor: "white", borderColor: "#e5e7eb", color: "#374151" }}
+                  >
+                    {copie ? <CheckCheck size={15} /> : <Copy size={15} />}
+                    {copie ? "Copié !" : "Copier"}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Généré automatiquement · modifiable si besoin
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
+                  style={{ backgroundColor: "#1a4731" }}
+                >
+                  {createMutation.isPending ? "Création…" : "Créer le compte"}
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
