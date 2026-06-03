@@ -20,9 +20,9 @@ const navItems = [
   { href: "/livraisons/nouvelle", label: "Nouvelle livraison", icon: Package },
 ];
 
-function SidebarContent({ onClose }: { onClose?: () => void }) {
+function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout: () => void }) {
   const [location] = useLocation();
-  const { utilisateur, logout } = useAuth();
+  const { utilisateur } = useAuth();
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#1a4731" }}>
@@ -92,7 +92,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </div>
         </div>
         <button
-          onClick={logout}
+          onClick={onLogout}
           className="flex items-center gap-2 text-green-300 hover:text-white text-xs w-full transition-colors py-1"
         >
           <LogOut size={14} />
@@ -104,13 +104,20 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const { logout } = useAuth();
   const [menuOuvert, setMenuOuvert] = useState(false);
+  const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
+
+  const demanderDeconnexion = () => {
+    setMenuOuvert(false);
+    setConfirmDeconnexion(true);
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans">
       {/* Sidebar desktop — always visible lg+ */}
       <aside className="hidden lg:flex w-64 flex-shrink-0 flex-col">
-        <SidebarContent />
+        <SidebarContent onLogout={demanderDeconnexion} />
       </aside>
 
       {/* Overlay mobile */}
@@ -128,7 +135,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           menuOuvert ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <SidebarContent onClose={() => setMenuOuvert(false)} />
+        <SidebarContent onClose={() => setMenuOuvert(false)} onLogout={demanderDeconnexion} />
       </aside>
 
       {/* Zone principale */}
@@ -158,6 +165,35 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="p-4 sm:p-6">{children}</div>
         </main>
       </div>
+
+      {/* Modal confirmation déconnexion */}
+      {confirmDeconnexion && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">Déconnexion</h3>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-gray-600">Voulez-vous vraiment vous déconnecter ?</p>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setConfirmDeconnexion(false)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => { setConfirmDeconnexion(false); logout(); }}
+                className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium"
+                style={{ backgroundColor: "#1a4731" }}
+              >
+                Se déconnecter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
