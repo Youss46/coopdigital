@@ -8,6 +8,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetMembresQueryKey } from "@workspace/api-client-react";
 import { UserPlus, Search, Eye, QrCode } from "lucide-react";
+import { usePermission } from "@/hooks/usePermission";
 
 function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
@@ -18,6 +19,8 @@ const COOP_ID_PAR_DEFAUT = 1;
 export default function Membres() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+
+  const peutCreer = usePermission("membres", "creer");
 
   const [recherche, setRecherche] = useState("");
   const [statut, setStatut] = useState<"" | "actif" | "inactif">("");
@@ -77,14 +80,16 @@ export default function Membres() {
           <h1 className="text-2xl font-bold text-gray-900">Membres</h1>
           <p className="text-gray-500 text-sm mt-0.5">{data?.total ?? 0} membres enregistrés</p>
         </div>
-        <button
-          onClick={() => setModalOuvert(true)}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-white text-sm font-medium flex-shrink-0"
-          style={{ backgroundColor: "#1a4731" }}
-        >
-          <UserPlus size={16} />
-          <span className="hidden sm:inline">Nouveau membre</span>
-        </button>
+        {peutCreer && (
+          <button
+            onClick={() => setModalOuvert(true)}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-white text-sm font-medium flex-shrink-0"
+            style={{ backgroundColor: "#1a4731" }}
+          >
+            <UserPlus size={16} />
+            <span className="hidden sm:inline">Nouveau membre</span>
+          </button>
+        )}
       </div>
 
       {/* Filtres */}

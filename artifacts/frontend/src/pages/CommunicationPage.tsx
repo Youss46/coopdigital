@@ -7,6 +7,7 @@ import {
 import { getGetCommunicationHistoriqueQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageSquare, Send, Users, CheckCircle, XCircle, Clock } from "lucide-react";
+import { usePermission } from "@/hooks/usePermission";
 
 function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", {
@@ -22,6 +23,7 @@ const MAX_SMS = 160;
 
 export default function CommunicationPage() {
   const queryClient = useQueryClient();
+  const peutEnvoyerSms = usePermission("communication", "envoyer_sms");
   const [message, setMessage] = useState("");
   const [groupement, setGroupement] = useState("");
   const [resultat, setResultat] = useState<{ envoyes: number; echecs: number; total: number } | null>(null);
@@ -93,8 +95,8 @@ export default function CommunicationPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Formulaire d'envoi */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        {/* Formulaire d'envoi — visible seulement si permission envoyer_sms */}
+        {peutEnvoyerSms && <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
             <Send size={16} />
             SMS groupé
@@ -153,7 +155,7 @@ export default function CommunicationPage() {
               ? "Envoi en cours…"
               : `Envoyer à ${nbDestinataires} membre${nbDestinataires !== 1 ? "s" : ""}`}
           </button>
-        </div>
+        </div>}
 
         {/* Historique */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

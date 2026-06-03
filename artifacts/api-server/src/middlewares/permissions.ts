@@ -1,0 +1,134 @@
+import { type Request, type Response, type NextFunction } from "express";
+
+// ─── Matrice des permissions RBAC ───────────────────────────────────────────
+
+export const PERMISSIONS: Record<string, Record<string, string[]>> = {
+
+  // MODULE COMPTES & ADMINISTRATION
+  users: {
+    lire:      ["pca", "directeur"],
+    creer:     ["pca", "directeur"],
+    modifier:  ["pca", "directeur"],
+    supprimer: ["pca", "directeur"],
+    activer:   ["pca", "directeur"],
+  },
+
+  // MODULE M01 — MEMBRES
+  membres: {
+    lire:     ["pca", "directeur", "comptable", "responsable_tracabilite", "agent_terrain", "auditeur"],
+    creer:    ["pca", "directeur", "agent_terrain"],
+    modifier: ["pca", "directeur", "agent_terrain"],
+    supprimer:["pca", "directeur"],
+    exporter: ["pca", "directeur", "comptable", "auditeur"],
+  },
+
+  // MODULE M02 — TRAÇABILITÉ
+  tracabilite: {
+    lire:             ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    creer_lot:        ["pca", "directeur", "responsable_tracabilite"],
+    modifier_lot:     ["pca", "directeur", "responsable_tracabilite"],
+    supprimer_lot:    ["pca", "directeur"],
+    scanner_qr:       ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
+    exporter_eudr:    ["pca", "directeur", "responsable_tracabilite", "auditeur"],
+  },
+
+  // MODULE M03 — STOCKS
+  stocks: {
+    lire:                ["pca", "directeur", "comptable", "magasinier", "auditeur"],
+    entree:              ["pca", "directeur", "magasinier"],
+    sortie:              ["pca", "directeur", "magasinier"],
+    creer_entrepot:      ["pca", "directeur"],
+    modifier_entrepot:   ["pca", "directeur"],
+    supprimer_entrepot:  ["pca"],
+    voir_alertes:        ["pca", "directeur", "magasinier"],
+  },
+
+  // MODULE M04 — AVANCES & PAIEMENTS
+  avances: {
+    lire:      ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
+    octroyer:  ["pca", "directeur", "agent_terrain"],
+    rembourser:["pca", "directeur", "agent_terrain"],
+    supprimer: ["pca", "directeur"],
+  },
+
+  livraisons: {
+    lire:      ["pca", "directeur", "comptable", "responsable_tracabilite", "agent_terrain", "auditeur"],
+    creer:     ["pca", "directeur", "agent_terrain"],
+    modifier:  ["pca", "directeur"],
+    supprimer: ["pca", "directeur"],
+  },
+
+  paiements: {
+    lire:     ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
+    confirmer:["pca", "directeur", "agent_terrain"],
+    annuler:  ["pca", "directeur"],
+  },
+
+  // MODULE M04 ÉTENDU — EXPORTATEURS & CRÉANCES
+  exportateurs: {
+    lire:     ["pca", "directeur", "comptable", "auditeur"],
+    creer:    ["pca", "directeur"],
+    modifier: ["pca", "directeur"],
+    supprimer:["pca"],
+  },
+
+  creances: {
+    lire:                      ["pca", "directeur", "comptable", "auditeur"],
+    enregistrer_encaissement:  ["pca", "directeur", "comptable"],
+    modifier:                  ["pca", "directeur"],
+  },
+
+  // MODULE M05 — COMPTABILITÉ
+  comptabilite: {
+    lire:                       ["pca", "directeur", "comptable", "auditeur"],
+    saisir_ecriture_manuelle:   ["pca", "directeur", "comptable"],
+    modifier_ecriture:          ["pca", "directeur"],
+    supprimer_ecriture:         ["pca"],
+    cloture_exercice:           ["pca", "directeur"],
+    voir_grand_livre:           ["pca", "directeur", "comptable", "auditeur"],
+    voir_balance:               ["pca", "directeur", "comptable", "auditeur"],
+    voir_bilan:                 ["pca", "directeur", "comptable", "auditeur"],
+    voir_compte_resultat:       ["pca", "directeur", "comptable", "auditeur"],
+  },
+
+  // MODULE M06 — REPORTING
+  reporting: {
+    voir_dashboard:               ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
+    generer_rapport_mensuel:      ["pca", "directeur", "comptable"],
+    generer_bilan_campagne:       ["pca", "directeur", "comptable"],
+    generer_fiche_membre:         ["pca", "directeur", "agent_terrain"],
+    exporter_donnees_bailleurs:   ["pca", "directeur", "auditeur"],
+  },
+
+  // MODULE M07 — COMMUNICATION
+  communication: {
+    lire_historique:    ["pca", "directeur", "comptable"],
+    envoyer_sms:        ["pca", "directeur"],
+    envoyer_whatsapp:   ["pca", "directeur"],
+    configurer_alertes: ["pca", "directeur"],
+  },
+};
+
+// ─── Fonction principale ─────────────────────────────────────────────────────
+
+export function hasPermission(userRole: string, module: string, action: string): boolean {
+  const allowed = PERMISSIONS[module]?.[action];
+  if (!allowed) return false;
+  return allowed.includes(userRole);
+}
+
+// ─── Middleware Express réutilisable ─────────────────────────────────────────
+
+export function checkPermission(module: string, action: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const role = req.user?.role ?? "";
+    if (!hasPermission(role, module, action)) {
+      res.status(403).json({
+        erreur: "Accès refusé",
+        message: `Votre rôle (${role}) ne permet pas cette action.`,
+      });
+      return;
+    }
+    next();
+  };
+}

@@ -14,6 +14,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Building2, PlusCircle, ChevronRight, ArrowLeft } from "lucide-react";
+import { usePermission } from "@/hooks/usePermission";
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -37,6 +38,7 @@ const STATUT_LABELS: Record<string, string> = {
 
 export default function ExportateursPage() {
   const queryClient = useQueryClient();
+  const peutCreer = usePermission("exportateurs", "creer");
   const [vueFiche, setVueFiche] = useState<number | null>(null);
   const [modalExp, setModalExp] = useState(false);
   const [modalVente, setModalVente] = useState(false);
@@ -156,21 +158,25 @@ export default function ExportateursPage() {
           <p className="text-gray-500 text-sm mt-1">Gestion des acheteurs et créances</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setModalVente(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50"
-          >
-            <PlusCircle size={15} />
-            Nouvelle vente
-          </button>
-          <button
-            onClick={() => setModalExp(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg"
-            style={{ backgroundColor: "#1a4731" }}
-          >
-            <PlusCircle size={15} />
-            Nouvel exportateur
-          </button>
+          {peutCreer && (
+            <button
+              onClick={() => setModalVente(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50"
+            >
+              <PlusCircle size={15} />
+              Nouvelle vente
+            </button>
+          )}
+          {peutCreer && (
+            <button
+              onClick={() => setModalExp(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg"
+              style={{ backgroundColor: "#1a4731" }}
+            >
+              <PlusCircle size={15} />
+              Nouvel exportateur
+            </button>
+          )}
         </div>
       </div>
 
@@ -185,13 +191,15 @@ export default function ExportateursPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <Building2 size={40} className="mx-auto text-gray-300 mb-3" />
           <p className="text-gray-500 font-medium">Aucun exportateur enregistré</p>
-          <button
-            onClick={() => setModalExp(true)}
-            className="mt-4 px-4 py-2 text-sm font-medium text-white rounded-lg"
-            style={{ backgroundColor: "#1a4731" }}
-          >
-            Ajouter un exportateur
-          </button>
+          {peutCreer && (
+            <button
+              onClick={() => setModalExp(true)}
+              className="mt-4 px-4 py-2 text-sm font-medium text-white rounded-lg"
+              style={{ backgroundColor: "#1a4731" }}
+            >
+              Ajouter un exportateur
+            </button>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

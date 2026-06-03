@@ -120,11 +120,6 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
     return;
   }
 
-  if (req.user?.role !== "pca" && req.user?.role !== "directeur") {
-    res.status(403).json({ erreur: "Accès réservé aux administrateurs" });
-    return;
-  }
-
   const { dateEcriture, numeroPiece, libelle, compteDebit, compteCredit, montantFcfa } = parse.data;
   const exercice = new Date(dateEcriture).getFullYear();
 

@@ -9,6 +9,7 @@ import {
 import { getGetAvancesQueryKey, getGetAvancesEncoursQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PlusCircle, TrendingDown, Banknote, Clock } from "lucide-react";
+import { usePermission } from "@/hooks/usePermission";
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -19,6 +20,8 @@ function formaterDate(d: string) {
 
 export default function Avances() {
   const queryClient = useQueryClient();
+  const peutOctroyer = usePermission("avances", "octroyer");
+  const peutRembourser = usePermission("avances", "rembourser");
   const [modalOuvert, setModalOuvert] = useState(false);
   const [filtreStatut, setFiltreStatut] = useState<"" | "en_cours" | "rembourse" | "en_retard">("");
   const [modalRemboursement, setModalRemboursement] = useState<{ id: number; solde: number; nom: string } | null>(null);
@@ -96,14 +99,16 @@ export default function Avances() {
           <h1 className="text-2xl font-bold text-gray-900">Avances</h1>
           <p className="text-gray-500 text-sm mt-0.5">{avancesData?.total ?? 0} avances enregistrées</p>
         </div>
-        <button
-          onClick={() => setModalOuvert(true)}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-white text-sm font-medium flex-shrink-0"
-          style={{ backgroundColor: "#1a4731" }}
-        >
-          <PlusCircle size={16} />
-          <span className="hidden sm:inline">Octroyer une avance</span>
-        </button>
+        {peutOctroyer && (
+          <button
+            onClick={() => setModalOuvert(true)}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-white text-sm font-medium flex-shrink-0"
+            style={{ backgroundColor: "#1a4731" }}
+          >
+            <PlusCircle size={16} />
+            <span className="hidden sm:inline">Octroyer une avance</span>
+          </button>
+        )}
       </div>
 
       {/* Résumé en cours */}
@@ -196,7 +201,7 @@ export default function Avances() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    {a.statut !== "rembourse" && a.soldeRestantFcfa > 0 && (
+                    {peutRembourser && a.statut !== "rembourse" && a.soldeRestantFcfa > 0 && (
                       <button
                         onClick={() => ouvrirRemboursement(a.id, a.soldeRestantFcfa, `${a.membreNom} ${a.membrePrenoms}`)}
                         className="text-xs text-blue-600 hover:text-blue-800 font-medium"

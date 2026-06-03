@@ -12,6 +12,7 @@ import {
   useGetFluxTresorerie,
   useGetMargeCampagnes,
 } from "@workspace/api-client-react";
+import { usePermission } from "@/hooks/usePermission";
 function getAuthToken(): string | null {
   return localStorage.getItem("coop_token");
 }
@@ -336,6 +337,8 @@ function TabEtatsFinanciers() {
 // ─── Onglet 3 : Rapports téléchargeables ────────────────────────────────────
 function TabRapports() {
   const [loading, setLoading] = useState<string | null>(null);
+  const peutGenererMensuel = usePermission("reporting", "generer_rapport_mensuel");
+  const peutGenererCampagne = usePermission("reporting", "generer_bilan_campagne");
 
   const now = new Date();
   const annee = now.getFullYear();
@@ -366,38 +369,42 @@ function TabRapports() {
   }
 
   const rapports = [
-    {
-      titre: "Rapport mensuel – mois précédent",
-      description: `Synthèse complète de ${new Date(anneeMoisPrecedent, moisPrecedent - 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })} : livraisons, ventes, compte de résultat.`,
-      url: `/api/rapports/mensuel/${moisPrecedent}/${anneeMoisPrecedent}`,
-      fichier: `rapport_${anneeMoisPrecedent}_${String(moisPrecedent).padStart(2, "0")}.pdf`,
-      cle: "mensuel_precedent",
-      icone: "📄",
-    },
-    {
-      titre: "Rapport mensuel – mois courant",
-      description: `Synthèse en cours pour ${new Date(annee, mois - 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}.`,
-      url: `/api/rapports/mensuel/${mois}/${annee}`,
-      fichier: `rapport_${annee}_${String(mois).padStart(2, "0")}.pdf`,
-      cle: "mensuel_courant",
-      icone: "📋",
-    },
-    {
-      titre: `Bilan de campagne ${annee}`,
-      description: `Bilan annuel complet ${annee} : top producteurs, exportateurs, compte de résultat, ventilation mensuelle.`,
-      url: `/api/rapports/campagne/${annee}`,
-      fichier: `bilan_campagne_${annee}.pdf`,
-      cle: `bilan_${annee}`,
-      icone: "📊",
-    },
-    {
-      titre: `Bilan de campagne ${annee - 1}`,
-      description: `Bilan annuel complet ${annee - 1} (exercice clos).`,
-      url: `/api/rapports/campagne/${annee - 1}`,
-      fichier: `bilan_campagne_${annee - 1}.pdf`,
-      cle: `bilan_${annee - 1}`,
-      icone: "📁",
-    },
+    ...(peutGenererMensuel ? [
+      {
+        titre: "Rapport mensuel – mois précédent",
+        description: `Synthèse complète de ${new Date(anneeMoisPrecedent, moisPrecedent - 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })} : livraisons, ventes, compte de résultat.`,
+        url: `/api/rapports/mensuel/${moisPrecedent}/${anneeMoisPrecedent}`,
+        fichier: `rapport_${anneeMoisPrecedent}_${String(moisPrecedent).padStart(2, "0")}.pdf`,
+        cle: "mensuel_precedent",
+        icone: "📄",
+      },
+      {
+        titre: "Rapport mensuel – mois courant",
+        description: `Synthèse en cours pour ${new Date(annee, mois - 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}.`,
+        url: `/api/rapports/mensuel/${mois}/${annee}`,
+        fichier: `rapport_${annee}_${String(mois).padStart(2, "0")}.pdf`,
+        cle: "mensuel_courant",
+        icone: "📋",
+      },
+    ] : []),
+    ...(peutGenererCampagne ? [
+      {
+        titre: `Bilan de campagne ${annee}`,
+        description: `Bilan annuel complet ${annee} : top producteurs, exportateurs, compte de résultat, ventilation mensuelle.`,
+        url: `/api/rapports/campagne/${annee}`,
+        fichier: `bilan_campagne_${annee}.pdf`,
+        cle: `bilan_${annee}`,
+        icone: "📊",
+      },
+      {
+        titre: `Bilan de campagne ${annee - 1}`,
+        description: `Bilan annuel complet ${annee - 1} (exercice clos).`,
+        url: `/api/rapports/campagne/${annee - 1}`,
+        fichier: `bilan_campagne_${annee - 1}.pdf`,
+        cle: `bilan_${annee - 1}`,
+        icone: "📁",
+      },
+    ] : []),
   ];
 
   return (
@@ -458,6 +465,7 @@ function TabRapports() {
 function FicheMembre() {
   const [membreId, setMembreId] = useState("");
   const [loading, setLoading] = useState(false);
+  const peutGenererFiche = usePermission("reporting", "generer_fiche_membre");
 
   async function telechargerFiche() {
     const id = parseInt(membreId);
@@ -485,6 +493,8 @@ function FicheMembre() {
       setLoading(false);
     }
   }
+
+  if (!peutGenererFiche) return null;
 
   return (
     <div className="flex gap-3 items-center">

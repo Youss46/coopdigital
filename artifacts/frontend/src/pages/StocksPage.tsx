@@ -13,6 +13,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle } from "lucide-react";
+import { usePermission } from "@/hooks/usePermission";
 
 function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", {
@@ -30,6 +31,8 @@ function formaterPoids(kg: string | number) {
 
 export default function StocksPage() {
   const queryClient = useQueryClient();
+  const peutEntree = usePermission("stocks", "entree");
+  const peutSortie = usePermission("stocks", "sortie");
   const [onglet, setOnglet] = useState<"entrepots" | "journal">("entrepots");
   const [modalMouvement, setModalMouvement] = useState<"entree" | "sortie" | null>(null);
   const [form, setForm] = useState({ entrepotId: "", poidsKg: "", motif: "" });
@@ -95,21 +98,25 @@ export default function StocksPage() {
           <p className="text-gray-500 text-sm mt-1">Suivi des entrepôts et mouvements de cacao</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setModalMouvement("entree")}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg"
-            style={{ backgroundColor: "#1a4731" }}
-          >
-            <TrendingUp size={15} />
-            Entrée
-          </button>
-          <button
-            onClick={() => setModalMouvement("sortie")}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg bg-blue-600"
-          >
-            <TrendingDown size={15} />
-            Sortie
-          </button>
+          {peutEntree && (
+            <button
+              onClick={() => setModalMouvement("entree")}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg"
+              style={{ backgroundColor: "#1a4731" }}
+            >
+              <TrendingUp size={15} />
+              Entrée
+            </button>
+          )}
+          {peutSortie && (
+            <button
+              onClick={() => setModalMouvement("sortie")}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg bg-blue-600"
+            >
+              <TrendingDown size={15} />
+              Sortie
+            </button>
+          )}
         </div>
       </div>
 

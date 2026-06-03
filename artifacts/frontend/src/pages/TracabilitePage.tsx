@@ -8,6 +8,7 @@ import {
 import { getGetLotsQueryKey, getGetLivraisonsNonLoteesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { QrCode, Package, PlusCircle, ChevronDown, Check } from "lucide-react";
+import { usePermission } from "@/hooks/usePermission";
 
 function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
@@ -30,6 +31,7 @@ const STATUT_LABELS: Record<string, string> = {
 
 export default function TracabilitePage() {
   const queryClient = useQueryClient();
+  const peutCreerLot = usePermission("tracabilite", "creer_lot");
   const [onglet, setOnglet] = useState<"lots" | "creer">("lots");
   const [filtreStatut, setFiltreStatut] = useState("");
   const [selection, setSelection] = useState<number[]>([]);
@@ -81,19 +83,21 @@ export default function TracabilitePage() {
 
       {/* Onglets */}
       <div className="flex gap-1 border-b border-gray-200">
-        {(["lots", "creer"] as const).map((o) => (
-          <button
-            key={o}
-            onClick={() => setOnglet(o)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              onglet === o
-                ? "border-[#1a4731] text-[#1a4731]"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {o === "lots" ? "Lots en stock" : "Créer un lot"}
-          </button>
-        ))}
+        {(["lots", "creer"] as const)
+          .filter((o) => o === "lots" || peutCreerLot)
+          .map((o) => (
+            <button
+              key={o}
+              onClick={() => setOnglet(o)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                onglet === o
+                  ? "border-[#1a4731] text-[#1a4731]"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {o === "lots" ? "Lots en stock" : "Créer un lot"}
+            </button>
+          ))}
       </div>
 
       {/* Onglet Lots */}
@@ -128,13 +132,15 @@ export default function TracabilitePage() {
               <p className="text-gray-400 text-sm mt-1">
                 Commencez par créer un lot depuis l'onglet "Créer un lot"
               </p>
-              <button
-                onClick={() => setOnglet("creer")}
-                className="mt-4 px-4 py-2 text-sm font-medium text-white rounded-lg"
-                style={{ backgroundColor: "#1a4731" }}
-              >
-                Créer un lot
-              </button>
+              {peutCreerLot && (
+                <button
+                  onClick={() => setOnglet("creer")}
+                  className="mt-4 px-4 py-2 text-sm font-medium text-white rounded-lg"
+                  style={{ backgroundColor: "#1a4731" }}
+                >
+                  Créer un lot
+                </button>
+              )}
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

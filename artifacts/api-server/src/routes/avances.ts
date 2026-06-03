@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { authMiddleware } from "../middlewares/auth";
+import { checkPermission } from "../middlewares/permissions";
 import {
   listAvances,
   createAvance,
@@ -11,9 +12,9 @@ const router: IRouter = Router();
 
 router.use(authMiddleware);
 
-router.get("/avances/encours", getAvancesEncours);
-router.get("/avances", listAvances);
-router.post("/avances", createAvance);
-router.put("/avances/:id/rembourser", rembourserAvance);
+router.get("/avances/encours", checkPermission("avances", "lire"), getAvancesEncours);
+router.get("/avances", checkPermission("avances", "lire"), listAvances);
+router.post("/avances", checkPermission("avances", "octroyer"), createAvance);
+router.put("/avances/:id/rembourser", checkPermission("avances", "rembourser"), rembourserAvance);
 
 export default router;

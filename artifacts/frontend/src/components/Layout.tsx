@@ -21,17 +21,72 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-  { href: "/membres", label: "Membres", icon: Users },
-  { href: "/avances", label: "Avances", icon: CreditCard },
-  { href: "/livraisons/nouvelle", label: "Nouvelle livraison", icon: Package },
-  { href: "/tracabilite", label: "Traçabilité QR", icon: QrCode },
-  { href: "/stocks", label: "Stocks", icon: Warehouse },
-  { href: "/exportateurs", label: "Exportateurs", icon: Building2 },
-  { href: "/creances", label: "Créances", icon: Receipt },
-  { href: "/communication", label: "Communication", icon: MessageSquare },
-  { href: "/reporting", label: "Comptabilité", icon: BarChart3 },
-  { href: "/administration/comptes", label: "Comptes", icon: ShieldCheck, roles: ["pca", "directeur"] },
+  {
+    href: "/dashboard",
+    label: "Tableau de bord",
+    icon: LayoutDashboard,
+    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
+  },
+  {
+    href: "/membres",
+    label: "Membres",
+    icon: Users,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "agent_terrain", "auditeur"],
+  },
+  {
+    href: "/tracabilite",
+    label: "Traçabilité",
+    icon: QrCode,
+    roles: ["pca", "directeur", "responsable_tracabilite", "auditeur"],
+  },
+  {
+    href: "/stocks",
+    label: "Stocks",
+    icon: Warehouse,
+    roles: ["pca", "directeur", "magasinier", "comptable", "auditeur"],
+  },
+  {
+    href: "/avances",
+    label: "Avances",
+    icon: CreditCard,
+    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
+  },
+  {
+    href: "/livraisons/nouvelle",
+    label: "Livraisons",
+    icon: Package,
+    roles: ["pca", "directeur", "agent_terrain", "responsable_tracabilite", "comptable", "auditeur"],
+  },
+  {
+    href: "/exportateurs",
+    label: "Exportateurs",
+    icon: Building2,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/creances",
+    label: "Créances",
+    icon: Receipt,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/reporting",
+    label: "Comptabilité",
+    icon: BarChart3,
+    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
+  },
+  {
+    href: "/communication",
+    label: "Communication",
+    icon: MessageSquare,
+    roles: ["pca", "directeur"],
+  },
+  {
+    href: "/administration/comptes",
+    label: "Administration",
+    icon: ShieldCheck,
+    roles: ["pca", "directeur"],
+  },
 ];
 
 type NavItem = { href: string; label: string; icon: React.ElementType; roles?: string[] };
