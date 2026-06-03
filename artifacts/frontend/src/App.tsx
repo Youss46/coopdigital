@@ -1,6 +1,8 @@
+import { useState, useCallback } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import SplashScreen from "@/components/SplashScreen";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Membres from "@/pages/Membres";
@@ -84,8 +86,12 @@ function AppRoutes() {
 }
 
 function App() {
+  const [splashTermine, setSplashTermine] = useState(false);
+  const handleSplashTermine = useCallback(() => setSplashTermine(true), []);
+
   return (
     <QueryClientProvider client={queryClient}>
+      {!splashTermine && <SplashScreen onTermine={handleSplashTermine} />}
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
         <AuthProvider>
           <AppRoutes />
