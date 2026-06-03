@@ -79,21 +79,21 @@ export default function Membres() {
         </div>
         <button
           onClick={() => setModalOuvert(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-white text-sm font-medium"
+          className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-white text-sm font-medium flex-shrink-0"
           style={{ backgroundColor: "#1a4731" }}
         >
           <UserPlus size={16} />
-          Nouveau membre
+          <span className="hidden sm:inline">Nouveau membre</span>
         </button>
       </div>
 
       {/* Filtres */}
-      <div className="flex gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-0" style={{ minWidth: "160px" }}>
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="search"
-            placeholder="Rechercher nom, téléphone, village…"
+            placeholder="Rechercher nom, téléphone…"
             value={recherche}
             onChange={(e) => setRecherche(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1"
@@ -104,22 +104,22 @@ export default function Membres() {
           onChange={(e) => setStatut(e.target.value as "" | "actif" | "inactif")}
           className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
         >
-          <option value="">Tous les statuts</option>
+          <option value="">Tous</option>
           <option value="actif">Actif</option>
           <option value="inactif">Inactif</option>
         </select>
       </div>
 
       {/* Tableau */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm min-w-[480px]">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               <th className="text-left px-4 py-3 font-medium text-gray-600">Nom & Prénoms</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Téléphone</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Village</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Groupement</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">Superficie</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Village</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Groupement</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Superficie</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">Statut</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">Actions</th>
             </tr>
@@ -128,7 +128,7 @@ export default function Membres() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 7 }).map((_, j) => (
+                  {Array.from({ length: 5 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-4 bg-gray-100 rounded animate-pulse" />
                     </td>
@@ -150,9 +150,9 @@ export default function Membres() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{m.telephone}</td>
-                  <td className="px-4 py-3 text-gray-600">{m.village ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-600">{m.groupement ?? "—"}</td>
-                  <td className="px-4 py-3 text-right text-gray-600">{parseFloat(m.superficieHa).toFixed(2)} ha</td>
+                  <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{m.village ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{m.groupement ?? "—"}</td>
+                  <td className="px-4 py-3 text-right text-gray-600 hidden md:table-cell">{parseFloat(m.superficieHa).toFixed(2)} ha</td>
                   <td className="px-4 py-3 text-center">
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

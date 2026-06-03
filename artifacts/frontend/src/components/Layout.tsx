@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -9,6 +9,8 @@ import {
   LogOut,
   Leaf,
   ChevronRight,
+  Menu,
+  X,
 } from "lucide-react";
 
 const navItems = [
@@ -18,81 +20,144 @@ const navItems = [
   { href: "/livraisons/nouvelle", label: "Nouvelle livraison", icon: Package },
 ];
 
-export default function Layout({ children }: { children: ReactNode }) {
+function SidebarContent({ onClose }: { onClose?: () => void }) {
   const [location] = useLocation();
   const { utilisateur, logout } = useAuth();
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
-      {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 flex flex-col" style={{ backgroundColor: "#1a4731" }}>
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-green-800">
+    <div className="flex flex-col h-full" style={{ backgroundColor: "#1a4731" }}>
+      {/* Logo + close button */}
+      <div className="flex items-center gap-3 px-6 py-5 border-b border-green-800">
+        <div
+          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: "#c4962a" }}
+        >
+          <Leaf className="w-5 h-5 text-white" />
+        </div>
+        <div className="flex-1">
+          <span className="text-white font-bold text-lg leading-tight">CoopDigital</span>
+          <p className="text-green-300 text-xs">Gestion coopérative</p>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="text-green-300 hover:text-white transition-colors lg:hidden ml-auto"
+            aria-label="Fermer le menu"
+          >
+            <X size={20} />
+          </button>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const isActive = location === href || location.startsWith(href + "/");
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? "text-white"
+                  : "text-green-200 hover:text-white hover:bg-green-800"
+              }`}
+              style={isActive ? { backgroundColor: "#c4962a" } : {}}
+            >
+              <Icon className="flex-shrink-0" size={18} />
+              <span>{label}</span>
+              {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto" size={14} />}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* User info */}
+      <div className="px-4 py-4 border-t border-green-800">
+        <div className="flex items-center gap-3 mb-3">
           <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
             style={{ backgroundColor: "#c4962a" }}
           >
-            <Leaf className="w-5 h-5 text-white" />
+            {utilisateur?.nom?.[0]?.toUpperCase() ?? "U"}
           </div>
-          <div>
-            <span className="text-white font-bold text-lg leading-tight">CoopDigital</span>
-            <p className="text-green-300 text-xs">Gestion coopérative</p>
+          <div className="overflow-hidden">
+            <p className="text-white text-sm font-medium truncate">
+              {utilisateur?.prenoms} {utilisateur?.nom}
+            </p>
+            <p className="text-green-300 text-xs truncate capitalize">
+              {utilisateur?.role?.replace(/_/g, " ")}
+            </p>
           </div>
         </div>
+        <button
+          onClick={logout}
+          className="flex items-center gap-2 text-green-300 hover:text-white text-xs w-full transition-colors py-1"
+        >
+          <LogOut size={14} />
+          <span>Déconnexion</span>
+        </button>
+      </div>
+    </div>
+  );
+}
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const isActive = location === href || location.startsWith(href + "/");
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? "text-white"
-                    : "text-green-200 hover:text-white hover:bg-green-800"
-                }`}
-                style={isActive ? { backgroundColor: "#c4962a" } : {}}
-              >
-                <Icon className="w-4.5 h-4.5 flex-shrink-0" size={18} />
-                <span>{label}</span>
-                {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto" />}
-              </Link>
-            );
-          })}
-        </nav>
+export default function Layout({ children }: { children: React.ReactNode }) {
+  const [menuOuvert, setMenuOuvert] = useState(false);
 
-        {/* User info */}
-        <div className="px-4 py-4 border-t border-green-800">
-          <div className="flex items-center gap-3 mb-3">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-              style={{ backgroundColor: "#c4962a" }}
-            >
-              {utilisateur?.nom?.[0]?.toUpperCase() ?? "U"}
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-white text-sm font-medium truncate">
-                {utilisateur?.prenoms} {utilisateur?.nom}
-              </p>
-              <p className="text-green-300 text-xs truncate capitalize">{utilisateur?.role?.replace(/_/g, " ")}</p>
-            </div>
-          </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-2 text-green-300 hover:text-white text-xs w-full transition-colors py-1"
-          >
-            <LogOut size={14} />
-            <span>Déconnexion</span>
-          </button>
-        </div>
+  return (
+    <div className="flex h-screen bg-gray-50 font-sans">
+      {/* Sidebar desktop — always visible lg+ */}
+      <aside className="hidden lg:flex w-64 flex-shrink-0 flex-col">
+        <SidebarContent />
       </aside>
 
-      {/* Contenu principal */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-6">{children}</div>
-      </main>
+      {/* Overlay mobile */}
+      {menuOuvert && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setMenuOuvert(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar mobile — slide-in drawer */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-72 flex flex-col lg:hidden transition-transform duration-300 ${
+          menuOuvert ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <SidebarContent onClose={() => setMenuOuvert(false)} />
+      </aside>
+
+      {/* Zone principale */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Barre supérieure mobile */}
+        <header className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
+          <button
+            onClick={() => setMenuOuvert(true)}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+            aria-label="Ouvrir le menu"
+          >
+            <Menu size={22} />
+          </button>
+          <div className="flex items-center gap-2">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: "#1a4731" }}
+            >
+              <Leaf className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-bold text-gray-900 text-base">CoopDigital</span>
+          </div>
+        </header>
+
+        {/* Contenu */}
+        <main className="flex-1 overflow-auto">
+          <div className="p-4 sm:p-6">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

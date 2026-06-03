@@ -89,17 +89,17 @@ export default function Avances() {
         </div>
         <button
           onClick={() => setModalOuvert(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-white text-sm font-medium"
+          className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-white text-sm font-medium flex-shrink-0"
           style={{ backgroundColor: "#1a4731" }}
         >
           <PlusCircle size={16} />
-          Octroyer une avance
+          <span className="hidden sm:inline">Octroyer une avance</span>
         </button>
       </div>
 
       {/* Résumé en cours */}
       {encours && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
             <div className="rounded-lg p-2" style={{ backgroundColor: "#1a473115" }}>
               <Banknote size={18} style={{ color: "#1a4731" }} />
@@ -149,15 +149,15 @@ export default function Avances() {
       </div>
 
       {/* Tableau */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm min-w-[480px]">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               <th className="text-left px-4 py-3 font-medium text-gray-600">Membre</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">Montant octroyé</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">Remboursé</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">Solde restant</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Échéance</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">Octroyé</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Remboursé</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">Solde</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Échéance</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">Statut</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">Actions</th>
             </tr>
@@ -165,7 +165,7 @@ export default function Avances() {
           <tbody className="divide-y divide-gray-50">
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 7 }).map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td>)}</tr>
+                <tr key={i}>{Array.from({ length: 5 }).map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td>)}</tr>
               ))
             ) : avances.length === 0 ? (
               <tr><td colSpan={7} className="text-center text-gray-400 py-12">Aucune avance</td></tr>
@@ -174,9 +174,9 @@ export default function Avances() {
                 <tr key={a.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{a.membreNom} {a.membrePrenoms}</td>
                   <td className="px-4 py-3 text-right text-gray-700">{formaterFCFA(a.montantOctroyeFcfa)}</td>
-                  <td className="px-4 py-3 text-right text-green-700">{formaterFCFA(a.montantRembourseFcfa)}</td>
+                  <td className="px-4 py-3 text-right text-green-700 hidden sm:table-cell">{formaterFCFA(a.montantRembourseFcfa)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-amber-700">{formaterFCFA(a.soldeRestantFcfa)}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{a.dateEcheance ? formaterDate(a.dateEcheance) : "—"}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs hidden sm:table-cell">{a.dateEcheance ? formaterDate(a.dateEcheance) : "—"}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       a.statut === "rembourse" ? "bg-green-100 text-green-700"
