@@ -5,3 +5,7 @@ export * from "./cotisations";
 export * from "./avances";
 export * from "./livraisons";
 export * from "./paiements";
+export * from "./lots";
+export * from "./stocks";
+export * from "./exportateurs";
+export * from "./communication";

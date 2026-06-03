@@ -257,6 +257,211 @@ export interface DashboardKpi {
   avancesEnCoursMontant: number;
   tonnageMois: number;
   paiementsMois: number;
+  creancesExportateurs?: number;
+}
+
+export type LotDetailStatut = typeof LotDetailStatut[keyof typeof LotDetailStatut];
+
+
+export const LotDetailStatut = {
+  en_stock: 'en_stock',
+  vendu: 'vendu',
+  transit: 'transit',
+} as const;
+
+export interface LotDetail {
+  id: number;
+  cooperativeId: number;
+  qrCodeLot: string;
+  statut: LotDetailStatut;
+  poidsTotalKg: string;
+  dateCreation: string;
+  /** @nullable */
+  entrepot?: string | null;
+  createdAt: string;
+  nbProducteurs?: number;
+  nbLivraisons?: number;
+}
+
+export interface LotInput {
+  cooperativeId: number;
+  livraisonIds: number[];
+  entrepot?: string;
+}
+
+export type LotStatutInputStatut = typeof LotStatutInputStatut[keyof typeof LotStatutInputStatut];
+
+
+export const LotStatutInputStatut = {
+  en_stock: 'en_stock',
+  vendu: 'vendu',
+  transit: 'transit',
+} as const;
+
+export interface LotStatutInput {
+  statut: LotStatutInputStatut;
+}
+
+export type VenteDetailStatut = typeof VenteDetailStatut[keyof typeof VenteDetailStatut];
+
+
+export const VenteDetailStatut = {
+  en_attente: 'en_attente',
+  partiel: 'partiel',
+  regle: 'regle',
+  en_retard: 'en_retard',
+} as const;
+
+export interface VenteDetail {
+  id: number;
+  exportateurId: number;
+  /** @nullable */
+  exportateurNom?: string | null;
+  /** @nullable */
+  lotId?: number | null;
+  poidsKg: string;
+  prixUnitaireFcfa: number;
+  montantTotalFcfa: number;
+  dateVente: string;
+  /** @nullable */
+  dateEcheanceReglement?: string | null;
+  montantRecuFcfa: number;
+  soldeDuFcfa: number;
+  statut: VenteDetailStatut;
+  createdAt: string;
+}
+
+export interface LotTracabilite {
+  lot: LotDetail;
+  livraisons: LivraisonDetail[];
+  membres: Membre[];
+  vente?: VenteDetail;
+}
+
+export interface EntrepotStock {
+  id: number;
+  cooperativeId: number;
+  nom: string;
+  ville: string;
+  capaciteKg: string;
+  /** @nullable */
+  seuilAlerteKg?: string | null;
+  stockActuelKg: number;
+  pourcentageRemplissage?: number;
+  enAlerte?: boolean;
+  createdAt: string;
+}
+
+export type MouvementStockType = typeof MouvementStockType[keyof typeof MouvementStockType];
+
+
+export const MouvementStockType = {
+  entree: 'entree',
+  sortie: 'sortie',
+} as const;
+
+export interface MouvementStock {
+  id: number;
+  entrepotId: number;
+  /** @nullable */
+  entrepotNom?: string | null;
+  /** @nullable */
+  lotId?: number | null;
+  type: MouvementStockType;
+  poidsKg: string;
+  /** @nullable */
+  motif?: string | null;
+  /** @nullable */
+  agentId?: number | null;
+  createdAt: string;
+}
+
+export interface MouvementInput {
+  entrepotId: number;
+  lotId?: number;
+  poidsKg: number;
+  motif?: string;
+}
+
+export interface ExportateurDetail {
+  id: number;
+  cooperativeId: number;
+  nom: string;
+  /** @nullable */
+  contact?: string | null;
+  /** @nullable */
+  ville?: string | null;
+  /** @nullable */
+  agrementNumero?: string | null;
+  soldeTotalDuFcfa?: number;
+  createdAt: string;
+}
+
+export interface ExportateurHistorique {
+  exportateur: ExportateurDetail;
+  ventes: VenteDetail[];
+  soldeTotalDuFcfa: number;
+}
+
+export interface ExportateurInput {
+  cooperativeId: number;
+  nom: string;
+  contact?: string;
+  ville?: string;
+  agrementNumero?: string;
+}
+
+export interface VenteInput {
+  exportateurId: number;
+  lotId?: number;
+  poidsKg: number;
+  prixUnitaireFcfa: number;
+  dateVente: string;
+  dateEcheanceReglement?: string;
+}
+
+export interface EncaissementInput {
+  montantFcfa: number;
+}
+
+export interface CreancesSummary {
+  totalDuFcfa: number;
+  enRetardFcfa: number;
+  aEchoirSemaineFcfa: number;
+  ventes: VenteDetail[];
+}
+
+export interface SmsGroupeInput {
+  message: string;
+  groupement?: string;
+}
+
+export interface SmsGroupeResult {
+  envoyes: number;
+  echecs: number;
+  total: number;
+}
+
+export type SmsHistoriqueStatut = typeof SmsHistoriqueStatut[keyof typeof SmsHistoriqueStatut];
+
+
+export const SmsHistoriqueStatut = {
+  envoye: 'envoye',
+  echec: 'echec',
+  partiel: 'partiel',
+} as const;
+
+export interface SmsHistorique {
+  id: number;
+  cooperativeId: number;
+  message: string;
+  /** @nullable */
+  groupement?: string | null;
+  nbDestinataires: number;
+  nbEnvoyes: number;
+  nbEchecs: number;
+  statut: SmsHistoriqueStatut;
+  createdAt: string;
 }
 
 export type GetMembresParams = {
@@ -292,4 +497,38 @@ export type GetLivraisonsParams = {
 membre_id?: number;
 limit?: number;
 };
+
+export type GetLotsParams = {
+statut?: GetLotsStatut;
+};
+
+export type GetLotsStatut = typeof GetLotsStatut[keyof typeof GetLotsStatut];
+
+
+export const GetLotsStatut = {
+  en_stock: 'en_stock',
+  vendu: 'vendu',
+  transit: 'transit',
+} as const;
+
+export type GetMouvementsStockParams = {
+entrepot_id?: number;
+date_debut?: string;
+date_fin?: string;
+};
+
+export type GetVentesParams = {
+exportateur_id?: number;
+statut?: GetVentesStatut;
+};
+
+export type GetVentesStatut = typeof GetVentesStatut[keyof typeof GetVentesStatut];
+
+
+export const GetVentesStatut = {
+  en_attente: 'en_attente',
+  partiel: 'partiel',
+  regle: 'regle',
+  en_retard: 'en_retard',
+} as const;
 

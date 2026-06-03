@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, membresTable, avancesTable, livraisonsTable, paiementsTable } from "@workspace/db";
+import { db, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable } from "@workspace/db";
 import { eq, sql, desc, gte, and } from "drizzle-orm";
 
 export async function getDashboard(req: Request, res: Response): Promise<void> {
@@ -14,6 +14,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       [avancesRow],
       [tonnageRow],
       [paiementsRow],
+      [creancesRow],
     ] = await Promise.all([
       db
         .select({ count: sql<number>`count(*)::int` })
@@ -31,6 +32,10 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .select({ total: sql<number>`coalesce(sum(montant_fcfa),0)::int` })
         .from(paiementsTable)
         .where(and(eq(paiementsTable.statut, "confirme"), gte(paiementsTable.createdAt, debutMois))),
+      db
+        .select({ total: sql<number>`coalesce(sum(solde_du_fcfa),0)::int` })
+        .from(ventesExportateursTable)
+        .where(sql`${ventesExportateursTable.statut} != 'regle'`),
     ]);
 
     res.json({
@@ -38,6 +43,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       avancesEnCoursMontant: avancesRow?.total ?? 0,
       tonnageMois: tonnageRow?.tonnage ?? 0,
       paiementsMois: paiementsRow?.total ?? 0,
+      creancesExportateurs: creancesRow?.total ?? 0,
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboard");

@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
-import { db, livraisonsTable, avancesTable, paiementsTable, membresTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable } from "@workspace/db";
+import { eq, and, desc, notInArray } from "drizzle-orm";
 import { CreateLivraisonBody } from "@workspace/api-zod";
 
 export async function listLivraisons(req: Request, res: Response): Promise<void> {
@@ -126,6 +126,39 @@ export async function createLivraison(req: Request, res: Response): Promise<void
     res.status(201).json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur createLivraison");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function getLivraisonsNonLotees(req: Request, res: Response): Promise<void> {
+  try {
+    const deja = await db.select({ livraisonId: lotLivraisonsTable.livraisonId }).from(lotLivraisonsTable);
+    const dejaIds = deja.map((d) => d.livraisonId);
+
+    const livraisons = await db
+      .select({
+        id: livraisonsTable.id,
+        membreId: livraisonsTable.membreId,
+        poidsKg: livraisonsTable.poidsKg,
+        prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
+        montantBrutFcfa: livraisonsTable.montantBrutFcfa,
+        avanceDeduiteFcfa: livraisonsTable.avanceDeduiteFcfa,
+        montantNetFcfa: livraisonsTable.montantNetFcfa,
+        dateLivraison: livraisonsTable.dateLivraison,
+        agentId: livraisonsTable.agentId,
+        createdAt: livraisonsTable.createdAt,
+        membreNom: membresTable.nom,
+        membrePrenoms: membresTable.prenoms,
+      })
+      .from(livraisonsTable)
+      .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+      .where(dejaIds.length > 0 ? notInArray(livraisonsTable.id, dejaIds) : undefined)
+      .orderBy(desc(livraisonsTable.dateLivraison))
+      .limit(500);
+
+    res.json(livraisons);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getLivraisonsNonLotees");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

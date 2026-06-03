@@ -1,1 +1,4 @@
 - [Express 5 req.params typing](express5-params-typing.md) — req.params[key] is string | string[], wrap with String() before parseInt or eq().
+- [Logger import pattern](logger-import.md) — `logger` dans api-server est un export nommé `{ logger }` depuis `src/lib/logger.ts`, pas un export default.
+- [React Query v5 queryKey required](rq-querykey.md) — useGetXxx avec `enabled` exige aussi `queryKey: getGetXxxQueryKey(...)`, sinon erreur TS.
+- [html5-qrcode types](html5qrcode-types.md) — `Html5Qrcode.clear()` retourne `void` (pas Promise<void>). Typer la ref `useRef<Html5Qrcode | null>` et appeler avec `void s.clear()`.

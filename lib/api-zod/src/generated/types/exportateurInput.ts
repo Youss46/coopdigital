@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface DashboardKpi {
-  membresActifs: number;
-  avancesEnCoursMontant: number;
-  tonnageMois: number;
-  paiementsMois: number;
-  creancesExportateurs?: number;
+export interface ExportateurInput {
+  cooperativeId: number;
+  nom: string;
+  contact?: string;
+  ville?: string;
+  agrementNumero?: string;
 }

@@ -5,11 +5,8 @@
  * CoopDigital — API de gestion des coopératives cacaoyères
  * OpenAPI spec version: 0.1.0
  */
+import type { LotStatutInputStatut } from './lotStatutInputStatut';
 
-export interface DashboardKpi {
-  membresActifs: number;
-  avancesEnCoursMontant: number;
-  tonnageMois: number;
-  paiementsMois: number;
-  creancesExportateurs?: number;
+export interface LotStatutInput {
+  statut: LotStatutInputStatut;
 }

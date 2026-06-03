@@ -14,6 +14,10 @@ tags:
   - name: avances
   - name: livraisons
   - name: dashboard
+  - name: lots
+  - name: stocks
+  - name: exportateurs
+  - name: communication
 
 paths:
   /healthz:
@@ -322,6 +326,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /livraisons/non-lotees:
+    get:
+      operationId: getLivraisonsNonLotees
+      tags: [livraisons]
+      summary: Livraisons non encore affectées à un lot
+      responses:
+        "200":
+          description: Livraisons disponibles pour création de lot
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LivraisonDetail"
+
   /dashboard:
     get:
       operationId: getDashboard
@@ -364,6 +383,425 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Avance"
+
+  # ── M02 Traçabilité ────────────────────────────────────────────
+  /lots:
+    get:
+      operationId: getLots
+      tags: [lots]
+      summary: Liste des lots
+      parameters:
+        - name: statut
+          in: query
+          schema: { type: string, enum: [en_stock, vendu, transit] }
+      responses:
+        "200":
+          description: Liste des lots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LotDetail"
+    post:
+      operationId: createLot
+      tags: [lots]
+      summary: Créer un lot à partir de livraisons
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LotInput"
+      responses:
+        "201":
+          description: Lot créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LotDetail"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /lots/qr/{code}:
+    get:
+      operationId: getLotByQr
+      tags: [lots]
+      summary: Lookup lot par QR code
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Lot trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LotDetail"
+        "404":
+          description: Non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /lots/{id}/statut:
+    put:
+      operationId: updateLotStatut
+      tags: [lots]
+      summary: Changer le statut d'un lot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LotStatutInput"
+      responses:
+        "200":
+          description: Statut mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LotDetail"
+        "404":
+          description: Non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /lots/{id}/tracabilite:
+    get:
+      operationId: getLotTracabilite
+      tags: [lots]
+      summary: Chaîne complète de traçabilité d'un lot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Chaîne de traçabilité
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LotTracabilite"
+        "404":
+          description: Non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── M03 Stocks ────────────────────────────────────────────────
+  /stocks/entrepots:
+    get:
+      operationId: getEntrepots
+      tags: [stocks]
+      summary: Liste des entrepôts avec stock actuel calculé
+      responses:
+        "200":
+          description: Entrepôts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EntrepotStock"
+
+  /stocks/mouvements:
+    get:
+      operationId: getMouvementsStock
+      tags: [stocks]
+      summary: Journal des mouvements de stock
+      parameters:
+        - name: entrepot_id
+          in: query
+          schema: { type: integer }
+        - name: date_debut
+          in: query
+          schema: { type: string }
+        - name: date_fin
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Mouvements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MouvementStock"
+
+  /stocks/entree:
+    post:
+      operationId: entreeStock
+      tags: [stocks]
+      summary: Entrée manuelle en stock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MouvementInput"
+      responses:
+        "201":
+          description: Mouvement enregistré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MouvementStock"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stocks/sortie:
+    post:
+      operationId: sortieStock
+      tags: [stocks]
+      summary: Sortie de stock vers exportateur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MouvementInput"
+      responses:
+        "201":
+          description: Mouvement enregistré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MouvementStock"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stocks/alertes:
+    get:
+      operationId: getStockAlertes
+      tags: [stocks]
+      summary: Entrepôts sous seuil minimum
+      responses:
+        "200":
+          description: Alertes stock
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EntrepotStock"
+
+  # ── M04 étendu Exportateurs ───────────────────────────────────
+  /exportateurs:
+    get:
+      operationId: getExportateurs
+      tags: [exportateurs]
+      summary: Liste des exportateurs avec solde créances
+      responses:
+        "200":
+          description: Exportateurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExportateurDetail"
+    post:
+      operationId: createExportateur
+      tags: [exportateurs]
+      summary: Créer un exportateur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportateurInput"
+      responses:
+        "201":
+          description: Exportateur créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportateurDetail"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /exportateurs/{id}:
+    get:
+      operationId: getExportateurById
+      tags: [exportateurs]
+      summary: Détail exportateur avec historique ventes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Exportateur trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportateurHistorique"
+        "404":
+          description: Non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /ventes:
+    get:
+      operationId: getVentes
+      tags: [exportateurs]
+      summary: Liste des ventes
+      parameters:
+        - name: exportateur_id
+          in: query
+          schema: { type: integer }
+        - name: statut
+          in: query
+          schema: { type: string, enum: [en_attente, partiel, regle, en_retard] }
+      responses:
+        "200":
+          description: Ventes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VenteDetail"
+    post:
+      operationId: createVente
+      tags: [exportateurs]
+      summary: Enregistrer une vente à crédit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VenteInput"
+      responses:
+        "201":
+          description: Vente enregistrée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VenteDetail"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /ventes/creances:
+    get:
+      operationId: getCreances
+      tags: [exportateurs]
+      summary: Tableau des créances (dû, en retard, à échoir)
+      responses:
+        "200":
+          description: Créances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreancesSummary"
+
+  /ventes/{id}/encaissement:
+    put:
+      operationId: encaisserVente
+      tags: [exportateurs]
+      summary: Enregistrer un paiement reçu sur une vente
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EncaissementInput"
+      responses:
+        "200":
+          description: Vente mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VenteDetail"
+        "404":
+          description: Non trouvée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── M07 Communication ─────────────────────────────────────────
+  /communication/sms-groupe:
+    post:
+      operationId: sendSmsGroupe
+      tags: [communication]
+      summary: Envoyer un SMS groupé aux membres
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmsGroupeInput"
+      responses:
+        "200":
+          description: SMS envoyé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmsGroupeResult"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /communication/historique:
+    get:
+      operationId: getCommunicationHistorique
+      tags: [communication]
+      summary: Historique des envois SMS
+      responses:
+        "200":
+          description: Historique
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SmsHistorique"
 
 components:
   schemas:
@@ -721,3 +1159,299 @@ components:
           type: number
         paiementsMois:
           type: integer
+        creancesExportateurs:
+          type: integer
+
+    # ── M02 Lots ────────────────────────────────────────────────
+    LotDetail:
+      type: object
+      required: [id, cooperativeId, qrCodeLot, statut, poidsTotalKg, dateCreation, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        qrCodeLot:
+          type: string
+        statut:
+          type: string
+          enum: [en_stock, vendu, transit]
+        poidsTotalKg:
+          type: string
+        dateCreation:
+          type: string
+        entrepot:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        nbProducteurs:
+          type: integer
+        nbLivraisons:
+          type: integer
+
+    LotInput:
+      type: object
+      required: [cooperativeId, livraisonIds]
+      properties:
+        cooperativeId:
+          type: integer
+        livraisonIds:
+          type: array
+          items:
+            type: integer
+        entrepot:
+          type: string
+
+    LotStatutInput:
+      type: object
+      required: [statut]
+      properties:
+        statut:
+          type: string
+          enum: [en_stock, vendu, transit]
+
+    LotTracabilite:
+      type: object
+      required: [lot, livraisons, membres]
+      properties:
+        lot:
+          $ref: "#/components/schemas/LotDetail"
+        livraisons:
+          type: array
+          items:
+            $ref: "#/components/schemas/LivraisonDetail"
+        membres:
+          type: array
+          items:
+            $ref: "#/components/schemas/Membre"
+        vente:
+          $ref: "#/components/schemas/VenteDetail"
+
+    # ── M03 Stocks ──────────────────────────────────────────────
+    EntrepotStock:
+      type: object
+      required: [id, cooperativeId, nom, ville, capaciteKg, stockActuelKg, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        nom:
+          type: string
+        ville:
+          type: string
+        capaciteKg:
+          type: string
+        seuilAlerteKg:
+          type: ["string", "null"]
+        stockActuelKg:
+          type: number
+        pourcentageRemplissage:
+          type: number
+        enAlerte:
+          type: boolean
+        createdAt:
+          type: string
+
+    MouvementStock:
+      type: object
+      required: [id, entrepotId, type, poidsKg, createdAt]
+      properties:
+        id:
+          type: integer
+        entrepotId:
+          type: integer
+        entrepotNom:
+          type: ["string", "null"]
+        lotId:
+          type: ["integer", "null"]
+        type:
+          type: string
+          enum: [entree, sortie]
+        poidsKg:
+          type: string
+        motif:
+          type: ["string", "null"]
+        agentId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    MouvementInput:
+      type: object
+      required: [entrepotId, poidsKg]
+      properties:
+        entrepotId:
+          type: integer
+        lotId:
+          type: integer
+        poidsKg:
+          type: number
+        motif:
+          type: string
+
+    # ── M04 étendu Exportateurs ─────────────────────────────────
+    ExportateurDetail:
+      type: object
+      required: [id, cooperativeId, nom, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        nom:
+          type: string
+        contact:
+          type: ["string", "null"]
+        ville:
+          type: ["string", "null"]
+        agrementNumero:
+          type: ["string", "null"]
+        soldeTotalDuFcfa:
+          type: integer
+        createdAt:
+          type: string
+
+    ExportateurHistorique:
+      type: object
+      required: [exportateur, ventes, soldeTotalDuFcfa]
+      properties:
+        exportateur:
+          $ref: "#/components/schemas/ExportateurDetail"
+        ventes:
+          type: array
+          items:
+            $ref: "#/components/schemas/VenteDetail"
+        soldeTotalDuFcfa:
+          type: integer
+
+    ExportateurInput:
+      type: object
+      required: [cooperativeId, nom]
+      properties:
+        cooperativeId:
+          type: integer
+        nom:
+          type: string
+        contact:
+          type: string
+        ville:
+          type: string
+        agrementNumero:
+          type: string
+
+    VenteDetail:
+      type: object
+      required: [id, exportateurId, poidsKg, prixUnitaireFcfa, montantTotalFcfa, dateVente, montantRecuFcfa, soldeDuFcfa, statut, createdAt]
+      properties:
+        id:
+          type: integer
+        exportateurId:
+          type: integer
+        exportateurNom:
+          type: ["string", "null"]
+        lotId:
+          type: ["integer", "null"]
+        poidsKg:
+          type: string
+        prixUnitaireFcfa:
+          type: integer
+        montantTotalFcfa:
+          type: integer
+        dateVente:
+          type: string
+        dateEcheanceReglement:
+          type: ["string", "null"]
+        montantRecuFcfa:
+          type: integer
+        soldeDuFcfa:
+          type: integer
+        statut:
+          type: string
+          enum: [en_attente, partiel, regle, en_retard]
+        createdAt:
+          type: string
+
+    VenteInput:
+      type: object
+      required: [exportateurId, poidsKg, prixUnitaireFcfa, dateVente]
+      properties:
+        exportateurId:
+          type: integer
+        lotId:
+          type: integer
+        poidsKg:
+          type: number
+        prixUnitaireFcfa:
+          type: integer
+        dateVente:
+          type: string
+        dateEcheanceReglement:
+          type: string
+
+    EncaissementInput:
+      type: object
+      required: [montantFcfa]
+      properties:
+        montantFcfa:
+          type: integer
+
+    CreancesSummary:
+      type: object
+      required: [totalDuFcfa, enRetardFcfa, aEchoirSemaineFcfa, ventes]
+      properties:
+        totalDuFcfa:
+          type: integer
+        enRetardFcfa:
+          type: integer
+        aEchoirSemaineFcfa:
+          type: integer
+        ventes:
+          type: array
+          items:
+            $ref: "#/components/schemas/VenteDetail"
+
+    # ── M07 Communication ────────────────────────────────────────
+    SmsGroupeInput:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        groupement:
+          type: string
+
+    SmsGroupeResult:
+      type: object
+      required: [envoyes, echecs, total]
+      properties:
+        envoyes:
+          type: integer
+        echecs:
+          type: integer
+        total:
+          type: integer
+
+    SmsHistorique:
+      type: object
+      required: [id, cooperativeId, message, nbDestinataires, nbEnvoyes, nbEchecs, statut, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        message:
+          type: string
+        groupement:
+          type: ["string", "null"]
+        nbDestinataires:
+          type: integer
+        nbEnvoyes:
+          type: integer
+        nbEchecs:
+          type: integer
+        statut:
+          type: string
+          enum: [envoye, echec, partiel]
+        createdAt:
+          type: string

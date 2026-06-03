@@ -7,6 +7,11 @@ import Membres from "@/pages/Membres";
 import MembreFiche from "@/pages/MembreFiche";
 import Avances from "@/pages/Avances";
 import NouvelleLivraison from "@/pages/NouvelleLivraison";
+import TracabilitePage from "@/pages/TracabilitePage";
+import StocksPage from "@/pages/StocksPage";
+import ExportateursPage from "@/pages/ExportateursPage";
+import CreancesPage from "@/pages/CreancesPage";
+import CommunicationPage from "@/pages/CommunicationPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -49,6 +54,21 @@ function AppRoutes() {
       </Route>
       <Route path="/livraisons/nouvelle">
         <ProtectedRoute component={NouvelleLivraison} />
+      </Route>
+      <Route path="/tracabilite">
+        <ProtectedRoute component={TracabilitePage} />
+      </Route>
+      <Route path="/stocks">
+        <ProtectedRoute component={StocksPage} />
+      </Route>
+      <Route path="/exportateurs">
+        <ProtectedRoute component={ExportateursPage} />
+      </Route>
+      <Route path="/creances">
+        <ProtectedRoute component={CreancesPage} />
+      </Route>
+      <Route path="/communication">
+        <ProtectedRoute component={CommunicationPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

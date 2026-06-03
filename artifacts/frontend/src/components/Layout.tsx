@@ -11,6 +11,11 @@ import {
   ChevronRight,
   Menu,
   X,
+  QrCode,
+  Warehouse,
+  Building2,
+  Receipt,
+  MessageSquare,
 } from "lucide-react";
 
 const navItems = [
@@ -18,6 +23,11 @@ const navItems = [
   { href: "/membres", label: "Membres", icon: Users },
   { href: "/avances", label: "Avances", icon: CreditCard },
   { href: "/livraisons/nouvelle", label: "Nouvelle livraison", icon: Package },
+  { href: "/tracabilite", label: "Traçabilité QR", icon: QrCode },
+  { href: "/stocks", label: "Stocks", icon: Warehouse },
+  { href: "/exportateurs", label: "Exportateurs", icon: Building2 },
+  { href: "/creances", label: "Créances", icon: Receipt },
+  { href: "/communication", label: "Communication", icon: MessageSquare },
 ];
 
 function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout: () => void }) {

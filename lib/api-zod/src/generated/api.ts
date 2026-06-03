@@ -378,13 +378,34 @@ export const CreateLivraisonBody = zod.object({
 
 
 /**
+ * @summary Livraisons non encore affectées à un lot
+ */
+export const GetLivraisonsNonLoteesResponseItem = zod.object({
+  "id": zod.number(),
+  "membreId": zod.number(),
+  "poidsKg": zod.string(),
+  "prixUnitaireFcfa": zod.number(),
+  "montantBrutFcfa": zod.number(),
+  "avanceDeduiteFcfa": zod.number(),
+  "montantNetFcfa": zod.number(),
+  "dateLivraison": zod.string(),
+  "agentId": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "membreNom": zod.string().nullish(),
+  "membrePrenoms": zod.string().nullish()
+})
+export const GetLivraisonsNonLoteesResponse = zod.array(GetLivraisonsNonLoteesResponseItem)
+
+
+/**
  * @summary KPIs du tableau de bord
  */
 export const GetDashboardResponse = zod.object({
   "membresActifs": zod.number(),
   "avancesEnCoursMontant": zod.number(),
   "tonnageMois": zod.number(),
-  "paiementsMois": zod.number()
+  "paiementsMois": zod.number(),
+  "creancesExportateurs": zod.number().optional()
 })
 
 
@@ -427,5 +448,424 @@ export const GetDashboardAvancesRetardResponseItem = zod.object({
   "membrePrenoms": zod.string().nullish()
 })
 export const GetDashboardAvancesRetardResponse = zod.array(GetDashboardAvancesRetardResponseItem)
+
+
+/**
+ * @summary Liste des lots
+ */
+export const GetLotsQueryParams = zod.object({
+  "statut": zod.enum(['en_stock', 'vendu', 'transit']).optional()
+})
+
+export const GetLotsResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "qrCodeLot": zod.string(),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit']),
+  "poidsTotalKg": zod.string(),
+  "dateCreation": zod.string(),
+  "entrepot": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "nbProducteurs": zod.number().optional(),
+  "nbLivraisons": zod.number().optional()
+})
+export const GetLotsResponse = zod.array(GetLotsResponseItem)
+
+
+/**
+ * @summary Créer un lot à partir de livraisons
+ */
+export const CreateLotBody = zod.object({
+  "cooperativeId": zod.number(),
+  "livraisonIds": zod.array(zod.number()),
+  "entrepot": zod.string().optional()
+})
+
+
+/**
+ * @summary Lookup lot par QR code
+ */
+export const GetLotByQrParams = zod.object({
+  "code": zod.coerce.string()
+})
+
+export const GetLotByQrResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "qrCodeLot": zod.string(),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit']),
+  "poidsTotalKg": zod.string(),
+  "dateCreation": zod.string(),
+  "entrepot": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "nbProducteurs": zod.number().optional(),
+  "nbLivraisons": zod.number().optional()
+})
+
+
+/**
+ * @summary Changer le statut d'un lot
+ */
+export const UpdateLotStatutParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateLotStatutBody = zod.object({
+  "statut": zod.enum(['en_stock', 'vendu', 'transit'])
+})
+
+export const UpdateLotStatutResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "qrCodeLot": zod.string(),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit']),
+  "poidsTotalKg": zod.string(),
+  "dateCreation": zod.string(),
+  "entrepot": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "nbProducteurs": zod.number().optional(),
+  "nbLivraisons": zod.number().optional()
+})
+
+
+/**
+ * @summary Chaîne complète de traçabilité d'un lot
+ */
+export const GetLotTracabiliteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetLotTracabiliteResponse = zod.object({
+  "lot": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "qrCodeLot": zod.string(),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit']),
+  "poidsTotalKg": zod.string(),
+  "dateCreation": zod.string(),
+  "entrepot": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "nbProducteurs": zod.number().optional(),
+  "nbLivraisons": zod.number().optional()
+}),
+  "livraisons": zod.array(zod.object({
+  "id": zod.number(),
+  "membreId": zod.number(),
+  "poidsKg": zod.string(),
+  "prixUnitaireFcfa": zod.number(),
+  "montantBrutFcfa": zod.number(),
+  "avanceDeduiteFcfa": zod.number(),
+  "montantNetFcfa": zod.number(),
+  "dateLivraison": zod.string(),
+  "agentId": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "membreNom": zod.string().nullish(),
+  "membrePrenoms": zod.string().nullish()
+})),
+  "membres": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "numeroCni": zod.string().nullish(),
+  "telephone": zod.string(),
+  "village": zod.string().nullish(),
+  "groupement": zod.string().nullish(),
+  "superficieHa": zod.string(),
+  "statut": zod.enum(['actif', 'inactif']),
+  "qrCodeToken": zod.string(),
+  "dateAdhesion": zod.string(),
+  "photoUrl": zod.string().nullish(),
+  "parcelleLat": zod.string().nullish(),
+  "parcelleLng": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})),
+  "vente": zod.object({
+  "id": zod.number(),
+  "exportateurId": zod.number(),
+  "exportateurNom": zod.string().nullish(),
+  "lotId": zod.number().nullish(),
+  "poidsKg": zod.string(),
+  "prixUnitaireFcfa": zod.number(),
+  "montantTotalFcfa": zod.number(),
+  "dateVente": zod.string(),
+  "dateEcheanceReglement": zod.string().nullish(),
+  "montantRecuFcfa": zod.number(),
+  "soldeDuFcfa": zod.number(),
+  "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']),
+  "createdAt": zod.string()
+}).optional()
+})
+
+
+/**
+ * @summary Liste des entrepôts avec stock actuel calculé
+ */
+export const GetEntrepotsResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "ville": zod.string(),
+  "capaciteKg": zod.string(),
+  "seuilAlerteKg": zod.string().nullish(),
+  "stockActuelKg": zod.number(),
+  "pourcentageRemplissage": zod.number().optional(),
+  "enAlerte": zod.boolean().optional(),
+  "createdAt": zod.string()
+})
+export const GetEntrepotsResponse = zod.array(GetEntrepotsResponseItem)
+
+
+/**
+ * @summary Journal des mouvements de stock
+ */
+export const GetMouvementsStockQueryParams = zod.object({
+  "entrepot_id": zod.coerce.number().optional(),
+  "date_debut": zod.coerce.string().optional(),
+  "date_fin": zod.coerce.string().optional()
+})
+
+export const GetMouvementsStockResponseItem = zod.object({
+  "id": zod.number(),
+  "entrepotId": zod.number(),
+  "entrepotNom": zod.string().nullish(),
+  "lotId": zod.number().nullish(),
+  "type": zod.enum(['entree', 'sortie']),
+  "poidsKg": zod.string(),
+  "motif": zod.string().nullish(),
+  "agentId": zod.number().nullish(),
+  "createdAt": zod.string()
+})
+export const GetMouvementsStockResponse = zod.array(GetMouvementsStockResponseItem)
+
+
+/**
+ * @summary Entrée manuelle en stock
+ */
+export const EntreeStockBody = zod.object({
+  "entrepotId": zod.number(),
+  "lotId": zod.number().optional(),
+  "poidsKg": zod.number(),
+  "motif": zod.string().optional()
+})
+
+
+/**
+ * @summary Sortie de stock vers exportateur
+ */
+export const SortieStockBody = zod.object({
+  "entrepotId": zod.number(),
+  "lotId": zod.number().optional(),
+  "poidsKg": zod.number(),
+  "motif": zod.string().optional()
+})
+
+
+/**
+ * @summary Entrepôts sous seuil minimum
+ */
+export const GetStockAlertesResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "ville": zod.string(),
+  "capaciteKg": zod.string(),
+  "seuilAlerteKg": zod.string().nullish(),
+  "stockActuelKg": zod.number(),
+  "pourcentageRemplissage": zod.number().optional(),
+  "enAlerte": zod.boolean().optional(),
+  "createdAt": zod.string()
+})
+export const GetStockAlertesResponse = zod.array(GetStockAlertesResponseItem)
+
+
+/**
+ * @summary Liste des exportateurs avec solde créances
+ */
+export const GetExportateursResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "contact": zod.string().nullish(),
+  "ville": zod.string().nullish(),
+  "agrementNumero": zod.string().nullish(),
+  "soldeTotalDuFcfa": zod.number().optional(),
+  "createdAt": zod.string()
+})
+export const GetExportateursResponse = zod.array(GetExportateursResponseItem)
+
+
+/**
+ * @summary Créer un exportateur
+ */
+export const CreateExportateurBody = zod.object({
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "contact": zod.string().optional(),
+  "ville": zod.string().optional(),
+  "agrementNumero": zod.string().optional()
+})
+
+
+/**
+ * @summary Détail exportateur avec historique ventes
+ */
+export const GetExportateurByIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetExportateurByIdResponse = zod.object({
+  "exportateur": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "nom": zod.string(),
+  "contact": zod.string().nullish(),
+  "ville": zod.string().nullish(),
+  "agrementNumero": zod.string().nullish(),
+  "soldeTotalDuFcfa": zod.number().optional(),
+  "createdAt": zod.string()
+}),
+  "ventes": zod.array(zod.object({
+  "id": zod.number(),
+  "exportateurId": zod.number(),
+  "exportateurNom": zod.string().nullish(),
+  "lotId": zod.number().nullish(),
+  "poidsKg": zod.string(),
+  "prixUnitaireFcfa": zod.number(),
+  "montantTotalFcfa": zod.number(),
+  "dateVente": zod.string(),
+  "dateEcheanceReglement": zod.string().nullish(),
+  "montantRecuFcfa": zod.number(),
+  "soldeDuFcfa": zod.number(),
+  "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']),
+  "createdAt": zod.string()
+})),
+  "soldeTotalDuFcfa": zod.number()
+})
+
+
+/**
+ * @summary Liste des ventes
+ */
+export const GetVentesQueryParams = zod.object({
+  "exportateur_id": zod.coerce.number().optional(),
+  "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']).optional()
+})
+
+export const GetVentesResponseItem = zod.object({
+  "id": zod.number(),
+  "exportateurId": zod.number(),
+  "exportateurNom": zod.string().nullish(),
+  "lotId": zod.number().nullish(),
+  "poidsKg": zod.string(),
+  "prixUnitaireFcfa": zod.number(),
+  "montantTotalFcfa": zod.number(),
+  "dateVente": zod.string(),
+  "dateEcheanceReglement": zod.string().nullish(),
+  "montantRecuFcfa": zod.number(),
+  "soldeDuFcfa": zod.number(),
+  "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']),
+  "createdAt": zod.string()
+})
+export const GetVentesResponse = zod.array(GetVentesResponseItem)
+
+
+/**
+ * @summary Enregistrer une vente à crédit
+ */
+export const CreateVenteBody = zod.object({
+  "exportateurId": zod.number(),
+  "lotId": zod.number().optional(),
+  "poidsKg": zod.number(),
+  "prixUnitaireFcfa": zod.number(),
+  "dateVente": zod.string(),
+  "dateEcheanceReglement": zod.string().optional()
+})
+
+
+/**
+ * @summary Tableau des créances (dû, en retard, à échoir)
+ */
+export const GetCreancesResponse = zod.object({
+  "totalDuFcfa": zod.number(),
+  "enRetardFcfa": zod.number(),
+  "aEchoirSemaineFcfa": zod.number(),
+  "ventes": zod.array(zod.object({
+  "id": zod.number(),
+  "exportateurId": zod.number(),
+  "exportateurNom": zod.string().nullish(),
+  "lotId": zod.number().nullish(),
+  "poidsKg": zod.string(),
+  "prixUnitaireFcfa": zod.number(),
+  "montantTotalFcfa": zod.number(),
+  "dateVente": zod.string(),
+  "dateEcheanceReglement": zod.string().nullish(),
+  "montantRecuFcfa": zod.number(),
+  "soldeDuFcfa": zod.number(),
+  "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Enregistrer un paiement reçu sur une vente
+ */
+export const EncaisserVenteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EncaisserVenteBody = zod.object({
+  "montantFcfa": zod.number()
+})
+
+export const EncaisserVenteResponse = zod.object({
+  "id": zod.number(),
+  "exportateurId": zod.number(),
+  "exportateurNom": zod.string().nullish(),
+  "lotId": zod.number().nullish(),
+  "poidsKg": zod.string(),
+  "prixUnitaireFcfa": zod.number(),
+  "montantTotalFcfa": zod.number(),
+  "dateVente": zod.string(),
+  "dateEcheanceReglement": zod.string().nullish(),
+  "montantRecuFcfa": zod.number(),
+  "soldeDuFcfa": zod.number(),
+  "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Envoyer un SMS groupé aux membres
+ */
+export const SendSmsGroupeBody = zod.object({
+  "message": zod.string(),
+  "groupement": zod.string().optional()
+})
+
+export const SendSmsGroupeResponse = zod.object({
+  "envoyes": zod.number(),
+  "echecs": zod.number(),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary Historique des envois SMS
+ */
+export const GetCommunicationHistoriqueResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "message": zod.string(),
+  "groupement": zod.string().nullish(),
+  "nbDestinataires": zod.number(),
+  "nbEnvoyes": zod.number(),
+  "nbEchecs": zod.number(),
+  "statut": zod.enum(['envoye', 'echec', 'partiel']),
+  "createdAt": zod.string()
+})
+export const GetCommunicationHistoriqueResponse = zod.array(GetCommunicationHistoriqueResponseItem)
 
 

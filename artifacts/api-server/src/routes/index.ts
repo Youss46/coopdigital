@@ -5,6 +5,10 @@ import membresRouter from "./membres";
 import avancesRouter from "./avances";
 import livraisonsRouter from "./livraisons";
 import dashboardRouter from "./dashboard";
+import lotsRouter from "./lots";
+import stocksRouter from "./stocks";
+import exportateursRouter from "./exportateurs";
+import communicationRouter from "./communication";
 
 const router: IRouter = Router();
 
@@ -14,5 +18,9 @@ router.use(membresRouter);
 router.use(avancesRouter);
 router.use(livraisonsRouter);
 router.use(dashboardRouter);
+router.use(lotsRouter);
+router.use(stocksRouter);
+router.use(exportateursRouter);
+router.use(communicationRouter);
 
 export default router;
