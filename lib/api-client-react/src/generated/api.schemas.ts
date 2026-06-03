@@ -534,6 +534,82 @@ export interface Tresorerie {
   dateCalcul?: string;
 }
 
+export interface ConfigComptable {
+  id: number;
+  cooperativeId: number;
+  autoLivraisons: boolean;
+  autoPaiements: boolean;
+  autoAvances: boolean;
+  autoVentesExport: boolean;
+  autoEncaissements: boolean;
+  autoSalaires: boolean;
+  autoStocks: boolean;
+  modifiePar?: number | null;
+  updatedAt?: string | null;
+}
+
+export interface UpdateConfigComptableInput {
+  autoLivraisons?: boolean;
+  autoPaiements?: boolean;
+  autoAvances?: boolean;
+  autoVentesExport?: boolean;
+  autoEncaissements?: boolean;
+  autoSalaires?: boolean;
+  autoStocks?: boolean;
+}
+
+export type EcritureEnAttenteSource = typeof EcritureEnAttenteSource[keyof typeof EcritureEnAttenteSource];
+
+
+export const EcritureEnAttenteSource = {
+  livraison: 'livraison',
+  paiement: 'paiement',
+  avance: 'avance',
+  vente: 'vente',
+  encaissement: 'encaissement',
+  salaire: 'salaire',
+  stock: 'stock',
+} as const;
+
+export type EcritureEnAttenteStatut = typeof EcritureEnAttenteStatut[keyof typeof EcritureEnAttenteStatut];
+
+
+export const EcritureEnAttenteStatut = {
+  en_attente: 'en_attente',
+  validee: 'validee',
+  rejetee: 'rejetee',
+  modifiee: 'modifiee',
+} as const;
+
+export interface EcritureEnAttente {
+  id: number;
+  cooperativeId: number;
+  source: EcritureEnAttenteSource;
+  sourceId?: number | null;
+  libelleProppose: string;
+  compteDebitPropose: string;
+  compteCreditPropose: string;
+  montantFcfa: number;
+  dateProposee: string;
+  statut: EcritureEnAttenteStatut;
+  commentaireComptable?: string | null;
+  creeLe: string;
+  traiteLe?: string | null;
+  traitePar?: number | null;
+}
+
+export interface ValiderEcritureInput {
+  compteDebit?: string;
+  compteCredit?: string;
+  montantFcfa?: number;
+  libelle?: string;
+  commentaire?: string;
+}
+
+export interface RejeterEcritureInput {
+  commentaire: string;
+}
+
 export interface BilanPoste {
   compte: string;
   libelle: string;
@@ -1093,6 +1169,44 @@ limit?: number;
 
 export type GetMargeCollecteParams = {
 exercice?: number;
+};
+
+export type CountEcrituresEnAttente200 = {
+  count: number;
+};
+
+export type ListEcrituresEnAttenteParams = {
+source?: ListEcrituresEnAttenteSource;
+statut?: ListEcrituresEnAttenteStatut;
+date_debut?: string;
+date_fin?: string;
+};
+
+export type ListEcrituresEnAttenteSource = typeof ListEcrituresEnAttenteSource[keyof typeof ListEcrituresEnAttenteSource];
+
+
+export const ListEcrituresEnAttenteSource = {
+  livraison: 'livraison',
+  paiement: 'paiement',
+  avance: 'avance',
+  vente: 'vente',
+  encaissement: 'encaissement',
+  salaire: 'salaire',
+  stock: 'stock',
+} as const;
+
+export type ListEcrituresEnAttenteStatut = typeof ListEcrituresEnAttenteStatut[keyof typeof ListEcrituresEnAttenteStatut];
+
+
+export const ListEcrituresEnAttenteStatut = {
+  en_attente: 'en_attente',
+  validee: 'validee',
+  rejetee: 'rejetee',
+  modifiee: 'modifiee',
+} as const;
+
+export type ValiderToutEcrituresEnAttente200 = {
+  validees: number;
 };
 
 export type GetBilanParams = {

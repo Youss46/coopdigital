@@ -1,55 +1,109 @@
 /**
  * Service de comptabilité OHADA — génération automatique des écritures comptables.
  * Toutes les fonctions sont fire-and-forget : les appeler APRÈS la transaction principale.
+ *
+ * proposerEcriture() est la fonction centrale :
+ * - En mode automatique (config activé) → insère directement dans ecritures_comptables
+ * - En mode manuel (config désactivé) → met en attente dans ecritures_en_attente
  */
-import { db, ecrituresComptablesTable, exercicesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { db, ecrituresComptablesTable, configComptableTable, ecrituresEnAttenteTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const COOP_ID = 1;
 
-async function getExercice(date: string): Promise<number> {
-  return new Date(date).getFullYear();
+export type SourceEcriture = "livraison" | "paiement" | "avance" | "vente" | "encaissement" | "salaire" | "stock";
+
+interface ProposerEcriturePayload {
+  source: SourceEcriture;
+  sourceId?: number;
+  libelle: string;
+  compteDebit: string;
+  compteCredit: string;
+  montantFcfa: number;
+  date: string;
+  numeroPiece?: string;
 }
 
-async function insererEcritures(
-  entries: {
-    dateEcriture: string;
-    libelle: string;
-    compteDebit: string;
-    compteCredit: string;
-    montantFcfa: number;
-    source: "livraison" | "vente" | "avance" | "paiement" | "manuel";
-    sourceId?: number;
-    numeroPiece?: string;
-  }[]
-) {
+const AUTO_KEY_MAP: Record<SourceEcriture, keyof typeof configComptableTable.$inferSelect> = {
+  livraison:    "autoLivraisons",
+  paiement:     "autoPaiements",
+  avance:       "autoAvances",
+  vente:        "autoVentesExport",
+  encaissement: "autoEncaissements",
+  salaire:      "autoSalaires",
+  stock:        "autoStocks",
+};
+
+async function getConfigComptable(cooperativeId: number) {
+  const rows = await db
+    .select()
+    .from(configComptableTable)
+    .where(eq(configComptableTable.cooperativeId, cooperativeId))
+    .limit(1);
+  if (rows.length === 0) {
+    await db.insert(configComptableTable).values({ cooperativeId }).onConflictDoNothing();
+    const rows2 = await db
+      .select()
+      .from(configComptableTable)
+      .where(eq(configComptableTable.cooperativeId, cooperativeId))
+      .limit(1);
+    return rows2[0]!;
+  }
+  return rows[0]!;
+}
+
+export async function proposerEcriture(
+  cooperativeId: number,
+  payload: ProposerEcriturePayload
+): Promise<{ mode: "automatique" | "manuel"; statut: "enregistree" | "en_attente" }> {
   try {
-    const exercice = await getExercice(entries[0]?.dateEcriture ?? new Date().toISOString().split("T")[0]!);
-    await db.insert(ecrituresComptablesTable).values(
-      entries.map((e) => ({
-        cooperativeId: COOP_ID,
-        dateEcriture: e.dateEcriture,
-        numeroPiece: e.numeroPiece ?? null,
-        libelle: e.libelle,
-        compteDebit: e.compteDebit,
-        compteCredit: e.compteCredit,
-        montantFcfa: Math.round(e.montantFcfa),
-        source: e.source,
-        sourceId: e.sourceId ?? null,
+    const config = await getConfigComptable(cooperativeId);
+    const cle = AUTO_KEY_MAP[payload.source];
+    const modeAuto = config[cle] === true;
+
+    if (modeAuto) {
+      const exercice = new Date(payload.date).getFullYear();
+      await db.insert(ecrituresComptablesTable).values({
+        cooperativeId,
+        dateEcriture: payload.date,
+        numeroPiece: payload.numeroPiece ?? null,
+        libelle: payload.libelle,
+        compteDebit: payload.compteDebit,
+        compteCredit: payload.compteCredit,
+        montantFcfa: Math.round(payload.montantFcfa),
+        source: payload.source as "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock",
+        sourceId: payload.sourceId ?? null,
         exercice,
-      }))
-    );
+      });
+      return { mode: "automatique", statut: "enregistree" };
+    }
+
+    await db.insert(ecrituresEnAttenteTable).values({
+      cooperativeId,
+      source: payload.source,
+      sourceId: payload.sourceId ?? null,
+      libelleProppose: payload.libelle,
+      compteDebitPropose: payload.compteDebit,
+      compteCreditPropose: payload.compteCredit,
+      montantFcfa: Math.round(payload.montantFcfa),
+      dateProposee: payload.date,
+      statut: "en_attente",
+    });
+    return { mode: "manuel", statut: "en_attente" };
   } catch (err) {
-    logger.error({ err, entries }, "Erreur génération écritures comptables");
+    logger.error({ err, payload }, "Erreur proposerEcriture");
+    return { mode: "manuel", statut: "en_attente" };
   }
 }
 
+// ─── Wrappers métier ─────────────────────────────────────────────────────────
+
 /**
  * Livraison enregistrée :
- * 1) 601 / 401 = montant brut (achat cacao au producteur)
- * 2) 401 / 521 = montant net payé (décaissement banque)
- * 3) 401 / 416 = avance déduite (imputation sur créance)
+ * 1) 601 / 401 = montant brut (achat cacao)
+ * 2) 401 / 521 = montant net (décaissement banque)
+ * 3) 401 / 416 = avance déduite (imputation créance)
  */
 export async function generateEcrituresLivraison(params: {
   livraisonId: number;
@@ -61,56 +115,38 @@ export async function generateEcrituresLivraison(params: {
 }) {
   const { livraisonId, membreNom, montantBrutFcfa, avanceDeduiteFcfa, montantNetFcfa, dateLivraison } = params;
   const piece = `LIV-${livraisonId}`;
-  const entries = [];
+  const promises: Promise<unknown>[] = [];
 
-  // Achat cacao
   if (montantBrutFcfa > 0) {
-    entries.push({
-      dateEcriture: dateLivraison,
-      numeroPiece: piece,
+    promises.push(proposerEcriture(COOP_ID, {
+      source: "livraison", sourceId: livraisonId,
       libelle: `Achat cacao – ${membreNom}`,
-      compteDebit: "601",
-      compteCredit: "401",
-      montantFcfa: montantBrutFcfa,
-      source: "livraison" as const,
-      sourceId: livraisonId,
-    });
+      compteDebit: "601", compteCredit: "401",
+      montantFcfa: montantBrutFcfa, date: dateLivraison, numeroPiece: piece,
+    }));
   }
-
-  // Paiement net en banque
   if (montantNetFcfa > 0) {
-    entries.push({
-      dateEcriture: dateLivraison,
-      numeroPiece: piece,
+    promises.push(proposerEcriture(COOP_ID, {
+      source: "livraison", sourceId: livraisonId,
       libelle: `Paiement net livraison – ${membreNom}`,
-      compteDebit: "401",
-      compteCredit: "521",
-      montantFcfa: montantNetFcfa,
-      source: "livraison" as const,
-      sourceId: livraisonId,
-    });
+      compteDebit: "401", compteCredit: "521",
+      montantFcfa: montantNetFcfa, date: dateLivraison, numeroPiece: piece,
+    }));
   }
-
-  // Imputation avance
   if (avanceDeduiteFcfa > 0) {
-    entries.push({
-      dateEcriture: dateLivraison,
-      numeroPiece: piece,
+    promises.push(proposerEcriture(COOP_ID, {
+      source: "livraison", sourceId: livraisonId,
       libelle: `Déduction avance sur livraison – ${membreNom}`,
-      compteDebit: "401",
-      compteCredit: "416",
-      montantFcfa: avanceDeduiteFcfa,
-      source: "livraison" as const,
-      sourceId: livraisonId,
-    });
+      compteDebit: "401", compteCredit: "416",
+      montantFcfa: avanceDeduiteFcfa, date: dateLivraison, numeroPiece: piece,
+    }));
   }
 
-  if (entries.length > 0) await insererEcritures(entries);
+  await Promise.all(promises);
 }
 
 /**
- * Avance octroyée :
- * 416 / 521 = montant octroyé (créance producteur / décaissement banque)
+ * Avance octroyée : 416 / 521
  */
 export async function generateEcrituresAvance(params: {
   avanceId: number;
@@ -118,23 +154,17 @@ export async function generateEcrituresAvance(params: {
   montantFcfa: number;
   dateOctroi: string;
 }) {
-  await insererEcritures([
-    {
-      dateEcriture: params.dateOctroi,
-      numeroPiece: `AVA-${params.avanceId}`,
-      libelle: `Avance octroyée – ${params.membreNom}`,
-      compteDebit: "416",
-      compteCredit: "521",
-      montantFcfa: params.montantFcfa,
-      source: "avance",
-      sourceId: params.avanceId,
-    },
-  ]);
+  await proposerEcriture(COOP_ID, {
+    source: "avance", sourceId: params.avanceId,
+    libelle: `Avance octroyée – ${params.membreNom}`,
+    compteDebit: "416", compteCredit: "521",
+    montantFcfa: params.montantFcfa, date: params.dateOctroi,
+    numeroPiece: `AVA-${params.avanceId}`,
+  });
 }
 
 /**
- * Vente exportateur :
- * 4111 / 701 = créance exportateur / produit vente cacao
+ * Vente exportateur : 4111 / 701
  */
 export async function generateEcrituresVente(params: {
   venteId: number;
@@ -142,23 +172,17 @@ export async function generateEcrituresVente(params: {
   montantFcfa: number;
   dateVente: string;
 }) {
-  await insererEcritures([
-    {
-      dateEcriture: params.dateVente,
-      numeroPiece: `VTE-${params.venteId}`,
-      libelle: `Vente cacao – ${params.exportateurNom}`,
-      compteDebit: "4111",
-      compteCredit: "701",
-      montantFcfa: params.montantFcfa,
-      source: "vente",
-      sourceId: params.venteId,
-    },
-  ]);
+  await proposerEcriture(COOP_ID, {
+    source: "vente", sourceId: params.venteId,
+    libelle: `Vente cacao – ${params.exportateurNom}`,
+    compteDebit: "4111", compteCredit: "701",
+    montantFcfa: params.montantFcfa, date: params.dateVente,
+    numeroPiece: `VTE-${params.venteId}`,
+  });
 }
 
 /**
- * Encaissement exportateur :
- * 521 / 4111 = encaissement banque / apurement créance
+ * Encaissement exportateur : 521 / 4111
  */
 export async function generateEcrituresEncaissement(params: {
   venteId: number;
@@ -166,16 +190,55 @@ export async function generateEcrituresEncaissement(params: {
   montantFcfa: number;
   date: string;
 }) {
-  await insererEcritures([
-    {
-      dateEcriture: params.date,
-      numeroPiece: `ENC-${params.venteId}`,
-      libelle: `Encaissement exportateur – ${params.exportateurNom}`,
-      compteDebit: "521",
-      compteCredit: "4111",
-      montantFcfa: params.montantFcfa,
-      source: "paiement",
-      sourceId: params.venteId,
-    },
-  ]);
+  await proposerEcriture(COOP_ID, {
+    source: "encaissement", sourceId: params.venteId,
+    libelle: `Encaissement exportateur – ${params.exportateurNom}`,
+    compteDebit: "521", compteCredit: "4111",
+    montantFcfa: params.montantFcfa, date: params.date,
+    numeroPiece: `ENC-${params.venteId}`,
+  });
+}
+
+/**
+ * Paiement bulletin de salaire :
+ * 661 / 421 = charges de personnel / rémunérations dues (brut)
+ * 421 / 521 = versement net au salarié
+ * 432 / 421 = cotisations CNPS salarié (si > 0)
+ */
+export async function generateEcrituresSalaire(params: {
+  bulletinId: number;
+  personnelNom: string;
+  salaireNetFcfa: number;
+  salaireBrutFcfa: number;
+  cotisationsSalarieFcfa: number;
+  datePaiement: string;
+}) {
+  const { bulletinId, personnelNom, salaireNetFcfa, salaireBrutFcfa, cotisationsSalarieFcfa, datePaiement } = params;
+  const piece = `SAL-${bulletinId}`;
+
+  const promises: Promise<unknown>[] = [
+    proposerEcriture(COOP_ID, {
+      source: "salaire", sourceId: bulletinId,
+      libelle: `Charge de personnel – ${personnelNom}`,
+      compteDebit: "661", compteCredit: "421",
+      montantFcfa: salaireBrutFcfa, date: datePaiement, numeroPiece: piece,
+    }),
+    proposerEcriture(COOP_ID, {
+      source: "salaire", sourceId: bulletinId,
+      libelle: `Versement salaire net – ${personnelNom}`,
+      compteDebit: "421", compteCredit: "521",
+      montantFcfa: salaireNetFcfa, date: datePaiement, numeroPiece: piece,
+    }),
+  ];
+
+  if (cotisationsSalarieFcfa > 0) {
+    promises.push(proposerEcriture(COOP_ID, {
+      source: "salaire", sourceId: bulletinId,
+      libelle: `Cotisations CNPS salarié – ${personnelNom}`,
+      compteDebit: "432", compteCredit: "421",
+      montantFcfa: cotisationsSalarieFcfa, date: datePaiement, numeroPiece: piece,
+    }));
+  }
+
+  await Promise.all(promises);
 }

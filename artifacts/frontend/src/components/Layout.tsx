@@ -19,7 +19,9 @@ import {
   BarChart3,
   ShieldCheck,
   Banknote,
+  BookOpen,
 } from "lucide-react";
+import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey } from "@workspace/api-client-react";
 
 const navItems = [
   {
@@ -71,8 +73,15 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
-    href: "/reporting",
+    href: "/comptabilite",
     label: "Comptabilité",
+    icon: BookOpen,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+    showBadge: true,
+  },
+  {
+    href: "/reporting",
+    label: "Reporting",
     icon: BarChart3,
     roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
   },
@@ -96,11 +105,17 @@ const navItems = [
   },
 ];
 
-type NavItem = { href: string; label: string; icon: React.ElementType; roles?: string[] };
+type NavItem = { href: string; label: string; icon: React.ElementType; roles?: string[]; showBadge?: boolean };
+
+const BADGE_ROLES = ["pca", "directeur", "comptable"];
 
 function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout: () => void }) {
   const [location] = useLocation();
   const { utilisateur } = useAuth();
+
+  const showBadge = BADGE_ROLES.includes(utilisateur?.role ?? "");
+  const { data: countData } = useCountEcrituresEnAttente({ query: { queryKey: getCountEcrituresEnAttenteQueryKey(), enabled: showBadge } });
+  const nbEnAttente = countData?.count ?? 0;
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#1a4731" }}>
@@ -128,17 +143,18 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {(navItems as NavItem[])
           .filter(({ roles }) => !roles || roles.includes(utilisateur?.role ?? ""))
-          .map(({ href, label, icon: Icon }) => {
+          .map(({ href, label, icon: Icon, showBadge: hasBadge }) => {
             const isActive = location === href || location.startsWith(href + "/");
+            const badgeCount = hasBadge && showBadge ? nbEnAttente : 0;
             return (
               <Link
                 key={href}
                 href={href}
                 onClick={onClose}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative ${
                   isActive
                     ? "text-white"
                     : "text-green-200 hover:text-white hover:bg-green-800"
@@ -146,8 +162,16 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
                 style={isActive ? { backgroundColor: "#c4962a" } : {}}
               >
                 <Icon className="flex-shrink-0" size={18} />
-                <span>{label}</span>
-                {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto" size={14} />}
+                <span className="flex-1">{label}</span>
+                {badgeCount > 0 && (
+                  <span
+                    className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold px-1"
+                    style={{ backgroundColor: "#dc2626" }}
+                  >
+                    {badgeCount > 99 ? "99+" : badgeCount}
+                  </span>
+                )}
+                {isActive && badgeCount === 0 && <ChevronRight className="w-3.5 h-3.5 ml-auto" size={14} />}
               </Link>
             );
           })}

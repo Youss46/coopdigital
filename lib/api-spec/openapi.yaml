@@ -944,6 +944,185 @@ paths:
         "401":
           description: Non authentifié
 
+  # ── Config comptable & écritures en attente ──────────────────
+  /comptabilite/config:
+    get:
+      operationId: getConfigComptable
+      tags: [comptabilite]
+      summary: Récupère la configuration comptable de la coopérative
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Configuration comptable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigComptable"
+        "401":
+          description: Non authentifié
+    put:
+      operationId: updateConfigComptable
+      tags: [comptabilite]
+      summary: Met à jour la configuration comptable
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConfigComptableInput"
+      responses:
+        "200":
+          description: Configuration mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigComptable"
+        "401":
+          description: Non authentifié
+
+  /comptabilite/en-attente/count:
+    get:
+      operationId: countEcrituresEnAttente
+      tags: [comptabilite]
+      summary: Nombre d'écritures en attente de validation
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Compteur
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count]
+                properties:
+                  count:
+                    type: integer
+        "401":
+          description: Non authentifié
+
+  /comptabilite/en-attente:
+    get:
+      operationId: listEcrituresEnAttente
+      tags: [comptabilite]
+      summary: Liste les écritures en attente (et historique)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [livraison, paiement, avance, vente, encaissement, salaire, stock]
+        - name: statut
+          in: query
+          schema:
+            type: string
+            enum: [en_attente, validee, rejetee, modifiee]
+        - name: date_debut
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_fin
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Liste des écritures en attente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EcritureEnAttente"
+        "401":
+          description: Non authentifié
+
+  /comptabilite/en-attente/valider-tout:
+    put:
+      operationId: validerToutEcrituresEnAttente
+      tags: [comptabilite]
+      summary: Valide toutes les écritures en attente
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Nombre d'écritures validées
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [validees]
+                properties:
+                  validees:
+                    type: integer
+        "401":
+          description: Non authentifié
+
+  /comptabilite/en-attente/{id}/valider:
+    put:
+      operationId: validerEcritureEnAttente
+      tags: [comptabilite]
+      summary: Valide (et éventuellement modifie) une écriture en attente
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValiderEcritureInput"
+      responses:
+        "200":
+          description: Écriture traitée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcritureEnAttente"
+        "400":
+          description: Écriture déjà traitée
+        "404":
+          description: Écriture introuvable
+        "401":
+          description: Non authentifié
+
+  /comptabilite/en-attente/{id}/rejeter:
+    put:
+      operationId: rejeterEcritureEnAttente
+      tags: [comptabilite]
+      summary: Rejette une écriture en attente
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejeterEcritureInput"
+      responses:
+        "200":
+          description: Écriture rejetée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcritureEnAttente"
+        "400":
+          description: Motif obligatoire ou écriture déjà traitée
+        "404":
+          description: Écriture introuvable
+        "401":
+          description: Non authentifié
+
   # ── M05 États financiers ──────────────────────────────────────
   /etats-financiers/bilan:
     get:
@@ -2333,6 +2512,114 @@ components:
         totalFcfa:
           type: integer
         dateCalcul:
+          type: string
+
+    ConfigComptable:
+      type: object
+      required: [id, cooperativeId, autoLivraisons, autoPaiements, autoAvances, autoVentesExport, autoEncaissements, autoSalaires, autoStocks]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        autoLivraisons:
+          type: boolean
+        autoPaiements:
+          type: boolean
+        autoAvances:
+          type: boolean
+        autoVentesExport:
+          type: boolean
+        autoEncaissements:
+          type: boolean
+        autoSalaires:
+          type: boolean
+        autoStocks:
+          type: boolean
+        modifiePar:
+          type: integer
+          nullable: true
+        updatedAt:
+          type: string
+          nullable: true
+
+    UpdateConfigComptableInput:
+      type: object
+      properties:
+        autoLivraisons:
+          type: boolean
+        autoPaiements:
+          type: boolean
+        autoAvances:
+          type: boolean
+        autoVentesExport:
+          type: boolean
+        autoEncaissements:
+          type: boolean
+        autoSalaires:
+          type: boolean
+        autoStocks:
+          type: boolean
+
+    EcritureEnAttente:
+      type: object
+      required: [id, cooperativeId, source, libelleProppose, compteDebitPropose, compteCreditPropose, montantFcfa, dateProposee, statut, creeLe]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        source:
+          type: string
+          enum: [livraison, paiement, avance, vente, encaissement, salaire, stock]
+        sourceId:
+          type: integer
+          nullable: true
+        libelleProppose:
+          type: string
+        compteDebitPropose:
+          type: string
+        compteCreditPropose:
+          type: string
+        montantFcfa:
+          type: integer
+        dateProposee:
+          type: string
+          format: date
+        statut:
+          type: string
+          enum: [en_attente, validee, rejetee, modifiee]
+        commentaireComptable:
+          type: string
+          nullable: true
+        creeLe:
+          type: string
+        traiteLe:
+          type: string
+          nullable: true
+        traitePar:
+          type: integer
+          nullable: true
+
+    ValiderEcritureInput:
+      type: object
+      properties:
+        compteDebit:
+          type: string
+        compteCredit:
+          type: string
+        montantFcfa:
+          type: integer
+        libelle:
+          type: string
+        commentaire:
+          type: string
+
+    RejeterEcritureInput:
+      type: object
+      required: [commentaire]
+      properties:
+        commentaire:
           type: string
 
     BilanPoste:

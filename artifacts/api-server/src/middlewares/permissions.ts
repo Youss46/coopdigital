@@ -89,6 +89,12 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_balance:               ["pca", "directeur", "comptable", "auditeur"],
     voir_bilan:                 ["pca", "directeur", "comptable", "auditeur"],
     voir_compte_resultat:       ["pca", "directeur", "comptable", "auditeur"],
+    voir_config:                ["pca", "directeur", "comptable"],
+    modifier_config:            ["pca", "directeur", "comptable"],
+    voir_ecritures_attente:     ["pca", "directeur", "comptable"],
+    valider_ecriture:           ["pca", "directeur", "comptable"],
+    rejeter_ecriture:           ["pca", "directeur", "comptable"],
+    valider_tout:               ["pca", "directeur", "comptable"],
   },
 
   // MODULE M06 — REPORTING

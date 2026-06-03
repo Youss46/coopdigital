@@ -9,6 +9,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { generateBulletin, generateMasse } from "../services/paieService";
+import { generateEcrituresSalaire } from "../services/comptabiliteService";
 
 const COOP_ID = 1;
 
@@ -267,7 +268,7 @@ export async function genererBulletins(
       return;
     }
 
-    let results;
+    let results: PromiseSettledResult<number>[];
     if (personnelIds && personnelIds.length > 0) {
       results = await Promise.allSettled(
         personnelIds.map((pid) =>
@@ -445,6 +446,24 @@ export async function payerBulletin(
       })
       .where(eq(bulletinsPaieTable.id, id))
       .returning();
+
+    void (async () => {
+      const [p] = await db
+        .select({ nom: personnelTable.nom, prenoms: personnelTable.prenoms })
+        .from(personnelTable)
+        .where(eq(personnelTable.id, b.personnelId))
+        .limit(1);
+      if (p && updated) {
+        await generateEcrituresSalaire({
+          bulletinId: updated.id,
+          personnelNom: `${p.prenoms} ${p.nom}`,
+          salaireNetFcfa: updated.salaireNetFcfa,
+          salaireBrutFcfa: updated.salaireBrutFcfa,
+          cotisationsSalarieFcfa: updated.salaireBrutFcfa - updated.salaireNetFcfa,
+          datePaiement: new Date().toISOString().split("T")[0]!,
+        });
+      }
+    })();
 
     res.json(updated);
   } catch (err) {

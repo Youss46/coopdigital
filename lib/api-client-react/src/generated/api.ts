@@ -34,12 +34,15 @@ import type {
   BulletinPaie,
   ComposanteSalaire,
   CompteResultat,
+  ConfigComptable,
+  CountEcrituresEnAttente200,
   CreancesSummary,
   CreateAvancePersonnelInput,
   CreatePersonnelInput,
   CreateUserInput,
   DashboardKpi,
   EcritureComptable,
+  EcritureEnAttente,
   EcritureManuelleInput,
   EncaissementInput,
   EntrepotStock,
@@ -68,6 +71,7 @@ import type {
   GrandLivrePage,
   HealthStatus,
   HistoriqueMasse,
+  ListEcrituresEnAttenteParams,
   LivraisonDetail,
   LivraisonInput,
   LivraisonResult,
@@ -89,6 +93,7 @@ import type {
   Personnel,
   PersonnelHistorique,
   RapportMensuel,
+  RejeterEcritureInput,
   RemboursementAvancePersonnelInput,
   RemboursementInput,
   ResetPasswordInput,
@@ -98,9 +103,12 @@ import type {
   SmsHistorique,
   ToggleActifInput,
   Tresorerie,
+  UpdateConfigComptableInput,
   UpdatePersonnelInput,
   UpdateUserInput,
   UtilisateurCompte,
+  ValiderEcritureInput,
+  ValiderToutEcrituresEnAttente200,
   VenteDetail,
   VenteInput
 } from './api.schemas';
@@ -3411,6 +3419,529 @@ export function useGetTresorerie<TData = Awaited<ReturnType<typeof getTresorerie
 
 
 
+
+export const getGetConfigComptableUrl = () => {
+
+
+
+
+  return `/api/comptabilite/config`
+}
+
+/**
+ * @summary Récupère la configuration comptable de la coopérative
+ */
+export const getConfigComptable = async ( options?: RequestInit): Promise<ConfigComptable> => {
+
+  return customFetch<ConfigComptable>(getGetConfigComptableUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetConfigComptableQueryKey = () => {
+    return [
+    `/api/comptabilite/config`
+    ] as const;
+    }
+
+
+export const getGetConfigComptableQueryOptions = <TData = Awaited<ReturnType<typeof getConfigComptable>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConfigComptable>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConfigComptableQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConfigComptable>>> = ({ signal }) => getConfigComptable({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConfigComptable>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetConfigComptableQueryResult = NonNullable<Awaited<ReturnType<typeof getConfigComptable>>>
+export type GetConfigComptableQueryError = ErrorType<void>
+
+
+/**
+ * @summary Récupère la configuration comptable de la coopérative
+ */
+
+export function useGetConfigComptable<TData = Awaited<ReturnType<typeof getConfigComptable>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConfigComptable>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetConfigComptableQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateConfigComptableUrl = () => {
+
+
+
+
+  return `/api/comptabilite/config`
+}
+
+/**
+ * @summary Met à jour la configuration comptable
+ */
+export const updateConfigComptable = async (updateConfigComptableInput: UpdateConfigComptableInput, options?: RequestInit): Promise<ConfigComptable> => {
+
+  return customFetch<ConfigComptable>(getUpdateConfigComptableUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateConfigComptableInput,)
+  }
+);}
+
+
+
+
+export const getUpdateConfigComptableMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConfigComptable>>, TError,{data: BodyType<UpdateConfigComptableInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateConfigComptable>>, TError,{data: BodyType<UpdateConfigComptableInput>}, TContext> => {
+
+const mutationKey = ['updateConfigComptable'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateConfigComptable>>, {data: BodyType<UpdateConfigComptableInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateConfigComptable(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateConfigComptableMutationResult = NonNullable<Awaited<ReturnType<typeof updateConfigComptable>>>
+    export type UpdateConfigComptableMutationBody = BodyType<UpdateConfigComptableInput>
+    export type UpdateConfigComptableMutationError = ErrorType<void>
+
+    /**
+ * @summary Met à jour la configuration comptable
+ */
+export const useUpdateConfigComptable = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConfigComptable>>, TError,{data: BodyType<UpdateConfigComptableInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateConfigComptable>>,
+        TError,
+        {data: BodyType<UpdateConfigComptableInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateConfigComptableMutationOptions(options));
+    }
+
+export const getCountEcrituresEnAttenteUrl = () => {
+
+
+
+
+  return `/api/comptabilite/en-attente/count`
+}
+
+/**
+ * @summary Nombre d'écritures en attente de validation
+ */
+export const countEcrituresEnAttente = async ( options?: RequestInit): Promise<CountEcrituresEnAttente200> => {
+
+  return customFetch<CountEcrituresEnAttente200>(getCountEcrituresEnAttenteUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCountEcrituresEnAttenteQueryKey = () => {
+    return [
+    `/api/comptabilite/en-attente/count`
+    ] as const;
+    }
+
+
+export const getCountEcrituresEnAttenteQueryOptions = <TData = Awaited<ReturnType<typeof countEcrituresEnAttente>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof countEcrituresEnAttente>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCountEcrituresEnAttenteQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof countEcrituresEnAttente>>> = ({ signal }) => countEcrituresEnAttente({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof countEcrituresEnAttente>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CountEcrituresEnAttenteQueryResult = NonNullable<Awaited<ReturnType<typeof countEcrituresEnAttente>>>
+export type CountEcrituresEnAttenteQueryError = ErrorType<void>
+
+
+/**
+ * @summary Nombre d'écritures en attente de validation
+ */
+
+export function useCountEcrituresEnAttente<TData = Awaited<ReturnType<typeof countEcrituresEnAttente>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof countEcrituresEnAttente>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCountEcrituresEnAttenteQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListEcrituresEnAttenteUrl = (params?: ListEcrituresEnAttenteParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/comptabilite/en-attente?${stringifiedParams}` : `/api/comptabilite/en-attente`
+}
+
+/**
+ * @summary Liste les écritures en attente (et historique)
+ */
+export const listEcrituresEnAttente = async (params?: ListEcrituresEnAttenteParams, options?: RequestInit): Promise<EcritureEnAttente[]> => {
+
+  return customFetch<EcritureEnAttente[]>(getListEcrituresEnAttenteUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEcrituresEnAttenteQueryKey = (params?: ListEcrituresEnAttenteParams,) => {
+    return [
+    `/api/comptabilite/en-attente`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListEcrituresEnAttenteQueryOptions = <TData = Awaited<ReturnType<typeof listEcrituresEnAttente>>, TError = ErrorType<void>>(params?: ListEcrituresEnAttenteParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEcrituresEnAttente>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEcrituresEnAttenteQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEcrituresEnAttente>>> = ({ signal }) => listEcrituresEnAttente(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEcrituresEnAttente>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEcrituresEnAttenteQueryResult = NonNullable<Awaited<ReturnType<typeof listEcrituresEnAttente>>>
+export type ListEcrituresEnAttenteQueryError = ErrorType<void>
+
+
+/**
+ * @summary Liste les écritures en attente (et historique)
+ */
+
+export function useListEcrituresEnAttente<TData = Awaited<ReturnType<typeof listEcrituresEnAttente>>, TError = ErrorType<void>>(
+ params?: ListEcrituresEnAttenteParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEcrituresEnAttente>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEcrituresEnAttenteQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getValiderToutEcrituresEnAttenteUrl = () => {
+
+
+
+
+  return `/api/comptabilite/en-attente/valider-tout`
+}
+
+/**
+ * @summary Valide toutes les écritures en attente
+ */
+export const validerToutEcrituresEnAttente = async ( options?: RequestInit): Promise<ValiderToutEcrituresEnAttente200> => {
+
+  return customFetch<ValiderToutEcrituresEnAttente200>(getValiderToutEcrituresEnAttenteUrl(),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+export const getValiderToutEcrituresEnAttenteMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validerToutEcrituresEnAttente>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof validerToutEcrituresEnAttente>>, TError,void, TContext> => {
+
+const mutationKey = ['validerToutEcrituresEnAttente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof validerToutEcrituresEnAttente>>, void> = () => {
+
+
+          return  validerToutEcrituresEnAttente(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ValiderToutEcrituresEnAttenteMutationResult = NonNullable<Awaited<ReturnType<typeof validerToutEcrituresEnAttente>>>
+
+    export type ValiderToutEcrituresEnAttenteMutationError = ErrorType<void>
+
+    /**
+ * @summary Valide toutes les écritures en attente
+ */
+export const useValiderToutEcrituresEnAttente = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validerToutEcrituresEnAttente>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof validerToutEcrituresEnAttente>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getValiderToutEcrituresEnAttenteMutationOptions(options));
+    }
+
+export const getValiderEcritureEnAttenteUrl = (id: number,) => {
+
+
+
+
+  return `/api/comptabilite/en-attente/${id}/valider`
+}
+
+/**
+ * @summary Valide (et éventuellement modifie) une écriture en attente
+ */
+export const validerEcritureEnAttente = async (id: number,
+    validerEcritureInput?: ValiderEcritureInput, options?: RequestInit): Promise<EcritureEnAttente> => {
+
+  return customFetch<EcritureEnAttente>(getValiderEcritureEnAttenteUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      validerEcritureInput,)
+  }
+);}
+
+
+
+
+export const getValiderEcritureEnAttenteMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validerEcritureEnAttente>>, TError,{id: number;data?: BodyType<ValiderEcritureInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof validerEcritureEnAttente>>, TError,{id: number;data?: BodyType<ValiderEcritureInput>}, TContext> => {
+
+const mutationKey = ['validerEcritureEnAttente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof validerEcritureEnAttente>>, {id: number;data?: BodyType<ValiderEcritureInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  validerEcritureEnAttente(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ValiderEcritureEnAttenteMutationResult = NonNullable<Awaited<ReturnType<typeof validerEcritureEnAttente>>>
+    export type ValiderEcritureEnAttenteMutationBody = BodyType<ValiderEcritureInput> | undefined
+    export type ValiderEcritureEnAttenteMutationError = ErrorType<void>
+
+    /**
+ * @summary Valide (et éventuellement modifie) une écriture en attente
+ */
+export const useValiderEcritureEnAttente = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validerEcritureEnAttente>>, TError,{id: number;data?: BodyType<ValiderEcritureInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof validerEcritureEnAttente>>,
+        TError,
+        {id: number;data?: BodyType<ValiderEcritureInput>},
+        TContext
+      > => {
+      return useMutation(getValiderEcritureEnAttenteMutationOptions(options));
+    }
+
+export const getRejeterEcritureEnAttenteUrl = (id: number,) => {
+
+
+
+
+  return `/api/comptabilite/en-attente/${id}/rejeter`
+}
+
+/**
+ * @summary Rejette une écriture en attente
+ */
+export const rejeterEcritureEnAttente = async (id: number,
+    rejeterEcritureInput: RejeterEcritureInput, options?: RequestInit): Promise<EcritureEnAttente> => {
+
+  return customFetch<EcritureEnAttente>(getRejeterEcritureEnAttenteUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      rejeterEcritureInput,)
+  }
+);}
+
+
+
+
+export const getRejeterEcritureEnAttenteMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejeterEcritureEnAttente>>, TError,{id: number;data: BodyType<RejeterEcritureInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rejeterEcritureEnAttente>>, TError,{id: number;data: BodyType<RejeterEcritureInput>}, TContext> => {
+
+const mutationKey = ['rejeterEcritureEnAttente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejeterEcritureEnAttente>>, {id: number;data: BodyType<RejeterEcritureInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  rejeterEcritureEnAttente(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RejeterEcritureEnAttenteMutationResult = NonNullable<Awaited<ReturnType<typeof rejeterEcritureEnAttente>>>
+    export type RejeterEcritureEnAttenteMutationBody = BodyType<RejeterEcritureInput>
+    export type RejeterEcritureEnAttenteMutationError = ErrorType<void>
+
+    /**
+ * @summary Rejette une écriture en attente
+ */
+export const useRejeterEcritureEnAttente = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejeterEcritureEnAttente>>, TError,{id: number;data: BodyType<RejeterEcritureInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rejeterEcritureEnAttente>>,
+        TError,
+        {id: number;data: BodyType<RejeterEcritureInput>},
+        TContext
+      > => {
+      return useMutation(getRejeterEcritureEnAttenteMutationOptions(options));
+    }
 
 export const getGetBilanUrl = (params?: GetBilanParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -998,6 +998,159 @@ export const GetTresorerieResponse = zod.object({
 
 
 /**
+ * @summary Récupère la configuration comptable de la coopérative
+ */
+export const GetConfigComptableResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "autoLivraisons": zod.boolean(),
+  "autoPaiements": zod.boolean(),
+  "autoAvances": zod.boolean(),
+  "autoVentesExport": zod.boolean(),
+  "autoEncaissements": zod.boolean(),
+  "autoSalaires": zod.boolean(),
+  "autoStocks": zod.boolean(),
+  "modifiePar": zod.number().nullish(),
+  "updatedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Met à jour la configuration comptable
+ */
+export const UpdateConfigComptableBody = zod.object({
+  "autoLivraisons": zod.boolean().optional(),
+  "autoPaiements": zod.boolean().optional(),
+  "autoAvances": zod.boolean().optional(),
+  "autoVentesExport": zod.boolean().optional(),
+  "autoEncaissements": zod.boolean().optional(),
+  "autoSalaires": zod.boolean().optional(),
+  "autoStocks": zod.boolean().optional()
+})
+
+export const UpdateConfigComptableResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "autoLivraisons": zod.boolean(),
+  "autoPaiements": zod.boolean(),
+  "autoAvances": zod.boolean(),
+  "autoVentesExport": zod.boolean(),
+  "autoEncaissements": zod.boolean(),
+  "autoSalaires": zod.boolean(),
+  "autoStocks": zod.boolean(),
+  "modifiePar": zod.number().nullish(),
+  "updatedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Nombre d'écritures en attente de validation
+ */
+export const CountEcrituresEnAttenteResponse = zod.object({
+  "count": zod.number()
+})
+
+
+/**
+ * @summary Liste les écritures en attente (et historique)
+ */
+export const ListEcrituresEnAttenteQueryParams = zod.object({
+  "source": zod.enum(['livraison', 'paiement', 'avance', 'vente', 'encaissement', 'salaire', 'stock']).optional(),
+  "statut": zod.enum(['en_attente', 'validee', 'rejetee', 'modifiee']).optional(),
+  "date_debut": zod.date().optional(),
+  "date_fin": zod.date().optional()
+})
+
+export const ListEcrituresEnAttenteResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "source": zod.enum(['livraison', 'paiement', 'avance', 'vente', 'encaissement', 'salaire', 'stock']),
+  "sourceId": zod.number().nullish(),
+  "libelleProppose": zod.string(),
+  "compteDebitPropose": zod.string(),
+  "compteCreditPropose": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateProposee": zod.coerce.date(),
+  "statut": zod.enum(['en_attente', 'validee', 'rejetee', 'modifiee']),
+  "commentaireComptable": zod.string().nullish(),
+  "creeLe": zod.string(),
+  "traiteLe": zod.string().nullish(),
+  "traitePar": zod.number().nullish()
+})
+export const ListEcrituresEnAttenteResponse = zod.array(ListEcrituresEnAttenteResponseItem)
+
+
+/**
+ * @summary Valide toutes les écritures en attente
+ */
+export const ValiderToutEcrituresEnAttenteResponse = zod.object({
+  "validees": zod.number()
+})
+
+
+/**
+ * @summary Valide (et éventuellement modifie) une écriture en attente
+ */
+export const ValiderEcritureEnAttenteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ValiderEcritureEnAttenteBody = zod.object({
+  "compteDebit": zod.string().optional(),
+  "compteCredit": zod.string().optional(),
+  "montantFcfa": zod.number().optional(),
+  "libelle": zod.string().optional(),
+  "commentaire": zod.string().optional()
+})
+
+export const ValiderEcritureEnAttenteResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "source": zod.enum(['livraison', 'paiement', 'avance', 'vente', 'encaissement', 'salaire', 'stock']),
+  "sourceId": zod.number().nullish(),
+  "libelleProppose": zod.string(),
+  "compteDebitPropose": zod.string(),
+  "compteCreditPropose": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateProposee": zod.coerce.date(),
+  "statut": zod.enum(['en_attente', 'validee', 'rejetee', 'modifiee']),
+  "commentaireComptable": zod.string().nullish(),
+  "creeLe": zod.string(),
+  "traiteLe": zod.string().nullish(),
+  "traitePar": zod.number().nullish()
+})
+
+
+/**
+ * @summary Rejette une écriture en attente
+ */
+export const RejeterEcritureEnAttenteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RejeterEcritureEnAttenteBody = zod.object({
+  "commentaire": zod.string()
+})
+
+export const RejeterEcritureEnAttenteResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "source": zod.enum(['livraison', 'paiement', 'avance', 'vente', 'encaissement', 'salaire', 'stock']),
+  "sourceId": zod.number().nullish(),
+  "libelleProppose": zod.string(),
+  "compteDebitPropose": zod.string(),
+  "compteCreditPropose": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateProposee": zod.coerce.date(),
+  "statut": zod.enum(['en_attente', 'validee', 'rejetee', 'modifiee']),
+  "commentaireComptable": zod.string().nullish(),
+  "creeLe": zod.string(),
+  "traiteLe": zod.string().nullish(),
+  "traitePar": zod.number().nullish()
+})
+
+
+/**
  * @summary Bilan OHADA (actif / passif)
  */
 export const GetBilanQueryParams = zod.object({

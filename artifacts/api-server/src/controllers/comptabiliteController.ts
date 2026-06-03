@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
-import { db, ecrituresComptablesTable, planComptableTable, exercicesTable } from "@workspace/db";
-import { eq, and, gte, lte, sql, desc, asc } from "drizzle-orm";
+import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable } from "@workspace/db";
+import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
 
 const COOP_ID = 1;
@@ -195,6 +195,266 @@ export async function getTresorerie(req: Request, res: Response): Promise<void> 
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getTresorerie");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── Config comptable ─────────────────────────────────────────────────────────
+
+export async function getConfigComptable(req: Request, res: Response): Promise<void> {
+  try {
+    const rows = await db
+      .select()
+      .from(configComptableTable)
+      .where(eq(configComptableTable.cooperativeId, COOP_ID))
+      .limit(1);
+
+    if (rows.length === 0) {
+      await db.insert(configComptableTable).values({ cooperativeId: COOP_ID }).onConflictDoNothing();
+      const created = await db.select().from(configComptableTable).where(eq(configComptableTable.cooperativeId, COOP_ID)).limit(1);
+      res.json(created[0]);
+      return;
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    req.log.error({ err }, "getConfigComptable");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function updateConfigComptable(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as {
+      autoLivraisons?: boolean;
+      autoPaiements?: boolean;
+      autoAvances?: boolean;
+      autoVentesExport?: boolean;
+      autoEncaissements?: boolean;
+      autoSalaires?: boolean;
+      autoStocks?: boolean;
+    };
+
+    const [updated] = await db
+      .update(configComptableTable)
+      .set({
+        ...body,
+        modifiePar: req.user?.id ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(configComptableTable.cooperativeId, COOP_ID))
+      .returning();
+
+    if (!updated) {
+      await db.insert(configComptableTable).values({ cooperativeId: COOP_ID, ...body, modifiePar: req.user?.id ?? null, updatedAt: new Date() }).onConflictDoNothing();
+      const created = await db.select().from(configComptableTable).where(eq(configComptableTable.cooperativeId, COOP_ID)).limit(1);
+      res.json(created[0]);
+      return;
+    }
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "updateConfigComptable");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── Écritures en attente ─────────────────────────────────────────────────────
+
+export async function listEcrituresEnAttente(req: Request, res: Response): Promise<void> {
+  try {
+    const source = req.query["source"] as string | undefined;
+    const statut = (req.query["statut"] as string | undefined) ?? "en_attente";
+    const dateDebut = req.query["date_debut"] as string | undefined;
+    const dateFin = req.query["date_fin"] as string | undefined;
+
+    const conditions = [eq(ecrituresEnAttenteTable.cooperativeId, COOP_ID)];
+    if (source) conditions.push(eq(ecrituresEnAttenteTable.source, source as "livraison" | "paiement" | "avance" | "vente" | "encaissement" | "salaire" | "stock"));
+    if (statut) conditions.push(eq(ecrituresEnAttenteTable.statut, statut as "en_attente" | "validee" | "rejetee" | "modifiee"));
+    if (dateDebut) conditions.push(gte(ecrituresEnAttenteTable.dateProposee, dateDebut));
+    if (dateFin) conditions.push(lte(ecrituresEnAttenteTable.dateProposee, dateFin));
+
+    const ecritures = await db
+      .select()
+      .from(ecrituresEnAttenteTable)
+      .where(and(...conditions))
+      .orderBy(desc(ecrituresEnAttenteTable.creeLe));
+
+    res.json(ecritures);
+  } catch (err) {
+    req.log.error({ err }, "listEcrituresEnAttente");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function countEcrituresEnAttente(req: Request, res: Response): Promise<void> {
+  try {
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(ecrituresEnAttenteTable)
+      .where(and(
+        eq(ecrituresEnAttenteTable.cooperativeId, COOP_ID),
+        eq(ecrituresEnAttenteTable.statut, "en_attente"),
+      ));
+    res.json({ count: count ?? 0 });
+  } catch (err) {
+    req.log.error({ err }, "countEcrituresEnAttente");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function validerEcritureEnAttente(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseInt(String(req.params["id"]));
+    if (!id || isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+
+    const [ecriture] = await db
+      .select()
+      .from(ecrituresEnAttenteTable)
+      .where(and(eq(ecrituresEnAttenteTable.id, id), eq(ecrituresEnAttenteTable.cooperativeId, COOP_ID)))
+      .limit(1);
+
+    if (!ecriture) { res.status(404).json({ erreur: "Écriture introuvable" }); return; }
+    if (ecriture.statut !== "en_attente") { res.status(400).json({ erreur: "Cette écriture a déjà été traitée" }); return; }
+
+    const body = req.body as {
+      compteDebit?: string;
+      compteCredit?: string;
+      montantFcfa?: number;
+      libelle?: string;
+      commentaire?: string;
+    };
+
+    const compteDebit = body.compteDebit ?? ecriture.compteDebitPropose;
+    const compteCredit = body.compteCredit ?? ecriture.compteCreditPropose;
+    const montantFcfa = body.montantFcfa ?? ecriture.montantFcfa;
+    const libelle = body.libelle ?? ecriture.libelleProppose;
+
+    const modifie =
+      compteDebit !== ecriture.compteDebitPropose ||
+      compteCredit !== ecriture.compteCreditPropose ||
+      montantFcfa !== ecriture.montantFcfa ||
+      libelle !== ecriture.libelleProppose;
+
+    const nouveauStatut = modifie ? "modifiee" : "validee";
+
+    const exercice = new Date(ecriture.dateProposee).getFullYear();
+    const sourceMap: Record<string, "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock"> = {
+      livraison: "livraison",
+      paiement: "paiement",
+      avance: "avance",
+      vente: "vente",
+      encaissement: "encaissement",
+      salaire: "salaire",
+      stock: "stock",
+    };
+
+    await db.insert(ecrituresComptablesTable).values({
+      cooperativeId: COOP_ID,
+      dateEcriture: ecriture.dateProposee,
+      libelle: modifie ? `${libelle} [modifiée]` : libelle,
+      compteDebit,
+      compteCredit,
+      montantFcfa,
+      source: sourceMap[ecriture.source] ?? "manuel",
+      sourceId: ecriture.sourceId,
+      exercice,
+    });
+
+    const [updated] = await db
+      .update(ecrituresEnAttenteTable)
+      .set({
+        statut: nouveauStatut,
+        commentaireComptable: body.commentaire ?? null,
+        traiteLe: new Date(),
+        traitePar: req.user?.id ?? null,
+      })
+      .where(eq(ecrituresEnAttenteTable.id, id))
+      .returning();
+
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "validerEcritureEnAttente");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function rejeterEcritureEnAttente(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseInt(String(req.params["id"]));
+    if (!id || isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+
+    const [ecriture] = await db
+      .select()
+      .from(ecrituresEnAttenteTable)
+      .where(and(eq(ecrituresEnAttenteTable.id, id), eq(ecrituresEnAttenteTable.cooperativeId, COOP_ID)))
+      .limit(1);
+
+    if (!ecriture) { res.status(404).json({ erreur: "Écriture introuvable" }); return; }
+    if (ecriture.statut !== "en_attente") { res.status(400).json({ erreur: "Cette écriture a déjà été traitée" }); return; }
+
+    const { commentaire } = req.body as { commentaire?: string };
+    if (!commentaire?.trim()) { res.status(400).json({ erreur: "Le motif du rejet est obligatoire" }); return; }
+
+    const [updated] = await db
+      .update(ecrituresEnAttenteTable)
+      .set({
+        statut: "rejetee",
+        commentaireComptable: commentaire,
+        traiteLe: new Date(),
+        traitePar: req.user?.id ?? null,
+      })
+      .where(eq(ecrituresEnAttenteTable.id, id))
+      .returning();
+
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "rejeterEcritureEnAttente");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function validerToutEcrituresEnAttente(req: Request, res: Response): Promise<void> {
+  try {
+    const enAttente = await db
+      .select()
+      .from(ecrituresEnAttenteTable)
+      .where(and(
+        eq(ecrituresEnAttenteTable.cooperativeId, COOP_ID),
+        eq(ecrituresEnAttenteTable.statut, "en_attente"),
+      ));
+
+    if (enAttente.length === 0) {
+      res.json({ validees: 0 });
+      return;
+    }
+
+    const sourceMap: Record<string, "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock"> = {
+      livraison: "livraison", paiement: "paiement", avance: "avance",
+      vente: "vente", encaissement: "encaissement", salaire: "salaire", stock: "stock",
+    };
+
+    await db.insert(ecrituresComptablesTable).values(
+      enAttente.map((e) => ({
+        cooperativeId: COOP_ID,
+        dateEcriture: e.dateProposee,
+        libelle: e.libelleProppose,
+        compteDebit: e.compteDebitPropose,
+        compteCredit: e.compteCreditPropose,
+        montantFcfa: e.montantFcfa,
+        source: sourceMap[e.source] ?? "manuel",
+        sourceId: e.sourceId,
+        exercice: new Date(e.dateProposee).getFullYear(),
+      }))
+    );
+
+    const ids = enAttente.map((e) => e.id);
+    await db
+      .update(ecrituresEnAttenteTable)
+      .set({ statut: "validee", traiteLe: new Date(), traitePar: req.user?.id ?? null })
+      .where(inArray(ecrituresEnAttenteTable.id, ids));
+
+    res.json({ validees: enAttente.length });
+  } catch (err) {
+    req.log.error({ err }, "validerToutEcrituresEnAttente");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
