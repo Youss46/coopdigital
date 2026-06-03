@@ -17,6 +17,7 @@ import {
   Receipt,
   MessageSquare,
   BarChart3,
+  ShieldCheck,
 } from "lucide-react";
 
 const navItems = [
@@ -30,7 +31,10 @@ const navItems = [
   { href: "/creances", label: "Créances", icon: Receipt },
   { href: "/communication", label: "Communication", icon: MessageSquare },
   { href: "/reporting", label: "Comptabilité", icon: BarChart3 },
+  { href: "/administration/comptes", label: "Comptes", icon: ShieldCheck, roles: ["pca", "directeur"] },
 ];
+
+type NavItem = { href: string; label: string; icon: React.ElementType; roles?: string[] };
 
 function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout: () => void }) {
   const [location] = useLocation();
@@ -63,26 +67,28 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const isActive = location === href || location.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? "text-white"
-                  : "text-green-200 hover:text-white hover:bg-green-800"
-              }`}
-              style={isActive ? { backgroundColor: "#c4962a" } : {}}
-            >
-              <Icon className="flex-shrink-0" size={18} />
-              <span>{label}</span>
-              {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto" size={14} />}
-            </Link>
-          );
-        })}
+        {(navItems as NavItem[])
+          .filter(({ roles }) => !roles || roles.includes(utilisateur?.role ?? ""))
+          .map(({ href, label, icon: Icon }) => {
+            const isActive = location === href || location.startsWith(href + "/");
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={onClose}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? "text-white"
+                    : "text-green-200 hover:text-white hover:bg-green-800"
+                }`}
+                style={isActive ? { backgroundColor: "#c4962a" } : {}}
+              >
+                <Icon className="flex-shrink-0" size={18} />
+                <span>{label}</span>
+                {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto" size={14} />}
+              </Link>
+            );
+          })}
       </nav>
 
       {/* User info */}

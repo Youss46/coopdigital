@@ -1086,3 +1086,116 @@ export const GetMargeCampagnesResponseItem = zod.object({
 export const GetMargeCampagnesResponse = zod.array(GetMargeCampagnesResponseItem)
 
 
+/**
+ * @summary Liste tous les comptes utilisateurs
+ */
+export const GetUsersResponseItem = zod.object({
+  "id": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "email": zod.string(),
+  "telephone": zod.string().nullish(),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "actif": zod.boolean(),
+  "cooperativeId": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const GetUsersResponse = zod.array(GetUsersResponseItem)
+
+
+/**
+ * @summary Créer un compte utilisateur
+ */
+export const createUserBodyMotDePasseMin = 8;
+
+
+
+export const CreateUserBody = zod.object({
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "email": zod.string().email(),
+  "telephone": zod.string().optional(),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "motDePasse": zod.string().min(createUserBodyMotDePasseMin)
+})
+
+
+/**
+ * @summary Modifier les informations d'un compte
+ */
+export const UpdateUserParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateUserBody = zod.object({
+  "nom": zod.string().optional(),
+  "prenoms": zod.string().optional(),
+  "email": zod.string().email().optional(),
+  "telephone": zod.string().optional()
+})
+
+export const UpdateUserResponse = zod.object({
+  "id": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "email": zod.string(),
+  "telephone": zod.string().nullish(),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "actif": zod.boolean(),
+  "cooperativeId": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Supprimer un compte utilisateur
+ */
+export const DeleteUserParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Réinitialiser le mot de passe d'un compte
+ */
+export const ResetUserPasswordParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const resetUserPasswordBodyNouveauMotDePasseMin = 8;
+
+
+
+export const ResetUserPasswordBody = zod.object({
+  "nouveauMotDePasse": zod.string().min(resetUserPasswordBodyNouveauMotDePasseMin)
+})
+
+export const ResetUserPasswordResponse = zod.object({
+  "message": zod.string().optional()
+})
+
+
+/**
+ * @summary Activer ou désactiver un compte
+ */
+export const ToggleUserActifParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ToggleUserActifBody = zod.object({
+  "actif": zod.boolean()
+})
+
+export const ToggleUserActifResponse = zod.object({
+  "id": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "email": zod.string(),
+  "telephone": zod.string().nullish(),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "actif": zod.boolean(),
+  "cooperativeId": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+

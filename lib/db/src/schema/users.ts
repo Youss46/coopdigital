@@ -1,14 +1,19 @@
-import { pgTable, serial, text, boolean, timestamp, integer, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, timestamp, integer, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { cooperativesTable } from "./cooperatives";
 
-export const userRoleEnum = pgEnum("user_role", [
-  "super_admin",
-  "admin",
+export const USER_ROLES = [
+  "pca",
+  "directeur",
+  "comptable",
+  "magasinier",
+  "responsable_tracabilite",
   "agent_terrain",
   "auditeur",
-]);
+] as const;
+
+export type UserRole = (typeof USER_ROLES)[number];
 
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -16,8 +21,9 @@ export const usersTable = pgTable("users", {
   nom: text("nom").notNull(),
   prenoms: text("prenoms").notNull(),
   email: text("email").unique().notNull(),
+  telephone: varchar("telephone", { length: 20 }),
   passwordHash: text("password_hash").notNull(),
-  role: userRoleEnum("role").notNull().default("agent_terrain"),
+  role: varchar("role", { length: 30 }).$type<UserRole>().notNull().default("agent_terrain"),
   actif: boolean("actif").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

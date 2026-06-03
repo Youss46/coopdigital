@@ -601,6 +601,70 @@ export interface EcritureManuelleInput {
   montantFcfa: number;
 }
 
+export type UtilisateurCompteRole = typeof UtilisateurCompteRole[keyof typeof UtilisateurCompteRole];
+
+
+export const UtilisateurCompteRole = {
+  pca: 'pca',
+  directeur: 'directeur',
+  comptable: 'comptable',
+  magasinier: 'magasinier',
+  responsable_tracabilite: 'responsable_tracabilite',
+  agent_terrain: 'agent_terrain',
+  auditeur: 'auditeur',
+} as const;
+
+export interface UtilisateurCompte {
+  id: number;
+  nom: string;
+  prenoms: string;
+  email: string;
+  telephone?: string | null;
+  role: UtilisateurCompteRole;
+  actif: boolean;
+  cooperativeId?: number | null;
+  createdAt: string;
+}
+
+export type CreateUserInputRole = typeof CreateUserInputRole[keyof typeof CreateUserInputRole];
+
+
+export const CreateUserInputRole = {
+  pca: 'pca',
+  directeur: 'directeur',
+  comptable: 'comptable',
+  magasinier: 'magasinier',
+  responsable_tracabilite: 'responsable_tracabilite',
+  agent_terrain: 'agent_terrain',
+  auditeur: 'auditeur',
+} as const;
+
+export interface CreateUserInput {
+  nom: string;
+  prenoms: string;
+  email: string;
+  telephone?: string;
+  role: CreateUserInputRole;
+  /** @minLength 8 */
+  motDePasse: string;
+}
+
+export interface UpdateUserInput {
+  nom?: string;
+  prenoms?: string;
+  email?: string;
+  telephone?: string;
+}
+
+export interface ResetPasswordInput {
+  /** @minLength 8 */
+  nouveauMotDePasse: string;
+}
+
+export interface ToggleActifInput {
+  actif: boolean;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -702,5 +766,9 @@ exercice?: number;
 
 export type GetFluxTresorerieParams = {
 exercice?: number;
+};
+
+export type ResetUserPassword200 = {
+  message?: string;
 };
 

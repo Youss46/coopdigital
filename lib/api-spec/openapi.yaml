@@ -21,6 +21,7 @@ tags:
   - name: comptabilite
   - name: etats-financiers
   - name: rapports
+  - name: users
 
 paths:
   /healthz:
@@ -1017,6 +1018,178 @@ paths:
         "401":
           description: Non authentifié
 
+  /users:
+    get:
+      operationId: getUsers
+      tags: [users]
+      summary: Liste tous les comptes utilisateurs
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Liste des utilisateurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UtilisateurCompte"
+        "403":
+          description: Accès refusé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Créer un compte utilisateur
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserInput"
+      responses:
+        "201":
+          description: Compte créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UtilisateurCompte"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Accès refusé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}:
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Modifier les informations d'un compte
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserInput"
+      responses:
+        "200":
+          description: Compte mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UtilisateurCompte"
+        "404":
+          description: Compte introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Supprimer un compte utilisateur
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Compte supprimé
+        "403":
+          description: Action non autorisée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}/password:
+    put:
+      operationId: resetUserPassword
+      tags: [users]
+      summary: Réinitialiser le mot de passe d'un compte
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "200":
+          description: Mot de passe réinitialisé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        "403":
+          description: Accès refusé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}/activer:
+    put:
+      operationId: toggleUserActif
+      tags: [users]
+      summary: Activer ou désactiver un compte
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleActifInput"
+      responses:
+        "200":
+          description: Statut mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UtilisateurCompte"
+        "403":
+          description: Accès refusé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -1899,3 +2072,78 @@ components:
           type: string
         montantFcfa:
           type: integer
+
+    UtilisateurCompte:
+      type: object
+      required: [id, nom, prenoms, email, role, actif, createdAt]
+      properties:
+        id:
+          type: integer
+        nom:
+          type: string
+        prenoms:
+          type: string
+        email:
+          type: string
+        telephone:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [pca, directeur, comptable, magasinier, responsable_tracabilite, agent_terrain, auditeur]
+        actif:
+          type: boolean
+        cooperativeId:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateUserInput:
+      type: object
+      required: [nom, prenoms, email, role, motDePasse]
+      properties:
+        nom:
+          type: string
+        prenoms:
+          type: string
+        email:
+          type: string
+          format: email
+        telephone:
+          type: string
+        role:
+          type: string
+          enum: [pca, directeur, comptable, magasinier, responsable_tracabilite, agent_terrain, auditeur]
+        motDePasse:
+          type: string
+          minLength: 8
+
+    UpdateUserInput:
+      type: object
+      properties:
+        nom:
+          type: string
+        prenoms:
+          type: string
+        email:
+          type: string
+          format: email
+        telephone:
+          type: string
+
+    ResetPasswordInput:
+      type: object
+      required: [nouveauMotDePasse]
+      properties:
+        nouveauMotDePasse:
+          type: string
+          minLength: 8
+
+    ToggleActifInput:
+      type: object
+      required: [actif]
+      properties:
+        actif:
+          type: boolean

@@ -13,6 +13,7 @@ import ExportateursPage from "@/pages/ExportateursPage";
 import CreancesPage from "@/pages/CreancesPage";
 import CommunicationPage from "@/pages/CommunicationPage";
 import ReportingPage from "@/pages/ReportingPage";
+import ComptesPage from "@/pages/ComptesPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -73,6 +74,9 @@ function AppRoutes() {
       </Route>
       <Route path="/reporting">
         <ProtectedRoute component={ReportingPage} />
+      </Route>
+      <Route path="/administration/comptes">
+        <ProtectedRoute component={ComptesPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

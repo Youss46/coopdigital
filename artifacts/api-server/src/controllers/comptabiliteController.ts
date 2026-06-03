@@ -120,7 +120,7 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
     return;
   }
 
-  if (req.user?.role !== "admin") {
+  if (req.user?.role !== "pca" && req.user?.role !== "directeur") {
     res.status(403).json({ erreur: "Accès réservé aux administrateurs" });
     return;
   }
