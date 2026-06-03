@@ -9,6 +9,9 @@ import lotsRouter from "./lots";
 import stocksRouter from "./stocks";
 import exportateursRouter from "./exportateurs";
 import communicationRouter from "./communication";
+import comptabiliteRouter from "./comptabilite";
+import etatsFinanciersRouter from "./etatsFinanciers";
+import rapportsRouter from "./rapports";
 
 const router: IRouter = Router();
 
@@ -22,5 +25,8 @@ router.use(lotsRouter);
 router.use(stocksRouter);
 router.use(exportateursRouter);
 router.use(communicationRouter);
+router.use(comptabiliteRouter);
+router.use(etatsFinanciersRouter);
+router.use(rapportsRouter);
 
 export default router;

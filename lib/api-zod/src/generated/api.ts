@@ -869,3 +869,220 @@ export const GetCommunicationHistoriqueResponseItem = zod.object({
 export const GetCommunicationHistoriqueResponse = zod.array(GetCommunicationHistoriqueResponseItem)
 
 
+/**
+ * @summary Grand-livre – toutes les écritures
+ */
+export const getGrandLivreQueryPageDefault = 1;
+export const getGrandLivreQueryLimitDefault = 50;
+
+export const GetGrandLivreQueryParams = zod.object({
+  "compte": zod.coerce.string().optional(),
+  "date_debut": zod.coerce.string().optional(),
+  "date_fin": zod.coerce.string().optional(),
+  "exercice": zod.coerce.number().optional(),
+  "page": zod.coerce.number().default(getGrandLivreQueryPageDefault),
+  "limit": zod.coerce.number().default(getGrandLivreQueryLimitDefault)
+})
+
+export const GetGrandLivreResponse = zod.object({
+  "ecritures": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "dateEcriture": zod.string(),
+  "numeroPiece": zod.string().nullish(),
+  "libelle": zod.string(),
+  "compteDebit": zod.string(),
+  "compteCredit": zod.string(),
+  "montantFcfa": zod.number(),
+  "source": zod.enum(['livraison', 'vente', 'avance', 'paiement', 'manuel']),
+  "sourceId": zod.number().nullish(),
+  "exercice": zod.number(),
+  "createdAt": zod.string()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Balance des comptes (débit / crédit / solde)
+ */
+export const GetBalanceQueryParams = zod.object({
+  "exercice": zod.coerce.number().optional()
+})
+
+export const GetBalanceResponseItem = zod.object({
+  "numeroCompte": zod.string(),
+  "libelle": zod.string(),
+  "type": zod.enum(['actif', 'passif', 'charge', 'produit']),
+  "totalDebit": zod.number(),
+  "totalCredit": zod.number(),
+  "solde": zod.number()
+})
+export const GetBalanceResponse = zod.array(GetBalanceResponseItem)
+
+
+/**
+ * @summary Journal comptable chronologique
+ */
+export const getJournalComptableQueryPageDefault = 1;
+export const getJournalComptableQueryLimitDefault = 50;
+
+export const GetJournalComptableQueryParams = zod.object({
+  "exercice": zod.coerce.number().optional(),
+  "page": zod.coerce.number().default(getJournalComptableQueryPageDefault),
+  "limit": zod.coerce.number().default(getJournalComptableQueryLimitDefault)
+})
+
+export const GetJournalComptableResponse = zod.object({
+  "ecritures": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "dateEcriture": zod.string(),
+  "numeroPiece": zod.string().nullish(),
+  "libelle": zod.string(),
+  "compteDebit": zod.string(),
+  "compteCredit": zod.string(),
+  "montantFcfa": zod.number(),
+  "source": zod.enum(['livraison', 'vente', 'avance', 'paiement', 'manuel']),
+  "sourceId": zod.number().nullish(),
+  "exercice": zod.number(),
+  "createdAt": zod.string()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Écriture manuelle (admin uniquement)
+ */
+export const CreateEcritureManuelleBody = zod.object({
+  "dateEcriture": zod.string(),
+  "numeroPiece": zod.string().optional(),
+  "libelle": zod.string(),
+  "compteDebit": zod.string(),
+  "compteCredit": zod.string(),
+  "montantFcfa": zod.number()
+})
+
+
+/**
+ * @summary Marge de collecte (CA – achats – charges)
+ */
+export const GetMargeCollecteQueryParams = zod.object({
+  "exercice": zod.coerce.number().optional()
+})
+
+export const GetMargeCollecteResponse = zod.object({
+  "caVentesFcfa": zod.number(),
+  "coutAchatsFcfa": zod.number(),
+  "chargesFcfa": zod.number(),
+  "margeNetteFcfa": zod.number(),
+  "exercice": zod.number(),
+  "tauxMarge": zod.number().optional()
+})
+
+
+/**
+ * @summary Soldes Banque + Caisse en temps réel
+ */
+export const GetTresorerieResponse = zod.object({
+  "soldeBanqueFcfa": zod.number(),
+  "soldeCaisseFcfa": zod.number(),
+  "totalFcfa": zod.number(),
+  "dateCalcul": zod.string().optional()
+})
+
+
+/**
+ * @summary Bilan OHADA (actif / passif)
+ */
+export const GetBilanQueryParams = zod.object({
+  "exercice": zod.coerce.number().optional()
+})
+
+export const GetBilanResponse = zod.object({
+  "actif": zod.array(zod.object({
+  "compte": zod.string(),
+  "libelle": zod.string(),
+  "montantFcfa": zod.number()
+})),
+  "passif": zod.array(zod.object({
+  "compte": zod.string(),
+  "libelle": zod.string(),
+  "montantFcfa": zod.number()
+})),
+  "totalActifFcfa": zod.number(),
+  "totalPassifFcfa": zod.number(),
+  "exercice": zod.number()
+})
+
+
+/**
+ * @summary Compte de résultat OHADA
+ */
+export const GetCompteResultatQueryParams = zod.object({
+  "exercice": zod.coerce.number().optional()
+})
+
+export const GetCompteResultatResponse = zod.object({
+  "produits": zod.array(zod.object({
+  "compte": zod.string(),
+  "libelle": zod.string(),
+  "montantFcfa": zod.number()
+})),
+  "charges": zod.array(zod.object({
+  "compte": zod.string(),
+  "libelle": zod.string(),
+  "montantFcfa": zod.number()
+})),
+  "totalProduitsFcfa": zod.number(),
+  "totalChargesFcfa": zod.number(),
+  "resultatNetFcfa": zod.number(),
+  "exercice": zod.number(),
+  "ventilationMensuelle": zod.array(zod.object({
+  "mois": zod.number(),
+  "produitsFcfa": zod.number(),
+  "chargesFcfa": zod.number(),
+  "resultatFcfa": zod.number()
+}))
+})
+
+
+/**
+ * @summary Flux de trésorerie
+ */
+export const GetFluxTresorerieQueryParams = zod.object({
+  "exercice": zod.coerce.number().optional()
+})
+
+export const GetFluxTresorerieResponse = zod.object({
+  "fluxOperationnelsFcfa": zod.number(),
+  "fluxFinancementFcfa": zod.number(),
+  "encaissementsExportateursFcfa": zod.number().optional(),
+  "paiementsProducteursFcfa": zod.number().optional(),
+  "avancesOctroyes": zod.number().optional(),
+  "avancesRembourses": zod.number().optional(),
+  "soldeDebutFcfa": zod.number(),
+  "soldeFinalFcfa": zod.number(),
+  "exercice": zod.number()
+})
+
+
+/**
+ * @summary Marge nette par campagne (comparatif)
+ */
+export const GetMargeCampagnesResponseItem = zod.object({
+  "annee": zod.number(),
+  "caVentesFcfa": zod.number(),
+  "coutAchatsFcfa": zod.number(),
+  "chargesFcfa": zod.number().optional(),
+  "margeNetteFcfa": zod.number(),
+  "tauxMarge": zod.number().optional()
+})
+export const GetMargeCampagnesResponse = zod.array(GetMargeCampagnesResponseItem)
+
+

@@ -16,6 +16,7 @@ import {
   Building2,
   Receipt,
   MessageSquare,
+  BarChart3,
 } from "lucide-react";
 
 const navItems = [
@@ -28,6 +29,7 @@ const navItems = [
   { href: "/exportateurs", label: "Exportateurs", icon: Building2 },
   { href: "/creances", label: "Créances", icon: Receipt },
   { href: "/communication", label: "Communication", icon: MessageSquare },
+  { href: "/reporting", label: "Comptabilité", icon: BarChart3 },
 ];
 
 function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout: () => void }) {

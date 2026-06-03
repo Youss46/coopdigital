@@ -464,6 +464,143 @@ export interface SmsHistorique {
   createdAt: string;
 }
 
+export type EcritureComptableSource = typeof EcritureComptableSource[keyof typeof EcritureComptableSource];
+
+
+export const EcritureComptableSource = {
+  livraison: 'livraison',
+  vente: 'vente',
+  avance: 'avance',
+  paiement: 'paiement',
+  manuel: 'manuel',
+} as const;
+
+export interface EcritureComptable {
+  id: number;
+  cooperativeId: number;
+  dateEcriture: string;
+  /** @nullable */
+  numeroPiece?: string | null;
+  libelle: string;
+  compteDebit: string;
+  compteCredit: string;
+  montantFcfa: number;
+  source: EcritureComptableSource;
+  /** @nullable */
+  sourceId?: number | null;
+  exercice: number;
+  createdAt: string;
+}
+
+export interface GrandLivrePage {
+  ecritures: EcritureComptable[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export type BalanceLigneType = typeof BalanceLigneType[keyof typeof BalanceLigneType];
+
+
+export const BalanceLigneType = {
+  actif: 'actif',
+  passif: 'passif',
+  charge: 'charge',
+  produit: 'produit',
+} as const;
+
+export interface BalanceLigne {
+  numeroCompte: string;
+  libelle: string;
+  type: BalanceLigneType;
+  totalDebit: number;
+  totalCredit: number;
+  solde: number;
+}
+
+export interface MargeCollecte {
+  caVentesFcfa: number;
+  coutAchatsFcfa: number;
+  chargesFcfa: number;
+  margeNetteFcfa: number;
+  exercice: number;
+  tauxMarge?: number;
+}
+
+export interface Tresorerie {
+  soldeBanqueFcfa: number;
+  soldeCaisseFcfa: number;
+  totalFcfa: number;
+  dateCalcul?: string;
+}
+
+export interface BilanPoste {
+  compte: string;
+  libelle: string;
+  montantFcfa: number;
+}
+
+export interface BilanEtat {
+  actif: BilanPoste[];
+  passif: BilanPoste[];
+  totalActifFcfa: number;
+  totalPassifFcfa: number;
+  exercice: number;
+}
+
+export interface CompteResultatLigne {
+  compte: string;
+  libelle: string;
+  montantFcfa: number;
+}
+
+export interface VentilationMensuelle {
+  mois: number;
+  produitsFcfa: number;
+  chargesFcfa: number;
+  resultatFcfa: number;
+}
+
+export interface CompteResultat {
+  produits: CompteResultatLigne[];
+  charges: CompteResultatLigne[];
+  totalProduitsFcfa: number;
+  totalChargesFcfa: number;
+  resultatNetFcfa: number;
+  exercice: number;
+  ventilationMensuelle: VentilationMensuelle[];
+}
+
+export interface FluxTresorerie {
+  fluxOperationnelsFcfa: number;
+  fluxFinancementFcfa: number;
+  encaissementsExportateursFcfa?: number;
+  paiementsProducteursFcfa?: number;
+  avancesOctroyes?: number;
+  avancesRembourses?: number;
+  soldeDebutFcfa: number;
+  soldeFinalFcfa: number;
+  exercice: number;
+}
+
+export interface MargeCampagne {
+  annee: number;
+  caVentesFcfa: number;
+  coutAchatsFcfa: number;
+  chargesFcfa?: number;
+  margeNetteFcfa: number;
+  tauxMarge?: number;
+}
+
+export interface EcritureManuelleInput {
+  dateEcriture: string;
+  numeroPiece?: string;
+  libelle: string;
+  compteDebit: string;
+  compteCredit: string;
+  montantFcfa: number;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -531,4 +668,39 @@ export const GetVentesStatut = {
   regle: 'regle',
   en_retard: 'en_retard',
 } as const;
+
+export type GetGrandLivreParams = {
+compte?: string;
+date_debut?: string;
+date_fin?: string;
+exercice?: number;
+page?: number;
+limit?: number;
+};
+
+export type GetBalanceParams = {
+exercice?: number;
+};
+
+export type GetJournalComptableParams = {
+exercice?: number;
+page?: number;
+limit?: number;
+};
+
+export type GetMargeCollecteParams = {
+exercice?: number;
+};
+
+export type GetBilanParams = {
+exercice?: number;
+};
+
+export type GetCompteResultatParams = {
+exercice?: number;
+};
+
+export type GetFluxTresorerieParams = {
+exercice?: number;
+};
 

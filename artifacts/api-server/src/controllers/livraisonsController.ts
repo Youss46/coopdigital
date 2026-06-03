@@ -2,6 +2,7 @@ import { type Request, type Response } from "express";
 import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable } from "@workspace/db";
 import { eq, and, desc, notInArray } from "drizzle-orm";
 import { CreateLivraisonBody } from "@workspace/api-zod";
+import { generateEcrituresLivraison } from "../services/comptabiliteService";
 
 export async function listLivraisons(req: Request, res: Response): Promise<void> {
   try {
@@ -121,6 +122,15 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         paiement,
         avanceMiseAJour: avanceMaj,
       };
+    });
+
+    void generateEcrituresLivraison({
+      livraisonId: result.livraison.id,
+      membreNom: `${result.livraison.membrePrenoms} ${result.livraison.membreNom}`,
+      montantBrutFcfa: result.livraison.montantBrutFcfa,
+      avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
+      montantNetFcfa: result.livraison.montantNetFcfa,
+      dateLivraison: result.livraison.dateLivraison,
     });
 
     res.status(201).json(result);

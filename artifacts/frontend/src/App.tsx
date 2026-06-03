@@ -12,6 +12,7 @@ import StocksPage from "@/pages/StocksPage";
 import ExportateursPage from "@/pages/ExportateursPage";
 import CreancesPage from "@/pages/CreancesPage";
 import CommunicationPage from "@/pages/CommunicationPage";
+import ReportingPage from "@/pages/ReportingPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -69,6 +70,9 @@ function AppRoutes() {
       </Route>
       <Route path="/communication">
         <ProtectedRoute component={CommunicationPage} />
+      </Route>
+      <Route path="/reporting">
+        <ProtectedRoute component={ReportingPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

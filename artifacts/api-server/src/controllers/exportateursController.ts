@@ -2,6 +2,7 @@ import { type Request, type Response } from "express";
 import { db, exportateursTable, ventesExportateursTable } from "@workspace/db";
 import { eq, sql, desc, and, lte } from "drizzle-orm";
 import { CreateExportateurBody, CreateVenteBody, EncaisserVenteBody } from "@workspace/api-zod";
+import { generateEcrituresVente, generateEcrituresEncaissement } from "../services/comptabiliteService";
 
 const venteSelect = {
   id: ventesExportateursTable.id,
@@ -173,6 +174,13 @@ export async function createVente(req: Request, res: Response): Promise<void> {
       .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
       .where(eq(ventesExportateursTable.id, vente!.id));
 
+    void generateEcrituresVente({
+      venteId: vente!.id,
+      exportateurNom: detail?.exportateurNom ?? `exp-${exportateurId}`,
+      montantFcfa: montantTotalFcfa,
+      dateVente,
+    });
+
     res.status(201).json(detail);
   } catch (err) {
     req.log.error({ err }, "Erreur createVente");
@@ -227,6 +235,13 @@ export async function encaisserVente(req: Request, res: Response): Promise<void>
       .from(ventesExportateursTable)
       .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
       .where(eq(ventesExportateursTable.id, updated!.id));
+
+    void generateEcrituresEncaissement({
+      venteId: id,
+      exportateurNom: detail?.exportateurNom ?? `exp-${id}`,
+      montantFcfa: parse.data.montantFcfa,
+      date: new Date().toISOString().split("T")[0]!,
+    });
 
     res.json(detail);
   } catch (err) {

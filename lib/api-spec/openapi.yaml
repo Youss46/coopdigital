@@ -18,6 +18,9 @@ tags:
   - name: stocks
   - name: exportateurs
   - name: communication
+  - name: comptabilite
+  - name: etats-financiers
+  - name: rapports
 
 paths:
   /healthz:
@@ -803,6 +806,217 @@ paths:
                 items:
                   $ref: "#/components/schemas/SmsHistorique"
 
+  # ── M05 Comptabilité ─────────────────────────────────────────
+  /comptabilite/grand-livre:
+    get:
+      operationId: getGrandLivre
+      tags: [comptabilite]
+      summary: Grand-livre – toutes les écritures
+      parameters:
+        - name: compte
+          in: query
+          schema: { type: string }
+        - name: date_debut
+          in: query
+          schema: { type: string }
+        - name: date_fin
+          in: query
+          schema: { type: string }
+        - name: exercice
+          in: query
+          schema: { type: integer }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+      responses:
+        "200":
+          description: Liste paginée des écritures
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrandLivrePage"
+        "401":
+          description: Non authentifié
+
+  /comptabilite/balance:
+    get:
+      operationId: getBalance
+      tags: [comptabilite]
+      summary: Balance des comptes (débit / crédit / solde)
+      parameters:
+        - name: exercice
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Balance par compte
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BalanceLigne"
+        "401":
+          description: Non authentifié
+
+  /comptabilite/journal:
+    get:
+      operationId: getJournalComptable
+      tags: [comptabilite]
+      summary: Journal comptable chronologique
+      parameters:
+        - name: exercice
+          in: query
+          schema: { type: integer }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+      responses:
+        "200":
+          description: Journal paginé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrandLivrePage"
+        "401":
+          description: Non authentifié
+
+  /comptabilite/ecriture:
+    post:
+      operationId: createEcritureManuelle
+      tags: [comptabilite]
+      summary: Écriture manuelle (admin uniquement)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EcritureManuelleInput"
+      responses:
+        "201":
+          description: Écriture créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EcritureComptable"
+        "401":
+          description: Non authentifié
+
+  /comptabilite/marge-collecte:
+    get:
+      operationId: getMargeCollecte
+      tags: [comptabilite]
+      summary: Marge de collecte (CA – achats – charges)
+      parameters:
+        - name: exercice
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Marge de collecte
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MargeCollecte"
+        "401":
+          description: Non authentifié
+
+  /comptabilite/tresorerie:
+    get:
+      operationId: getTresorerie
+      tags: [comptabilite]
+      summary: Soldes Banque + Caisse en temps réel
+      responses:
+        "200":
+          description: Situation de trésorerie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tresorerie"
+        "401":
+          description: Non authentifié
+
+  # ── M05 États financiers ──────────────────────────────────────
+  /etats-financiers/bilan:
+    get:
+      operationId: getBilan
+      tags: [etats-financiers]
+      summary: Bilan OHADA (actif / passif)
+      parameters:
+        - name: exercice
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Bilan structuré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BilanEtat"
+        "401":
+          description: Non authentifié
+
+  /etats-financiers/compte-resultat:
+    get:
+      operationId: getCompteResultat
+      tags: [etats-financiers]
+      summary: Compte de résultat OHADA
+      parameters:
+        - name: exercice
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Compte de résultat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompteResultat"
+        "401":
+          description: Non authentifié
+
+  /etats-financiers/flux-tresorerie:
+    get:
+      operationId: getFluxTresorerie
+      tags: [etats-financiers]
+      summary: Flux de trésorerie
+      parameters:
+        - name: exercice
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Flux de trésorerie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FluxTresorerie"
+        "401":
+          description: Non authentifié
+
+  /etats-financiers/marge-par-campagne:
+    get:
+      operationId: getMargeCampagnes
+      tags: [etats-financiers]
+      summary: Marge nette par campagne (comparatif)
+      responses:
+        "200":
+          description: Marges par campagne
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MargeCampagne"
+        "401":
+          description: Non authentifié
+
 components:
   schemas:
     HealthStatus:
@@ -1455,3 +1669,233 @@ components:
           enum: [envoye, echec, partiel]
         createdAt:
           type: string
+
+    # ── M05 Comptabilité ─────────────────────────────────────────
+    EcritureComptable:
+      type: object
+      required: [id, cooperativeId, dateEcriture, libelle, compteDebit, compteCredit, montantFcfa, source, exercice, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        dateEcriture:
+          type: string
+        numeroPiece:
+          type: ["string", "null"]
+        libelle:
+          type: string
+        compteDebit:
+          type: string
+        compteCredit:
+          type: string
+        montantFcfa:
+          type: integer
+        source:
+          type: string
+          enum: [livraison, vente, avance, paiement, manuel]
+        sourceId:
+          type: ["integer", "null"]
+        exercice:
+          type: integer
+        createdAt:
+          type: string
+
+    GrandLivrePage:
+      type: object
+      required: [ecritures, total, page, limit]
+      properties:
+        ecritures:
+          type: array
+          items:
+            $ref: "#/components/schemas/EcritureComptable"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    BalanceLigne:
+      type: object
+      required: [numeroCompte, libelle, type, totalDebit, totalCredit, solde]
+      properties:
+        numeroCompte:
+          type: string
+        libelle:
+          type: string
+        type:
+          type: string
+          enum: [actif, passif, charge, produit]
+        totalDebit:
+          type: integer
+        totalCredit:
+          type: integer
+        solde:
+          type: integer
+
+    MargeCollecte:
+      type: object
+      required: [caVentesFcfa, coutAchatsFcfa, chargesFcfa, margeNetteFcfa, exercice]
+      properties:
+        caVentesFcfa:
+          type: integer
+        coutAchatsFcfa:
+          type: integer
+        chargesFcfa:
+          type: integer
+        margeNetteFcfa:
+          type: integer
+        exercice:
+          type: integer
+        tauxMarge:
+          type: number
+
+    Tresorerie:
+      type: object
+      required: [soldeBanqueFcfa, soldeCaisseFcfa, totalFcfa]
+      properties:
+        soldeBanqueFcfa:
+          type: integer
+        soldeCaisseFcfa:
+          type: integer
+        totalFcfa:
+          type: integer
+        dateCalcul:
+          type: string
+
+    BilanPoste:
+      type: object
+      required: [compte, libelle, montantFcfa]
+      properties:
+        compte:
+          type: string
+        libelle:
+          type: string
+        montantFcfa:
+          type: integer
+
+    BilanEtat:
+      type: object
+      required: [actif, passif, totalActifFcfa, totalPassifFcfa, exercice]
+      properties:
+        actif:
+          type: array
+          items:
+            $ref: "#/components/schemas/BilanPoste"
+        passif:
+          type: array
+          items:
+            $ref: "#/components/schemas/BilanPoste"
+        totalActifFcfa:
+          type: integer
+        totalPassifFcfa:
+          type: integer
+        exercice:
+          type: integer
+
+    CompteResultatLigne:
+      type: object
+      required: [compte, libelle, montantFcfa]
+      properties:
+        compte:
+          type: string
+        libelle:
+          type: string
+        montantFcfa:
+          type: integer
+
+    VentilationMensuelle:
+      type: object
+      required: [mois, produitsFcfa, chargesFcfa, resultatFcfa]
+      properties:
+        mois:
+          type: integer
+        produitsFcfa:
+          type: integer
+        chargesFcfa:
+          type: integer
+        resultatFcfa:
+          type: integer
+
+    CompteResultat:
+      type: object
+      required: [produits, charges, totalProduitsFcfa, totalChargesFcfa, resultatNetFcfa, exercice, ventilationMensuelle]
+      properties:
+        produits:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompteResultatLigne"
+        charges:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompteResultatLigne"
+        totalProduitsFcfa:
+          type: integer
+        totalChargesFcfa:
+          type: integer
+        resultatNetFcfa:
+          type: integer
+        exercice:
+          type: integer
+        ventilationMensuelle:
+          type: array
+          items:
+            $ref: "#/components/schemas/VentilationMensuelle"
+
+    FluxTresorerie:
+      type: object
+      required: [fluxOperationnelsFcfa, fluxFinancementFcfa, soldeDebutFcfa, soldeFinalFcfa, exercice]
+      properties:
+        fluxOperationnelsFcfa:
+          type: integer
+        fluxFinancementFcfa:
+          type: integer
+        encaissementsExportateursFcfa:
+          type: integer
+        paiementsProducteursFcfa:
+          type: integer
+        avancesOctroyes:
+          type: integer
+        avancesRembourses:
+          type: integer
+        soldeDebutFcfa:
+          type: integer
+        soldeFinalFcfa:
+          type: integer
+        exercice:
+          type: integer
+
+    MargeCampagne:
+      type: object
+      required: [annee, caVentesFcfa, coutAchatsFcfa, margeNetteFcfa]
+      properties:
+        annee:
+          type: integer
+        caVentesFcfa:
+          type: integer
+        coutAchatsFcfa:
+          type: integer
+        chargesFcfa:
+          type: integer
+        margeNetteFcfa:
+          type: integer
+        tauxMarge:
+          type: number
+
+    EcritureManuelleInput:
+      type: object
+      required: [dateEcriture, libelle, compteDebit, compteCredit, montantFcfa]
+      properties:
+        dateEcriture:
+          type: string
+        numeroPiece:
+          type: string
+        libelle:
+          type: string
+        compteDebit:
+          type: string
+        compteCredit:
+          type: string
+        montantFcfa:
+          type: integer

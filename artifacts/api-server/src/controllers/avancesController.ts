@@ -2,6 +2,7 @@ import { type Request, type Response } from "express";
 import { db, avancesTable, membresTable } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { CreateAvanceBody, RembourserAvanceBody } from "@workspace/api-zod";
+import { generateEcrituresAvance } from "../services/comptabiliteService";
 
 export async function listAvances(req: Request, res: Response): Promise<void> {
   try {
@@ -76,6 +77,13 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
         agentId: req.user?.id ?? null,
       })
       .returning();
+
+    void generateEcrituresAvance({
+      avanceId: avance!.id,
+      membreNom: `${membre.prenoms} ${membre.nom}`,
+      montantFcfa: montantOctroyeFcfa,
+      dateOctroi: avance!.dateOctroi,
+    });
 
     res.status(201).json(avance);
   } catch (err) {
