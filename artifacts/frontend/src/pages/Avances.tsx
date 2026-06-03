@@ -21,6 +21,8 @@ export default function Avances() {
   const queryClient = useQueryClient();
   const [modalOuvert, setModalOuvert] = useState(false);
   const [filtreStatut, setFiltreStatut] = useState<"" | "en_cours" | "rembourse" | "en_retard">("");
+  const [modalRemboursement, setModalRemboursement] = useState<{ id: number; solde: number; nom: string } | null>(null);
+  const [montantRemboursement, setMontantRemboursement] = useState("");
 
   const { data: encours } = useGetAvancesEncours();
   const { data: avancesData, isLoading } = useGetAvances({ statut: filtreStatut || undefined });
@@ -71,12 +73,19 @@ export default function Avances() {
     });
   };
 
-  const handleRembourser = (id: number, solde: number) => {
-    const saisie = window.prompt(`Montant à rembourser (max ${formaterFCFA(solde)}) :`);
-    if (!saisie) return;
-    const montant = parseInt(saisie.replace(/\D/g, ""));
+  const ouvrirRemboursement = (id: number, solde: number, nom: string) => {
+    setMontantRemboursement(String(solde));
+    setModalRemboursement({ id, solde, nom });
+  };
+
+  const confirmerRemboursement = () => {
+    if (!modalRemboursement) return;
+    const montant = parseInt(montantRemboursement.replace(/\D/g, ""));
     if (isNaN(montant) || montant <= 0) return;
-    mutationRembourser.mutate({ id, data: { montantFcfa: Math.min(montant, solde) } });
+    mutationRembourser.mutate(
+      { id: modalRemboursement.id, data: { montantFcfa: Math.min(montant, modalRemboursement.solde) } },
+      { onSuccess: () => { setModalRemboursement(null); setMontantRemboursement(""); } }
+    );
   };
 
   return (
@@ -189,7 +198,7 @@ export default function Avances() {
                   <td className="px-4 py-3 text-center">
                     {a.statut !== "rembourse" && a.soldeRestantFcfa > 0 && (
                       <button
-                        onClick={() => handleRembourser(a.id, a.soldeRestantFcfa)}
+                        onClick={() => ouvrirRemboursement(a.id, a.soldeRestantFcfa, `${a.membreNom} ${a.membrePrenoms}`)}
                         className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                       >
                         Rembourser
@@ -289,6 +298,66 @@ export default function Avances() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal remboursement */}
+      {modalRemboursement && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Rembourser une avance</h3>
+              <button
+                onClick={() => setModalRemboursement(null)}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                Membre : <span className="font-semibold text-gray-900">{modalRemboursement.nom}</span>
+              </p>
+              <p className="text-sm text-gray-500">
+                Solde restant : <span className="font-semibold text-amber-700">{formaterFCFA(modalRemboursement.solde)}</span>
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Montant à rembourser (FCFA) *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={modalRemboursement.solde}
+                  value={montantRemboursement}
+                  onChange={(e) => setMontantRemboursement(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
+                  autoFocus
+                />
+              </div>
+              {mutationRembourser.isError && (
+                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">Erreur lors du remboursement</p>
+              )}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setModalRemboursement(null)}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmerRemboursement}
+                  disabled={mutationRembourser.isPending || !montantRemboursement}
+                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
+                  style={{ backgroundColor: "#1a4731" }}
+                >
+                  {mutationRembourser.isPending ? "Enregistrement…" : "Confirmer"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
