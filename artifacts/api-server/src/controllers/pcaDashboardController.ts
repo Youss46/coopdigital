@@ -81,9 +81,10 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
       const joursRestants = fermeture
         ? Math.max(0, Math.floor((fermeture.getTime() - maintenant.getTime()) / 86_400_000))
         : null;
+      // Durée totale : soit la fermeture réelle, soit 365 jours par défaut (durée standard d'une campagne cacaoyère)
       const totalJours = fermeture
         ? Math.floor((fermeture.getTime() - ouverture.getTime()) / 86_400_000)
-        : null;
+        : 365;
       campagneActive = {
         id: campagne.id,
         nom: campagne.libelle,
@@ -91,7 +92,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
         date_fermeture: campagne.dateFermeture ?? null,
         jours_ecoules: Math.max(0, joursEcoules),
         jours_restants: joursRestants,
-        avancement_pct: totalJours ? Math.min(100, Math.round((joursEcoules / totalJours) * 100)) : 0,
+        avancement_pct: Math.min(100, Math.round((Math.max(0, joursEcoules) / totalJours) * 100)),
       };
     }
 
