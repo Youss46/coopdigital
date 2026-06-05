@@ -24,6 +24,7 @@ import {
   UserCheck,
   PackageX,
   CheckCircle2,
+  Landmark,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey } from "@workspace/api-client-react";
 
@@ -93,6 +94,12 @@ const navItems = [
     label: "Intrants",
     icon: Leaf,
     roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur", "magasinier"],
+  },
+  {
+    href: "/emprunts",
+    label: "Emprunts",
+    icon: Landmark,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
     href: "/refus",

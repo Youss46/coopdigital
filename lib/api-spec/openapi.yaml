@@ -2342,6 +2342,190 @@ paths:
                 items:
                   $ref: "#/components/schemas/DistributionIntrant"
 
+
+  /emprunts/dashboard:
+    get:
+      summary: KPIs emprunts
+      tags: [emprunts]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Dashboard emprunts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmpruntsDashboard"
+
+  /emprunts/alertes:
+    get:
+      summary: Échéances dans les 30 prochains jours
+      tags: [emprunts]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Liste des échéances à venir
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EcheanceAlerte"
+
+  /emprunts/preteurs:
+    get:
+      summary: Liste des prêteurs
+      tags: [emprunts]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Liste prêteurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Preteur"
+    post:
+      summary: Créer un prêteur
+      tags: [emprunts]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreteurInput"
+      responses:
+        "201":
+          description: Prêteur créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Preteur"
+
+  /emprunts/preview-echeancier:
+    post:
+      summary: Aperçu échéancier (sans persistance)
+      tags: [emprunts]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmpruntInput"
+      responses:
+        "200":
+          description: Tableau d'amortissement calculé
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LigneEcheancier"
+
+  /emprunts:
+    get:
+      summary: Liste des emprunts
+      tags: [emprunts]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: query
+          name: statut
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste emprunts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmpruntDetail"
+    post:
+      summary: Créer un emprunt (génère l'échéancier automatiquement)
+      tags: [emprunts]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmpruntInput"
+      responses:
+        "201":
+          description: Emprunt créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmpruntDetail"
+
+  /emprunts/{id}:
+    get:
+      summary: Détail emprunt + échéancier
+      tags: [emprunts]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Emprunt avec échéancier complet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmpruntAvecEcheancier"
+
+  /emprunts/{id}/echeancier:
+    get:
+      summary: Tableau d'amortissement
+      tags: [emprunts]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lignes échéancier
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LigneEcheancier"
+
+  /emprunts/{id}/rembourser:
+    post:
+      summary: Enregistrer un remboursement
+      tags: [emprunts]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemboursementEmpruntInput"
+      responses:
+        "201":
+          description: Remboursement enregistré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemboursementEmprunt"
+
   /intrants:
     get:
       operationId: listIntrants
@@ -2485,6 +2669,237 @@ paths:
 
 components:
   schemas:
+
+    Preteur:
+      type: object
+      required: [id, cooperativeId, type, nom, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        type:
+          type: string
+          enum: [banque, microfinance, bailleur, prive]
+        nom:
+          type: string
+        contact:
+          type: ["string", "null"]
+        ville:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    PreteurInput:
+      type: object
+      required: [type, nom]
+      properties:
+        type:
+          type: string
+          enum: [banque, microfinance, bailleur, prive]
+        nom:
+          type: string
+        contact:
+          type: string
+        ville:
+          type: string
+
+    EmpruntDetail:
+      type: object
+      required: [id, libelle, montantFcfa, tauxInteretAnnuelPct, dureeMois, dateDebut, dateEcheance, periodicite, montantRembourse, soldeRestant, statut, createdAt]
+      properties:
+        id:
+          type: integer
+        libelle:
+          type: string
+        montantFcfa:
+          type: string
+        tauxInteretAnnuelPct:
+          type: string
+        dureeMois:
+          type: integer
+        dateDebut:
+          type: string
+        dateEcheance:
+          type: string
+        periodicite:
+          type: string
+          enum: [mensuel, trimestriel, semestriel, annuel, in_fine]
+        montantRembourse:
+          type: string
+        soldeRestant:
+          type: string
+        statut:
+          type: string
+          enum: [en_cours, rembourse, en_retard, restructure]
+        objet:
+          type: ["string", "null"]
+        garantie:
+          type: ["string", "null"]
+        preteurId:
+          type: ["integer", "null"]
+        preteurNom:
+          type: ["string", "null"]
+        preteurType:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    EmpruntInput:
+      type: object
+      required: [preteurId, libelle, montantFcfa, tauxInteretAnnuelPct, dureeMois, dateDebut, periodicite]
+      properties:
+        preteurId:
+          type: integer
+        libelle:
+          type: string
+        montantFcfa:
+          type: number
+        tauxInteretAnnuelPct:
+          type: number
+        dureeMois:
+          type: integer
+        dateDebut:
+          type: string
+        periodicite:
+          type: string
+          enum: [mensuel, trimestriel, semestriel, annuel, in_fine]
+        objet:
+          type: string
+        garantie:
+          type: string
+
+    LigneEcheancier:
+      type: object
+      required: [numeroEcheance, dateEcheance, capitalFcfa, interetFcfa, totalEcheanceFcfa, statut]
+      properties:
+        id:
+          type: integer
+        empruntId:
+          type: integer
+        numeroEcheance:
+          type: integer
+        dateEcheance:
+          type: string
+        capitalFcfa:
+          type: string
+        interetFcfa:
+          type: string
+        totalEcheanceFcfa:
+          type: string
+        statut:
+          type: string
+          enum: [a_payer, paye, en_retard]
+        datePaiement:
+          type: ["string", "null"]
+        referencePaiement:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    EmpruntAvecEcheancier:
+      allOf:
+        - $ref: "#/components/schemas/EmpruntDetail"
+        - type: object
+          properties:
+            echeancier:
+              type: array
+              items:
+                $ref: "#/components/schemas/LigneEcheancier"
+
+    RemboursementEmpruntInput:
+      type: object
+      required: [dateRemboursement, montantCapitalFcfa, montantInteretFcfa]
+      properties:
+        echeanceId:
+          type: integer
+        dateRemboursement:
+          type: string
+        montantCapitalFcfa:
+          type: number
+        montantInteretFcfa:
+          type: number
+        modePaiement:
+          type: string
+        reference:
+          type: string
+
+    RemboursementEmprunt:
+      type: object
+      required: [id, empruntId, dateRemboursement, montantTotalFcfa, createdAt]
+      properties:
+        id:
+          type: integer
+        empruntId:
+          type: integer
+        echeanceId:
+          type: ["integer", "null"]
+        dateRemboursement:
+          type: string
+        montantCapitalFcfa:
+          type: string
+        montantInteretFcfa:
+          type: string
+        montantTotalFcfa:
+          type: string
+        modePaiement:
+          type: ["string", "null"]
+        reference:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    EmpruntsDashboard:
+      type: object
+      required: [totalEmprunte, totalRembourse, soldeTotal, nbEmpruntsActifs]
+      properties:
+        totalEmprunte:
+          type: number
+        totalRembourse:
+          type: number
+        soldeTotal:
+          type: number
+        nbEmpruntsActifs:
+          type: number
+        prochaineEcheance:
+          type: ["object", "null"]
+          properties:
+            dateEcheance:
+              type: string
+            totalEcheance:
+              type: string
+            libelle:
+              type: string
+            preteurNom:
+              type: ["string", "null"]
+
+    EcheanceAlerte:
+      type: object
+      required: [echeanceId, empruntId, numeroEcheance, dateEcheance, totalEcheanceFcfa, statut]
+      properties:
+        echeanceId:
+          type: integer
+        empruntId:
+          type: integer
+        numeroEcheance:
+          type: integer
+        dateEcheance:
+          type: string
+        capitalFcfa:
+          type: string
+        interetFcfa:
+          type: string
+        totalEcheanceFcfa:
+          type: string
+        statut:
+          type: string
+        libelle:
+          type: ["string", "null"]
+        preteurNom:
+          type: ["string", "null"]
+
     CategorieIntrant:
       type: object
       required: [id, cooperativeId, libelle, unite, createdAt]

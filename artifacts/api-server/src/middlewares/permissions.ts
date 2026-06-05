@@ -154,6 +154,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     configurer_alertes: ["pca", "directeur"],
   },
 
+  // MODULE EMPRUNTS
+  emprunts: {
+    voir:        ["pca", "directeur", "comptable", "auditeur"],
+    creer:       ["pca", "directeur"],
+    rembourser:  ["pca", "directeur", "comptable"],
+    supprimer:   ["pca"],
+  },
+
   // MODULE M28 — INTRANTS
   intrants: {
     voir:          ["pca", "directeur", "comptable", "agent_terrain", "auditeur", "magasinier"],

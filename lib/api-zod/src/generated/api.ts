@@ -2485,6 +2485,227 @@ export const GetDistributionsMembreIntrantsResponse = zod.array(GetDistributions
 
 
 /**
+ * @summary KPIs emprunts
+ */
+export const GetEmpruntsDashboardResponse = zod.object({
+  "totalEmprunte": zod.number(),
+  "totalRembourse": zod.number(),
+  "soldeTotal": zod.number(),
+  "nbEmpruntsActifs": zod.number(),
+  "prochaineEcheance": zod.object({
+  "dateEcheance": zod.string().optional(),
+  "totalEcheance": zod.string().optional(),
+  "libelle": zod.string().optional(),
+  "preteurNom": zod.string().nullish()
+}).nullish()
+})
+
+
+/**
+ * @summary Échéances dans les 30 prochains jours
+ */
+export const GetEmpruntsAlertesResponseItem = zod.object({
+  "echeanceId": zod.number(),
+  "empruntId": zod.number(),
+  "numeroEcheance": zod.number(),
+  "dateEcheance": zod.string(),
+  "capitalFcfa": zod.string().optional(),
+  "interetFcfa": zod.string().optional(),
+  "totalEcheanceFcfa": zod.string(),
+  "statut": zod.string(),
+  "libelle": zod.string().nullish(),
+  "preteurNom": zod.string().nullish()
+})
+export const GetEmpruntsAlertesResponse = zod.array(GetEmpruntsAlertesResponseItem)
+
+
+/**
+ * @summary Liste des prêteurs
+ */
+export const GetEmpruntsPreteursResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "type": zod.enum(['banque', 'microfinance', 'bailleur', 'prive']),
+  "nom": zod.string(),
+  "contact": zod.string().nullish(),
+  "ville": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const GetEmpruntsPreteursResponse = zod.array(GetEmpruntsPreteursResponseItem)
+
+
+/**
+ * @summary Créer un prêteur
+ */
+export const PostEmpruntsPreteursBody = zod.object({
+  "type": zod.enum(['banque', 'microfinance', 'bailleur', 'prive']),
+  "nom": zod.string(),
+  "contact": zod.string().optional(),
+  "ville": zod.string().optional()
+})
+
+
+/**
+ * @summary Aperçu échéancier (sans persistance)
+ */
+export const PostEmpruntsPreviewEcheancierBody = zod.object({
+  "preteurId": zod.number(),
+  "libelle": zod.string(),
+  "montantFcfa": zod.number(),
+  "tauxInteretAnnuelPct": zod.number(),
+  "dureeMois": zod.number(),
+  "dateDebut": zod.string(),
+  "periodicite": zod.enum(['mensuel', 'trimestriel', 'semestriel', 'annuel', 'in_fine']),
+  "objet": zod.string().optional(),
+  "garantie": zod.string().optional()
+})
+
+export const PostEmpruntsPreviewEcheancierResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "empruntId": zod.number().optional(),
+  "numeroEcheance": zod.number(),
+  "dateEcheance": zod.string(),
+  "capitalFcfa": zod.string(),
+  "interetFcfa": zod.string(),
+  "totalEcheanceFcfa": zod.string(),
+  "statut": zod.enum(['a_payer', 'paye', 'en_retard']),
+  "datePaiement": zod.string().nullish(),
+  "referencePaiement": zod.string().nullish(),
+  "createdAt": zod.string().optional()
+})
+export const PostEmpruntsPreviewEcheancierResponse = zod.array(PostEmpruntsPreviewEcheancierResponseItem)
+
+
+/**
+ * @summary Liste des emprunts
+ */
+export const GetEmpruntsQueryParams = zod.object({
+  "statut": zod.coerce.string().optional()
+})
+
+export const GetEmpruntsResponseItem = zod.object({
+  "id": zod.number(),
+  "libelle": zod.string(),
+  "montantFcfa": zod.string(),
+  "tauxInteretAnnuelPct": zod.string(),
+  "dureeMois": zod.number(),
+  "dateDebut": zod.string(),
+  "dateEcheance": zod.string(),
+  "periodicite": zod.enum(['mensuel', 'trimestriel', 'semestriel', 'annuel', 'in_fine']),
+  "montantRembourse": zod.string(),
+  "soldeRestant": zod.string(),
+  "statut": zod.enum(['en_cours', 'rembourse', 'en_retard', 'restructure']),
+  "objet": zod.string().nullish(),
+  "garantie": zod.string().nullish(),
+  "preteurId": zod.number().nullish(),
+  "preteurNom": zod.string().nullish(),
+  "preteurType": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+export const GetEmpruntsResponse = zod.array(GetEmpruntsResponseItem)
+
+
+/**
+ * @summary Créer un emprunt (génère l'échéancier automatiquement)
+ */
+export const PostEmpruntsBody = zod.object({
+  "preteurId": zod.number(),
+  "libelle": zod.string(),
+  "montantFcfa": zod.number(),
+  "tauxInteretAnnuelPct": zod.number(),
+  "dureeMois": zod.number(),
+  "dateDebut": zod.string(),
+  "periodicite": zod.enum(['mensuel', 'trimestriel', 'semestriel', 'annuel', 'in_fine']),
+  "objet": zod.string().optional(),
+  "garantie": zod.string().optional()
+})
+
+
+/**
+ * @summary Détail emprunt + échéancier
+ */
+export const GetEmpruntsIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEmpruntsIdResponse = zod.object({
+  "id": zod.number(),
+  "libelle": zod.string(),
+  "montantFcfa": zod.string(),
+  "tauxInteretAnnuelPct": zod.string(),
+  "dureeMois": zod.number(),
+  "dateDebut": zod.string(),
+  "dateEcheance": zod.string(),
+  "periodicite": zod.enum(['mensuel', 'trimestriel', 'semestriel', 'annuel', 'in_fine']),
+  "montantRembourse": zod.string(),
+  "soldeRestant": zod.string(),
+  "statut": zod.enum(['en_cours', 'rembourse', 'en_retard', 'restructure']),
+  "objet": zod.string().nullish(),
+  "garantie": zod.string().nullish(),
+  "preteurId": zod.number().nullish(),
+  "preteurNom": zod.string().nullish(),
+  "preteurType": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+}).and(zod.object({
+  "echeancier": zod.array(zod.object({
+  "id": zod.number().optional(),
+  "empruntId": zod.number().optional(),
+  "numeroEcheance": zod.number(),
+  "dateEcheance": zod.string(),
+  "capitalFcfa": zod.string(),
+  "interetFcfa": zod.string(),
+  "totalEcheanceFcfa": zod.string(),
+  "statut": zod.enum(['a_payer', 'paye', 'en_retard']),
+  "datePaiement": zod.string().nullish(),
+  "referencePaiement": zod.string().nullish(),
+  "createdAt": zod.string().optional()
+})).optional()
+}))
+
+
+/**
+ * @summary Tableau d'amortissement
+ */
+export const GetEmpruntsIdEcheancierParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEmpruntsIdEcheancierResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "empruntId": zod.number().optional(),
+  "numeroEcheance": zod.number(),
+  "dateEcheance": zod.string(),
+  "capitalFcfa": zod.string(),
+  "interetFcfa": zod.string(),
+  "totalEcheanceFcfa": zod.string(),
+  "statut": zod.enum(['a_payer', 'paye', 'en_retard']),
+  "datePaiement": zod.string().nullish(),
+  "referencePaiement": zod.string().nullish(),
+  "createdAt": zod.string().optional()
+})
+export const GetEmpruntsIdEcheancierResponse = zod.array(GetEmpruntsIdEcheancierResponseItem)
+
+
+/**
+ * @summary Enregistrer un remboursement
+ */
+export const PostEmpruntsIdRembourserParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostEmpruntsIdRembourserBody = zod.object({
+  "echeanceId": zod.number().optional(),
+  "dateRemboursement": zod.string(),
+  "montantCapitalFcfa": zod.number(),
+  "montantInteretFcfa": zod.number(),
+  "modePaiement": zod.string().optional(),
+  "reference": zod.string().optional()
+})
+
+
+/**
  * @summary Liste du catalogue intrants
  */
 export const ListIntrantsQueryParams = zod.object({

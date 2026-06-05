@@ -20,6 +20,7 @@ import refusRouter from "./refus";
 import fournisseursRouter from "./fournisseurs";
 import paiementsRouter from "./paiements";
 import intrantsRouter from "./intrants";
+import empruntsRouter from "./emprunts";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(refusRouter);
 router.use(fournisseursRouter);
 router.use(paiementsRouter);
 router.use(intrantsRouter);
+router.use(empruntsRouter);
 
 export default router;

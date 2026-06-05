@@ -50,9 +50,14 @@ import type {
   DashboardKpi,
   DistributionIntrant,
   DistributionIntrantInput,
+  EcheanceAlerte,
   EcritureComptable,
   EcritureEnAttente,
   EcritureManuelleInput,
+  EmpruntAvecEcheancier,
+  EmpruntDetail,
+  EmpruntInput,
+  EmpruntsDashboard,
   EncaissementInput,
   EncoursMembre,
   EnregistrerLiberation201,
@@ -73,6 +78,7 @@ import type {
   GetBilanParams,
   GetBulletinsParams,
   GetCompteResultatParams,
+  GetEmpruntsParams,
   GetEncoursIntrantsMembre200,
   GetFluxTresorerieParams,
   GetGrandLivreParams,
@@ -92,6 +98,7 @@ import type {
   IntrantInput,
   IntrantResume,
   LiberationInput,
+  LigneEcheancier,
   ListEcrituresEnAttenteParams,
   ListFournisseursParams,
   ListIntrantsParams,
@@ -119,6 +126,8 @@ import type {
   PayerBulletinInput,
   Personnel,
   PersonnelHistorique,
+  Preteur,
+  PreteurInput,
   RapportCampagneIntrants,
   RapportMensuel,
   RapportParts,
@@ -126,6 +135,8 @@ import type {
   RefusStats,
   RejeterEcritureInput,
   RemboursementAvancePersonnelInput,
+  RemboursementEmprunt,
+  RemboursementEmpruntInput,
   RemboursementInput,
   RemboursementIntrantInput,
   ResetPasswordInput,
@@ -8231,6 +8242,760 @@ export function useGetDistributionsMembreIntrants<TData = Awaited<ReturnType<typ
 
 
 
+
+export const getGetEmpruntsDashboardUrl = () => {
+
+
+
+
+  return `/api/emprunts/dashboard`
+}
+
+/**
+ * @summary KPIs emprunts
+ */
+export const getEmpruntsDashboard = async ( options?: RequestInit): Promise<EmpruntsDashboard> => {
+
+  return customFetch<EmpruntsDashboard>(getGetEmpruntsDashboardUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmpruntsDashboardQueryKey = () => {
+    return [
+    `/api/emprunts/dashboard`
+    ] as const;
+    }
+
+
+export const getGetEmpruntsDashboardQueryOptions = <TData = Awaited<ReturnType<typeof getEmpruntsDashboard>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmpruntsDashboardQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmpruntsDashboard>>> = ({ signal }) => getEmpruntsDashboard({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsDashboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmpruntsDashboardQueryResult = NonNullable<Awaited<ReturnType<typeof getEmpruntsDashboard>>>
+export type GetEmpruntsDashboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary KPIs emprunts
+ */
+
+export function useGetEmpruntsDashboard<TData = Awaited<ReturnType<typeof getEmpruntsDashboard>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmpruntsDashboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEmpruntsAlertesUrl = () => {
+
+
+
+
+  return `/api/emprunts/alertes`
+}
+
+/**
+ * @summary Échéances dans les 30 prochains jours
+ */
+export const getEmpruntsAlertes = async ( options?: RequestInit): Promise<EcheanceAlerte[]> => {
+
+  return customFetch<EcheanceAlerte[]>(getGetEmpruntsAlertesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmpruntsAlertesQueryKey = () => {
+    return [
+    `/api/emprunts/alertes`
+    ] as const;
+    }
+
+
+export const getGetEmpruntsAlertesQueryOptions = <TData = Awaited<ReturnType<typeof getEmpruntsAlertes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmpruntsAlertesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmpruntsAlertes>>> = ({ signal }) => getEmpruntsAlertes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsAlertes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmpruntsAlertesQueryResult = NonNullable<Awaited<ReturnType<typeof getEmpruntsAlertes>>>
+export type GetEmpruntsAlertesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Échéances dans les 30 prochains jours
+ */
+
+export function useGetEmpruntsAlertes<TData = Awaited<ReturnType<typeof getEmpruntsAlertes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmpruntsAlertesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEmpruntsPreteursUrl = () => {
+
+
+
+
+  return `/api/emprunts/preteurs`
+}
+
+/**
+ * @summary Liste des prêteurs
+ */
+export const getEmpruntsPreteurs = async ( options?: RequestInit): Promise<Preteur[]> => {
+
+  return customFetch<Preteur[]>(getGetEmpruntsPreteursUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmpruntsPreteursQueryKey = () => {
+    return [
+    `/api/emprunts/preteurs`
+    ] as const;
+    }
+
+
+export const getGetEmpruntsPreteursQueryOptions = <TData = Awaited<ReturnType<typeof getEmpruntsPreteurs>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsPreteurs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmpruntsPreteursQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmpruntsPreteurs>>> = ({ signal }) => getEmpruntsPreteurs({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsPreteurs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmpruntsPreteursQueryResult = NonNullable<Awaited<ReturnType<typeof getEmpruntsPreteurs>>>
+export type GetEmpruntsPreteursQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des prêteurs
+ */
+
+export function useGetEmpruntsPreteurs<TData = Awaited<ReturnType<typeof getEmpruntsPreteurs>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsPreteurs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmpruntsPreteursQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostEmpruntsPreteursUrl = () => {
+
+
+
+
+  return `/api/emprunts/preteurs`
+}
+
+/**
+ * @summary Créer un prêteur
+ */
+export const postEmpruntsPreteurs = async (preteurInput: PreteurInput, options?: RequestInit): Promise<Preteur> => {
+
+  return customFetch<Preteur>(getPostEmpruntsPreteursUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      preteurInput,)
+  }
+);}
+
+
+
+
+export const getPostEmpruntsPreteursMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEmpruntsPreteurs>>, TError,{data: BodyType<PreteurInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postEmpruntsPreteurs>>, TError,{data: BodyType<PreteurInput>}, TContext> => {
+
+const mutationKey = ['postEmpruntsPreteurs'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postEmpruntsPreteurs>>, {data: BodyType<PreteurInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postEmpruntsPreteurs(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostEmpruntsPreteursMutationResult = NonNullable<Awaited<ReturnType<typeof postEmpruntsPreteurs>>>
+    export type PostEmpruntsPreteursMutationBody = BodyType<PreteurInput>
+    export type PostEmpruntsPreteursMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Créer un prêteur
+ */
+export const usePostEmpruntsPreteurs = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEmpruntsPreteurs>>, TError,{data: BodyType<PreteurInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postEmpruntsPreteurs>>,
+        TError,
+        {data: BodyType<PreteurInput>},
+        TContext
+      > => {
+      return useMutation(getPostEmpruntsPreteursMutationOptions(options));
+    }
+
+export const getPostEmpruntsPreviewEcheancierUrl = () => {
+
+
+
+
+  return `/api/emprunts/preview-echeancier`
+}
+
+/**
+ * @summary Aperçu échéancier (sans persistance)
+ */
+export const postEmpruntsPreviewEcheancier = async (empruntInput: EmpruntInput, options?: RequestInit): Promise<LigneEcheancier[]> => {
+
+  return customFetch<LigneEcheancier[]>(getPostEmpruntsPreviewEcheancierUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      empruntInput,)
+  }
+);}
+
+
+
+
+export const getPostEmpruntsPreviewEcheancierMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEmpruntsPreviewEcheancier>>, TError,{data: BodyType<EmpruntInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postEmpruntsPreviewEcheancier>>, TError,{data: BodyType<EmpruntInput>}, TContext> => {
+
+const mutationKey = ['postEmpruntsPreviewEcheancier'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postEmpruntsPreviewEcheancier>>, {data: BodyType<EmpruntInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postEmpruntsPreviewEcheancier(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostEmpruntsPreviewEcheancierMutationResult = NonNullable<Awaited<ReturnType<typeof postEmpruntsPreviewEcheancier>>>
+    export type PostEmpruntsPreviewEcheancierMutationBody = BodyType<EmpruntInput>
+    export type PostEmpruntsPreviewEcheancierMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Aperçu échéancier (sans persistance)
+ */
+export const usePostEmpruntsPreviewEcheancier = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEmpruntsPreviewEcheancier>>, TError,{data: BodyType<EmpruntInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postEmpruntsPreviewEcheancier>>,
+        TError,
+        {data: BodyType<EmpruntInput>},
+        TContext
+      > => {
+      return useMutation(getPostEmpruntsPreviewEcheancierMutationOptions(options));
+    }
+
+export const getGetEmpruntsUrl = (params?: GetEmpruntsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/emprunts?${stringifiedParams}` : `/api/emprunts`
+}
+
+/**
+ * @summary Liste des emprunts
+ */
+export const getEmprunts = async (params?: GetEmpruntsParams, options?: RequestInit): Promise<EmpruntDetail[]> => {
+
+  return customFetch<EmpruntDetail[]>(getGetEmpruntsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmpruntsQueryKey = (params?: GetEmpruntsParams,) => {
+    return [
+    `/api/emprunts`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetEmpruntsQueryOptions = <TData = Awaited<ReturnType<typeof getEmprunts>>, TError = ErrorType<unknown>>(params?: GetEmpruntsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmprunts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmpruntsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmprunts>>> = ({ signal }) => getEmprunts(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmprunts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmpruntsQueryResult = NonNullable<Awaited<ReturnType<typeof getEmprunts>>>
+export type GetEmpruntsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des emprunts
+ */
+
+export function useGetEmprunts<TData = Awaited<ReturnType<typeof getEmprunts>>, TError = ErrorType<unknown>>(
+ params?: GetEmpruntsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmprunts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmpruntsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostEmpruntsUrl = () => {
+
+
+
+
+  return `/api/emprunts`
+}
+
+/**
+ * @summary Créer un emprunt (génère l'échéancier automatiquement)
+ */
+export const postEmprunts = async (empruntInput: EmpruntInput, options?: RequestInit): Promise<EmpruntDetail> => {
+
+  return customFetch<EmpruntDetail>(getPostEmpruntsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      empruntInput,)
+  }
+);}
+
+
+
+
+export const getPostEmpruntsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEmprunts>>, TError,{data: BodyType<EmpruntInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postEmprunts>>, TError,{data: BodyType<EmpruntInput>}, TContext> => {
+
+const mutationKey = ['postEmprunts'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postEmprunts>>, {data: BodyType<EmpruntInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postEmprunts(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostEmpruntsMutationResult = NonNullable<Awaited<ReturnType<typeof postEmprunts>>>
+    export type PostEmpruntsMutationBody = BodyType<EmpruntInput>
+    export type PostEmpruntsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Créer un emprunt (génère l'échéancier automatiquement)
+ */
+export const usePostEmprunts = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEmprunts>>, TError,{data: BodyType<EmpruntInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postEmprunts>>,
+        TError,
+        {data: BodyType<EmpruntInput>},
+        TContext
+      > => {
+      return useMutation(getPostEmpruntsMutationOptions(options));
+    }
+
+export const getGetEmpruntsIdUrl = (id: number,) => {
+
+
+
+
+  return `/api/emprunts/${id}`
+}
+
+/**
+ * @summary Détail emprunt + échéancier
+ */
+export const getEmpruntsId = async (id: number, options?: RequestInit): Promise<EmpruntAvecEcheancier> => {
+
+  return customFetch<EmpruntAvecEcheancier>(getGetEmpruntsIdUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmpruntsIdQueryKey = (id: number,) => {
+    return [
+    `/api/emprunts/${id}`
+    ] as const;
+    }
+
+
+export const getGetEmpruntsIdQueryOptions = <TData = Awaited<ReturnType<typeof getEmpruntsId>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmpruntsIdQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmpruntsId>>> = ({ signal }) => getEmpruntsId(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsId>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmpruntsIdQueryResult = NonNullable<Awaited<ReturnType<typeof getEmpruntsId>>>
+export type GetEmpruntsIdQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Détail emprunt + échéancier
+ */
+
+export function useGetEmpruntsId<TData = Awaited<ReturnType<typeof getEmpruntsId>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmpruntsIdQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEmpruntsIdEcheancierUrl = (id: number,) => {
+
+
+
+
+  return `/api/emprunts/${id}/echeancier`
+}
+
+/**
+ * @summary Tableau d'amortissement
+ */
+export const getEmpruntsIdEcheancier = async (id: number, options?: RequestInit): Promise<LigneEcheancier[]> => {
+
+  return customFetch<LigneEcheancier[]>(getGetEmpruntsIdEcheancierUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmpruntsIdEcheancierQueryKey = (id: number,) => {
+    return [
+    `/api/emprunts/${id}/echeancier`
+    ] as const;
+    }
+
+
+export const getGetEmpruntsIdEcheancierQueryOptions = <TData = Awaited<ReturnType<typeof getEmpruntsIdEcheancier>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsIdEcheancier>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmpruntsIdEcheancierQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmpruntsIdEcheancier>>> = ({ signal }) => getEmpruntsIdEcheancier(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsIdEcheancier>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmpruntsIdEcheancierQueryResult = NonNullable<Awaited<ReturnType<typeof getEmpruntsIdEcheancier>>>
+export type GetEmpruntsIdEcheancierQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Tableau d'amortissement
+ */
+
+export function useGetEmpruntsIdEcheancier<TData = Awaited<ReturnType<typeof getEmpruntsIdEcheancier>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmpruntsIdEcheancier>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmpruntsIdEcheancierQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostEmpruntsIdRembourserUrl = (id: number,) => {
+
+
+
+
+  return `/api/emprunts/${id}/rembourser`
+}
+
+/**
+ * @summary Enregistrer un remboursement
+ */
+export const postEmpruntsIdRembourser = async (id: number,
+    remboursementEmpruntInput: RemboursementEmpruntInput, options?: RequestInit): Promise<RemboursementEmprunt> => {
+
+  return customFetch<RemboursementEmprunt>(getPostEmpruntsIdRembourserUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      remboursementEmpruntInput,)
+  }
+);}
+
+
+
+
+export const getPostEmpruntsIdRembourserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEmpruntsIdRembourser>>, TError,{id: number;data: BodyType<RemboursementEmpruntInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postEmpruntsIdRembourser>>, TError,{id: number;data: BodyType<RemboursementEmpruntInput>}, TContext> => {
+
+const mutationKey = ['postEmpruntsIdRembourser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postEmpruntsIdRembourser>>, {id: number;data: BodyType<RemboursementEmpruntInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  postEmpruntsIdRembourser(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostEmpruntsIdRembourserMutationResult = NonNullable<Awaited<ReturnType<typeof postEmpruntsIdRembourser>>>
+    export type PostEmpruntsIdRembourserMutationBody = BodyType<RemboursementEmpruntInput>
+    export type PostEmpruntsIdRembourserMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer un remboursement
+ */
+export const usePostEmpruntsIdRembourser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEmpruntsIdRembourser>>, TError,{id: number;data: BodyType<RemboursementEmpruntInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postEmpruntsIdRembourser>>,
+        TError,
+        {id: number;data: BodyType<RemboursementEmpruntInput>},
+        TContext
+      > => {
+      return useMutation(getPostEmpruntsIdRembourserMutationOptions(options));
+    }
 
 export const getListIntrantsUrl = (params?: ListIntrantsParams,) => {
   const normalizedParams = new URLSearchParams();

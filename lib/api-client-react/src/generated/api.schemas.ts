@@ -5,6 +5,204 @@
  * CoopDigital — API de gestion des coopératives cacaoyères
  * OpenAPI spec version: 0.1.0
  */
+export type PreteurType = typeof PreteurType[keyof typeof PreteurType];
+
+
+export const PreteurType = {
+  banque: 'banque',
+  microfinance: 'microfinance',
+  bailleur: 'bailleur',
+  prive: 'prive',
+} as const;
+
+export interface Preteur {
+  id: number;
+  cooperativeId: number;
+  type: PreteurType;
+  nom: string;
+  /** @nullable */
+  contact?: string | null;
+  /** @nullable */
+  ville?: string | null;
+  createdAt: string;
+}
+
+export type PreteurInputType = typeof PreteurInputType[keyof typeof PreteurInputType];
+
+
+export const PreteurInputType = {
+  banque: 'banque',
+  microfinance: 'microfinance',
+  bailleur: 'bailleur',
+  prive: 'prive',
+} as const;
+
+export interface PreteurInput {
+  type: PreteurInputType;
+  nom: string;
+  contact?: string;
+  ville?: string;
+}
+
+export type EmpruntDetailPeriodicite = typeof EmpruntDetailPeriodicite[keyof typeof EmpruntDetailPeriodicite];
+
+
+export const EmpruntDetailPeriodicite = {
+  mensuel: 'mensuel',
+  trimestriel: 'trimestriel',
+  semestriel: 'semestriel',
+  annuel: 'annuel',
+  in_fine: 'in_fine',
+} as const;
+
+export type EmpruntDetailStatut = typeof EmpruntDetailStatut[keyof typeof EmpruntDetailStatut];
+
+
+export const EmpruntDetailStatut = {
+  en_cours: 'en_cours',
+  rembourse: 'rembourse',
+  en_retard: 'en_retard',
+  restructure: 'restructure',
+} as const;
+
+export interface EmpruntDetail {
+  id: number;
+  libelle: string;
+  montantFcfa: string;
+  tauxInteretAnnuelPct: string;
+  dureeMois: number;
+  dateDebut: string;
+  dateEcheance: string;
+  periodicite: EmpruntDetailPeriodicite;
+  montantRembourse: string;
+  soldeRestant: string;
+  statut: EmpruntDetailStatut;
+  /** @nullable */
+  objet?: string | null;
+  /** @nullable */
+  garantie?: string | null;
+  /** @nullable */
+  preteurId?: number | null;
+  /** @nullable */
+  preteurNom?: string | null;
+  /** @nullable */
+  preteurType?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type EmpruntInputPeriodicite = typeof EmpruntInputPeriodicite[keyof typeof EmpruntInputPeriodicite];
+
+
+export const EmpruntInputPeriodicite = {
+  mensuel: 'mensuel',
+  trimestriel: 'trimestriel',
+  semestriel: 'semestriel',
+  annuel: 'annuel',
+  in_fine: 'in_fine',
+} as const;
+
+export interface EmpruntInput {
+  preteurId: number;
+  libelle: string;
+  montantFcfa: number;
+  tauxInteretAnnuelPct: number;
+  dureeMois: number;
+  dateDebut: string;
+  periodicite: EmpruntInputPeriodicite;
+  objet?: string;
+  garantie?: string;
+}
+
+export type LigneEcheancierStatut = typeof LigneEcheancierStatut[keyof typeof LigneEcheancierStatut];
+
+
+export const LigneEcheancierStatut = {
+  a_payer: 'a_payer',
+  paye: 'paye',
+  en_retard: 'en_retard',
+} as const;
+
+export interface LigneEcheancier {
+  id?: number;
+  empruntId?: number;
+  numeroEcheance: number;
+  dateEcheance: string;
+  capitalFcfa: string;
+  interetFcfa: string;
+  totalEcheanceFcfa: string;
+  statut: LigneEcheancierStatut;
+  /** @nullable */
+  datePaiement?: string | null;
+  /** @nullable */
+  referencePaiement?: string | null;
+  createdAt?: string;
+}
+
+export type EmpruntAvecEcheancier = EmpruntDetail & {
+  echeancier?: LigneEcheancier[];
+};
+
+export interface RemboursementEmpruntInput {
+  echeanceId?: number;
+  dateRemboursement: string;
+  montantCapitalFcfa: number;
+  montantInteretFcfa: number;
+  modePaiement?: string;
+  reference?: string;
+}
+
+export interface RemboursementEmprunt {
+  id: number;
+  empruntId: number;
+  /** @nullable */
+  echeanceId?: number | null;
+  dateRemboursement: string;
+  montantCapitalFcfa?: string;
+  montantInteretFcfa?: string;
+  montantTotalFcfa: string;
+  /** @nullable */
+  modePaiement?: string | null;
+  /** @nullable */
+  reference?: string | null;
+  createdAt: string;
+}
+
+/**
+ * @nullable
+ */
+export type EmpruntsDashboardProchaineEcheance = {
+  dateEcheance?: string;
+  totalEcheance?: string;
+  libelle?: string;
+  /** @nullable */
+  preteurNom?: string | null;
+} | null;
+
+export interface EmpruntsDashboard {
+  totalEmprunte: number;
+  totalRembourse: number;
+  soldeTotal: number;
+  nbEmpruntsActifs: number;
+  /** @nullable */
+  prochaineEcheance?: EmpruntsDashboardProchaineEcheance;
+}
+
+export interface EcheanceAlerte {
+  echeanceId: number;
+  empruntId: number;
+  numeroEcheance: number;
+  dateEcheance: string;
+  capitalFcfa?: string;
+  interetFcfa?: string;
+  totalEcheanceFcfa: string;
+  statut: string;
+  /** @nullable */
+  libelle?: string | null;
+  /** @nullable */
+  preteurNom?: string | null;
+}
+
 export interface CategorieIntrant {
   id: number;
   cooperativeId: number;
@@ -1812,6 +2010,10 @@ export type GetEncoursIntrantsMembre200 = {
 
 export type GetRapportCampagneIntrantsParams = {
 campagne_id?: number;
+};
+
+export type GetEmpruntsParams = {
+statut?: string;
 };
 
 export type ListIntrantsParams = {
