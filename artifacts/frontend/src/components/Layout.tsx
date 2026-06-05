@@ -30,8 +30,9 @@ import {
   Gavel,
   TrendingUp,
   Award,
+  ShieldAlert,
 } from "lucide-react";
-import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey } from "@workspace/api-client-react";
+import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 
 const navItems = [
   {
@@ -137,6 +138,13 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
   },
   {
+    href: "/anomalies",
+    label: "Anomalies",
+    icon: ShieldAlert,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+    showAnomaliesBadge: true,
+  },
+  {
     href: "/refus",
     label: "Stocks refoulés",
     icon: PackageX,
@@ -181,17 +189,21 @@ const navItems = [
   },
 ];
 
-type NavItem = { href: string; label: string; icon: React.ElementType; roles?: string[]; showBadge?: boolean };
+type NavItem = { href: string; label: string; icon: React.ElementType; roles?: string[]; showBadge?: boolean; showAnomaliesBadge?: boolean };
 
 const BADGE_ROLES = ["pca", "directeur", "comptable"];
+const ANOMALIE_BADGE_ROLES = ["pca", "directeur", "comptable", "auditeur"];
 
 function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout: () => void }) {
   const [location] = useLocation();
   const { utilisateur } = useAuth();
 
   const showBadge = BADGE_ROLES.includes(utilisateur?.role ?? "");
+  const showAnomaliesBadge = ANOMALIE_BADGE_ROLES.includes(utilisateur?.role ?? "");
   const { data: countData } = useCountEcrituresEnAttente({ query: { queryKey: getCountEcrituresEnAttenteQueryKey(), enabled: showBadge } });
   const nbEnAttente = countData?.count ?? 0;
+  const { data: statsData } = useGetAnomaliesStats({ query: { queryKey: getGetAnomaliesStatsQueryKey(), enabled: showAnomaliesBadge } });
+  const nbCritiques = Number(statsData?.nb_critiques ?? 0);
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#1a4731" }}>
@@ -222,9 +234,10 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {(navItems as NavItem[])
           .filter(({ roles }) => !roles || roles.includes(utilisateur?.role ?? ""))
-          .map(({ href, label, icon: Icon, showBadge: hasBadge }) => {
+          .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge }) => {
             const isActive = location === href || location.startsWith(href + "/");
-            const badgeCount = hasBadge && showBadge ? nbEnAttente : 0;
+            const badgeCount = hasAnomaliesBadge && showAnomaliesBadge ? nbCritiques
+              : hasBadge && showBadge ? nbEnAttente : 0;
             return (
               <Link
                 key={href}

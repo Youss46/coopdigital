@@ -4296,3 +4296,159 @@ export const PostScoringRecalculerResponse = zod.object({
 })
 
 
+/**
+ * @summary Liste des anomalies détectées
+ */
+export const GetAnomaliesQueryParams = zod.object({
+  "gravite": zod.coerce.string().optional(),
+  "statut": zod.coerce.string().optional(),
+  "module": zod.coerce.string().optional(),
+  "membre_id": zod.coerce.number().optional(),
+  "agent_id": zod.coerce.number().optional(),
+  "date_debut": zod.coerce.string().optional(),
+  "date_fin": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().optional(),
+  "offset": zod.coerce.number().optional()
+})
+
+export const GetAnomaliesResponse = zod.object({
+  "anomalies": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "type_anomalie": zod.string(),
+  "niveau_gravite": zod.enum(['info', 'attention', 'critique']),
+  "module_source": zod.string(),
+  "entite_id": zod.number().nullish(),
+  "entite_type": zod.string().nullish(),
+  "description": zod.string(),
+  "valeur_detectee": zod.string().nullish(),
+  "seuil_configure": zod.string().nullish(),
+  "agent_id": zod.number().nullish(),
+  "membre_id": zod.number().nullish(),
+  "statut": zod.enum(['nouvelle', 'en_cours', 'resolue', 'ignoree', 'faux_positif']),
+  "traite_par": zod.number().nullish(),
+  "traite_le": zod.string().nullish(),
+  "commentaire_traitement": zod.string().nullish(),
+  "created_at": zod.string()
+})),
+  "total": zod.number(),
+  "limit": zod.number(),
+  "offset": zod.number()
+})
+
+
+/**
+ * @summary Statistiques des anomalies
+ */
+export const GetAnomaliesStatsResponse = zod.object({
+  "nb_critiques": zod.number().nullish(),
+  "nb_attention": zod.number().nullish(),
+  "nb_info": zod.number().nullish(),
+  "nb_non_traitees": zod.number().nullish(),
+  "nb_resolues_mois": zod.number().nullish(),
+  "nb_faux_positifs": zod.number().nullish(),
+  "par_module": zod.array(zod.object({
+  "module": zod.string().optional(),
+  "nb": zod.number().optional()
+})).optional(),
+  "top_agents": zod.array(zod.object({
+  "agent_id": zod.number().nullish(),
+  "nb": zod.number().optional()
+})).optional(),
+  "top_membres": zod.array(zod.object({
+  "membre_id": zod.number().nullish(),
+  "nb": zod.number().optional()
+})).optional(),
+  "evolution": zod.array(zod.object({
+  "jour": zod.string().optional(),
+  "nb": zod.number().optional()
+})).optional()
+})
+
+
+/**
+ * @summary Configuration des seuils d'anomalies
+ */
+export const GetAnomaliesConfigResponse = zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "poids_max_livraison_kg": zod.string().nullish(),
+  "poids_moyen_multiplicateur": zod.string().nullish(),
+  "delai_min_entre_livraisons_h": zod.number().nullish(),
+  "avance_max_fcfa": zod.string().nullish(),
+  "avance_si_retard_existant": zod.boolean().nullish(),
+  "sortie_max_pct_stock": zod.string().nullish(),
+  "paiement_sans_livraison": zod.boolean().nullish(),
+  "doublon_paiement_delai_h": zod.number().nullish(),
+  "ecriture_montant_max_fcfa": zod.string().nullish(),
+  "ecart_reconciliation_pct": zod.string().nullish(),
+  "updated_at": zod.string().optional()
+})
+
+
+/**
+ * @summary Mettre à jour la configuration des seuils
+ */
+export const PutAnomaliesConfigBody = zod.object({
+  "poidsMaxLivraisonKg": zod.number().optional(),
+  "poidsMoyenMultiplicateur": zod.number().optional(),
+  "delaiMinEntreLivraisonsH": zod.number().optional(),
+  "avanceMaxFcfa": zod.number().optional(),
+  "avanceSiRetardExistant": zod.boolean().optional(),
+  "sortieMaxPctStock": zod.number().optional(),
+  "paiementSansLivraison": zod.boolean().optional(),
+  "doublonPaiementDelaiH": zod.number().optional(),
+  "ecritureMontantMaxFcfa": zod.number().optional(),
+  "ecartReconciliationPct": zod.number().optional()
+})
+
+export const PutAnomaliesConfigResponse = zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "poids_max_livraison_kg": zod.string().nullish(),
+  "poids_moyen_multiplicateur": zod.string().nullish(),
+  "delai_min_entre_livraisons_h": zod.number().nullish(),
+  "avance_max_fcfa": zod.string().nullish(),
+  "avance_si_retard_existant": zod.boolean().nullish(),
+  "sortie_max_pct_stock": zod.string().nullish(),
+  "paiement_sans_livraison": zod.boolean().nullish(),
+  "doublon_paiement_delai_h": zod.number().nullish(),
+  "ecriture_montant_max_fcfa": zod.string().nullish(),
+  "ecart_reconciliation_pct": zod.string().nullish(),
+  "updated_at": zod.string().optional()
+})
+
+
+/**
+ * @summary Traiter une anomalie (résoudre, ignorer, faux positif)
+ */
+export const TraiterAnomalieParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const TraiterAnomalieBody = zod.object({
+  "statut": zod.enum(['resolue', 'ignoree', 'faux_positif']),
+  "commentaire": zod.string().optional()
+})
+
+export const TraiterAnomalieResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "type_anomalie": zod.string(),
+  "niveau_gravite": zod.enum(['info', 'attention', 'critique']),
+  "module_source": zod.string(),
+  "entite_id": zod.number().nullish(),
+  "entite_type": zod.string().nullish(),
+  "description": zod.string(),
+  "valeur_detectee": zod.string().nullish(),
+  "seuil_configure": zod.string().nullish(),
+  "agent_id": zod.number().nullish(),
+  "membre_id": zod.number().nullish(),
+  "statut": zod.enum(['nouvelle', 'en_cours', 'resolue', 'ignoree', 'faux_positif']),
+  "traite_par": zod.number().nullish(),
+  "traite_le": zod.string().nullish(),
+  "commentaire_traitement": zod.string().nullish(),
+  "created_at": zod.string()
+})
+
+

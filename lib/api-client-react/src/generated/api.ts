@@ -25,6 +25,9 @@ import type {
   AgListItem,
   AlertePrix,
   AnalyseMarge,
+  AnomalieItem,
+  AnomaliesListResponse,
+  AnomaliesStats,
   ApproIntrant,
   ApproIntrantInput,
   AssembleeGenerale,
@@ -52,6 +55,8 @@ import type {
   ComparaisonCampagne,
   ComposanteSalaire,
   CompteResultat,
+  ConfigAnomalies,
+  ConfigAnomaliesInput,
   ConfigComptable,
   ConfigPartsSociales,
   ConfigPrix,
@@ -97,6 +102,7 @@ import type {
   GenerationResult,
   GenererBulletinsInput,
   GenererRapportInput,
+  GetAnomaliesParams,
   GetAvancesParams,
   GetAvancesPersonnelParams,
   GetBalanceParams,
@@ -210,6 +216,7 @@ import type {
   TendancePrix,
   ToggleActifInput,
   TopProducteur,
+  TraiterAnomalieInput,
   TraiterRefusInput,
   TrancheInput,
   Tresorerie,
@@ -14004,5 +14011,386 @@ export const usePostScoringRecalculer = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getPostScoringRecalculerMutationOptions(options));
+    }
+
+export const getGetAnomaliesUrl = (params?: GetAnomaliesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/api/anomalies?${stringifiedParams}` : `/api/api/anomalies`
+}
+
+/**
+ * @summary Liste des anomalies détectées
+ */
+export const getAnomalies = async (params?: GetAnomaliesParams, options?: RequestInit): Promise<AnomaliesListResponse> => {
+
+  return customFetch<AnomaliesListResponse>(getGetAnomaliesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAnomaliesQueryKey = (params?: GetAnomaliesParams,) => {
+    return [
+    `/api/api/anomalies`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAnomaliesQueryOptions = <TData = Awaited<ReturnType<typeof getAnomalies>>, TError = ErrorType<unknown>>(params?: GetAnomaliesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnomalies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAnomaliesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnomalies>>> = ({ signal }) => getAnomalies(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnomalies>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAnomaliesQueryResult = NonNullable<Awaited<ReturnType<typeof getAnomalies>>>
+export type GetAnomaliesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des anomalies détectées
+ */
+
+export function useGetAnomalies<TData = Awaited<ReturnType<typeof getAnomalies>>, TError = ErrorType<unknown>>(
+ params?: GetAnomaliesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnomalies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAnomaliesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAnomaliesStatsUrl = () => {
+
+
+
+
+  return `/api/api/anomalies/stats`
+}
+
+/**
+ * @summary Statistiques des anomalies
+ */
+export const getAnomaliesStats = async ( options?: RequestInit): Promise<AnomaliesStats> => {
+
+  return customFetch<AnomaliesStats>(getGetAnomaliesStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAnomaliesStatsQueryKey = () => {
+    return [
+    `/api/api/anomalies/stats`
+    ] as const;
+    }
+
+
+export const getGetAnomaliesStatsQueryOptions = <TData = Awaited<ReturnType<typeof getAnomaliesStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnomaliesStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAnomaliesStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnomaliesStats>>> = ({ signal }) => getAnomaliesStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnomaliesStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAnomaliesStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getAnomaliesStats>>>
+export type GetAnomaliesStatsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Statistiques des anomalies
+ */
+
+export function useGetAnomaliesStats<TData = Awaited<ReturnType<typeof getAnomaliesStats>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnomaliesStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAnomaliesStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAnomaliesConfigUrl = () => {
+
+
+
+
+  return `/api/api/anomalies/config`
+}
+
+/**
+ * @summary Configuration des seuils d'anomalies
+ */
+export const getAnomaliesConfig = async ( options?: RequestInit): Promise<ConfigAnomalies> => {
+
+  return customFetch<ConfigAnomalies>(getGetAnomaliesConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAnomaliesConfigQueryKey = () => {
+    return [
+    `/api/api/anomalies/config`
+    ] as const;
+    }
+
+
+export const getGetAnomaliesConfigQueryOptions = <TData = Awaited<ReturnType<typeof getAnomaliesConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnomaliesConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAnomaliesConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnomaliesConfig>>> = ({ signal }) => getAnomaliesConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnomaliesConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAnomaliesConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getAnomaliesConfig>>>
+export type GetAnomaliesConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Configuration des seuils d'anomalies
+ */
+
+export function useGetAnomaliesConfig<TData = Awaited<ReturnType<typeof getAnomaliesConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnomaliesConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAnomaliesConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPutAnomaliesConfigUrl = () => {
+
+
+
+
+  return `/api/api/anomalies/config`
+}
+
+/**
+ * @summary Mettre à jour la configuration des seuils
+ */
+export const putAnomaliesConfig = async (configAnomaliesInput: ConfigAnomaliesInput, options?: RequestInit): Promise<ConfigAnomalies> => {
+
+  return customFetch<ConfigAnomalies>(getPutAnomaliesConfigUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      configAnomaliesInput,)
+  }
+);}
+
+
+
+
+export const getPutAnomaliesConfigMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAnomaliesConfig>>, TError,{data: BodyType<ConfigAnomaliesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAnomaliesConfig>>, TError,{data: BodyType<ConfigAnomaliesInput>}, TContext> => {
+
+const mutationKey = ['putAnomaliesConfig'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAnomaliesConfig>>, {data: BodyType<ConfigAnomaliesInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  putAnomaliesConfig(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutAnomaliesConfigMutationResult = NonNullable<Awaited<ReturnType<typeof putAnomaliesConfig>>>
+    export type PutAnomaliesConfigMutationBody = BodyType<ConfigAnomaliesInput>
+    export type PutAnomaliesConfigMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mettre à jour la configuration des seuils
+ */
+export const usePutAnomaliesConfig = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAnomaliesConfig>>, TError,{data: BodyType<ConfigAnomaliesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putAnomaliesConfig>>,
+        TError,
+        {data: BodyType<ConfigAnomaliesInput>},
+        TContext
+      > => {
+      return useMutation(getPutAnomaliesConfigMutationOptions(options));
+    }
+
+export const getTraiterAnomalieUrl = (id: number,) => {
+
+
+
+
+  return `/api/api/anomalies/${id}/traiter`
+}
+
+/**
+ * @summary Traiter une anomalie (résoudre, ignorer, faux positif)
+ */
+export const traiterAnomalie = async (id: number,
+    traiterAnomalieInput: TraiterAnomalieInput, options?: RequestInit): Promise<AnomalieItem> => {
+
+  return customFetch<AnomalieItem>(getTraiterAnomalieUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      traiterAnomalieInput,)
+  }
+);}
+
+
+
+
+export const getTraiterAnomalieMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof traiterAnomalie>>, TError,{id: number;data: BodyType<TraiterAnomalieInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof traiterAnomalie>>, TError,{id: number;data: BodyType<TraiterAnomalieInput>}, TContext> => {
+
+const mutationKey = ['traiterAnomalie'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof traiterAnomalie>>, {id: number;data: BodyType<TraiterAnomalieInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  traiterAnomalie(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TraiterAnomalieMutationResult = NonNullable<Awaited<ReturnType<typeof traiterAnomalie>>>
+    export type TraiterAnomalieMutationBody = BodyType<TraiterAnomalieInput>
+    export type TraiterAnomalieMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Traiter une anomalie (résoudre, ignorer, faux positif)
+ */
+export const useTraiterAnomalie = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof traiterAnomalie>>, TError,{id: number;data: BodyType<TraiterAnomalieInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof traiterAnomalie>>,
+        TError,
+        {id: number;data: BodyType<TraiterAnomalieInput>},
+        TContext
+      > => {
+      return useMutation(getTraiterAnomalieMutationOptions(options));
     }
 

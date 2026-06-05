@@ -1,4 +1,5 @@
 import { type Request, type Response } from "express";
+import { checkAvance, creerAnomalies } from "../services/anomalieService";
 import { db, avancesTable, membresTable } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { CreateAvanceBody, RembourserAvanceBody } from "@workspace/api-zod";
@@ -64,6 +65,23 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    // ── Détection anomalies ──────────────────────────────────────────────
+    const anomaliesDetectees = await checkAvance({
+      membreId, montantOctroyeFcfa,
+      agentId: req.user?.id ?? null,
+    });
+    const anomaliesCritiques = anomaliesDetectees.filter((a) => a.niveauGravite === "critique");
+    if (anomaliesCritiques.length > 0) {
+      void creerAnomalies(anomaliesCritiques, "avances");
+      res.status(422).json({
+        erreur: anomaliesCritiques[0]!.description,
+        anomalie: "bloquee",
+        anomalies: anomaliesCritiques,
+      });
+      return;
+    }
+    const anomaliesAttention = anomaliesDetectees.filter((a) => a.niveauGravite !== "critique");
+
     const [avance] = await db
       .insert(avancesTable)
       .values({
@@ -77,6 +95,10 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
         agentId: req.user?.id ?? null,
       })
       .returning();
+
+    if (anomaliesAttention.length > 0) {
+      void creerAnomalies(anomaliesAttention, "avances", { entiteId: avance!.id, entiteType: "avance" });
+    }
 
     void generateEcrituresAvance({
       avanceId: avance!.id,

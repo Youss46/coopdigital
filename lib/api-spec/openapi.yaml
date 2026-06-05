@@ -3848,6 +3848,98 @@ paths:
               schema:
                 $ref: "#/components/schemas/RecalculerResult"
 
+  /api/anomalies:
+    get:
+      operationId: getAnomalies
+      summary: Liste des anomalies détectées
+      tags: [anomalies]
+      security: [{bearerAuth: []}]
+      parameters:
+        - { name: gravite,    in: query, schema: { type: string } }
+        - { name: statut,     in: query, schema: { type: string } }
+        - { name: module,     in: query, schema: { type: string } }
+        - { name: membre_id,  in: query, schema: { type: integer } }
+        - { name: agent_id,   in: query, schema: { type: integer } }
+        - { name: date_debut, in: query, schema: { type: string } }
+        - { name: date_fin,   in: query, schema: { type: string } }
+        - { name: limit,      in: query, schema: { type: integer } }
+        - { name: offset,     in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Liste anomalies
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnomaliesListResponse"
+
+  /api/anomalies/stats:
+    get:
+      operationId: getAnomaliesStats
+      summary: Statistiques des anomalies
+      tags: [anomalies]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Statistiques
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnomaliesStats"
+
+  /api/anomalies/config:
+    get:
+      operationId: getAnomaliesConfig
+      summary: Configuration des seuils d'anomalies
+      tags: [anomalies]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigAnomalies"
+    put:
+      operationId: putAnomaliesConfig
+      summary: Mettre à jour la configuration des seuils
+      tags: [anomalies]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigAnomaliesInput"
+      responses:
+        "200":
+          description: Configuration mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigAnomalies"
+
+  /api/anomalies/{id}/traiter:
+    put:
+      operationId: traiterAnomalie
+      summary: Traiter une anomalie (résoudre, ignorer, faux positif)
+      tags: [anomalies]
+      security: [{bearerAuth: []}]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TraiterAnomalieInput"
+      responses:
+        "200":
+          description: Anomalie traitée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnomalieItem"
+
 components:
   schemas:
 
@@ -7496,3 +7588,113 @@ components:
           type: integer
         campagneId:
           type: integer
+
+    AnomalieItem:
+      type: object
+      required: [id, cooperative_id, type_anomalie, niveau_gravite, module_source, description, statut, created_at]
+      properties:
+        id:                     { type: integer }
+        cooperative_id:         { type: integer }
+        type_anomalie:          { type: string }
+        niveau_gravite:         { type: string, enum: [info, attention, critique] }
+        module_source:          { type: string }
+        entite_id:              { type: integer, nullable: true }
+        entite_type:            { type: string,  nullable: true }
+        description:            { type: string }
+        valeur_detectee:        { type: string,  nullable: true }
+        seuil_configure:        { type: string,  nullable: true }
+        agent_id:               { type: integer, nullable: true }
+        membre_id:              { type: integer, nullable: true }
+        statut:                 { type: string, enum: [nouvelle, en_cours, resolue, ignoree, faux_positif] }
+        traite_par:             { type: integer, nullable: true }
+        traite_le:              { type: string,  nullable: true }
+        commentaire_traitement: { type: string,  nullable: true }
+        created_at:             { type: string }
+
+    AnomaliesListResponse:
+      type: object
+      required: [anomalies, total, limit, offset]
+      properties:
+        anomalies:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnomalieItem"
+        total:  { type: integer }
+        limit:  { type: integer }
+        offset: { type: integer }
+
+    AnomaliesStats:
+      type: object
+      properties:
+        nb_critiques:     { type: integer, nullable: true }
+        nb_attention:     { type: integer, nullable: true }
+        nb_info:          { type: integer, nullable: true }
+        nb_non_traitees:  { type: integer, nullable: true }
+        nb_resolues_mois: { type: integer, nullable: true }
+        nb_faux_positifs: { type: integer, nullable: true }
+        par_module:
+          type: array
+          items:
+            type: object
+            properties:
+              module: { type: string }
+              nb:     { type: integer }
+        top_agents:
+          type: array
+          items:
+            type: object
+            properties:
+              agent_id: { type: integer, nullable: true }
+              nb:       { type: integer }
+        top_membres:
+          type: array
+          items:
+            type: object
+            properties:
+              membre_id: { type: integer, nullable: true }
+              nb:        { type: integer }
+        evolution:
+          type: array
+          items:
+            type: object
+            properties:
+              jour: { type: string }
+              nb:   { type: integer }
+
+    ConfigAnomalies:
+      type: object
+      properties:
+        id:                           { type: integer }
+        cooperative_id:               { type: integer }
+        poids_max_livraison_kg:       { type: string, nullable: true }
+        poids_moyen_multiplicateur:   { type: string, nullable: true }
+        delai_min_entre_livraisons_h: { type: integer, nullable: true }
+        avance_max_fcfa:              { type: string, nullable: true }
+        avance_si_retard_existant:    { type: boolean, nullable: true }
+        sortie_max_pct_stock:         { type: string, nullable: true }
+        paiement_sans_livraison:      { type: boolean, nullable: true }
+        doublon_paiement_delai_h:     { type: integer, nullable: true }
+        ecriture_montant_max_fcfa:    { type: string, nullable: true }
+        ecart_reconciliation_pct:     { type: string, nullable: true }
+        updated_at:                   { type: string }
+
+    ConfigAnomaliesInput:
+      type: object
+      properties:
+        poidsMaxLivraisonKg:      { type: number }
+        poidsMoyenMultiplicateur: { type: number }
+        delaiMinEntreLivraisonsH: { type: integer }
+        avanceMaxFcfa:            { type: number }
+        avanceSiRetardExistant:   { type: boolean }
+        sortieMaxPctStock:        { type: number }
+        paiementSansLivraison:    { type: boolean }
+        doublonPaiementDelaiH:    { type: integer }
+        ecritureMontantMaxFcfa:   { type: number }
+        ecartReconciliationPct:   { type: number }
+
+    TraiterAnomalieInput:
+      type: object
+      required: [statut]
+      properties:
+        statut:      { type: string, enum: [resolue, ignoree, faux_positif] }
+        commentaire: { type: string }

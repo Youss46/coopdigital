@@ -1,4 +1,5 @@
 import { type Request, type Response } from "express";
+import { checkStock, creerAnomalies } from "../services/anomalieService";
 import { db, entrepotsTable, mouvementsStockTable, usersTable } from "@workspace/db";
 import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
 import { EntreeStockBody, SortieStockBody } from "@workspace/api-zod";
@@ -154,6 +155,26 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
     }
 
     const agentId = (req as Request & { user?: { id: number } }).user?.id ?? null;
+
+    // ── Détection anomalies ──────────────────────────────────────────────
+    const anomaliesDetectees = await checkStock({
+      entrepotId: parse.data.entrepotId,
+      poidsKg: parse.data.poidsKg,
+      stockActuel,
+      agentId,
+    });
+    const anomaliesCritiques = anomaliesDetectees.filter((a) => a.niveauGravite === "critique");
+    if (anomaliesCritiques.length > 0) {
+      void creerAnomalies(anomaliesCritiques, "stocks");
+      res.status(422).json({
+        erreur: anomaliesCritiques[0]!.description,
+        anomalie: "bloquee",
+        anomalies: anomaliesCritiques,
+      });
+      return;
+    }
+    const anomaliesAttention = anomaliesDetectees.filter((a) => a.niveauGravite !== "critique");
+
     const [mouvement] = await db
       .insert(mouvementsStockTable)
       .values({
@@ -182,6 +203,9 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
       .leftJoin(entrepotsTable, eq(entrepotsTable.id, mouvementsStockTable.entrepotId))
       .where(eq(mouvementsStockTable.id, mouvement!.id));
 
+    if (anomaliesAttention.length > 0) {
+      void creerAnomalies(anomaliesAttention, "stocks", { entiteId: mouvement!.id, entiteType: "mouvement_stock" });
+    }
     res.status(201).json(withNom);
   } catch (err) {
     req.log.error({ err }, "Erreur sortieStock");

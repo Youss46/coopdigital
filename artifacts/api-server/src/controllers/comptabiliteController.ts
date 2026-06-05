@@ -1,4 +1,5 @@
 import { type Request, type Response } from "express";
+import { checkEcriture, creerAnomalies } from "../services/anomalieService";
 import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable } from "@workspace/db";
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
@@ -124,6 +125,20 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
   const exercice = new Date(dateEcriture).getFullYear();
 
   try {
+    // ── Détection anomalies ──────────────────────────────────────────────
+    const anomaliesDetectees = await checkEcriture({ montantFcfa, agentId: (req.user as { id?: number } | undefined)?.id ?? null });
+    const anomaliesCritiques = anomaliesDetectees.filter((a) => a.niveauGravite === "critique");
+    if (anomaliesCritiques.length > 0) {
+      void creerAnomalies(anomaliesCritiques, "comptabilite");
+      res.status(422).json({
+        erreur: anomaliesCritiques[0]!.description,
+        anomalie: "bloquee",
+        anomalies: anomaliesCritiques,
+      });
+      return;
+    }
+    const anomaliesAttention = anomaliesDetectees.filter((a) => a.niveauGravite !== "critique");
+
     const [ecriture] = await db.insert(ecrituresComptablesTable).values({
       cooperativeId: COOP_ID,
       dateEcriture,
@@ -137,6 +152,9 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
       exercice,
     }).returning();
 
+    if (anomaliesAttention.length > 0) {
+      void creerAnomalies(anomaliesAttention, "comptabilite", { entiteId: ecriture!.id, entiteType: "ecriture" });
+    }
     res.status(201).json(ecriture);
   } catch (err) {
     req.log.error({ err }, "Erreur createEcritureManuelle");

@@ -2676,6 +2676,129 @@ export interface RecalculerResult {
   campagneId: number;
 }
 
+export type AnomalieItemNiveauGravite = typeof AnomalieItemNiveauGravite[keyof typeof AnomalieItemNiveauGravite];
+
+
+export const AnomalieItemNiveauGravite = {
+  info: 'info',
+  attention: 'attention',
+  critique: 'critique',
+} as const;
+
+export type AnomalieItemStatut = typeof AnomalieItemStatut[keyof typeof AnomalieItemStatut];
+
+
+export const AnomalieItemStatut = {
+  nouvelle: 'nouvelle',
+  en_cours: 'en_cours',
+  resolue: 'resolue',
+  ignoree: 'ignoree',
+  faux_positif: 'faux_positif',
+} as const;
+
+export interface AnomalieItem {
+  id: number;
+  cooperative_id: number;
+  type_anomalie: string;
+  niveau_gravite: AnomalieItemNiveauGravite;
+  module_source: string;
+  entite_id?: number | null;
+  entite_type?: string | null;
+  description: string;
+  valeur_detectee?: string | null;
+  seuil_configure?: string | null;
+  agent_id?: number | null;
+  membre_id?: number | null;
+  statut: AnomalieItemStatut;
+  traite_par?: number | null;
+  traite_le?: string | null;
+  commentaire_traitement?: string | null;
+  created_at: string;
+}
+
+export interface AnomaliesListResponse {
+  anomalies: AnomalieItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export type AnomaliesStatsParModuleItem = {
+  module?: string;
+  nb?: number;
+};
+
+export type AnomaliesStatsTopAgentsItem = {
+  agent_id?: number | null;
+  nb?: number;
+};
+
+export type AnomaliesStatsTopMembresItem = {
+  membre_id?: number | null;
+  nb?: number;
+};
+
+export type AnomaliesStatsEvolutionItem = {
+  jour?: string;
+  nb?: number;
+};
+
+export interface AnomaliesStats {
+  nb_critiques?: number | null;
+  nb_attention?: number | null;
+  nb_info?: number | null;
+  nb_non_traitees?: number | null;
+  nb_resolues_mois?: number | null;
+  nb_faux_positifs?: number | null;
+  par_module?: AnomaliesStatsParModuleItem[];
+  top_agents?: AnomaliesStatsTopAgentsItem[];
+  top_membres?: AnomaliesStatsTopMembresItem[];
+  evolution?: AnomaliesStatsEvolutionItem[];
+}
+
+export interface ConfigAnomalies {
+  id?: number;
+  cooperative_id?: number;
+  poids_max_livraison_kg?: string | null;
+  poids_moyen_multiplicateur?: string | null;
+  delai_min_entre_livraisons_h?: number | null;
+  avance_max_fcfa?: string | null;
+  avance_si_retard_existant?: boolean | null;
+  sortie_max_pct_stock?: string | null;
+  paiement_sans_livraison?: boolean | null;
+  doublon_paiement_delai_h?: number | null;
+  ecriture_montant_max_fcfa?: string | null;
+  ecart_reconciliation_pct?: string | null;
+  updated_at?: string;
+}
+
+export interface ConfigAnomaliesInput {
+  poidsMaxLivraisonKg?: number;
+  poidsMoyenMultiplicateur?: number;
+  delaiMinEntreLivraisonsH?: number;
+  avanceMaxFcfa?: number;
+  avanceSiRetardExistant?: boolean;
+  sortieMaxPctStock?: number;
+  paiementSansLivraison?: boolean;
+  doublonPaiementDelaiH?: number;
+  ecritureMontantMaxFcfa?: number;
+  ecartReconciliationPct?: number;
+}
+
+export type TraiterAnomalieInputStatut = typeof TraiterAnomalieInputStatut[keyof typeof TraiterAnomalieInputStatut];
+
+
+export const TraiterAnomalieInputStatut = {
+  resolue: 'resolue',
+  ignoree: 'ignoree',
+  faux_positif: 'faux_positif',
+} as const;
+
+export interface TraiterAnomalieInput {
+  statut: TraiterAnomalieInputStatut;
+  commentaire?: string;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -2975,4 +3098,16 @@ export const GetScoringParNiveauNiveau = {
   platine: 'platine',
   non_classe: 'non_classe',
 } as const;
+
+export type GetAnomaliesParams = {
+gravite?: string;
+statut?: string;
+module?: string;
+membre_id?: number;
+agent_id?: number;
+date_debut?: string;
+date_fin?: string;
+limit?: number;
+offset?: number;
+};
 

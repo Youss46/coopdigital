@@ -155,4 +155,10 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     supprimer_bulletin:  ["pca", "directeur"],
     gerer_avances:       ["pca", "directeur", "comptable"],
   },
+
+  anomalies: {
+    lire:       ["pca", "directeur", "comptable", "auditeur"],
+    traiter:    ["pca", "directeur", "comptable"],
+    configurer: ["pca", "directeur"],
+  },
 };

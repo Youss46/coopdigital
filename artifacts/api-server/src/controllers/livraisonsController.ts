@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express";
 import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable, campagnesTable } from "@workspace/db";
 import { eq, and, desc, notInArray } from "drizzle-orm";
+import { checkLivraison, creerAnomalies } from "../services/anomalieService";
 import { CreateLivraisonBody } from "@workspace/api-zod";
 import { generateEcrituresLivraison } from "../services/comptabiliteService";
 import { getEncoursMembre, enregistrerRemboursementParLivraison } from "../services/intrantsService";
@@ -69,6 +70,24 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         .limit(1);
       campagneIdResolu = campagneActive?.id ?? null;
     }
+
+    // ── Détection anomalies AVANT la transaction ──────────────────────────
+    const anomaliesDetectees = await checkLivraison({
+      membreId, poidsKg, prixUnitaireFcfa,
+      campagneIdResolu,
+      agentId: req.user?.id ?? null,
+    });
+    const anomaliesCritiques = anomaliesDetectees.filter((a) => a.niveauGravite === "critique");
+    if (anomaliesCritiques.length > 0) {
+      void creerAnomalies(anomaliesCritiques, "livraisons");
+      res.status(422).json({
+        erreur: anomaliesCritiques[0]!.description,
+        anomalie: "bloquee",
+        anomalies: anomaliesCritiques,
+      });
+      return;
+    }
+    const anomaliesAttention = anomaliesDetectees.filter((a) => a.niveauGravite !== "critique");
 
     // Récupérer l'encours intrants AVANT la transaction (lecture seule)
     const encoursIntrants = await getEncoursMembre(membreId);
@@ -156,6 +175,13 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         avanceMiseAJour: avanceMaj,
       };
     });
+
+    if (anomaliesAttention.length > 0) {
+      void creerAnomalies(anomaliesAttention, "livraisons", {
+        entiteId: result.livraison.id,
+        entiteType: "livraison",
+      });
+    }
 
     void generateEcrituresLivraison({
       livraisonId: result.livraison.id,

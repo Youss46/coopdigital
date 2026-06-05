@@ -27,6 +27,7 @@ import subventionsRouter from "./subventions";
 import gouvernanceRouter from "./gouvernance";
 import prixRouter from "./prix";
 import scoringRouter from "./scoring";
+import anomaliesRouter from "./anomalies";
 
 const router: IRouter = Router();
 
@@ -58,5 +59,6 @@ router.use(subventionsRouter);
 router.use(gouvernanceRouter);
 router.use(prixRouter);
 router.use(scoringRouter);
+router.use(anomaliesRouter);
 
 export default router;
