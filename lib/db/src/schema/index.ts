@@ -15,3 +15,4 @@ export * from "./salaires";
 export * from "./parts_sociales";
 export * from "./refus";
 export * from "./fournisseurs";
+export * from "./intrants";

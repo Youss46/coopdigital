@@ -22,6 +22,7 @@ import CampagnesPage from "@/pages/CampagnesPage";
 import FournisseursPage from "@/pages/FournisseursPage";
 import RefusPage from "@/pages/RefusPage";
 import ReglementsPage from "@/pages/ReglementsPage";
+import IntrantsPage from "@/pages/IntrantsPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -103,6 +104,9 @@ function AppRoutes() {
       </Route>
       <Route path="/refus">
         <ProtectedRoute component={RefusPage} />
+      </Route>
+      <Route path="/intrants">
+        <ProtectedRoute component={IntrantsPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

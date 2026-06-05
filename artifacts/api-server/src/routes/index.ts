@@ -19,6 +19,7 @@ import partsSocialesRouter from "./partsSociales";
 import refusRouter from "./refus";
 import fournisseursRouter from "./fournisseurs";
 import paiementsRouter from "./paiements";
+import intrantsRouter from "./intrants";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(salairesRouter);
 router.use(refusRouter);
 router.use(fournisseursRouter);
 router.use(paiementsRouter);
+router.use(intrantsRouter);
 
 export default router;

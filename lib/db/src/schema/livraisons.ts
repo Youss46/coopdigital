@@ -27,6 +27,7 @@ export const livraisonsTable = pgTable("livraisons", {
   prixUnitaireFcfa: integer("prix_unitaire_fcfa").notNull(),
   montantBrutFcfa: integer("montant_brut_fcfa").notNull(),
   avanceDeduiteFcfa: integer("avance_deduite_fcfa").notNull().default(0),
+  intrantsDeduitsFcfa: integer("intrants_deduits_fcfa").notNull().default(0),
   montantNetFcfa: integer("montant_net_fcfa").notNull(),
   dateLivraison: date("date_livraison", { mode: "string" }).notNull(),
   agentId: integer("agent_id").references(() => usersTable.id),

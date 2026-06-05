@@ -5,12 +5,14 @@ import {
   useGetMembres,
   useGetAvances,
   useGetCampagneActive,
+  useGetEncoursIntrantsMembre,
   getGetMembresQueryKey,
   getGetAvancesQueryKey,
+  getGetEncoursIntrantsMembreQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetDashboardQueryKey, getGetDashboardLivraisonsQueryKey } from "@workspace/api-client-react";
-import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp, Sprout } from "lucide-react";
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -30,7 +32,7 @@ export default function NouvelleLivraison() {
   const [modePaiement, setModePaiement] = useState<"orange_money" | "mtn_momo" | "especes">("especes");
   const [dateLivraison, setDateLivraison] = useState(new Date().toISOString().split("T")[0]!);
   const [showOptions, setShowOptions] = useState(false);
-  const [succes, setSucces] = useState<{ montantNet: number; avanceDeduite: number } | null>(null);
+  const [succes, setSucces] = useState<{ montantNet: number; avanceDeduite: number; intrantsDeduits: number } | null>(null);
 
   const { data: campagneActive } = useGetCampagneActive();
 
@@ -44,8 +46,17 @@ export default function NouvelleLivraison() {
     query: { queryKey: getGetAvancesQueryKey(avancesParams), enabled: !!membreSelectionne },
   });
 
+  const encoursParams = membreSelectionne?.id ?? 0;
+  const { data: encoursIntrantsData } = useGetEncoursIntrantsMembre(encoursParams, {
+    query: {
+      queryKey: getGetEncoursIntrantsMembreQueryKey(encoursParams),
+      enabled: !!membreSelectionne,
+    },
+  });
+
   const avanceEnCours = avancesData?.avances?.[0];
   const soldeAvance = avanceEnCours?.soldeRestantFcfa ?? 0;
+  const encoursIntrants = encoursIntrantsData?.encoursFcfa ?? 0;
 
   // Calculs temps réel
   const poids = parseFloat(poidsKg) || 0;
@@ -54,7 +65,9 @@ export default function NouvelleLivraison() {
   const prix = parseInt(prixUnitaire) || 0;
   const montantBrut = Math.round(poidsNet * prix);
   const avanceDeduite = Math.min(soldeAvance, montantBrut);
-  const montantNet = montantBrut - avanceDeduite;
+  const apresAvance = montantBrut - avanceDeduite;
+  const intrantsDeduits = Math.min(encoursIntrants, Math.max(0, apresAvance));
+  const montantNet = apresAvance - intrantsDeduits;
 
   const mutation = useCreateLivraison({
     mutation: {
@@ -64,6 +77,7 @@ export default function NouvelleLivraison() {
         setSucces({
           montantNet: data.livraison.montantNetFcfa,
           avanceDeduite: data.livraison.avanceDeduiteFcfa,
+          intrantsDeduits: data.livraison.intrantsDeduitsFcfa ?? 0,
         });
       },
     },
@@ -108,7 +122,13 @@ export default function NouvelleLivraison() {
           {succes.avanceDeduite > 0 && (
             <div className="flex justify-between">
               <span className="text-gray-500 text-sm">Avance déduite</span>
-              <span className="text-amber-600 font-medium text-sm">- {formaterFCFA(succes.avanceDeduite)}</span>
+              <span className="text-amber-600 font-medium text-sm">− {formaterFCFA(succes.avanceDeduite)}</span>
+            </div>
+          )}
+          {succes.intrantsDeduits > 0 && (
+            <div className="flex justify-between">
+              <span className="text-gray-500 text-sm">Intrants déduits</span>
+              <span className="text-orange-600 font-medium text-sm">− {formaterFCFA(succes.intrantsDeduits)}</span>
             </div>
           )}
           <div className="flex justify-between border-t border-gray-100 pt-3">
@@ -206,6 +226,12 @@ export default function NouvelleLivraison() {
                 <p className="text-xs text-gray-500">{membreSelectionne.telephone}</p>
                 {soldeAvance > 0 && (
                   <p className="text-xs text-amber-600 mt-0.5">Avance en cours : {formaterFCFA(soldeAvance)}</p>
+                )}
+                {encoursIntrants > 0 && (
+                  <p className="text-xs text-orange-600 mt-0.5 flex items-center gap-1">
+                    <Sprout size={10} />
+                    Intrants dus : {formaterFCFA(encoursIntrants)}
+                  </p>
                 )}
               </div>
               <button
@@ -332,22 +358,31 @@ export default function NouvelleLivraison() {
           )}
         </div>
 
-        {/* Récapitulatif */}
+        {/* Récapitulatif enrichi */}
         {montantBrut > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
             <h2 className="font-semibold text-gray-900 text-sm mb-3">Récapitulatif</h2>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Poids net ({poidsNet.toFixed(1)} kg × {formaterFCFA(prix)})</span>
+              <span className="text-gray-500">Montant brut ({poidsNet.toFixed(1)} kg × {formaterFCFA(prix)})</span>
               <span className="font-medium">{formaterFCFA(montantBrut)}</span>
             </div>
             {avanceDeduite > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-amber-600">Avance déduite</span>
+                <span className="text-amber-600">− Avance déduite</span>
                 <span className="text-amber-600 font-medium">− {formaterFCFA(avanceDeduite)}</span>
               </div>
             )}
-            <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
-              <span className="font-bold text-gray-900">Montant net à payer</span>
+            {intrantsDeduits > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-orange-600 flex items-center gap-1">
+                  <Sprout size={12} />
+                  − Intrants dus
+                </span>
+                <span className="text-orange-600 font-medium">− {formaterFCFA(intrantsDeduits)}</span>
+              </div>
+            )}
+            <div className="border-t border-gray-200 pt-3 mt-1 flex justify-between items-center">
+              <span className="font-bold text-gray-900">NET À PAYER ✅</span>
               <span
                 className="text-2xl font-bold px-4 py-1 rounded-lg text-white"
                 style={{ backgroundColor: "#1a4731" }}

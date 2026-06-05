@@ -154,6 +154,17 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     configurer_alertes: ["pca", "directeur"],
   },
 
+  // MODULE M28 — INTRANTS
+  intrants: {
+    voir:          ["pca", "directeur", "comptable", "agent_terrain", "auditeur", "magasinier"],
+    distribuer:    ["pca", "directeur", "agent_terrain"],
+    approvisionner:["pca", "directeur", "magasinier"],
+    rembourser:    ["pca", "directeur", "agent_terrain", "comptable"],
+    rapport:       ["pca", "directeur", "comptable", "auditeur"],
+    creer:         ["pca", "directeur", "magasinier"],
+    modifier:      ["pca", "directeur", "magasinier"],
+  },
+
 };
 
 // ─── Fonction principale ─────────────────────────────────────────────────────

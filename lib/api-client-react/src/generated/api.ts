@@ -20,6 +20,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ApproIntrant,
+  ApproIntrantInput,
   AuthResponse,
   Avance,
   AvanceAvecPersonnel,
@@ -34,6 +36,7 @@ import type {
   BulletinPaie,
   Campagne,
   CampagneInput,
+  CategorieIntrant,
   ComposanteSalaire,
   CompteResultat,
   ConfigComptable,
@@ -45,10 +48,13 @@ import type {
   CreatePersonnelInput,
   CreateUserInput,
   DashboardKpi,
+  DistributionIntrant,
+  DistributionIntrantInput,
   EcritureComptable,
   EcritureEnAttente,
   EcritureManuelleInput,
   EncaissementInput,
+  EncoursMembre,
   EnregistrerLiberation201,
   EntrepotStock,
   ErrorResponse,
@@ -67,6 +73,7 @@ import type {
   GetBilanParams,
   GetBulletinsParams,
   GetCompteResultatParams,
+  GetEncoursIntrantsMembre200,
   GetFluxTresorerieParams,
   GetGrandLivreParams,
   GetJournalComptableParams,
@@ -75,14 +82,19 @@ import type {
   GetMargeCollecteParams,
   GetMembresParams,
   GetMouvementsStockParams,
+  GetRapportCampagneIntrantsParams,
   GetRapportTypeFournisseur200Item,
   GetVentesParams,
   GrandLivrePage,
   HealthStatus,
   HistoriqueMasse,
+  Intrant,
+  IntrantInput,
+  IntrantResume,
   LiberationInput,
   ListEcrituresEnAttenteParams,
   ListFournisseursParams,
+  ListIntrantsParams,
   ListPaiementsParams,
   ListRefusParams,
   LivraisonDetail,
@@ -107,6 +119,7 @@ import type {
   PayerBulletinInput,
   Personnel,
   PersonnelHistorique,
+  RapportCampagneIntrants,
   RapportMensuel,
   RapportParts,
   Refus,
@@ -114,6 +127,7 @@ import type {
   RejeterEcritureInput,
   RemboursementAvancePersonnelInput,
   RemboursementInput,
+  RemboursementIntrantInput,
   ResetPasswordInput,
   ResetUserPassword200,
   SearchFournisseursParams,
@@ -2208,15 +2222,15 @@ export const getGetStockAlertesUrl = () => {
 
 
 
-  return `/api/stocks/alertes`
+  return `/api/intrants/stock-alerte`
 }
 
 /**
- * @summary Entrepôts sous seuil minimum
+ * @summary Intrants sous le seuil minimum
  */
-export const getStockAlertes = async ( options?: RequestInit): Promise<EntrepotStock[]> => {
+export const getStockAlertes = async ( options?: RequestInit): Promise<IntrantResume[]> => {
 
-  return customFetch<EntrepotStock[]>(getGetStockAlertesUrl(),
+  return customFetch<IntrantResume[]>(getGetStockAlertesUrl(),
   {
     ...options,
     method: 'GET'
@@ -2231,7 +2245,7 @@ export const getStockAlertes = async ( options?: RequestInit): Promise<EntrepotS
 
 export const getGetStockAlertesQueryKey = () => {
     return [
-    `/api/stocks/alertes`
+    `/api/intrants/stock-alerte`
     ] as const;
     }
 
@@ -2259,7 +2273,7 @@ export type GetStockAlertesQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Entrepôts sous seuil minimum
+ * @summary Intrants sous le seuil minimum
  */
 
 export function useGetStockAlertes<TData = Awaited<ReturnType<typeof getStockAlertes>>, TError = ErrorType<unknown>>(
@@ -7824,5 +7838,914 @@ export const useValiderPaiement = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getValiderPaiementMutationOptions(options));
+    }
+
+export const getListCategoriesIntrantsUrl = () => {
+
+
+
+
+  return `/api/intrants/categories`
+}
+
+/**
+ * @summary Liste des catégories d'intrants
+ */
+export const listCategoriesIntrants = async ( options?: RequestInit): Promise<CategorieIntrant[]> => {
+
+  return customFetch<CategorieIntrant[]>(getListCategoriesIntrantsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCategoriesIntrantsQueryKey = () => {
+    return [
+    `/api/intrants/categories`
+    ] as const;
+    }
+
+
+export const getListCategoriesIntrantsQueryOptions = <TData = Awaited<ReturnType<typeof listCategoriesIntrants>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCategoriesIntrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCategoriesIntrantsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCategoriesIntrants>>> = ({ signal }) => listCategoriesIntrants({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCategoriesIntrants>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCategoriesIntrantsQueryResult = NonNullable<Awaited<ReturnType<typeof listCategoriesIntrants>>>
+export type ListCategoriesIntrantsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des catégories d'intrants
+ */
+
+export function useListCategoriesIntrants<TData = Awaited<ReturnType<typeof listCategoriesIntrants>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCategoriesIntrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCategoriesIntrantsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEncoursIntrantsUrl = () => {
+
+
+
+
+  return `/api/intrants/encours`
+}
+
+/**
+ * @summary Membres avec solde intrants non remboursés
+ */
+export const getEncoursIntrants = async ( options?: RequestInit): Promise<EncoursMembre[]> => {
+
+  return customFetch<EncoursMembre[]>(getGetEncoursIntrantsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEncoursIntrantsQueryKey = () => {
+    return [
+    `/api/intrants/encours`
+    ] as const;
+    }
+
+
+export const getGetEncoursIntrantsQueryOptions = <TData = Awaited<ReturnType<typeof getEncoursIntrants>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEncoursIntrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEncoursIntrantsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEncoursIntrants>>> = ({ signal }) => getEncoursIntrants({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEncoursIntrants>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEncoursIntrantsQueryResult = NonNullable<Awaited<ReturnType<typeof getEncoursIntrants>>>
+export type GetEncoursIntrantsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Membres avec solde intrants non remboursés
+ */
+
+export function useGetEncoursIntrants<TData = Awaited<ReturnType<typeof getEncoursIntrants>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEncoursIntrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEncoursIntrantsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEncoursIntrantsMembreUrl = (id: number,) => {
+
+
+
+
+  return `/api/intrants/encours/membre/${id}`
+}
+
+/**
+ * @summary Encours intrants d'un membre
+ */
+export const getEncoursIntrantsMembre = async (id: number, options?: RequestInit): Promise<GetEncoursIntrantsMembre200> => {
+
+  return customFetch<GetEncoursIntrantsMembre200>(getGetEncoursIntrantsMembreUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEncoursIntrantsMembreQueryKey = (id: number,) => {
+    return [
+    `/api/intrants/encours/membre/${id}`
+    ] as const;
+    }
+
+
+export const getGetEncoursIntrantsMembreQueryOptions = <TData = Awaited<ReturnType<typeof getEncoursIntrantsMembre>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEncoursIntrantsMembre>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEncoursIntrantsMembreQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEncoursIntrantsMembre>>> = ({ signal }) => getEncoursIntrantsMembre(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEncoursIntrantsMembre>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEncoursIntrantsMembreQueryResult = NonNullable<Awaited<ReturnType<typeof getEncoursIntrantsMembre>>>
+export type GetEncoursIntrantsMembreQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Encours intrants d'un membre
+ */
+
+export function useGetEncoursIntrantsMembre<TData = Awaited<ReturnType<typeof getEncoursIntrantsMembre>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEncoursIntrantsMembre>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEncoursIntrantsMembreQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRapportCampagneIntrantsUrl = (params?: GetRapportCampagneIntrantsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/intrants/rapport-campagne?${stringifiedParams}` : `/api/intrants/rapport-campagne`
+}
+
+/**
+ * @summary Bilan distribution/remboursement par campagne
+ */
+export const getRapportCampagneIntrants = async (params?: GetRapportCampagneIntrantsParams, options?: RequestInit): Promise<RapportCampagneIntrants> => {
+
+  return customFetch<RapportCampagneIntrants>(getGetRapportCampagneIntrantsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRapportCampagneIntrantsQueryKey = (params?: GetRapportCampagneIntrantsParams,) => {
+    return [
+    `/api/intrants/rapport-campagne`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetRapportCampagneIntrantsQueryOptions = <TData = Awaited<ReturnType<typeof getRapportCampagneIntrants>>, TError = ErrorType<unknown>>(params?: GetRapportCampagneIntrantsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRapportCampagneIntrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRapportCampagneIntrantsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRapportCampagneIntrants>>> = ({ signal }) => getRapportCampagneIntrants(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRapportCampagneIntrants>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRapportCampagneIntrantsQueryResult = NonNullable<Awaited<ReturnType<typeof getRapportCampagneIntrants>>>
+export type GetRapportCampagneIntrantsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Bilan distribution/remboursement par campagne
+ */
+
+export function useGetRapportCampagneIntrants<TData = Awaited<ReturnType<typeof getRapportCampagneIntrants>>, TError = ErrorType<unknown>>(
+ params?: GetRapportCampagneIntrantsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRapportCampagneIntrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRapportCampagneIntrantsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetDistributionsMembreIntrantsUrl = (id: number,) => {
+
+
+
+
+  return `/api/intrants/distribution/membre/${id}`
+}
+
+/**
+ * @summary Historique distributions intrants d'un membre
+ */
+export const getDistributionsMembreIntrants = async (id: number, options?: RequestInit): Promise<DistributionIntrant[]> => {
+
+  return customFetch<DistributionIntrant[]>(getGetDistributionsMembreIntrantsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDistributionsMembreIntrantsQueryKey = (id: number,) => {
+    return [
+    `/api/intrants/distribution/membre/${id}`
+    ] as const;
+    }
+
+
+export const getGetDistributionsMembreIntrantsQueryOptions = <TData = Awaited<ReturnType<typeof getDistributionsMembreIntrants>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDistributionsMembreIntrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDistributionsMembreIntrantsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDistributionsMembreIntrants>>> = ({ signal }) => getDistributionsMembreIntrants(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDistributionsMembreIntrants>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDistributionsMembreIntrantsQueryResult = NonNullable<Awaited<ReturnType<typeof getDistributionsMembreIntrants>>>
+export type GetDistributionsMembreIntrantsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Historique distributions intrants d'un membre
+ */
+
+export function useGetDistributionsMembreIntrants<TData = Awaited<ReturnType<typeof getDistributionsMembreIntrants>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDistributionsMembreIntrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDistributionsMembreIntrantsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListIntrantsUrl = (params?: ListIntrantsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/intrants?${stringifiedParams}` : `/api/intrants`
+}
+
+/**
+ * @summary Liste du catalogue intrants
+ */
+export const listIntrants = async (params?: ListIntrantsParams, options?: RequestInit): Promise<Intrant[]> => {
+
+  return customFetch<Intrant[]>(getListIntrantsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListIntrantsQueryKey = (params?: ListIntrantsParams,) => {
+    return [
+    `/api/intrants`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListIntrantsQueryOptions = <TData = Awaited<ReturnType<typeof listIntrants>>, TError = ErrorType<unknown>>(params?: ListIntrantsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listIntrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListIntrantsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listIntrants>>> = ({ signal }) => listIntrants(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listIntrants>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListIntrantsQueryResult = NonNullable<Awaited<ReturnType<typeof listIntrants>>>
+export type ListIntrantsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste du catalogue intrants
+ */
+
+export function useListIntrants<TData = Awaited<ReturnType<typeof listIntrants>>, TError = ErrorType<unknown>>(
+ params?: ListIntrantsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listIntrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListIntrantsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateIntrantUrl = () => {
+
+
+
+
+  return `/api/intrants`
+}
+
+/**
+ * @summary Créer un intrant
+ */
+export const createIntrant = async (intrantInput: IntrantInput, options?: RequestInit): Promise<Intrant> => {
+
+  return customFetch<Intrant>(getCreateIntrantUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      intrantInput,)
+  }
+);}
+
+
+
+
+export const getCreateIntrantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createIntrant>>, TError,{data: BodyType<IntrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createIntrant>>, TError,{data: BodyType<IntrantInput>}, TContext> => {
+
+const mutationKey = ['createIntrant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createIntrant>>, {data: BodyType<IntrantInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createIntrant(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateIntrantMutationResult = NonNullable<Awaited<ReturnType<typeof createIntrant>>>
+    export type CreateIntrantMutationBody = BodyType<IntrantInput>
+    export type CreateIntrantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Créer un intrant
+ */
+export const useCreateIntrant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createIntrant>>, TError,{data: BodyType<IntrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createIntrant>>,
+        TError,
+        {data: BodyType<IntrantInput>},
+        TContext
+      > => {
+      return useMutation(getCreateIntrantMutationOptions(options));
+    }
+
+export const getGetIntrantUrl = (id: number,) => {
+
+
+
+
+  return `/api/intrants/${id}`
+}
+
+/**
+ * @summary Fiche intrant
+ */
+export const getIntrant = async (id: number, options?: RequestInit): Promise<Intrant> => {
+
+  return customFetch<Intrant>(getGetIntrantUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetIntrantQueryKey = (id: number,) => {
+    return [
+    `/api/intrants/${id}`
+    ] as const;
+    }
+
+
+export const getGetIntrantQueryOptions = <TData = Awaited<ReturnType<typeof getIntrant>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntrant>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetIntrantQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIntrant>>> = ({ signal }) => getIntrant(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIntrant>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetIntrantQueryResult = NonNullable<Awaited<ReturnType<typeof getIntrant>>>
+export type GetIntrantQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Fiche intrant
+ */
+
+export function useGetIntrant<TData = Awaited<ReturnType<typeof getIntrant>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntrant>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetIntrantQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateIntrantUrl = (id: number,) => {
+
+
+
+
+  return `/api/intrants/${id}`
+}
+
+/**
+ * @summary Modifier un intrant
+ */
+export const updateIntrant = async (id: number,
+    intrantInput: IntrantInput, options?: RequestInit): Promise<Intrant> => {
+
+  return customFetch<Intrant>(getUpdateIntrantUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      intrantInput,)
+  }
+);}
+
+
+
+
+export const getUpdateIntrantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateIntrant>>, TError,{id: number;data: BodyType<IntrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateIntrant>>, TError,{id: number;data: BodyType<IntrantInput>}, TContext> => {
+
+const mutationKey = ['updateIntrant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateIntrant>>, {id: number;data: BodyType<IntrantInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateIntrant(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateIntrantMutationResult = NonNullable<Awaited<ReturnType<typeof updateIntrant>>>
+    export type UpdateIntrantMutationBody = BodyType<IntrantInput>
+    export type UpdateIntrantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Modifier un intrant
+ */
+export const useUpdateIntrant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateIntrant>>, TError,{id: number;data: BodyType<IntrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateIntrant>>,
+        TError,
+        {id: number;data: BodyType<IntrantInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateIntrantMutationOptions(options));
+    }
+
+export const getCreateApprovIntrantUrl = () => {
+
+
+
+
+  return `/api/intrants/appro`
+}
+
+/**
+ * @summary Enregistrer un approvisionnement
+ */
+export const createApprovIntrant = async (approIntrantInput: ApproIntrantInput, options?: RequestInit): Promise<ApproIntrant> => {
+
+  return customFetch<ApproIntrant>(getCreateApprovIntrantUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      approIntrantInput,)
+  }
+);}
+
+
+
+
+export const getCreateApprovIntrantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createApprovIntrant>>, TError,{data: BodyType<ApproIntrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createApprovIntrant>>, TError,{data: BodyType<ApproIntrantInput>}, TContext> => {
+
+const mutationKey = ['createApprovIntrant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createApprovIntrant>>, {data: BodyType<ApproIntrantInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createApprovIntrant(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateApprovIntrantMutationResult = NonNullable<Awaited<ReturnType<typeof createApprovIntrant>>>
+    export type CreateApprovIntrantMutationBody = BodyType<ApproIntrantInput>
+    export type CreateApprovIntrantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer un approvisionnement
+ */
+export const useCreateApprovIntrant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createApprovIntrant>>, TError,{data: BodyType<ApproIntrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createApprovIntrant>>,
+        TError,
+        {data: BodyType<ApproIntrantInput>},
+        TContext
+      > => {
+      return useMutation(getCreateApprovIntrantMutationOptions(options));
+    }
+
+export const getCreateDistributionIntrantUrl = () => {
+
+
+
+
+  return `/api/intrants/distribution`
+}
+
+/**
+ * @summary Distribuer un intrant à un membre
+ */
+export const createDistributionIntrant = async (distributionIntrantInput: DistributionIntrantInput, options?: RequestInit): Promise<DistributionIntrant> => {
+
+  return customFetch<DistributionIntrant>(getCreateDistributionIntrantUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      distributionIntrantInput,)
+  }
+);}
+
+
+
+
+export const getCreateDistributionIntrantMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDistributionIntrant>>, TError,{data: BodyType<DistributionIntrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDistributionIntrant>>, TError,{data: BodyType<DistributionIntrantInput>}, TContext> => {
+
+const mutationKey = ['createDistributionIntrant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDistributionIntrant>>, {data: BodyType<DistributionIntrantInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createDistributionIntrant(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDistributionIntrantMutationResult = NonNullable<Awaited<ReturnType<typeof createDistributionIntrant>>>
+    export type CreateDistributionIntrantMutationBody = BodyType<DistributionIntrantInput>
+    export type CreateDistributionIntrantMutationError = ErrorType<void>
+
+    /**
+ * @summary Distribuer un intrant à un membre
+ */
+export const useCreateDistributionIntrant = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDistributionIntrant>>, TError,{data: BodyType<DistributionIntrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createDistributionIntrant>>,
+        TError,
+        {data: BodyType<DistributionIntrantInput>},
+        TContext
+      > => {
+      return useMutation(getCreateDistributionIntrantMutationOptions(options));
+    }
+
+export const getRemboursementManuelIntrantUrl = () => {
+
+
+
+
+  return `/api/intrants/remboursement`
+}
+
+/**
+ * @summary Remboursement manuel d'une distribution
+ */
+export const remboursementManuelIntrant = async (remboursementIntrantInput: RemboursementIntrantInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getRemboursementManuelIntrantUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      remboursementIntrantInput,)
+  }
+);}
+
+
+
+
+export const getRemboursementManuelIntrantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof remboursementManuelIntrant>>, TError,{data: BodyType<RemboursementIntrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof remboursementManuelIntrant>>, TError,{data: BodyType<RemboursementIntrantInput>}, TContext> => {
+
+const mutationKey = ['remboursementManuelIntrant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof remboursementManuelIntrant>>, {data: BodyType<RemboursementIntrantInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  remboursementManuelIntrant(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemboursementManuelIntrantMutationResult = NonNullable<Awaited<ReturnType<typeof remboursementManuelIntrant>>>
+    export type RemboursementManuelIntrantMutationBody = BodyType<RemboursementIntrantInput>
+    export type RemboursementManuelIntrantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remboursement manuel d'une distribution
+ */
+export const useRemboursementManuelIntrant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof remboursementManuelIntrant>>, TError,{data: BodyType<RemboursementIntrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof remboursementManuelIntrant>>,
+        TError,
+        {data: BodyType<RemboursementIntrantInput>},
+        TContext
+      > => {
+      return useMutation(getRemboursementManuelIntrantMutationOptions(options));
     }
 

@@ -23,6 +23,7 @@ tags:
   - name: rapports
   - name: users
   - name: salaires
+  - name: intrants
 
 paths:
   /healthz:
@@ -2225,8 +2226,560 @@ paths:
               schema:
                 $ref: "#/components/schemas/PaiementListItem"
 
+
+  /intrants/categories:
+    get:
+      operationId: listCategoriesIntrants
+      tags: [intrants]
+      summary: Liste des catégories d'intrants
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Liste catégories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategorieIntrant"
+
+  /intrants/stock-alerte:
+    get:
+      operationId: getStockAlertes
+      tags: [intrants]
+      summary: Intrants sous le seuil minimum
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Liste intrants en alerte
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IntrantResume"
+
+  /intrants/encours:
+    get:
+      operationId: getEncoursIntrants
+      tags: [intrants]
+      summary: Membres avec solde intrants non remboursés
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Liste encours
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EncoursMembre"
+
+  /intrants/encours/membre/{id}:
+    get:
+      operationId: getEncoursIntrantsMembre
+      tags: [intrants]
+      summary: Encours intrants d'un membre
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Encours du membre
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [membreId, encoursFcfa]
+                properties:
+                  membreId:
+                    type: integer
+                  encoursFcfa:
+                    type: integer
+
+  /intrants/rapport-campagne:
+    get:
+      operationId: getRapportCampagneIntrants
+      tags: [intrants]
+      summary: Bilan distribution/remboursement par campagne
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: campagne_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rapport campagne
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RapportCampagneIntrants"
+
+  /intrants/distribution/membre/{id}:
+    get:
+      operationId: getDistributionsMembreIntrants
+      tags: [intrants]
+      summary: Historique distributions intrants d'un membre
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Historique distributions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DistributionIntrant"
+
+  /intrants:
+    get:
+      operationId: listIntrants
+      tags: [intrants]
+      summary: Liste du catalogue intrants
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: actif
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Liste intrants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Intrant"
+    post:
+      operationId: createIntrant
+      tags: [intrants]
+      summary: Créer un intrant
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntrantInput"
+      responses:
+        "201":
+          description: Intrant créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Intrant"
+
+  /intrants/{id}:
+    get:
+      operationId: getIntrant
+      tags: [intrants]
+      summary: Fiche intrant
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Intrant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Intrant"
+    put:
+      operationId: updateIntrant
+      tags: [intrants]
+      summary: Modifier un intrant
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntrantInput"
+      responses:
+        "200":
+          description: Intrant modifié
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Intrant"
+
+  /intrants/appro:
+    post:
+      operationId: createApprovIntrant
+      tags: [intrants]
+      summary: Enregistrer un approvisionnement
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproIntrantInput"
+      responses:
+        "201":
+          description: Approvisionnement enregistré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApproIntrant"
+
+  /intrants/distribution:
+    post:
+      operationId: createDistributionIntrant
+      tags: [intrants]
+      summary: Distribuer un intrant à un membre
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DistributionIntrantInput"
+      responses:
+        "201":
+          description: Distribution enregistrée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributionIntrant"
+        "409":
+          description: Stock insuffisant
+
+  /intrants/remboursement:
+    put:
+      operationId: remboursementManuelIntrant
+      tags: [intrants]
+      summary: Remboursement manuel d'une distribution
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemboursementIntrantInput"
+      responses:
+        "201":
+          description: Remboursement enregistré
+
 components:
   schemas:
+    CategorieIntrant:
+      type: object
+      required: [id, cooperativeId, libelle, unite, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        libelle:
+          type: string
+        unite:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Intrant:
+      type: object
+      required: [id, cooperativeId, nom, unite, prixUnitaireFcfa, stockActuel, stockMinimum, actif, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        categorieId:
+          type: ["integer", "null"]
+        categorieLibelle:
+          type: ["string", "null"]
+        nom:
+          type: string
+        description:
+          type: ["string", "null"]
+        unite:
+          type: string
+        prixUnitaireFcfa:
+          type: string
+        stockActuel:
+          type: string
+        stockMinimum:
+          type: string
+        fournisseurIntrant:
+          type: ["string", "null"]
+        datePeremption:
+          type: ["string", "null"]
+          format: date
+        actif:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    IntrantResume:
+      type: object
+      required: [id, nom, unite, stockActuel, stockMinimum, prixUnitaireFcfa]
+      properties:
+        id:
+          type: integer
+        nom:
+          type: string
+        unite:
+          type: string
+        stockActuel:
+          type: string
+        stockMinimum:
+          type: string
+        prixUnitaireFcfa:
+          type: string
+
+    IntrantInput:
+      type: object
+      required: [nom, unite]
+      properties:
+        nom:
+          type: string
+        description:
+          type: string
+        unite:
+          type: string
+        prixUnitaireFcfa:
+          type: number
+        stockMinimum:
+          type: number
+        fournisseurIntrant:
+          type: string
+        datePeremption:
+          type: string
+          format: date
+        categorieId:
+          type: integer
+        actif:
+          type: boolean
+
+    ApproIntrantInput:
+      type: object
+      required: [intrantId, dateAppro, quantite, prixUnitaireFcfa]
+      properties:
+        intrantId:
+          type: integer
+        campagneId:
+          type: integer
+        dateAppro:
+          type: string
+          format: date
+        quantite:
+          type: number
+        prixUnitaireFcfa:
+          type: number
+        fournisseur:
+          type: string
+        numeroFacture:
+          type: string
+
+    ApproIntrant:
+      type: object
+      required: [id, intrantId, dateAppro, quantite, prixUnitaireFcfa, montantTotalFcfa, createdAt]
+      properties:
+        id:
+          type: integer
+        intrantId:
+          type: integer
+        campagneId:
+          type: ["integer", "null"]
+        dateAppro:
+          type: string
+          format: date
+        quantite:
+          type: string
+        prixUnitaireFcfa:
+          type: string
+        montantTotalFcfa:
+          type: string
+        fournisseur:
+          type: ["string", "null"]
+        numeroFacture:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    DistributionIntrantInput:
+      type: object
+      required: [intrantId, membreId, dateDistribution, quantite, prixUnitaireFcfa]
+      properties:
+        intrantId:
+          type: integer
+        membreId:
+          type: integer
+        campagneId:
+          type: integer
+        dateDistribution:
+          type: string
+          format: date
+        quantite:
+          type: number
+        prixUnitaireFcfa:
+          type: number
+        mode:
+          type: string
+          enum: [credit, gratuit, subventionne]
+        tauxSubventionPct:
+          type: number
+
+    DistributionIntrant:
+      type: object
+      required: [id, intrantId, membreId, dateDistribution, quantite, prixUnitaireFcfa, montantFcfa, mode, montantMembreFcfa, statutRemboursement, montantRembourse_fcfa, createdAt]
+      properties:
+        id:
+          type: integer
+        intrantId:
+          type: integer
+        intrantNom:
+          type: ["string", "null"]
+        intrantUnite:
+          type: ["string", "null"]
+        membreId:
+          type: integer
+        campagneId:
+          type: ["integer", "null"]
+        dateDistribution:
+          type: string
+          format: date
+        quantite:
+          type: string
+        prixUnitaireFcfa:
+          type: string
+        montantFcfa:
+          type: string
+        mode:
+          type: string
+          enum: [credit, gratuit, subventionne]
+        tauxSubventionPct:
+          type: string
+        montantMembreFcfa:
+          type: string
+        statutRemboursement:
+          type: string
+          enum: [non_rembourse, partiel, rembourse]
+        montantRembourse_fcfa:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    EncoursMembre:
+      type: object
+      required: [membreId, soldeDu, totalDu, totalRembourse, derniereDistribution]
+      properties:
+        membreId:
+          type: integer
+        membreNom:
+          type: ["string", "null"]
+        membrePrenoms:
+          type: ["string", "null"]
+        membreTelephone:
+          type: ["string", "null"]
+        totalDu:
+          type: string
+        totalRembourse:
+          type: string
+        soldeDu:
+          type: string
+        derniereDistribution:
+          type: ["string", "null"]
+          format: date
+        nbDistributions:
+          type: string
+
+    RemboursementIntrantInput:
+      type: object
+      required: [distributionId, montantFcfa, mode]
+      properties:
+        distributionId:
+          type: integer
+        montantFcfa:
+          type: number
+        mode:
+          type: string
+          enum: [deduction_livraison, especes, mobile]
+        dateRemboursement:
+          type: string
+          format: date
+
+    RapportCampagneIntrants:
+      type: object
+      required: [parIntrant, totaux, top10]
+      properties:
+        parIntrant:
+          type: array
+          items:
+            type: object
+            properties:
+              intrantId:
+                type: integer
+              intrantNom:
+                type: ["string", "null"]
+              intrantUnite:
+                type: ["string", "null"]
+              totalQuantite:
+                type: string
+              totalValeur:
+                type: string
+              totalRembourse:
+                type: string
+              nbDistributions:
+                type: string
+        totaux:
+          type: object
+          properties:
+            totalDu:
+              type: number
+            totalRembourse:
+              type: number
+            tauxRecouvrement:
+              type: integer
+            nbDistributions:
+              type: integer
+            nbMembres:
+              type: integer
+        top10:
+          type: array
+          items:
+            type: object
+            properties:
+              membreId:
+                type: integer
+              membreNom:
+                type: ["string", "null"]
+              membrePrenoms:
+                type: ["string", "null"]
+              totalRecu:
+                type: string
+
     HealthStatus:
       type: object
       required: [status]
@@ -2572,6 +3125,8 @@ components:
         montantBrutFcfa:
           type: integer
         avanceDeduiteFcfa:
+          type: integer
+        intrantsDeduitsFcfa:
           type: integer
         montantNetFcfa:
           type: integer

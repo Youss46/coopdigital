@@ -3,6 +3,7 @@ import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLiv
 import { eq, and, desc, notInArray } from "drizzle-orm";
 import { CreateLivraisonBody } from "@workspace/api-zod";
 import { generateEcrituresLivraison } from "../services/comptabiliteService";
+import { getEncoursMembre, enregistrerRemboursementParLivraison } from "../services/intrantsService";
 
 export async function listLivraisons(req: Request, res: Response): Promise<void> {
   try {
@@ -19,6 +20,7 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
         prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
         montantBrutFcfa: livraisonsTable.montantBrutFcfa,
         avanceDeduiteFcfa: livraisonsTable.avanceDeduiteFcfa,
+        intrantsDeduitsFcfa: livraisonsTable.intrantsDeduitsFcfa,
         montantNetFcfa: livraisonsTable.montantNetFcfa,
         dateLivraison: livraisonsTable.dateLivraison,
         agentId: livraisonsTable.agentId,
@@ -68,6 +70,9 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       campagneIdResolu = campagneActive?.id ?? null;
     }
 
+    // Récupérer l'encours intrants AVANT la transaction (lecture seule)
+    const encoursIntrants = await getEncoursMembre(membreId);
+
     const result = await db.transaction(async (tx) => {
       const montantBrut = Math.round(poidsKg * prixUnitaireFcfa);
 
@@ -80,7 +85,12 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         .limit(1);
 
       const avanceDeduite = avanceEnCours ? Math.min(avanceEnCours.soldeRestantFcfa, montantBrut) : 0;
-      const montantNet = montantBrut - avanceDeduite;
+      const apresAvance = montantBrut - avanceDeduite;
+
+      // Déduction intrants APRÈS avance
+      const intrantsDeduits = Math.min(encoursIntrants, Math.max(0, apresAvance));
+      const montantNet = apresAvance - intrantsDeduits;
+
       const dateStr = dateLivraison ?? new Date().toISOString().split("T")[0]!;
 
       // Créer la livraison
@@ -93,6 +103,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
           prixUnitaireFcfa,
           montantBrutFcfa: montantBrut,
           avanceDeduiteFcfa: avanceDeduite,
+          intrantsDeduitsFcfa: intrantsDeduits,
           montantNetFcfa: montantNet,
           dateLivraison: dateStr,
           agentId: req.user?.id ?? null,
@@ -134,6 +145,11 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         avanceMaj = updated;
       }
 
+      // Remboursement automatique des intrants par déduction livraison
+      if (intrantsDeduits > 0) {
+        await enregistrerRemboursementParLivraison(tx, membreId, intrantsDeduits, dateStr);
+      }
+
       return {
         livraison: { ...livraison!, membreNom: membre.nom, membrePrenoms: membre.prenoms },
         paiement,
@@ -170,6 +186,7 @@ export async function getLivraisonsNonLotees(req: Request, res: Response): Promi
         prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
         montantBrutFcfa: livraisonsTable.montantBrutFcfa,
         avanceDeduiteFcfa: livraisonsTable.avanceDeduiteFcfa,
+        intrantsDeduitsFcfa: livraisonsTable.intrantsDeduitsFcfa,
         montantNetFcfa: livraisonsTable.montantNetFcfa,
         dateLivraison: livraisonsTable.dateLivraison,
         agentId: livraisonsTable.agentId,

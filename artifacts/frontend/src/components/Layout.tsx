@@ -89,6 +89,12 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
   },
   {
+    href: "/intrants",
+    label: "Intrants",
+    icon: Leaf,
+    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur", "magasinier"],
+  },
+  {
     href: "/refus",
     label: "Stocks refoulés",
     icon: PackageX,

@@ -5,6 +5,211 @@
  * CoopDigital — API de gestion des coopératives cacaoyères
  * OpenAPI spec version: 0.1.0
  */
+export interface CategorieIntrant {
+  id: number;
+  cooperativeId: number;
+  libelle: string;
+  unite: string;
+  createdAt: string;
+}
+
+export interface Intrant {
+  id: number;
+  cooperativeId: number;
+  /** @nullable */
+  categorieId?: number | null;
+  /** @nullable */
+  categorieLibelle?: string | null;
+  nom: string;
+  /** @nullable */
+  description?: string | null;
+  unite: string;
+  prixUnitaireFcfa: string;
+  stockActuel: string;
+  stockMinimum: string;
+  /** @nullable */
+  fournisseurIntrant?: string | null;
+  /** @nullable */
+  datePeremption?: string | null;
+  actif: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IntrantResume {
+  id: number;
+  nom: string;
+  unite: string;
+  stockActuel: string;
+  stockMinimum: string;
+  prixUnitaireFcfa: string;
+}
+
+export interface IntrantInput {
+  nom: string;
+  description?: string;
+  unite: string;
+  prixUnitaireFcfa?: number;
+  stockMinimum?: number;
+  fournisseurIntrant?: string;
+  datePeremption?: string;
+  categorieId?: number;
+  actif?: boolean;
+}
+
+export interface ApproIntrantInput {
+  intrantId: number;
+  campagneId?: number;
+  dateAppro: string;
+  quantite: number;
+  prixUnitaireFcfa: number;
+  fournisseur?: string;
+  numeroFacture?: string;
+}
+
+export interface ApproIntrant {
+  id: number;
+  intrantId: number;
+  /** @nullable */
+  campagneId?: number | null;
+  dateAppro: string;
+  quantite: string;
+  prixUnitaireFcfa: string;
+  montantTotalFcfa: string;
+  /** @nullable */
+  fournisseur?: string | null;
+  /** @nullable */
+  numeroFacture?: string | null;
+  createdAt: string;
+}
+
+export type DistributionIntrantInputMode = typeof DistributionIntrantInputMode[keyof typeof DistributionIntrantInputMode];
+
+
+export const DistributionIntrantInputMode = {
+  credit: 'credit',
+  gratuit: 'gratuit',
+  subventionne: 'subventionne',
+} as const;
+
+export interface DistributionIntrantInput {
+  intrantId: number;
+  membreId: number;
+  campagneId?: number;
+  dateDistribution: string;
+  quantite: number;
+  prixUnitaireFcfa: number;
+  mode?: DistributionIntrantInputMode;
+  tauxSubventionPct?: number;
+}
+
+export type DistributionIntrantMode = typeof DistributionIntrantMode[keyof typeof DistributionIntrantMode];
+
+
+export const DistributionIntrantMode = {
+  credit: 'credit',
+  gratuit: 'gratuit',
+  subventionne: 'subventionne',
+} as const;
+
+export type DistributionIntrantStatutRemboursement = typeof DistributionIntrantStatutRemboursement[keyof typeof DistributionIntrantStatutRemboursement];
+
+
+export const DistributionIntrantStatutRemboursement = {
+  non_rembourse: 'non_rembourse',
+  partiel: 'partiel',
+  rembourse: 'rembourse',
+} as const;
+
+export interface DistributionIntrant {
+  id: number;
+  intrantId: number;
+  /** @nullable */
+  intrantNom?: string | null;
+  /** @nullable */
+  intrantUnite?: string | null;
+  membreId: number;
+  /** @nullable */
+  campagneId?: number | null;
+  dateDistribution: string;
+  quantite: string;
+  prixUnitaireFcfa: string;
+  montantFcfa: string;
+  mode: DistributionIntrantMode;
+  tauxSubventionPct?: string;
+  montantMembreFcfa: string;
+  statutRemboursement: DistributionIntrantStatutRemboursement;
+  montantRembourse_fcfa: string;
+  createdAt: string;
+}
+
+export interface EncoursMembre {
+  membreId: number;
+  /** @nullable */
+  membreNom?: string | null;
+  /** @nullable */
+  membrePrenoms?: string | null;
+  /** @nullable */
+  membreTelephone?: string | null;
+  totalDu: string;
+  totalRembourse: string;
+  soldeDu: string;
+  /** @nullable */
+  derniereDistribution: string | null;
+  nbDistributions?: string;
+}
+
+export type RemboursementIntrantInputMode = typeof RemboursementIntrantInputMode[keyof typeof RemboursementIntrantInputMode];
+
+
+export const RemboursementIntrantInputMode = {
+  deduction_livraison: 'deduction_livraison',
+  especes: 'especes',
+  mobile: 'mobile',
+} as const;
+
+export interface RemboursementIntrantInput {
+  distributionId: number;
+  montantFcfa: number;
+  mode: RemboursementIntrantInputMode;
+  dateRemboursement?: string;
+}
+
+export type RapportCampagneIntrantsParIntrantItem = {
+  intrantId?: number;
+  /** @nullable */
+  intrantNom?: string | null;
+  /** @nullable */
+  intrantUnite?: string | null;
+  totalQuantite?: string;
+  totalValeur?: string;
+  totalRembourse?: string;
+  nbDistributions?: string;
+};
+
+export type RapportCampagneIntrantsTotaux = {
+  totalDu?: number;
+  totalRembourse?: number;
+  tauxRecouvrement?: number;
+  nbDistributions?: number;
+  nbMembres?: number;
+};
+
+export type RapportCampagneIntrantsTop10Item = {
+  membreId?: number;
+  /** @nullable */
+  membreNom?: string | null;
+  /** @nullable */
+  membrePrenoms?: string | null;
+  totalRecu?: string;
+};
+
+export interface RapportCampagneIntrants {
+  parIntrant: RapportCampagneIntrantsParIntrantItem[];
+  totaux: RapportCampagneIntrantsTotaux;
+  top10: RapportCampagneIntrantsTop10Item[];
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -126,6 +331,7 @@ export interface LivraisonDetail {
   prixUnitaireFcfa: number;
   montantBrutFcfa: number;
   avanceDeduiteFcfa: number;
+  intrantsDeduitsFcfa?: number;
   montantNetFcfa: number;
   dateLivraison: string;
   /** @nullable */
@@ -1598,4 +1804,17 @@ export const ListPaiementsStatut = {
   confirme: 'confirme',
   echec: 'echec',
 } as const;
+
+export type GetEncoursIntrantsMembre200 = {
+  membreId: number;
+  encoursFcfa: number;
+};
+
+export type GetRapportCampagneIntrantsParams = {
+campagne_id?: number;
+};
+
+export type ListIntrantsParams = {
+actif?: boolean;
+};
 

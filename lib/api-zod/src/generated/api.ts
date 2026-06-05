@@ -208,6 +208,7 @@ export const GetMembreHistoriqueResponse = zod.object({
   "prixUnitaireFcfa": zod.number(),
   "montantBrutFcfa": zod.number(),
   "avanceDeduiteFcfa": zod.number(),
+  "intrantsDeduitsFcfa": zod.number().optional(),
   "montantNetFcfa": zod.number(),
   "dateLivraison": zod.string(),
   "agentId": zod.number().nullish(),
@@ -355,6 +356,7 @@ export const GetLivraisonsResponseItem = zod.object({
   "prixUnitaireFcfa": zod.number(),
   "montantBrutFcfa": zod.number(),
   "avanceDeduiteFcfa": zod.number(),
+  "intrantsDeduitsFcfa": zod.number().optional(),
   "montantNetFcfa": zod.number(),
   "dateLivraison": zod.string(),
   "agentId": zod.number().nullish(),
@@ -391,6 +393,7 @@ export const GetLivraisonsNonLoteesResponseItem = zod.object({
   "prixUnitaireFcfa": zod.number(),
   "montantBrutFcfa": zod.number(),
   "avanceDeduiteFcfa": zod.number(),
+  "intrantsDeduitsFcfa": zod.number().optional(),
   "montantNetFcfa": zod.number(),
   "dateLivraison": zod.string(),
   "agentId": zod.number().nullish(),
@@ -423,6 +426,7 @@ export const GetDashboardLivraisonsResponseItem = zod.object({
   "prixUnitaireFcfa": zod.number(),
   "montantBrutFcfa": zod.number(),
   "avanceDeduiteFcfa": zod.number(),
+  "intrantsDeduitsFcfa": zod.number().optional(),
   "montantNetFcfa": zod.number(),
   "dateLivraison": zod.string(),
   "agentId": zod.number().nullish(),
@@ -559,6 +563,7 @@ export const GetLotTracabiliteResponse = zod.object({
   "prixUnitaireFcfa": zod.number(),
   "montantBrutFcfa": zod.number(),
   "avanceDeduiteFcfa": zod.number(),
+  "intrantsDeduitsFcfa": zod.number().optional(),
   "montantNetFcfa": zod.number(),
   "dateLivraison": zod.string(),
   "agentId": zod.number().nullish(),
@@ -667,19 +672,15 @@ export const SortieStockBody = zod.object({
 
 
 /**
- * @summary Entrepôts sous seuil minimum
+ * @summary Intrants sous le seuil minimum
  */
 export const GetStockAlertesResponseItem = zod.object({
   "id": zod.number(),
-  "cooperativeId": zod.number(),
   "nom": zod.string(),
-  "ville": zod.string(),
-  "capaciteKg": zod.string(),
-  "seuilAlerteKg": zod.string().nullish(),
-  "stockActuelKg": zod.number(),
-  "pourcentageRemplissage": zod.number().optional(),
-  "enAlerte": zod.boolean().optional(),
-  "createdAt": zod.string()
+  "unite": zod.string(),
+  "stockActuel": zod.string(),
+  "stockMinimum": zod.string(),
+  "prixUnitaireFcfa": zod.string()
 })
 export const GetStockAlertesResponse = zod.array(GetStockAlertesResponseItem)
 
@@ -2376,6 +2377,257 @@ export const ValiderPaiementResponse = zod.object({
   "membrePrenoms": zod.string().nullish(),
   "telephone": zod.string().nullish(),
   "dateLivraison": zod.string().nullish()
+})
+
+
+/**
+ * @summary Liste des catégories d'intrants
+ */
+export const ListCategoriesIntrantsResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "libelle": zod.string(),
+  "unite": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListCategoriesIntrantsResponse = zod.array(ListCategoriesIntrantsResponseItem)
+
+
+/**
+ * @summary Membres avec solde intrants non remboursés
+ */
+export const GetEncoursIntrantsResponseItem = zod.object({
+  "membreId": zod.number(),
+  "membreNom": zod.string().nullish(),
+  "membrePrenoms": zod.string().nullish(),
+  "membreTelephone": zod.string().nullish(),
+  "totalDu": zod.string(),
+  "totalRembourse": zod.string(),
+  "soldeDu": zod.string(),
+  "derniereDistribution": zod.coerce.date().nullable(),
+  "nbDistributions": zod.string().optional()
+})
+export const GetEncoursIntrantsResponse = zod.array(GetEncoursIntrantsResponseItem)
+
+
+/**
+ * @summary Encours intrants d'un membre
+ */
+export const GetEncoursIntrantsMembreParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEncoursIntrantsMembreResponse = zod.object({
+  "membreId": zod.number(),
+  "encoursFcfa": zod.number()
+})
+
+
+/**
+ * @summary Bilan distribution/remboursement par campagne
+ */
+export const GetRapportCampagneIntrantsQueryParams = zod.object({
+  "campagne_id": zod.coerce.number().optional()
+})
+
+export const GetRapportCampagneIntrantsResponse = zod.object({
+  "parIntrant": zod.array(zod.object({
+  "intrantId": zod.number().optional(),
+  "intrantNom": zod.string().nullish(),
+  "intrantUnite": zod.string().nullish(),
+  "totalQuantite": zod.string().optional(),
+  "totalValeur": zod.string().optional(),
+  "totalRembourse": zod.string().optional(),
+  "nbDistributions": zod.string().optional()
+})),
+  "totaux": zod.object({
+  "totalDu": zod.number().optional(),
+  "totalRembourse": zod.number().optional(),
+  "tauxRecouvrement": zod.number().optional(),
+  "nbDistributions": zod.number().optional(),
+  "nbMembres": zod.number().optional()
+}),
+  "top10": zod.array(zod.object({
+  "membreId": zod.number().optional(),
+  "membreNom": zod.string().nullish(),
+  "membrePrenoms": zod.string().nullish(),
+  "totalRecu": zod.string().optional()
+}))
+})
+
+
+/**
+ * @summary Historique distributions intrants d'un membre
+ */
+export const GetDistributionsMembreIntrantsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetDistributionsMembreIntrantsResponseItem = zod.object({
+  "id": zod.number(),
+  "intrantId": zod.number(),
+  "intrantNom": zod.string().nullish(),
+  "intrantUnite": zod.string().nullish(),
+  "membreId": zod.number(),
+  "campagneId": zod.number().nullish(),
+  "dateDistribution": zod.coerce.date(),
+  "quantite": zod.string(),
+  "prixUnitaireFcfa": zod.string(),
+  "montantFcfa": zod.string(),
+  "mode": zod.enum(['credit', 'gratuit', 'subventionne']),
+  "tauxSubventionPct": zod.string().optional(),
+  "montantMembreFcfa": zod.string(),
+  "statutRemboursement": zod.enum(['non_rembourse', 'partiel', 'rembourse']),
+  "montantRembourse_fcfa": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const GetDistributionsMembreIntrantsResponse = zod.array(GetDistributionsMembreIntrantsResponseItem)
+
+
+/**
+ * @summary Liste du catalogue intrants
+ */
+export const ListIntrantsQueryParams = zod.object({
+  "actif": zod.coerce.boolean().optional()
+})
+
+export const ListIntrantsResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "categorieId": zod.number().nullish(),
+  "categorieLibelle": zod.string().nullish(),
+  "nom": zod.string(),
+  "description": zod.string().nullish(),
+  "unite": zod.string(),
+  "prixUnitaireFcfa": zod.string(),
+  "stockActuel": zod.string(),
+  "stockMinimum": zod.string(),
+  "fournisseurIntrant": zod.string().nullish(),
+  "datePeremption": zod.coerce.date().nullish(),
+  "actif": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListIntrantsResponse = zod.array(ListIntrantsResponseItem)
+
+
+/**
+ * @summary Créer un intrant
+ */
+export const CreateIntrantBody = zod.object({
+  "nom": zod.string(),
+  "description": zod.string().optional(),
+  "unite": zod.string(),
+  "prixUnitaireFcfa": zod.number().optional(),
+  "stockMinimum": zod.number().optional(),
+  "fournisseurIntrant": zod.string().optional(),
+  "datePeremption": zod.coerce.date().optional(),
+  "categorieId": zod.number().optional(),
+  "actif": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Fiche intrant
+ */
+export const GetIntrantParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetIntrantResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "categorieId": zod.number().nullish(),
+  "categorieLibelle": zod.string().nullish(),
+  "nom": zod.string(),
+  "description": zod.string().nullish(),
+  "unite": zod.string(),
+  "prixUnitaireFcfa": zod.string(),
+  "stockActuel": zod.string(),
+  "stockMinimum": zod.string(),
+  "fournisseurIntrant": zod.string().nullish(),
+  "datePeremption": zod.coerce.date().nullish(),
+  "actif": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Modifier un intrant
+ */
+export const UpdateIntrantParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateIntrantBody = zod.object({
+  "nom": zod.string(),
+  "description": zod.string().optional(),
+  "unite": zod.string(),
+  "prixUnitaireFcfa": zod.number().optional(),
+  "stockMinimum": zod.number().optional(),
+  "fournisseurIntrant": zod.string().optional(),
+  "datePeremption": zod.coerce.date().optional(),
+  "categorieId": zod.number().optional(),
+  "actif": zod.boolean().optional()
+})
+
+export const UpdateIntrantResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "categorieId": zod.number().nullish(),
+  "categorieLibelle": zod.string().nullish(),
+  "nom": zod.string(),
+  "description": zod.string().nullish(),
+  "unite": zod.string(),
+  "prixUnitaireFcfa": zod.string(),
+  "stockActuel": zod.string(),
+  "stockMinimum": zod.string(),
+  "fournisseurIntrant": zod.string().nullish(),
+  "datePeremption": zod.coerce.date().nullish(),
+  "actif": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Enregistrer un approvisionnement
+ */
+export const CreateApprovIntrantBody = zod.object({
+  "intrantId": zod.number(),
+  "campagneId": zod.number().optional(),
+  "dateAppro": zod.coerce.date(),
+  "quantite": zod.number(),
+  "prixUnitaireFcfa": zod.number(),
+  "fournisseur": zod.string().optional(),
+  "numeroFacture": zod.string().optional()
+})
+
+
+/**
+ * @summary Distribuer un intrant à un membre
+ */
+export const CreateDistributionIntrantBody = zod.object({
+  "intrantId": zod.number(),
+  "membreId": zod.number(),
+  "campagneId": zod.number().optional(),
+  "dateDistribution": zod.coerce.date(),
+  "quantite": zod.number(),
+  "prixUnitaireFcfa": zod.number(),
+  "mode": zod.enum(['credit', 'gratuit', 'subventionne']).optional(),
+  "tauxSubventionPct": zod.number().optional()
+})
+
+
+/**
+ * @summary Remboursement manuel d'une distribution
+ */
+export const RemboursementManuelIntrantBody = zod.object({
+  "distributionId": zod.number(),
+  "montantFcfa": zod.number(),
+  "mode": zod.enum(['deduction_livraison', 'especes', 'mobile']),
+  "dateRemboursement": zod.coerce.date().optional()
 })
 
 

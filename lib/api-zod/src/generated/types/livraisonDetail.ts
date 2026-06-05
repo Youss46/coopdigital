@@ -13,6 +13,7 @@ export interface LivraisonDetail {
   prixUnitaireFcfa: number;
   montantBrutFcfa: number;
   avanceDeduiteFcfa: number;
+  intrantsDeduitsFcfa?: number;
   montantNetFcfa: number;
   dateLivraison: string;
   /** @nullable */
