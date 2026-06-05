@@ -33,6 +33,7 @@ import notificationsRouter from "./notifications";
 import configRouter from "./config";
 import storageRouter from "./storage";
 import portailRouter from "./portail";
+import transportRouter from "./transport";
 
 const router: IRouter = Router();
 
@@ -70,5 +71,6 @@ router.use(auditRouter);
 router.use(notificationsRouter);
 router.use(configRouter);
 router.use(storageRouter);
+router.use(transportRouter);
 
 export default router;

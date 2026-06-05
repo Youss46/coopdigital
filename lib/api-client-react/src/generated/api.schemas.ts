@@ -3237,6 +3237,363 @@ export interface CreateDocumentBody {
   date_expiration?: string;
 }
 
+export type VehiculeType = typeof VehiculeType[keyof typeof VehiculeType];
+
+
+export const VehiculeType = {
+  camion: 'camion',
+  camionnette: 'camionnette',
+  moto: 'moto',
+  tracteur: 'tracteur',
+} as const;
+
+export type VehiculeProprietaire = typeof VehiculeProprietaire[keyof typeof VehiculeProprietaire];
+
+
+export const VehiculeProprietaire = {
+  cooperative: 'cooperative',
+  location: 'location',
+  prestataire: 'prestataire',
+} as const;
+
+export type VehiculeStatut = typeof VehiculeStatut[keyof typeof VehiculeStatut];
+
+
+export const VehiculeStatut = {
+  disponible: 'disponible',
+  en_mission: 'en_mission',
+  en_panne: 'en_panne',
+  maintenance: 'maintenance',
+} as const;
+
+export interface Vehicule {
+  id: number;
+  cooperative_id: number;
+  immatriculation: string;
+  marque?: string | null;
+  modele?: string | null;
+  type: VehiculeType;
+  capacite_kg?: number | null;
+  annee_fabrication?: number | null;
+  date_acquisition?: string | null;
+  valeur_acquisition_fcfa?: number | null;
+  proprietaire: VehiculeProprietaire;
+  nom_prestataire?: string | null;
+  statut: VehiculeStatut;
+  kilometrage_actuel: number;
+  prochain_entretien_km?: number | null;
+  prochain_entretien_date?: string | null;
+  assurance_expiration?: string | null;
+  visite_technique_expiration?: string | null;
+  photo_url?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CreateVehiculeBodyType = typeof CreateVehiculeBodyType[keyof typeof CreateVehiculeBodyType];
+
+
+export const CreateVehiculeBodyType = {
+  camion: 'camion',
+  camionnette: 'camionnette',
+  moto: 'moto',
+  tracteur: 'tracteur',
+} as const;
+
+export type CreateVehiculeBodyProprietaire = typeof CreateVehiculeBodyProprietaire[keyof typeof CreateVehiculeBodyProprietaire];
+
+
+export const CreateVehiculeBodyProprietaire = {
+  cooperative: 'cooperative',
+  location: 'location',
+  prestataire: 'prestataire',
+} as const;
+
+export type CreateVehiculeBodyStatut = typeof CreateVehiculeBodyStatut[keyof typeof CreateVehiculeBodyStatut];
+
+
+export const CreateVehiculeBodyStatut = {
+  disponible: 'disponible',
+  en_mission: 'en_mission',
+  en_panne: 'en_panne',
+  maintenance: 'maintenance',
+} as const;
+
+export interface CreateVehiculeBody {
+  immatriculation: string;
+  marque?: string;
+  modele?: string;
+  type: CreateVehiculeBodyType;
+  capacite_kg?: number;
+  annee_fabrication?: number;
+  date_acquisition?: string;
+  valeur_acquisition_fcfa?: number;
+  proprietaire?: CreateVehiculeBodyProprietaire;
+  nom_prestataire?: string;
+  statut?: CreateVehiculeBodyStatut;
+  kilometrage_actuel?: number;
+  prochain_entretien_km?: number;
+  prochain_entretien_date?: string;
+  assurance_expiration?: string;
+  visite_technique_expiration?: string;
+  photo_url?: string;
+}
+
+export type UpdateVehiculeBodyType = typeof UpdateVehiculeBodyType[keyof typeof UpdateVehiculeBodyType];
+
+
+export const UpdateVehiculeBodyType = {
+  camion: 'camion',
+  camionnette: 'camionnette',
+  moto: 'moto',
+  tracteur: 'tracteur',
+} as const;
+
+export type UpdateVehiculeBodyProprietaire = typeof UpdateVehiculeBodyProprietaire[keyof typeof UpdateVehiculeBodyProprietaire];
+
+
+export const UpdateVehiculeBodyProprietaire = {
+  cooperative: 'cooperative',
+  location: 'location',
+  prestataire: 'prestataire',
+} as const;
+
+export type UpdateVehiculeBodyStatut = typeof UpdateVehiculeBodyStatut[keyof typeof UpdateVehiculeBodyStatut];
+
+
+export const UpdateVehiculeBodyStatut = {
+  disponible: 'disponible',
+  en_mission: 'en_mission',
+  en_panne: 'en_panne',
+  maintenance: 'maintenance',
+} as const;
+
+export interface UpdateVehiculeBody {
+  marque?: string;
+  modele?: string;
+  type?: UpdateVehiculeBodyType;
+  capacite_kg?: number;
+  proprietaire?: UpdateVehiculeBodyProprietaire;
+  nom_prestataire?: string;
+  statut?: UpdateVehiculeBodyStatut;
+  kilometrage_actuel?: number;
+  prochain_entretien_km?: number;
+  prochain_entretien_date?: string;
+  assurance_expiration?: string;
+  visite_technique_expiration?: string;
+  photo_url?: string;
+}
+
+export type ChauffeurStatut = typeof ChauffeurStatut[keyof typeof ChauffeurStatut];
+
+
+export const ChauffeurStatut = {
+  actif: 'actif',
+  inactif: 'inactif',
+} as const;
+
+export interface Chauffeur {
+  id: number;
+  cooperative_id: number;
+  nom: string;
+  prenoms?: string | null;
+  telephone?: string | null;
+  numero_permis?: string | null;
+  categorie_permis?: string | null;
+  date_expiration_permis?: string | null;
+  date_embauche?: string | null;
+  statut: ChauffeurStatut;
+  created_at: string;
+}
+
+export type CreateChauffeurBodyStatut = typeof CreateChauffeurBodyStatut[keyof typeof CreateChauffeurBodyStatut];
+
+
+export const CreateChauffeurBodyStatut = {
+  actif: 'actif',
+  inactif: 'inactif',
+} as const;
+
+export interface CreateChauffeurBody {
+  nom: string;
+  prenoms?: string;
+  telephone?: string;
+  numero_permis?: string;
+  categorie_permis?: string;
+  date_expiration_permis?: string;
+  date_embauche?: string;
+  statut?: CreateChauffeurBodyStatut;
+}
+
+export type UpdateChauffeurBodyStatut = typeof UpdateChauffeurBodyStatut[keyof typeof UpdateChauffeurBodyStatut];
+
+
+export const UpdateChauffeurBodyStatut = {
+  actif: 'actif',
+  inactif: 'inactif',
+} as const;
+
+export interface UpdateChauffeurBody {
+  nom?: string;
+  prenoms?: string;
+  telephone?: string;
+  numero_permis?: string;
+  categorie_permis?: string;
+  date_expiration_permis?: string;
+  date_embauche?: string;
+  statut?: UpdateChauffeurBodyStatut;
+}
+
+export type MissionTransportTypeMission = typeof MissionTransportTypeMission[keyof typeof MissionTransportTypeMission];
+
+
+export const MissionTransportTypeMission = {
+  collecte: 'collecte',
+  livraison_export: 'livraison_export',
+  intrants: 'intrants',
+  autre: 'autre',
+} as const;
+
+export type MissionTransportStatut = typeof MissionTransportStatut[keyof typeof MissionTransportStatut];
+
+
+export const MissionTransportStatut = {
+  planifiee: 'planifiee',
+  en_cours: 'en_cours',
+  terminee: 'terminee',
+  annulee: 'annulee',
+} as const;
+
+export interface MissionTransport {
+  id: number;
+  cooperative_id: number;
+  vehicule_id: number;
+  chauffeur_id: number;
+  campagne_id?: number | null;
+  type_mission: MissionTransportTypeMission;
+  zone_collecte?: string | null;
+  section?: string | null;
+  vente_exportateur_id?: number | null;
+  exportateur_destination?: string | null;
+  lieu_depart: string;
+  lieu_arrivee: string;
+  date_depart: string;
+  date_arrivee_prevue?: string | null;
+  date_arrivee_reelle?: string | null;
+  poids_charge_kg?: number;
+  nombre_sacs?: number;
+  kilometrage_depart?: number | null;
+  kilometrage_arrivee?: number | null;
+  distance_km?: number | null;
+  cout_carburant_fcfa?: number;
+  cout_chauffeur_fcfa?: number;
+  cout_peage_fcfa?: number;
+  cout_divers_fcfa?: number;
+  cout_total_fcfa?: number;
+  cout_par_kg_fcfa?: number | null;
+  statut: MissionTransportStatut;
+  observations?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CreateMissionTransportBodyTypeMission = typeof CreateMissionTransportBodyTypeMission[keyof typeof CreateMissionTransportBodyTypeMission];
+
+
+export const CreateMissionTransportBodyTypeMission = {
+  collecte: 'collecte',
+  livraison_export: 'livraison_export',
+  intrants: 'intrants',
+  autre: 'autre',
+} as const;
+
+export interface CreateMissionTransportBody {
+  vehicule_id: number;
+  chauffeur_id: number;
+  campagne_id?: number;
+  type_mission: CreateMissionTransportBodyTypeMission;
+  zone_collecte?: string;
+  section?: string;
+  vente_exportateur_id?: number;
+  exportateur_destination?: string;
+  lieu_depart: string;
+  lieu_arrivee: string;
+  date_depart: string;
+  date_arrivee_prevue?: string;
+  kilometrage_depart?: number;
+  observations?: string;
+}
+
+export interface TerminerMissionBody {
+  date_arrivee_reelle: string;
+  kilometrage_arrivee: number;
+  cout_carburant_fcfa: number;
+  cout_chauffeur_fcfa: number;
+  cout_peage_fcfa: number;
+  cout_divers_fcfa?: number;
+  poids_charge_kg: number;
+  observations?: string;
+}
+
+export interface EntretienVehicule {
+  id: number;
+  vehicule_id: number;
+  type_entretien: string;
+  date_entretien: string;
+  kilometrage_entretien?: number | null;
+  description?: string | null;
+  cout_fcfa?: number | null;
+  garage?: string | null;
+  prochain_entretien_km?: number | null;
+  prochain_entretien_date?: string | null;
+  created_at: string;
+}
+
+export interface CreateEntretienVehiculeBody {
+  type_entretien: string;
+  date_entretien: string;
+  kilometrage_entretien?: number;
+  description?: string;
+  cout_fcfa?: number;
+  garage?: string;
+  prochain_entretien_km?: number;
+  prochain_entretien_date?: string;
+}
+
+export interface AlerteTransport {
+  vehicule_id?: number | null;
+  chauffeur_id?: number | null;
+  immatriculation?: string | null;
+  nom?: string | null;
+  type?: string;
+  message?: string;
+  date_expiration?: string | null;
+}
+
+export type RapportCampagneTransportVehiculePlusUtilise = {
+  vehicule_id?: number;
+  immatriculation?: string;
+  nb_missions?: string;
+} | null;
+
+export interface RapportCampagneTransport {
+  nb_missions?: number;
+  distance_totale_km?: number;
+  cout_total_fcfa?: number;
+  cout_moyen_kg_fcfa?: number;
+  tonnage_transporte_kg?: number;
+  vehicule_plus_utilise?: RapportCampagneTransportVehiculePlusUtilise;
+}
+
+export interface RapportVehicule {
+  vehicule?: Vehicule;
+  missions?: MissionTransport[];
+  entretiens?: EntretienVehicule[];
+  cout_missions_fcfa?: number;
+  cout_entretiens_fcfa?: number;
+  nb_missions?: number;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -3627,5 +3984,34 @@ export type UploadLogo200 = {
 
 export type GetDocumentsOfficiels200 = {
   documents: DocumentOfficiel[];
+};
+
+export type GetVehicules200 = {
+  vehicules: Vehicule[];
+};
+
+export type GetTransportAlertes200 = {
+  alertes_vehicules?: AlerteTransport[];
+  alertes_chauffeurs?: AlerteTransport[];
+};
+
+export type GetEntretiensVehicule200 = {
+  entretiens?: EntretienVehicule[];
+};
+
+export type GetChauffeurs200 = {
+  chauffeurs: Chauffeur[];
+};
+
+export type GetMissionsParams = {
+statut?: string;
+};
+
+export type GetMissions200 = {
+  missions: MissionTransport[];
+};
+
+export type GetRapportCampagneTransportParams = {
+campagne_id?: number;
 };
 

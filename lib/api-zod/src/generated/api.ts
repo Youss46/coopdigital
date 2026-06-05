@@ -5316,3 +5316,509 @@ export const DeleteDocumentOfficielParams = zod.object({
 })
 
 
+/**
+ * @summary Liste des véhicules
+ */
+export const GetVehiculesResponse = zod.object({
+  "vehicules": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "immatriculation": zod.string(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "type": zod.enum(['camion', 'camionnette', 'moto', 'tracteur']),
+  "capacite_kg": zod.number().nullish(),
+  "annee_fabrication": zod.number().nullish(),
+  "date_acquisition": zod.coerce.date().nullish(),
+  "valeur_acquisition_fcfa": zod.number().nullish(),
+  "proprietaire": zod.enum(['cooperative', 'location', 'prestataire']),
+  "nom_prestataire": zod.string().nullish(),
+  "statut": zod.enum(['disponible', 'en_mission', 'en_panne', 'maintenance']),
+  "kilometrage_actuel": zod.number(),
+  "prochain_entretien_km": zod.number().nullish(),
+  "prochain_entretien_date": zod.coerce.date().nullish(),
+  "assurance_expiration": zod.coerce.date().nullish(),
+  "visite_technique_expiration": zod.coerce.date().nullish(),
+  "photo_url": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Créer un véhicule
+ */
+export const CreateVehiculeBody = zod.object({
+  "immatriculation": zod.string(),
+  "marque": zod.string().optional(),
+  "modele": zod.string().optional(),
+  "type": zod.enum(['camion', 'camionnette', 'moto', 'tracteur']),
+  "capacite_kg": zod.number().optional(),
+  "annee_fabrication": zod.number().optional(),
+  "date_acquisition": zod.coerce.date().optional(),
+  "valeur_acquisition_fcfa": zod.number().optional(),
+  "proprietaire": zod.enum(['cooperative', 'location', 'prestataire']).optional(),
+  "nom_prestataire": zod.string().optional(),
+  "statut": zod.enum(['disponible', 'en_mission', 'en_panne', 'maintenance']).optional(),
+  "kilometrage_actuel": zod.number().optional(),
+  "prochain_entretien_km": zod.number().optional(),
+  "prochain_entretien_date": zod.coerce.date().optional(),
+  "assurance_expiration": zod.coerce.date().optional(),
+  "visite_technique_expiration": zod.coerce.date().optional(),
+  "photo_url": zod.string().optional()
+})
+
+
+/**
+ * @summary Alertes véhicules et chauffeurs
+ */
+export const GetTransportAlertesResponse = zod.object({
+  "alertes_vehicules": zod.array(zod.object({
+  "vehicule_id": zod.number().nullish(),
+  "chauffeur_id": zod.number().nullish(),
+  "immatriculation": zod.string().nullish(),
+  "nom": zod.string().nullish(),
+  "type": zod.string().optional(),
+  "message": zod.string().optional(),
+  "date_expiration": zod.string().nullish()
+})).optional(),
+  "alertes_chauffeurs": zod.array(zod.object({
+  "vehicule_id": zod.number().nullish(),
+  "chauffeur_id": zod.number().nullish(),
+  "immatriculation": zod.string().nullish(),
+  "nom": zod.string().nullish(),
+  "type": zod.string().optional(),
+  "message": zod.string().optional(),
+  "date_expiration": zod.string().nullish()
+})).optional()
+})
+
+
+/**
+ * @summary Modifier un véhicule
+ */
+export const UpdateVehiculeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateVehiculeBody = zod.object({
+  "marque": zod.string().optional(),
+  "modele": zod.string().optional(),
+  "type": zod.enum(['camion', 'camionnette', 'moto', 'tracteur']).optional(),
+  "capacite_kg": zod.number().optional(),
+  "proprietaire": zod.enum(['cooperative', 'location', 'prestataire']).optional(),
+  "nom_prestataire": zod.string().optional(),
+  "statut": zod.enum(['disponible', 'en_mission', 'en_panne', 'maintenance']).optional(),
+  "kilometrage_actuel": zod.number().optional(),
+  "prochain_entretien_km": zod.number().optional(),
+  "prochain_entretien_date": zod.coerce.date().optional(),
+  "assurance_expiration": zod.coerce.date().optional(),
+  "visite_technique_expiration": zod.coerce.date().optional(),
+  "photo_url": zod.string().optional()
+})
+
+export const UpdateVehiculeResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "immatriculation": zod.string(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "type": zod.enum(['camion', 'camionnette', 'moto', 'tracteur']),
+  "capacite_kg": zod.number().nullish(),
+  "annee_fabrication": zod.number().nullish(),
+  "date_acquisition": zod.coerce.date().nullish(),
+  "valeur_acquisition_fcfa": zod.number().nullish(),
+  "proprietaire": zod.enum(['cooperative', 'location', 'prestataire']),
+  "nom_prestataire": zod.string().nullish(),
+  "statut": zod.enum(['disponible', 'en_mission', 'en_panne', 'maintenance']),
+  "kilometrage_actuel": zod.number(),
+  "prochain_entretien_km": zod.number().nullish(),
+  "prochain_entretien_date": zod.coerce.date().nullish(),
+  "assurance_expiration": zod.coerce.date().nullish(),
+  "visite_technique_expiration": zod.coerce.date().nullish(),
+  "photo_url": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Historique entretiens d'un véhicule
+ */
+export const GetEntretiensVehiculeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEntretiensVehiculeResponse = zod.object({
+  "entretiens": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicule_id": zod.number(),
+  "type_entretien": zod.string(),
+  "date_entretien": zod.coerce.date(),
+  "kilometrage_entretien": zod.number().nullish(),
+  "description": zod.string().nullish(),
+  "cout_fcfa": zod.number().nullish(),
+  "garage": zod.string().nullish(),
+  "prochain_entretien_km": zod.number().nullish(),
+  "prochain_entretien_date": zod.coerce.date().nullish(),
+  "created_at": zod.coerce.date()
+})).optional()
+})
+
+
+/**
+ * @summary Enregistrer un entretien
+ */
+export const CreateEntretienVehiculeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateEntretienVehiculeBody = zod.object({
+  "type_entretien": zod.string(),
+  "date_entretien": zod.coerce.date(),
+  "kilometrage_entretien": zod.number().optional(),
+  "description": zod.string().optional(),
+  "cout_fcfa": zod.number().optional(),
+  "garage": zod.string().optional(),
+  "prochain_entretien_km": zod.number().optional(),
+  "prochain_entretien_date": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Liste des chauffeurs
+ */
+export const GetChauffeursResponse = zod.object({
+  "chauffeurs": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "numero_permis": zod.string().nullish(),
+  "categorie_permis": zod.string().nullish(),
+  "date_expiration_permis": zod.coerce.date().nullish(),
+  "date_embauche": zod.coerce.date().nullish(),
+  "statut": zod.enum(['actif', 'inactif']),
+  "created_at": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Créer un chauffeur
+ */
+export const CreateChauffeurBody = zod.object({
+  "nom": zod.string(),
+  "prenoms": zod.string().optional(),
+  "telephone": zod.string().optional(),
+  "numero_permis": zod.string().optional(),
+  "categorie_permis": zod.string().optional(),
+  "date_expiration_permis": zod.coerce.date().optional(),
+  "date_embauche": zod.coerce.date().optional(),
+  "statut": zod.enum(['actif', 'inactif']).optional()
+})
+
+
+/**
+ * @summary Modifier un chauffeur
+ */
+export const UpdateChauffeurParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateChauffeurBody = zod.object({
+  "nom": zod.string().optional(),
+  "prenoms": zod.string().optional(),
+  "telephone": zod.string().optional(),
+  "numero_permis": zod.string().optional(),
+  "categorie_permis": zod.string().optional(),
+  "date_expiration_permis": zod.coerce.date().optional(),
+  "date_embauche": zod.coerce.date().optional(),
+  "statut": zod.enum(['actif', 'inactif']).optional()
+})
+
+export const UpdateChauffeurResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "numero_permis": zod.string().nullish(),
+  "categorie_permis": zod.string().nullish(),
+  "date_expiration_permis": zod.coerce.date().nullish(),
+  "date_embauche": zod.coerce.date().nullish(),
+  "statut": zod.enum(['actif', 'inactif']),
+  "created_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Supprimer un chauffeur
+ */
+export const DeleteChauffeurParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Liste des missions
+ */
+export const GetMissionsQueryParams = zod.object({
+  "statut": zod.coerce.string().optional()
+})
+
+export const GetMissionsResponse = zod.object({
+  "missions": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "vehicule_id": zod.number(),
+  "chauffeur_id": zod.number(),
+  "campagne_id": zod.number().nullish(),
+  "type_mission": zod.enum(['collecte', 'livraison_export', 'intrants', 'autre']),
+  "zone_collecte": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "vente_exportateur_id": zod.number().nullish(),
+  "exportateur_destination": zod.string().nullish(),
+  "lieu_depart": zod.string(),
+  "lieu_arrivee": zod.string(),
+  "date_depart": zod.coerce.date(),
+  "date_arrivee_prevue": zod.coerce.date().nullish(),
+  "date_arrivee_reelle": zod.coerce.date().nullish(),
+  "poids_charge_kg": zod.number().optional(),
+  "nombre_sacs": zod.number().optional(),
+  "kilometrage_depart": zod.number().nullish(),
+  "kilometrage_arrivee": zod.number().nullish(),
+  "distance_km": zod.number().nullish(),
+  "cout_carburant_fcfa": zod.number().optional(),
+  "cout_chauffeur_fcfa": zod.number().optional(),
+  "cout_peage_fcfa": zod.number().optional(),
+  "cout_divers_fcfa": zod.number().optional(),
+  "cout_total_fcfa": zod.number().optional(),
+  "cout_par_kg_fcfa": zod.number().nullish(),
+  "statut": zod.enum(['planifiee', 'en_cours', 'terminee', 'annulee']),
+  "observations": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Planifier une mission
+ */
+export const CreateMissionBody = zod.object({
+  "vehicule_id": zod.number(),
+  "chauffeur_id": zod.number(),
+  "campagne_id": zod.number().optional(),
+  "type_mission": zod.enum(['collecte', 'livraison_export', 'intrants', 'autre']),
+  "zone_collecte": zod.string().optional(),
+  "section": zod.string().optional(),
+  "vente_exportateur_id": zod.number().optional(),
+  "exportateur_destination": zod.string().optional(),
+  "lieu_depart": zod.string(),
+  "lieu_arrivee": zod.string(),
+  "date_depart": zod.string(),
+  "date_arrivee_prevue": zod.string().optional(),
+  "kilometrage_depart": zod.number().optional(),
+  "observations": zod.string().optional()
+})
+
+
+/**
+ * @summary Démarrer une mission
+ */
+export const DemarrerMissionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DemarrerMissionResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "vehicule_id": zod.number(),
+  "chauffeur_id": zod.number(),
+  "campagne_id": zod.number().nullish(),
+  "type_mission": zod.enum(['collecte', 'livraison_export', 'intrants', 'autre']),
+  "zone_collecte": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "vente_exportateur_id": zod.number().nullish(),
+  "exportateur_destination": zod.string().nullish(),
+  "lieu_depart": zod.string(),
+  "lieu_arrivee": zod.string(),
+  "date_depart": zod.coerce.date(),
+  "date_arrivee_prevue": zod.coerce.date().nullish(),
+  "date_arrivee_reelle": zod.coerce.date().nullish(),
+  "poids_charge_kg": zod.number().optional(),
+  "nombre_sacs": zod.number().optional(),
+  "kilometrage_depart": zod.number().nullish(),
+  "kilometrage_arrivee": zod.number().nullish(),
+  "distance_km": zod.number().nullish(),
+  "cout_carburant_fcfa": zod.number().optional(),
+  "cout_chauffeur_fcfa": zod.number().optional(),
+  "cout_peage_fcfa": zod.number().optional(),
+  "cout_divers_fcfa": zod.number().optional(),
+  "cout_total_fcfa": zod.number().optional(),
+  "cout_par_kg_fcfa": zod.number().nullish(),
+  "statut": zod.enum(['planifiee', 'en_cours', 'terminee', 'annulee']),
+  "observations": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Terminer une mission
+ */
+export const TerminerMissionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const TerminerMissionBody = zod.object({
+  "date_arrivee_reelle": zod.string(),
+  "kilometrage_arrivee": zod.number(),
+  "cout_carburant_fcfa": zod.number(),
+  "cout_chauffeur_fcfa": zod.number(),
+  "cout_peage_fcfa": zod.number(),
+  "cout_divers_fcfa": zod.number().optional(),
+  "poids_charge_kg": zod.number(),
+  "observations": zod.string().optional()
+})
+
+export const TerminerMissionResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "vehicule_id": zod.number(),
+  "chauffeur_id": zod.number(),
+  "campagne_id": zod.number().nullish(),
+  "type_mission": zod.enum(['collecte', 'livraison_export', 'intrants', 'autre']),
+  "zone_collecte": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "vente_exportateur_id": zod.number().nullish(),
+  "exportateur_destination": zod.string().nullish(),
+  "lieu_depart": zod.string(),
+  "lieu_arrivee": zod.string(),
+  "date_depart": zod.coerce.date(),
+  "date_arrivee_prevue": zod.coerce.date().nullish(),
+  "date_arrivee_reelle": zod.coerce.date().nullish(),
+  "poids_charge_kg": zod.number().optional(),
+  "nombre_sacs": zod.number().optional(),
+  "kilometrage_depart": zod.number().nullish(),
+  "kilometrage_arrivee": zod.number().nullish(),
+  "distance_km": zod.number().nullish(),
+  "cout_carburant_fcfa": zod.number().optional(),
+  "cout_chauffeur_fcfa": zod.number().optional(),
+  "cout_peage_fcfa": zod.number().optional(),
+  "cout_divers_fcfa": zod.number().optional(),
+  "cout_total_fcfa": zod.number().optional(),
+  "cout_par_kg_fcfa": zod.number().nullish(),
+  "statut": zod.enum(['planifiee', 'en_cours', 'terminee', 'annulee']),
+  "observations": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Rapport transport campagne
+ */
+export const GetRapportCampagneTransportQueryParams = zod.object({
+  "campagne_id": zod.coerce.number().optional()
+})
+
+export const GetRapportCampagneTransportResponse = zod.object({
+  "nb_missions": zod.number().optional(),
+  "distance_totale_km": zod.number().optional(),
+  "cout_total_fcfa": zod.number().optional(),
+  "cout_moyen_kg_fcfa": zod.number().optional(),
+  "tonnage_transporte_kg": zod.number().optional(),
+  "vehicule_plus_utilise": zod.object({
+  "vehicule_id": zod.number().optional(),
+  "immatriculation": zod.string().optional(),
+  "nb_missions": zod.string().optional()
+}).nullish()
+})
+
+
+/**
+ * @summary Rapport transport d'un véhicule
+ */
+export const GetRapportVehiculeTransportParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetRapportVehiculeTransportResponse = zod.object({
+  "vehicule": zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "immatriculation": zod.string(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "type": zod.enum(['camion', 'camionnette', 'moto', 'tracteur']),
+  "capacite_kg": zod.number().nullish(),
+  "annee_fabrication": zod.number().nullish(),
+  "date_acquisition": zod.coerce.date().nullish(),
+  "valeur_acquisition_fcfa": zod.number().nullish(),
+  "proprietaire": zod.enum(['cooperative', 'location', 'prestataire']),
+  "nom_prestataire": zod.string().nullish(),
+  "statut": zod.enum(['disponible', 'en_mission', 'en_panne', 'maintenance']),
+  "kilometrage_actuel": zod.number(),
+  "prochain_entretien_km": zod.number().nullish(),
+  "prochain_entretien_date": zod.coerce.date().nullish(),
+  "assurance_expiration": zod.coerce.date().nullish(),
+  "visite_technique_expiration": zod.coerce.date().nullish(),
+  "photo_url": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date()
+}).optional(),
+  "missions": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "vehicule_id": zod.number(),
+  "chauffeur_id": zod.number(),
+  "campagne_id": zod.number().nullish(),
+  "type_mission": zod.enum(['collecte', 'livraison_export', 'intrants', 'autre']),
+  "zone_collecte": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "vente_exportateur_id": zod.number().nullish(),
+  "exportateur_destination": zod.string().nullish(),
+  "lieu_depart": zod.string(),
+  "lieu_arrivee": zod.string(),
+  "date_depart": zod.coerce.date(),
+  "date_arrivee_prevue": zod.coerce.date().nullish(),
+  "date_arrivee_reelle": zod.coerce.date().nullish(),
+  "poids_charge_kg": zod.number().optional(),
+  "nombre_sacs": zod.number().optional(),
+  "kilometrage_depart": zod.number().nullish(),
+  "kilometrage_arrivee": zod.number().nullish(),
+  "distance_km": zod.number().nullish(),
+  "cout_carburant_fcfa": zod.number().optional(),
+  "cout_chauffeur_fcfa": zod.number().optional(),
+  "cout_peage_fcfa": zod.number().optional(),
+  "cout_divers_fcfa": zod.number().optional(),
+  "cout_total_fcfa": zod.number().optional(),
+  "cout_par_kg_fcfa": zod.number().nullish(),
+  "statut": zod.enum(['planifiee', 'en_cours', 'terminee', 'annulee']),
+  "observations": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date()
+})).optional(),
+  "entretiens": zod.array(zod.object({
+  "id": zod.number(),
+  "vehicule_id": zod.number(),
+  "type_entretien": zod.string(),
+  "date_entretien": zod.coerce.date(),
+  "kilometrage_entretien": zod.number().nullish(),
+  "description": zod.string().nullish(),
+  "cout_fcfa": zod.number().nullish(),
+  "garage": zod.string().nullish(),
+  "prochain_entretien_km": zod.number().nullish(),
+  "prochain_entretien_date": zod.coerce.date().nullish(),
+  "created_at": zod.coerce.date()
+})).optional(),
+  "cout_missions_fcfa": zod.number().optional(),
+  "cout_entretiens_fcfa": zod.number().optional(),
+  "nb_missions": zod.number().optional()
+})
+
+

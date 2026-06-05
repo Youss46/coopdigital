@@ -4512,6 +4512,261 @@ paths:
         "404":
           description: Document introuvable
 
+  /transport/vehicules:
+    get:
+      operationId: getVehicules
+      summary: Liste des véhicules
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [vehicules]
+                properties:
+                  vehicules: { type: array, items: { $ref: "#/components/schemas/Vehicule" } }
+    post:
+      operationId: createVehicule
+      summary: Créer un véhicule
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateVehiculeBody" }
+      responses:
+        "201":
+          description: Créé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vehicule" }
+
+  /transport/vehicules/alertes:
+    get:
+      operationId: getTransportAlertes
+      summary: Alertes véhicules et chauffeurs
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alertes_vehicules: { type: array, items: { $ref: "#/components/schemas/AlerteTransport" } }
+                  alertes_chauffeurs: { type: array, items: { $ref: "#/components/schemas/AlerteTransport" } }
+
+  /transport/vehicules/{id}:
+    put:
+      operationId: updateVehicule
+      summary: Modifier un véhicule
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateVehiculeBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vehicule" }
+
+  /transport/vehicules/{id}/entretiens:
+    get:
+      operationId: getEntretiensVehicule
+      summary: Historique entretiens d'un véhicule
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entretiens: { type: array, items: { $ref: "#/components/schemas/EntretienVehicule" } }
+
+  /transport/vehicules/{id}/entretien:
+    post:
+      operationId: createEntretienVehicule
+      summary: Enregistrer un entretien
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateEntretienVehiculeBody" }
+      responses:
+        "201":
+          description: Créé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EntretienVehicule" }
+
+  /transport/chauffeurs:
+    get:
+      operationId: getChauffeurs
+      summary: Liste des chauffeurs
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [chauffeurs]
+                properties:
+                  chauffeurs: { type: array, items: { $ref: "#/components/schemas/Chauffeur" } }
+    post:
+      operationId: createChauffeur
+      summary: Créer un chauffeur
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateChauffeurBody" }
+      responses:
+        "201":
+          description: Créé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Chauffeur" }
+
+  /transport/chauffeurs/{id}:
+    put:
+      operationId: updateChauffeur
+      summary: Modifier un chauffeur
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateChauffeurBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Chauffeur" }
+    delete:
+      operationId: deleteChauffeur
+      summary: Supprimer un chauffeur
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Supprimé
+
+  /transport/missions:
+    get:
+      operationId: getMissions
+      summary: Liste des missions
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: statut, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [missions]
+                properties:
+                  missions: { type: array, items: { $ref: "#/components/schemas/MissionTransport" } }
+    post:
+      operationId: createMission
+      summary: Planifier une mission
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateMissionTransportBody" }
+      responses:
+        "201":
+          description: Créé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MissionTransport" }
+
+  /transport/missions/{id}/demarrer:
+    put:
+      operationId: demarrerMission
+      summary: Démarrer une mission
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MissionTransport" }
+
+  /transport/missions/{id}/terminer:
+    put:
+      operationId: terminerMission
+      summary: Terminer une mission
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TerminerMissionBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MissionTransport" }
+
+  /transport/rapport-campagne:
+    get:
+      operationId: getRapportCampagneTransport
+      summary: Rapport transport campagne
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: campagne_id, in: query, required: false, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RapportCampagneTransport" }
+
+  /transport/rapport-vehicule/{id}:
+    get:
+      operationId: getRapportVehiculeTransport
+      summary: Rapport transport d'un véhicule
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RapportVehicule" }
+
 components:
   schemas:
 
@@ -8709,3 +8964,242 @@ components:
         fichier_url:     { type: string }
         date_document:   { type: string, format: date }
         date_expiration: { type: string, format: date }
+
+    Vehicule:
+      type: object
+      required: [id, cooperative_id, immatriculation, type, proprietaire, statut, kilometrage_actuel, created_at, updated_at]
+      properties:
+        id:                          { type: integer }
+        cooperative_id:              { type: integer }
+        immatriculation:             { type: string }
+        marque:                      { type: string, nullable: true }
+        modele:                      { type: string, nullable: true }
+        type:                        { type: string, enum: [camion, camionnette, moto, tracteur] }
+        capacite_kg:                 { type: number, nullable: true }
+        annee_fabrication:           { type: integer, nullable: true }
+        date_acquisition:            { type: string, format: date, nullable: true }
+        valeur_acquisition_fcfa:     { type: number, nullable: true }
+        proprietaire:                { type: string, enum: [cooperative, location, prestataire] }
+        nom_prestataire:             { type: string, nullable: true }
+        statut:                      { type: string, enum: [disponible, en_mission, en_panne, maintenance] }
+        kilometrage_actuel:          { type: integer }
+        prochain_entretien_km:       { type: integer, nullable: true }
+        prochain_entretien_date:     { type: string, format: date, nullable: true }
+        assurance_expiration:        { type: string, format: date, nullable: true }
+        visite_technique_expiration: { type: string, format: date, nullable: true }
+        photo_url:                   { type: string, nullable: true }
+        created_at:                  { type: string, format: date-time }
+        updated_at:                  { type: string, format: date-time }
+
+    CreateVehiculeBody:
+      type: object
+      required: [immatriculation, type]
+      properties:
+        immatriculation:             { type: string }
+        marque:                      { type: string }
+        modele:                      { type: string }
+        type:                        { type: string, enum: [camion, camionnette, moto, tracteur] }
+        capacite_kg:                 { type: number }
+        annee_fabrication:           { type: integer }
+        date_acquisition:            { type: string, format: date }
+        valeur_acquisition_fcfa:     { type: number }
+        proprietaire:                { type: string, enum: [cooperative, location, prestataire] }
+        nom_prestataire:             { type: string }
+        statut:                      { type: string, enum: [disponible, en_mission, en_panne, maintenance] }
+        kilometrage_actuel:          { type: integer }
+        prochain_entretien_km:       { type: integer }
+        prochain_entretien_date:     { type: string, format: date }
+        assurance_expiration:        { type: string, format: date }
+        visite_technique_expiration: { type: string, format: date }
+        photo_url:                   { type: string }
+
+    UpdateVehiculeBody:
+      type: object
+      properties:
+        marque:                      { type: string }
+        modele:                      { type: string }
+        type:                        { type: string, enum: [camion, camionnette, moto, tracteur] }
+        capacite_kg:                 { type: number }
+        proprietaire:                { type: string, enum: [cooperative, location, prestataire] }
+        nom_prestataire:             { type: string }
+        statut:                      { type: string, enum: [disponible, en_mission, en_panne, maintenance] }
+        kilometrage_actuel:          { type: integer }
+        prochain_entretien_km:       { type: integer }
+        prochain_entretien_date:     { type: string, format: date }
+        assurance_expiration:        { type: string, format: date }
+        visite_technique_expiration: { type: string, format: date }
+        photo_url:                   { type: string }
+
+    Chauffeur:
+      type: object
+      required: [id, cooperative_id, nom, statut, created_at]
+      properties:
+        id:                       { type: integer }
+        cooperative_id:           { type: integer }
+        nom:                      { type: string }
+        prenoms:                  { type: string, nullable: true }
+        telephone:                { type: string, nullable: true }
+        numero_permis:            { type: string, nullable: true }
+        categorie_permis:         { type: string, nullable: true }
+        date_expiration_permis:   { type: string, format: date, nullable: true }
+        date_embauche:            { type: string, format: date, nullable: true }
+        statut:                   { type: string, enum: [actif, inactif] }
+        created_at:               { type: string, format: date-time }
+
+    CreateChauffeurBody:
+      type: object
+      required: [nom]
+      properties:
+        nom:                      { type: string }
+        prenoms:                  { type: string }
+        telephone:                { type: string }
+        numero_permis:            { type: string }
+        categorie_permis:         { type: string }
+        date_expiration_permis:   { type: string, format: date }
+        date_embauche:            { type: string, format: date }
+        statut:                   { type: string, enum: [actif, inactif] }
+
+    UpdateChauffeurBody:
+      type: object
+      properties:
+        nom:                      { type: string }
+        prenoms:                  { type: string }
+        telephone:                { type: string }
+        numero_permis:            { type: string }
+        categorie_permis:         { type: string }
+        date_expiration_permis:   { type: string, format: date }
+        date_embauche:            { type: string, format: date }
+        statut:                   { type: string, enum: [actif, inactif] }
+
+    MissionTransport:
+      type: object
+      required: [id, cooperative_id, vehicule_id, chauffeur_id, type_mission, lieu_depart, lieu_arrivee, date_depart, statut, created_at, updated_at]
+      properties:
+        id:                       { type: integer }
+        cooperative_id:           { type: integer }
+        vehicule_id:              { type: integer }
+        chauffeur_id:             { type: integer }
+        campagne_id:              { type: integer, nullable: true }
+        type_mission:             { type: string, enum: [collecte, livraison_export, intrants, autre] }
+        zone_collecte:            { type: string, nullable: true }
+        section:                  { type: string, nullable: true }
+        vente_exportateur_id:     { type: integer, nullable: true }
+        exportateur_destination:  { type: string, nullable: true }
+        lieu_depart:              { type: string }
+        lieu_arrivee:             { type: string }
+        date_depart:              { type: string, format: date-time }
+        date_arrivee_prevue:      { type: string, format: date-time, nullable: true }
+        date_arrivee_reelle:      { type: string, format: date-time, nullable: true }
+        poids_charge_kg:          { type: number }
+        nombre_sacs:              { type: integer }
+        kilometrage_depart:       { type: integer, nullable: true }
+        kilometrage_arrivee:      { type: integer, nullable: true }
+        distance_km:              { type: integer, nullable: true }
+        cout_carburant_fcfa:      { type: number }
+        cout_chauffeur_fcfa:      { type: number }
+        cout_peage_fcfa:          { type: number }
+        cout_divers_fcfa:         { type: number }
+        cout_total_fcfa:          { type: number }
+        cout_par_kg_fcfa:         { type: number, nullable: true }
+        statut:                   { type: string, enum: [planifiee, en_cours, terminee, annulee] }
+        observations:             { type: string, nullable: true }
+        created_at:               { type: string, format: date-time }
+        updated_at:               { type: string, format: date-time }
+
+    CreateMissionTransportBody:
+      type: object
+      required: [vehicule_id, chauffeur_id, type_mission, lieu_depart, lieu_arrivee, date_depart]
+      properties:
+        vehicule_id:              { type: integer }
+        chauffeur_id:             { type: integer }
+        campagne_id:              { type: integer }
+        type_mission:             { type: string, enum: [collecte, livraison_export, intrants, autre] }
+        zone_collecte:            { type: string }
+        section:                  { type: string }
+        vente_exportateur_id:     { type: integer }
+        exportateur_destination:  { type: string }
+        lieu_depart:              { type: string }
+        lieu_arrivee:             { type: string }
+        date_depart:              { type: string }
+        date_arrivee_prevue:      { type: string }
+        kilometrage_depart:       { type: integer }
+        observations:             { type: string }
+
+    TerminerMissionBody:
+      type: object
+      required: [date_arrivee_reelle, kilometrage_arrivee, cout_carburant_fcfa, cout_chauffeur_fcfa, cout_peage_fcfa, poids_charge_kg]
+      properties:
+        date_arrivee_reelle:      { type: string }
+        kilometrage_arrivee:      { type: integer }
+        cout_carburant_fcfa:      { type: number }
+        cout_chauffeur_fcfa:      { type: number }
+        cout_peage_fcfa:          { type: number }
+        cout_divers_fcfa:         { type: number }
+        poids_charge_kg:          { type: number }
+        observations:             { type: string }
+
+    EntretienVehicule:
+      type: object
+      required: [id, vehicule_id, type_entretien, date_entretien, created_at]
+      properties:
+        id:                       { type: integer }
+        vehicule_id:              { type: integer }
+        type_entretien:           { type: string }
+        date_entretien:           { type: string, format: date }
+        kilometrage_entretien:    { type: integer, nullable: true }
+        description:              { type: string, nullable: true }
+        cout_fcfa:                { type: number, nullable: true }
+        garage:                   { type: string, nullable: true }
+        prochain_entretien_km:    { type: integer, nullable: true }
+        prochain_entretien_date:  { type: string, format: date, nullable: true }
+        created_at:               { type: string, format: date-time }
+
+    CreateEntretienVehiculeBody:
+      type: object
+      required: [type_entretien, date_entretien]
+      properties:
+        type_entretien:           { type: string }
+        date_entretien:           { type: string, format: date }
+        kilometrage_entretien:    { type: integer }
+        description:              { type: string }
+        cout_fcfa:                { type: number }
+        garage:                   { type: string }
+        prochain_entretien_km:    { type: integer }
+        prochain_entretien_date:  { type: string, format: date }
+
+    AlerteTransport:
+      type: object
+      properties:
+        vehicule_id:              { type: integer, nullable: true }
+        chauffeur_id:             { type: integer, nullable: true }
+        immatriculation:          { type: string, nullable: true }
+        nom:                      { type: string, nullable: true }
+        type:                     { type: string }
+        message:                  { type: string }
+        date_expiration:          { type: string, nullable: true }
+
+    RapportCampagneTransport:
+      type: object
+      properties:
+        nb_missions:              { type: integer }
+        distance_totale_km:       { type: integer }
+        cout_total_fcfa:          { type: number }
+        cout_moyen_kg_fcfa:       { type: number }
+        tonnage_transporte_kg:    { type: number }
+        vehicule_plus_utilise:
+          type: object
+          nullable: true
+          properties:
+            vehicule_id:          { type: integer }
+            immatriculation:      { type: string }
+            nb_missions:          { type: string }
+
+    RapportVehicule:
+      type: object
+      properties:
+        vehicule:                 { $ref: "#/components/schemas/Vehicule" }
+        missions:                 { type: array, items: { $ref: "#/components/schemas/MissionTransport" } }
+        entretiens:               { type: array, items: { $ref: "#/components/schemas/EntretienVehicule" } }
+        cout_missions_fcfa:       { type: number }
+        cout_entretiens_fcfa:     { type: number }
+        nb_missions:              { type: integer }

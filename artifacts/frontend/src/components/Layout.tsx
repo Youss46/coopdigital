@@ -33,6 +33,7 @@ import {
   ShieldAlert,
   ScrollText,
   Settings,
+  Truck,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -214,6 +215,12 @@ const navItems = [
     label: "Administration",
     icon: ShieldCheck,
     roles: ["pca", "directeur"],
+  },
+  {
+    href: "/transport",
+    label: "Transport",
+    icon: Truck,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "magasinier"],
   },
   {
     href: "/parametres",
