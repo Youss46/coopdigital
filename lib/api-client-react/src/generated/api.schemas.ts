@@ -1972,6 +1972,217 @@ export interface FournisseurInput {
   lieuNaissance?: string;
 }
 
+export type BailleurType = typeof BailleurType[keyof typeof BailleurType];
+
+
+export const BailleurType = {
+  ong: 'ong',
+  institution: 'institution',
+  etat: 'etat',
+  prive: 'prive',
+} as const;
+
+export interface Bailleur {
+  id: number;
+  cooperative_id: number;
+  nom: string;
+  type: BailleurType;
+  pays?: string | null;
+  contactNom?: string | null;
+  contactEmail?: string | null;
+  contactTelephone?: string | null;
+  created_at: string;
+}
+
+export type BailleurInputType = typeof BailleurInputType[keyof typeof BailleurInputType];
+
+
+export const BailleurInputType = {
+  ong: 'ong',
+  institution: 'institution',
+  etat: 'etat',
+  prive: 'prive',
+} as const;
+
+export interface BailleurInput {
+  nom: string;
+  type?: BailleurInputType;
+  pays?: string;
+  contactNom?: string;
+  contactEmail?: string;
+  contactTelephone?: string;
+}
+
+export type SubventionStatut = typeof SubventionStatut[keyof typeof SubventionStatut];
+
+
+export const SubventionStatut = {
+  en_attente: 'en_attente',
+  actif: 'actif',
+  cloture: 'cloture',
+  suspendu: 'suspendu',
+} as const;
+
+export interface Subvention {
+  id: number;
+  cooperative_id: number;
+  bailleur_id: number;
+  reference: string;
+  libelle: string;
+  montantTotalFcfa?: string;
+  montantRecuFcfa?: string;
+  montantSoldeFcfa?: string;
+  deviseOrigine?: string;
+  montantDeviseOrigine?: string | null;
+  dateConvention?: string | null;
+  dateDebut?: string | null;
+  dateFin?: string | null;
+  statut: SubventionStatut;
+  conditions?: string | null;
+  rapportRequis?: boolean;
+  periodiciteRapport?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type SubventionAvecBailleur = Subvention & {
+  bailleur?: Bailleur;
+  tauxUtilisationPct?: number;
+  alerteExpiration?: boolean;
+  alerteSousUtilisation?: boolean;
+};
+
+export type SubventionInputStatut = typeof SubventionInputStatut[keyof typeof SubventionInputStatut];
+
+
+export const SubventionInputStatut = {
+  en_attente: 'en_attente',
+  actif: 'actif',
+  cloture: 'cloture',
+  suspendu: 'suspendu',
+} as const;
+
+export type SubventionInputLignesBudgetItem = {
+  posteBudgetaire?: string;
+  montantAlloueFcfa?: number;
+};
+
+export interface SubventionInput {
+  bailleurId: number;
+  reference: string;
+  libelle: string;
+  montantTotalFcfa: number;
+  deviseOrigine?: string;
+  montantDeviseOrigine?: number;
+  dateConvention?: string;
+  dateDebut?: string;
+  dateFin?: string;
+  statut?: SubventionInputStatut;
+  conditions?: string;
+  rapportRequis?: boolean;
+  periodiciteRapport?: string;
+  lignesBudget?: SubventionInputLignesBudgetItem[];
+}
+
+export type TrancheSubventionStatut = typeof TrancheSubventionStatut[keyof typeof TrancheSubventionStatut];
+
+
+export const TrancheSubventionStatut = {
+  attendue: 'attendue',
+  recue: 'recue',
+  en_retard: 'en_retard',
+} as const;
+
+export interface TrancheSubvention {
+  id: number;
+  subvention_id: number;
+  numeroTranche?: number;
+  montantFcfa?: string;
+  datePrevue?: string | null;
+  dateRecue?: string | null;
+  statut: TrancheSubventionStatut;
+  referenceVirement?: string | null;
+  createdAt?: string;
+}
+
+export interface TrancheInput {
+  montantFcfa: number;
+  datePrevue?: string;
+  referenceVirement?: string;
+  trancheId?: number;
+}
+
+export interface LigneBudgetSubvention {
+  id: number;
+  subvention_id: number;
+  posteBudgetaire?: string;
+  montantAlloueFcfa?: string;
+  montantUtiliseFcfa?: string;
+  soldeFcfa?: string | null;
+  justificatifUrl?: string | null;
+}
+
+export interface UtiliserFondsInput {
+  ligneId: number;
+  montant: number;
+  justificatifUrl?: string;
+}
+
+export type RapportBailleurStatut = typeof RapportBailleurStatut[keyof typeof RapportBailleurStatut];
+
+
+export const RapportBailleurStatut = {
+  brouillon: 'brouillon',
+  soumis: 'soumis',
+  valide: 'valide',
+} as const;
+
+export type RapportBailleurContenuJson = { [key: string]: unknown } | null;
+
+export interface RapportBailleur {
+  id: number;
+  subventionId?: number;
+  cooperativeId?: number;
+  periode?: string | null;
+  typeRapport?: string | null;
+  statut: RapportBailleurStatut;
+  dateSoumission?: string | null;
+  contenuJson?: RapportBailleurContenuJson;
+  pdfUrl?: string | null;
+  createdAt?: string;
+}
+
+export interface GenererRapportInput {
+  periode?: string;
+  typeRapport?: string;
+}
+
+export type RapportBailleurResponseContenuJson = { [key: string]: unknown };
+
+export interface RapportBailleurResponse {
+  rapport: RapportBailleur;
+  contenuJson: RapportBailleurResponseContenuJson;
+}
+
+export interface SubventionDetail {
+  subvention: Subvention;
+  bailleur: Bailleur;
+  tranches: TrancheSubvention[];
+  lignes: LigneBudgetSubvention[];
+  rapports: RapportBailleur[];
+}
+
+export type SubventionsDashboardProchaineTranche = { [key: string]: unknown } | null;
+
+export interface SubventionsDashboard {
+  totalRecu: number;
+  totalUtilise: number;
+  soldeDisponible: number;
+  tauxUtilisationPct: number;
+  nbSubventionsActives: number;
+  prochaineTranche?: SubventionsDashboardProchaineTranche;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -2216,6 +2427,12 @@ campagne_id?: number;
 export type PostBudgetIdSync200 = {
   ok?: boolean;
   message?: string;
+};
+
+export type PostSubventionsIdTranche200 = {
+  ok: boolean;
+  montantRecuFcfa: number;
+  montantSoldeFcfa: number;
 };
 
 export type GetEmpruntsParams = {

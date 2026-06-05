@@ -1,8 +1,1 @@
-- [Express 5 req.params typing](express5-params-typing.md) — req.params[key] is string | string[], wrap with String() before parseInt or eq().
-- [Logger import pattern](logger-import.md) — `logger` dans api-server est un export nommé `{ logger }` depuis `src/lib/logger.ts`, pas un export default.
-- [React Query v5 queryKey required](rq-querykey.md) — useGetXxx avec `enabled` exige aussi `queryKey: getGetXxxQueryKey(...)`, sinon erreur TS.
-- [html5-qrcode types](html5qrcode-types.md) — `Html5Qrcode.clear()` retourne `void` (pas Promise<void>). Typer la ref `useRef<Html5Qrcode | null>` et appeler avec `void s.clear()`.
-- [pdfkit + @swc/helpers runtime](pdfkit-swc-helpers.md) — pdfkit → fontkit → @swc/helpers. Le build.mjs externalise `@swc/*`, donc il faut ajouter `@swc/helpers` comme dep directe de api-server sinon crash au démarrage.
-- [JWT_SECRET env var](jwt-secret-config.md) — JWT_SECRET doit être configuré (via setEnvVars shared) avant le premier démarrage. Valeur générée avec crypto.randomBytes(48).toString('hex').
-- [Orval inline body naming conflict](orval-inline-body-conflict.md) — schéma request-body inline → Orval génère FooBody dans types/ ET api.ts → conflit; toujours utiliser $ref vers un named schema dans components/schemas.
-- [api-zod export type star](api-zod-export-star.md) — lib/api-zod/src/index.ts doit utiliser `export type * from "./generated/types"` pour éviter conflict valeur Zod vs TypeScript type.
+- [Orval inline body naming conflict](orval-inline-body-conflict.md) — inline requestBody génère PostXxxBody qui entre en collision avec generated/types; fixer avec $ref vers schéma nommé.

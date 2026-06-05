@@ -2698,6 +2698,313 @@ export const PostBudgetIdSyncResponse = zod.object({
 
 
 /**
+ * @summary Lister les bailleurs
+ */
+export const GetBailleursResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "nom": zod.string(),
+  "type": zod.enum(['ong', 'institution', 'etat', 'prive']),
+  "pays": zod.string().nullish(),
+  "contactNom": zod.string().nullish(),
+  "contactEmail": zod.string().nullish(),
+  "contactTelephone": zod.string().nullish(),
+  "created_at": zod.coerce.date()
+})
+export const GetBailleursResponse = zod.array(GetBailleursResponseItem)
+
+
+/**
+ * @summary Créer un bailleur
+ */
+export const PostBailleursBody = zod.object({
+  "nom": zod.string(),
+  "type": zod.enum(['ong', 'institution', 'etat', 'prive']).optional(),
+  "pays": zod.string().optional(),
+  "contactNom": zod.string().optional(),
+  "contactEmail": zod.string().optional(),
+  "contactTelephone": zod.string().optional()
+})
+
+
+/**
+ * @summary Modifier un bailleur
+ */
+export const PutBailleursIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PutBailleursIdBody = zod.object({
+  "nom": zod.string(),
+  "type": zod.enum(['ong', 'institution', 'etat', 'prive']).optional(),
+  "pays": zod.string().optional(),
+  "contactNom": zod.string().optional(),
+  "contactEmail": zod.string().optional(),
+  "contactTelephone": zod.string().optional()
+})
+
+export const PutBailleursIdResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "nom": zod.string(),
+  "type": zod.enum(['ong', 'institution', 'etat', 'prive']),
+  "pays": zod.string().nullish(),
+  "contactNom": zod.string().nullish(),
+  "contactEmail": zod.string().nullish(),
+  "contactTelephone": zod.string().nullish(),
+  "created_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Supprimer un bailleur
+ */
+export const DeleteBailleursIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Dashboard subventions (KPIs globaux)
+ */
+export const GetSubventionsDashboardResponse = zod.object({
+  "totalRecu": zod.number(),
+  "totalUtilise": zod.number(),
+  "soldeDisponible": zod.number(),
+  "tauxUtilisationPct": zod.number(),
+  "nbSubventionsActives": zod.number(),
+  "prochaineTranche": zod.object({
+
+}).passthrough().nullish()
+})
+
+
+/**
+ * @summary Lister les subventions
+ */
+export const GetSubventionsResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "bailleur_id": zod.number(),
+  "reference": zod.string(),
+  "libelle": zod.string(),
+  "montantTotalFcfa": zod.string().optional(),
+  "montantRecuFcfa": zod.string().optional(),
+  "montantSoldeFcfa": zod.string().optional(),
+  "deviseOrigine": zod.string().optional(),
+  "montantDeviseOrigine": zod.string().nullish(),
+  "dateConvention": zod.coerce.date().nullish(),
+  "dateDebut": zod.coerce.date().nullish(),
+  "dateFin": zod.coerce.date().nullish(),
+  "statut": zod.enum(['en_attente', 'actif', 'cloture', 'suspendu']),
+  "conditions": zod.string().nullish(),
+  "rapportRequis": zod.boolean().optional(),
+  "periodiciteRapport": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}).and(zod.object({
+  "bailleur": zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "nom": zod.string(),
+  "type": zod.enum(['ong', 'institution', 'etat', 'prive']),
+  "pays": zod.string().nullish(),
+  "contactNom": zod.string().nullish(),
+  "contactEmail": zod.string().nullish(),
+  "contactTelephone": zod.string().nullish(),
+  "created_at": zod.coerce.date()
+}).optional(),
+  "tauxUtilisationPct": zod.number().optional(),
+  "alerteExpiration": zod.boolean().optional(),
+  "alerteSousUtilisation": zod.boolean().optional()
+}))
+export const GetSubventionsResponse = zod.array(GetSubventionsResponseItem)
+
+
+/**
+ * @summary Créer une subvention
+ */
+export const PostSubventionsBody = zod.object({
+  "bailleurId": zod.number(),
+  "reference": zod.string(),
+  "libelle": zod.string(),
+  "montantTotalFcfa": zod.number(),
+  "deviseOrigine": zod.string().optional(),
+  "montantDeviseOrigine": zod.number().optional(),
+  "dateConvention": zod.coerce.date().optional(),
+  "dateDebut": zod.coerce.date().optional(),
+  "dateFin": zod.coerce.date().optional(),
+  "statut": zod.enum(['en_attente', 'actif', 'cloture', 'suspendu']).optional(),
+  "conditions": zod.string().optional(),
+  "rapportRequis": zod.boolean().optional(),
+  "periodiciteRapport": zod.string().optional(),
+  "lignesBudget": zod.array(zod.object({
+  "posteBudgetaire": zod.string().optional(),
+  "montantAlloueFcfa": zod.number().optional()
+})).optional()
+})
+
+
+/**
+ * @summary Détail subvention (tranches + budget + rapports)
+ */
+export const GetSubventionsIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetSubventionsIdResponse = zod.object({
+  "subvention": zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "bailleur_id": zod.number(),
+  "reference": zod.string(),
+  "libelle": zod.string(),
+  "montantTotalFcfa": zod.string().optional(),
+  "montantRecuFcfa": zod.string().optional(),
+  "montantSoldeFcfa": zod.string().optional(),
+  "deviseOrigine": zod.string().optional(),
+  "montantDeviseOrigine": zod.string().nullish(),
+  "dateConvention": zod.coerce.date().nullish(),
+  "dateDebut": zod.coerce.date().nullish(),
+  "dateFin": zod.coerce.date().nullish(),
+  "statut": zod.enum(['en_attente', 'actif', 'cloture', 'suspendu']),
+  "conditions": zod.string().nullish(),
+  "rapportRequis": zod.boolean().optional(),
+  "periodiciteRapport": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),
+  "bailleur": zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "nom": zod.string(),
+  "type": zod.enum(['ong', 'institution', 'etat', 'prive']),
+  "pays": zod.string().nullish(),
+  "contactNom": zod.string().nullish(),
+  "contactEmail": zod.string().nullish(),
+  "contactTelephone": zod.string().nullish(),
+  "created_at": zod.coerce.date()
+}),
+  "tranches": zod.array(zod.object({
+  "id": zod.number(),
+  "subvention_id": zod.number(),
+  "numeroTranche": zod.number().optional(),
+  "montantFcfa": zod.string().optional(),
+  "datePrevue": zod.coerce.date().nullish(),
+  "dateRecue": zod.coerce.date().nullish(),
+  "statut": zod.enum(['attendue', 'recue', 'en_retard']),
+  "referenceVirement": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+})),
+  "lignes": zod.array(zod.object({
+  "id": zod.number(),
+  "subvention_id": zod.number(),
+  "posteBudgetaire": zod.string().optional(),
+  "montantAlloueFcfa": zod.string().optional(),
+  "montantUtiliseFcfa": zod.string().optional(),
+  "soldeFcfa": zod.string().nullish(),
+  "justificatifUrl": zod.string().nullish()
+})),
+  "rapports": zod.array(zod.object({
+  "id": zod.number(),
+  "subventionId": zod.number().optional(),
+  "cooperativeId": zod.number().optional(),
+  "periode": zod.string().nullish(),
+  "typeRapport": zod.string().nullish(),
+  "statut": zod.enum(['brouillon', 'soumis', 'valide']),
+  "dateSoumission": zod.coerce.date().nullish(),
+  "contenuJson": zod.object({
+
+}).passthrough().nullish(),
+  "pdfUrl": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+}))
+})
+
+
+/**
+ * @summary Enregistrer la réception d'une tranche
+ */
+export const PostSubventionsIdTrancheParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostSubventionsIdTrancheBody = zod.object({
+  "montantFcfa": zod.number(),
+  "datePrevue": zod.coerce.date().optional(),
+  "referenceVirement": zod.string().optional(),
+  "trancheId": zod.number().optional()
+})
+
+export const PostSubventionsIdTrancheResponse = zod.object({
+  "ok": zod.boolean(),
+  "montantRecuFcfa": zod.number(),
+  "montantSoldeFcfa": zod.number()
+})
+
+
+/**
+ * @summary Enregistrer une dépense sur une ligne budgétaire
+ */
+export const PutSubventionsIdUtiliserParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PutSubventionsIdUtiliserBody = zod.object({
+  "ligneId": zod.number(),
+  "montant": zod.number(),
+  "justificatifUrl": zod.string().optional()
+})
+
+export const PutSubventionsIdUtiliserResponse = zod.object({
+  "id": zod.number(),
+  "subvention_id": zod.number(),
+  "posteBudgetaire": zod.string().optional(),
+  "montantAlloueFcfa": zod.string().optional(),
+  "montantUtiliseFcfa": zod.string().optional(),
+  "soldeFcfa": zod.string().nullish(),
+  "justificatifUrl": zod.string().nullish()
+})
+
+
+/**
+ * @summary Générer un rapport bailleur
+ */
+export const PostSubventionsIdRapportParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostSubventionsIdRapportBody = zod.object({
+  "periode": zod.string().optional(),
+  "typeRapport": zod.string().optional()
+})
+
+
+/**
+ * @summary Soumettre un rapport bailleur
+ */
+export const PutSubventionsIdRapportRapportIdSoumettreParams = zod.object({
+  "id": zod.coerce.number(),
+  "rapportId": zod.coerce.number()
+})
+
+export const PutSubventionsIdRapportRapportIdSoumettreResponse = zod.object({
+  "id": zod.number(),
+  "subventionId": zod.number().optional(),
+  "cooperativeId": zod.number().optional(),
+  "periode": zod.string().nullish(),
+  "typeRapport": zod.string().nullish(),
+  "statut": zod.enum(['brouillon', 'soumis', 'valide']),
+  "dateSoumission": zod.coerce.date().nullish(),
+  "contenuJson": zod.object({
+
+}).passthrough().nullish(),
+  "pdfUrl": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+})
+
+
+/**
  * @summary Liste des devises actives
  */
 export const GetDevisesResponseItem = zod.object({

@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Landmark,
   Target,
+  HandCoins,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey } from "@workspace/api-client-react";
 
@@ -106,6 +107,12 @@ const navItems = [
     href: "/budget",
     label: "Budget",
     icon: Target,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/subventions",
+    label: "Subventions",
+    icon: HandCoins,
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {

@@ -112,6 +112,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     modifier: ["pca", "directeur", "comptable"],
   },
 
+  subventions: {
+    voir:              ["pca", "directeur", "comptable", "auditeur"],
+    creer_subvention:  ["pca", "directeur"],
+    enregistrer_fonds: ["pca", "directeur", "comptable"],
+    utiliser_fonds:    ["pca", "directeur", "comptable"],
+    generer_rapport:   ["pca", "directeur", "comptable"],
+  },
+
   devises: {
     voir_taux:      ["pca", "directeur", "comptable", "auditeur"],
     modifier_taux:  ["pca", "directeur", "comptable"],

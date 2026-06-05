@@ -29,6 +29,8 @@ import type {
   AvancePagination,
   AvancePersonnel,
   AvancesEncours,
+  Bailleur,
+  BailleurInput,
   BalanceLigne,
   BilanEtat,
   BudgetCampagne,
@@ -78,6 +80,7 @@ import type {
   FournisseurInput,
   GenerationResult,
   GenererBulletinsInput,
+  GenererRapportInput,
   GetAvancesParams,
   GetAvancesPersonnelParams,
   GetBalanceParams,
@@ -107,6 +110,7 @@ import type {
   IntrantResume,
   LiberationInput,
   LigneBudget,
+  LigneBudgetSubvention,
   LigneEcheancier,
   ListEcrituresEnAttenteParams,
   ListFournisseursParams,
@@ -137,8 +141,11 @@ import type {
   Personnel,
   PersonnelHistorique,
   PostBudgetIdSync200,
+  PostSubventionsIdTranche200,
   Preteur,
   PreteurInput,
+  RapportBailleur,
+  RapportBailleurResponse,
   RapportBudget,
   RapportCampagneIntrants,
   RapportChange,
@@ -158,16 +165,23 @@ import type {
   SmsGroupeInput,
   SmsGroupeResult,
   SmsHistorique,
+  Subvention,
+  SubventionAvecBailleur,
+  SubventionDetail,
+  SubventionInput,
+  SubventionsDashboard,
   TauxActuel,
   TauxChange,
   TauxChangeInput,
   ToggleActifInput,
   TraiterRefusInput,
+  TrancheInput,
   Tresorerie,
   UpdateConfigComptableInput,
   UpdatePersonnelInput,
   UpdateUserInput,
   UtilisateurCompte,
+  UtiliserFondsInput,
   ValiderEcritureInput,
   ValiderPaiementInput,
   ValiderToutEcrituresEnAttente200,
@@ -8842,6 +8856,886 @@ export const usePostBudgetIdSync = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getPostBudgetIdSyncMutationOptions(options));
+    }
+
+export const getGetBailleursUrl = () => {
+
+
+
+
+  return `/api/bailleurs`
+}
+
+/**
+ * @summary Lister les bailleurs
+ */
+export const getBailleurs = async ( options?: RequestInit): Promise<Bailleur[]> => {
+
+  return customFetch<Bailleur[]>(getGetBailleursUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBailleursQueryKey = () => {
+    return [
+    `/api/bailleurs`
+    ] as const;
+    }
+
+
+export const getGetBailleursQueryOptions = <TData = Awaited<ReturnType<typeof getBailleurs>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBailleurs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBailleursQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBailleurs>>> = ({ signal }) => getBailleurs({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBailleurs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBailleursQueryResult = NonNullable<Awaited<ReturnType<typeof getBailleurs>>>
+export type GetBailleursQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lister les bailleurs
+ */
+
+export function useGetBailleurs<TData = Awaited<ReturnType<typeof getBailleurs>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBailleurs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBailleursQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostBailleursUrl = () => {
+
+
+
+
+  return `/api/bailleurs`
+}
+
+/**
+ * @summary Créer un bailleur
+ */
+export const postBailleurs = async (bailleurInput: BailleurInput, options?: RequestInit): Promise<Bailleur> => {
+
+  return customFetch<Bailleur>(getPostBailleursUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bailleurInput,)
+  }
+);}
+
+
+
+
+export const getPostBailleursMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postBailleurs>>, TError,{data: BodyType<BailleurInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postBailleurs>>, TError,{data: BodyType<BailleurInput>}, TContext> => {
+
+const mutationKey = ['postBailleurs'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postBailleurs>>, {data: BodyType<BailleurInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postBailleurs(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostBailleursMutationResult = NonNullable<Awaited<ReturnType<typeof postBailleurs>>>
+    export type PostBailleursMutationBody = BodyType<BailleurInput>
+    export type PostBailleursMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Créer un bailleur
+ */
+export const usePostBailleurs = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postBailleurs>>, TError,{data: BodyType<BailleurInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postBailleurs>>,
+        TError,
+        {data: BodyType<BailleurInput>},
+        TContext
+      > => {
+      return useMutation(getPostBailleursMutationOptions(options));
+    }
+
+export const getPutBailleursIdUrl = (id: number,) => {
+
+
+
+
+  return `/api/bailleurs/${id}`
+}
+
+/**
+ * @summary Modifier un bailleur
+ */
+export const putBailleursId = async (id: number,
+    bailleurInput: BailleurInput, options?: RequestInit): Promise<Bailleur> => {
+
+  return customFetch<Bailleur>(getPutBailleursIdUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bailleurInput,)
+  }
+);}
+
+
+
+
+export const getPutBailleursIdMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putBailleursId>>, TError,{id: number;data: BodyType<BailleurInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putBailleursId>>, TError,{id: number;data: BodyType<BailleurInput>}, TContext> => {
+
+const mutationKey = ['putBailleursId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putBailleursId>>, {id: number;data: BodyType<BailleurInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  putBailleursId(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutBailleursIdMutationResult = NonNullable<Awaited<ReturnType<typeof putBailleursId>>>
+    export type PutBailleursIdMutationBody = BodyType<BailleurInput>
+    export type PutBailleursIdMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Modifier un bailleur
+ */
+export const usePutBailleursId = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putBailleursId>>, TError,{id: number;data: BodyType<BailleurInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putBailleursId>>,
+        TError,
+        {id: number;data: BodyType<BailleurInput>},
+        TContext
+      > => {
+      return useMutation(getPutBailleursIdMutationOptions(options));
+    }
+
+export const getDeleteBailleursIdUrl = (id: number,) => {
+
+
+
+
+  return `/api/bailleurs/${id}`
+}
+
+/**
+ * @summary Supprimer un bailleur
+ */
+export const deleteBailleursId = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteBailleursIdUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteBailleursIdMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBailleursId>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteBailleursId>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteBailleursId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteBailleursId>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteBailleursId(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteBailleursIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteBailleursId>>>
+
+    export type DeleteBailleursIdMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Supprimer un bailleur
+ */
+export const useDeleteBailleursId = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBailleursId>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteBailleursId>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteBailleursIdMutationOptions(options));
+    }
+
+export const getGetSubventionsDashboardUrl = () => {
+
+
+
+
+  return `/api/subventions/dashboard`
+}
+
+/**
+ * @summary Dashboard subventions (KPIs globaux)
+ */
+export const getSubventionsDashboard = async ( options?: RequestInit): Promise<SubventionsDashboard> => {
+
+  return customFetch<SubventionsDashboard>(getGetSubventionsDashboardUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSubventionsDashboardQueryKey = () => {
+    return [
+    `/api/subventions/dashboard`
+    ] as const;
+    }
+
+
+export const getGetSubventionsDashboardQueryOptions = <TData = Awaited<ReturnType<typeof getSubventionsDashboard>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSubventionsDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSubventionsDashboardQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSubventionsDashboard>>> = ({ signal }) => getSubventionsDashboard({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSubventionsDashboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSubventionsDashboardQueryResult = NonNullable<Awaited<ReturnType<typeof getSubventionsDashboard>>>
+export type GetSubventionsDashboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Dashboard subventions (KPIs globaux)
+ */
+
+export function useGetSubventionsDashboard<TData = Awaited<ReturnType<typeof getSubventionsDashboard>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSubventionsDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSubventionsDashboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSubventionsUrl = () => {
+
+
+
+
+  return `/api/subventions`
+}
+
+/**
+ * @summary Lister les subventions
+ */
+export const getSubventions = async ( options?: RequestInit): Promise<SubventionAvecBailleur[]> => {
+
+  return customFetch<SubventionAvecBailleur[]>(getGetSubventionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSubventionsQueryKey = () => {
+    return [
+    `/api/subventions`
+    ] as const;
+    }
+
+
+export const getGetSubventionsQueryOptions = <TData = Awaited<ReturnType<typeof getSubventions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSubventions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSubventionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSubventions>>> = ({ signal }) => getSubventions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSubventions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSubventionsQueryResult = NonNullable<Awaited<ReturnType<typeof getSubventions>>>
+export type GetSubventionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lister les subventions
+ */
+
+export function useGetSubventions<TData = Awaited<ReturnType<typeof getSubventions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSubventions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSubventionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostSubventionsUrl = () => {
+
+
+
+
+  return `/api/subventions`
+}
+
+/**
+ * @summary Créer une subvention
+ */
+export const postSubventions = async (subventionInput: SubventionInput, options?: RequestInit): Promise<Subvention> => {
+
+  return customFetch<Subvention>(getPostSubventionsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      subventionInput,)
+  }
+);}
+
+
+
+
+export const getPostSubventionsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubventions>>, TError,{data: BodyType<SubventionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postSubventions>>, TError,{data: BodyType<SubventionInput>}, TContext> => {
+
+const mutationKey = ['postSubventions'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postSubventions>>, {data: BodyType<SubventionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postSubventions(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostSubventionsMutationResult = NonNullable<Awaited<ReturnType<typeof postSubventions>>>
+    export type PostSubventionsMutationBody = BodyType<SubventionInput>
+    export type PostSubventionsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Créer une subvention
+ */
+export const usePostSubventions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubventions>>, TError,{data: BodyType<SubventionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postSubventions>>,
+        TError,
+        {data: BodyType<SubventionInput>},
+        TContext
+      > => {
+      return useMutation(getPostSubventionsMutationOptions(options));
+    }
+
+export const getGetSubventionsIdUrl = (id: number,) => {
+
+
+
+
+  return `/api/subventions/${id}`
+}
+
+/**
+ * @summary Détail subvention (tranches + budget + rapports)
+ */
+export const getSubventionsId = async (id: number, options?: RequestInit): Promise<SubventionDetail> => {
+
+  return customFetch<SubventionDetail>(getGetSubventionsIdUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSubventionsIdQueryKey = (id: number,) => {
+    return [
+    `/api/subventions/${id}`
+    ] as const;
+    }
+
+
+export const getGetSubventionsIdQueryOptions = <TData = Awaited<ReturnType<typeof getSubventionsId>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSubventionsId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSubventionsIdQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSubventionsId>>> = ({ signal }) => getSubventionsId(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSubventionsId>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSubventionsIdQueryResult = NonNullable<Awaited<ReturnType<typeof getSubventionsId>>>
+export type GetSubventionsIdQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Détail subvention (tranches + budget + rapports)
+ */
+
+export function useGetSubventionsId<TData = Awaited<ReturnType<typeof getSubventionsId>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSubventionsId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSubventionsIdQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostSubventionsIdTrancheUrl = (id: number,) => {
+
+
+
+
+  return `/api/subventions/${id}/tranche`
+}
+
+/**
+ * @summary Enregistrer la réception d'une tranche
+ */
+export const postSubventionsIdTranche = async (id: number,
+    trancheInput: TrancheInput, options?: RequestInit): Promise<PostSubventionsIdTranche200> => {
+
+  return customFetch<PostSubventionsIdTranche200>(getPostSubventionsIdTrancheUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      trancheInput,)
+  }
+);}
+
+
+
+
+export const getPostSubventionsIdTrancheMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubventionsIdTranche>>, TError,{id: number;data: BodyType<TrancheInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postSubventionsIdTranche>>, TError,{id: number;data: BodyType<TrancheInput>}, TContext> => {
+
+const mutationKey = ['postSubventionsIdTranche'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postSubventionsIdTranche>>, {id: number;data: BodyType<TrancheInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  postSubventionsIdTranche(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostSubventionsIdTrancheMutationResult = NonNullable<Awaited<ReturnType<typeof postSubventionsIdTranche>>>
+    export type PostSubventionsIdTrancheMutationBody = BodyType<TrancheInput>
+    export type PostSubventionsIdTrancheMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer la réception d'une tranche
+ */
+export const usePostSubventionsIdTranche = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubventionsIdTranche>>, TError,{id: number;data: BodyType<TrancheInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postSubventionsIdTranche>>,
+        TError,
+        {id: number;data: BodyType<TrancheInput>},
+        TContext
+      > => {
+      return useMutation(getPostSubventionsIdTrancheMutationOptions(options));
+    }
+
+export const getPutSubventionsIdUtiliserUrl = (id: number,) => {
+
+
+
+
+  return `/api/subventions/${id}/utiliser`
+}
+
+/**
+ * @summary Enregistrer une dépense sur une ligne budgétaire
+ */
+export const putSubventionsIdUtiliser = async (id: number,
+    utiliserFondsInput: UtiliserFondsInput, options?: RequestInit): Promise<LigneBudgetSubvention> => {
+
+  return customFetch<LigneBudgetSubvention>(getPutSubventionsIdUtiliserUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      utiliserFondsInput,)
+  }
+);}
+
+
+
+
+export const getPutSubventionsIdUtiliserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putSubventionsIdUtiliser>>, TError,{id: number;data: BodyType<UtiliserFondsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putSubventionsIdUtiliser>>, TError,{id: number;data: BodyType<UtiliserFondsInput>}, TContext> => {
+
+const mutationKey = ['putSubventionsIdUtiliser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putSubventionsIdUtiliser>>, {id: number;data: BodyType<UtiliserFondsInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  putSubventionsIdUtiliser(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutSubventionsIdUtiliserMutationResult = NonNullable<Awaited<ReturnType<typeof putSubventionsIdUtiliser>>>
+    export type PutSubventionsIdUtiliserMutationBody = BodyType<UtiliserFondsInput>
+    export type PutSubventionsIdUtiliserMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer une dépense sur une ligne budgétaire
+ */
+export const usePutSubventionsIdUtiliser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putSubventionsIdUtiliser>>, TError,{id: number;data: BodyType<UtiliserFondsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putSubventionsIdUtiliser>>,
+        TError,
+        {id: number;data: BodyType<UtiliserFondsInput>},
+        TContext
+      > => {
+      return useMutation(getPutSubventionsIdUtiliserMutationOptions(options));
+    }
+
+export const getPostSubventionsIdRapportUrl = (id: number,) => {
+
+
+
+
+  return `/api/subventions/${id}/rapport`
+}
+
+/**
+ * @summary Générer un rapport bailleur
+ */
+export const postSubventionsIdRapport = async (id: number,
+    genererRapportInput: GenererRapportInput, options?: RequestInit): Promise<RapportBailleurResponse> => {
+
+  return customFetch<RapportBailleurResponse>(getPostSubventionsIdRapportUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      genererRapportInput,)
+  }
+);}
+
+
+
+
+export const getPostSubventionsIdRapportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubventionsIdRapport>>, TError,{id: number;data: BodyType<GenererRapportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postSubventionsIdRapport>>, TError,{id: number;data: BodyType<GenererRapportInput>}, TContext> => {
+
+const mutationKey = ['postSubventionsIdRapport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postSubventionsIdRapport>>, {id: number;data: BodyType<GenererRapportInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  postSubventionsIdRapport(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostSubventionsIdRapportMutationResult = NonNullable<Awaited<ReturnType<typeof postSubventionsIdRapport>>>
+    export type PostSubventionsIdRapportMutationBody = BodyType<GenererRapportInput>
+    export type PostSubventionsIdRapportMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Générer un rapport bailleur
+ */
+export const usePostSubventionsIdRapport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubventionsIdRapport>>, TError,{id: number;data: BodyType<GenererRapportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postSubventionsIdRapport>>,
+        TError,
+        {id: number;data: BodyType<GenererRapportInput>},
+        TContext
+      > => {
+      return useMutation(getPostSubventionsIdRapportMutationOptions(options));
+    }
+
+export const getPutSubventionsIdRapportRapportIdSoumettreUrl = (id: number,
+    rapportId: number,) => {
+
+
+
+
+  return `/api/subventions/${id}/rapport/${rapportId}/soumettre`
+}
+
+/**
+ * @summary Soumettre un rapport bailleur
+ */
+export const putSubventionsIdRapportRapportIdSoumettre = async (id: number,
+    rapportId: number, options?: RequestInit): Promise<RapportBailleur> => {
+
+  return customFetch<RapportBailleur>(getPutSubventionsIdRapportRapportIdSoumettreUrl(id,rapportId),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+export const getPutSubventionsIdRapportRapportIdSoumettreMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putSubventionsIdRapportRapportIdSoumettre>>, TError,{id: number;rapportId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putSubventionsIdRapportRapportIdSoumettre>>, TError,{id: number;rapportId: number}, TContext> => {
+
+const mutationKey = ['putSubventionsIdRapportRapportIdSoumettre'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putSubventionsIdRapportRapportIdSoumettre>>, {id: number;rapportId: number}> = (props) => {
+          const {id,rapportId} = props ?? {};
+
+          return  putSubventionsIdRapportRapportIdSoumettre(id,rapportId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutSubventionsIdRapportRapportIdSoumettreMutationResult = NonNullable<Awaited<ReturnType<typeof putSubventionsIdRapportRapportIdSoumettre>>>
+
+    export type PutSubventionsIdRapportRapportIdSoumettreMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Soumettre un rapport bailleur
+ */
+export const usePutSubventionsIdRapportRapportIdSoumettre = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putSubventionsIdRapportRapportIdSoumettre>>, TError,{id: number;rapportId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putSubventionsIdRapportRapportIdSoumettre>>,
+        TError,
+        {id: number;rapportId: number},
+        TContext
+      > => {
+      return useMutation(getPutSubventionsIdRapportRapportIdSoumettreMutationOptions(options));
     }
 
 export const getGetDevisesUrl = () => {

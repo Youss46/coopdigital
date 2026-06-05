@@ -2520,6 +2520,247 @@ paths:
                   message:
                     type: string
 
+  /bailleurs:
+    get:
+      summary: Lister les bailleurs
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Liste des bailleurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bailleur"
+    post:
+      summary: Créer un bailleur
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BailleurInput"
+      responses:
+        "201":
+          description: Bailleur créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bailleur"
+
+  /bailleurs/{id}:
+    put:
+      summary: Modifier un bailleur
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BailleurInput"
+      responses:
+        "200":
+          description: Bailleur modifié
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bailleur"
+    delete:
+      summary: Supprimer un bailleur
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Supprimé
+
+  /subventions/dashboard:
+    get:
+      summary: Dashboard subventions (KPIs globaux)
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubventionsDashboard"
+
+  /subventions:
+    get:
+      summary: Lister les subventions
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Liste des subventions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SubventionAvecBailleur"
+    post:
+      summary: Créer une subvention
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubventionInput"
+      responses:
+        "201":
+          description: Subvention créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subvention"
+
+  /subventions/{id}:
+    get:
+      summary: Détail subvention (tranches + budget + rapports)
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Détail complet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubventionDetail"
+
+  /subventions/{id}/tranche:
+    post:
+      summary: Enregistrer la réception d'une tranche
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrancheInput"
+      responses:
+        "200":
+          description: Tranche enregistrée
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, montantRecuFcfa, montantSoldeFcfa]
+                properties:
+                  ok:
+                    type: boolean
+                  montantRecuFcfa:
+                    type: number
+                  montantSoldeFcfa:
+                    type: number
+
+  /subventions/{id}/utiliser:
+    put:
+      summary: Enregistrer une dépense sur une ligne budgétaire
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UtiliserFondsInput"
+      responses:
+        "200":
+          description: Ligne mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LigneBudgetSubvention"
+
+  /subventions/{id}/rapport:
+    post:
+      summary: Générer un rapport bailleur
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenererRapportInput"
+      responses:
+        "201":
+          description: Rapport généré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RapportBailleurResponse"
+
+  /subventions/{id}/rapport/{rapportId}/soumettre:
+    put:
+      summary: Soumettre un rapport bailleur
+      tags: [subventions]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: rapportId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rapport soumis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RapportBailleur"
+
   /devises:
     get:
       summary: Liste des devises actives
@@ -5615,3 +5856,327 @@ components:
           format: date
         lieuNaissance:
           type: string
+    Bailleur:
+      type: object
+      required: [id, cooperative_id, nom, type, created_at]
+      properties:
+        id:
+          type: integer
+        cooperative_id:
+          type: integer
+        nom:
+          type: string
+        type:
+          type: string
+          enum: [ong, institution, etat, prive]
+        pays:
+          type: string
+          nullable: true
+        contactNom:
+          type: string
+          nullable: true
+        contactEmail:
+          type: string
+          nullable: true
+        contactTelephone:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    BailleurInput:
+      type: object
+      required: [nom]
+      properties:
+        nom:
+          type: string
+        type:
+          type: string
+          enum: [ong, institution, etat, prive]
+        pays:
+          type: string
+        contactNom:
+          type: string
+        contactEmail:
+          type: string
+        contactTelephone:
+          type: string
+
+    Subvention:
+      type: object
+      required: [id, cooperative_id, bailleur_id, reference, libelle, montant_total_fcfa, statut]
+      properties:
+        id:
+          type: integer
+        cooperative_id:
+          type: integer
+        bailleur_id:
+          type: integer
+        reference:
+          type: string
+        libelle:
+          type: string
+        montantTotalFcfa:
+          type: string
+        montantRecuFcfa:
+          type: string
+        montantSoldeFcfa:
+          type: string
+        deviseOrigine:
+          type: string
+        montantDeviseOrigine:
+          type: string
+          nullable: true
+        dateConvention:
+          type: string
+          format: date
+          nullable: true
+        dateDebut:
+          type: string
+          format: date
+          nullable: true
+        dateFin:
+          type: string
+          format: date
+          nullable: true
+        statut:
+          type: string
+          enum: [en_attente, actif, cloture, suspendu]
+        conditions:
+          type: string
+          nullable: true
+        rapportRequis:
+          type: boolean
+        periodiciteRapport:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SubventionAvecBailleur:
+      allOf:
+        - $ref: "#/components/schemas/Subvention"
+        - type: object
+          properties:
+            bailleur:
+              $ref: "#/components/schemas/Bailleur"
+            tauxUtilisationPct:
+              type: number
+            alerteExpiration:
+              type: boolean
+            alerteSousUtilisation:
+              type: boolean
+
+    SubventionInput:
+      type: object
+      required: [bailleurId, reference, libelle, montantTotalFcfa]
+      properties:
+        bailleurId:
+          type: integer
+        reference:
+          type: string
+        libelle:
+          type: string
+        montantTotalFcfa:
+          type: number
+        deviseOrigine:
+          type: string
+        montantDeviseOrigine:
+          type: number
+        dateConvention:
+          type: string
+          format: date
+        dateDebut:
+          type: string
+          format: date
+        dateFin:
+          type: string
+          format: date
+        statut:
+          type: string
+          enum: [en_attente, actif, cloture, suspendu]
+        conditions:
+          type: string
+        rapportRequis:
+          type: boolean
+        periodiciteRapport:
+          type: string
+        lignesBudget:
+          type: array
+          items:
+            type: object
+            properties:
+              posteBudgetaire:
+                type: string
+              montantAlloueFcfa:
+                type: number
+
+    TrancheSubvention:
+      type: object
+      required: [id, subvention_id, numero_tranche, montant_fcfa, statut]
+      properties:
+        id:
+          type: integer
+        subvention_id:
+          type: integer
+        numeroTranche:
+          type: integer
+        montantFcfa:
+          type: string
+        datePrevue:
+          type: string
+          format: date
+          nullable: true
+        dateRecue:
+          type: string
+          format: date
+          nullable: true
+        statut:
+          type: string
+          enum: [attendue, recue, en_retard]
+        referenceVirement:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    TrancheInput:
+      type: object
+      required: [montantFcfa]
+      properties:
+        montantFcfa:
+          type: number
+        datePrevue:
+          type: string
+          format: date
+        referenceVirement:
+          type: string
+        trancheId:
+          type: integer
+
+    LigneBudgetSubvention:
+      type: object
+      required: [id, subvention_id, poste_budgetaire, montant_alloue_fcfa, montant_utilise_fcfa]
+      properties:
+        id:
+          type: integer
+        subvention_id:
+          type: integer
+        posteBudgetaire:
+          type: string
+        montantAlloueFcfa:
+          type: string
+        montantUtiliseFcfa:
+          type: string
+        soldeFcfa:
+          type: string
+          nullable: true
+        justificatifUrl:
+          type: string
+          nullable: true
+
+    UtiliserFondsInput:
+      type: object
+      required: [ligneId, montant]
+      properties:
+        ligneId:
+          type: integer
+        montant:
+          type: number
+        justificatifUrl:
+          type: string
+
+    RapportBailleur:
+      type: object
+      required: [id, subvention_id, statut, created_at]
+      properties:
+        id:
+          type: integer
+        subventionId:
+          type: integer
+        cooperativeId:
+          type: integer
+        periode:
+          type: string
+          nullable: true
+        typeRapport:
+          type: string
+          nullable: true
+        statut:
+          type: string
+          enum: [brouillon, soumis, valide]
+        dateSoumission:
+          type: string
+          format: date
+          nullable: true
+        contenuJson:
+          type: object
+          nullable: true
+        pdfUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    GenererRapportInput:
+      type: object
+      properties:
+        periode:
+          type: string
+        typeRapport:
+          type: string
+
+    RapportBailleurResponse:
+      type: object
+      required: [rapport, contenuJson]
+      properties:
+        rapport:
+          $ref: "#/components/schemas/RapportBailleur"
+        contenuJson:
+          type: object
+
+    SubventionDetail:
+      type: object
+      required: [subvention, bailleur, tranches, lignes, rapports]
+      properties:
+        subvention:
+          $ref: "#/components/schemas/Subvention"
+        bailleur:
+          $ref: "#/components/schemas/Bailleur"
+        tranches:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrancheSubvention"
+        lignes:
+          type: array
+          items:
+            $ref: "#/components/schemas/LigneBudgetSubvention"
+        rapports:
+          type: array
+          items:
+            $ref: "#/components/schemas/RapportBailleur"
+
+    SubventionsDashboard:
+      type: object
+      required: [totalRecu, totalUtilise, soldeDisponible, tauxUtilisationPct, nbSubventionsActives]
+      properties:
+        totalRecu:
+          type: number
+        totalUtilise:
+          type: number
+        soldeDisponible:
+          type: number
+        tauxUtilisationPct:
+          type: number
+        nbSubventionsActives:
+          type: integer
+        prochaineTranche:
+          type: object
+          nullable: true

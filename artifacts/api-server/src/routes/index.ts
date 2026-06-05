@@ -23,6 +23,7 @@ import intrantsRouter from "./intrants";
 import empruntsRouter from "./emprunts";
 import devisesRouter from "./devises";
 import budgetRouter from "./budget";
+import subventionsRouter from "./subventions";
 
 const router: IRouter = Router();
 
@@ -50,5 +51,6 @@ router.use(intrantsRouter);
 router.use(empruntsRouter);
 router.use(devisesRouter);
 router.use(budgetRouter);
+router.use(subventionsRouter);
 
 export default router;
