@@ -20,8 +20,12 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AgDetail,
+  AgInput,
+  AgListItem,
   ApproIntrant,
   ApproIntrantInput,
+  AssembleeGenerale,
   AuthResponse,
   Avance,
   AvanceAvecPersonnel,
@@ -42,12 +46,15 @@ import type {
   Campagne,
   CampagneInput,
   CategorieIntrant,
+  CloturerAgInput,
   ComposanteSalaire,
   CompteResultat,
   ConfigComptable,
   ConfigPartsSociales,
   ConversionInput,
   ConversionResult,
+  ConvocationInput,
+  ConvocationResult,
   CountEcrituresEnAttente200,
   CountRefusEnAttente200,
   CreancesSummary,
@@ -142,6 +149,9 @@ import type {
   PersonnelHistorique,
   PostBudgetIdSync200,
   PostSubventionsIdTranche200,
+  PresenceAvecMembre,
+  PresenceInput,
+  PresenceResult,
   Preteur,
   PreteurInput,
   RapportBailleur,
@@ -186,7 +196,9 @@ import type {
   ValiderPaiementInput,
   ValiderToutEcrituresEnAttente200,
   VenteDetail,
-  VenteInput
+  VenteInput,
+  VoteAg,
+  VoteInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -8857,6 +8869,815 @@ export const usePostBudgetIdSync = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getPostBudgetIdSyncMutationOptions(options));
     }
+
+export const getGetAgUrl = () => {
+
+
+
+
+  return `/api/ag`
+}
+
+/**
+ * @summary Lister les assemblées générales
+ */
+export const getAg = async ( options?: RequestInit): Promise<AgListItem[]> => {
+
+  return customFetch<AgListItem[]>(getGetAgUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAgQueryKey = () => {
+    return [
+    `/api/ag`
+    ] as const;
+    }
+
+
+export const getGetAgQueryOptions = <TData = Awaited<ReturnType<typeof getAg>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAg>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAgQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAg>>> = ({ signal }) => getAg({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAg>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAgQueryResult = NonNullable<Awaited<ReturnType<typeof getAg>>>
+export type GetAgQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lister les assemblées générales
+ */
+
+export function useGetAg<TData = Awaited<ReturnType<typeof getAg>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAg>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAgQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostAgUrl = () => {
+
+
+
+
+  return `/api/ag`
+}
+
+/**
+ * @summary Planifier une AG
+ */
+export const postAg = async (agInput: AgInput, options?: RequestInit): Promise<AssembleeGenerale> => {
+
+  return customFetch<AssembleeGenerale>(getPostAgUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      agInput,)
+  }
+);}
+
+
+
+
+export const getPostAgMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAg>>, TError,{data: BodyType<AgInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAg>>, TError,{data: BodyType<AgInput>}, TContext> => {
+
+const mutationKey = ['postAg'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAg>>, {data: BodyType<AgInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postAg(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAgMutationResult = NonNullable<Awaited<ReturnType<typeof postAg>>>
+    export type PostAgMutationBody = BodyType<AgInput>
+    export type PostAgMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Planifier une AG
+ */
+export const usePostAg = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAg>>, TError,{data: BodyType<AgInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postAg>>,
+        TError,
+        {data: BodyType<AgInput>},
+        TContext
+      > => {
+      return useMutation(getPostAgMutationOptions(options));
+    }
+
+export const getGetAgIdUrl = (id: number,) => {
+
+
+
+
+  return `/api/ag/${id}`
+}
+
+/**
+ * @summary Détail AG (points, présences, votes, convocations)
+ */
+export const getAgId = async (id: number, options?: RequestInit): Promise<AgDetail> => {
+
+  return customFetch<AgDetail>(getGetAgIdUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAgIdQueryKey = (id: number,) => {
+    return [
+    `/api/ag/${id}`
+    ] as const;
+    }
+
+
+export const getGetAgIdQueryOptions = <TData = Awaited<ReturnType<typeof getAgId>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAgIdQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgId>>> = ({ signal }) => getAgId(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgId>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAgIdQueryResult = NonNullable<Awaited<ReturnType<typeof getAgId>>>
+export type GetAgIdQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Détail AG (points, présences, votes, convocations)
+ */
+
+export function useGetAgId<TData = Awaited<ReturnType<typeof getAgId>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAgIdQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPutAgIdUrl = (id: number,) => {
+
+
+
+
+  return `/api/ag/${id}`
+}
+
+/**
+ * @summary Modifier une AG
+ */
+export const putAgId = async (id: number,
+    agInput: AgInput, options?: RequestInit): Promise<AssembleeGenerale> => {
+
+  return customFetch<AssembleeGenerale>(getPutAgIdUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      agInput,)
+  }
+);}
+
+
+
+
+export const getPutAgIdMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAgId>>, TError,{id: number;data: BodyType<AgInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAgId>>, TError,{id: number;data: BodyType<AgInput>}, TContext> => {
+
+const mutationKey = ['putAgId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAgId>>, {id: number;data: BodyType<AgInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  putAgId(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutAgIdMutationResult = NonNullable<Awaited<ReturnType<typeof putAgId>>>
+    export type PutAgIdMutationBody = BodyType<AgInput>
+    export type PutAgIdMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Modifier une AG
+ */
+export const usePutAgId = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAgId>>, TError,{id: number;data: BodyType<AgInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putAgId>>,
+        TError,
+        {id: number;data: BodyType<AgInput>},
+        TContext
+      > => {
+      return useMutation(getPutAgIdMutationOptions(options));
+    }
+
+export const getPutAgIdOuvrirUrl = (id: number,) => {
+
+
+
+
+  return `/api/ag/${id}/ouvrir`
+}
+
+/**
+ * @summary Ouvrir la séance
+ */
+export const putAgIdOuvrir = async (id: number, options?: RequestInit): Promise<AssembleeGenerale> => {
+
+  return customFetch<AssembleeGenerale>(getPutAgIdOuvrirUrl(id),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+export const getPutAgIdOuvrirMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAgIdOuvrir>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAgIdOuvrir>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['putAgIdOuvrir'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAgIdOuvrir>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  putAgIdOuvrir(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutAgIdOuvrirMutationResult = NonNullable<Awaited<ReturnType<typeof putAgIdOuvrir>>>
+
+    export type PutAgIdOuvrirMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Ouvrir la séance
+ */
+export const usePutAgIdOuvrir = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAgIdOuvrir>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putAgIdOuvrir>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPutAgIdOuvrirMutationOptions(options));
+    }
+
+export const getPutAgIdCloturerUrl = (id: number,) => {
+
+
+
+
+  return `/api/ag/${id}/cloturer`
+}
+
+/**
+ * @summary Clôturer la séance
+ */
+export const putAgIdCloturer = async (id: number,
+    cloturerAgInput?: CloturerAgInput, options?: RequestInit): Promise<AssembleeGenerale> => {
+
+  return customFetch<AssembleeGenerale>(getPutAgIdCloturerUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      cloturerAgInput,)
+  }
+);}
+
+
+
+
+export const getPutAgIdCloturerMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAgIdCloturer>>, TError,{id: number;data?: BodyType<CloturerAgInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAgIdCloturer>>, TError,{id: number;data?: BodyType<CloturerAgInput>}, TContext> => {
+
+const mutationKey = ['putAgIdCloturer'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAgIdCloturer>>, {id: number;data?: BodyType<CloturerAgInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  putAgIdCloturer(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutAgIdCloturerMutationResult = NonNullable<Awaited<ReturnType<typeof putAgIdCloturer>>>
+    export type PutAgIdCloturerMutationBody = BodyType<CloturerAgInput> | undefined
+    export type PutAgIdCloturerMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Clôturer la séance
+ */
+export const usePutAgIdCloturer = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAgIdCloturer>>, TError,{id: number;data?: BodyType<CloturerAgInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putAgIdCloturer>>,
+        TError,
+        {id: number;data?: BodyType<CloturerAgInput>},
+        TContext
+      > => {
+      return useMutation(getPutAgIdCloturerMutationOptions(options));
+    }
+
+export const getPostAgIdConvoquerUrl = (id: number,) => {
+
+
+
+
+  return `/api/ag/${id}/convoquer`
+}
+
+/**
+ * @summary Envoyer les convocations
+ */
+export const postAgIdConvoquer = async (id: number,
+    convocationInput: ConvocationInput, options?: RequestInit): Promise<ConvocationResult> => {
+
+  return customFetch<ConvocationResult>(getPostAgIdConvoquerUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      convocationInput,)
+  }
+);}
+
+
+
+
+export const getPostAgIdConvoquerMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAgIdConvoquer>>, TError,{id: number;data: BodyType<ConvocationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAgIdConvoquer>>, TError,{id: number;data: BodyType<ConvocationInput>}, TContext> => {
+
+const mutationKey = ['postAgIdConvoquer'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAgIdConvoquer>>, {id: number;data: BodyType<ConvocationInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  postAgIdConvoquer(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAgIdConvoquerMutationResult = NonNullable<Awaited<ReturnType<typeof postAgIdConvoquer>>>
+    export type PostAgIdConvoquerMutationBody = BodyType<ConvocationInput>
+    export type PostAgIdConvoquerMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Envoyer les convocations
+ */
+export const usePostAgIdConvoquer = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAgIdConvoquer>>, TError,{id: number;data: BodyType<ConvocationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postAgIdConvoquer>>,
+        TError,
+        {id: number;data: BodyType<ConvocationInput>},
+        TContext
+      > => {
+      return useMutation(getPostAgIdConvoquerMutationOptions(options));
+    }
+
+export const getPostAgIdPresenceUrl = (id: number,) => {
+
+
+
+
+  return `/api/ag/${id}/presence`
+}
+
+/**
+ * @summary Enregistrer une présence
+ */
+export const postAgIdPresence = async (id: number,
+    presenceInput: PresenceInput, options?: RequestInit): Promise<PresenceResult> => {
+
+  return customFetch<PresenceResult>(getPostAgIdPresenceUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      presenceInput,)
+  }
+);}
+
+
+
+
+export const getPostAgIdPresenceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAgIdPresence>>, TError,{id: number;data: BodyType<PresenceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAgIdPresence>>, TError,{id: number;data: BodyType<PresenceInput>}, TContext> => {
+
+const mutationKey = ['postAgIdPresence'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAgIdPresence>>, {id: number;data: BodyType<PresenceInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  postAgIdPresence(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAgIdPresenceMutationResult = NonNullable<Awaited<ReturnType<typeof postAgIdPresence>>>
+    export type PostAgIdPresenceMutationBody = BodyType<PresenceInput>
+    export type PostAgIdPresenceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer une présence
+ */
+export const usePostAgIdPresence = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAgIdPresence>>, TError,{id: number;data: BodyType<PresenceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postAgIdPresence>>,
+        TError,
+        {id: number;data: BodyType<PresenceInput>},
+        TContext
+      > => {
+      return useMutation(getPostAgIdPresenceMutationOptions(options));
+    }
+
+export const getGetAgIdPresencesUrl = (id: number,) => {
+
+
+
+
+  return `/api/ag/${id}/presences`
+}
+
+/**
+ * @summary Liste des présences
+ */
+export const getAgIdPresences = async (id: number, options?: RequestInit): Promise<PresenceAvecMembre[]> => {
+
+  return customFetch<PresenceAvecMembre[]>(getGetAgIdPresencesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAgIdPresencesQueryKey = (id: number,) => {
+    return [
+    `/api/ag/${id}/presences`
+    ] as const;
+    }
+
+
+export const getGetAgIdPresencesQueryOptions = <TData = Awaited<ReturnType<typeof getAgIdPresences>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgIdPresences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAgIdPresencesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgIdPresences>>> = ({ signal }) => getAgIdPresences(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgIdPresences>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAgIdPresencesQueryResult = NonNullable<Awaited<ReturnType<typeof getAgIdPresences>>>
+export type GetAgIdPresencesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des présences
+ */
+
+export function useGetAgIdPresences<TData = Awaited<ReturnType<typeof getAgIdPresences>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgIdPresences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAgIdPresencesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostAgIdVoteUrl = (id: number,) => {
+
+
+
+
+  return `/api/ag/${id}/vote`
+}
+
+/**
+ * @summary Enregistrer un vote
+ */
+export const postAgIdVote = async (id: number,
+    voteInput: VoteInput, options?: RequestInit): Promise<VoteAg> => {
+
+  return customFetch<VoteAg>(getPostAgIdVoteUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      voteInput,)
+  }
+);}
+
+
+
+
+export const getPostAgIdVoteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAgIdVote>>, TError,{id: number;data: BodyType<VoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAgIdVote>>, TError,{id: number;data: BodyType<VoteInput>}, TContext> => {
+
+const mutationKey = ['postAgIdVote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAgIdVote>>, {id: number;data: BodyType<VoteInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  postAgIdVote(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAgIdVoteMutationResult = NonNullable<Awaited<ReturnType<typeof postAgIdVote>>>
+    export type PostAgIdVoteMutationBody = BodyType<VoteInput>
+    export type PostAgIdVoteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer un vote
+ */
+export const usePostAgIdVote = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAgIdVote>>, TError,{id: number;data: BodyType<VoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postAgIdVote>>,
+        TError,
+        {id: number;data: BodyType<VoteInput>},
+        TContext
+      > => {
+      return useMutation(getPostAgIdVoteMutationOptions(options));
+    }
+
+export const getGetAgIdPvPdfUrl = (id: number,) => {
+
+
+
+
+  return `/api/ag/${id}/pv-pdf`
+}
+
+/**
+ * @summary Générer le PV PDF
+ */
+export const getAgIdPvPdf = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetAgIdPvPdfUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAgIdPvPdfQueryKey = (id: number,) => {
+    return [
+    `/api/ag/${id}/pv-pdf`
+    ] as const;
+    }
+
+
+export const getGetAgIdPvPdfQueryOptions = <TData = Awaited<ReturnType<typeof getAgIdPvPdf>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgIdPvPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAgIdPvPdfQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgIdPvPdf>>> = ({ signal }) => getAgIdPvPdf(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgIdPvPdf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAgIdPvPdfQueryResult = NonNullable<Awaited<ReturnType<typeof getAgIdPvPdf>>>
+export type GetAgIdPvPdfQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Générer le PV PDF
+ */
+
+export function useGetAgIdPvPdf<TData = Awaited<ReturnType<typeof getAgIdPvPdf>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgIdPvPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAgIdPvPdfQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetBailleursUrl = () => {
 

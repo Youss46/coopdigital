@@ -162,6 +162,17 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     modifier: ["pca", "directeur", "comptable"],
   },
 
+  // MODULE GOUVERNANCE — ASSEMBLÉES GÉNÉRALES
+  gouvernance: {
+    voir:             ["pca", "directeur", "comptable", "auditeur"],
+    planifier_ag:     ["pca", "directeur"],
+    convoquer:        ["pca", "directeur"],
+    gerer_seance:     ["pca", "directeur"],
+    enregistrer_vote: ["pca", "directeur"],
+    generer_pv:       ["pca", "directeur"],
+    voir_archives:    ["pca", "directeur", "comptable", "auditeur"],
+  },
+
   // MODULE SUBVENTIONS / BAILLEURS
   subventions: {
     voir:              ["pca", "directeur", "comptable", "auditeur"],

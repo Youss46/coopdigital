@@ -2183,6 +2183,233 @@ export interface SubventionsDashboard {
   prochaineTranche?: SubventionsDashboardProchaineTranche;
 }
 
+export type AssembleeGeneraleType = typeof AssembleeGeneraleType[keyof typeof AssembleeGeneraleType];
+
+
+export const AssembleeGeneraleType = {
+  ordinaire: 'ordinaire',
+  extraordinaire: 'extraordinaire',
+  constitutive: 'constitutive',
+} as const;
+
+export type AssembleeGeneraleStatut = typeof AssembleeGeneraleStatut[keyof typeof AssembleeGeneraleStatut];
+
+
+export const AssembleeGeneraleStatut = {
+  planifiee: 'planifiee',
+  ouverte: 'ouverte',
+  cloturee: 'cloturee',
+  annulee: 'annulee',
+} as const;
+
+export interface AssembleeGenerale {
+  id: number;
+  cooperativeId?: number;
+  type: AssembleeGeneraleType;
+  libelle: string;
+  dateAg?: string;
+  heureDebut?: string | null;
+  heureFin?: string | null;
+  lieu?: string | null;
+  ordreDuJour?: string[] | null;
+  quorumRequisPct?: string;
+  nbMembresConvoques?: number | null;
+  nbMembresPresents?: number;
+  quorumAtteint?: boolean;
+  statut: AssembleeGeneraleStatut;
+  pvUrl?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type AgListItem = AssembleeGenerale & {
+  nbPoints?: number;
+  nbVotes?: number;
+};
+
+export type AgInputType = typeof AgInputType[keyof typeof AgInputType];
+
+
+export const AgInputType = {
+  ordinaire: 'ordinaire',
+  extraordinaire: 'extraordinaire',
+  constitutive: 'constitutive',
+} as const;
+
+export type AgInputPointsItem = {
+  intitule?: string;
+  type?: string;
+  rapporteur?: string;
+  dureeMinutes?: number;
+};
+
+export interface AgInput {
+  type?: AgInputType;
+  libelle: string;
+  dateAg: string;
+  heureDebut?: string;
+  heureFin?: string;
+  lieu?: string;
+  ordreDuJour?: string[];
+  quorumRequisPct?: number;
+  points?: AgInputPointsItem[];
+}
+
+export interface CloturerAgInput {
+  heureFin?: string;
+}
+
+export type ConvocationInputCanal = typeof ConvocationInputCanal[keyof typeof ConvocationInputCanal];
+
+
+export const ConvocationInputCanal = {
+  sms: 'sms',
+  whatsapp: 'whatsapp',
+  affichage: 'affichage',
+} as const;
+
+export interface ConvocationInput {
+  canal?: ConvocationInputCanal;
+  messagePersonnalise?: string;
+}
+
+export interface ConvocationResult {
+  ok: boolean;
+  envoyes: number;
+  echecs: number;
+  total: number;
+}
+
+export type PresenceInputModePresence = typeof PresenceInputModePresence[keyof typeof PresenceInputModePresence];
+
+
+export const PresenceInputModePresence = {
+  physique: 'physique',
+  procuration: 'procuration',
+} as const;
+
+export interface PresenceInput {
+  membreId: number;
+  modePresence?: PresenceInputModePresence;
+  mandataireId?: number;
+}
+
+export interface PresenceResult {
+  ok: boolean;
+  nbMembresPresents: number;
+  quorumAtteint: boolean;
+  ag?: AssembleeGenerale;
+}
+
+export type PresenceAvecMembrePresence = {
+  modePresence?: string;
+  heureArrivee?: string | null;
+  emargementNumerique?: boolean;
+};
+
+export type PresenceAvecMembreMembre = {
+  id?: number;
+  nom?: string;
+  prenoms?: string | null;
+  numeroCarte?: string | null;
+};
+
+export interface PresenceAvecMembre {
+  presence: PresenceAvecMembrePresence;
+  membre: PresenceAvecMembreMembre;
+}
+
+export type PointOrdreDuJourType = typeof PointOrdreDuJourType[keyof typeof PointOrdreDuJourType];
+
+
+export const PointOrdreDuJourType = {
+  information: 'information',
+  deliberation: 'deliberation',
+  vote: 'vote',
+  election: 'election',
+} as const;
+
+export type PointOrdreDuJourStatut = typeof PointOrdreDuJourStatut[keyof typeof PointOrdreDuJourStatut];
+
+
+export const PointOrdreDuJourStatut = {
+  en_attente: 'en_attente',
+  en_cours: 'en_cours',
+  traite: 'traite',
+} as const;
+
+export interface PointOrdreDuJour {
+  id: number;
+  agId?: number;
+  numero: number;
+  intitule: string;
+  type: PointOrdreDuJourType;
+  rapporteur?: string | null;
+  dureeMinutes?: number | null;
+  statut: PointOrdreDuJourStatut;
+  decision?: string | null;
+  createdAt?: string;
+}
+
+export type VoteAgResultat = typeof VoteAgResultat[keyof typeof VoteAgResultat];
+
+
+export const VoteAgResultat = {
+  adopte: 'adopte',
+  rejete: 'rejete',
+  nul: 'nul',
+} as const;
+
+export interface VoteAg {
+  id: number;
+  agId?: number;
+  pointId?: number;
+  intituleResolution?: string;
+  nbPour?: number;
+  nbContre?: number;
+  nbAbstention?: number;
+  nbVotants?: number;
+  resultat: VoteAgResultat;
+  pourcentagePour?: string | null;
+  createdAt?: string;
+}
+
+export interface VoteInput {
+  pointId: number;
+  intituleResolution: string;
+  nbPour?: number;
+  nbContre?: number;
+  nbAbstention?: number;
+}
+
+export type ConvocationAgCanal = typeof ConvocationAgCanal[keyof typeof ConvocationAgCanal];
+
+
+export const ConvocationAgCanal = {
+  sms: 'sms',
+  whatsapp: 'whatsapp',
+  affichage: 'affichage',
+} as const;
+
+export interface ConvocationAg {
+  id: number;
+  agId?: number;
+  canal: ConvocationAgCanal;
+  dateEnvoi?: string;
+  nbEnvoyes?: number;
+  nbRecus?: number;
+  messageEnvoye?: string | null;
+  createdAt?: string;
+}
+
+export interface AgDetail {
+  ag: AssembleeGenerale;
+  points: PointOrdreDuJour[];
+  presences: PresenceAvecMembre[];
+  votes: VoteAg[];
+  convocations: ConvocationAg[];
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;

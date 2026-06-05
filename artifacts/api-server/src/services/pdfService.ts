@@ -461,3 +461,135 @@ export async function generateBilanCampagne(cooperativeId: number, annee: number
     doc.end();
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. Procès-verbal d'Assemblée Générale
+// ─────────────────────────────────────────────────────────────────────────────
+type AgRow = {
+  id: number; libelle: string; type: string; dateAg: string;
+  heureDebut?: string|null; heureFin?: string|null; lieu?: string|null;
+  nbMembresConvoques?: number|null; nbMembresPresents: number;
+  quorumAtteint: boolean; quorumRequisPct: string;
+  ordreDuJour?: string[]|null; statut: string;
+};
+type PointRow = {
+  id: number; numero: number; intitule: string; type: string;
+  rapporteur?: string|null; statut: string; decision?: string|null;
+};
+type PresenceRow = {
+  p: { modePresence: string; heureArrivee?: Date|null };
+  m: { nom: string; prenoms?: string|null; numeroCarte?: string|null };
+};
+type VoteRow = {
+  id: number; pointId: number; intituleResolution: string;
+  nbPour: number; nbContre: number; nbAbstention: number;
+  nbVotants: number; resultat: string; pourcentagePour?: string|null;
+};
+
+export async function generatePvAg(params: {
+  ag: AgRow; points: PointRow[]; presences: PresenceRow[]; votes: VoteRow[];
+}): Promise<Buffer> {
+  const { ag, points, presences, votes } = params;
+  const typeFr: Record<string, string> = {
+    ordinaire: "Ordinaire", extraordinaire: "Extraordinaire", constitutive: "Constitutive",
+  };
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: MARGIN, size: "A4" });
+    const chunks: Buffer[] = [];
+    doc.on("data", (c: Buffer) => chunks.push(c));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    // ─── En-tête ─────────────────────────────────────────────────────────────
+    enTeteDoc(doc, `PV — AG ${typeFr[ag.type] ?? ag.type} ${new Date(ag.dateAg).getFullYear()}`);
+
+    // ─── Bloc infos AG ────────────────────────────────────────────────────────
+    const dateStr = new Date(ag.dateAg).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    doc.fontSize(11).font("Helvetica-Bold").fillColor(VERT)
+      .text(ag.libelle, MARGIN, doc.y, { width: PAGE_W - MARGIN * 2 });
+    doc.moveDown(0.3);
+    doc.fontSize(9).font("Helvetica").fillColor("black");
+    const infos = [
+      ["Date",  dateStr],
+      ["Heure", `${ag.heureDebut ? ag.heureDebut.slice(0,5) : "—"}${ag.heureFin ? " → " + ag.heureFin.slice(0,5) : ""}`],
+      ["Lieu",  ag.lieu ?? "—"],
+    ];
+    infos.forEach(([k, v]) => {
+      doc.font("Helvetica-Bold").text(`${k} :  `, MARGIN, doc.y, { continued: true })
+         .font("Helvetica").text(v!);
+    });
+    doc.moveDown(0.5);
+
+    // ─── Quorum ───────────────────────────────────────────────────────────────
+    const quorumPct = ag.nbMembresConvoques && ag.nbMembresConvoques > 0
+      ? Math.round((ag.nbMembresPresents / ag.nbMembresConvoques) * 100) : 0;
+    const quorumColor = ag.quorumAtteint ? "#16a34a" : "#dc2626";
+    doc.fontSize(10).font("Helvetica-Bold").fillColor(VERT).text("CONSTAT DE QUORUM", MARGIN, doc.y);
+    doc.fontSize(9).font("Helvetica").fillColor("black");
+    doc.text(`Membres convoqués : ${ag.nbMembresConvoques ?? 0}   |   Présents : ${ag.nbMembresPresents}   |   Taux : ${quorumPct}%`);
+    doc.fontSize(9).fillColor(quorumColor).font("Helvetica-Bold")
+      .text(ag.quorumAtteint ? `✓ Quorum atteint (requis : ${parseFloat(ag.quorumRequisPct)}%)` : `✗ Quorum non atteint (requis : ${parseFloat(ag.quorumRequisPct)}%)`);
+    doc.fillColor("black").moveDown(0.8);
+
+    // ─── Ordre du jour ────────────────────────────────────────────────────────
+    doc.fontSize(10).font("Helvetica-Bold").fillColor(VERT).text("ORDRE DU JOUR");
+    doc.fontSize(9).font("Helvetica").fillColor("black").moveDown(0.2);
+    points.forEach((pt) => {
+      const resultVote = votes.find((v) => v.pointId === pt.id);
+      const marker = resultVote ? (resultVote.resultat === "adopte" ? "✓" : "✗") : "•";
+      doc.text(`${pt.numero}. ${marker} ${pt.intitule}`, MARGIN + 10, doc.y);
+    });
+    doc.moveDown(0.8);
+
+    // ─── Délibérations & votes ────────────────────────────────────────────────
+    const votePoints = points.filter((pt) => votes.find((v) => v.pointId === pt.id));
+    if (votePoints.length > 0) {
+      doc.fontSize(10).font("Helvetica-Bold").fillColor(VERT).text("RÉSOLUTIONS");
+      doc.moveDown(0.3);
+      let resNum = 1;
+      votePoints.forEach((pt) => {
+        const v = votes.find((x) => x.pointId === pt.id)!;
+        const adopte = v.resultat === "adopte";
+        doc.fontSize(9).font("Helvetica-Bold").fillColor(adopte ? "#16a34a" : "#dc2626")
+          .text(`Résolution n°${resNum++} — ${v.intituleResolution}`);
+        doc.fontSize(8).font("Helvetica").fillColor("black")
+          .text(`Pour : ${v.nbPour}   Contre : ${v.nbContre}   Abstentions : ${v.nbAbstention}   Votants : ${v.nbVotants}   Résultat : ${adopte ? "ADOPTÉ" : "REJETÉ"} à ${Math.round(parseFloat(v.pourcentagePour ?? "0"))}%`);
+        if (pt.decision) doc.fontSize(8).font("Helvetica-Oblique").text(`Décision : ${pt.decision}`);
+        doc.moveDown(0.4);
+      });
+    }
+
+    // ─── Émargement (50 premiers) ─────────────────────────────────────────────
+    doc.addPage();
+    enTeteDoc(doc, "Feuille d'émargement");
+    doc.fontSize(10).font("Helvetica-Bold").fillColor(VERT).text("LISTE DES PRÉSENTS");
+    doc.moveDown(0.4);
+
+    const W = [30, 200, 100, 100, 100];
+    ligneTableau(doc, ["#","Nom et prénoms","Mode","Heure arrivée","Émargement"], W, MARGIN, doc.y, VERT);
+    let y = doc.y + 16;
+    presences.slice(0, 80).forEach((row, i) => {
+      const bg = i % 2 === 0 ? "#f9fafb" : "white";
+      doc.rect(MARGIN, y, W.reduce((a, b) => a + b, 0), 16).fill(bg);
+      const nom = [row.m.prenoms, row.m.nom].filter(Boolean).join(" ");
+      const heure = row.p.heureArrivee ? new Date(row.p.heureArrivee).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—";
+      ligneTableau(doc, [String(i+1), nom, row.p.modePresence, heure, ""], W, MARGIN, y);
+      y += 16;
+      if (y > 750) { doc.addPage(); enTeteDoc(doc, "Feuille d'émargement (suite)"); y = doc.y + 10; }
+    });
+
+    // ─── Signatures ───────────────────────────────────────────────────────────
+    doc.moveDown(3);
+    const sigY = Math.min(doc.y + 20, 730);
+    doc.fontSize(9).font("Helvetica-Bold").text("Président de séance", MARGIN, sigY, { width: 200, align: "center" });
+    doc.text("Secrétaire de séance", PAGE_W - MARGIN - 200, sigY, { width: 200, align: "center" });
+    doc.moveDown(0.3);
+    doc.fontSize(8).font("Helvetica").fillColor(GRIS)
+      .text("Signature :", MARGIN, doc.y, { width: 200, align: "center" });
+    doc.text("Signature :", PAGE_W - MARGIN - 200, doc.y - doc.currentLineHeight(), { width: 200, align: "center" });
+
+    piedPage(doc);
+    doc.end();
+  });
+}

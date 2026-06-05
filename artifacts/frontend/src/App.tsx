@@ -26,6 +26,7 @@ import IntrantsPage from "@/pages/IntrantsPage";
 import EmpruntsPage from "@/pages/EmpruntsPage";
 import BudgetPage from "@/pages/BudgetPage";
 import SubventionsPage from "@/pages/SubventionsPage";
+import GouvernancePage from "@/pages/GouvernancePage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -119,6 +120,9 @@ function AppRoutes() {
       </Route>
       <Route path="/subventions">
         <ProtectedRoute component={SubventionsPage} />
+      </Route>
+      <Route path="/gouvernance">
+        <ProtectedRoute component={GouvernancePage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

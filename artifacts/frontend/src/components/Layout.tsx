@@ -27,6 +27,7 @@ import {
   Landmark,
   Target,
   HandCoins,
+  Gavel,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey } from "@workspace/api-client-react";
 
@@ -114,6 +115,12 @@ const navItems = [
     label: "Subventions",
     icon: HandCoins,
     roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/gouvernance",
+    label: "Gouvernance",
+    icon: Gavel,
+    roles: ["pca", "directeur", "secretaire", "auditeur"],
   },
   {
     href: "/refus",

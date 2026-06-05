@@ -2520,6 +2520,240 @@ paths:
                   message:
                     type: string
 
+  /ag:
+    get:
+      summary: Lister les assemblées générales
+      tags: [gouvernance]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Liste des AGs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgListItem"
+    post:
+      summary: Planifier une AG
+      tags: [gouvernance]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgInput"
+      responses:
+        "201":
+          description: AG créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssembleeGenerale"
+
+  /ag/{id}:
+    get:
+      summary: Détail AG (points, présences, votes, convocations)
+      tags: [gouvernance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Détail complet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgDetail"
+    put:
+      summary: Modifier une AG
+      tags: [gouvernance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgInput"
+      responses:
+        "200":
+          description: AG modifiée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssembleeGenerale"
+
+  /ag/{id}/ouvrir:
+    put:
+      summary: Ouvrir la séance
+      tags: [gouvernance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Séance ouverte
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssembleeGenerale"
+
+  /ag/{id}/cloturer:
+    put:
+      summary: Clôturer la séance
+      tags: [gouvernance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloturerAgInput"
+      responses:
+        "200":
+          description: Séance clôturée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssembleeGenerale"
+
+  /ag/{id}/convoquer:
+    post:
+      summary: Envoyer les convocations
+      tags: [gouvernance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConvocationInput"
+      responses:
+        "200":
+          description: Convocations envoyées
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConvocationResult"
+
+  /ag/{id}/presence:
+    post:
+      summary: Enregistrer une présence
+      tags: [gouvernance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PresenceInput"
+      responses:
+        "200":
+          description: Présence enregistrée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresenceResult"
+
+  /ag/{id}/presences:
+    get:
+      summary: Liste des présences
+      tags: [gouvernance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Émargement
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PresenceAvecMembre"
+
+  /ag/{id}/vote:
+    post:
+      summary: Enregistrer un vote
+      tags: [gouvernance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteInput"
+      responses:
+        "201":
+          description: Vote enregistré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoteAg"
+
+  /ag/{id}/pv-pdf:
+    get:
+      summary: Générer le PV PDF
+      tags: [gouvernance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF procès-verbal
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
   /bailleurs:
     get:
       summary: Lister les bailleurs
@@ -6180,3 +6414,308 @@ components:
         prochaineTranche:
           type: object
           nullable: true
+
+    AssembleeGenerale:
+      type: object
+      required: [id, cooperative_id, type, libelle, date_ag, statut]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        type:
+          type: string
+          enum: [ordinaire, extraordinaire, constitutive]
+        libelle:
+          type: string
+        dateAg:
+          type: string
+          format: date
+        heureDebut:
+          type: string
+          nullable: true
+        heureFin:
+          type: string
+          nullable: true
+        lieu:
+          type: string
+          nullable: true
+        ordreDuJour:
+          type: array
+          items:
+            type: string
+          nullable: true
+        quorumRequisPct:
+          type: string
+        nbMembresConvoques:
+          type: integer
+          nullable: true
+        nbMembresPresents:
+          type: integer
+        quorumAtteint:
+          type: boolean
+        statut:
+          type: string
+          enum: [planifiee, ouverte, cloturee, annulee]
+        pvUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AgListItem:
+      allOf:
+        - $ref: "#/components/schemas/AssembleeGenerale"
+        - type: object
+          properties:
+            nbPoints:
+              type: integer
+            nbVotes:
+              type: integer
+
+    AgInput:
+      type: object
+      required: [libelle, dateAg]
+      properties:
+        type:
+          type: string
+          enum: [ordinaire, extraordinaire, constitutive]
+        libelle:
+          type: string
+        dateAg:
+          type: string
+          format: date
+        heureDebut:
+          type: string
+        heureFin:
+          type: string
+        lieu:
+          type: string
+        ordreDuJour:
+          type: array
+          items:
+            type: string
+        quorumRequisPct:
+          type: number
+        points:
+          type: array
+          items:
+            type: object
+            properties:
+              intitule:
+                type: string
+              type:
+                type: string
+              rapporteur:
+                type: string
+              dureeMinutes:
+                type: integer
+
+    CloturerAgInput:
+      type: object
+      properties:
+        heureFin:
+          type: string
+
+    ConvocationInput:
+      type: object
+      properties:
+        canal:
+          type: string
+          enum: [sms, whatsapp, affichage]
+        messagePersonnalise:
+          type: string
+
+    ConvocationResult:
+      type: object
+      required: [ok, envoyes, echecs, total]
+      properties:
+        ok:
+          type: boolean
+        envoyes:
+          type: integer
+        echecs:
+          type: integer
+        total:
+          type: integer
+
+    PresenceInput:
+      type: object
+      required: [membreId]
+      properties:
+        membreId:
+          type: integer
+        modePresence:
+          type: string
+          enum: [physique, procuration]
+        mandataireId:
+          type: integer
+
+    PresenceResult:
+      type: object
+      required: [ok, nbMembresPresents, quorumAtteint]
+      properties:
+        ok:
+          type: boolean
+        nbMembresPresents:
+          type: integer
+        quorumAtteint:
+          type: boolean
+        ag:
+          $ref: "#/components/schemas/AssembleeGenerale"
+
+    PresenceAvecMembre:
+      type: object
+      required: [presence, membre]
+      properties:
+        presence:
+          type: object
+          properties:
+            modePresence:
+              type: string
+            heureArrivee:
+              type: string
+              nullable: true
+            emargementNumerique:
+              type: boolean
+        membre:
+          type: object
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+            prenoms:
+              type: string
+              nullable: true
+            numeroCarte:
+              type: string
+              nullable: true
+
+    PointOrdreDuJour:
+      type: object
+      required: [id, ag_id, numero, intitule, type, statut]
+      properties:
+        id:
+          type: integer
+        agId:
+          type: integer
+        numero:
+          type: integer
+        intitule:
+          type: string
+        type:
+          type: string
+          enum: [information, deliberation, vote, election]
+        rapporteur:
+          type: string
+          nullable: true
+        dureeMinutes:
+          type: integer
+          nullable: true
+        statut:
+          type: string
+          enum: [en_attente, en_cours, traite]
+        decision:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    VoteAg:
+      type: object
+      required: [id, ag_id, point_id, intitule_resolution, nb_pour, nb_contre, nb_abstention, nb_votants, resultat]
+      properties:
+        id:
+          type: integer
+        agId:
+          type: integer
+        pointId:
+          type: integer
+        intituleResolution:
+          type: string
+        nbPour:
+          type: integer
+        nbContre:
+          type: integer
+        nbAbstention:
+          type: integer
+        nbVotants:
+          type: integer
+        resultat:
+          type: string
+          enum: [adopte, rejete, nul]
+        pourcentagePour:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    VoteInput:
+      type: object
+      required: [pointId, intituleResolution]
+      properties:
+        pointId:
+          type: integer
+        intituleResolution:
+          type: string
+        nbPour:
+          type: integer
+        nbContre:
+          type: integer
+        nbAbstention:
+          type: integer
+
+    ConvocationAg:
+      type: object
+      required: [id, ag_id, canal, date_envoi, nb_envoyes]
+      properties:
+        id:
+          type: integer
+        agId:
+          type: integer
+        canal:
+          type: string
+          enum: [sms, whatsapp, affichage]
+        dateEnvoi:
+          type: string
+          format: date-time
+        nbEnvoyes:
+          type: integer
+        nbRecus:
+          type: integer
+        messageEnvoye:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AgDetail:
+      type: object
+      required: [ag, points, presences, votes, convocations]
+      properties:
+        ag:
+          $ref: "#/components/schemas/AssembleeGenerale"
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/PointOrdreDuJour"
+        presences:
+          type: array
+          items:
+            $ref: "#/components/schemas/PresenceAvecMembre"
+        votes:
+          type: array
+          items:
+            $ref: "#/components/schemas/VoteAg"
+        convocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConvocationAg"

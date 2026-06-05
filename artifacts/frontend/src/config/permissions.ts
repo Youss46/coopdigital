@@ -120,6 +120,16 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     generer_rapport:   ["pca", "directeur", "comptable"],
   },
 
+  gouvernance: {
+    voir:             ["pca", "directeur", "comptable", "auditeur"],
+    planifier_ag:     ["pca", "directeur"],
+    convoquer:        ["pca", "directeur"],
+    gerer_seance:     ["pca", "directeur"],
+    enregistrer_vote: ["pca", "directeur"],
+    generer_pv:       ["pca", "directeur"],
+    voir_archives:    ["pca", "directeur", "comptable", "auditeur"],
+  },
+
   devises: {
     voir_taux:      ["pca", "directeur", "comptable", "auditeur"],
     modifier_taux:  ["pca", "directeur", "comptable"],

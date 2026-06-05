@@ -2698,6 +2698,344 @@ export const PostBudgetIdSyncResponse = zod.object({
 
 
 /**
+ * @summary Lister les assemblées générales
+ */
+export const GetAgResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number().optional(),
+  "type": zod.enum(['ordinaire', 'extraordinaire', 'constitutive']),
+  "libelle": zod.string(),
+  "dateAg": zod.coerce.date().optional(),
+  "heureDebut": zod.string().nullish(),
+  "heureFin": zod.string().nullish(),
+  "lieu": zod.string().nullish(),
+  "ordreDuJour": zod.array(zod.string()).nullish(),
+  "quorumRequisPct": zod.string().optional(),
+  "nbMembresConvoques": zod.number().nullish(),
+  "nbMembresPresents": zod.number().optional(),
+  "quorumAtteint": zod.boolean().optional(),
+  "statut": zod.enum(['planifiee', 'ouverte', 'cloturee', 'annulee']),
+  "pvUrl": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}).and(zod.object({
+  "nbPoints": zod.number().optional(),
+  "nbVotes": zod.number().optional()
+}))
+export const GetAgResponse = zod.array(GetAgResponseItem)
+
+
+/**
+ * @summary Planifier une AG
+ */
+export const PostAgBody = zod.object({
+  "type": zod.enum(['ordinaire', 'extraordinaire', 'constitutive']).optional(),
+  "libelle": zod.string(),
+  "dateAg": zod.coerce.date(),
+  "heureDebut": zod.string().optional(),
+  "heureFin": zod.string().optional(),
+  "lieu": zod.string().optional(),
+  "ordreDuJour": zod.array(zod.string()).optional(),
+  "quorumRequisPct": zod.number().optional(),
+  "points": zod.array(zod.object({
+  "intitule": zod.string().optional(),
+  "type": zod.string().optional(),
+  "rapporteur": zod.string().optional(),
+  "dureeMinutes": zod.number().optional()
+})).optional()
+})
+
+
+/**
+ * @summary Détail AG (points, présences, votes, convocations)
+ */
+export const GetAgIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetAgIdResponse = zod.object({
+  "ag": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number().optional(),
+  "type": zod.enum(['ordinaire', 'extraordinaire', 'constitutive']),
+  "libelle": zod.string(),
+  "dateAg": zod.coerce.date().optional(),
+  "heureDebut": zod.string().nullish(),
+  "heureFin": zod.string().nullish(),
+  "lieu": zod.string().nullish(),
+  "ordreDuJour": zod.array(zod.string()).nullish(),
+  "quorumRequisPct": zod.string().optional(),
+  "nbMembresConvoques": zod.number().nullish(),
+  "nbMembresPresents": zod.number().optional(),
+  "quorumAtteint": zod.boolean().optional(),
+  "statut": zod.enum(['planifiee', 'ouverte', 'cloturee', 'annulee']),
+  "pvUrl": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}),
+  "points": zod.array(zod.object({
+  "id": zod.number(),
+  "agId": zod.number().optional(),
+  "numero": zod.number(),
+  "intitule": zod.string(),
+  "type": zod.enum(['information', 'deliberation', 'vote', 'election']),
+  "rapporteur": zod.string().nullish(),
+  "dureeMinutes": zod.number().nullish(),
+  "statut": zod.enum(['en_attente', 'en_cours', 'traite']),
+  "decision": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+})),
+  "presences": zod.array(zod.object({
+  "presence": zod.object({
+  "modePresence": zod.string().optional(),
+  "heureArrivee": zod.string().nullish(),
+  "emargementNumerique": zod.boolean().optional()
+}),
+  "membre": zod.object({
+  "id": zod.number().optional(),
+  "nom": zod.string().optional(),
+  "prenoms": zod.string().nullish(),
+  "numeroCarte": zod.string().nullish()
+})
+})),
+  "votes": zod.array(zod.object({
+  "id": zod.number(),
+  "agId": zod.number().optional(),
+  "pointId": zod.number().optional(),
+  "intituleResolution": zod.string().optional(),
+  "nbPour": zod.number().optional(),
+  "nbContre": zod.number().optional(),
+  "nbAbstention": zod.number().optional(),
+  "nbVotants": zod.number().optional(),
+  "resultat": zod.enum(['adopte', 'rejete', 'nul']),
+  "pourcentagePour": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+})),
+  "convocations": zod.array(zod.object({
+  "id": zod.number(),
+  "agId": zod.number().optional(),
+  "canal": zod.enum(['sms', 'whatsapp', 'affichage']),
+  "dateEnvoi": zod.coerce.date().optional(),
+  "nbEnvoyes": zod.number().optional(),
+  "nbRecus": zod.number().optional(),
+  "messageEnvoye": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+}))
+})
+
+
+/**
+ * @summary Modifier une AG
+ */
+export const PutAgIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PutAgIdBody = zod.object({
+  "type": zod.enum(['ordinaire', 'extraordinaire', 'constitutive']).optional(),
+  "libelle": zod.string(),
+  "dateAg": zod.coerce.date(),
+  "heureDebut": zod.string().optional(),
+  "heureFin": zod.string().optional(),
+  "lieu": zod.string().optional(),
+  "ordreDuJour": zod.array(zod.string()).optional(),
+  "quorumRequisPct": zod.number().optional(),
+  "points": zod.array(zod.object({
+  "intitule": zod.string().optional(),
+  "type": zod.string().optional(),
+  "rapporteur": zod.string().optional(),
+  "dureeMinutes": zod.number().optional()
+})).optional()
+})
+
+export const PutAgIdResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number().optional(),
+  "type": zod.enum(['ordinaire', 'extraordinaire', 'constitutive']),
+  "libelle": zod.string(),
+  "dateAg": zod.coerce.date().optional(),
+  "heureDebut": zod.string().nullish(),
+  "heureFin": zod.string().nullish(),
+  "lieu": zod.string().nullish(),
+  "ordreDuJour": zod.array(zod.string()).nullish(),
+  "quorumRequisPct": zod.string().optional(),
+  "nbMembresConvoques": zod.number().nullish(),
+  "nbMembresPresents": zod.number().optional(),
+  "quorumAtteint": zod.boolean().optional(),
+  "statut": zod.enum(['planifiee', 'ouverte', 'cloturee', 'annulee']),
+  "pvUrl": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Ouvrir la séance
+ */
+export const PutAgIdOuvrirParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PutAgIdOuvrirResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number().optional(),
+  "type": zod.enum(['ordinaire', 'extraordinaire', 'constitutive']),
+  "libelle": zod.string(),
+  "dateAg": zod.coerce.date().optional(),
+  "heureDebut": zod.string().nullish(),
+  "heureFin": zod.string().nullish(),
+  "lieu": zod.string().nullish(),
+  "ordreDuJour": zod.array(zod.string()).nullish(),
+  "quorumRequisPct": zod.string().optional(),
+  "nbMembresConvoques": zod.number().nullish(),
+  "nbMembresPresents": zod.number().optional(),
+  "quorumAtteint": zod.boolean().optional(),
+  "statut": zod.enum(['planifiee', 'ouverte', 'cloturee', 'annulee']),
+  "pvUrl": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Clôturer la séance
+ */
+export const PutAgIdCloturerParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PutAgIdCloturerBody = zod.object({
+  "heureFin": zod.string().optional()
+})
+
+export const PutAgIdCloturerResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number().optional(),
+  "type": zod.enum(['ordinaire', 'extraordinaire', 'constitutive']),
+  "libelle": zod.string(),
+  "dateAg": zod.coerce.date().optional(),
+  "heureDebut": zod.string().nullish(),
+  "heureFin": zod.string().nullish(),
+  "lieu": zod.string().nullish(),
+  "ordreDuJour": zod.array(zod.string()).nullish(),
+  "quorumRequisPct": zod.string().optional(),
+  "nbMembresConvoques": zod.number().nullish(),
+  "nbMembresPresents": zod.number().optional(),
+  "quorumAtteint": zod.boolean().optional(),
+  "statut": zod.enum(['planifiee', 'ouverte', 'cloturee', 'annulee']),
+  "pvUrl": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Envoyer les convocations
+ */
+export const PostAgIdConvoquerParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostAgIdConvoquerBody = zod.object({
+  "canal": zod.enum(['sms', 'whatsapp', 'affichage']).optional(),
+  "messagePersonnalise": zod.string().optional()
+})
+
+export const PostAgIdConvoquerResponse = zod.object({
+  "ok": zod.boolean(),
+  "envoyes": zod.number(),
+  "echecs": zod.number(),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary Enregistrer une présence
+ */
+export const PostAgIdPresenceParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostAgIdPresenceBody = zod.object({
+  "membreId": zod.number(),
+  "modePresence": zod.enum(['physique', 'procuration']).optional(),
+  "mandataireId": zod.number().optional()
+})
+
+export const PostAgIdPresenceResponse = zod.object({
+  "ok": zod.boolean(),
+  "nbMembresPresents": zod.number(),
+  "quorumAtteint": zod.boolean(),
+  "ag": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number().optional(),
+  "type": zod.enum(['ordinaire', 'extraordinaire', 'constitutive']),
+  "libelle": zod.string(),
+  "dateAg": zod.coerce.date().optional(),
+  "heureDebut": zod.string().nullish(),
+  "heureFin": zod.string().nullish(),
+  "lieu": zod.string().nullish(),
+  "ordreDuJour": zod.array(zod.string()).nullish(),
+  "quorumRequisPct": zod.string().optional(),
+  "nbMembresConvoques": zod.number().nullish(),
+  "nbMembresPresents": zod.number().optional(),
+  "quorumAtteint": zod.boolean().optional(),
+  "statut": zod.enum(['planifiee', 'ouverte', 'cloturee', 'annulee']),
+  "pvUrl": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}).optional()
+})
+
+
+/**
+ * @summary Liste des présences
+ */
+export const GetAgIdPresencesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetAgIdPresencesResponseItem = zod.object({
+  "presence": zod.object({
+  "modePresence": zod.string().optional(),
+  "heureArrivee": zod.string().nullish(),
+  "emargementNumerique": zod.boolean().optional()
+}),
+  "membre": zod.object({
+  "id": zod.number().optional(),
+  "nom": zod.string().optional(),
+  "prenoms": zod.string().nullish(),
+  "numeroCarte": zod.string().nullish()
+})
+})
+export const GetAgIdPresencesResponse = zod.array(GetAgIdPresencesResponseItem)
+
+
+/**
+ * @summary Enregistrer un vote
+ */
+export const PostAgIdVoteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostAgIdVoteBody = zod.object({
+  "pointId": zod.number(),
+  "intituleResolution": zod.string(),
+  "nbPour": zod.number().optional(),
+  "nbContre": zod.number().optional(),
+  "nbAbstention": zod.number().optional()
+})
+
+
+/**
+ * @summary Générer le PV PDF
+ */
+export const GetAgIdPvPdfParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary Lister les bailleurs
  */
 export const GetBailleursResponseItem = zod.object({
