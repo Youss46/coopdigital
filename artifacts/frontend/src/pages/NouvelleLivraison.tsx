@@ -6,13 +6,15 @@ import {
   useGetAvances,
   useGetCampagneActive,
   useGetEncoursIntrantsMembre,
+  useGetBalances,
+  useGetConfigPesee,
   getGetMembresQueryKey,
   getGetAvancesQueryKey,
   getGetEncoursIntrantsMembreQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetDashboardQueryKey, getGetDashboardLivraisonsQueryKey } from "@workspace/api-client-react";
-import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp, Sprout } from "lucide-react";
+import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp, Sprout, AlertTriangle } from "lucide-react";
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -25,6 +27,9 @@ export default function NouvelleLivraison() {
   const [membreRecherche, setMembreRecherche] = useState("");
   const [membreSelectionne, setMembreSelectionne] = useState<{ id: number; nom: string; prenoms: string; telephone: string } | null>(null);
   const [poidsKg, setPoidsKg] = useState("");
+  const [poids2eme, setPoids2eme] = useState("");
+  const [balanceId, setBalanceId] = useState<string>("");
+  const [tauxHumidite, setTauxHumidite] = useState("");
   const [nombreSacs, setNombreSacs] = useState("");
   const [retenueKg, setRetenueKg] = useState("");
   const [sectionLivraison, setSectionLivraison] = useState("");
@@ -35,6 +40,12 @@ export default function NouvelleLivraison() {
   const [succes, setSucces] = useState<{ montantNet: number; avanceDeduite: number; intrantsDeduits: number } | null>(null);
 
   const { data: campagneActive } = useGetCampagneActive();
+  const { data: balancesData } = useGetBalances();
+  const { data: configPesee } = useGetConfigPesee();
+
+  const seuilDouble = Number(configPesee?.seuil_double_pesee_kg ?? 500);
+  const ecartMaxPct = Number(configPesee?.ecart_max_autorise_pct ?? 2);
+  const TAUX_HUMIDITE_STANDARD = 8;
 
   const membresParams = { search: membreRecherche, limit: 10, statut: "actif" as const };
   const { data: membresData } = useGetMembres(membresParams, {
@@ -58,10 +69,27 @@ export default function NouvelleLivraison() {
   const soldeAvance = avanceEnCours?.soldeRestantFcfa ?? 0;
   const encoursIntrants = encoursIntrantsData?.encoursFcfa ?? 0;
 
-  // Calculs temps réel
-  const poids = parseFloat(poidsKg) || 0;
-  const retenue = parseFloat(retenueKg) || 0;
-  const poidsNet = Math.max(0, poids - retenue);
+  // ── Calculs pesée ─────────────────────────────────────────────────────────
+  const poids1 = parseFloat(poidsKg) || 0;
+  const poids2 = parseFloat(poids2eme) || 0;
+  const doublePeseeRequise = poids1 > seuilDouble;
+  const doublePeseeRenseignee = poids2 > 0;
+
+  const ecartKg = doublePeseeRenseignee ? Math.abs(poids2 - poids1) : 0;
+  const ecartPct = poids1 > 0 && doublePeseeRenseignee ? (ecartKg / poids1) * 100 : 0;
+  const ecartExcessif = ecartPct > ecartMaxPct && doublePeseeRenseignee;
+  const poidsRetenu = doublePeseeRenseignee ? (poids1 + poids2) / 2 : poids1;
+
+  // ── Calculs humidité ──────────────────────────────────────────────────────
+  const taux = parseFloat(tauxHumidite) || 0;
+  const retenueHumiditeKg = taux > TAUX_HUMIDITE_STANDARD && poidsRetenu > 0
+    ? Math.round(poidsRetenu * (taux - TAUX_HUMIDITE_STANDARD) / 100 * 1000) / 1000
+    : 0;
+
+  // ── Calculs finaux ────────────────────────────────────────────────────────
+  const retenueTare = parseFloat(retenueKg) || 0;
+  const retenueTotal = retenueTare + retenueHumiditeKg;
+  const poidsNet = Math.max(0, poidsRetenu - retenueTotal);
   const prix = parseInt(prixUnitaire) || 0;
   const montantBrut = Math.round(poidsNet * prix);
   const avanceDeduite = Math.min(soldeAvance, montantBrut);
@@ -86,6 +114,7 @@ export default function NouvelleLivraison() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!membreSelectionne || poidsNet <= 0 || prix <= 0) return;
+    // La double pesée est obligatoire si poids > seuil — mais on laisse quand même soumettre (avertissement visible)
     mutation.mutate({
       data: {
         membreId: membreSelectionne.id,
@@ -95,7 +124,7 @@ export default function NouvelleLivraison() {
         modePaiement,
         campagneId: campagneActive?.id ?? null,
         nombreSacs: nombreSacs ? parseInt(nombreSacs) : null,
-        retenueKg: retenue > 0 ? retenue : null,
+        retenueKg: retenueTotal > 0 ? retenueTotal : null,
         sectionLivraison: sectionLivraison || null,
       },
     });
@@ -148,9 +177,12 @@ export default function NouvelleLivraison() {
               setMembreSelectionne(null);
               setMembreRecherche("");
               setPoidsKg("");
+              setPoids2eme("");
               setNombreSacs("");
               setRetenueKg("");
               setSectionLivraison("");
+              setTauxHumidite("");
+              setBalanceId("");
             }}
             className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
@@ -251,9 +283,31 @@ export default function NouvelleLivraison() {
             <Scale size={15} />
             Pesée
           </h2>
+
+          {/* Balance */}
+          {(balancesData?.balances ?? []).length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Balance utilisée</label>
+              <select
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+                value={balanceId}
+                onChange={(e) => setBalanceId(e.target.value)}
+              >
+                <option value="">— Sélectionner une balance —</option>
+                {(balancesData?.balances ?? []).map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.marque ?? "Balance"} {b.numero_serie ? `#${b.numero_serie}` : ""}{b.site ? ` — ${b.site}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Poids brut (kg) *</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                {doublePeseeRequise ? "1ère pesée (kg) *" : "Poids brut (kg) *"}
+              </label>
               <input
                 required
                 type="number"
@@ -278,7 +332,78 @@ export default function NouvelleLivraison() {
               />
             </div>
           </div>
+
+          {/* Alerte double pesée requise */}
+          {doublePeseeRequise && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+              <span>Double pesée obligatoire pour {poids1.toFixed(1)} kg (seuil : {seuilDouble} kg)</span>
+            </div>
+          )}
+
+          {/* 2ème pesée */}
+          {(doublePeseeRequise || doublePeseeRenseignee) && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  2ème pesée (kg) {doublePeseeRequise ? "*" : ""}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={poids2eme}
+                  onChange={(e) => setPoids2eme(e.target.value)}
+                  placeholder="121.0"
+                  className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none ${ecartExcessif ? "border-red-300 bg-red-50" : "border-gray-200"}`}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Écart</label>
+                <div className={`w-full border rounded-lg px-3 py-2.5 text-sm font-medium ${
+                  ecartExcessif ? "border-red-200 bg-red-50 text-red-700" :
+                  doublePeseeRenseignee ? "border-green-200 bg-green-50 text-green-700" :
+                  "border-gray-100 bg-gray-50 text-gray-400"
+                }`}>
+                  {doublePeseeRenseignee ? `${ecartKg.toFixed(3)} kg (${ecartPct.toFixed(2)} %)` : "—"}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {ecartExcessif && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-800">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+              Écart de {ecartPct.toFixed(2)} % dépasse le seuil de {ecartMaxPct} % — un litige sera créé automatiquement
+            </div>
+          )}
+
+          {/* Poids retenu (si double pesée) */}
+          {doublePeseeRenseignee && (
+            <div className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2 text-sm">
+              <span className="text-gray-600">Poids retenu (moyenne)</span>
+              <span className="font-bold" style={{ color: "#1a4731" }}>{poidsRetenu.toFixed(3)} kg</span>
+            </div>
+          )}
+
+          {/* Taux d'humidité */}
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Taux d'humidité (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={tauxHumidite}
+                onChange={(e) => setTauxHumidite(e.target.value)}
+                placeholder="Ex: 10"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+              />
+              {taux > TAUX_HUMIDITE_STANDARD && (
+                <p className="text-xs text-amber-600 mt-0.5">Retenue humidité : −{retenueHumiditeKg.toFixed(3)} kg</p>
+              )}
+            </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Retenue / tare (kg)</label>
               <input
@@ -291,14 +416,15 @@ export default function NouvelleLivraison() {
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Poids net (kg)</label>
               <div className="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2.5 text-sm font-semibold" style={{ color: "#1a4731" }}>
-                {poidsNet > 0 ? poidsNet.toFixed(1) : "—"}
+                {poidsNet > 0 ? poidsNet.toFixed(3) : "—"}
               </div>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Prix unitaire (FCFA/kg) *</label>
               <input
@@ -310,15 +436,16 @@ export default function NouvelleLivraison() {
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Date de livraison</label>
-              <input
-                type="date"
-                value={dateLivraison}
-                onChange={(e) => setDateLivraison(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
-              />
-            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Date de livraison</label>
+            <input
+              type="date"
+              value={dateLivraison}
+              onChange={(e) => setDateLivraison(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+            />
           </div>
 
           {/* Options supplémentaires */}
@@ -362,8 +489,20 @@ export default function NouvelleLivraison() {
         {montantBrut > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
             <h2 className="font-semibold text-gray-900 text-sm mb-3">Récapitulatif</h2>
+            {doublePeseeRenseignee && (
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>Poids retenu (pesée)</span>
+                <span>{poidsRetenu.toFixed(3)} kg</span>
+              </div>
+            )}
+            {retenueHumiditeKg > 0 && (
+              <div className="flex justify-between text-xs text-amber-600">
+                <span>− Retenue humidité ({taux}%)</span>
+                <span>−{retenueHumiditeKg.toFixed(3)} kg</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Montant brut ({poidsNet.toFixed(1)} kg × {formaterFCFA(prix)})</span>
+              <span className="text-gray-500">Montant brut ({poidsNet.toFixed(3)} kg × {prix} FCFA)</span>
               <span className="font-medium">{formaterFCFA(montantBrut)}</span>
             </div>
             {avanceDeduite > 0 && (

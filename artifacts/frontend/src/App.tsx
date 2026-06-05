@@ -36,6 +36,7 @@ import NotificationsPage from "@/pages/NotificationsPage";
 import NotificationsPreferencesPage from "@/pages/NotificationsPreferencesPage";
 import ParametresPage from "@/pages/ParametresPage";
 import TransportPage from "@/pages/TransportPage";
+import PeseePage from "@/pages/PeseePage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -159,6 +160,9 @@ function AppRoutes() {
       </Route>
       <Route path="/transport">
         <ProtectedRoute component={TransportPage} />
+      </Route>
+      <Route path="/pesee">
+        <ProtectedRoute component={PeseePage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

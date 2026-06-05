@@ -8,3 +8,4 @@
 - [Orval format:date coerce](orval-date-coerce.md) — OpenAPI `format: date` fields generate `zod.coerce.date()` → TS `Date`; Drizzle date columns expect `string`; use a `toDateStr(d)` helper to convert.
 - [Object storage signed_url cast](objectstorage-signedfetch.md) — objectStorage.ts `response.json()` returns `unknown`; must cast `as { signed_url: string }` to avoid TS2339.
 - [Frontend toast hook path](frontend-toast-path.md) — toast hook lives at `@/hooks/use-toast`, NOT `@/components/ui/use-toast`.
+- [YAML inline mapping space required](yaml-colon-brace.md) — YAML `key:{...}` (no space after colon) causes orval to fail; must always write `key: { ... }` with a space.

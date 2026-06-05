@@ -34,6 +34,7 @@ import {
   ScrollText,
   Settings,
   Truck,
+  Scale,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -221,6 +222,12 @@ const navItems = [
     label: "Transport",
     icon: Truck,
     roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "magasinier"],
+  },
+  {
+    href: "/pesee",
+    label: "Pesée",
+    icon: Scale,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "magasinier"],
   },
   {
     href: "/parametres",

@@ -4767,6 +4767,228 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/RapportVehicule" }
 
+  /pesee/balances/alertes:
+    get:
+      operationId: getBalancesAlertes
+      summary: Balances à vérifier (vérification dépassée)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alertes: { type: array, items: { $ref: "#/components/schemas/Balance" } }
+
+  /pesee/balances:
+    get:
+      operationId: getBalances
+      summary: Liste des balances
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balances: { type: array, items: { $ref: "#/components/schemas/Balance" } }
+    post:
+      operationId: createBalance
+      summary: Créer une balance
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateBalanceBody" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance: { $ref: "#/components/schemas/Balance" }
+
+  /pesee/balances/{id}:
+    put:
+      operationId: updateBalance
+      summary: Modifier une balance
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateBalanceBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance: { $ref: "#/components/schemas/Balance" }
+
+  /pesee/balances/{id}/verification:
+    post:
+      operationId: createVerificationBalance
+      summary: Enregistrer une vérification de balance
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateVerificationBody" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  verification: { $ref: "#/components/schemas/VerificationBalance" }
+
+  /pesee/valider:
+    post:
+      operationId: validerDoublePesee
+      summary: Valider la double pesée d'une livraison
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ValiderDoublePeseeBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  livraison: { type: object }
+                  ecart_pct: { type: number }
+                  litige_cree: { type: boolean }
+
+  /pesee/litiges:
+    get:
+      operationId: getLitiges
+      summary: Liste des litiges de pesée
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  litiges: { type: array, items: { $ref: "#/components/schemas/LitigePesee" } }
+    post:
+      operationId: createLitige
+      summary: Déclarer un litige de pesée
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateLitigeBody" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  litige: { $ref: "#/components/schemas/LitigePesee" }
+
+  /pesee/litiges/{id}/resoudre:
+    put:
+      operationId: resoudreLitige
+      summary: Résoudre un litige de pesée
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResoudreLitigeBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  litige: { $ref: "#/components/schemas/LitigePesee" }
+
+  /pesee/statistiques:
+    get:
+      operationId: getStatistiquesPesee
+      summary: Statistiques globales pesée
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatistiquesPesee" }
+
+  /pesee/rapport-agent/{agent_id}:
+    get:
+      operationId: getRapportAgentPesee
+      summary: Rapport pesée par agent terrain
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: agent_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RapportAgentPesee" }
+
+  /pesee/config:
+    get:
+      operationId: getConfigPesee
+      summary: Configuration pesée de la coopérative
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigPesee" }
+    put:
+      operationId: updateConfigPesee
+      summary: Modifier la config pesée
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateConfigPeseeBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigPesee" }
+
 components:
   schemas:
 
@@ -9203,3 +9425,159 @@ components:
         cout_missions_fcfa:       { type: number }
         cout_entretiens_fcfa:     { type: number }
         nb_missions:              { type: integer }
+
+    Balance:
+      type: object
+      required: [id, cooperative_id, statut, created_at, updated_at]
+      properties:
+        id:                         { type: integer }
+        cooperative_id:             { type: integer }
+        numero_serie:               { type: string, nullable: true }
+        marque:                     { type: string, nullable: true }
+        capacite_max_kg:            { type: number, nullable: true }
+        precision_g:                { type: number, nullable: true }
+        site:                       { type: string, nullable: true }
+        date_acquisition:           { type: string, format: date, nullable: true }
+        date_derniere_verification: { type: string, format: date, nullable: true }
+        date_prochaine_verification: { type: string, format: date, nullable: true }
+        statut:                     { type: string }
+        created_at:                 { type: string }
+        updated_at:                 { type: string }
+
+    CreateBalanceBody:
+      type: object
+      required: [statut]
+      properties:
+        numero_serie:               { type: string }
+        marque:                     { type: string }
+        capacite_max_kg:            { type: number }
+        precision_g:                { type: number }
+        site:                       { type: string }
+        date_acquisition:           { type: string, format: date }
+        date_prochaine_verification: { type: string, format: date }
+        statut:                     { type: string }
+
+    UpdateBalanceBody:
+      type: object
+      properties:
+        numero_serie:               { type: string }
+        marque:                     { type: string }
+        capacite_max_kg:            { type: number }
+        precision_g:                { type: number }
+        site:                       { type: string }
+        date_acquisition:           { type: string, format: date }
+        date_derniere_verification: { type: string, format: date }
+        date_prochaine_verification: { type: string, format: date }
+        statut:                     { type: string }
+
+    VerificationBalance:
+      type: object
+      required: [id, balance_id, date_verification, resultat, created_at]
+      properties:
+        id:                   { type: integer }
+        balance_id:           { type: integer }
+        date_verification:    { type: string, format: date }
+        verificateur:         { type: string, nullable: true }
+        resultat:             { type: string }
+        ecart_mesure_g:       { type: number, nullable: true }
+        observations:         { type: string, nullable: true }
+        prochaine_verification: { type: string, format: date, nullable: true }
+        created_at:           { type: string }
+
+    CreateVerificationBody:
+      type: object
+      required: [date_verification, resultat]
+      properties:
+        date_verification:    { type: string, format: date }
+        verificateur:         { type: string }
+        resultat:             { type: string }
+        ecart_mesure_g:       { type: number }
+        observations:         { type: string }
+        prochaine_verification: { type: string, format: date }
+
+    ValiderDoublePeseeBody:
+      type: object
+      required: [livraison_id, poids_2eme_pesee, balance_id]
+      properties:
+        livraison_id:         { type: integer }
+        poids_2eme_pesee:     { type: number }
+        balance_id:           { type: integer }
+        peseur_id:            { type: integer }
+
+    LitigePesee:
+      type: object
+      required: [id, cooperative_id, livraison_id, date_litige, statut, created_at]
+      properties:
+        id:                         { type: integer }
+        cooperative_id:             { type: integer }
+        livraison_id:               { type: integer }
+        membre_id:                  { type: integer, nullable: true }
+        date_litige:                { type: string, format: date }
+        poids_conteste_kg:          { type: number, nullable: true }
+        poids_revendique_membre_kg: { type: number, nullable: true }
+        motif:                      { type: string, nullable: true }
+        statut:                     { type: string }
+        decision:                   { type: string, nullable: true }
+        poids_final_retenu_kg:      { type: number, nullable: true }
+        difference_fcfa:            { type: number, nullable: true }
+        resolu_par:                 { type: integer, nullable: true }
+        resolu_le:                  { type: string, nullable: true }
+        created_at:                 { type: string }
+
+    CreateLitigeBody:
+      type: object
+      required: [livraison_id, date_litige]
+      properties:
+        livraison_id:               { type: integer }
+        membre_id:                  { type: integer }
+        date_litige:                { type: string, format: date }
+        poids_conteste_kg:          { type: number }
+        poids_revendique_membre_kg: { type: number }
+        motif:                      { type: string }
+
+    ResoudreLitigeBody:
+      type: object
+      required: [poids_final_retenu_kg, decision]
+      properties:
+        poids_final_retenu_kg:      { type: number }
+        decision:                   { type: string }
+
+    ConfigPesee:
+      type: object
+      properties:
+        id:                           { type: integer, nullable: true }
+        cooperative_id:               { type: integer, nullable: true }
+        ecart_max_autorise_pct:       { type: number }
+        seuil_double_pesee_kg:        { type: number }
+        tolerance_balance_g:          { type: number }
+        frequence_verification_jours: { type: integer }
+        updated_at:                   { type: string, nullable: true }
+
+    UpdateConfigPeseeBody:
+      type: object
+      properties:
+        ecart_max_autorise_pct:       { type: number }
+        seuil_double_pesee_kg:        { type: number }
+        tolerance_balance_g:          { type: number }
+        frequence_verification_jours: { type: integer }
+
+    StatistiquesPesee:
+      type: object
+      properties:
+        nb_pesees_total:      { type: integer }
+        nb_double_pesees:     { type: integer }
+        ecart_moyen_pct:      { type: number }
+        nb_litiges:           { type: integer }
+        nb_litiges_resolus:   { type: integer }
+        agent_plus_ecarts:    { type: object, nullable: true }
+        balance_plus_ecarts:  { type: object, nullable: true }
+
+    RapportAgentPesee:
+      type: object
+      properties:
+        agent_id:       { type: integer }
+        nom:            { type: string, nullable: true }
+        nb_pesees:      { type: integer }
+        ecart_moyen_pct: { type: number }
+        nb_anomalies:   { type: integer }
+        nb_litiges:     { type: integer }

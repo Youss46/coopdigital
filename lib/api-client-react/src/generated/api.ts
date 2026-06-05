@@ -69,6 +69,7 @@ import type {
   ConfigComptable,
   ConfigCooperative,
   ConfigPartsSociales,
+  ConfigPesee,
   ConfigPrix,
   ConfigPrixInput,
   ConfigScoring,
@@ -80,13 +81,19 @@ import type {
   CountRefusEnAttente200,
   CreancesSummary,
   CreateAvancePersonnelInput,
+  CreateBalance201,
+  CreateBalanceBody,
   CreateChauffeurBody,
   CreateDocumentBody,
   CreateEntretienVehiculeBody,
+  CreateLitige201,
+  CreateLitigeBody,
   CreateMissionTransportBody,
   CreatePersonnelInput,
   CreateUserInput,
   CreateVehiculeBody,
+  CreateVerificationBalance201,
+  CreateVerificationBody,
   DashboardKpi,
   DesactiverMembresSansCampagne200,
   Devise,
@@ -128,6 +135,8 @@ import type {
   GetAvancesParams,
   GetAvancesPersonnelParams,
   GetBalanceParams,
+  GetBalances200,
+  GetBalancesAlertes200,
   GetBilanParams,
   GetBulletinsParams,
   GetChauffeurs200,
@@ -140,6 +149,7 @@ import type {
   GetFluxTresorerieParams,
   GetGrandLivreParams,
   GetJournalComptableParams,
+  GetLitiges200,
   GetLivraisonsParams,
   GetLotsParams,
   GetMargeCollecteParams,
@@ -216,6 +226,7 @@ import type {
   PresenceResult,
   Preteur,
   PreteurInput,
+  RapportAgentPesee,
   RapportBailleur,
   RapportBailleurResponse,
   RapportBudget,
@@ -237,6 +248,8 @@ import type {
   RemboursementIntrantInput,
   ResetPasswordInput,
   ResetUserPassword200,
+  ResoudreLitige200,
+  ResoudreLitigeBody,
   ResultatVerifications,
   ResumeMembre,
   SaisirPrixInput,
@@ -247,6 +260,7 @@ import type {
   SmsGroupeInput,
   SmsGroupeResult,
   SmsHistorique,
+  StatistiquesPesee,
   Subvention,
   SubventionAvecBailleur,
   SubventionDetail,
@@ -263,9 +277,12 @@ import type {
   TraiterRefusInput,
   TrancheInput,
   Tresorerie,
+  UpdateBalance200,
+  UpdateBalanceBody,
   UpdateChauffeurBody,
   UpdateConfigBody,
   UpdateConfigComptableInput,
+  UpdateConfigPeseeBody,
   UpdateConfigScoringInput,
   UpdatePersonnelInput,
   UpdatePreferencesNotificationsBody,
@@ -276,6 +293,8 @@ import type {
   UploadUrlResponse,
   UtilisateurCompte,
   UtiliserFondsInput,
+  ValiderDoublePesee200,
+  ValiderDoublePeseeBody,
   ValiderEcritureInput,
   ValiderPaiementInput,
   ValiderToutEcrituresEnAttente200,
@@ -18005,4 +18024,966 @@ export function useGetRapportVehiculeTransport<TData = Awaited<ReturnType<typeof
 
 
 
+
+export const getGetBalancesAlertesUrl = () => {
+
+
+
+
+  return `/api/pesee/balances/alertes`
+}
+
+/**
+ * @summary Balances à vérifier (vérification dépassée)
+ */
+export const getBalancesAlertes = async ( options?: RequestInit): Promise<GetBalancesAlertes200> => {
+
+  return customFetch<GetBalancesAlertes200>(getGetBalancesAlertesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBalancesAlertesQueryKey = () => {
+    return [
+    `/api/pesee/balances/alertes`
+    ] as const;
+    }
+
+
+export const getGetBalancesAlertesQueryOptions = <TData = Awaited<ReturnType<typeof getBalancesAlertes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalancesAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBalancesAlertesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBalancesAlertes>>> = ({ signal }) => getBalancesAlertes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBalancesAlertes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBalancesAlertesQueryResult = NonNullable<Awaited<ReturnType<typeof getBalancesAlertes>>>
+export type GetBalancesAlertesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Balances à vérifier (vérification dépassée)
+ */
+
+export function useGetBalancesAlertes<TData = Awaited<ReturnType<typeof getBalancesAlertes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalancesAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBalancesAlertesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetBalancesUrl = () => {
+
+
+
+
+  return `/api/pesee/balances`
+}
+
+/**
+ * @summary Liste des balances
+ */
+export const getBalances = async ( options?: RequestInit): Promise<GetBalances200> => {
+
+  return customFetch<GetBalances200>(getGetBalancesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBalancesQueryKey = () => {
+    return [
+    `/api/pesee/balances`
+    ] as const;
+    }
+
+
+export const getGetBalancesQueryOptions = <TData = Awaited<ReturnType<typeof getBalances>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalances>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBalancesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBalances>>> = ({ signal }) => getBalances({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBalances>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBalancesQueryResult = NonNullable<Awaited<ReturnType<typeof getBalances>>>
+export type GetBalancesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des balances
+ */
+
+export function useGetBalances<TData = Awaited<ReturnType<typeof getBalances>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalances>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBalancesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateBalanceUrl = () => {
+
+
+
+
+  return `/api/pesee/balances`
+}
+
+/**
+ * @summary Créer une balance
+ */
+export const createBalance = async (createBalanceBody: CreateBalanceBody, options?: RequestInit): Promise<CreateBalance201> => {
+
+  return customFetch<CreateBalance201>(getCreateBalanceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createBalanceBody,)
+  }
+);}
+
+
+
+
+export const getCreateBalanceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBalance>>, TError,{data: BodyType<CreateBalanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBalance>>, TError,{data: BodyType<CreateBalanceBody>}, TContext> => {
+
+const mutationKey = ['createBalance'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBalance>>, {data: BodyType<CreateBalanceBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createBalance(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBalanceMutationResult = NonNullable<Awaited<ReturnType<typeof createBalance>>>
+    export type CreateBalanceMutationBody = BodyType<CreateBalanceBody>
+    export type CreateBalanceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Créer une balance
+ */
+export const useCreateBalance = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBalance>>, TError,{data: BodyType<CreateBalanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createBalance>>,
+        TError,
+        {data: BodyType<CreateBalanceBody>},
+        TContext
+      > => {
+      return useMutation(getCreateBalanceMutationOptions(options));
+    }
+
+export const getUpdateBalanceUrl = (id: number,) => {
+
+
+
+
+  return `/api/pesee/balances/${id}`
+}
+
+/**
+ * @summary Modifier une balance
+ */
+export const updateBalance = async (id: number,
+    updateBalanceBody: UpdateBalanceBody, options?: RequestInit): Promise<UpdateBalance200> => {
+
+  return customFetch<UpdateBalance200>(getUpdateBalanceUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateBalanceBody,)
+  }
+);}
+
+
+
+
+export const getUpdateBalanceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBalance>>, TError,{id: number;data: BodyType<UpdateBalanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBalance>>, TError,{id: number;data: BodyType<UpdateBalanceBody>}, TContext> => {
+
+const mutationKey = ['updateBalance'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBalance>>, {id: number;data: BodyType<UpdateBalanceBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateBalance(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBalanceMutationResult = NonNullable<Awaited<ReturnType<typeof updateBalance>>>
+    export type UpdateBalanceMutationBody = BodyType<UpdateBalanceBody>
+    export type UpdateBalanceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Modifier une balance
+ */
+export const useUpdateBalance = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBalance>>, TError,{id: number;data: BodyType<UpdateBalanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBalance>>,
+        TError,
+        {id: number;data: BodyType<UpdateBalanceBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateBalanceMutationOptions(options));
+    }
+
+export const getCreateVerificationBalanceUrl = (id: number,) => {
+
+
+
+
+  return `/api/pesee/balances/${id}/verification`
+}
+
+/**
+ * @summary Enregistrer une vérification de balance
+ */
+export const createVerificationBalance = async (id: number,
+    createVerificationBody: CreateVerificationBody, options?: RequestInit): Promise<CreateVerificationBalance201> => {
+
+  return customFetch<CreateVerificationBalance201>(getCreateVerificationBalanceUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createVerificationBody,)
+  }
+);}
+
+
+
+
+export const getCreateVerificationBalanceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVerificationBalance>>, TError,{id: number;data: BodyType<CreateVerificationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVerificationBalance>>, TError,{id: number;data: BodyType<CreateVerificationBody>}, TContext> => {
+
+const mutationKey = ['createVerificationBalance'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVerificationBalance>>, {id: number;data: BodyType<CreateVerificationBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createVerificationBalance(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVerificationBalanceMutationResult = NonNullable<Awaited<ReturnType<typeof createVerificationBalance>>>
+    export type CreateVerificationBalanceMutationBody = BodyType<CreateVerificationBody>
+    export type CreateVerificationBalanceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer une vérification de balance
+ */
+export const useCreateVerificationBalance = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVerificationBalance>>, TError,{id: number;data: BodyType<CreateVerificationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVerificationBalance>>,
+        TError,
+        {id: number;data: BodyType<CreateVerificationBody>},
+        TContext
+      > => {
+      return useMutation(getCreateVerificationBalanceMutationOptions(options));
+    }
+
+export const getValiderDoublePeseeUrl = () => {
+
+
+
+
+  return `/api/pesee/valider`
+}
+
+/**
+ * @summary Valider la double pesée d'une livraison
+ */
+export const validerDoublePesee = async (validerDoublePeseeBody: ValiderDoublePeseeBody, options?: RequestInit): Promise<ValiderDoublePesee200> => {
+
+  return customFetch<ValiderDoublePesee200>(getValiderDoublePeseeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      validerDoublePeseeBody,)
+  }
+);}
+
+
+
+
+export const getValiderDoublePeseeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validerDoublePesee>>, TError,{data: BodyType<ValiderDoublePeseeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof validerDoublePesee>>, TError,{data: BodyType<ValiderDoublePeseeBody>}, TContext> => {
+
+const mutationKey = ['validerDoublePesee'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof validerDoublePesee>>, {data: BodyType<ValiderDoublePeseeBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  validerDoublePesee(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ValiderDoublePeseeMutationResult = NonNullable<Awaited<ReturnType<typeof validerDoublePesee>>>
+    export type ValiderDoublePeseeMutationBody = BodyType<ValiderDoublePeseeBody>
+    export type ValiderDoublePeseeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Valider la double pesée d'une livraison
+ */
+export const useValiderDoublePesee = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validerDoublePesee>>, TError,{data: BodyType<ValiderDoublePeseeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof validerDoublePesee>>,
+        TError,
+        {data: BodyType<ValiderDoublePeseeBody>},
+        TContext
+      > => {
+      return useMutation(getValiderDoublePeseeMutationOptions(options));
+    }
+
+export const getGetLitigesUrl = () => {
+
+
+
+
+  return `/api/pesee/litiges`
+}
+
+/**
+ * @summary Liste des litiges de pesée
+ */
+export const getLitiges = async ( options?: RequestInit): Promise<GetLitiges200> => {
+
+  return customFetch<GetLitiges200>(getGetLitigesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLitigesQueryKey = () => {
+    return [
+    `/api/pesee/litiges`
+    ] as const;
+    }
+
+
+export const getGetLitigesQueryOptions = <TData = Awaited<ReturnType<typeof getLitiges>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLitiges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLitigesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLitiges>>> = ({ signal }) => getLitiges({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLitiges>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLitigesQueryResult = NonNullable<Awaited<ReturnType<typeof getLitiges>>>
+export type GetLitigesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des litiges de pesée
+ */
+
+export function useGetLitiges<TData = Awaited<ReturnType<typeof getLitiges>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLitiges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLitigesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateLitigeUrl = () => {
+
+
+
+
+  return `/api/pesee/litiges`
+}
+
+/**
+ * @summary Déclarer un litige de pesée
+ */
+export const createLitige = async (createLitigeBody: CreateLitigeBody, options?: RequestInit): Promise<CreateLitige201> => {
+
+  return customFetch<CreateLitige201>(getCreateLitigeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createLitigeBody,)
+  }
+);}
+
+
+
+
+export const getCreateLitigeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createLitige>>, TError,{data: BodyType<CreateLitigeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createLitige>>, TError,{data: BodyType<CreateLitigeBody>}, TContext> => {
+
+const mutationKey = ['createLitige'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createLitige>>, {data: BodyType<CreateLitigeBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createLitige(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateLitigeMutationResult = NonNullable<Awaited<ReturnType<typeof createLitige>>>
+    export type CreateLitigeMutationBody = BodyType<CreateLitigeBody>
+    export type CreateLitigeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Déclarer un litige de pesée
+ */
+export const useCreateLitige = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createLitige>>, TError,{data: BodyType<CreateLitigeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createLitige>>,
+        TError,
+        {data: BodyType<CreateLitigeBody>},
+        TContext
+      > => {
+      return useMutation(getCreateLitigeMutationOptions(options));
+    }
+
+export const getResoudreLitigeUrl = (id: number,) => {
+
+
+
+
+  return `/api/pesee/litiges/${id}/resoudre`
+}
+
+/**
+ * @summary Résoudre un litige de pesée
+ */
+export const resoudreLitige = async (id: number,
+    resoudreLitigeBody: ResoudreLitigeBody, options?: RequestInit): Promise<ResoudreLitige200> => {
+
+  return customFetch<ResoudreLitige200>(getResoudreLitigeUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      resoudreLitigeBody,)
+  }
+);}
+
+
+
+
+export const getResoudreLitigeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resoudreLitige>>, TError,{id: number;data: BodyType<ResoudreLitigeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resoudreLitige>>, TError,{id: number;data: BodyType<ResoudreLitigeBody>}, TContext> => {
+
+const mutationKey = ['resoudreLitige'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resoudreLitige>>, {id: number;data: BodyType<ResoudreLitigeBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  resoudreLitige(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResoudreLitigeMutationResult = NonNullable<Awaited<ReturnType<typeof resoudreLitige>>>
+    export type ResoudreLitigeMutationBody = BodyType<ResoudreLitigeBody>
+    export type ResoudreLitigeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Résoudre un litige de pesée
+ */
+export const useResoudreLitige = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resoudreLitige>>, TError,{id: number;data: BodyType<ResoudreLitigeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resoudreLitige>>,
+        TError,
+        {id: number;data: BodyType<ResoudreLitigeBody>},
+        TContext
+      > => {
+      return useMutation(getResoudreLitigeMutationOptions(options));
+    }
+
+export const getGetStatistiquesPeseeUrl = () => {
+
+
+
+
+  return `/api/pesee/statistiques`
+}
+
+/**
+ * @summary Statistiques globales pesée
+ */
+export const getStatistiquesPesee = async ( options?: RequestInit): Promise<StatistiquesPesee> => {
+
+  return customFetch<StatistiquesPesee>(getGetStatistiquesPeseeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStatistiquesPeseeQueryKey = () => {
+    return [
+    `/api/pesee/statistiques`
+    ] as const;
+    }
+
+
+export const getGetStatistiquesPeseeQueryOptions = <TData = Awaited<ReturnType<typeof getStatistiquesPesee>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStatistiquesPesee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStatistiquesPeseeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStatistiquesPesee>>> = ({ signal }) => getStatistiquesPesee({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStatistiquesPesee>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStatistiquesPeseeQueryResult = NonNullable<Awaited<ReturnType<typeof getStatistiquesPesee>>>
+export type GetStatistiquesPeseeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Statistiques globales pesée
+ */
+
+export function useGetStatistiquesPesee<TData = Awaited<ReturnType<typeof getStatistiquesPesee>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStatistiquesPesee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStatistiquesPeseeQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRapportAgentPeseeUrl = (agentId: number,) => {
+
+
+
+
+  return `/api/pesee/rapport-agent/${agentId}`
+}
+
+/**
+ * @summary Rapport pesée par agent terrain
+ */
+export const getRapportAgentPesee = async (agentId: number, options?: RequestInit): Promise<RapportAgentPesee> => {
+
+  return customFetch<RapportAgentPesee>(getGetRapportAgentPeseeUrl(agentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRapportAgentPeseeQueryKey = (agentId: number,) => {
+    return [
+    `/api/pesee/rapport-agent/${agentId}`
+    ] as const;
+    }
+
+
+export const getGetRapportAgentPeseeQueryOptions = <TData = Awaited<ReturnType<typeof getRapportAgentPesee>>, TError = ErrorType<unknown>>(agentId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRapportAgentPesee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRapportAgentPeseeQueryKey(agentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRapportAgentPesee>>> = ({ signal }) => getRapportAgentPesee(agentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(agentId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRapportAgentPesee>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRapportAgentPeseeQueryResult = NonNullable<Awaited<ReturnType<typeof getRapportAgentPesee>>>
+export type GetRapportAgentPeseeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Rapport pesée par agent terrain
+ */
+
+export function useGetRapportAgentPesee<TData = Awaited<ReturnType<typeof getRapportAgentPesee>>, TError = ErrorType<unknown>>(
+ agentId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRapportAgentPesee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRapportAgentPeseeQueryOptions(agentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetConfigPeseeUrl = () => {
+
+
+
+
+  return `/api/pesee/config`
+}
+
+/**
+ * @summary Configuration pesée de la coopérative
+ */
+export const getConfigPesee = async ( options?: RequestInit): Promise<ConfigPesee> => {
+
+  return customFetch<ConfigPesee>(getGetConfigPeseeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetConfigPeseeQueryKey = () => {
+    return [
+    `/api/pesee/config`
+    ] as const;
+    }
+
+
+export const getGetConfigPeseeQueryOptions = <TData = Awaited<ReturnType<typeof getConfigPesee>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConfigPesee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConfigPeseeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConfigPesee>>> = ({ signal }) => getConfigPesee({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConfigPesee>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetConfigPeseeQueryResult = NonNullable<Awaited<ReturnType<typeof getConfigPesee>>>
+export type GetConfigPeseeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Configuration pesée de la coopérative
+ */
+
+export function useGetConfigPesee<TData = Awaited<ReturnType<typeof getConfigPesee>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConfigPesee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetConfigPeseeQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateConfigPeseeUrl = () => {
+
+
+
+
+  return `/api/pesee/config`
+}
+
+/**
+ * @summary Modifier la config pesée
+ */
+export const updateConfigPesee = async (updateConfigPeseeBody: UpdateConfigPeseeBody, options?: RequestInit): Promise<ConfigPesee> => {
+
+  return customFetch<ConfigPesee>(getUpdateConfigPeseeUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateConfigPeseeBody,)
+  }
+);}
+
+
+
+
+export const getUpdateConfigPeseeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConfigPesee>>, TError,{data: BodyType<UpdateConfigPeseeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateConfigPesee>>, TError,{data: BodyType<UpdateConfigPeseeBody>}, TContext> => {
+
+const mutationKey = ['updateConfigPesee'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateConfigPesee>>, {data: BodyType<UpdateConfigPeseeBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateConfigPesee(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateConfigPeseeMutationResult = NonNullable<Awaited<ReturnType<typeof updateConfigPesee>>>
+    export type UpdateConfigPeseeMutationBody = BodyType<UpdateConfigPeseeBody>
+    export type UpdateConfigPeseeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Modifier la config pesée
+ */
+export const useUpdateConfigPesee = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConfigPesee>>, TError,{data: BodyType<UpdateConfigPeseeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateConfigPesee>>,
+        TError,
+        {data: BodyType<UpdateConfigPeseeBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateConfigPeseeMutationOptions(options));
+    }
 

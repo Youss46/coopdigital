@@ -1,9 +1,10 @@
-import { pgTable, serial, integer, numeric, text, date, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, text, date, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { membresTable } from "./membres";
 import { usersTable } from "./users";
 import { campagnesTable } from "./campagnes";
+import { balancesTable } from "./pesee";
 
 export const livraisonsTable = pgTable("livraisons", {
   id: serial("id").primaryKey(),
@@ -32,6 +33,18 @@ export const livraisonsTable = pgTable("livraisons", {
   dateLivraison: date("date_livraison", { mode: "string" }).notNull(),
   agentId: integer("agent_id").references(() => usersTable.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+
+  // Pesée enrichie (migration 026)
+  balanceId:             integer("balance_id").references(() => balancesTable.id),
+  peseurId:              integer("peseur_id").references(() => usersTable.id),
+  poidsBrut1erePeseeKg:  numeric("poids_brut_1ere_pesee_kg", { precision: 10, scale: 3 }),
+  poidsBrut2emePeseeKg:  numeric("poids_brut_2eme_pesee_kg", { precision: 10, scale: 3 }),
+  ecartPeseeKg:          numeric("ecart_pesee_kg", { precision: 10, scale: 3 }),
+  ecartPeseePct:         numeric("ecart_pesee_pct", { precision: 6, scale: 3 }),
+  poidsRetenuKg:         numeric("poids_retenu_kg", { precision: 10, scale: 3 }),
+  doublePeseeRequise:    boolean("double_pesee_requise").default(false),
+  doublePeseeEffectuee:  boolean("double_pesee_effectuee").default(false),
+  litigePesee:           boolean("litige_pesee").default(false),
 });
 
 export const insertLivraisonSchema = createInsertSchema(livraisonsTable).omit({

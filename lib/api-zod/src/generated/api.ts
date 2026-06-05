@@ -5822,3 +5822,276 @@ export const GetRapportVehiculeTransportResponse = zod.object({
 })
 
 
+/**
+ * @summary Balances à vérifier (vérification dépassée)
+ */
+export const GetBalancesAlertesResponse = zod.object({
+  "alertes": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "numero_serie": zod.string().nullish(),
+  "marque": zod.string().nullish(),
+  "capacite_max_kg": zod.number().nullish(),
+  "precision_g": zod.number().nullish(),
+  "site": zod.string().nullish(),
+  "date_acquisition": zod.coerce.date().nullish(),
+  "date_derniere_verification": zod.coerce.date().nullish(),
+  "date_prochaine_verification": zod.coerce.date().nullish(),
+  "statut": zod.string(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})).optional()
+})
+
+
+/**
+ * @summary Liste des balances
+ */
+export const GetBalancesResponse = zod.object({
+  "balances": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "numero_serie": zod.string().nullish(),
+  "marque": zod.string().nullish(),
+  "capacite_max_kg": zod.number().nullish(),
+  "precision_g": zod.number().nullish(),
+  "site": zod.string().nullish(),
+  "date_acquisition": zod.coerce.date().nullish(),
+  "date_derniere_verification": zod.coerce.date().nullish(),
+  "date_prochaine_verification": zod.coerce.date().nullish(),
+  "statut": zod.string(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})).optional()
+})
+
+
+/**
+ * @summary Créer une balance
+ */
+export const CreateBalanceBody = zod.object({
+  "numero_serie": zod.string().optional(),
+  "marque": zod.string().optional(),
+  "capacite_max_kg": zod.number().optional(),
+  "precision_g": zod.number().optional(),
+  "site": zod.string().optional(),
+  "date_acquisition": zod.coerce.date().optional(),
+  "date_prochaine_verification": zod.coerce.date().optional(),
+  "statut": zod.string()
+})
+
+
+/**
+ * @summary Modifier une balance
+ */
+export const UpdateBalanceParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateBalanceBody = zod.object({
+  "numero_serie": zod.string().optional(),
+  "marque": zod.string().optional(),
+  "capacite_max_kg": zod.number().optional(),
+  "precision_g": zod.number().optional(),
+  "site": zod.string().optional(),
+  "date_acquisition": zod.coerce.date().optional(),
+  "date_derniere_verification": zod.coerce.date().optional(),
+  "date_prochaine_verification": zod.coerce.date().optional(),
+  "statut": zod.string().optional()
+})
+
+export const UpdateBalanceResponse = zod.object({
+  "balance": zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "numero_serie": zod.string().nullish(),
+  "marque": zod.string().nullish(),
+  "capacite_max_kg": zod.number().nullish(),
+  "precision_g": zod.number().nullish(),
+  "site": zod.string().nullish(),
+  "date_acquisition": zod.coerce.date().nullish(),
+  "date_derniere_verification": zod.coerce.date().nullish(),
+  "date_prochaine_verification": zod.coerce.date().nullish(),
+  "statut": zod.string(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+}).optional()
+})
+
+
+/**
+ * @summary Enregistrer une vérification de balance
+ */
+export const CreateVerificationBalanceParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateVerificationBalanceBody = zod.object({
+  "date_verification": zod.coerce.date(),
+  "verificateur": zod.string().optional(),
+  "resultat": zod.string(),
+  "ecart_mesure_g": zod.number().optional(),
+  "observations": zod.string().optional(),
+  "prochaine_verification": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Valider la double pesée d'une livraison
+ */
+export const ValiderDoublePeseeBody = zod.object({
+  "livraison_id": zod.number(),
+  "poids_2eme_pesee": zod.number(),
+  "balance_id": zod.number(),
+  "peseur_id": zod.number().optional()
+})
+
+export const ValiderDoublePeseeResponse = zod.object({
+  "livraison": zod.object({
+
+}).passthrough().optional(),
+  "ecart_pct": zod.number().optional(),
+  "litige_cree": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Liste des litiges de pesée
+ */
+export const GetLitigesResponse = zod.object({
+  "litiges": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "livraison_id": zod.number(),
+  "membre_id": zod.number().nullish(),
+  "date_litige": zod.coerce.date(),
+  "poids_conteste_kg": zod.number().nullish(),
+  "poids_revendique_membre_kg": zod.number().nullish(),
+  "motif": zod.string().nullish(),
+  "statut": zod.string(),
+  "decision": zod.string().nullish(),
+  "poids_final_retenu_kg": zod.number().nullish(),
+  "difference_fcfa": zod.number().nullish(),
+  "resolu_par": zod.number().nullish(),
+  "resolu_le": zod.string().nullish(),
+  "created_at": zod.string()
+})).optional()
+})
+
+
+/**
+ * @summary Déclarer un litige de pesée
+ */
+export const CreateLitigeBody = zod.object({
+  "livraison_id": zod.number(),
+  "membre_id": zod.number().optional(),
+  "date_litige": zod.coerce.date(),
+  "poids_conteste_kg": zod.number().optional(),
+  "poids_revendique_membre_kg": zod.number().optional(),
+  "motif": zod.string().optional()
+})
+
+
+/**
+ * @summary Résoudre un litige de pesée
+ */
+export const ResoudreLitigeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ResoudreLitigeBody = zod.object({
+  "poids_final_retenu_kg": zod.number(),
+  "decision": zod.string()
+})
+
+export const ResoudreLitigeResponse = zod.object({
+  "litige": zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "livraison_id": zod.number(),
+  "membre_id": zod.number().nullish(),
+  "date_litige": zod.coerce.date(),
+  "poids_conteste_kg": zod.number().nullish(),
+  "poids_revendique_membre_kg": zod.number().nullish(),
+  "motif": zod.string().nullish(),
+  "statut": zod.string(),
+  "decision": zod.string().nullish(),
+  "poids_final_retenu_kg": zod.number().nullish(),
+  "difference_fcfa": zod.number().nullish(),
+  "resolu_par": zod.number().nullish(),
+  "resolu_le": zod.string().nullish(),
+  "created_at": zod.string()
+}).optional()
+})
+
+
+/**
+ * @summary Statistiques globales pesée
+ */
+export const GetStatistiquesPeseeResponse = zod.object({
+  "nb_pesees_total": zod.number().optional(),
+  "nb_double_pesees": zod.number().optional(),
+  "ecart_moyen_pct": zod.number().optional(),
+  "nb_litiges": zod.number().optional(),
+  "nb_litiges_resolus": zod.number().optional(),
+  "agent_plus_ecarts": zod.object({
+
+}).passthrough().nullish(),
+  "balance_plus_ecarts": zod.object({
+
+}).passthrough().nullish()
+})
+
+
+/**
+ * @summary Rapport pesée par agent terrain
+ */
+export const GetRapportAgentPeseeParams = zod.object({
+  "agent_id": zod.coerce.number()
+})
+
+export const GetRapportAgentPeseeResponse = zod.object({
+  "agent_id": zod.number().optional(),
+  "nom": zod.string().nullish(),
+  "nb_pesees": zod.number().optional(),
+  "ecart_moyen_pct": zod.number().optional(),
+  "nb_anomalies": zod.number().optional(),
+  "nb_litiges": zod.number().optional()
+})
+
+
+/**
+ * @summary Configuration pesée de la coopérative
+ */
+export const GetConfigPeseeResponse = zod.object({
+  "id": zod.number().nullish(),
+  "cooperative_id": zod.number().nullish(),
+  "ecart_max_autorise_pct": zod.number().optional(),
+  "seuil_double_pesee_kg": zod.number().optional(),
+  "tolerance_balance_g": zod.number().optional(),
+  "frequence_verification_jours": zod.number().optional(),
+  "updated_at": zod.string().nullish()
+})
+
+
+/**
+ * @summary Modifier la config pesée
+ */
+export const UpdateConfigPeseeBody = zod.object({
+  "ecart_max_autorise_pct": zod.number().optional(),
+  "seuil_double_pesee_kg": zod.number().optional(),
+  "tolerance_balance_g": zod.number().optional(),
+  "frequence_verification_jours": zod.number().optional()
+})
+
+export const UpdateConfigPeseeResponse = zod.object({
+  "id": zod.number().nullish(),
+  "cooperative_id": zod.number().nullish(),
+  "ecart_max_autorise_pct": zod.number().optional(),
+  "seuil_double_pesee_kg": zod.number().optional(),
+  "tolerance_balance_g": zod.number().optional(),
+  "frequence_verification_jours": zod.number().optional(),
+  "updated_at": zod.string().nullish()
+})
+
+

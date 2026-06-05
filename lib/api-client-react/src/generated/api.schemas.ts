@@ -3594,6 +3594,145 @@ export interface RapportVehicule {
   nb_missions?: number;
 }
 
+export interface Balance {
+  id: number;
+  cooperative_id: number;
+  numero_serie?: string | null;
+  marque?: string | null;
+  capacite_max_kg?: number | null;
+  precision_g?: number | null;
+  site?: string | null;
+  date_acquisition?: string | null;
+  date_derniere_verification?: string | null;
+  date_prochaine_verification?: string | null;
+  statut: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateBalanceBody {
+  numero_serie?: string;
+  marque?: string;
+  capacite_max_kg?: number;
+  precision_g?: number;
+  site?: string;
+  date_acquisition?: string;
+  date_prochaine_verification?: string;
+  statut: string;
+}
+
+export interface UpdateBalanceBody {
+  numero_serie?: string;
+  marque?: string;
+  capacite_max_kg?: number;
+  precision_g?: number;
+  site?: string;
+  date_acquisition?: string;
+  date_derniere_verification?: string;
+  date_prochaine_verification?: string;
+  statut?: string;
+}
+
+export interface VerificationBalance {
+  id: number;
+  balance_id: number;
+  date_verification: string;
+  verificateur?: string | null;
+  resultat: string;
+  ecart_mesure_g?: number | null;
+  observations?: string | null;
+  prochaine_verification?: string | null;
+  created_at: string;
+}
+
+export interface CreateVerificationBody {
+  date_verification: string;
+  verificateur?: string;
+  resultat: string;
+  ecart_mesure_g?: number;
+  observations?: string;
+  prochaine_verification?: string;
+}
+
+export interface ValiderDoublePeseeBody {
+  livraison_id: number;
+  poids_2eme_pesee: number;
+  balance_id: number;
+  peseur_id?: number;
+}
+
+export interface LitigePesee {
+  id: number;
+  cooperative_id: number;
+  livraison_id: number;
+  membre_id?: number | null;
+  date_litige: string;
+  poids_conteste_kg?: number | null;
+  poids_revendique_membre_kg?: number | null;
+  motif?: string | null;
+  statut: string;
+  decision?: string | null;
+  poids_final_retenu_kg?: number | null;
+  difference_fcfa?: number | null;
+  resolu_par?: number | null;
+  resolu_le?: string | null;
+  created_at: string;
+}
+
+export interface CreateLitigeBody {
+  livraison_id: number;
+  membre_id?: number;
+  date_litige: string;
+  poids_conteste_kg?: number;
+  poids_revendique_membre_kg?: number;
+  motif?: string;
+}
+
+export interface ResoudreLitigeBody {
+  poids_final_retenu_kg: number;
+  decision: string;
+}
+
+export interface ConfigPesee {
+  id?: number | null;
+  cooperative_id?: number | null;
+  ecart_max_autorise_pct?: number;
+  seuil_double_pesee_kg?: number;
+  tolerance_balance_g?: number;
+  frequence_verification_jours?: number;
+  updated_at?: string | null;
+}
+
+export interface UpdateConfigPeseeBody {
+  ecart_max_autorise_pct?: number;
+  seuil_double_pesee_kg?: number;
+  tolerance_balance_g?: number;
+  frequence_verification_jours?: number;
+}
+
+export type StatistiquesPeseeAgentPlusEcarts = { [key: string]: unknown } | null;
+
+export type StatistiquesPeseeBalancePlusEcarts = { [key: string]: unknown } | null;
+
+export interface StatistiquesPesee {
+  nb_pesees_total?: number;
+  nb_double_pesees?: number;
+  ecart_moyen_pct?: number;
+  nb_litiges?: number;
+  nb_litiges_resolus?: number;
+  agent_plus_ecarts?: StatistiquesPeseeAgentPlusEcarts;
+  balance_plus_ecarts?: StatistiquesPeseeBalancePlusEcarts;
+}
+
+export interface RapportAgentPesee {
+  agent_id?: number;
+  nom?: string | null;
+  nb_pesees?: number;
+  ecart_moyen_pct?: number;
+  nb_anomalies?: number;
+  nb_litiges?: number;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -4013,5 +4152,45 @@ export type GetMissions200 = {
 
 export type GetRapportCampagneTransportParams = {
 campagne_id?: number;
+};
+
+export type GetBalancesAlertes200 = {
+  alertes?: Balance[];
+};
+
+export type GetBalances200 = {
+  balances?: Balance[];
+};
+
+export type CreateBalance201 = {
+  balance?: Balance;
+};
+
+export type UpdateBalance200 = {
+  balance?: Balance;
+};
+
+export type CreateVerificationBalance201 = {
+  verification?: VerificationBalance;
+};
+
+export type ValiderDoublePesee200Livraison = { [key: string]: unknown };
+
+export type ValiderDoublePesee200 = {
+  livraison?: ValiderDoublePesee200Livraison;
+  ecart_pct?: number;
+  litige_cree?: boolean;
+};
+
+export type GetLitiges200 = {
+  litiges?: LitigePesee[];
+};
+
+export type CreateLitige201 = {
+  litige?: LitigePesee;
+};
+
+export type ResoudreLitige200 = {
+  litige?: LitigePesee;
 };
 
