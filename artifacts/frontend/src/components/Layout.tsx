@@ -28,6 +28,7 @@ import {
   Target,
   HandCoins,
   Gavel,
+  TrendingUp,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey } from "@workspace/api-client-react";
 
@@ -121,6 +122,12 @@ const navItems = [
     label: "Gouvernance",
     icon: Gavel,
     roles: ["pca", "directeur", "secretaire", "auditeur"],
+  },
+  {
+    href: "/prix",
+    label: "Suivi des Prix",
+    icon: TrendingUp,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
   },
   {
     href: "/refus",

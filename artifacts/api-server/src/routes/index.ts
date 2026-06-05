@@ -25,6 +25,7 @@ import devisesRouter from "./devises";
 import budgetRouter from "./budget";
 import subventionsRouter from "./subventions";
 import gouvernanceRouter from "./gouvernance";
+import prixRouter from "./prix";
 
 const router: IRouter = Router();
 
@@ -54,5 +55,6 @@ router.use(devisesRouter);
 router.use(budgetRouter);
 router.use(subventionsRouter);
 router.use(gouvernanceRouter);
+router.use(prixRouter);
 
 export default router;

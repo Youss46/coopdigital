@@ -2410,6 +2410,148 @@ export interface AgDetail {
   convocations: ConvocationAg[];
 }
 
+export interface HistoriquePrix {
+  id: number;
+  cooperativeId: number;
+  campagneId?: number | null;
+  datePrix: string;
+  prixBordChampFcfa: string;
+  prixVenteExportFcfa: string;
+  margeBruteKgFcfa?: string | null;
+  source?: string | null;
+  saisiPar?: number | null;
+  createdAt: string;
+}
+
+export interface SaisirPrixInput {
+  campagneId?: number;
+  datePrix: string;
+  prixBordChampFcfa: number;
+  prixVenteExportFcfa: number;
+  source?: string;
+}
+
+export type AlertePrixType = typeof AlertePrixType[keyof typeof AlertePrixType];
+
+
+export const AlertePrixType = {
+  marge_faible: 'marge_faible',
+  prix_bas: 'prix_bas',
+  prix_eleve: 'prix_eleve',
+  variation_forte: 'variation_forte',
+} as const;
+
+export interface AlertePrix {
+  id: number;
+  cooperativeId: number;
+  type: AlertePrixType;
+  seuilConfigure?: string | null;
+  valeurDeclenchante?: string | null;
+  message?: string | null;
+  lu: boolean;
+  createdAt: string;
+}
+
+export interface ConfigPrix {
+  id: number;
+  cooperativeId: number;
+  seuilMargeMinimumFcfa?: string | null;
+  seuilVariationAlertePct?: string | null;
+  diffusionAutoSms: boolean;
+  updatedAt?: string;
+}
+
+export interface ConfigPrixInput {
+  seuilMargeMinimumFcfa?: number;
+  seuilVariationAlertePct?: number;
+  diffusionAutoSms?: boolean;
+}
+
+export type LotMargeRentabilite = typeof LotMargeRentabilite[keyof typeof LotMargeRentabilite];
+
+
+export const LotMargeRentabilite = {
+  bonne: 'bonne',
+  faible: 'faible',
+  negative: 'negative',
+} as const;
+
+export interface LotMarge {
+  venteId: number;
+  lotId?: number | null;
+  exportateur: string;
+  poidsKg: number;
+  prixVenteKg: number;
+  prixAchatMoyenKg: number;
+  chargesEstimeesKg: number;
+  margeKg: number;
+  margeTotale: number;
+  dateVente: string;
+  rentabilite: LotMargeRentabilite;
+}
+
+export interface AnalyseMarge {
+  lots: LotMarge[];
+  meilleurLot?: LotMarge | null;
+  moinsRentable?: LotMarge | null;
+  margesMoyenne: number;
+}
+
+export interface ComparaisonCampagne {
+  campagne_id?: number;
+  libelle?: string;
+  prix_achat_moy?: string | null;
+  prix_vente_moy?: string | null;
+  marge_moy?: string | null;
+  tonnage_total?: string | null;
+  nb_ventes?: string;
+}
+
+export type TendancePrixDirection = typeof TendancePrixDirection[keyof typeof TendancePrixDirection];
+
+
+export const TendancePrixDirection = {
+  hausse: 'hausse',
+  stable: 'stable',
+  baisse: 'baisse',
+} as const;
+
+export interface TendancePrix {
+  direction: TendancePrixDirection;
+  moyenneMobile: number;
+  variationSemainePct: number;
+  dernierPrix?: HistoriquePrix | null;
+  series?: HistoriquePrix[];
+}
+
+export interface DiffuserPrixSmsInput {
+  prix: number;
+  date: string;
+}
+
+export interface SmsDiffusionResult {
+  envoyes: number;
+  echecs: number;
+  total: number;
+}
+
+export type SimulationMargeRentabilite = typeof SimulationMargeRentabilite[keyof typeof SimulationMargeRentabilite];
+
+
+export const SimulationMargeRentabilite = {
+  bonne: 'bonne',
+  faible: 'faible',
+  negative: 'negative',
+} as const;
+
+export interface SimulationMarge {
+  prixBordChampHypothetique: number;
+  prixVenteReference: number;
+  chargesEstimees: number;
+  margeSimulee: number;
+  rentabilite: SimulationMargeRentabilite;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -2654,6 +2796,25 @@ campagne_id?: number;
 export type PostBudgetIdSync200 = {
   ok?: boolean;
   message?: string;
+};
+
+export type GetPrixHistoriqueParams = {
+campagneId?: number;
+dateDebut?: string;
+dateFin?: string;
+limit?: number;
+};
+
+export type GetPrixAnalyseMargeParams = {
+campagneId?: number;
+};
+
+export type GetPrixAlertesParams = {
+nonLues?: boolean;
+};
+
+export type GetPrixSimulationParams = {
+prixHypothetique: number;
 };
 
 export type PostSubventionsIdTranche200 = {

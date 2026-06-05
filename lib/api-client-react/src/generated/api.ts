@@ -23,6 +23,8 @@ import type {
   AgDetail,
   AgInput,
   AgListItem,
+  AlertePrix,
+  AnalyseMarge,
   ApproIntrant,
   ApproIntrantInput,
   AssembleeGenerale,
@@ -47,10 +49,13 @@ import type {
   CampagneInput,
   CategorieIntrant,
   CloturerAgInput,
+  ComparaisonCampagne,
   ComposanteSalaire,
   CompteResultat,
   ConfigComptable,
   ConfigPartsSociales,
+  ConfigPrix,
+  ConfigPrixInput,
   ConversionInput,
   ConversionResult,
   ConvocationInput,
@@ -63,6 +68,7 @@ import type {
   CreateUserInput,
   DashboardKpi,
   Devise,
+  DiffuserPrixSmsInput,
   DistributionIntrant,
   DistributionIntrantInput,
   EcheanceAlerte,
@@ -104,12 +110,17 @@ import type {
   GetMargeCollecteParams,
   GetMembresParams,
   GetMouvementsStockParams,
+  GetPrixAlertesParams,
+  GetPrixAnalyseMargeParams,
+  GetPrixHistoriqueParams,
+  GetPrixSimulationParams,
   GetRapportCampagneIntrantsParams,
   GetRapportTypeFournisseur200Item,
   GetVentesParams,
   GrandLivrePage,
   HealthStatus,
   HistoriqueMasse,
+  HistoriquePrix,
   HypotheseBudget,
   HypothesesInput,
   Intrant,
@@ -171,7 +182,10 @@ import type {
   RemboursementIntrantInput,
   ResetPasswordInput,
   ResetUserPassword200,
+  SaisirPrixInput,
   SearchFournisseursParams,
+  SimulationMarge,
+  SmsDiffusionResult,
   SmsGroupeInput,
   SmsGroupeResult,
   SmsHistorique,
@@ -183,6 +197,7 @@ import type {
   TauxActuel,
   TauxChange,
   TauxChangeInput,
+  TendancePrix,
   ToggleActifInput,
   TraiterRefusInput,
   TrancheInput,
@@ -9667,6 +9682,933 @@ export function useGetAgIdPvPdf<TData = Awaited<ReturnType<typeof getAgIdPvPdf>>
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetAgIdPvPdfQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPrixActuelUrl = () => {
+
+
+
+
+  return `/api/prix/actuel`
+}
+
+/**
+ * @summary Dernier prix bord champ
+ */
+export const getPrixActuel = async ( options?: RequestInit): Promise<HistoriquePrix> => {
+
+  return customFetch<HistoriquePrix>(getGetPrixActuelUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPrixActuelQueryKey = () => {
+    return [
+    `/api/prix/actuel`
+    ] as const;
+    }
+
+
+export const getGetPrixActuelQueryOptions = <TData = Awaited<ReturnType<typeof getPrixActuel>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixActuel>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPrixActuelQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPrixActuel>>> = ({ signal }) => getPrixActuel({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPrixActuel>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPrixActuelQueryResult = NonNullable<Awaited<ReturnType<typeof getPrixActuel>>>
+export type GetPrixActuelQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Dernier prix bord champ
+ */
+
+export function useGetPrixActuel<TData = Awaited<ReturnType<typeof getPrixActuel>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixActuel>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPrixActuelQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostPrixUrl = () => {
+
+
+
+
+  return `/api/prix`
+}
+
+/**
+ * @summary Saisir un nouveau prix
+ */
+export const postPrix = async (saisirPrixInput: SaisirPrixInput, options?: RequestInit): Promise<HistoriquePrix> => {
+
+  return customFetch<HistoriquePrix>(getPostPrixUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      saisirPrixInput,)
+  }
+);}
+
+
+
+
+export const getPostPrixMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPrix>>, TError,{data: BodyType<SaisirPrixInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPrix>>, TError,{data: BodyType<SaisirPrixInput>}, TContext> => {
+
+const mutationKey = ['postPrix'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPrix>>, {data: BodyType<SaisirPrixInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPrix(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPrixMutationResult = NonNullable<Awaited<ReturnType<typeof postPrix>>>
+    export type PostPrixMutationBody = BodyType<SaisirPrixInput>
+    export type PostPrixMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Saisir un nouveau prix
+ */
+export const usePostPrix = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPrix>>, TError,{data: BodyType<SaisirPrixInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postPrix>>,
+        TError,
+        {data: BodyType<SaisirPrixInput>},
+        TContext
+      > => {
+      return useMutation(getPostPrixMutationOptions(options));
+    }
+
+export const getGetPrixHistoriqueUrl = (params?: GetPrixHistoriqueParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/prix/historique?${stringifiedParams}` : `/api/prix/historique`
+}
+
+/**
+ * @summary Historique des prix avec filtres
+ */
+export const getPrixHistorique = async (params?: GetPrixHistoriqueParams, options?: RequestInit): Promise<HistoriquePrix[]> => {
+
+  return customFetch<HistoriquePrix[]>(getGetPrixHistoriqueUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPrixHistoriqueQueryKey = (params?: GetPrixHistoriqueParams,) => {
+    return [
+    `/api/prix/historique`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPrixHistoriqueQueryOptions = <TData = Awaited<ReturnType<typeof getPrixHistorique>>, TError = ErrorType<unknown>>(params?: GetPrixHistoriqueParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixHistorique>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPrixHistoriqueQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPrixHistorique>>> = ({ signal }) => getPrixHistorique(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPrixHistorique>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPrixHistoriqueQueryResult = NonNullable<Awaited<ReturnType<typeof getPrixHistorique>>>
+export type GetPrixHistoriqueQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Historique des prix avec filtres
+ */
+
+export function useGetPrixHistorique<TData = Awaited<ReturnType<typeof getPrixHistorique>>, TError = ErrorType<unknown>>(
+ params?: GetPrixHistoriqueParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixHistorique>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPrixHistoriqueQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPrixAnalyseMargeUrl = (params?: GetPrixAnalyseMargeParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/prix/analyse-marge?${stringifiedParams}` : `/api/prix/analyse-marge`
+}
+
+/**
+ * @summary Analyse de marge par lot
+ */
+export const getPrixAnalyseMarge = async (params?: GetPrixAnalyseMargeParams, options?: RequestInit): Promise<AnalyseMarge> => {
+
+  return customFetch<AnalyseMarge>(getGetPrixAnalyseMargeUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPrixAnalyseMargeQueryKey = (params?: GetPrixAnalyseMargeParams,) => {
+    return [
+    `/api/prix/analyse-marge`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPrixAnalyseMargeQueryOptions = <TData = Awaited<ReturnType<typeof getPrixAnalyseMarge>>, TError = ErrorType<unknown>>(params?: GetPrixAnalyseMargeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixAnalyseMarge>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPrixAnalyseMargeQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPrixAnalyseMarge>>> = ({ signal }) => getPrixAnalyseMarge(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPrixAnalyseMarge>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPrixAnalyseMargeQueryResult = NonNullable<Awaited<ReturnType<typeof getPrixAnalyseMarge>>>
+export type GetPrixAnalyseMargeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Analyse de marge par lot
+ */
+
+export function useGetPrixAnalyseMarge<TData = Awaited<ReturnType<typeof getPrixAnalyseMarge>>, TError = ErrorType<unknown>>(
+ params?: GetPrixAnalyseMargeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixAnalyseMarge>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPrixAnalyseMargeQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPrixComparaisonUrl = () => {
+
+
+
+
+  return `/api/prix/comparaison`
+}
+
+/**
+ * @summary Comparaison prix et marges sur N campagnes
+ */
+export const getPrixComparaison = async ( options?: RequestInit): Promise<ComparaisonCampagne[]> => {
+
+  return customFetch<ComparaisonCampagne[]>(getGetPrixComparaisonUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPrixComparaisonQueryKey = () => {
+    return [
+    `/api/prix/comparaison`
+    ] as const;
+    }
+
+
+export const getGetPrixComparaisonQueryOptions = <TData = Awaited<ReturnType<typeof getPrixComparaison>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixComparaison>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPrixComparaisonQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPrixComparaison>>> = ({ signal }) => getPrixComparaison({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPrixComparaison>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPrixComparaisonQueryResult = NonNullable<Awaited<ReturnType<typeof getPrixComparaison>>>
+export type GetPrixComparaisonQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Comparaison prix et marges sur N campagnes
+ */
+
+export function useGetPrixComparaison<TData = Awaited<ReturnType<typeof getPrixComparaison>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixComparaison>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPrixComparaisonQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPrixTendanceUrl = () => {
+
+
+
+
+  return `/api/prix/tendance`
+}
+
+/**
+ * @summary Tendance des prix (moyenne mobile 4 semaines)
+ */
+export const getPrixTendance = async ( options?: RequestInit): Promise<TendancePrix> => {
+
+  return customFetch<TendancePrix>(getGetPrixTendanceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPrixTendanceQueryKey = () => {
+    return [
+    `/api/prix/tendance`
+    ] as const;
+    }
+
+
+export const getGetPrixTendanceQueryOptions = <TData = Awaited<ReturnType<typeof getPrixTendance>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixTendance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPrixTendanceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPrixTendance>>> = ({ signal }) => getPrixTendance({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPrixTendance>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPrixTendanceQueryResult = NonNullable<Awaited<ReturnType<typeof getPrixTendance>>>
+export type GetPrixTendanceQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Tendance des prix (moyenne mobile 4 semaines)
+ */
+
+export function useGetPrixTendance<TData = Awaited<ReturnType<typeof getPrixTendance>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixTendance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPrixTendanceQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPrixConfigUrl = () => {
+
+
+
+
+  return `/api/prix/config`
+}
+
+/**
+ * @summary Configuration des seuils alertes
+ */
+export const getPrixConfig = async ( options?: RequestInit): Promise<ConfigPrix> => {
+
+  return customFetch<ConfigPrix>(getGetPrixConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPrixConfigQueryKey = () => {
+    return [
+    `/api/prix/config`
+    ] as const;
+    }
+
+
+export const getGetPrixConfigQueryOptions = <TData = Awaited<ReturnType<typeof getPrixConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPrixConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPrixConfig>>> = ({ signal }) => getPrixConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPrixConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPrixConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getPrixConfig>>>
+export type GetPrixConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Configuration des seuils alertes
+ */
+
+export function useGetPrixConfig<TData = Awaited<ReturnType<typeof getPrixConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPrixConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPutPrixConfigUrl = () => {
+
+
+
+
+  return `/api/prix/config`
+}
+
+/**
+ * @summary Mettre à jour la configuration
+ */
+export const putPrixConfig = async (configPrixInput: ConfigPrixInput, options?: RequestInit): Promise<ConfigPrix> => {
+
+  return customFetch<ConfigPrix>(getPutPrixConfigUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      configPrixInput,)
+  }
+);}
+
+
+
+
+export const getPutPrixConfigMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPrixConfig>>, TError,{data: BodyType<ConfigPrixInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putPrixConfig>>, TError,{data: BodyType<ConfigPrixInput>}, TContext> => {
+
+const mutationKey = ['putPrixConfig'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putPrixConfig>>, {data: BodyType<ConfigPrixInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  putPrixConfig(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutPrixConfigMutationResult = NonNullable<Awaited<ReturnType<typeof putPrixConfig>>>
+    export type PutPrixConfigMutationBody = BodyType<ConfigPrixInput>
+    export type PutPrixConfigMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mettre à jour la configuration
+ */
+export const usePutPrixConfig = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPrixConfig>>, TError,{data: BodyType<ConfigPrixInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putPrixConfig>>,
+        TError,
+        {data: BodyType<ConfigPrixInput>},
+        TContext
+      > => {
+      return useMutation(getPutPrixConfigMutationOptions(options));
+    }
+
+export const getGetPrixAlertesUrl = (params?: GetPrixAlertesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/prix/alertes?${stringifiedParams}` : `/api/prix/alertes`
+}
+
+/**
+ * @summary Alertes prix
+ */
+export const getPrixAlertes = async (params?: GetPrixAlertesParams, options?: RequestInit): Promise<AlertePrix[]> => {
+
+  return customFetch<AlertePrix[]>(getGetPrixAlertesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPrixAlertesQueryKey = (params?: GetPrixAlertesParams,) => {
+    return [
+    `/api/prix/alertes`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPrixAlertesQueryOptions = <TData = Awaited<ReturnType<typeof getPrixAlertes>>, TError = ErrorType<unknown>>(params?: GetPrixAlertesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPrixAlertesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPrixAlertes>>> = ({ signal }) => getPrixAlertes(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPrixAlertes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPrixAlertesQueryResult = NonNullable<Awaited<ReturnType<typeof getPrixAlertes>>>
+export type GetPrixAlertesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Alertes prix
+ */
+
+export function useGetPrixAlertes<TData = Awaited<ReturnType<typeof getPrixAlertes>>, TError = ErrorType<unknown>>(
+ params?: GetPrixAlertesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPrixAlertesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPutPrixAlertesIdLuUrl = (id: number,) => {
+
+
+
+
+  return `/api/prix/alertes/${id}/lu`
+}
+
+/**
+ * @summary Marquer alerte comme lue
+ */
+export const putPrixAlertesIdLu = async (id: number, options?: RequestInit): Promise<AlertePrix> => {
+
+  return customFetch<AlertePrix>(getPutPrixAlertesIdLuUrl(id),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+export const getPutPrixAlertesIdLuMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPrixAlertesIdLu>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putPrixAlertesIdLu>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['putPrixAlertesIdLu'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putPrixAlertesIdLu>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  putPrixAlertesIdLu(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutPrixAlertesIdLuMutationResult = NonNullable<Awaited<ReturnType<typeof putPrixAlertesIdLu>>>
+
+    export type PutPrixAlertesIdLuMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Marquer alerte comme lue
+ */
+export const usePutPrixAlertesIdLu = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPrixAlertesIdLu>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putPrixAlertesIdLu>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPutPrixAlertesIdLuMutationOptions(options));
+    }
+
+export const getPostPrixDiffuserSmsUrl = () => {
+
+
+
+
+  return `/api/prix/diffuser-sms`
+}
+
+/**
+ * @summary Diffuser le prix par SMS aux membres actifs
+ */
+export const postPrixDiffuserSms = async (diffuserPrixSmsInput: DiffuserPrixSmsInput, options?: RequestInit): Promise<SmsDiffusionResult> => {
+
+  return customFetch<SmsDiffusionResult>(getPostPrixDiffuserSmsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      diffuserPrixSmsInput,)
+  }
+);}
+
+
+
+
+export const getPostPrixDiffuserSmsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPrixDiffuserSms>>, TError,{data: BodyType<DiffuserPrixSmsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPrixDiffuserSms>>, TError,{data: BodyType<DiffuserPrixSmsInput>}, TContext> => {
+
+const mutationKey = ['postPrixDiffuserSms'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPrixDiffuserSms>>, {data: BodyType<DiffuserPrixSmsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPrixDiffuserSms(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPrixDiffuserSmsMutationResult = NonNullable<Awaited<ReturnType<typeof postPrixDiffuserSms>>>
+    export type PostPrixDiffuserSmsMutationBody = BodyType<DiffuserPrixSmsInput>
+    export type PostPrixDiffuserSmsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Diffuser le prix par SMS aux membres actifs
+ */
+export const usePostPrixDiffuserSms = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPrixDiffuserSms>>, TError,{data: BodyType<DiffuserPrixSmsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postPrixDiffuserSms>>,
+        TError,
+        {data: BodyType<DiffuserPrixSmsInput>},
+        TContext
+      > => {
+      return useMutation(getPostPrixDiffuserSmsMutationOptions(options));
+    }
+
+export const getGetPrixSimulationUrl = (params: GetPrixSimulationParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/prix/simulation?${stringifiedParams}` : `/api/prix/simulation`
+}
+
+/**
+ * @summary Simuler la marge avec un prix hypothétique
+ */
+export const getPrixSimulation = async (params: GetPrixSimulationParams, options?: RequestInit): Promise<SimulationMarge> => {
+
+  return customFetch<SimulationMarge>(getGetPrixSimulationUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPrixSimulationQueryKey = (params?: GetPrixSimulationParams,) => {
+    return [
+    `/api/prix/simulation`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPrixSimulationQueryOptions = <TData = Awaited<ReturnType<typeof getPrixSimulation>>, TError = ErrorType<unknown>>(params: GetPrixSimulationParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixSimulation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPrixSimulationQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPrixSimulation>>> = ({ signal }) => getPrixSimulation(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPrixSimulation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPrixSimulationQueryResult = NonNullable<Awaited<ReturnType<typeof getPrixSimulation>>>
+export type GetPrixSimulationQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Simuler la marge avec un prix hypothétique
+ */
+
+export function useGetPrixSimulation<TData = Awaited<ReturnType<typeof getPrixSimulation>>, TError = ErrorType<unknown>>(
+ params: GetPrixSimulationParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPrixSimulation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPrixSimulationQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

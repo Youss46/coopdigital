@@ -3036,6 +3036,262 @@ export const GetAgIdPvPdfParams = zod.object({
 
 
 /**
+ * @summary Dernier prix bord champ
+ */
+export const GetPrixActuelResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "campagneId": zod.number().nullish(),
+  "datePrix": zod.coerce.date(),
+  "prixBordChampFcfa": zod.string(),
+  "prixVenteExportFcfa": zod.string(),
+  "margeBruteKgFcfa": zod.string().nullish(),
+  "source": zod.string().nullish(),
+  "saisiPar": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Saisir un nouveau prix
+ */
+export const PostPrixBody = zod.object({
+  "campagneId": zod.number().optional(),
+  "datePrix": zod.coerce.date(),
+  "prixBordChampFcfa": zod.number(),
+  "prixVenteExportFcfa": zod.number(),
+  "source": zod.string().optional()
+})
+
+
+/**
+ * @summary Historique des prix avec filtres
+ */
+export const GetPrixHistoriqueQueryParams = zod.object({
+  "campagneId": zod.coerce.number().optional(),
+  "dateDebut": zod.date().optional(),
+  "dateFin": zod.date().optional(),
+  "limit": zod.coerce.number().optional()
+})
+
+export const GetPrixHistoriqueResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "campagneId": zod.number().nullish(),
+  "datePrix": zod.coerce.date(),
+  "prixBordChampFcfa": zod.string(),
+  "prixVenteExportFcfa": zod.string(),
+  "margeBruteKgFcfa": zod.string().nullish(),
+  "source": zod.string().nullish(),
+  "saisiPar": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const GetPrixHistoriqueResponse = zod.array(GetPrixHistoriqueResponseItem)
+
+
+/**
+ * @summary Analyse de marge par lot
+ */
+export const GetPrixAnalyseMargeQueryParams = zod.object({
+  "campagneId": zod.coerce.number().optional()
+})
+
+export const GetPrixAnalyseMargeResponse = zod.object({
+  "lots": zod.array(zod.object({
+  "venteId": zod.number(),
+  "lotId": zod.number().nullish(),
+  "exportateur": zod.string(),
+  "poidsKg": zod.number(),
+  "prixVenteKg": zod.number(),
+  "prixAchatMoyenKg": zod.number(),
+  "chargesEstimeesKg": zod.number(),
+  "margeKg": zod.number(),
+  "margeTotale": zod.number(),
+  "dateVente": zod.string(),
+  "rentabilite": zod.enum(['bonne', 'faible', 'negative'])
+})),
+  "meilleurLot": zod.object({
+  "venteId": zod.number(),
+  "lotId": zod.number().nullish(),
+  "exportateur": zod.string(),
+  "poidsKg": zod.number(),
+  "prixVenteKg": zod.number(),
+  "prixAchatMoyenKg": zod.number(),
+  "chargesEstimeesKg": zod.number(),
+  "margeKg": zod.number(),
+  "margeTotale": zod.number(),
+  "dateVente": zod.string(),
+  "rentabilite": zod.enum(['bonne', 'faible', 'negative'])
+}).nullish(),
+  "moinsRentable": zod.object({
+  "venteId": zod.number(),
+  "lotId": zod.number().nullish(),
+  "exportateur": zod.string(),
+  "poidsKg": zod.number(),
+  "prixVenteKg": zod.number(),
+  "prixAchatMoyenKg": zod.number(),
+  "chargesEstimeesKg": zod.number(),
+  "margeKg": zod.number(),
+  "margeTotale": zod.number(),
+  "dateVente": zod.string(),
+  "rentabilite": zod.enum(['bonne', 'faible', 'negative'])
+}).nullish(),
+  "margesMoyenne": zod.number()
+})
+
+
+/**
+ * @summary Comparaison prix et marges sur N campagnes
+ */
+export const GetPrixComparaisonResponseItem = zod.object({
+  "campagne_id": zod.number().optional(),
+  "libelle": zod.string().optional(),
+  "prix_achat_moy": zod.string().nullish(),
+  "prix_vente_moy": zod.string().nullish(),
+  "marge_moy": zod.string().nullish(),
+  "tonnage_total": zod.string().nullish(),
+  "nb_ventes": zod.string().optional()
+})
+export const GetPrixComparaisonResponse = zod.array(GetPrixComparaisonResponseItem)
+
+
+/**
+ * @summary Tendance des prix (moyenne mobile 4 semaines)
+ */
+export const GetPrixTendanceResponse = zod.object({
+  "direction": zod.enum(['hausse', 'stable', 'baisse']),
+  "moyenneMobile": zod.number(),
+  "variationSemainePct": zod.number(),
+  "dernierPrix": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "campagneId": zod.number().nullish(),
+  "datePrix": zod.coerce.date(),
+  "prixBordChampFcfa": zod.string(),
+  "prixVenteExportFcfa": zod.string(),
+  "margeBruteKgFcfa": zod.string().nullish(),
+  "source": zod.string().nullish(),
+  "saisiPar": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+}).nullish(),
+  "series": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "campagneId": zod.number().nullish(),
+  "datePrix": zod.coerce.date(),
+  "prixBordChampFcfa": zod.string(),
+  "prixVenteExportFcfa": zod.string(),
+  "margeBruteKgFcfa": zod.string().nullish(),
+  "source": zod.string().nullish(),
+  "saisiPar": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})).optional()
+})
+
+
+/**
+ * @summary Configuration des seuils alertes
+ */
+export const GetPrixConfigResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "seuilMargeMinimumFcfa": zod.string().nullish(),
+  "seuilVariationAlertePct": zod.string().nullish(),
+  "diffusionAutoSms": zod.boolean(),
+  "updatedAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Mettre à jour la configuration
+ */
+export const PutPrixConfigBody = zod.object({
+  "seuilMargeMinimumFcfa": zod.number().optional(),
+  "seuilVariationAlertePct": zod.number().optional(),
+  "diffusionAutoSms": zod.boolean().optional()
+})
+
+export const PutPrixConfigResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "seuilMargeMinimumFcfa": zod.string().nullish(),
+  "seuilVariationAlertePct": zod.string().nullish(),
+  "diffusionAutoSms": zod.boolean(),
+  "updatedAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Alertes prix
+ */
+export const GetPrixAlertesQueryParams = zod.object({
+  "nonLues": zod.coerce.boolean().optional()
+})
+
+export const GetPrixAlertesResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "type": zod.enum(['marge_faible', 'prix_bas', 'prix_eleve', 'variation_forte']),
+  "seuilConfigure": zod.string().nullish(),
+  "valeurDeclenchante": zod.string().nullish(),
+  "message": zod.string().nullish(),
+  "lu": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+export const GetPrixAlertesResponse = zod.array(GetPrixAlertesResponseItem)
+
+
+/**
+ * @summary Marquer alerte comme lue
+ */
+export const PutPrixAlertesIdLuParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PutPrixAlertesIdLuResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "type": zod.enum(['marge_faible', 'prix_bas', 'prix_eleve', 'variation_forte']),
+  "seuilConfigure": zod.string().nullish(),
+  "valeurDeclenchante": zod.string().nullish(),
+  "message": zod.string().nullish(),
+  "lu": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Diffuser le prix par SMS aux membres actifs
+ */
+export const PostPrixDiffuserSmsBody = zod.object({
+  "prix": zod.number(),
+  "date": zod.coerce.date()
+})
+
+export const PostPrixDiffuserSmsResponse = zod.object({
+  "envoyes": zod.number(),
+  "echecs": zod.number(),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary Simuler la marge avec un prix hypothétique
+ */
+export const GetPrixSimulationQueryParams = zod.object({
+  "prixHypothetique": zod.coerce.number()
+})
+
+export const GetPrixSimulationResponse = zod.object({
+  "prixBordChampHypothetique": zod.number(),
+  "prixVenteReference": zod.number(),
+  "chargesEstimees": zod.number(),
+  "margeSimulee": zod.number(),
+  "rentabilite": zod.enum(['bonne', 'faible', 'negative'])
+})
+
+
+/**
  * @summary Lister les bailleurs
  */
 export const GetBailleursResponseItem = zod.object({

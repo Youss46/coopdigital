@@ -197,6 +197,15 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     supprimer:   ["pca"],
   },
 
+  // MODULE PRIX
+  prix: {
+    voir:         ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    saisir_prix:  ["pca", "directeur"],
+    diffuser_sms: ["pca", "directeur"],
+    voir_analyse: ["pca", "directeur", "comptable", "auditeur"],
+    configurer:   ["pca", "directeur"],
+  },
+
   // MODULE M28 — INTRANTS
   intrants: {
     voir:          ["pca", "directeur", "comptable", "agent_terrain", "auditeur", "magasinier"],

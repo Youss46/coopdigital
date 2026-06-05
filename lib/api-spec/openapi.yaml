@@ -2754,6 +2754,225 @@ paths:
                 type: string
                 format: binary
 
+  /prix/actuel:
+    get:
+      summary: Dernier prix bord champ
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Prix actuel ou null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoriquePrix"
+
+  /prix:
+    post:
+      summary: Saisir un nouveau prix
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaisirPrixInput"
+      responses:
+        "201":
+          description: Prix enregistré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoriquePrix"
+
+  /prix/historique:
+    get:
+      summary: Historique des prix avec filtres
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: query
+          name: campagneId
+          schema:
+            type: integer
+        - in: query
+          name: dateDebut
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: dateFin
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Liste des prix
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HistoriquePrix"
+
+  /prix/analyse-marge:
+    get:
+      summary: Analyse de marge par lot
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: query
+          name: campagneId
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Analyse marge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyseMarge"
+
+  /prix/comparaison:
+    get:
+      summary: Comparaison prix et marges sur N campagnes
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Tableau comparatif campagnes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ComparaisonCampagne"
+
+  /prix/tendance:
+    get:
+      summary: Tendance des prix (moyenne mobile 4 semaines)
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Tendance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TendancePrix"
+
+  /prix/config:
+    get:
+      summary: Configuration des seuils alertes
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Configuration prix
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigPrix"
+    put:
+      summary: Mettre à jour la configuration
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigPrixInput"
+      responses:
+        "200":
+          description: Config mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigPrix"
+
+  /prix/alertes:
+    get:
+      summary: Alertes prix
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: query
+          name: nonLues
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Liste des alertes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AlertePrix"
+
+  /prix/alertes/{id}/lu:
+    put:
+      summary: Marquer alerte comme lue
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Alerte mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertePrix"
+
+  /prix/diffuser-sms:
+    post:
+      summary: Diffuser le prix par SMS aux membres actifs
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiffuserPrixSmsInput"
+      responses:
+        "200":
+          description: Résultat diffusion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmsDiffusionResult"
+
+  /prix/simulation:
+    get:
+      summary: Simuler la marge avec un prix hypothétique
+      tags: [prix]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: query
+          name: prixHypothetique
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Simulation marge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulationMarge"
+
   /bailleurs:
     get:
       summary: Lister les bailleurs
@@ -6719,3 +6938,230 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ConvocationAg"
+
+    HistoriquePrix:
+      type: object
+      required: [id, cooperativeId, datePrix, prixBordChampFcfa, prixVenteExportFcfa, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        campagneId:
+          type: integer
+          nullable: true
+        datePrix:
+          type: string
+          format: date
+        prixBordChampFcfa:
+          type: string
+        prixVenteExportFcfa:
+          type: string
+        margeBruteKgFcfa:
+          type: string
+          nullable: true
+        source:
+          type: string
+          nullable: true
+        saisiPar:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    SaisirPrixInput:
+      type: object
+      required: [datePrix, prixBordChampFcfa, prixVenteExportFcfa]
+      properties:
+        campagneId:
+          type: integer
+        datePrix:
+          type: string
+          format: date
+        prixBordChampFcfa:
+          type: number
+        prixVenteExportFcfa:
+          type: number
+        source:
+          type: string
+
+    AlertePrix:
+      type: object
+      required: [id, cooperativeId, type, lu, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        type:
+          type: string
+          enum: [marge_faible, prix_bas, prix_eleve, variation_forte]
+        seuilConfigure:
+          type: string
+          nullable: true
+        valeurDeclenchante:
+          type: string
+          nullable: true
+        message:
+          type: string
+          nullable: true
+        lu:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    ConfigPrix:
+      type: object
+      required: [id, cooperativeId, diffusionAutoSms]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        seuilMargeMinimumFcfa:
+          type: string
+          nullable: true
+        seuilVariationAlertePct:
+          type: string
+          nullable: true
+        diffusionAutoSms:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+
+    ConfigPrixInput:
+      type: object
+      properties:
+        seuilMargeMinimumFcfa:
+          type: number
+        seuilVariationAlertePct:
+          type: number
+        diffusionAutoSms:
+          type: boolean
+
+    LotMarge:
+      type: object
+      required: [venteId, exportateur, poidsKg, prixVenteKg, prixAchatMoyenKg, chargesEstimeesKg, margeKg, margeTotale, dateVente, rentabilite]
+      properties:
+        venteId:
+          type: integer
+        lotId:
+          type: integer
+          nullable: true
+        exportateur:
+          type: string
+        poidsKg:
+          type: number
+        prixVenteKg:
+          type: number
+        prixAchatMoyenKg:
+          type: number
+        chargesEstimeesKg:
+          type: number
+        margeKg:
+          type: number
+        margeTotale:
+          type: number
+        dateVente:
+          type: string
+        rentabilite:
+          type: string
+          enum: [bonne, faible, negative]
+
+    AnalyseMarge:
+      type: object
+      required: [lots, margesMoyenne]
+      properties:
+        lots:
+          type: array
+          items:
+            $ref: "#/components/schemas/LotMarge"
+        meilleurLot:
+          $ref: "#/components/schemas/LotMarge"
+          nullable: true
+        moinsRentable:
+          $ref: "#/components/schemas/LotMarge"
+          nullable: true
+        margesMoyenne:
+          type: number
+
+    ComparaisonCampagne:
+      type: object
+      properties:
+        campagne_id:
+          type: integer
+        libelle:
+          type: string
+        prix_achat_moy:
+          type: string
+          nullable: true
+        prix_vente_moy:
+          type: string
+          nullable: true
+        marge_moy:
+          type: string
+          nullable: true
+        tonnage_total:
+          type: string
+          nullable: true
+        nb_ventes:
+          type: string
+
+    TendancePrix:
+      type: object
+      required: [direction, moyenneMobile, variationSemainePct]
+      properties:
+        direction:
+          type: string
+          enum: [hausse, stable, baisse]
+        moyenneMobile:
+          type: number
+        variationSemainePct:
+          type: number
+        dernierPrix:
+          $ref: "#/components/schemas/HistoriquePrix"
+          nullable: true
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoriquePrix"
+
+    DiffuserPrixSmsInput:
+      type: object
+      required: [prix, date]
+      properties:
+        prix:
+          type: number
+        date:
+          type: string
+          format: date
+
+    SmsDiffusionResult:
+      type: object
+      required: [envoyes, echecs, total]
+      properties:
+        envoyes:
+          type: integer
+        echecs:
+          type: integer
+        total:
+          type: integer
+
+    SimulationMarge:
+      type: object
+      required: [prixBordChampHypothetique, prixVenteReference, chargesEstimees, margeSimulee, rentabilite]
+      properties:
+        prixBordChampHypothetique:
+          type: number
+        prixVenteReference:
+          type: number
+        chargesEstimees:
+          type: number
+        margeSimulee:
+          type: number
+        rentabilite:
+          type: string
+          enum: [bonne, faible, negative]

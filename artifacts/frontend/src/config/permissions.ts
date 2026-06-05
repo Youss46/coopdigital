@@ -130,6 +130,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_archives:    ["pca", "directeur", "comptable", "auditeur"],
   },
 
+  prix: {
+    voir:         ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    saisir_prix:  ["pca", "directeur"],
+    diffuser_sms: ["pca", "directeur"],
+    voir_analyse: ["pca", "directeur", "comptable", "auditeur"],
+    configurer:   ["pca", "directeur"],
+  },
+
   devises: {
     voir_taux:      ["pca", "directeur", "comptable", "auditeur"],
     modifier_taux:  ["pca", "directeur", "comptable"],
