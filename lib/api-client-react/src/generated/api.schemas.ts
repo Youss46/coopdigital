@@ -3103,6 +3103,140 @@ export interface UpdatePreferencesNotificationsBody {
   recevoir_email?: boolean;
 }
 
+export interface UploadUrlRequest {
+  name: string;
+  size: number;
+  contentType: string;
+}
+
+export interface UploadUrlResponse {
+  uploadURL: string;
+  objectPath: string;
+}
+
+export interface ConfigCooperative {
+  id?: number;
+  cooperative_id?: number;
+  nom_complet?: string | null;
+  nom_abrege?: string | null;
+  logo_url?: string | null;
+  slogan?: string | null;
+  adresse?: string | null;
+  ville?: string | null;
+  region?: string | null;
+  pays?: string | null;
+  telephone?: string | null;
+  telephone2?: string | null;
+  email?: string | null;
+  site_web?: string | null;
+  boite_postale?: string | null;
+  numero_agrement?: string | null;
+  date_agrement?: string | null;
+  autorite_agrement?: string | null;
+  forme_juridique?: string | null;
+  numero_rccm?: string | null;
+  numero_contribuable?: string | null;
+  date_creation?: string | null;
+  banque_principale?: string | null;
+  numero_compte_bancaire?: string | null;
+  iban?: string | null;
+  swift?: string | null;
+  devise?: string | null;
+  exercice_fiscal_debut_mois?: number | null;
+  produit_principal?: string | null;
+  zone_collecte?: string | null;
+  superficie_totale_ha?: number | null;
+  valeur_nominale_part_fcfa?: number | null;
+  nbre_parts_min?: number | null;
+  cotisation_annuelle_fcfa?: number | null;
+  quorum_ag_pct?: number | null;
+  couleur_primaire?: string | null;
+  couleur_secondaire?: string | null;
+  pied_de_page_pdf?: string | null;
+  updated_at?: string | null;
+}
+
+export interface UpdateConfigBody {
+  nom_complet?: string;
+  nom_abrege?: string;
+  slogan?: string;
+  adresse?: string;
+  ville?: string;
+  region?: string;
+  pays?: string;
+  telephone?: string;
+  telephone2?: string;
+  email?: string;
+  site_web?: string;
+  boite_postale?: string;
+  numero_agrement?: string;
+  date_agrement?: string;
+  autorite_agrement?: string;
+  forme_juridique?: string;
+  numero_rccm?: string;
+  numero_contribuable?: string;
+  date_creation?: string;
+  banque_principale?: string;
+  numero_compte_bancaire?: string;
+  iban?: string;
+  swift?: string;
+  devise?: string;
+  exercice_fiscal_debut_mois?: number;
+  produit_principal?: string;
+  zone_collecte?: string;
+  superficie_totale_ha?: number;
+  valeur_nominale_part_fcfa?: number;
+  nbre_parts_min?: number;
+  cotisation_annuelle_fcfa?: number;
+  quorum_ag_pct?: number;
+  couleur_primaire?: string;
+  couleur_secondaire?: string;
+  pied_de_page_pdf?: string;
+}
+
+export type DocumentOfficielType = typeof DocumentOfficielType[keyof typeof DocumentOfficielType];
+
+
+export const DocumentOfficielType = {
+  statuts: 'statuts',
+  reglement_interieur: 'reglement_interieur',
+  agrement: 'agrement',
+  certification: 'certification',
+  contrat_exportateur: 'contrat_exportateur',
+  autre: 'autre',
+} as const;
+
+export interface DocumentOfficiel {
+  id: number;
+  cooperative_id: number;
+  type: DocumentOfficielType;
+  libelle: string;
+  fichier_url: string;
+  date_document?: string | null;
+  date_expiration?: string | null;
+  created_at: string;
+}
+
+export type CreateDocumentBodyType = typeof CreateDocumentBodyType[keyof typeof CreateDocumentBodyType];
+
+
+export const CreateDocumentBodyType = {
+  statuts: 'statuts',
+  reglement_interieur: 'reglement_interieur',
+  agrement: 'agrement',
+  certification: 'certification',
+  contrat_exportateur: 'contrat_exportateur',
+  autre: 'autre',
+} as const;
+
+export interface CreateDocumentBody {
+  type: CreateDocumentBodyType;
+  libelle: string;
+  fichier_url: string;
+  date_document?: string;
+  date_expiration?: string;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -3485,5 +3619,13 @@ export const GetNotificationsGravite = {
 
 export type MarquerNotificationLue200 = {
   ok: boolean;
+};
+
+export type UploadLogo200 = {
+  logo_url: string;
+};
+
+export type GetDocumentsOfficiels200 = {
+  documents: DocumentOfficiel[];
 };
 

@@ -32,6 +32,7 @@ import {
   Award,
   ShieldAlert,
   ScrollText,
+  Settings,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -212,6 +213,12 @@ const navItems = [
     href: "/administration/comptes",
     label: "Administration",
     icon: ShieldCheck,
+    roles: ["pca", "directeur"],
+  },
+  {
+    href: "/parametres",
+    label: "Paramètres",
+    icon: Settings,
     roles: ["pca", "directeur"],
   },
 ];

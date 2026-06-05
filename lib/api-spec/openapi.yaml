@@ -4363,6 +4363,155 @@ paths:
         "404":
           description: Notification introuvable
 
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Demander une URL presignée pour upload
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UploadUrlRequest" }
+      responses:
+        "200":
+          description: URL presignée générée
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadUrlResponse" }
+
+  /storage/public-objects/{filePath}:
+    get:
+      tags: [Storage]
+      operationId: getPublicObject
+      summary: Servir un asset public
+      parameters:
+        - { name: filePath, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Contenu du fichier
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      summary: Servir un objet uploadé
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: objectPath, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Contenu du fichier
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+        "404":
+          description: Objet introuvable
+
+  /config:
+    get:
+      tags: [config]
+      operationId: getConfig
+      summary: Lire la configuration de la coopérative
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Configuration complète
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigCooperative" }
+    put:
+      tags: [config]
+      operationId: updateConfig
+      summary: Modifier la configuration
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateConfigBody" }
+      responses:
+        "200":
+          description: Configuration mise à jour
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigCooperative" }
+
+  /config/logo:
+    post:
+      tags: [config]
+      operationId: uploadLogo
+      summary: Uploader le logo de la coopérative
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UploadUrlRequest" }
+      responses:
+        "200":
+          description: URL logo mise à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [logo_url]
+                properties:
+                  logo_url: { type: string }
+
+  /config/documents:
+    get:
+      tags: [config]
+      operationId: getDocumentsOfficiels
+      summary: Lister les documents officiels
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Liste des documents
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [documents]
+                properties:
+                  documents:
+                    type: array
+                    items: { $ref: "#/components/schemas/DocumentOfficiel" }
+    post:
+      tags: [config]
+      operationId: createDocumentOfficiel
+      summary: Ajouter un document officiel
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateDocumentBody" }
+      responses:
+        "201":
+          description: Document créé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DocumentOfficiel" }
+
+  /config/documents/{id}:
+    delete:
+      tags: [config]
+      operationId: deleteDocumentOfficiel
+      summary: Supprimer un document officiel
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Supprimé
+        "404":
+          description: Document introuvable
+
 components:
   schemas:
 
@@ -8440,3 +8589,123 @@ components:
         notif_prix_change:              { type: boolean }
         recevoir_sms:                   { type: boolean }
         recevoir_email:                 { type: boolean }
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:        { type: string }
+        size:        { type: integer }
+        contentType: { type: string }
+
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:  { type: string }
+        objectPath: { type: string }
+
+    ConfigCooperative:
+      type: object
+      properties:
+        id:                         { type: integer }
+        cooperative_id:             { type: integer }
+        nom_complet:                { type: string, nullable: true }
+        nom_abrege:                 { type: string, nullable: true }
+        logo_url:                   { type: string, nullable: true }
+        slogan:                     { type: string, nullable: true }
+        adresse:                    { type: string, nullable: true }
+        ville:                      { type: string, nullable: true }
+        region:                     { type: string, nullable: true }
+        pays:                       { type: string, nullable: true }
+        telephone:                  { type: string, nullable: true }
+        telephone2:                 { type: string, nullable: true }
+        email:                      { type: string, nullable: true }
+        site_web:                   { type: string, nullable: true }
+        boite_postale:              { type: string, nullable: true }
+        numero_agrement:            { type: string, nullable: true }
+        date_agrement:              { type: string, format: date, nullable: true }
+        autorite_agrement:          { type: string, nullable: true }
+        forme_juridique:            { type: string, nullable: true }
+        numero_rccm:                { type: string, nullable: true }
+        numero_contribuable:        { type: string, nullable: true }
+        date_creation:              { type: string, format: date, nullable: true }
+        banque_principale:          { type: string, nullable: true }
+        numero_compte_bancaire:     { type: string, nullable: true }
+        iban:                       { type: string, nullable: true }
+        swift:                      { type: string, nullable: true }
+        devise:                     { type: string, nullable: true }
+        exercice_fiscal_debut_mois: { type: integer, nullable: true }
+        produit_principal:          { type: string, nullable: true }
+        zone_collecte:              { type: string, nullable: true }
+        superficie_totale_ha:       { type: number, nullable: true }
+        valeur_nominale_part_fcfa:  { type: number, nullable: true }
+        nbre_parts_min:             { type: integer, nullable: true }
+        cotisation_annuelle_fcfa:   { type: number, nullable: true }
+        quorum_ag_pct:              { type: number, nullable: true }
+        couleur_primaire:           { type: string, nullable: true }
+        couleur_secondaire:         { type: string, nullable: true }
+        pied_de_page_pdf:           { type: string, nullable: true }
+        updated_at:                 { type: string, format: date-time, nullable: true }
+
+    UpdateConfigBody:
+      type: object
+      properties:
+        nom_complet:                { type: string }
+        nom_abrege:                 { type: string }
+        slogan:                     { type: string }
+        adresse:                    { type: string }
+        ville:                      { type: string }
+        region:                     { type: string }
+        pays:                       { type: string }
+        telephone:                  { type: string }
+        telephone2:                 { type: string }
+        email:                      { type: string }
+        site_web:                   { type: string }
+        boite_postale:              { type: string }
+        numero_agrement:            { type: string }
+        date_agrement:              { type: string, format: date }
+        autorite_agrement:          { type: string }
+        forme_juridique:            { type: string }
+        numero_rccm:                { type: string }
+        numero_contribuable:        { type: string }
+        date_creation:              { type: string, format: date }
+        banque_principale:          { type: string }
+        numero_compte_bancaire:     { type: string }
+        iban:                       { type: string }
+        swift:                      { type: string }
+        devise:                     { type: string }
+        exercice_fiscal_debut_mois: { type: integer }
+        produit_principal:          { type: string }
+        zone_collecte:              { type: string }
+        superficie_totale_ha:       { type: number }
+        valeur_nominale_part_fcfa:  { type: number }
+        nbre_parts_min:             { type: integer }
+        cotisation_annuelle_fcfa:   { type: number }
+        quorum_ag_pct:              { type: number }
+        couleur_primaire:           { type: string }
+        couleur_secondaire:         { type: string }
+        pied_de_page_pdf:           { type: string }
+
+    DocumentOfficiel:
+      type: object
+      required: [id, cooperative_id, type, libelle, fichier_url, created_at]
+      properties:
+        id:              { type: integer }
+        cooperative_id:  { type: integer }
+        type:            { type: string, enum: [statuts, reglement_interieur, agrement, certification, contrat_exportateur, autre] }
+        libelle:         { type: string }
+        fichier_url:     { type: string }
+        date_document:   { type: string, format: date, nullable: true }
+        date_expiration: { type: string, format: date, nullable: true }
+        created_at:      { type: string, format: date-time }
+
+    CreateDocumentBody:
+      type: object
+      required: [type, libelle, fichier_url]
+      properties:
+        type:            { type: string, enum: [statuts, reglement_interieur, agrement, certification, contrat_exportateur, autre] }
+        libelle:         { type: string }
+        fichier_url:     { type: string }
+        date_document:   { type: string, format: date }
+        date_expiration: { type: string, format: date }

@@ -5104,3 +5104,215 @@ export const SupprimerNotificationParams = zod.object({
 })
 
 
+/**
+ * @summary Demander une URL presignée pour upload
+ */
+export const RequestUploadUrlBody = zod.object({
+  "name": zod.string(),
+  "size": zod.number(),
+  "contentType": zod.string()
+})
+
+export const RequestUploadUrlResponse = zod.object({
+  "uploadURL": zod.string(),
+  "objectPath": zod.string()
+})
+
+
+/**
+ * @summary Servir un asset public
+ */
+export const GetPublicObjectParams = zod.object({
+  "filePath": zod.coerce.string()
+})
+
+
+/**
+ * @summary Servir un objet uploadé
+ */
+export const GetStorageObjectParams = zod.object({
+  "objectPath": zod.coerce.string()
+})
+
+
+/**
+ * @summary Lire la configuration de la coopérative
+ */
+export const GetConfigResponse = zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "nom_complet": zod.string().nullish(),
+  "nom_abrege": zod.string().nullish(),
+  "logo_url": zod.string().nullish(),
+  "slogan": zod.string().nullish(),
+  "adresse": zod.string().nullish(),
+  "ville": zod.string().nullish(),
+  "region": zod.string().nullish(),
+  "pays": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "telephone2": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "site_web": zod.string().nullish(),
+  "boite_postale": zod.string().nullish(),
+  "numero_agrement": zod.string().nullish(),
+  "date_agrement": zod.coerce.date().nullish(),
+  "autorite_agrement": zod.string().nullish(),
+  "forme_juridique": zod.string().nullish(),
+  "numero_rccm": zod.string().nullish(),
+  "numero_contribuable": zod.string().nullish(),
+  "date_creation": zod.coerce.date().nullish(),
+  "banque_principale": zod.string().nullish(),
+  "numero_compte_bancaire": zod.string().nullish(),
+  "iban": zod.string().nullish(),
+  "swift": zod.string().nullish(),
+  "devise": zod.string().nullish(),
+  "exercice_fiscal_debut_mois": zod.number().nullish(),
+  "produit_principal": zod.string().nullish(),
+  "zone_collecte": zod.string().nullish(),
+  "superficie_totale_ha": zod.number().nullish(),
+  "valeur_nominale_part_fcfa": zod.number().nullish(),
+  "nbre_parts_min": zod.number().nullish(),
+  "cotisation_annuelle_fcfa": zod.number().nullish(),
+  "quorum_ag_pct": zod.number().nullish(),
+  "couleur_primaire": zod.string().nullish(),
+  "couleur_secondaire": zod.string().nullish(),
+  "pied_de_page_pdf": zod.string().nullish(),
+  "updated_at": zod.coerce.date().nullish()
+})
+
+
+/**
+ * @summary Modifier la configuration
+ */
+export const UpdateConfigBody = zod.object({
+  "nom_complet": zod.string().optional(),
+  "nom_abrege": zod.string().optional(),
+  "slogan": zod.string().optional(),
+  "adresse": zod.string().optional(),
+  "ville": zod.string().optional(),
+  "region": zod.string().optional(),
+  "pays": zod.string().optional(),
+  "telephone": zod.string().optional(),
+  "telephone2": zod.string().optional(),
+  "email": zod.string().optional(),
+  "site_web": zod.string().optional(),
+  "boite_postale": zod.string().optional(),
+  "numero_agrement": zod.string().optional(),
+  "date_agrement": zod.coerce.date().optional(),
+  "autorite_agrement": zod.string().optional(),
+  "forme_juridique": zod.string().optional(),
+  "numero_rccm": zod.string().optional(),
+  "numero_contribuable": zod.string().optional(),
+  "date_creation": zod.coerce.date().optional(),
+  "banque_principale": zod.string().optional(),
+  "numero_compte_bancaire": zod.string().optional(),
+  "iban": zod.string().optional(),
+  "swift": zod.string().optional(),
+  "devise": zod.string().optional(),
+  "exercice_fiscal_debut_mois": zod.number().optional(),
+  "produit_principal": zod.string().optional(),
+  "zone_collecte": zod.string().optional(),
+  "superficie_totale_ha": zod.number().optional(),
+  "valeur_nominale_part_fcfa": zod.number().optional(),
+  "nbre_parts_min": zod.number().optional(),
+  "cotisation_annuelle_fcfa": zod.number().optional(),
+  "quorum_ag_pct": zod.number().optional(),
+  "couleur_primaire": zod.string().optional(),
+  "couleur_secondaire": zod.string().optional(),
+  "pied_de_page_pdf": zod.string().optional()
+})
+
+export const UpdateConfigResponse = zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "nom_complet": zod.string().nullish(),
+  "nom_abrege": zod.string().nullish(),
+  "logo_url": zod.string().nullish(),
+  "slogan": zod.string().nullish(),
+  "adresse": zod.string().nullish(),
+  "ville": zod.string().nullish(),
+  "region": zod.string().nullish(),
+  "pays": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "telephone2": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "site_web": zod.string().nullish(),
+  "boite_postale": zod.string().nullish(),
+  "numero_agrement": zod.string().nullish(),
+  "date_agrement": zod.coerce.date().nullish(),
+  "autorite_agrement": zod.string().nullish(),
+  "forme_juridique": zod.string().nullish(),
+  "numero_rccm": zod.string().nullish(),
+  "numero_contribuable": zod.string().nullish(),
+  "date_creation": zod.coerce.date().nullish(),
+  "banque_principale": zod.string().nullish(),
+  "numero_compte_bancaire": zod.string().nullish(),
+  "iban": zod.string().nullish(),
+  "swift": zod.string().nullish(),
+  "devise": zod.string().nullish(),
+  "exercice_fiscal_debut_mois": zod.number().nullish(),
+  "produit_principal": zod.string().nullish(),
+  "zone_collecte": zod.string().nullish(),
+  "superficie_totale_ha": zod.number().nullish(),
+  "valeur_nominale_part_fcfa": zod.number().nullish(),
+  "nbre_parts_min": zod.number().nullish(),
+  "cotisation_annuelle_fcfa": zod.number().nullish(),
+  "quorum_ag_pct": zod.number().nullish(),
+  "couleur_primaire": zod.string().nullish(),
+  "couleur_secondaire": zod.string().nullish(),
+  "pied_de_page_pdf": zod.string().nullish(),
+  "updated_at": zod.coerce.date().nullish()
+})
+
+
+/**
+ * @summary Uploader le logo de la coopérative
+ */
+export const UploadLogoBody = zod.object({
+  "name": zod.string(),
+  "size": zod.number(),
+  "contentType": zod.string()
+})
+
+export const UploadLogoResponse = zod.object({
+  "logo_url": zod.string()
+})
+
+
+/**
+ * @summary Lister les documents officiels
+ */
+export const GetDocumentsOfficielsResponse = zod.object({
+  "documents": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "type": zod.enum(['statuts', 'reglement_interieur', 'agrement', 'certification', 'contrat_exportateur', 'autre']),
+  "libelle": zod.string(),
+  "fichier_url": zod.string(),
+  "date_document": zod.coerce.date().nullish(),
+  "date_expiration": zod.coerce.date().nullish(),
+  "created_at": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Ajouter un document officiel
+ */
+export const CreateDocumentOfficielBody = zod.object({
+  "type": zod.enum(['statuts', 'reglement_interieur', 'agrement', 'certification', 'contrat_exportateur', 'autre']),
+  "libelle": zod.string(),
+  "fichier_url": zod.string(),
+  "date_document": zod.coerce.date().optional(),
+  "date_expiration": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Supprimer un document officiel
+ */
+export const DeleteDocumentOfficielParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+

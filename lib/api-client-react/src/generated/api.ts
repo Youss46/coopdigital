@@ -66,6 +66,7 @@ import type {
   ConfigAnomalies,
   ConfigAnomaliesInput,
   ConfigComptable,
+  ConfigCooperative,
   ConfigPartsSociales,
   ConfigPrix,
   ConfigPrixInput,
@@ -78,6 +79,7 @@ import type {
   CountRefusEnAttente200,
   CreancesSummary,
   CreateAvancePersonnelInput,
+  CreateDocumentBody,
   CreatePersonnelInput,
   CreateUserInput,
   DashboardKpi,
@@ -86,6 +88,7 @@ import type {
   DiffuserPrixSmsInput,
   DistributionIntrant,
   DistributionIntrantInput,
+  DocumentOfficiel,
   EcheanceAlerte,
   EcritureComptable,
   EcritureEnAttente,
@@ -123,6 +126,7 @@ import type {
   GetBulletinsParams,
   GetComparaisonCampagnesParams,
   GetCompteResultatParams,
+  GetDocumentsOfficiels200,
   GetEmpruntsParams,
   GetEncoursIntrantsMembre200,
   GetFluxTresorerieParams,
@@ -242,11 +246,15 @@ import type {
   TraiterRefusInput,
   TrancheInput,
   Tresorerie,
+  UpdateConfigBody,
   UpdateConfigComptableInput,
   UpdateConfigScoringInput,
   UpdatePersonnelInput,
   UpdatePreferencesNotificationsBody,
   UpdateUserInput,
+  UploadLogo200,
+  UploadUrlRequest,
+  UploadUrlResponse,
   UtilisateurCompte,
   UtiliserFondsInput,
   ValiderEcritureInput,
@@ -16120,5 +16128,667 @@ export const useSupprimerNotification = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getSupprimerNotificationMutationOptions(options));
+    }
+
+export const getRequestUploadUrlUrl = () => {
+
+
+
+
+  return `/api/storage/uploads/request-url`
+}
+
+/**
+ * @summary Demander une URL presignée pour upload
+ */
+export const requestUploadUrl = async (uploadUrlRequest: UploadUrlRequest, options?: RequestInit): Promise<UploadUrlResponse> => {
+
+  return customFetch<UploadUrlResponse>(getRequestUploadUrlUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      uploadUrlRequest,)
+  }
+);}
+
+
+
+
+export const getRequestUploadUrlMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError,{data: BodyType<UploadUrlRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError,{data: BodyType<UploadUrlRequest>}, TContext> => {
+
+const mutationKey = ['requestUploadUrl'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestUploadUrl>>, {data: BodyType<UploadUrlRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestUploadUrl(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestUploadUrlMutationResult = NonNullable<Awaited<ReturnType<typeof requestUploadUrl>>>
+    export type RequestUploadUrlMutationBody = BodyType<UploadUrlRequest>
+    export type RequestUploadUrlMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Demander une URL presignée pour upload
+ */
+export const useRequestUploadUrl = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError,{data: BodyType<UploadUrlRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestUploadUrl>>,
+        TError,
+        {data: BodyType<UploadUrlRequest>},
+        TContext
+      > => {
+      return useMutation(getRequestUploadUrlMutationOptions(options));
+    }
+
+export const getGetPublicObjectUrl = (filePath: string,) => {
+
+
+
+
+  return `/api/storage/public-objects/${filePath}`
+}
+
+/**
+ * @summary Servir un asset public
+ */
+export const getPublicObject = async (filePath: string, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetPublicObjectUrl(filePath),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicObjectQueryKey = (filePath: string,) => {
+    return [
+    `/api/storage/public-objects/${filePath}`
+    ] as const;
+    }
+
+
+export const getGetPublicObjectQueryOptions = <TData = Awaited<ReturnType<typeof getPublicObject>>, TError = ErrorType<unknown>>(filePath: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicObjectQueryKey(filePath);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicObject>>> = ({ signal }) => getPublicObject(filePath, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(filePath), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicObject>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicObjectQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicObject>>>
+export type GetPublicObjectQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Servir un asset public
+ */
+
+export function useGetPublicObject<TData = Awaited<ReturnType<typeof getPublicObject>>, TError = ErrorType<unknown>>(
+ filePath: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicObjectQueryOptions(filePath,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetStorageObjectUrl = (objectPath: string,) => {
+
+
+
+
+  return `/api/storage/objects/${objectPath}`
+}
+
+/**
+ * @summary Servir un objet uploadé
+ */
+export const getStorageObject = async (objectPath: string, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetStorageObjectUrl(objectPath),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStorageObjectQueryKey = (objectPath: string,) => {
+    return [
+    `/api/storage/objects/${objectPath}`
+    ] as const;
+    }
+
+
+export const getGetStorageObjectQueryOptions = <TData = Awaited<ReturnType<typeof getStorageObject>>, TError = ErrorType<void>>(objectPath: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStorageObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStorageObjectQueryKey(objectPath);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStorageObject>>> = ({ signal }) => getStorageObject(objectPath, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(objectPath), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStorageObject>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStorageObjectQueryResult = NonNullable<Awaited<ReturnType<typeof getStorageObject>>>
+export type GetStorageObjectQueryError = ErrorType<void>
+
+
+/**
+ * @summary Servir un objet uploadé
+ */
+
+export function useGetStorageObject<TData = Awaited<ReturnType<typeof getStorageObject>>, TError = ErrorType<void>>(
+ objectPath: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStorageObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStorageObjectQueryOptions(objectPath,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetConfigUrl = () => {
+
+
+
+
+  return `/api/config`
+}
+
+/**
+ * @summary Lire la configuration de la coopérative
+ */
+export const getConfig = async ( options?: RequestInit): Promise<ConfigCooperative> => {
+
+  return customFetch<ConfigCooperative>(getGetConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetConfigQueryKey = () => {
+    return [
+    `/api/config`
+    ] as const;
+    }
+
+
+export const getGetConfigQueryOptions = <TData = Awaited<ReturnType<typeof getConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConfig>>> = ({ signal }) => getConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getConfig>>>
+export type GetConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lire la configuration de la coopérative
+ */
+
+export function useGetConfig<TData = Awaited<ReturnType<typeof getConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateConfigUrl = () => {
+
+
+
+
+  return `/api/config`
+}
+
+/**
+ * @summary Modifier la configuration
+ */
+export const updateConfig = async (updateConfigBody: UpdateConfigBody, options?: RequestInit): Promise<ConfigCooperative> => {
+
+  return customFetch<ConfigCooperative>(getUpdateConfigUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateConfigBody,)
+  }
+);}
+
+
+
+
+export const getUpdateConfigMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConfig>>, TError,{data: BodyType<UpdateConfigBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateConfig>>, TError,{data: BodyType<UpdateConfigBody>}, TContext> => {
+
+const mutationKey = ['updateConfig'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateConfig>>, {data: BodyType<UpdateConfigBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateConfig(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateConfigMutationResult = NonNullable<Awaited<ReturnType<typeof updateConfig>>>
+    export type UpdateConfigMutationBody = BodyType<UpdateConfigBody>
+    export type UpdateConfigMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Modifier la configuration
+ */
+export const useUpdateConfig = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConfig>>, TError,{data: BodyType<UpdateConfigBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateConfig>>,
+        TError,
+        {data: BodyType<UpdateConfigBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateConfigMutationOptions(options));
+    }
+
+export const getUploadLogoUrl = () => {
+
+
+
+
+  return `/api/config/logo`
+}
+
+/**
+ * @summary Uploader le logo de la coopérative
+ */
+export const uploadLogo = async (uploadUrlRequest: UploadUrlRequest, options?: RequestInit): Promise<UploadLogo200> => {
+
+  return customFetch<UploadLogo200>(getUploadLogoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      uploadUrlRequest,)
+  }
+);}
+
+
+
+
+export const getUploadLogoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadLogo>>, TError,{data: BodyType<UploadUrlRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadLogo>>, TError,{data: BodyType<UploadUrlRequest>}, TContext> => {
+
+const mutationKey = ['uploadLogo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadLogo>>, {data: BodyType<UploadUrlRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadLogo(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadLogoMutationResult = NonNullable<Awaited<ReturnType<typeof uploadLogo>>>
+    export type UploadLogoMutationBody = BodyType<UploadUrlRequest>
+    export type UploadLogoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Uploader le logo de la coopérative
+ */
+export const useUploadLogo = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadLogo>>, TError,{data: BodyType<UploadUrlRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadLogo>>,
+        TError,
+        {data: BodyType<UploadUrlRequest>},
+        TContext
+      > => {
+      return useMutation(getUploadLogoMutationOptions(options));
+    }
+
+export const getGetDocumentsOfficielsUrl = () => {
+
+
+
+
+  return `/api/config/documents`
+}
+
+/**
+ * @summary Lister les documents officiels
+ */
+export const getDocumentsOfficiels = async ( options?: RequestInit): Promise<GetDocumentsOfficiels200> => {
+
+  return customFetch<GetDocumentsOfficiels200>(getGetDocumentsOfficielsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDocumentsOfficielsQueryKey = () => {
+    return [
+    `/api/config/documents`
+    ] as const;
+    }
+
+
+export const getGetDocumentsOfficielsQueryOptions = <TData = Awaited<ReturnType<typeof getDocumentsOfficiels>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDocumentsOfficiels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDocumentsOfficielsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocumentsOfficiels>>> = ({ signal }) => getDocumentsOfficiels({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDocumentsOfficiels>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDocumentsOfficielsQueryResult = NonNullable<Awaited<ReturnType<typeof getDocumentsOfficiels>>>
+export type GetDocumentsOfficielsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lister les documents officiels
+ */
+
+export function useGetDocumentsOfficiels<TData = Awaited<ReturnType<typeof getDocumentsOfficiels>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDocumentsOfficiels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDocumentsOfficielsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateDocumentOfficielUrl = () => {
+
+
+
+
+  return `/api/config/documents`
+}
+
+/**
+ * @summary Ajouter un document officiel
+ */
+export const createDocumentOfficiel = async (createDocumentBody: CreateDocumentBody, options?: RequestInit): Promise<DocumentOfficiel> => {
+
+  return customFetch<DocumentOfficiel>(getCreateDocumentOfficielUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createDocumentBody,)
+  }
+);}
+
+
+
+
+export const getCreateDocumentOfficielMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDocumentOfficiel>>, TError,{data: BodyType<CreateDocumentBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDocumentOfficiel>>, TError,{data: BodyType<CreateDocumentBody>}, TContext> => {
+
+const mutationKey = ['createDocumentOfficiel'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDocumentOfficiel>>, {data: BodyType<CreateDocumentBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createDocumentOfficiel(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDocumentOfficielMutationResult = NonNullable<Awaited<ReturnType<typeof createDocumentOfficiel>>>
+    export type CreateDocumentOfficielMutationBody = BodyType<CreateDocumentBody>
+    export type CreateDocumentOfficielMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Ajouter un document officiel
+ */
+export const useCreateDocumentOfficiel = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDocumentOfficiel>>, TError,{data: BodyType<CreateDocumentBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createDocumentOfficiel>>,
+        TError,
+        {data: BodyType<CreateDocumentBody>},
+        TContext
+      > => {
+      return useMutation(getCreateDocumentOfficielMutationOptions(options));
+    }
+
+export const getDeleteDocumentOfficielUrl = (id: number,) => {
+
+
+
+
+  return `/api/config/documents/${id}`
+}
+
+/**
+ * @summary Supprimer un document officiel
+ */
+export const deleteDocumentOfficiel = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteDocumentOfficielUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteDocumentOfficielMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDocumentOfficiel>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDocumentOfficiel>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteDocumentOfficiel'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDocumentOfficiel>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteDocumentOfficiel(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDocumentOfficielMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDocumentOfficiel>>>
+
+    export type DeleteDocumentOfficielMutationError = ErrorType<void>
+
+    /**
+ * @summary Supprimer un document officiel
+ */
+export const useDeleteDocumentOfficiel = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDocumentOfficiel>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDocumentOfficiel>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteDocumentOfficielMutationOptions(options));
     }
 

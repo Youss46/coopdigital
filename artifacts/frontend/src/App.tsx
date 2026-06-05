@@ -34,6 +34,7 @@ import AuditPage from "@/pages/AuditPage";
 import PcaDashboardPage from "@/pages/PcaDashboardPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import NotificationsPreferencesPage from "@/pages/NotificationsPreferencesPage";
+import ParametresPage from "@/pages/ParametresPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -151,6 +152,9 @@ function AppRoutes() {
       </Route>
       <Route path="/notifications">
         <ProtectedRoute component={NotificationsPage} />
+      </Route>
+      <Route path="/parametres">
+        <ProtectedRoute component={ParametresPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

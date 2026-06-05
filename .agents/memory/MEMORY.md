@@ -5,3 +5,6 @@
 - [api-zod barrel export conflict](api-zod-export-star.md) — `lib/api-zod/src/index.ts` must use only `export * from "./generated/api"` (not `export type * from "./generated/types"`) to avoid TS2308 ambiguity when Zod query-param schemas share names with TypeScript types.
 - [Express 5 params string cast](express5-params-typing.md) — `req.params[dynamicKey]` may type as `string | string[]`; use `String(req.params[key])` for dynamic access.
 - [Router ordering for public portail routes](router-ordering.md) — portailRouter must be registered before any sub-router that calls router.use(authMiddleware) without a path (dashboard, lots, communication, etc.) or all requests without a token are blocked with 401.
+- [Orval format:date coerce](orval-date-coerce.md) — OpenAPI `format: date` fields generate `zod.coerce.date()` → TS `Date`; Drizzle date columns expect `string`; use a `toDateStr(d)` helper to convert.
+- [Object storage signed_url cast](objectstorage-signedfetch.md) — objectStorage.ts `response.json()` returns `unknown`; must cast `as { signed_url: string }` to avoid TS2339.
+- [Frontend toast hook path](frontend-toast-path.md) — toast hook lives at `@/hooks/use-toast`, NOT `@/components/ui/use-toast`.
