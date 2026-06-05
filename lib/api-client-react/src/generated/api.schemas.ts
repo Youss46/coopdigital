@@ -1764,6 +1764,8 @@ export interface CampagneInput {
   anneeDebut: number;
   anneeFin: number;
   dateOuverture: string;
+  /** @nullable */
+  dateFermeture?: string | null;
 }
 
 export type VerificationClotureStatut = typeof VerificationClotureStatut[keyof typeof VerificationClotureStatut];

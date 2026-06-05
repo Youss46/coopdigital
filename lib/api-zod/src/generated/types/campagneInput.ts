@@ -11,4 +11,6 @@ export interface CampagneInput {
   anneeDebut: number;
   anneeFin: number;
   dateOuverture: Date;
+  /** @nullable */
+  dateFermeture?: Date | null;
 }

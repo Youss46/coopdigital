@@ -42,11 +42,12 @@ export async function getCampagne(req: Request, res: Response) {
 }
 
 export async function createCampagne(req: Request, res: Response) {
-  const { libelle, anneeDebut, anneeFin, dateOuverture } = req.body as {
+  const { libelle, anneeDebut, anneeFin, dateOuverture, dateFermeture } = req.body as {
     libelle: string;
     anneeDebut: number;
     anneeFin: number;
     dateOuverture: string;
+    dateFermeture?: string | null;
   };
 
   if (!libelle || !anneeDebut || !anneeFin || !dateOuverture) {
@@ -61,6 +62,7 @@ export async function createCampagne(req: Request, res: Response) {
       anneeDebut,
       anneeFin,
       dateOuverture,
+      dateFermeture: dateFermeture || null,
       statut: "ouverte",
     })
     .returning();

@@ -6586,6 +6586,9 @@ components:
         dateOuverture:
           type: string
           format: date
+        dateFermeture:
+          type: ["string", "null"]
+          format: date
 
     VerificationCloture:
       type: object

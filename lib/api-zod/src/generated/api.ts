@@ -2013,7 +2013,8 @@ export const CreateCampagneBody = zod.object({
   "libelle": zod.string(),
   "anneeDebut": zod.number(),
   "anneeFin": zod.number(),
-  "dateOuverture": zod.coerce.date()
+  "dateOuverture": zod.coerce.date(),
+  "dateFermeture": zod.coerce.date().nullish()
 })
 
 

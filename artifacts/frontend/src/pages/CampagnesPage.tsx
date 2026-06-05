@@ -278,10 +278,15 @@ export default function CampagnesPage() {
                   <input type="number" className={INPUT_CLS} value={form.anneeFin ?? ""}
                     onChange={e => handleField("anneeFin", parseInt(e.target.value))} required />
                 </div>
-                <div className="col-span-2">
+                <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Date d'ouverture *</label>
                   <input type="date" className={INPUT_CLS} value={form.dateOuverture ?? ""}
                     onChange={e => handleField("dateOuverture", e.target.value)} required />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Date de clôture <span className="text-gray-400 font-normal">(optionnel)</span></label>
+                  <input type="date" className={INPUT_CLS} value={form.dateFermeture ?? ""}
+                    onChange={e => handleField("dateFermeture", e.target.value || null)} />
                 </div>
               </div>
               <div className="flex justify-end gap-3">
