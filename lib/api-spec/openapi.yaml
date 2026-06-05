@@ -1768,7 +1768,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/HistoriqueMasse"
 
-  /api/campagnes/active:
+  /campagnes/active:
     get:
       operationId: getCampagneActive
       tags: [campagnes]
@@ -1784,7 +1784,29 @@ paths:
         "404":
           description: Aucune campagne active
 
-  /api/campagnes:
+  /campagnes/comparaison:
+    get:
+      operationId: getComparaisonCampagnes
+      tags: [campagnes]
+      summary: Comparaison N campagnes (bilans côte à côte)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: ids
+          in: query
+          schema:
+            type: string
+          description: IDs séparés par virgule (ex. "1,2,3"). Vide = 5 dernières.
+      responses:
+        "200":
+          description: Comparaison campagnes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ComparaisonBilanCampagne"
+
+  /campagnes:
     get:
       operationId: listCampagnes
       tags: [campagnes]
@@ -1818,11 +1840,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/Campagne"
 
-  /api/campagnes/{id}/fermer:
+  /campagnes/{id}:
+    get:
+      operationId: getCampagne
+      tags: [campagnes]
+      summary: Détail d'une campagne
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Campagne
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campagne"
+        "404":
+          description: Introuvable
+
+  /campagnes/{id}/fermer:
     put:
       operationId: fermerCampagne
       tags: [campagnes]
-      summary: Clôturer une campagne
+      summary: Fermer une campagne (simple)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1842,6 +1886,87 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Campagne"
+
+  /campagnes/{id}/verifier:
+    get:
+      operationId: verifierCampagne
+      tags: [campagnes]
+      summary: Lancer les 10 vérifications pré-clôture
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Résultats des vérifications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResultatVerifications"
+
+  /campagnes/{id}/cloture:
+    post:
+      operationId: cloturerCampagne
+      tags: [campagnes]
+      summary: Clôturer définitivement une campagne
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Campagne clôturée + bilan généré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BilanCampagneResult"
+
+  /campagnes/{id}/bilan:
+    get:
+      operationId: getBilanCampagne
+      tags: [campagnes]
+      summary: Bilan complet d'une campagne
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bilan campagne
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BilanCampagneResult"
+
+  /campagnes/{id}/bilan-pdf:
+    get:
+      operationId: getBilanCampagnePdf
+      tags: [campagnes]
+      summary: Télécharger le bilan PDF d'une campagne
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF bilan campagne
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
 
   /api/parts-sociales/config:
     get:
@@ -6457,6 +6582,96 @@ components:
         dateOuverture:
           type: string
           format: date
+
+    VerificationCloture:
+      type: object
+      required: [code, verification, statut, message]
+      properties:
+        code:
+          type: string
+        verification:
+          type: string
+        statut:
+          type: string
+          enum: [ok, bloquant, avertissement]
+        message:
+          type: string
+
+    ResultatVerifications:
+      type: object
+      required: [bloquants, avertissements, ok, toutOk]
+      properties:
+        bloquants:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerificationCloture"
+        avertissements:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerificationCloture"
+        ok:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerificationCloture"
+        toutOk:
+          type: boolean
+
+    BilanCampagne:
+      type: object
+      properties:
+        id:               { type: integer }
+        campagneId:       { type: integer }
+        tonnageTotalKg:   { type: ["string", "null"] }
+        tonnageMembresKg: { type: ["string", "null"] }
+        tonnagePisteursKg: { type: ["string", "null"] }
+        tonnageExternesKg: { type: ["string", "null"] }
+        nbLivraisons:     { type: ["integer", "null"] }
+        nbMembresActifs:  { type: ["integer", "null"] }
+        nbFournisseursTotal: { type: ["integer", "null"] }
+        prixAchatMoyenKgFcfa: { type: ["string", "null"] }
+        tonnageVenduKg:   { type: ["string", "null"] }
+        caVentesFcfa:     { type: ["string", "null"] }
+        prixVenteMoyenKgFcfa: { type: ["string", "null"] }
+        nbExportateurs:   { type: ["integer", "null"] }
+        creancesRestantesFcfa: { type: ["string", "null"] }
+        coutAchatTotalFcfa: { type: ["string", "null"] }
+        chargesExploitationFcfa: { type: ["string", "null"] }
+        chargesPersonnelFcfa: { type: ["string", "null"] }
+        chargesFinancieresFcfa: { type: ["string", "null"] }
+        margeBruteFcfa:   { type: ["string", "null"] }
+        margeNetteFcfa:   { type: ["string", "null"] }
+        margeKgFcfa:      { type: ["string", "null"] }
+        avancesOctroYeesFcfa: { type: ["string", "null"] }
+        avancesRembouRseesFcfa: { type: ["string", "null"] }
+        avancesSoldeFcfa: { type: ["string", "null"] }
+        intrantsDistribuEsFcfa: { type: ["string", "null"] }
+        intrantsRecouVresFcfa: { type: ["string", "null"] }
+        partsSocialesCollecteesFcfa: { type: ["string", "null"] }
+        cotisationsCollecteesFcfa: { type: ["string", "null"] }
+        variationTonnagePct: { type: ["string", "null"] }
+        variationCaPct:   { type: ["string", "null"] }
+        variationMargePct: { type: ["string", "null"] }
+        dateGeneration:   { type: ["string", "null"], format: date-time }
+
+    BilanCampagneResult:
+      type: object
+      required: [campagne, bilan]
+      properties:
+        campagne:
+          $ref: "#/components/schemas/Campagne"
+        bilan:
+          $ref: "#/components/schemas/BilanCampagne"
+
+    ComparaisonBilanCampagne:
+      type: object
+      required: [campagne]
+      properties:
+        campagne:
+          $ref: "#/components/schemas/Campagne"
+        bilan:
+          oneOf:
+            - $ref: "#/components/schemas/BilanCampagne"
+            - type: "null"
 
     ConfigPartsSociales:
       type: object

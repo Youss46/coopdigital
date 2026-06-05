@@ -121,9 +121,12 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE CAMPAGNES
   campagnes: {
-    lire:   ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "agent_terrain", "auditeur"],
-    creer:  ["pca", "directeur"],
-    fermer: ["pca", "directeur"],
+    lire:       ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "agent_terrain", "auditeur"],
+    creer:      ["pca", "directeur"],
+    fermer:     ["pca", "directeur"],
+    verifier:   ["pca", "directeur", "comptable"],
+    cloturer:   ["pca", "directeur"],
+    voir_bilan: ["pca", "directeur", "comptable", "auditeur"],
   },
 
   // MODULE PARTS SOCIALES

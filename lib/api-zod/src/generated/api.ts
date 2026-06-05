@@ -1927,6 +1927,64 @@ export const GetCampagneActiveResponse = zod.object({
 
 
 /**
+ * @summary Comparaison N campagnes (bilans côte à côte)
+ */
+export const GetComparaisonCampagnesQueryParams = zod.object({
+  "ids": zod.coerce.string().optional().describe('IDs séparés par virgule (ex. \"1,2,3\"). Vide = 5 dernières.')
+})
+
+export const GetComparaisonCampagnesResponseItem = zod.object({
+  "campagne": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "libelle": zod.string(),
+  "anneeDebut": zod.number(),
+  "anneeFin": zod.number(),
+  "dateOuverture": zod.coerce.date(),
+  "dateFermeture": zod.coerce.date().nullish(),
+  "statut": zod.enum(['ouverte', 'fermee']),
+  "createdAt": zod.coerce.date()
+}),
+  "bilan": zod.union([zod.object({
+  "id": zod.number().optional(),
+  "campagneId": zod.number().optional(),
+  "tonnageTotalKg": zod.string().nullish(),
+  "tonnageMembresKg": zod.string().nullish(),
+  "tonnagePisteursKg": zod.string().nullish(),
+  "tonnageExternesKg": zod.string().nullish(),
+  "nbLivraisons": zod.number().nullish(),
+  "nbMembresActifs": zod.number().nullish(),
+  "nbFournisseursTotal": zod.number().nullish(),
+  "prixAchatMoyenKgFcfa": zod.string().nullish(),
+  "tonnageVenduKg": zod.string().nullish(),
+  "caVentesFcfa": zod.string().nullish(),
+  "prixVenteMoyenKgFcfa": zod.string().nullish(),
+  "nbExportateurs": zod.number().nullish(),
+  "creancesRestantesFcfa": zod.string().nullish(),
+  "coutAchatTotalFcfa": zod.string().nullish(),
+  "chargesExploitationFcfa": zod.string().nullish(),
+  "chargesPersonnelFcfa": zod.string().nullish(),
+  "chargesFinancieresFcfa": zod.string().nullish(),
+  "margeBruteFcfa": zod.string().nullish(),
+  "margeNetteFcfa": zod.string().nullish(),
+  "margeKgFcfa": zod.string().nullish(),
+  "avancesOctroYeesFcfa": zod.string().nullish(),
+  "avancesRembouRseesFcfa": zod.string().nullish(),
+  "avancesSoldeFcfa": zod.string().nullish(),
+  "intrantsDistribuEsFcfa": zod.string().nullish(),
+  "intrantsRecouVresFcfa": zod.string().nullish(),
+  "partsSocialesCollecteesFcfa": zod.string().nullish(),
+  "cotisationsCollecteesFcfa": zod.string().nullish(),
+  "variationTonnagePct": zod.string().nullish(),
+  "variationCaPct": zod.string().nullish(),
+  "variationMargePct": zod.string().nullish(),
+  "dateGeneration": zod.coerce.date().nullish()
+}),zod.null()]).optional()
+})
+export const GetComparaisonCampagnesResponse = zod.array(GetComparaisonCampagnesResponseItem)
+
+
+/**
  * @summary Liste de toutes les campagnes
  */
 export const ListCampagnesResponseItem = zod.object({
@@ -1955,7 +2013,27 @@ export const CreateCampagneBody = zod.object({
 
 
 /**
- * @summary Clôturer une campagne
+ * @summary Détail d'une campagne
+ */
+export const GetCampagneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCampagneResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "libelle": zod.string(),
+  "anneeDebut": zod.number(),
+  "anneeFin": zod.number(),
+  "dateOuverture": zod.coerce.date(),
+  "dateFermeture": zod.coerce.date().nullish(),
+  "statut": zod.enum(['ouverte', 'fermee']),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Fermer une campagne (simple)
  */
 export const FermerCampagneParams = zod.object({
   "id": zod.coerce.number()
@@ -1975,6 +2053,158 @@ export const FermerCampagneResponse = zod.object({
   "dateFermeture": zod.coerce.date().nullish(),
   "statut": zod.enum(['ouverte', 'fermee']),
   "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Lancer les 10 vérifications pré-clôture
+ */
+export const VerifierCampagneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const VerifierCampagneResponse = zod.object({
+  "bloquants": zod.array(zod.object({
+  "code": zod.string(),
+  "verification": zod.string(),
+  "statut": zod.enum(['ok', 'bloquant', 'avertissement']),
+  "message": zod.string()
+})),
+  "avertissements": zod.array(zod.object({
+  "code": zod.string(),
+  "verification": zod.string(),
+  "statut": zod.enum(['ok', 'bloquant', 'avertissement']),
+  "message": zod.string()
+})),
+  "ok": zod.array(zod.object({
+  "code": zod.string(),
+  "verification": zod.string(),
+  "statut": zod.enum(['ok', 'bloquant', 'avertissement']),
+  "message": zod.string()
+})),
+  "toutOk": zod.boolean()
+})
+
+
+/**
+ * @summary Clôturer définitivement une campagne
+ */
+export const CloturerCampagneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CloturerCampagneResponse = zod.object({
+  "campagne": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "libelle": zod.string(),
+  "anneeDebut": zod.number(),
+  "anneeFin": zod.number(),
+  "dateOuverture": zod.coerce.date(),
+  "dateFermeture": zod.coerce.date().nullish(),
+  "statut": zod.enum(['ouverte', 'fermee']),
+  "createdAt": zod.coerce.date()
+}),
+  "bilan": zod.object({
+  "id": zod.number().optional(),
+  "campagneId": zod.number().optional(),
+  "tonnageTotalKg": zod.string().nullish(),
+  "tonnageMembresKg": zod.string().nullish(),
+  "tonnagePisteursKg": zod.string().nullish(),
+  "tonnageExternesKg": zod.string().nullish(),
+  "nbLivraisons": zod.number().nullish(),
+  "nbMembresActifs": zod.number().nullish(),
+  "nbFournisseursTotal": zod.number().nullish(),
+  "prixAchatMoyenKgFcfa": zod.string().nullish(),
+  "tonnageVenduKg": zod.string().nullish(),
+  "caVentesFcfa": zod.string().nullish(),
+  "prixVenteMoyenKgFcfa": zod.string().nullish(),
+  "nbExportateurs": zod.number().nullish(),
+  "creancesRestantesFcfa": zod.string().nullish(),
+  "coutAchatTotalFcfa": zod.string().nullish(),
+  "chargesExploitationFcfa": zod.string().nullish(),
+  "chargesPersonnelFcfa": zod.string().nullish(),
+  "chargesFinancieresFcfa": zod.string().nullish(),
+  "margeBruteFcfa": zod.string().nullish(),
+  "margeNetteFcfa": zod.string().nullish(),
+  "margeKgFcfa": zod.string().nullish(),
+  "avancesOctroYeesFcfa": zod.string().nullish(),
+  "avancesRembouRseesFcfa": zod.string().nullish(),
+  "avancesSoldeFcfa": zod.string().nullish(),
+  "intrantsDistribuEsFcfa": zod.string().nullish(),
+  "intrantsRecouVresFcfa": zod.string().nullish(),
+  "partsSocialesCollecteesFcfa": zod.string().nullish(),
+  "cotisationsCollecteesFcfa": zod.string().nullish(),
+  "variationTonnagePct": zod.string().nullish(),
+  "variationCaPct": zod.string().nullish(),
+  "variationMargePct": zod.string().nullish(),
+  "dateGeneration": zod.coerce.date().nullish()
+})
+})
+
+
+/**
+ * @summary Bilan complet d'une campagne
+ */
+export const GetBilanCampagneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBilanCampagneResponse = zod.object({
+  "campagne": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "libelle": zod.string(),
+  "anneeDebut": zod.number(),
+  "anneeFin": zod.number(),
+  "dateOuverture": zod.coerce.date(),
+  "dateFermeture": zod.coerce.date().nullish(),
+  "statut": zod.enum(['ouverte', 'fermee']),
+  "createdAt": zod.coerce.date()
+}),
+  "bilan": zod.object({
+  "id": zod.number().optional(),
+  "campagneId": zod.number().optional(),
+  "tonnageTotalKg": zod.string().nullish(),
+  "tonnageMembresKg": zod.string().nullish(),
+  "tonnagePisteursKg": zod.string().nullish(),
+  "tonnageExternesKg": zod.string().nullish(),
+  "nbLivraisons": zod.number().nullish(),
+  "nbMembresActifs": zod.number().nullish(),
+  "nbFournisseursTotal": zod.number().nullish(),
+  "prixAchatMoyenKgFcfa": zod.string().nullish(),
+  "tonnageVenduKg": zod.string().nullish(),
+  "caVentesFcfa": zod.string().nullish(),
+  "prixVenteMoyenKgFcfa": zod.string().nullish(),
+  "nbExportateurs": zod.number().nullish(),
+  "creancesRestantesFcfa": zod.string().nullish(),
+  "coutAchatTotalFcfa": zod.string().nullish(),
+  "chargesExploitationFcfa": zod.string().nullish(),
+  "chargesPersonnelFcfa": zod.string().nullish(),
+  "chargesFinancieresFcfa": zod.string().nullish(),
+  "margeBruteFcfa": zod.string().nullish(),
+  "margeNetteFcfa": zod.string().nullish(),
+  "margeKgFcfa": zod.string().nullish(),
+  "avancesOctroYeesFcfa": zod.string().nullish(),
+  "avancesRembouRseesFcfa": zod.string().nullish(),
+  "avancesSoldeFcfa": zod.string().nullish(),
+  "intrantsDistribuEsFcfa": zod.string().nullish(),
+  "intrantsRecouVresFcfa": zod.string().nullish(),
+  "partsSocialesCollecteesFcfa": zod.string().nullish(),
+  "cotisationsCollecteesFcfa": zod.string().nullish(),
+  "variationTonnagePct": zod.string().nullish(),
+  "variationCaPct": zod.string().nullish(),
+  "variationMargePct": zod.string().nullish(),
+  "dateGeneration": zod.coerce.date().nullish()
+})
+})
+
+
+/**
+ * @summary Télécharger le bilan PDF d'une campagne
+ */
+export const GetBilanCampagnePdfParams = zod.object({
+  "id": zod.coerce.number()
 })
 
 

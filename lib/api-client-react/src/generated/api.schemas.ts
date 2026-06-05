@@ -1764,6 +1764,106 @@ export interface CampagneInput {
   dateOuverture: string;
 }
 
+export type VerificationClotureStatut = typeof VerificationClotureStatut[keyof typeof VerificationClotureStatut];
+
+
+export const VerificationClotureStatut = {
+  ok: 'ok',
+  bloquant: 'bloquant',
+  avertissement: 'avertissement',
+} as const;
+
+export interface VerificationCloture {
+  code: string;
+  verification: string;
+  statut: VerificationClotureStatut;
+  message: string;
+}
+
+export interface ResultatVerifications {
+  bloquants: VerificationCloture[];
+  avertissements: VerificationCloture[];
+  ok: VerificationCloture[];
+  toutOk: boolean;
+}
+
+export interface BilanCampagne {
+  id?: number;
+  campagneId?: number;
+  /** @nullable */
+  tonnageTotalKg?: string | null;
+  /** @nullable */
+  tonnageMembresKg?: string | null;
+  /** @nullable */
+  tonnagePisteursKg?: string | null;
+  /** @nullable */
+  tonnageExternesKg?: string | null;
+  /** @nullable */
+  nbLivraisons?: number | null;
+  /** @nullable */
+  nbMembresActifs?: number | null;
+  /** @nullable */
+  nbFournisseursTotal?: number | null;
+  /** @nullable */
+  prixAchatMoyenKgFcfa?: string | null;
+  /** @nullable */
+  tonnageVenduKg?: string | null;
+  /** @nullable */
+  caVentesFcfa?: string | null;
+  /** @nullable */
+  prixVenteMoyenKgFcfa?: string | null;
+  /** @nullable */
+  nbExportateurs?: number | null;
+  /** @nullable */
+  creancesRestantesFcfa?: string | null;
+  /** @nullable */
+  coutAchatTotalFcfa?: string | null;
+  /** @nullable */
+  chargesExploitationFcfa?: string | null;
+  /** @nullable */
+  chargesPersonnelFcfa?: string | null;
+  /** @nullable */
+  chargesFinancieresFcfa?: string | null;
+  /** @nullable */
+  margeBruteFcfa?: string | null;
+  /** @nullable */
+  margeNetteFcfa?: string | null;
+  /** @nullable */
+  margeKgFcfa?: string | null;
+  /** @nullable */
+  avancesOctroYeesFcfa?: string | null;
+  /** @nullable */
+  avancesRembouRseesFcfa?: string | null;
+  /** @nullable */
+  avancesSoldeFcfa?: string | null;
+  /** @nullable */
+  intrantsDistribuEsFcfa?: string | null;
+  /** @nullable */
+  intrantsRecouVresFcfa?: string | null;
+  /** @nullable */
+  partsSocialesCollecteesFcfa?: string | null;
+  /** @nullable */
+  cotisationsCollecteesFcfa?: string | null;
+  /** @nullable */
+  variationTonnagePct?: string | null;
+  /** @nullable */
+  variationCaPct?: string | null;
+  /** @nullable */
+  variationMargePct?: string | null;
+  /** @nullable */
+  dateGeneration?: string | null;
+}
+
+export interface BilanCampagneResult {
+  campagne: Campagne;
+  bilan: BilanCampagne;
+}
+
+export interface ComparaisonBilanCampagne {
+  campagne: Campagne;
+  bilan?: BilanCampagne | null;
+}
+
 export interface ConfigPartsSociales {
   cooperativeId: number;
   valeurNominaleFcfa: number;
@@ -3084,6 +3184,13 @@ export const GetAvancesPersonnelStatut = {
   en_cours: 'en_cours',
   rembourse: 'rembourse',
 } as const;
+
+export type GetComparaisonCampagnesParams = {
+/**
+ * IDs séparés par virgule (ex. "1,2,3"). Vide = 5 dernières.
+ */
+ids?: string;
+};
 
 export type EnregistrerLiberation201 = {
   succes: boolean;

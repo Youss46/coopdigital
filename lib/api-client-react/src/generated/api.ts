@@ -47,6 +47,7 @@ import type {
   Bailleur,
   BailleurInput,
   BalanceLigne,
+  BilanCampagneResult,
   BilanEtat,
   BudgetCampagne,
   BudgetDetail,
@@ -58,6 +59,7 @@ import type {
   CampagneInput,
   CategorieIntrant,
   CloturerAgInput,
+  ComparaisonBilanCampagne,
   ComparaisonCampagne,
   ComposanteSalaire,
   CompteResultat,
@@ -118,6 +120,7 @@ import type {
   GetBalanceParams,
   GetBilanParams,
   GetBulletinsParams,
+  GetComparaisonCampagnesParams,
   GetCompteResultatParams,
   GetEmpruntsParams,
   GetEncoursIntrantsMembre200,
@@ -206,6 +209,7 @@ import type {
   RemboursementIntrantInput,
   ResetPasswordInput,
   ResetUserPassword200,
+  ResultatVerifications,
   ResumeMembre,
   SaisirPrixInput,
   ScoreMembreDetail,
@@ -6271,7 +6275,7 @@ export const getGetCampagneActiveUrl = () => {
 
 
 
-  return `/api/api/campagnes/active`
+  return `/api/campagnes/active`
 }
 
 /**
@@ -6294,7 +6298,7 @@ export const getCampagneActive = async ( options?: RequestInit): Promise<Campagn
 
 export const getGetCampagneActiveQueryKey = () => {
     return [
-    `/api/api/campagnes/active`
+    `/api/campagnes/active`
     ] as const;
     }
 
@@ -6343,12 +6347,96 @@ export function useGetCampagneActive<TData = Awaited<ReturnType<typeof getCampag
 
 
 
+export const getGetComparaisonCampagnesUrl = (params?: GetComparaisonCampagnesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/campagnes/comparaison?${stringifiedParams}` : `/api/campagnes/comparaison`
+}
+
+/**
+ * @summary Comparaison N campagnes (bilans côte à côte)
+ */
+export const getComparaisonCampagnes = async (params?: GetComparaisonCampagnesParams, options?: RequestInit): Promise<ComparaisonBilanCampagne[]> => {
+
+  return customFetch<ComparaisonBilanCampagne[]>(getGetComparaisonCampagnesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetComparaisonCampagnesQueryKey = (params?: GetComparaisonCampagnesParams,) => {
+    return [
+    `/api/campagnes/comparaison`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetComparaisonCampagnesQueryOptions = <TData = Awaited<ReturnType<typeof getComparaisonCampagnes>>, TError = ErrorType<unknown>>(params?: GetComparaisonCampagnesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparaisonCampagnes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetComparaisonCampagnesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparaisonCampagnes>>> = ({ signal }) => getComparaisonCampagnes(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getComparaisonCampagnes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetComparaisonCampagnesQueryResult = NonNullable<Awaited<ReturnType<typeof getComparaisonCampagnes>>>
+export type GetComparaisonCampagnesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Comparaison N campagnes (bilans côte à côte)
+ */
+
+export function useGetComparaisonCampagnes<TData = Awaited<ReturnType<typeof getComparaisonCampagnes>>, TError = ErrorType<unknown>>(
+ params?: GetComparaisonCampagnesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparaisonCampagnes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetComparaisonCampagnesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListCampagnesUrl = () => {
 
 
 
 
-  return `/api/api/campagnes`
+  return `/api/campagnes`
 }
 
 /**
@@ -6371,7 +6459,7 @@ export const listCampagnes = async ( options?: RequestInit): Promise<Campagne[]>
 
 export const getListCampagnesQueryKey = () => {
     return [
-    `/api/api/campagnes`
+    `/api/campagnes`
     ] as const;
     }
 
@@ -6425,7 +6513,7 @@ export const getCreateCampagneUrl = () => {
 
 
 
-  return `/api/api/campagnes`
+  return `/api/campagnes`
 }
 
 /**
@@ -6491,16 +6579,93 @@ export const useCreateCampagne = <TError = ErrorType<unknown>,
       return useMutation(getCreateCampagneMutationOptions(options));
     }
 
+export const getGetCampagneUrl = (id: number,) => {
+
+
+
+
+  return `/api/campagnes/${id}`
+}
+
+/**
+ * @summary Détail d'une campagne
+ */
+export const getCampagne = async (id: number, options?: RequestInit): Promise<Campagne> => {
+
+  return customFetch<Campagne>(getGetCampagneUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCampagneQueryKey = (id: number,) => {
+    return [
+    `/api/campagnes/${id}`
+    ] as const;
+    }
+
+
+export const getGetCampagneQueryOptions = <TData = Awaited<ReturnType<typeof getCampagne>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCampagne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCampagneQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCampagne>>> = ({ signal }) => getCampagne(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCampagne>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCampagneQueryResult = NonNullable<Awaited<ReturnType<typeof getCampagne>>>
+export type GetCampagneQueryError = ErrorType<void>
+
+
+/**
+ * @summary Détail d'une campagne
+ */
+
+export function useGetCampagne<TData = Awaited<ReturnType<typeof getCampagne>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCampagne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCampagneQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getFermerCampagneUrl = (id: number,) => {
 
 
 
 
-  return `/api/api/campagnes/${id}/fermer`
+  return `/api/campagnes/${id}/fermer`
 }
 
 /**
- * @summary Clôturer une campagne
+ * @summary Fermer une campagne (simple)
  */
 export const fermerCampagne = async (id: number,
     fermerCampagneInput?: FermerCampagneInput, options?: RequestInit): Promise<Campagne> => {
@@ -6550,7 +6715,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type FermerCampagneMutationError = ErrorType<unknown>
 
     /**
- * @summary Clôturer une campagne
+ * @summary Fermer une campagne (simple)
  */
 export const useFermerCampagne = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fermerCampagne>>, TError,{id: number;data?: BodyType<FermerCampagneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -6562,6 +6727,307 @@ export const useFermerCampagne = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getFermerCampagneMutationOptions(options));
     }
+
+export const getVerifierCampagneUrl = (id: number,) => {
+
+
+
+
+  return `/api/campagnes/${id}/verifier`
+}
+
+/**
+ * @summary Lancer les 10 vérifications pré-clôture
+ */
+export const verifierCampagne = async (id: number, options?: RequestInit): Promise<ResultatVerifications> => {
+
+  return customFetch<ResultatVerifications>(getVerifierCampagneUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getVerifierCampagneQueryKey = (id: number,) => {
+    return [
+    `/api/campagnes/${id}/verifier`
+    ] as const;
+    }
+
+
+export const getVerifierCampagneQueryOptions = <TData = Awaited<ReturnType<typeof verifierCampagne>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifierCampagne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getVerifierCampagneQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof verifierCampagne>>> = ({ signal }) => verifierCampagne(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof verifierCampagne>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type VerifierCampagneQueryResult = NonNullable<Awaited<ReturnType<typeof verifierCampagne>>>
+export type VerifierCampagneQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lancer les 10 vérifications pré-clôture
+ */
+
+export function useVerifierCampagne<TData = Awaited<ReturnType<typeof verifierCampagne>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifierCampagne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getVerifierCampagneQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCloturerCampagneUrl = (id: number,) => {
+
+
+
+
+  return `/api/campagnes/${id}/cloture`
+}
+
+/**
+ * @summary Clôturer définitivement une campagne
+ */
+export const cloturerCampagne = async (id: number, options?: RequestInit): Promise<BilanCampagneResult> => {
+
+  return customFetch<BilanCampagneResult>(getCloturerCampagneUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCloturerCampagneMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cloturerCampagne>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cloturerCampagne>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['cloturerCampagne'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cloturerCampagne>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  cloturerCampagne(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CloturerCampagneMutationResult = NonNullable<Awaited<ReturnType<typeof cloturerCampagne>>>
+
+    export type CloturerCampagneMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Clôturer définitivement une campagne
+ */
+export const useCloturerCampagne = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cloturerCampagne>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cloturerCampagne>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getCloturerCampagneMutationOptions(options));
+    }
+
+export const getGetBilanCampagneUrl = (id: number,) => {
+
+
+
+
+  return `/api/campagnes/${id}/bilan`
+}
+
+/**
+ * @summary Bilan complet d'une campagne
+ */
+export const getBilanCampagne = async (id: number, options?: RequestInit): Promise<BilanCampagneResult> => {
+
+  return customFetch<BilanCampagneResult>(getGetBilanCampagneUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBilanCampagneQueryKey = (id: number,) => {
+    return [
+    `/api/campagnes/${id}/bilan`
+    ] as const;
+    }
+
+
+export const getGetBilanCampagneQueryOptions = <TData = Awaited<ReturnType<typeof getBilanCampagne>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBilanCampagne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBilanCampagneQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBilanCampagne>>> = ({ signal }) => getBilanCampagne(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBilanCampagne>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBilanCampagneQueryResult = NonNullable<Awaited<ReturnType<typeof getBilanCampagne>>>
+export type GetBilanCampagneQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Bilan complet d'une campagne
+ */
+
+export function useGetBilanCampagne<TData = Awaited<ReturnType<typeof getBilanCampagne>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBilanCampagne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBilanCampagneQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetBilanCampagnePdfUrl = (id: number,) => {
+
+
+
+
+  return `/api/campagnes/${id}/bilan-pdf`
+}
+
+/**
+ * @summary Télécharger le bilan PDF d'une campagne
+ */
+export const getBilanCampagnePdf = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetBilanCampagnePdfUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBilanCampagnePdfQueryKey = (id: number,) => {
+    return [
+    `/api/campagnes/${id}/bilan-pdf`
+    ] as const;
+    }
+
+
+export const getGetBilanCampagnePdfQueryOptions = <TData = Awaited<ReturnType<typeof getBilanCampagnePdf>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBilanCampagnePdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBilanCampagnePdfQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBilanCampagnePdf>>> = ({ signal }) => getBilanCampagnePdf(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBilanCampagnePdf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBilanCampagnePdfQueryResult = NonNullable<Awaited<ReturnType<typeof getBilanCampagnePdf>>>
+export type GetBilanCampagnePdfQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Télécharger le bilan PDF d'une campagne
+ */
+
+export function useGetBilanCampagnePdf<TData = Awaited<ReturnType<typeof getBilanCampagnePdf>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBilanCampagnePdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBilanCampagnePdfQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetConfigPartsUrl = () => {
 
