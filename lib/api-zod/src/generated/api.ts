@@ -4085,3 +4085,214 @@ export const RemboursementManuelIntrantBody = zod.object({
 })
 
 
+/**
+ * @summary Récupérer la configuration du scoring
+ */
+export const GetScoringConfigResponse = zod.object({
+  "id": zod.number().optional(),
+  "cooperativeId": zod.number().optional(),
+  "poidsVolumePct": zod.string().optional(),
+  "poidsQualitePct": zod.string().optional(),
+  "poidsRegularitePct": zod.string().optional(),
+  "poidsRemboursementPct": zod.string().optional(),
+  "poidsFidelitePct": zod.string().optional(),
+  "poidsCotisationPct": zod.string().optional(),
+  "seuilBronze": zod.string().optional(),
+  "seuilArgent": zod.string().optional(),
+  "seuilOr": zod.string().optional(),
+  "seuilPlatine": zod.string().optional(),
+  "avantagesBronze": zod.string().nullish(),
+  "avantagesArgent": zod.string().nullish(),
+  "avantagesOr": zod.string().nullish(),
+  "avantagesPlatine": zod.string().nullish(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Modifier la configuration du scoring
+ */
+export const UpdateScoringConfigBody = zod.object({
+  "poidsVolumePct": zod.number().optional(),
+  "poidsQualitePct": zod.number().optional(),
+  "poidsRegularitePct": zod.number().optional(),
+  "poidsRemboursementPct": zod.number().optional(),
+  "poidsFidelitePct": zod.number().optional(),
+  "poidsCotisationPct": zod.number().optional(),
+  "seuilBronze": zod.number().optional(),
+  "seuilArgent": zod.number().optional(),
+  "seuilOr": zod.number().optional(),
+  "seuilPlatine": zod.number().optional(),
+  "avantagesBronze": zod.string().optional(),
+  "avantagesArgent": zod.string().optional(),
+  "avantagesOr": zod.string().optional(),
+  "avantagesPlatine": zod.string().optional()
+})
+
+export const UpdateScoringConfigResponse = zod.object({
+  "id": zod.number().optional(),
+  "cooperativeId": zod.number().optional(),
+  "poidsVolumePct": zod.string().optional(),
+  "poidsQualitePct": zod.string().optional(),
+  "poidsRegularitePct": zod.string().optional(),
+  "poidsRemboursementPct": zod.string().optional(),
+  "poidsFidelitePct": zod.string().optional(),
+  "poidsCotisationPct": zod.string().optional(),
+  "seuilBronze": zod.string().optional(),
+  "seuilArgent": zod.string().optional(),
+  "seuilOr": zod.string().optional(),
+  "seuilPlatine": zod.string().optional(),
+  "avantagesBronze": zod.string().nullish(),
+  "avantagesArgent": zod.string().nullish(),
+  "avantagesOr": zod.string().nullish(),
+  "avantagesPlatine": zod.string().nullish(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Classement complet d'une campagne
+ */
+export const GetScoringClassementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetScoringClassementResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "membre_id": zod.number().optional(),
+  "score_global": zod.string().optional(),
+  "niveau": zod.string().optional(),
+  "rang": zod.number().nullish(),
+  "score_volume": zod.string().optional(),
+  "score_qualite": zod.string().optional(),
+  "score_regularite": zod.string().optional(),
+  "score_remboursement": zod.string().optional(),
+  "score_fidelite": zod.string().optional(),
+  "score_cotisation": zod.string().optional(),
+  "date_calcul": zod.string().optional(),
+  "nom": zod.string().optional(),
+  "prenoms": zod.string().optional(),
+  "village": zod.string().nullish(),
+  "groupement": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "photo_url": zod.string().nullish(),
+  "tonnage": zod.string().optional()
+})
+export const GetScoringClassementResponse = zod.array(GetScoringClassementResponseItem)
+
+
+/**
+ * @summary Top N producteurs
+ */
+export const GetScoringTopQueryParams = zod.object({
+  "n": zod.coerce.number().optional(),
+  "campagneId": zod.coerce.number().optional()
+})
+
+export const GetScoringTopResponseItem = zod.object({
+  "rang": zod.number().nullish(),
+  "membre_id": zod.number().optional(),
+  "nom": zod.string().optional(),
+  "prenoms": zod.string().optional(),
+  "village": zod.string().nullish(),
+  "score_global": zod.string().optional(),
+  "niveau": zod.string().optional(),
+  "score_volume": zod.string().optional(),
+  "score_qualite": zod.string().optional(),
+  "tonnage": zod.string().optional()
+})
+export const GetScoringTopResponse = zod.array(GetScoringTopResponseItem)
+
+
+/**
+ * @summary Membres par niveau
+ */
+export const GetScoringParNiveauQueryParams = zod.object({
+  "niveau": zod.enum(['bronze', 'argent', 'or', 'platine', 'non_classe']).optional(),
+  "campagneId": zod.coerce.number().optional()
+})
+
+export const GetScoringParNiveauResponseItem = zod.object({
+  "membre_id": zod.number().optional(),
+  "nom": zod.string().optional(),
+  "prenoms": zod.string().optional(),
+  "village": zod.string().nullish(),
+  "groupement": zod.string().nullish(),
+  "score_global": zod.string().optional(),
+  "rang": zod.number().nullish()
+})
+export const GetScoringParNiveauResponse = zod.array(GetScoringParNiveauResponseItem)
+
+
+/**
+ * @summary Évolution du score d'un membre
+ */
+export const GetScoringEvolutionParams = zod.object({
+  "membreId": zod.coerce.number()
+})
+
+export const GetScoringEvolutionResponseItem = zod.object({
+  "campagne_id": zod.number().optional(),
+  "nom_campagne": zod.string().optional(),
+  "score_global": zod.string().optional(),
+  "niveau": zod.string().optional(),
+  "rang": zod.number().nullish(),
+  "date_calcul": zod.string().optional()
+})
+export const GetScoringEvolutionResponse = zod.array(GetScoringEvolutionResponseItem)
+
+
+/**
+ * @summary Résumé du score d'un membre (dernière campagne)
+ */
+export const GetScoringResumeParams = zod.object({
+  "membreId": zod.coerce.number()
+})
+
+export const GetScoringResumeResponse = zod.object({
+  "score_global": zod.string().optional(),
+  "niveau": zod.string().optional(),
+  "rang": zod.number().nullish(),
+  "date_calcul": zod.string().optional(),
+  "campagne_id": zod.number().optional()
+})
+
+
+/**
+ * @summary Score détaillé d'un membre (toutes campagnes)
+ */
+export const GetScoringMembreParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetScoringMembreResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "campagne_id": zod.number().optional(),
+  "score_global": zod.string().optional(),
+  "niveau": zod.string().optional(),
+  "rang": zod.number().nullish(),
+  "score_volume": zod.string().optional(),
+  "score_qualite": zod.string().optional(),
+  "score_regularite": zod.string().optional(),
+  "score_remboursement": zod.string().optional(),
+  "score_fidelite": zod.string().optional(),
+  "score_cotisation": zod.string().optional(),
+  "date_calcul": zod.string().optional(),
+  "nom_campagne": zod.string().optional()
+})
+export const GetScoringMembreResponse = zod.array(GetScoringMembreResponseItem)
+
+
+/**
+ * @summary Recalculer tous les scores d'une campagne
+ */
+export const PostScoringRecalculerBody = zod.object({
+  "campagneId": zod.number()
+})
+
+export const PostScoringRecalculerResponse = zod.object({
+  "calculés": zod.number(),
+  "campagneId": zod.number()
+})
+
+

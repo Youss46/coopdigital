@@ -3657,6 +3657,197 @@ paths:
         "201":
           description: Remboursement enregistré
 
+  # ─── Scoring paths ────────────────────────────────────────────────────────
+  /api/scoring/config:
+    get:
+      operationId: getScoringConfig
+      summary: Récupérer la configuration du scoring
+      tags: [scoring]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Configuration scoring
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigScoring"
+
+    put:
+      operationId: updateScoringConfig
+      summary: Modifier la configuration du scoring
+      tags: [scoring]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConfigScoringInput"
+      responses:
+        "200":
+          description: Configuration mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigScoring"
+
+  /api/scoring/campagne/{id}:
+    get:
+      operationId: getScoringClassement
+      summary: Classement complet d'une campagne
+      tags: [scoring]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Classement
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EntreeClassement"
+
+  /api/scoring/top:
+    get:
+      operationId: getScoringTop
+      summary: Top N producteurs
+      tags: [scoring]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: n
+          in: query
+          schema:
+            type: integer
+        - name: campagneId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Top producteurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TopProducteur"
+
+  /api/scoring/par-niveau:
+    get:
+      operationId: getScoringParNiveau
+      summary: Membres par niveau
+      tags: [scoring]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: niveau
+          in: query
+          schema:
+            type: string
+            enum: [bronze, argent, or, platine, non_classe]
+        - name: campagneId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Membres du niveau
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MembreNiveau"
+
+  /api/scoring/evolution/{membreId}:
+    get:
+      operationId: getScoringEvolution
+      summary: Évolution du score d'un membre
+      tags: [scoring]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: membreId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Historique des scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EvolutionScore"
+
+  /api/scoring/resume/{membreId}:
+    get:
+      operationId: getScoringResume
+      summary: Résumé du score d'un membre (dernière campagne)
+      tags: [scoring]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: membreId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Résumé score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResumeMembre"
+
+  /api/scoring/membre/{id}:
+    get:
+      operationId: getScoringMembre
+      summary: Score détaillé d'un membre (toutes campagnes)
+      tags: [scoring]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scores du membre
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScoreMembreDetail"
+
+  /api/scoring/recalculer:
+    post:
+      operationId: postScoringRecalculer
+      summary: Recalculer tous les scores d'une campagne
+      tags: [scoring]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecalculerInput"
+      responses:
+        "200":
+          description: Résultat recalcul
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecalculerResult"
+
 components:
   schemas:
 
@@ -7165,3 +7356,143 @@ components:
         rentabilite:
           type: string
           enum: [bonne, faible, negative]
+
+    # ─── Scoring schemas ───────────────────────────────────────────────────────
+    ConfigScoring:
+      type: object
+      properties:
+        id:                       { type: integer }
+        cooperativeId:            { type: integer }
+        poidsVolumePct:           { type: string }
+        poidsQualitePct:          { type: string }
+        poidsRegularitePct:       { type: string }
+        poidsRemboursementPct:    { type: string }
+        poidsFidelitePct:         { type: string }
+        poidsCotisationPct:       { type: string }
+        seuilBronze:              { type: string }
+        seuilArgent:              { type: string }
+        seuilOr:                  { type: string }
+        seuilPlatine:             { type: string }
+        avantagesBronze:          { type: string, nullable: true }
+        avantagesArgent:          { type: string, nullable: true }
+        avantagesOr:              { type: string, nullable: true }
+        avantagesPlatine:         { type: string, nullable: true }
+        updatedAt:                { type: string }
+
+    UpdateConfigScoringInput:
+      type: object
+      properties:
+        poidsVolumePct:           { type: number }
+        poidsQualitePct:          { type: number }
+        poidsRegularitePct:       { type: number }
+        poidsRemboursementPct:    { type: number }
+        poidsFidelitePct:         { type: number }
+        poidsCotisationPct:       { type: number }
+        seuilBronze:              { type: number }
+        seuilArgent:              { type: number }
+        seuilOr:                  { type: number }
+        seuilPlatine:             { type: number }
+        avantagesBronze:          { type: string }
+        avantagesArgent:          { type: string }
+        avantagesOr:              { type: string }
+        avantagesPlatine:         { type: string }
+
+    EntreeClassement:
+      type: object
+      properties:
+        id:                   { type: integer }
+        membre_id:            { type: integer }
+        score_global:         { type: string }
+        niveau:               { type: string }
+        rang:                 { type: integer, nullable: true }
+        score_volume:         { type: string }
+        score_qualite:        { type: string }
+        score_regularite:     { type: string }
+        score_remboursement:  { type: string }
+        score_fidelite:       { type: string }
+        score_cotisation:     { type: string }
+        date_calcul:          { type: string }
+        nom:                  { type: string }
+        prenoms:              { type: string }
+        village:              { type: string, nullable: true }
+        groupement:           { type: string, nullable: true }
+        section:              { type: string, nullable: true }
+        photo_url:            { type: string, nullable: true }
+        tonnage:              { type: string }
+
+    TopProducteur:
+      type: object
+      properties:
+        rang:           { type: integer, nullable: true }
+        membre_id:      { type: integer }
+        nom:            { type: string }
+        prenoms:        { type: string }
+        village:        { type: string, nullable: true }
+        score_global:   { type: string }
+        niveau:         { type: string }
+        score_volume:   { type: string }
+        score_qualite:  { type: string }
+        tonnage:        { type: string }
+
+    MembreNiveau:
+      type: object
+      properties:
+        membre_id:    { type: integer }
+        nom:          { type: string }
+        prenoms:      { type: string }
+        village:      { type: string, nullable: true }
+        groupement:   { type: string, nullable: true }
+        score_global: { type: string }
+        rang:         { type: integer, nullable: true }
+
+    ScoreMembreDetail:
+      type: object
+      properties:
+        id:                   { type: integer }
+        campagne_id:          { type: integer }
+        score_global:         { type: string }
+        niveau:               { type: string }
+        rang:                 { type: integer, nullable: true }
+        score_volume:         { type: string }
+        score_qualite:        { type: string }
+        score_regularite:     { type: string }
+        score_remboursement:  { type: string }
+        score_fidelite:       { type: string }
+        score_cotisation:     { type: string }
+        date_calcul:          { type: string }
+        nom_campagne:         { type: string }
+
+    EvolutionScore:
+      type: object
+      properties:
+        campagne_id:    { type: integer }
+        nom_campagne:   { type: string }
+        score_global:   { type: string }
+        niveau:         { type: string }
+        rang:           { type: integer, nullable: true }
+        date_calcul:    { type: string }
+
+    ResumeMembre:
+      type: object
+      properties:
+        score_global:   { type: string }
+        niveau:         { type: string }
+        rang:           { type: integer, nullable: true }
+        date_calcul:    { type: string }
+        campagne_id:    { type: integer }
+
+    RecalculerInput:
+      type: object
+      required: [campagneId]
+      properties:
+        campagneId:
+          type: integer
+
+    RecalculerResult:
+      type: object
+      required: [calculés, campagneId]
+      properties:
+        calculés:
+          type: integer
+        campagneId:
+          type: integer

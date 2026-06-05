@@ -22,3 +22,4 @@ export * from "./budget";
 export * from "./subventions";
 export * from "./gouvernance";
 export * from "./prix";
+export * from "./scoring";

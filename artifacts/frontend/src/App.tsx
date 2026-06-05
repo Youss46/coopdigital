@@ -28,6 +28,7 @@ import BudgetPage from "@/pages/BudgetPage";
 import SubventionsPage from "@/pages/SubventionsPage";
 import GouvernancePage from "@/pages/GouvernancePage";
 import PrixPage from "@/pages/PrixPage";
+import ScoringPage from "@/pages/ScoringPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -127,6 +128,9 @@ function AppRoutes() {
       </Route>
       <Route path="/prix">
         <ProtectedRoute component={PrixPage} />
+      </Route>
+      <Route path="/scoring">
+        <ProtectedRoute component={ScoringPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

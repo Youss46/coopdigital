@@ -6,10 +6,12 @@ import {
   useGetAvances,
   useGetPartsMembre,
   useEnregistrerLiberation,
+  useGetScoringResume,
   getGetMembreByIdQueryKey,
   getGetMembreHistoriqueQueryKey,
   getGetAvancesQueryKey,
   getGetPartsMembreQueryKey,
+  getGetScoringResumeQueryKey,
   type LiberationInput,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,8 +35,16 @@ function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const TABS = ["Avances", "Livraisons", "Parts sociales"] as const;
+const TABS = ["Avances", "Livraisons", "Parts sociales", "Score"] as const;
 type Tab = (typeof TABS)[number];
+
+const NIVEAUX_SCORE: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
+  platine:    { label: "Platine",    color: "text-purple-700", bg: "bg-purple-100",  emoji: "💎" },
+  or:         { label: "Or",         color: "text-yellow-700", bg: "bg-yellow-100",  emoji: "🥇" },
+  argent:     { label: "Argent",     color: "text-gray-600",   bg: "bg-gray-100",    emoji: "🥈" },
+  bronze:     { label: "Bronze",     color: "text-orange-700", bg: "bg-orange-100",  emoji: "🥉" },
+  non_classe: { label: "Non classé", color: "text-slate-500",  bg: "bg-slate-100",   emoji: "📋" },
+};
 
 export default function MembreFiche() {
   const [, navigate] = useLocation();
@@ -61,6 +71,9 @@ export default function MembreFiche() {
   });
   const { data: partsData, isLoading: partsLoading } = useGetPartsMembre(id, {
     query: { queryKey: getGetPartsMembreQueryKey(id), enabled: !!id && activeTab === "Parts sociales" },
+  });
+  const { data: scoreResume } = useGetScoringResume(id, {
+    query: { queryKey: getGetScoringResumeQueryKey(id), enabled: !!id },
   });
 
   const liberationMut = useEnregistrerLiberation();
@@ -158,6 +171,16 @@ export default function MembreFiche() {
               {formaterFCFA(soldeCredit)} dû
             </span>
           )}
+          {scoreResume && (() => {
+            const resume = scoreResume as { niveau?: string; score_global?: string | number };
+            const niv = resume.niveau ?? "non_classe";
+            const n = NIVEAUX_SCORE[niv] ?? NIVEAUX_SCORE.non_classe!;
+            return (
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ${n.bg} ${n.color} flex items-center gap-1`}>
+                {n.emoji} {n.label} · {Math.round(Number(resume.score_global ?? 0))}/100
+              </span>
+            );
+          })()}
         </div>
       </div>
 
@@ -407,6 +430,94 @@ export default function MembreFiche() {
                 Aucune souscription de parts sociales
               </div>
             )}
+          </div>
+        )}
+        {/* Score */}
+        {activeTab === "Score" && (
+          <div className="p-5 space-y-5">
+            {!scoreResume ? (
+              <p className="text-center text-gray-400 text-sm py-8">Score non calculé pour ce membre.</p>
+            ) : (() => {
+              const r = scoreResume as {
+                niveau?: string;
+                score_global?: string | number;
+                rang?: number | null;
+                details?: Array<{ composante: string; valeur: number; score: number; poids: number }>;
+                dernier_recalcul?: string | null;
+              };
+              const niv = r.niveau ?? "non_classe";
+              const n = NIVEAUX_SCORE[niv] ?? NIVEAUX_SCORE.non_classe!;
+              const score = Math.round(Number(r.score_global ?? 0));
+              const details = r.details ?? [];
+              const COMPOSANTE_LABELS: Record<string, string> = {
+                livraisons:         "Régularité des livraisons",
+                volume:             "Volume livré",
+                qualite:            "Qualité du cacao",
+                remboursement:      "Remboursement des avances",
+                anciennete:         "Ancienneté",
+                superficie:         "Superficie exploitée",
+              };
+              return (
+                <>
+                  {/* Résumé */}
+                  <div className="flex items-center gap-4">
+                    <div className="text-center flex-shrink-0">
+                      <div
+                        className="w-20 h-20 rounded-full flex flex-col items-center justify-center border-4"
+                        style={{
+                          borderColor: score >= 75 ? "#16a34a" : score >= 50 ? "#ca8a04" : score >= 30 ? "#ea580c" : "#9ca3af",
+                        }}
+                      >
+                        <span className="text-2xl font-bold text-gray-900">{score}</span>
+                        <span className="text-xs text-gray-400">/100</span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold ${n.bg} ${n.color}`}>
+                        {n.emoji} {n.label}
+                      </span>
+                      {r.rang != null && (
+                        <p className="text-sm text-gray-500 mt-1">Rang #{r.rang} dans la coopérative</p>
+                      )}
+                      {r.dernier_recalcul && (
+                        <p className="text-xs text-gray-400 mt-0.5">Calculé le {formaterDate(r.dernier_recalcul)}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Détails des composantes */}
+                  {details.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Détail des composantes</h3>
+                      <div className="space-y-3">
+                        {details.map((d) => {
+                          const scoreComp = Math.round(d.score * d.poids);
+                          const maxComp = Math.round(100 * d.poids);
+                          const pct = maxComp > 0 ? Math.min(100, Math.round((scoreComp / maxComp) * 100)) : 0;
+                          return (
+                            <div key={d.composante}>
+                              <div className="flex justify-between text-xs text-gray-600 mb-1">
+                                <span>{COMPOSANTE_LABELS[d.composante] ?? d.composante}</span>
+                                <span className="font-medium">{Math.round(d.score)}/100 · poids {Math.round(d.poids * 100)}%</span>
+                              </div>
+                              <div className="w-full bg-gray-100 rounded-full h-1.5">
+                                <div
+                                  className="h-1.5 rounded-full transition-all"
+                                  style={{
+                                    width: `${pct}%`,
+                                    backgroundColor: pct >= 70 ? "#16a34a" : pct >= 40 ? "#ca8a04" : "#ef4444",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </div>

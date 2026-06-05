@@ -56,6 +56,7 @@ import type {
   ConfigPartsSociales,
   ConfigPrix,
   ConfigPrixInput,
+  ConfigScoring,
   ConversionInput,
   ConversionResult,
   ConvocationInput,
@@ -82,8 +83,10 @@ import type {
   EncaissementInput,
   EncoursMembre,
   EnregistrerLiberation201,
+  EntreeClassement,
   EntrepotStock,
   ErrorResponse,
+  EvolutionScore,
   ExportateurDetail,
   ExportateurHistorique,
   ExportateurInput,
@@ -116,6 +119,8 @@ import type {
   GetPrixSimulationParams,
   GetRapportCampagneIntrantsParams,
   GetRapportTypeFournisseur200Item,
+  GetScoringParNiveauParams,
+  GetScoringTopParams,
   GetVentesParams,
   GrandLivrePage,
   HealthStatus,
@@ -148,6 +153,7 @@ import type {
   Membre,
   MembreHistorique,
   MembreInput,
+  MembreNiveau,
   MembrePagination,
   MembreUpdate,
   ModifierLigneInput,
@@ -172,6 +178,8 @@ import type {
   RapportChange,
   RapportMensuel,
   RapportParts,
+  RecalculerInput,
+  RecalculerResult,
   Refus,
   RefusStats,
   RejeterEcritureInput,
@@ -182,7 +190,9 @@ import type {
   RemboursementIntrantInput,
   ResetPasswordInput,
   ResetUserPassword200,
+  ResumeMembre,
   SaisirPrixInput,
+  ScoreMembreDetail,
   SearchFournisseursParams,
   SimulationMarge,
   SmsDiffusionResult,
@@ -199,10 +209,12 @@ import type {
   TauxChangeInput,
   TendancePrix,
   ToggleActifInput,
+  TopProducteur,
   TraiterRefusInput,
   TrancheInput,
   Tresorerie,
   UpdateConfigComptableInput,
+  UpdateConfigScoringInput,
   UpdatePersonnelInput,
   UpdateUserInput,
   UtilisateurCompte,
@@ -13297,5 +13309,700 @@ export const useRemboursementManuelIntrant = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRemboursementManuelIntrantMutationOptions(options));
+    }
+
+export const getGetScoringConfigUrl = () => {
+
+
+
+
+  return `/api/api/scoring/config`
+}
+
+/**
+ * @summary Récupérer la configuration du scoring
+ */
+export const getScoringConfig = async ( options?: RequestInit): Promise<ConfigScoring> => {
+
+  return customFetch<ConfigScoring>(getGetScoringConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScoringConfigQueryKey = () => {
+    return [
+    `/api/api/scoring/config`
+    ] as const;
+    }
+
+
+export const getGetScoringConfigQueryOptions = <TData = Awaited<ReturnType<typeof getScoringConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScoringConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScoringConfig>>> = ({ signal }) => getScoringConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScoringConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScoringConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getScoringConfig>>>
+export type GetScoringConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Récupérer la configuration du scoring
+ */
+
+export function useGetScoringConfig<TData = Awaited<ReturnType<typeof getScoringConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScoringConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateScoringConfigUrl = () => {
+
+
+
+
+  return `/api/api/scoring/config`
+}
+
+/**
+ * @summary Modifier la configuration du scoring
+ */
+export const updateScoringConfig = async (updateConfigScoringInput: UpdateConfigScoringInput, options?: RequestInit): Promise<ConfigScoring> => {
+
+  return customFetch<ConfigScoring>(getUpdateScoringConfigUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateConfigScoringInput,)
+  }
+);}
+
+
+
+
+export const getUpdateScoringConfigMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateScoringConfig>>, TError,{data: BodyType<UpdateConfigScoringInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateScoringConfig>>, TError,{data: BodyType<UpdateConfigScoringInput>}, TContext> => {
+
+const mutationKey = ['updateScoringConfig'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateScoringConfig>>, {data: BodyType<UpdateConfigScoringInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateScoringConfig(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateScoringConfigMutationResult = NonNullable<Awaited<ReturnType<typeof updateScoringConfig>>>
+    export type UpdateScoringConfigMutationBody = BodyType<UpdateConfigScoringInput>
+    export type UpdateScoringConfigMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Modifier la configuration du scoring
+ */
+export const useUpdateScoringConfig = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateScoringConfig>>, TError,{data: BodyType<UpdateConfigScoringInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateScoringConfig>>,
+        TError,
+        {data: BodyType<UpdateConfigScoringInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateScoringConfigMutationOptions(options));
+    }
+
+export const getGetScoringClassementUrl = (id: number,) => {
+
+
+
+
+  return `/api/api/scoring/campagne/${id}`
+}
+
+/**
+ * @summary Classement complet d'une campagne
+ */
+export const getScoringClassement = async (id: number, options?: RequestInit): Promise<EntreeClassement[]> => {
+
+  return customFetch<EntreeClassement[]>(getGetScoringClassementUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScoringClassementQueryKey = (id: number,) => {
+    return [
+    `/api/api/scoring/campagne/${id}`
+    ] as const;
+    }
+
+
+export const getGetScoringClassementQueryOptions = <TData = Awaited<ReturnType<typeof getScoringClassement>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringClassement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScoringClassementQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScoringClassement>>> = ({ signal }) => getScoringClassement(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScoringClassement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScoringClassementQueryResult = NonNullable<Awaited<ReturnType<typeof getScoringClassement>>>
+export type GetScoringClassementQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Classement complet d'une campagne
+ */
+
+export function useGetScoringClassement<TData = Awaited<ReturnType<typeof getScoringClassement>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringClassement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScoringClassementQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetScoringTopUrl = (params?: GetScoringTopParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/api/scoring/top?${stringifiedParams}` : `/api/api/scoring/top`
+}
+
+/**
+ * @summary Top N producteurs
+ */
+export const getScoringTop = async (params?: GetScoringTopParams, options?: RequestInit): Promise<TopProducteur[]> => {
+
+  return customFetch<TopProducteur[]>(getGetScoringTopUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScoringTopQueryKey = (params?: GetScoringTopParams,) => {
+    return [
+    `/api/api/scoring/top`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetScoringTopQueryOptions = <TData = Awaited<ReturnType<typeof getScoringTop>>, TError = ErrorType<unknown>>(params?: GetScoringTopParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringTop>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScoringTopQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScoringTop>>> = ({ signal }) => getScoringTop(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScoringTop>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScoringTopQueryResult = NonNullable<Awaited<ReturnType<typeof getScoringTop>>>
+export type GetScoringTopQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Top N producteurs
+ */
+
+export function useGetScoringTop<TData = Awaited<ReturnType<typeof getScoringTop>>, TError = ErrorType<unknown>>(
+ params?: GetScoringTopParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringTop>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScoringTopQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetScoringParNiveauUrl = (params?: GetScoringParNiveauParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/api/scoring/par-niveau?${stringifiedParams}` : `/api/api/scoring/par-niveau`
+}
+
+/**
+ * @summary Membres par niveau
+ */
+export const getScoringParNiveau = async (params?: GetScoringParNiveauParams, options?: RequestInit): Promise<MembreNiveau[]> => {
+
+  return customFetch<MembreNiveau[]>(getGetScoringParNiveauUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScoringParNiveauQueryKey = (params?: GetScoringParNiveauParams,) => {
+    return [
+    `/api/api/scoring/par-niveau`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetScoringParNiveauQueryOptions = <TData = Awaited<ReturnType<typeof getScoringParNiveau>>, TError = ErrorType<unknown>>(params?: GetScoringParNiveauParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringParNiveau>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScoringParNiveauQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScoringParNiveau>>> = ({ signal }) => getScoringParNiveau(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScoringParNiveau>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScoringParNiveauQueryResult = NonNullable<Awaited<ReturnType<typeof getScoringParNiveau>>>
+export type GetScoringParNiveauQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Membres par niveau
+ */
+
+export function useGetScoringParNiveau<TData = Awaited<ReturnType<typeof getScoringParNiveau>>, TError = ErrorType<unknown>>(
+ params?: GetScoringParNiveauParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringParNiveau>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScoringParNiveauQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetScoringEvolutionUrl = (membreId: number,) => {
+
+
+
+
+  return `/api/api/scoring/evolution/${membreId}`
+}
+
+/**
+ * @summary Évolution du score d'un membre
+ */
+export const getScoringEvolution = async (membreId: number, options?: RequestInit): Promise<EvolutionScore[]> => {
+
+  return customFetch<EvolutionScore[]>(getGetScoringEvolutionUrl(membreId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScoringEvolutionQueryKey = (membreId: number,) => {
+    return [
+    `/api/api/scoring/evolution/${membreId}`
+    ] as const;
+    }
+
+
+export const getGetScoringEvolutionQueryOptions = <TData = Awaited<ReturnType<typeof getScoringEvolution>>, TError = ErrorType<unknown>>(membreId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringEvolution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScoringEvolutionQueryKey(membreId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScoringEvolution>>> = ({ signal }) => getScoringEvolution(membreId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(membreId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScoringEvolution>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScoringEvolutionQueryResult = NonNullable<Awaited<ReturnType<typeof getScoringEvolution>>>
+export type GetScoringEvolutionQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Évolution du score d'un membre
+ */
+
+export function useGetScoringEvolution<TData = Awaited<ReturnType<typeof getScoringEvolution>>, TError = ErrorType<unknown>>(
+ membreId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringEvolution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScoringEvolutionQueryOptions(membreId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetScoringResumeUrl = (membreId: number,) => {
+
+
+
+
+  return `/api/api/scoring/resume/${membreId}`
+}
+
+/**
+ * @summary Résumé du score d'un membre (dernière campagne)
+ */
+export const getScoringResume = async (membreId: number, options?: RequestInit): Promise<ResumeMembre> => {
+
+  return customFetch<ResumeMembre>(getGetScoringResumeUrl(membreId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScoringResumeQueryKey = (membreId: number,) => {
+    return [
+    `/api/api/scoring/resume/${membreId}`
+    ] as const;
+    }
+
+
+export const getGetScoringResumeQueryOptions = <TData = Awaited<ReturnType<typeof getScoringResume>>, TError = ErrorType<unknown>>(membreId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringResume>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScoringResumeQueryKey(membreId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScoringResume>>> = ({ signal }) => getScoringResume(membreId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(membreId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScoringResume>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScoringResumeQueryResult = NonNullable<Awaited<ReturnType<typeof getScoringResume>>>
+export type GetScoringResumeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Résumé du score d'un membre (dernière campagne)
+ */
+
+export function useGetScoringResume<TData = Awaited<ReturnType<typeof getScoringResume>>, TError = ErrorType<unknown>>(
+ membreId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringResume>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScoringResumeQueryOptions(membreId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetScoringMembreUrl = (id: number,) => {
+
+
+
+
+  return `/api/api/scoring/membre/${id}`
+}
+
+/**
+ * @summary Score détaillé d'un membre (toutes campagnes)
+ */
+export const getScoringMembre = async (id: number, options?: RequestInit): Promise<ScoreMembreDetail[]> => {
+
+  return customFetch<ScoreMembreDetail[]>(getGetScoringMembreUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScoringMembreQueryKey = (id: number,) => {
+    return [
+    `/api/api/scoring/membre/${id}`
+    ] as const;
+    }
+
+
+export const getGetScoringMembreQueryOptions = <TData = Awaited<ReturnType<typeof getScoringMembre>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringMembre>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScoringMembreQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScoringMembre>>> = ({ signal }) => getScoringMembre(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScoringMembre>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScoringMembreQueryResult = NonNullable<Awaited<ReturnType<typeof getScoringMembre>>>
+export type GetScoringMembreQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Score détaillé d'un membre (toutes campagnes)
+ */
+
+export function useGetScoringMembre<TData = Awaited<ReturnType<typeof getScoringMembre>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScoringMembre>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScoringMembreQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostScoringRecalculerUrl = () => {
+
+
+
+
+  return `/api/api/scoring/recalculer`
+}
+
+/**
+ * @summary Recalculer tous les scores d'une campagne
+ */
+export const postScoringRecalculer = async (recalculerInput: RecalculerInput, options?: RequestInit): Promise<RecalculerResult> => {
+
+  return customFetch<RecalculerResult>(getPostScoringRecalculerUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      recalculerInput,)
+  }
+);}
+
+
+
+
+export const getPostScoringRecalculerMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postScoringRecalculer>>, TError,{data: BodyType<RecalculerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postScoringRecalculer>>, TError,{data: BodyType<RecalculerInput>}, TContext> => {
+
+const mutationKey = ['postScoringRecalculer'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postScoringRecalculer>>, {data: BodyType<RecalculerInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postScoringRecalculer(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostScoringRecalculerMutationResult = NonNullable<Awaited<ReturnType<typeof postScoringRecalculer>>>
+    export type PostScoringRecalculerMutationBody = BodyType<RecalculerInput>
+    export type PostScoringRecalculerMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Recalculer tous les scores d'une campagne
+ */
+export const usePostScoringRecalculer = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postScoringRecalculer>>, TError,{data: BodyType<RecalculerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postScoringRecalculer>>,
+        TError,
+        {data: BodyType<RecalculerInput>},
+        TContext
+      > => {
+      return useMutation(getPostScoringRecalculerMutationOptions(options));
     }
 

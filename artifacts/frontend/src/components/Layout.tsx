@@ -29,6 +29,7 @@ import {
   HandCoins,
   Gavel,
   TrendingUp,
+  Award,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey } from "@workspace/api-client-react";
 
@@ -128,6 +129,12 @@ const navItems = [
     label: "Suivi des Prix",
     icon: TrendingUp,
     roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+  },
+  {
+    href: "/scoring",
+    label: "Scoring Producteurs",
+    icon: Award,
+    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
   },
   {
     href: "/refus",

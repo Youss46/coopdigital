@@ -2552,6 +2552,130 @@ export interface SimulationMarge {
   rentabilite: SimulationMargeRentabilite;
 }
 
+export interface ConfigScoring {
+  id?: number;
+  cooperativeId?: number;
+  poidsVolumePct?: string;
+  poidsQualitePct?: string;
+  poidsRegularitePct?: string;
+  poidsRemboursementPct?: string;
+  poidsFidelitePct?: string;
+  poidsCotisationPct?: string;
+  seuilBronze?: string;
+  seuilArgent?: string;
+  seuilOr?: string;
+  seuilPlatine?: string;
+  avantagesBronze?: string | null;
+  avantagesArgent?: string | null;
+  avantagesOr?: string | null;
+  avantagesPlatine?: string | null;
+  updatedAt?: string;
+}
+
+export interface UpdateConfigScoringInput {
+  poidsVolumePct?: number;
+  poidsQualitePct?: number;
+  poidsRegularitePct?: number;
+  poidsRemboursementPct?: number;
+  poidsFidelitePct?: number;
+  poidsCotisationPct?: number;
+  seuilBronze?: number;
+  seuilArgent?: number;
+  seuilOr?: number;
+  seuilPlatine?: number;
+  avantagesBronze?: string;
+  avantagesArgent?: string;
+  avantagesOr?: string;
+  avantagesPlatine?: string;
+}
+
+export interface EntreeClassement {
+  id?: number;
+  membre_id?: number;
+  score_global?: string;
+  niveau?: string;
+  rang?: number | null;
+  score_volume?: string;
+  score_qualite?: string;
+  score_regularite?: string;
+  score_remboursement?: string;
+  score_fidelite?: string;
+  score_cotisation?: string;
+  date_calcul?: string;
+  nom?: string;
+  prenoms?: string;
+  village?: string | null;
+  groupement?: string | null;
+  section?: string | null;
+  photo_url?: string | null;
+  tonnage?: string;
+}
+
+export interface TopProducteur {
+  rang?: number | null;
+  membre_id?: number;
+  nom?: string;
+  prenoms?: string;
+  village?: string | null;
+  score_global?: string;
+  niveau?: string;
+  score_volume?: string;
+  score_qualite?: string;
+  tonnage?: string;
+}
+
+export interface MembreNiveau {
+  membre_id?: number;
+  nom?: string;
+  prenoms?: string;
+  village?: string | null;
+  groupement?: string | null;
+  score_global?: string;
+  rang?: number | null;
+}
+
+export interface ScoreMembreDetail {
+  id?: number;
+  campagne_id?: number;
+  score_global?: string;
+  niveau?: string;
+  rang?: number | null;
+  score_volume?: string;
+  score_qualite?: string;
+  score_regularite?: string;
+  score_remboursement?: string;
+  score_fidelite?: string;
+  score_cotisation?: string;
+  date_calcul?: string;
+  nom_campagne?: string;
+}
+
+export interface EvolutionScore {
+  campagne_id?: number;
+  nom_campagne?: string;
+  score_global?: string;
+  niveau?: string;
+  rang?: number | null;
+  date_calcul?: string;
+}
+
+export interface ResumeMembre {
+  score_global?: string;
+  niveau?: string;
+  rang?: number | null;
+  date_calcul?: string;
+  campagne_id?: number;
+}
+
+export interface RecalculerInput {
+  campagneId: number;
+}
+
+export interface RecalculerResult {
+  calculés: number;
+  campagneId: number;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -2830,4 +2954,25 @@ statut?: string;
 export type ListIntrantsParams = {
 actif?: boolean;
 };
+
+export type GetScoringTopParams = {
+n?: number;
+campagneId?: number;
+};
+
+export type GetScoringParNiveauParams = {
+niveau?: GetScoringParNiveauNiveau;
+campagneId?: number;
+};
+
+export type GetScoringParNiveauNiveau = typeof GetScoringParNiveauNiveau[keyof typeof GetScoringParNiveauNiveau];
+
+
+export const GetScoringParNiveauNiveau = {
+  bronze: 'bronze',
+  argent: 'argent',
+  or: 'or',
+  platine: 'platine',
+  non_classe: 'non_classe',
+} as const;
 
