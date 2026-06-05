@@ -31,6 +31,7 @@ import PrixPage from "@/pages/PrixPage";
 import ScoringPage from "@/pages/ScoringPage";
 import AnomaliesPage from "@/pages/AnomaliesPage";
 import AuditPage from "@/pages/AuditPage";
+import PcaDashboardPage from "@/pages/PcaDashboardPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -139,6 +140,9 @@ function AppRoutes() {
       </Route>
       <Route path="/audit">
         <ProtectedRoute component={AuditPage} />
+      </Route>
+      <Route path="/dashboard/pca">
+        <ProtectedRoute component={PcaDashboardPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

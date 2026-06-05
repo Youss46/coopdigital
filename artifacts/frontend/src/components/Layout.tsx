@@ -37,6 +37,12 @@ import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetA
 
 const navItems = [
   {
+    href: "/dashboard/pca",
+    label: "Vue PCA",
+    icon: TrendingUp,
+    roles: ["pca"],
+  },
+  {
     href: "/dashboard",
     label: "Tableau de bord",
     icon: LayoutDashboard,
