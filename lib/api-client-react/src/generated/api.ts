@@ -31,6 +31,9 @@ import type {
   AvancesEncours,
   BalanceLigne,
   BilanEtat,
+  BudgetCampagne,
+  BudgetDetail,
+  BudgetResponse,
   BulletinAvecPersonnel,
   BulletinDetail,
   BulletinPaie,
@@ -97,10 +100,13 @@ import type {
   GrandLivrePage,
   HealthStatus,
   HistoriqueMasse,
+  HypotheseBudget,
+  HypothesesInput,
   Intrant,
   IntrantInput,
   IntrantResume,
   LiberationInput,
+  LigneBudget,
   LigneEcheancier,
   ListEcrituresEnAttenteParams,
   ListFournisseursParams,
@@ -122,6 +128,7 @@ import type {
   MembreInput,
   MembrePagination,
   MembreUpdate,
+  ModifierLigneInput,
   MouvementInput,
   MouvementStock,
   PaiementListItem,
@@ -129,8 +136,10 @@ import type {
   PayerBulletinInput,
   Personnel,
   PersonnelHistorique,
+  PostBudgetIdSync200,
   Preteur,
   PreteurInput,
+  RapportBudget,
   RapportCampagneIntrants,
   RapportChange,
   RapportMensuel,
@@ -8249,6 +8258,591 @@ export function useGetDistributionsMembreIntrants<TData = Awaited<ReturnType<typ
 
 
 
+
+export const getPostBudgetCampagneIdUrl = (id: number,) => {
+
+
+
+
+  return `/api/budget/campagne/${id}`
+}
+
+/**
+ * @summary Créer ou récupérer le budget d'une campagne
+ */
+export const postBudgetCampagneId = async (id: number, options?: RequestInit): Promise<BudgetResponse> => {
+
+  return customFetch<BudgetResponse>(getPostBudgetCampagneIdUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostBudgetCampagneIdMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postBudgetCampagneId>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postBudgetCampagneId>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['postBudgetCampagneId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postBudgetCampagneId>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  postBudgetCampagneId(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostBudgetCampagneIdMutationResult = NonNullable<Awaited<ReturnType<typeof postBudgetCampagneId>>>
+
+    export type PostBudgetCampagneIdMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Créer ou récupérer le budget d'une campagne
+ */
+export const usePostBudgetCampagneId = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postBudgetCampagneId>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postBudgetCampagneId>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPostBudgetCampagneIdMutationOptions(options));
+    }
+
+export const getGetBudgetCampagneIdUrl = (id: number,) => {
+
+
+
+
+  return `/api/budget/campagne/${id}`
+}
+
+/**
+ * @summary Budget complet (lignes + hypothèses + totaux)
+ */
+export const getBudgetCampagneId = async (id: number, options?: RequestInit): Promise<BudgetDetail> => {
+
+  return customFetch<BudgetDetail>(getGetBudgetCampagneIdUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBudgetCampagneIdQueryKey = (id: number,) => {
+    return [
+    `/api/budget/campagne/${id}`
+    ] as const;
+    }
+
+
+export const getGetBudgetCampagneIdQueryOptions = <TData = Awaited<ReturnType<typeof getBudgetCampagneId>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBudgetCampagneId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBudgetCampagneIdQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBudgetCampagneId>>> = ({ signal }) => getBudgetCampagneId(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBudgetCampagneId>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBudgetCampagneIdQueryResult = NonNullable<Awaited<ReturnType<typeof getBudgetCampagneId>>>
+export type GetBudgetCampagneIdQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Budget complet (lignes + hypothèses + totaux)
+ */
+
+export function useGetBudgetCampagneId<TData = Awaited<ReturnType<typeof getBudgetCampagneId>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBudgetCampagneId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBudgetCampagneIdQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPutBudgetIdLigneUrl = (id: number,) => {
+
+
+
+
+  return `/api/budget/${id}/ligne`
+}
+
+/**
+ * @summary Modifier une ligne prévisionnelle
+ */
+export const putBudgetIdLigne = async (id: number,
+    modifierLigneInput: ModifierLigneInput, options?: RequestInit): Promise<LigneBudget> => {
+
+  return customFetch<LigneBudget>(getPutBudgetIdLigneUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      modifierLigneInput,)
+  }
+);}
+
+
+
+
+export const getPutBudgetIdLigneMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putBudgetIdLigne>>, TError,{id: number;data: BodyType<ModifierLigneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putBudgetIdLigne>>, TError,{id: number;data: BodyType<ModifierLigneInput>}, TContext> => {
+
+const mutationKey = ['putBudgetIdLigne'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putBudgetIdLigne>>, {id: number;data: BodyType<ModifierLigneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  putBudgetIdLigne(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutBudgetIdLigneMutationResult = NonNullable<Awaited<ReturnType<typeof putBudgetIdLigne>>>
+    export type PutBudgetIdLigneMutationBody = BodyType<ModifierLigneInput>
+    export type PutBudgetIdLigneMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Modifier une ligne prévisionnelle
+ */
+export const usePutBudgetIdLigne = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putBudgetIdLigne>>, TError,{id: number;data: BodyType<ModifierLigneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putBudgetIdLigne>>,
+        TError,
+        {id: number;data: BodyType<ModifierLigneInput>},
+        TContext
+      > => {
+      return useMutation(getPutBudgetIdLigneMutationOptions(options));
+    }
+
+export const getPutBudgetIdValiderUrl = (id: number,) => {
+
+
+
+
+  return `/api/budget/${id}/valider`
+}
+
+/**
+ * @summary Valider le budget
+ */
+export const putBudgetIdValider = async (id: number, options?: RequestInit): Promise<BudgetCampagne> => {
+
+  return customFetch<BudgetCampagne>(getPutBudgetIdValiderUrl(id),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+export const getPutBudgetIdValiderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putBudgetIdValider>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putBudgetIdValider>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['putBudgetIdValider'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putBudgetIdValider>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  putBudgetIdValider(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutBudgetIdValiderMutationResult = NonNullable<Awaited<ReturnType<typeof putBudgetIdValider>>>
+
+    export type PutBudgetIdValiderMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Valider le budget
+ */
+export const usePutBudgetIdValider = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putBudgetIdValider>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putBudgetIdValider>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPutBudgetIdValiderMutationOptions(options));
+    }
+
+export const getGetBudgetIdAlertesUrl = (id: number,) => {
+
+
+
+
+  return `/api/budget/${id}/alertes`
+}
+
+/**
+ * @summary Lignes en dépassement (>10%)
+ */
+export const getBudgetIdAlertes = async (id: number, options?: RequestInit): Promise<LigneBudget[]> => {
+
+  return customFetch<LigneBudget[]>(getGetBudgetIdAlertesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBudgetIdAlertesQueryKey = (id: number,) => {
+    return [
+    `/api/budget/${id}/alertes`
+    ] as const;
+    }
+
+
+export const getGetBudgetIdAlertesQueryOptions = <TData = Awaited<ReturnType<typeof getBudgetIdAlertes>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBudgetIdAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBudgetIdAlertesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBudgetIdAlertes>>> = ({ signal }) => getBudgetIdAlertes(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBudgetIdAlertes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBudgetIdAlertesQueryResult = NonNullable<Awaited<ReturnType<typeof getBudgetIdAlertes>>>
+export type GetBudgetIdAlertesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lignes en dépassement (>10%)
+ */
+
+export function useGetBudgetIdAlertes<TData = Awaited<ReturnType<typeof getBudgetIdAlertes>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBudgetIdAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBudgetIdAlertesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetBudgetIdRapportUrl = (id: number,) => {
+
+
+
+
+  return `/api/budget/${id}/rapport`
+}
+
+/**
+ * @summary Rapport budget vs réalisé par catégorie
+ */
+export const getBudgetIdRapport = async (id: number, options?: RequestInit): Promise<RapportBudget> => {
+
+  return customFetch<RapportBudget>(getGetBudgetIdRapportUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBudgetIdRapportQueryKey = (id: number,) => {
+    return [
+    `/api/budget/${id}/rapport`
+    ] as const;
+    }
+
+
+export const getGetBudgetIdRapportQueryOptions = <TData = Awaited<ReturnType<typeof getBudgetIdRapport>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBudgetIdRapport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBudgetIdRapportQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBudgetIdRapport>>> = ({ signal }) => getBudgetIdRapport(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBudgetIdRapport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBudgetIdRapportQueryResult = NonNullable<Awaited<ReturnType<typeof getBudgetIdRapport>>>
+export type GetBudgetIdRapportQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Rapport budget vs réalisé par catégorie
+ */
+
+export function useGetBudgetIdRapport<TData = Awaited<ReturnType<typeof getBudgetIdRapport>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBudgetIdRapport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBudgetIdRapportQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostBudgetIdHypothesesUrl = (id: number,) => {
+
+
+
+
+  return `/api/budget/${id}/hypotheses`
+}
+
+/**
+ * @summary Saisir les hypothèses de campagne
+ */
+export const postBudgetIdHypotheses = async (id: number,
+    hypothesesInput: HypothesesInput, options?: RequestInit): Promise<HypotheseBudget> => {
+
+  return customFetch<HypotheseBudget>(getPostBudgetIdHypothesesUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      hypothesesInput,)
+  }
+);}
+
+
+
+
+export const getPostBudgetIdHypothesesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postBudgetIdHypotheses>>, TError,{id: number;data: BodyType<HypothesesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postBudgetIdHypotheses>>, TError,{id: number;data: BodyType<HypothesesInput>}, TContext> => {
+
+const mutationKey = ['postBudgetIdHypotheses'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postBudgetIdHypotheses>>, {id: number;data: BodyType<HypothesesInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  postBudgetIdHypotheses(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostBudgetIdHypothesesMutationResult = NonNullable<Awaited<ReturnType<typeof postBudgetIdHypotheses>>>
+    export type PostBudgetIdHypothesesMutationBody = BodyType<HypothesesInput>
+    export type PostBudgetIdHypothesesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Saisir les hypothèses de campagne
+ */
+export const usePostBudgetIdHypotheses = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postBudgetIdHypotheses>>, TError,{id: number;data: BodyType<HypothesesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postBudgetIdHypotheses>>,
+        TError,
+        {id: number;data: BodyType<HypothesesInput>},
+        TContext
+      > => {
+      return useMutation(getPostBudgetIdHypothesesMutationOptions(options));
+    }
+
+export const getPostBudgetIdSyncUrl = (id: number,) => {
+
+
+
+
+  return `/api/budget/${id}/sync`
+}
+
+/**
+ * @summary Déclencher la synchronisation manuelle du réalisé
+ */
+export const postBudgetIdSync = async (id: number, options?: RequestInit): Promise<PostBudgetIdSync200> => {
+
+  return customFetch<PostBudgetIdSync200>(getPostBudgetIdSyncUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostBudgetIdSyncMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postBudgetIdSync>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postBudgetIdSync>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['postBudgetIdSync'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postBudgetIdSync>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  postBudgetIdSync(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostBudgetIdSyncMutationResult = NonNullable<Awaited<ReturnType<typeof postBudgetIdSync>>>
+
+    export type PostBudgetIdSyncMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Déclencher la synchronisation manuelle du réalisé
+ */
+export const usePostBudgetIdSync = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postBudgetIdSync>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postBudgetIdSync>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPostBudgetIdSyncMutationOptions(options));
+    }
 
 export const getGetDevisesUrl = () => {
 

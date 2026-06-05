@@ -18,3 +18,4 @@ export * from "./fournisseurs";
 export * from "./intrants";
 export * from "./emprunts";
 export * from "./devises";
+export * from "./budget";

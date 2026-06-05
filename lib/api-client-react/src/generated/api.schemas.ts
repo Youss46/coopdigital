@@ -5,6 +5,124 @@
  * CoopDigital — API de gestion des coopératives cacaoyères
  * OpenAPI spec version: 0.1.0
  */
+export type BudgetCampagneStatut = typeof BudgetCampagneStatut[keyof typeof BudgetCampagneStatut];
+
+
+export const BudgetCampagneStatut = {
+  brouillon: 'brouillon',
+  valide: 'valide',
+  cloture: 'cloture',
+} as const;
+
+export interface BudgetCampagne {
+  id: number;
+  cooperative_id: number;
+  campagne_id: number;
+  statut: BudgetCampagneStatut;
+  /** @nullable */
+  valide_par?: number | null;
+  /** @nullable */
+  date_validation?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type LigneBudgetCategorie = typeof LigneBudgetCategorie[keyof typeof LigneBudgetCategorie];
+
+
+export const LigneBudgetCategorie = {
+  recette: 'recette',
+  charge_achat: 'charge_achat',
+  charge_exploitation: 'charge_exploitation',
+  charge_personnel: 'charge_personnel',
+  charge_financiere: 'charge_financiere',
+  investissement: 'investissement',
+} as const;
+
+export interface LigneBudget {
+  id: number;
+  budget_id: number;
+  categorie: LigneBudgetCategorie;
+  libelle: string;
+  montant_previsionnel_fcfa: string;
+  montant_realise_fcfa: string;
+  /** @nullable */
+  ecart_fcfa?: string | null;
+  /** @nullable */
+  ecart_pct?: string | null;
+  ordre: number;
+  created_at?: string;
+}
+
+export interface HypotheseBudget {
+  id: number;
+  budget_id: number;
+  /** @nullable */
+  tonnage_previsionnel_kg?: string | null;
+  /** @nullable */
+  prix_achat_moyen_fcfa?: string | null;
+  /** @nullable */
+  prix_vente_moyen_fcfa?: string | null;
+  /** @nullable */
+  nb_membres_actifs?: number | null;
+  /** @nullable */
+  nb_livraisons_estimees?: number | null;
+  /** @nullable */
+  marge_brute_estimee_fcfa?: string | null;
+}
+
+export interface BudgetResponse {
+  budget: BudgetCampagne;
+  cree: boolean;
+}
+
+export type BudgetDetailTotaux = {[key: string]: {
+  previsionnel?: number;
+  realise?: number;
+}};
+
+export type BudgetDetailResultat = {
+  previsionnel?: number;
+  realise?: number;
+};
+
+export interface BudgetDetail {
+  budget: BudgetCampagne;
+  lignes: LigneBudget[];
+  hypotheses?: HypotheseBudget | null;
+  totaux: BudgetDetailTotaux;
+  resultat: BudgetDetailResultat;
+}
+
+export interface ModifierLigneInput {
+  ligneId: number;
+  montantPrevisionnelFcfa?: number;
+  libelle?: string;
+  ordre?: number;
+}
+
+export interface HypothesesInput {
+  tonnagePrevisionnelKg?: number;
+  prixAchatMoyenFcfa?: number;
+  prixVenteMoyenFcfa?: number;
+  nbMembresActifs?: number;
+  nbLivraisonsEstimees?: number;
+}
+
+export type RapportBudgetParCategorie = {[key: string]: {
+  totalPrev?: number;
+  totalReel?: number;
+  ecartPct?: number;
+  lignes?: LigneBudget[];
+}};
+
+export interface RapportBudget {
+  parCategorie: RapportBudgetParCategorie;
+  totalPrev: number;
+  totalReel: number;
+  tauxExecution: number;
+}
+
 export interface Devise {
   id: number;
   code: string;
@@ -2093,6 +2211,11 @@ export type GetEncoursIntrantsMembre200 = {
 
 export type GetRapportCampagneIntrantsParams = {
 campagne_id?: number;
+};
+
+export type PostBudgetIdSync200 = {
+  ok?: boolean;
+  message?: string;
 };
 
 export type GetEmpruntsParams = {

@@ -2485,6 +2485,219 @@ export const GetDistributionsMembreIntrantsResponse = zod.array(GetDistributions
 
 
 /**
+ * @summary Créer ou récupérer le budget d'une campagne
+ */
+export const PostBudgetCampagneIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostBudgetCampagneIdResponse = zod.object({
+  "budget": zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "campagne_id": zod.number(),
+  "statut": zod.enum(['brouillon', 'valide', 'cloture']),
+  "valide_par": zod.number().nullish(),
+  "date_validation": zod.string().nullish(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+}),
+  "cree": zod.boolean()
+})
+
+
+/**
+ * @summary Budget complet (lignes + hypothèses + totaux)
+ */
+export const GetBudgetCampagneIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBudgetCampagneIdResponse = zod.object({
+  "budget": zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "campagne_id": zod.number(),
+  "statut": zod.enum(['brouillon', 'valide', 'cloture']),
+  "valide_par": zod.number().nullish(),
+  "date_validation": zod.string().nullish(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+}),
+  "lignes": zod.array(zod.object({
+  "id": zod.number(),
+  "budget_id": zod.number(),
+  "categorie": zod.enum(['recette', 'charge_achat', 'charge_exploitation', 'charge_personnel', 'charge_financiere', 'investissement']),
+  "libelle": zod.string(),
+  "montant_previsionnel_fcfa": zod.string(),
+  "montant_realise_fcfa": zod.string(),
+  "ecart_fcfa": zod.string().nullish(),
+  "ecart_pct": zod.string().nullish(),
+  "ordre": zod.number(),
+  "created_at": zod.string().optional()
+})),
+  "hypotheses": zod.union([zod.object({
+  "id": zod.number(),
+  "budget_id": zod.number(),
+  "tonnage_previsionnel_kg": zod.string().nullish(),
+  "prix_achat_moyen_fcfa": zod.string().nullish(),
+  "prix_vente_moyen_fcfa": zod.string().nullish(),
+  "nb_membres_actifs": zod.number().nullish(),
+  "nb_livraisons_estimees": zod.number().nullish(),
+  "marge_brute_estimee_fcfa": zod.string().nullish()
+}),zod.null()]).optional(),
+  "totaux": zod.record(zod.string(), zod.object({
+  "previsionnel": zod.number().optional(),
+  "realise": zod.number().optional()
+})),
+  "resultat": zod.object({
+  "previsionnel": zod.number().optional(),
+  "realise": zod.number().optional()
+})
+})
+
+
+/**
+ * @summary Modifier une ligne prévisionnelle
+ */
+export const PutBudgetIdLigneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PutBudgetIdLigneBody = zod.object({
+  "ligneId": zod.number(),
+  "montantPrevisionnelFcfa": zod.number().optional(),
+  "libelle": zod.string().optional(),
+  "ordre": zod.number().optional()
+})
+
+export const PutBudgetIdLigneResponse = zod.object({
+  "id": zod.number(),
+  "budget_id": zod.number(),
+  "categorie": zod.enum(['recette', 'charge_achat', 'charge_exploitation', 'charge_personnel', 'charge_financiere', 'investissement']),
+  "libelle": zod.string(),
+  "montant_previsionnel_fcfa": zod.string(),
+  "montant_realise_fcfa": zod.string(),
+  "ecart_fcfa": zod.string().nullish(),
+  "ecart_pct": zod.string().nullish(),
+  "ordre": zod.number(),
+  "created_at": zod.string().optional()
+})
+
+
+/**
+ * @summary Valider le budget
+ */
+export const PutBudgetIdValiderParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PutBudgetIdValiderResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "campagne_id": zod.number(),
+  "statut": zod.enum(['brouillon', 'valide', 'cloture']),
+  "valide_par": zod.number().nullish(),
+  "date_validation": zod.string().nullish(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})
+
+
+/**
+ * @summary Lignes en dépassement (>10%)
+ */
+export const GetBudgetIdAlertesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBudgetIdAlertesResponseItem = zod.object({
+  "id": zod.number(),
+  "budget_id": zod.number(),
+  "categorie": zod.enum(['recette', 'charge_achat', 'charge_exploitation', 'charge_personnel', 'charge_financiere', 'investissement']),
+  "libelle": zod.string(),
+  "montant_previsionnel_fcfa": zod.string(),
+  "montant_realise_fcfa": zod.string(),
+  "ecart_fcfa": zod.string().nullish(),
+  "ecart_pct": zod.string().nullish(),
+  "ordre": zod.number(),
+  "created_at": zod.string().optional()
+})
+export const GetBudgetIdAlertesResponse = zod.array(GetBudgetIdAlertesResponseItem)
+
+
+/**
+ * @summary Rapport budget vs réalisé par catégorie
+ */
+export const GetBudgetIdRapportParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBudgetIdRapportResponse = zod.object({
+  "parCategorie": zod.record(zod.string(), zod.object({
+  "totalPrev": zod.number().optional(),
+  "totalReel": zod.number().optional(),
+  "ecartPct": zod.number().optional(),
+  "lignes": zod.array(zod.object({
+  "id": zod.number(),
+  "budget_id": zod.number(),
+  "categorie": zod.enum(['recette', 'charge_achat', 'charge_exploitation', 'charge_personnel', 'charge_financiere', 'investissement']),
+  "libelle": zod.string(),
+  "montant_previsionnel_fcfa": zod.string(),
+  "montant_realise_fcfa": zod.string(),
+  "ecart_fcfa": zod.string().nullish(),
+  "ecart_pct": zod.string().nullish(),
+  "ordre": zod.number(),
+  "created_at": zod.string().optional()
+})).optional()
+})),
+  "totalPrev": zod.number(),
+  "totalReel": zod.number(),
+  "tauxExecution": zod.number()
+})
+
+
+/**
+ * @summary Saisir les hypothèses de campagne
+ */
+export const PostBudgetIdHypothesesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostBudgetIdHypothesesBody = zod.object({
+  "tonnagePrevisionnelKg": zod.number().optional(),
+  "prixAchatMoyenFcfa": zod.number().optional(),
+  "prixVenteMoyenFcfa": zod.number().optional(),
+  "nbMembresActifs": zod.number().optional(),
+  "nbLivraisonsEstimees": zod.number().optional()
+})
+
+export const PostBudgetIdHypothesesResponse = zod.object({
+  "id": zod.number(),
+  "budget_id": zod.number(),
+  "tonnage_previsionnel_kg": zod.string().nullish(),
+  "prix_achat_moyen_fcfa": zod.string().nullish(),
+  "prix_vente_moyen_fcfa": zod.string().nullish(),
+  "nb_membres_actifs": zod.number().nullish(),
+  "nb_livraisons_estimees": zod.number().nullish(),
+  "marge_brute_estimee_fcfa": zod.string().nullish()
+})
+
+
+/**
+ * @summary Déclencher la synchronisation manuelle du réalisé
+ */
+export const PostBudgetIdSyncParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostBudgetIdSyncResponse = zod.object({
+  "ok": zod.boolean().optional(),
+  "message": zod.string().optional()
+})
+
+
+/**
  * @summary Liste des devises actives
  */
 export const GetDevisesResponseItem = zod.object({

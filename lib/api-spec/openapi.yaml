@@ -2344,6 +2344,182 @@ paths:
 
 
 
+
+  /budget/campagne/{id}:
+    post:
+      summary: Créer ou récupérer le budget d'une campagne
+      tags: [budget]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Budget existant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetResponse"
+        "201":
+          description: Budget créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetResponse"
+    get:
+      summary: Budget complet (lignes + hypothèses + totaux)
+      tags: [budget]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Budget détaillé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetDetail"
+
+  /budget/{id}/ligne:
+    put:
+      summary: Modifier une ligne prévisionnelle
+      tags: [budget]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModifierLigneInput"
+      responses:
+        "200":
+          description: Ligne modifiée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LigneBudget"
+
+  /budget/{id}/valider:
+    put:
+      summary: Valider le budget
+      tags: [budget]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Budget validé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetCampagne"
+
+  /budget/{id}/alertes:
+    get:
+      summary: Lignes en dépassement (>10%)
+      tags: [budget]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lignes en alerte
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LigneBudget"
+
+  /budget/{id}/rapport:
+    get:
+      summary: Rapport budget vs réalisé par catégorie
+      tags: [budget]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rapport
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RapportBudget"
+
+  /budget/{id}/hypotheses:
+    post:
+      summary: Saisir les hypothèses de campagne
+      tags: [budget]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HypothesesInput"
+      responses:
+        "200":
+          description: Hypothèses enregistrées
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HypotheseBudget"
+
+  /budget/{id}/sync:
+    post:
+      summary: Déclencher la synchronisation manuelle du réalisé
+      tags: [budget]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sync effectuée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
+
   /devises:
     get:
       summary: Liste des devises actives
@@ -2789,6 +2965,169 @@ paths:
 
 components:
   schemas:
+
+    BudgetCampagne:
+      type: object
+      required: [id, cooperative_id, campagne_id, statut, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        cooperative_id:
+          type: integer
+        campagne_id:
+          type: integer
+        statut:
+          type: string
+          enum: [brouillon, valide, cloture]
+        valide_par:
+          type: ["integer", "null"]
+        date_validation:
+          type: ["string", "null"]
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    LigneBudget:
+      type: object
+      required: [id, budget_id, categorie, libelle, montant_previsionnel_fcfa, montant_realise_fcfa, ordre]
+      properties:
+        id:
+          type: integer
+        budget_id:
+          type: integer
+        categorie:
+          type: string
+          enum: [recette, charge_achat, charge_exploitation, charge_personnel, charge_financiere, investissement]
+        libelle:
+          type: string
+        montant_previsionnel_fcfa:
+          type: string
+        montant_realise_fcfa:
+          type: string
+        ecart_fcfa:
+          type: ["string", "null"]
+        ecart_pct:
+          type: ["string", "null"]
+        ordre:
+          type: integer
+        created_at:
+          type: string
+
+    HypotheseBudget:
+      type: object
+      required: [id, budget_id]
+      properties:
+        id:
+          type: integer
+        budget_id:
+          type: integer
+        tonnage_previsionnel_kg:
+          type: ["string", "null"]
+        prix_achat_moyen_fcfa:
+          type: ["string", "null"]
+        prix_vente_moyen_fcfa:
+          type: ["string", "null"]
+        nb_membres_actifs:
+          type: ["integer", "null"]
+        nb_livraisons_estimees:
+          type: ["integer", "null"]
+        marge_brute_estimee_fcfa:
+          type: ["string", "null"]
+
+    BudgetResponse:
+      type: object
+      required: [budget, cree]
+      properties:
+        budget:
+          $ref: "#/components/schemas/BudgetCampagne"
+        cree:
+          type: boolean
+
+    BudgetDetail:
+      type: object
+      required: [budget, lignes, totaux, resultat]
+      properties:
+        budget:
+          $ref: "#/components/schemas/BudgetCampagne"
+        lignes:
+          type: array
+          items:
+            $ref: "#/components/schemas/LigneBudget"
+        hypotheses:
+          oneOf:
+            - $ref: "#/components/schemas/HypotheseBudget"
+            - type: "null"
+        totaux:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              previsionnel:
+                type: number
+              realise:
+                type: number
+        resultat:
+          type: object
+          properties:
+            previsionnel:
+              type: number
+            realise:
+              type: number
+
+    ModifierLigneInput:
+      type: object
+      required: [ligneId]
+      properties:
+        ligneId:
+          type: integer
+        montantPrevisionnelFcfa:
+          type: number
+        libelle:
+          type: string
+        ordre:
+          type: integer
+
+    HypothesesInput:
+      type: object
+      properties:
+        tonnagePrevisionnelKg:
+          type: number
+        prixAchatMoyenFcfa:
+          type: number
+        prixVenteMoyenFcfa:
+          type: number
+        nbMembresActifs:
+          type: integer
+        nbLivraisonsEstimees:
+          type: integer
+
+    RapportBudget:
+      type: object
+      required: [parCategorie, totalPrev, totalReel, tauxExecution]
+      properties:
+        parCategorie:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              totalPrev:
+                type: number
+              totalReel:
+                type: number
+              ecartPct:
+                type: number
+              lignes:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LigneBudget"
+        totalPrev:
+          type: number
+        totalReel:
+          type: number
+        tauxExecution:
+          type: number
+
 
     Devise:
       type: object

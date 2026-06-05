@@ -25,6 +25,7 @@ import {
   PackageX,
   CheckCircle2,
   Landmark,
+  Target,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey } from "@workspace/api-client-react";
 
@@ -99,6 +100,12 @@ const navItems = [
     href: "/emprunts",
     label: "Emprunts",
     icon: Landmark,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/budget",
+    label: "Budget",
+    icon: Target,
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {

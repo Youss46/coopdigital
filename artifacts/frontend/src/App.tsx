@@ -24,6 +24,7 @@ import RefusPage from "@/pages/RefusPage";
 import ReglementsPage from "@/pages/ReglementsPage";
 import IntrantsPage from "@/pages/IntrantsPage";
 import EmpruntsPage from "@/pages/EmpruntsPage";
+import BudgetPage from "@/pages/BudgetPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -111,6 +112,9 @@ function AppRoutes() {
       </Route>
       <Route path="/emprunts">
         <ProtectedRoute component={EmpruntsPage} />
+      </Route>
+      <Route path="/budget">
+        <ProtectedRoute component={BudgetPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>
