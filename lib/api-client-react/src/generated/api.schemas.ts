@@ -244,6 +244,53 @@ export interface LivraisonInput {
   prixUnitaireFcfa: number;
   dateLivraison: string;
   modePaiement?: LivraisonInputModePaiement;
+  campagneId?: number | null;
+  nombreSacs?: number | null;
+  retenueKg?: number | null;
+  sectionLivraison?: string | null;
+}
+
+export interface ValiderPaiementInput {
+  referenceTransaction?: string | null;
+  dateReglement?: string | null;
+}
+
+export type PaiementListItemModePaiement = typeof PaiementListItemModePaiement[keyof typeof PaiementListItemModePaiement];
+
+
+export const PaiementListItemModePaiement = {
+  orange_money: 'orange_money',
+  mtn_momo: 'mtn_momo',
+  especes: 'especes',
+} as const;
+
+export type PaiementListItemStatut = typeof PaiementListItemStatut[keyof typeof PaiementListItemStatut];
+
+
+export const PaiementListItemStatut = {
+  en_attente: 'en_attente',
+  confirme: 'confirme',
+  echec: 'echec',
+} as const;
+
+export interface PaiementListItem {
+  id: number;
+  livraisonId: number;
+  membreId: number;
+  montantFcfa: number;
+  modePaiement: PaiementListItemModePaiement;
+  /** @nullable */
+  referenceTransaction?: string | null;
+  statut: PaiementListItemStatut;
+  createdAt: string;
+  /** @nullable */
+  membreNom?: string | null;
+  /** @nullable */
+  membrePrenoms?: string | null;
+  /** @nullable */
+  telephone?: string | null;
+  /** @nullable */
+  dateLivraison?: string | null;
 }
 
 export interface LivraisonResult {
@@ -1080,6 +1127,246 @@ export interface RemboursementAvancePersonnelInput {
   montantRembourse?: number;
 }
 
+export type CampagneStatut = typeof CampagneStatut[keyof typeof CampagneStatut];
+
+
+export const CampagneStatut = {
+  ouverte: 'ouverte',
+  fermee: 'fermee',
+} as const;
+
+export interface Campagne {
+  id: number;
+  cooperativeId: number;
+  libelle: string;
+  anneeDebut: number;
+  anneeFin: number;
+  dateOuverture: string;
+  /** @nullable */
+  dateFermeture?: string | null;
+  statut: CampagneStatut;
+  createdAt: string;
+}
+
+export interface FermerCampagneInput {
+  dateFermeture?: string;
+}
+
+export interface CampagneInput {
+  libelle: string;
+  anneeDebut: number;
+  anneeFin: number;
+  dateOuverture: string;
+}
+
+export interface ConfigPartsSociales {
+  cooperativeId: number;
+  valeurNominaleFcfa: number;
+  nbrePartsMin: number;
+}
+
+export interface RapportParts {
+  /** @nullable */
+  totalMembresSouscripteurs?: number | null;
+  /** @nullable */
+  totalPartsSouscrites?: number | null;
+  /** @nullable */
+  totalSouscritFcfa?: number | null;
+  /** @nullable */
+  totalLibereFcfa?: number | null;
+  /** @nullable */
+  totalResteALibererFcfa?: number | null;
+}
+
+export interface LiberationParts {
+  id: number;
+  membreId: number;
+  cooperativeId: number;
+  dateVersement: string;
+  /** @nullable */
+  codeLiberation?: string | null;
+  /** @nullable */
+  versement?: string | null;
+  montantFcfa: number;
+  /** @nullable */
+  agentId?: number | null;
+  createdAt: string;
+}
+
+export type PartsMembreMembre = {
+  id: number;
+  nom: string;
+  prenoms: string;
+  nbrePartsSouscrites: number;
+  valeurNominalePartFcfa: number;
+  totalSouscritFcfa: number;
+  totalLibereFcfa: number;
+  resteALibererFcfa: number;
+};
+
+export interface PartsMembre {
+  membre: PartsMembreMembre;
+  liberations: LiberationParts[];
+  config: ConfigPartsSociales;
+}
+
+export interface LiberationInput {
+  membreId: number;
+  montantFcfa: number;
+  dateVersement: string;
+  codeLiberation?: string;
+  versement?: string;
+}
+
+/**
+ * @nullable
+ */
+export type RefusRefusDecision = typeof RefusRefusDecision[keyof typeof RefusRefusDecision] | null;
+
+
+export const RefusRefusDecision = {
+  retour_stock: 'retour_stock',
+  declassement: 'declassement',
+  autre_acheteur: 'autre_acheteur',
+  perte: 'perte',
+} as const;
+
+export type RefusRefusStatut = typeof RefusRefusStatut[keyof typeof RefusRefusStatut];
+
+
+export const RefusRefusStatut = {
+  en_attente: 'en_attente',
+  traite: 'traite',
+} as const;
+
+export type RefusRefus = {
+  id: number;
+  cooperativeId: number;
+  venteExportateurId: number;
+  poidsRefuleKg: string;
+  /** @nullable */
+  motifRefus: string | null;
+  /** @nullable */
+  decision?: RefusRefusDecision;
+  statut: RefusRefusStatut;
+  /** @nullable */
+  traitePar?: number | null;
+  /** @nullable */
+  traiteLe?: string | null;
+  createdAt: string;
+};
+
+/**
+ * @nullable
+ */
+export type RefusVente = {
+  exportateurId?: number;
+  dateVente?: string;
+  /** @nullable */
+  produit?: string | null;
+  /** @nullable */
+  nombreSacsRefoules?: number | null;
+  /** @nullable */
+  numeroBonSortie?: string | null;
+} | null;
+
+export interface Refus {
+  refus: RefusRefus;
+  /** @nullable */
+  vente?: RefusVente;
+}
+
+export interface RefusStats {
+  totalRefulesKg?: string;
+  totalTraitesKg?: string;
+  totalEnAttenteKg?: string;
+  nbEnAttente?: number;
+  nbTraites?: number;
+}
+
+export type TraiterRefusInputDecision = typeof TraiterRefusInputDecision[keyof typeof TraiterRefusInputDecision];
+
+
+export const TraiterRefusInputDecision = {
+  retour_stock: 'retour_stock',
+  declassement: 'declassement',
+  autre_acheteur: 'autre_acheteur',
+  perte: 'perte',
+} as const;
+
+export interface TraiterRefusInput {
+  decision: TraiterRefusInputDecision;
+  entrepotRetourId?: number;
+  ancienGrade?: string;
+  nouveauGrade?: string;
+  nouvelExportateurId?: number;
+  prixUnitaireNouveauFcfa?: number;
+  motifPerte?: string;
+  pvConstat?: boolean;
+  tauxHumidite?: number;
+}
+
+export type FournisseurTypeFournisseur = typeof FournisseurTypeFournisseur[keyof typeof FournisseurTypeFournisseur];
+
+
+export const FournisseurTypeFournisseur = {
+  membre: 'membre',
+  pisteur: 'pisteur',
+  externe: 'externe',
+} as const;
+
+export interface Fournisseur {
+  id: number;
+  cooperativeId: number;
+  typeFournisseur: FournisseurTypeFournisseur;
+  /** @nullable */
+  membreId?: number | null;
+  code: string;
+  nom: string;
+  /** @nullable */
+  prenoms?: string | null;
+  /** @nullable */
+  sexe?: string | null;
+  /** @nullable */
+  telephone?: string | null;
+  /** @nullable */
+  section?: string | null;
+  /** @nullable */
+  nationalite?: string | null;
+  /** @nullable */
+  numeroCni?: string | null;
+  /** @nullable */
+  origine?: string | null;
+  /** @nullable */
+  dateAdhesion?: string | null;
+  /** @nullable */
+  lieuNaissance?: string | null;
+  actif: boolean;
+  createdAt: string;
+}
+
+export type FournisseurInputTypeFournisseur = typeof FournisseurInputTypeFournisseur[keyof typeof FournisseurInputTypeFournisseur];
+
+
+export const FournisseurInputTypeFournisseur = {
+  pisteur: 'pisteur',
+  externe: 'externe',
+} as const;
+
+export interface FournisseurInput {
+  typeFournisseur: FournisseurInputTypeFournisseur;
+  nom: string;
+  prenoms?: string;
+  sexe?: string;
+  telephone?: string;
+  section?: string;
+  nationalite?: string;
+  numeroCni?: string;
+  origine?: string;
+  dateAdhesion?: string;
+  lieuNaissance?: string;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -1251,5 +1538,64 @@ export type GetAvancesPersonnelStatut = typeof GetAvancesPersonnelStatut[keyof t
 export const GetAvancesPersonnelStatut = {
   en_cours: 'en_cours',
   rembourse: 'rembourse',
+} as const;
+
+export type EnregistrerLiberation201 = {
+  succes: boolean;
+};
+
+export type CountRefusEnAttente200 = {
+  count: number;
+};
+
+export type ListRefusParams = {
+statut?: ListRefusStatut;
+};
+
+export type ListRefusStatut = typeof ListRefusStatut[keyof typeof ListRefusStatut];
+
+
+export const ListRefusStatut = {
+  en_attente: 'en_attente',
+  traite: 'traite',
+} as const;
+
+export type SearchFournisseursParams = {
+q: string;
+};
+
+export type GetRapportTypeFournisseur200Item = {
+  typeFournisseur: string;
+  count: number;
+};
+
+export type ListFournisseursParams = {
+type?: ListFournisseursType;
+section?: string;
+q?: string;
+};
+
+export type ListFournisseursType = typeof ListFournisseursType[keyof typeof ListFournisseursType];
+
+
+export const ListFournisseursType = {
+  membre: 'membre',
+  pisteur: 'pisteur',
+  externe: 'externe',
+} as const;
+
+export type ListPaiementsParams = {
+statut?: ListPaiementsStatut;
+membre_id?: number;
+limit?: number;
+};
+
+export type ListPaiementsStatut = typeof ListPaiementsStatut[keyof typeof ListPaiementsStatut];
+
+
+export const ListPaiementsStatut = {
+  en_attente: 'en_attente',
+  confirme: 'confirme',
+  echec: 'echec',
 } as const;
 

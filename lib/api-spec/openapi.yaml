@@ -1767,6 +1767,464 @@ paths:
                 items:
                   $ref: "#/components/schemas/HistoriqueMasse"
 
+  /api/campagnes/active:
+    get:
+      operationId: getCampagneActive
+      tags: [campagnes]
+      summary: Campagne en cours (statut ouverte)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Campagne active
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campagne"
+        "404":
+          description: Aucune campagne active
+
+  /api/campagnes:
+    get:
+      operationId: listCampagnes
+      tags: [campagnes]
+      summary: Liste de toutes les campagnes
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Liste campagnes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Campagne"
+    post:
+      operationId: createCampagne
+      tags: [campagnes]
+      summary: Créer une nouvelle campagne
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampagneInput"
+      responses:
+        "201":
+          description: Campagne créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campagne"
+
+  /api/campagnes/{id}/fermer:
+    put:
+      operationId: fermerCampagne
+      tags: [campagnes]
+      summary: Clôturer une campagne
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FermerCampagneInput"
+      responses:
+        "200":
+          description: Campagne fermée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campagne"
+
+  /api/parts-sociales/config:
+    get:
+      operationId: getConfigParts
+      tags: [parts-sociales]
+      summary: Config parts sociales de la coopérative
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigPartsSociales"
+    put:
+      operationId: updateConfigParts
+      tags: [parts-sociales]
+      summary: Modifier la config parts sociales
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigPartsSociales"
+      responses:
+        "200":
+          description: Config mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigPartsSociales"
+
+  /api/parts-sociales/rapport:
+    get:
+      operationId: getRapportParts
+      tags: [parts-sociales]
+      summary: Rapport global parts sociales
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Rapport
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RapportParts"
+
+  /api/parts-sociales/membre/{id}:
+    get:
+      operationId: getPartsMembre
+      tags: [parts-sociales]
+      summary: Parts sociales d'un membre
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Parts du membre
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartsMembre"
+
+  /api/parts-sociales/liberation:
+    post:
+      operationId: enregistrerLiberation
+      tags: [parts-sociales]
+      summary: Enregistrer un versement de libération
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LiberationInput"
+      responses:
+        "201":
+          description: Versement enregistré
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [succes]
+                properties:
+                  succes:
+                    type: boolean
+
+  /api/refus/count:
+    get:
+      operationId: countRefusEnAttente
+      tags: [refus]
+      summary: Nombre de refus en attente de traitement
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Comptage
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count]
+                properties:
+                  count:
+                    type: integer
+
+  /api/refus/stats:
+    get:
+      operationId: getStatsRefus
+      tags: [refus]
+      summary: Statistiques stocks refoulés
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefusStats"
+
+  /api/refus:
+    get:
+      operationId: listRefus
+      tags: [refus]
+      summary: Liste des stocks refoulés
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: statut
+          in: query
+          schema:
+            type: string
+            enum: [en_attente, traite]
+      responses:
+        "200":
+          description: Liste refus
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Refus"
+
+  /api/refus/{id}/traiter:
+    put:
+      operationId: traiterRefus
+      tags: [refus]
+      summary: Traiter un lot refoulé (décision)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TraiterRefusInput"
+      responses:
+        "200":
+          description: Refus traité
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Refus"
+
+  /api/fournisseurs/search:
+    get:
+      operationId: searchFournisseurs
+      tags: [fournisseurs]
+      summary: Recherche autocomplete fournisseurs
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Résultats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Fournisseur"
+
+  /api/fournisseurs/rapport-type:
+    get:
+      operationId: getRapportTypeFournisseur
+      tags: [fournisseurs]
+      summary: Répartition des fournisseurs par type
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Rapport
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [typeFournisseur, count]
+                  properties:
+                    typeFournisseur:
+                      type: string
+                    count:
+                      type: integer
+
+  /api/fournisseurs:
+    get:
+      operationId: listFournisseurs
+      tags: [fournisseurs]
+      summary: Liste des fournisseurs
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [membre, pisteur, externe]
+        - name: section
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste fournisseurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Fournisseur"
+    post:
+      operationId: createFournisseur
+      tags: [fournisseurs]
+      summary: Créer un fournisseur (pisteur/externe)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FournisseurInput"
+      responses:
+        "201":
+          description: Fournisseur créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fournisseur"
+
+  /api/fournisseurs/{id}:
+    get:
+      operationId: getFournisseurById
+      tags: [fournisseurs]
+      summary: Fiche fournisseur
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Fournisseur
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fournisseur"
+    put:
+      operationId: updateFournisseur
+      tags: [fournisseurs]
+      summary: Modifier un fournisseur
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FournisseurInput"
+      responses:
+        "200":
+          description: Fournisseur mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fournisseur"
+
+  /api/fournisseurs/depuis-membre/{id}:
+    post:
+      operationId: createFournisseurDepuisMembre
+      tags: [fournisseurs]
+      summary: Créer un fournisseur depuis un membre existant
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Fournisseur créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fournisseur"
+
+  /api/paiements:
+    get:
+      operationId: listPaiements
+      tags: [paiements]
+      summary: Liste des paiements producteurs
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: statut
+          in: query
+          schema:
+            type: string
+            enum: [en_attente, confirme, echec]
+        - name: membre_id
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Liste paiements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaiementListItem"
+
+  /api/paiements/{id}/valider:
+    patch:
+      operationId: validerPaiement
+      tags: [paiements]
+      summary: Marquer un paiement comme confirmé
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValiderPaiementInput"
+      responses:
+        "200":
+          description: Paiement confirmé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaiementListItem"
+
 components:
   schemas:
     HealthStatus:
@@ -2045,6 +2503,59 @@ components:
         modePaiement:
           type: string
           enum: [orange_money, mtn_momo, especes]
+        campagneId:
+          type: integer
+          nullable: true
+        nombreSacs:
+          type: integer
+          nullable: true
+        retenueKg:
+          type: number
+          nullable: true
+        sectionLivraison:
+          type: string
+          nullable: true
+
+    ValiderPaiementInput:
+      type: object
+      properties:
+        referenceTransaction:
+          type: string
+          nullable: true
+        dateReglement:
+          type: string
+          nullable: true
+
+    PaiementListItem:
+      type: object
+      required: [id, livraisonId, membreId, montantFcfa, modePaiement, statut, createdAt]
+      properties:
+        id:
+          type: integer
+        livraisonId:
+          type: integer
+        membreId:
+          type: integer
+        montantFcfa:
+          type: integer
+        modePaiement:
+          type: string
+          enum: [orange_money, mtn_momo, especes]
+        referenceTransaction:
+          type: ["string", "null"]
+        statut:
+          type: string
+          enum: [en_attente, confirme, echec]
+        createdAt:
+          type: string
+        membreNom:
+          type: ["string", "null"]
+        membrePrenoms:
+          type: ["string", "null"]
+        telephone:
+          type: ["string", "null"]
+        dateLivraison:
+          type: ["string", "null"]
 
     LivraisonDetail:
       type: object
@@ -3242,3 +3753,303 @@ components:
       properties:
         montantRembourse:
           type: integer
+
+    Campagne:
+      type: object
+      required: [id, cooperativeId, libelle, anneeDebut, anneeFin, dateOuverture, statut, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        libelle:
+          type: string
+        anneeDebut:
+          type: integer
+        anneeFin:
+          type: integer
+        dateOuverture:
+          type: string
+          format: date
+        dateFermeture:
+          type: ["string", "null"]
+          format: date
+        statut:
+          type: string
+          enum: [ouverte, fermee]
+        createdAt:
+          type: string
+          format: date-time
+
+    FermerCampagneInput:
+      type: object
+      properties:
+        dateFermeture:
+          type: string
+          format: date
+
+    CampagneInput:
+      type: object
+      required: [libelle, anneeDebut, anneeFin, dateOuverture]
+      properties:
+        libelle:
+          type: string
+        anneeDebut:
+          type: integer
+        anneeFin:
+          type: integer
+        dateOuverture:
+          type: string
+          format: date
+
+    ConfigPartsSociales:
+      type: object
+      required: [cooperativeId, valeurNominaleFcfa, nbrePartsMin]
+      properties:
+        cooperativeId:
+          type: integer
+        valeurNominaleFcfa:
+          type: integer
+        nbrePartsMin:
+          type: integer
+
+    RapportParts:
+      type: object
+      properties:
+        totalMembresSouscripteurs:
+          type: ["integer", "null"]
+        totalPartsSouscrites:
+          type: ["integer", "null"]
+        totalSouscritFcfa:
+          type: ["integer", "null"]
+        totalLibereFcfa:
+          type: ["integer", "null"]
+        totalResteALibererFcfa:
+          type: ["integer", "null"]
+
+    LiberationParts:
+      type: object
+      required: [id, membreId, cooperativeId, dateVersement, montantFcfa, createdAt]
+      properties:
+        id:
+          type: integer
+        membreId:
+          type: integer
+        cooperativeId:
+          type: integer
+        dateVersement:
+          type: string
+          format: date
+        codeLiberation:
+          type: ["string", "null"]
+        versement:
+          type: ["string", "null"]
+        montantFcfa:
+          type: integer
+        agentId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    PartsMembre:
+      type: object
+      required: [membre, liberations, config]
+      properties:
+        membre:
+          type: object
+          required: [id, nom, prenoms, nbrePartsSouscrites, valeurNominalePartFcfa, totalSouscritFcfa, totalLibereFcfa, resteALibererFcfa]
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+            prenoms:
+              type: string
+            nbrePartsSouscrites:
+              type: integer
+            valeurNominalePartFcfa:
+              type: integer
+            totalSouscritFcfa:
+              type: integer
+            totalLibereFcfa:
+              type: integer
+            resteALibererFcfa:
+              type: integer
+        liberations:
+          type: array
+          items:
+            $ref: "#/components/schemas/LiberationParts"
+        config:
+          $ref: "#/components/schemas/ConfigPartsSociales"
+
+    LiberationInput:
+      type: object
+      required: [membreId, montantFcfa, dateVersement]
+      properties:
+        membreId:
+          type: integer
+        montantFcfa:
+          type: integer
+        dateVersement:
+          type: string
+          format: date
+        codeLiberation:
+          type: string
+        versement:
+          type: string
+
+    Refus:
+      type: object
+      required: [refus]
+      properties:
+        refus:
+          type: object
+          required: [id, cooperativeId, venteExportateurId, poidsRefuleKg, motifRefus, statut, createdAt]
+          properties:
+            id:
+              type: integer
+            cooperativeId:
+              type: integer
+            venteExportateurId:
+              type: integer
+            poidsRefuleKg:
+              type: string
+            motifRefus:
+              type: ["string", "null"]
+            decision:
+              type: ["string", "null"]
+              enum: [retour_stock, declassement, autre_acheteur, perte, null]
+            statut:
+              type: string
+              enum: [en_attente, traite]
+            traitePar:
+              type: ["integer", "null"]
+            traiteLe:
+              type: ["string", "null"]
+              format: date-time
+            createdAt:
+              type: string
+              format: date-time
+        vente:
+          type: ["object", "null"]
+          properties:
+            exportateurId:
+              type: integer
+            dateVente:
+              type: string
+            produit:
+              type: ["string", "null"]
+            nombreSacsRefoules:
+              type: ["integer", "null"]
+            numeroBonSortie:
+              type: ["string", "null"]
+
+    RefusStats:
+      type: object
+      properties:
+        totalRefulesKg:
+          type: string
+        totalTraitesKg:
+          type: string
+        totalEnAttenteKg:
+          type: string
+        nbEnAttente:
+          type: integer
+        nbTraites:
+          type: integer
+
+    TraiterRefusInput:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [retour_stock, declassement, autre_acheteur, perte]
+        entrepotRetourId:
+          type: integer
+        ancienGrade:
+          type: string
+        nouveauGrade:
+          type: string
+        nouvelExportateurId:
+          type: integer
+        prixUnitaireNouveauFcfa:
+          type: integer
+        motifPerte:
+          type: string
+        pvConstat:
+          type: boolean
+        tauxHumidite:
+          type: number
+
+    Fournisseur:
+      type: object
+      required: [id, cooperativeId, typeFournisseur, code, nom, actif, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        typeFournisseur:
+          type: string
+          enum: [membre, pisteur, externe]
+        membreId:
+          type: ["integer", "null"]
+        code:
+          type: string
+        nom:
+          type: string
+        prenoms:
+          type: ["string", "null"]
+        sexe:
+          type: ["string", "null"]
+        telephone:
+          type: ["string", "null"]
+        section:
+          type: ["string", "null"]
+        nationalite:
+          type: ["string", "null"]
+        numeroCni:
+          type: ["string", "null"]
+        origine:
+          type: ["string", "null"]
+        dateAdhesion:
+          type: ["string", "null"]
+          format: date
+        lieuNaissance:
+          type: ["string", "null"]
+        actif:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    FournisseurInput:
+      type: object
+      required: [typeFournisseur, nom]
+      properties:
+        typeFournisseur:
+          type: string
+          enum: [pisteur, externe]
+        nom:
+          type: string
+        prenoms:
+          type: string
+        sexe:
+          type: string
+        telephone:
+          type: string
+        section:
+          type: string
+        nationalite:
+          type: string
+        numeroCni:
+          type: string
+        origine:
+          type: string
+        dateAdhesion:
+          type: string
+          format: date
+        lieuNaissance:
+          type: string

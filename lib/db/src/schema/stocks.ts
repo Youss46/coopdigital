@@ -15,7 +15,13 @@ export const entrepotsTable = pgTable("entrepots", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const mouvementTypeEnum = pgEnum("mouvement_type", ["entree", "sortie"]);
+export const mouvementTypeEnum = pgEnum("mouvement_type", [
+  "entree",
+  "sortie",
+  "retour_refus",
+  "declassement",
+  "perte",
+]);
 
 export const mouvementsStockTable = pgTable("mouvements_stock", {
   id: serial("id").primaryKey(),

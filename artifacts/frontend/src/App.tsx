@@ -18,6 +18,10 @@ import SalairesPage from "@/pages/SalairesPage";
 import ReportingPage from "@/pages/ReportingPage";
 import ComptabilitePage from "@/pages/ComptabilitePage";
 import ComptesPage from "@/pages/ComptesPage";
+import CampagnesPage from "@/pages/CampagnesPage";
+import FournisseursPage from "@/pages/FournisseursPage";
+import RefusPage from "@/pages/RefusPage";
+import ReglementsPage from "@/pages/ReglementsPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -87,6 +91,18 @@ function AppRoutes() {
       </Route>
       <Route path="/administration/comptes">
         <ProtectedRoute component={ComptesPage} />
+      </Route>
+      <Route path="/campagnes">
+        <ProtectedRoute component={CampagnesPage} />
+      </Route>
+      <Route path="/fournisseurs">
+        <ProtectedRoute component={FournisseursPage} />
+      </Route>
+      <Route path="/reglements">
+        <ProtectedRoute component={ReglementsPage} />
+      </Route>
+      <Route path="/refus">
+        <ProtectedRoute component={RefusPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

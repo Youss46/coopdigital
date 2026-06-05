@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable } from "@workspace/db";
+import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable, campagnesTable } from "@workspace/db";
 import { eq, and, desc, notInArray } from "drizzle-orm";
 import { CreateLivraisonBody } from "@workspace/api-zod";
 import { generateEcrituresLivraison } from "../services/comptabiliteService";
@@ -46,13 +46,26 @@ export async function createLivraison(req: Request, res: Response): Promise<void
     return;
   }
 
-  const { membreId, poidsKg, prixUnitaireFcfa, dateLivraison, modePaiement } = parse.data;
+  const { membreId, poidsKg, prixUnitaireFcfa, dateLivraison, modePaiement,
+          campagneId, nombreSacs, retenueKg, sectionLivraison } = parse.data;
 
   try {
     const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, membreId)).limit(1);
     if (!membre) {
       res.status(404).json({ erreur: "Membre introuvable" });
       return;
+    }
+
+    // Auto-détecter la campagne active si non fournie
+    let campagneIdResolu: number | null = campagneId ?? null;
+    if (!campagneIdResolu) {
+      const [campagneActive] = await db
+        .select({ id: campagnesTable.id })
+        .from(campagnesTable)
+        .where(eq(campagnesTable.statut, "ouverte"))
+        .orderBy(desc(campagnesTable.dateOuverture))
+        .limit(1);
+      campagneIdResolu = campagneActive?.id ?? null;
     }
 
     const result = await db.transaction(async (tx) => {
@@ -75,6 +88,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         .insert(livraisonsTable)
         .values({
           membreId,
+          campagneId: campagneIdResolu,
           poidsKg: String(poidsKg),
           prixUnitaireFcfa,
           montantBrutFcfa: montantBrut,
@@ -82,6 +96,9 @@ export async function createLivraison(req: Request, res: Response): Promise<void
           montantNetFcfa: montantNet,
           dateLivraison: dateStr,
           agentId: req.user?.id ?? null,
+          nombreSacs: nombreSacs ?? null,
+          retenueKg: retenueKg != null ? String(retenueKg) : null,
+          sectionLivraison: sectionLivraison ?? null,
         })
         .returning();
 

@@ -119,6 +119,33 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     gerer_avances:       ["pca", "directeur", "comptable"],
   },
 
+  // MODULE CAMPAGNES
+  campagnes: {
+    lire:   ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "agent_terrain", "auditeur"],
+    creer:  ["pca", "directeur"],
+    fermer: ["pca", "directeur"],
+  },
+
+  // MODULE PARTS SOCIALES
+  parts_sociales: {
+    lire:               ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
+    enregistrer_versement: ["pca", "directeur", "comptable", "agent_terrain"],
+    configurer:         ["pca", "directeur"],
+  },
+
+  // MODULE REFUS
+  refus: {
+    lire:    ["pca", "directeur", "magasinier", "responsable_tracabilite", "comptable", "auditeur"],
+    traiter: ["pca", "directeur", "magasinier", "responsable_tracabilite"],
+  },
+
+  // MODULE FOURNISSEURS
+  fournisseurs: {
+    lire:     ["pca", "directeur", "comptable", "agent_terrain", "responsable_tracabilite", "auditeur"],
+    creer:    ["pca", "directeur", "agent_terrain"],
+    modifier: ["pca", "directeur", "agent_terrain"],
+  },
+
   // MODULE M07 — COMMUNICATION
   communication: {
     lire_historique:    ["pca", "directeur", "comptable"],
@@ -126,6 +153,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     envoyer_whatsapp:   ["pca", "directeur"],
     configurer_alertes: ["pca", "directeur"],
   },
+
 };
 
 // ─── Fonction principale ─────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { membresTable } from "./membres";
 import { cooperativesTable } from "./cooperatives";
 import { livraisonsTable } from "./livraisons";
+import { campagnesTable } from "./campagnes";
 
 export const parcellesTable = pgTable("parcelles", {
   id: serial("id").primaryKey(),
@@ -21,6 +22,7 @@ export const lotStatutEnum = pgEnum("lot_statut", ["en_stock", "vendu", "transit
 export const lotsTable = pgTable("lots", {
   id: serial("id").primaryKey(),
   cooperativeId: integer("cooperative_id").notNull().references(() => cooperativesTable.id),
+  campagneId: integer("campagne_id").references(() => campagnesTable.id),
   qrCodeLot: uuid("qr_code_lot").notNull().defaultRandom().unique(),
   statut: lotStatutEnum("statut").notNull().default("en_stock"),
   poidsTotalKg: numeric("poids_total_kg", { precision: 10, scale: 2 }).notNull().default("0"),

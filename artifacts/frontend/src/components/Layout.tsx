@@ -20,6 +20,10 @@ import {
   ShieldCheck,
   Banknote,
   BookOpen,
+  CalendarDays,
+  UserCheck,
+  PackageX,
+  CheckCircle2,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey } from "@workspace/api-client-react";
 
@@ -61,10 +65,34 @@ const navItems = [
     roles: ["pca", "directeur", "agent_terrain", "responsable_tracabilite", "comptable", "auditeur"],
   },
   {
+    href: "/campagnes",
+    label: "Campagnes",
+    icon: CalendarDays,
+    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "agent_terrain", "auditeur"],
+  },
+  {
+    href: "/fournisseurs",
+    label: "Fournisseurs",
+    icon: UserCheck,
+    roles: ["pca", "directeur", "comptable", "agent_terrain", "responsable_tracabilite", "auditeur"],
+  },
+  {
     href: "/exportateurs",
     label: "Exportateurs",
     icon: Building2,
     roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/reglements",
+    label: "Règlements",
+    icon: CheckCircle2,
+    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
+  },
+  {
+    href: "/refus",
+    label: "Stocks refoulés",
+    icon: PackageX,
+    roles: ["pca", "directeur", "magasinier", "responsable_tracabilite", "comptable", "auditeur"],
   },
   {
     href: "/creances",

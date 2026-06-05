@@ -13,4 +13,8 @@ export interface LivraisonInput {
   prixUnitaireFcfa: number;
   dateLivraison: string;
   modePaiement?: LivraisonInputModePaiement;
+  campagneId?: number | null;
+  nombreSacs?: number | null;
+  retenueKg?: number | null;
+  sectionLivraison?: string | null;
 }

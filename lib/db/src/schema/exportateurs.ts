@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { cooperativesTable } from "./cooperatives";
 import { lotsTable } from "./lots";
+import { campagnesTable } from "./campagnes";
 
 export const exportateursTable = pgTable("exportateurs", {
   id: serial("id").primaryKey(),
@@ -20,11 +21,34 @@ export const ventesExportateursTable = pgTable("ventes_exportateurs", {
   id: serial("id").primaryKey(),
   exportateurId: integer("exportateur_id").notNull().references(() => exportateursTable.id),
   lotId: integer("lot_id").references(() => lotsTable.id),
+  campagneId: integer("campagne_id").references(() => campagnesTable.id),
+
+  // Enrichissements livraison exportateur GESTCOOP
+  numeroBonSortie: text("numero_bon_sortie"),
+  numeroBonLivraison: text("numero_bon_livraison"),
+  numeroRemorqueCamion: text("numero_remorque_camion"),
+  typeLivraison: text("type_livraison"),
+  produit: text("produit").default("cacao"),
+  poidsBrutKg: numeric("poids_brut_kg", { precision: 10, scale: 2 }),
+  nombreSacsTotal: integer("nombre_sacs_total"),
+  nombreSacsArrives: integer("nombre_sacs_arrives"),
+  nombreSacsRefoules: integer("nombre_sacs_refoules").notNull().default(0),
+  nombreSacsAcceptes: integer("nombre_sacs_acceptes"),
+  poidsRefuleKg: numeric("poids_refoule_kg", { precision: 10, scale: 2 }).default("0"),
+  refactionKg: numeric("refaction_kg", { precision: 10, scale: 2 }).default("0"),
+  poidsNetAccepteKg: numeric("poids_net_accepte_kg", { precision: 10, scale: 2 }),
+  puMiseEnCompteFcfa: numeric("pu_mise_en_compte_fcfa", { precision: 12, scale: 2 }),
+  montantMiseEnCompteFcfa: numeric("montant_mise_en_compte_fcfa", { precision: 14, scale: 2 }),
+  tauxBic: numeric("taux_bic", { precision: 5, scale: 2 }).default("0"),
+  montantBicFcfa: numeric("montant_bic_fcfa", { precision: 14, scale: 2 }),
+  montantNetAPayerFcfa: numeric("montant_net_a_payer_fcfa", { precision: 14, scale: 2 }),
+
+  // Champs existants
   poidsKg: numeric("poids_kg", { precision: 10, scale: 2 }).notNull(),
   prixUnitaireFcfa: integer("prix_unitaire_fcfa").notNull(),
   montantTotalFcfa: integer("montant_total_fcfa").notNull(),
-  dateVente: date("date_vente").notNull(),
-  dateEcheanceReglement: date("date_echeance_reglement"),
+  dateVente: date("date_vente", { mode: "string" }).notNull(),
+  dateEcheanceReglement: date("date_echeance_reglement", { mode: "string" }),
   montantRecuFcfa: integer("montant_recu_fcfa").notNull().default(0),
   soldeDuFcfa: integer("solde_du_fcfa").notNull(),
   statut: venteStatutEnum("statut").notNull().default("en_attente"),

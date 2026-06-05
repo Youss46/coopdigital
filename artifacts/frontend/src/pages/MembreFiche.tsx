@@ -1,14 +1,30 @@
+import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import {
   useGetMembreById,
   useGetMembreHistorique,
   useGetAvances,
+  useGetPartsMembre,
+  useEnregistrerLiberation,
   getGetMembreByIdQueryKey,
   getGetMembreHistoriqueQueryKey,
   getGetAvancesQueryKey,
+  getGetPartsMembreQueryKey,
+  type LiberationInput,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
-import { ArrowLeft, MapPin, Phone, Users, Leaf, Calendar, TrendingDown } from "lucide-react";
+import {
+  ArrowLeft, MapPin, Phone, Users, Leaf, Calendar, TrendingDown,
+  Coins, Plus, Loader2, ChevronDown, ChevronUp,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { usePermission } from "@/hooks/usePermission";
+
+const INPUT_CLS =
+  "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white";
+const BTN_CLS =
+  "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors";
 
 function formaterFCFA(montant: number) {
   return new Intl.NumberFormat("fr-FR").format(montant) + " FCFA";
@@ -17,10 +33,22 @@ function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+const TABS = ["Avances", "Livraisons", "Parts sociales"] as const;
+type Tab = (typeof TABS)[number];
+
 export default function MembreFiche() {
   const [, navigate] = useLocation();
   const [match, params] = useRoute("/membres/:id");
   const id = parseInt(params?.id ?? "0");
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const peutLiberer = usePermission("parts_sociales", "enregistrer_versement");
+
+  const [activeTab, setActiveTab] = useState<Tab>("Avances");
+  const [showLiberationForm, setShowLiberationForm] = useState(false);
+  const [liberationForm, setLiberationForm] = useState<Partial<LiberationInput>>({
+    dateVersement: new Date().toISOString().slice(0, 10),
+  });
 
   const { data: membre, isLoading } = useGetMembreById(id, {
     query: { queryKey: getGetMembreByIdQueryKey(id), enabled: !!id },
@@ -31,7 +59,11 @@ export default function MembreFiche() {
   const { data: avancesData } = useGetAvances({ membre_id: id }, {
     query: { queryKey: getGetAvancesQueryKey({ membre_id: id }), enabled: !!id },
   });
+  const { data: partsData, isLoading: partsLoading } = useGetPartsMembre(id, {
+    query: { queryKey: getGetPartsMembreQueryKey(id), enabled: !!id && activeTab === "Parts sociales" },
+  });
 
+  const liberationMut = useEnregistrerLiberation();
   const avanceEnCours = avancesData?.avances?.find((a) => a.statut === "en_cours");
 
   if (!match) return null;
@@ -59,6 +91,28 @@ export default function MembreFiche() {
 
   const soldeCredit = avanceEnCours ? avanceEnCours.soldeRestantFcfa : 0;
 
+  async function handleLiberation(e: React.FormEvent) {
+    e.preventDefault();
+    if (!liberationForm.montantFcfa || !liberationForm.dateVersement) return;
+    try {
+      await liberationMut.mutateAsync({
+        data: { ...liberationForm, membreId: id } as LiberationInput,
+      });
+      toast({ title: "Versement enregistré avec succès" });
+      setShowLiberationForm(false);
+      setLiberationForm({ dateVersement: new Date().toISOString().slice(0, 10) });
+      void qc.invalidateQueries({ queryKey: getGetPartsMembreQueryKey(id) });
+    } catch {
+      toast({ title: "Erreur lors de l'enregistrement", variant: "destructive" });
+    }
+  }
+
+  const pctLibere = partsData
+    ? partsData.membre.totalSouscritFcfa > 0
+      ? Math.round((partsData.membre.totalLibereFcfa / partsData.membre.totalSouscritFcfa) * 100)
+      : 0
+    : 0;
+
   return (
     <div className="space-y-5 max-w-4xl">
       {/* Navigation */}
@@ -72,7 +126,6 @@ export default function MembreFiche() {
 
       {/* Header */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 flex items-start gap-6">
-        {/* Avatar */}
         <div
           className="w-16 h-16 rounded-xl flex items-center justify-center text-white text-2xl font-bold flex-shrink-0"
           style={{ backgroundColor: "#1a4731" }}
@@ -108,21 +161,36 @@ export default function MembreFiche() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* QR Code */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col items-center gap-3">
-          <h2 className="font-semibold text-gray-900 text-sm w-full">QR Code membre</h2>
-          <div className="p-3 bg-white border border-gray-100 rounded-lg">
-            <QRCodeSVG value={membre.qrCodeToken} size={140} />
-          </div>
-          <p className="text-xs text-gray-400 font-mono text-center break-all">{membre.qrCodeToken}</p>
+      {/* QR Code */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col items-center gap-3 max-w-xs">
+        <h2 className="font-semibold text-gray-900 text-sm w-full">QR Code membre</h2>
+        <div className="p-3 bg-white border border-gray-100 rounded-lg">
+          <QRCodeSVG value={membre.qrCodeToken} size={140} />
+        </div>
+        <p className="text-xs text-gray-400 font-mono text-center break-all">{membre.qrCodeToken}</p>
+      </div>
+
+      {/* Onglets */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Tab bar */}
+        <div className="flex border-b border-gray-100">
+          {TABS.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-5 py-3 text-sm font-medium transition-colors ${
+                activeTab === tab
+                  ? "border-b-2 border-green-600 text-green-700"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
 
         {/* Avances */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900 text-sm">Avances</h2>
-          </div>
+        {activeTab === "Avances" && (
           <div className="divide-y divide-gray-50">
             {!historique?.avances || historique.avances.length === 0 ? (
               <p className="text-center text-gray-400 text-sm py-8">Aucune avance</p>
@@ -156,48 +224,191 @@ export default function MembreFiche() {
               ))
             )}
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Historique livraisons */}
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900 text-sm">Historique des livraisons</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-50 bg-gray-50">
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Date</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Poids (kg)</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Prix/kg</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Montant brut</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Avance déduite</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Net payé</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {!historique?.livraisons || historique.livraisons.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center text-gray-400 py-8">Aucune livraison</td>
+        {/* Livraisons */}
+        {activeTab === "Livraisons" && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-50 bg-gray-50">
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">Date</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-500">Poids (kg)</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-500">Prix/kg</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-500">Montant brut</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-500">Avance déduite</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-500">Net payé</th>
                 </tr>
-              ) : (
-                historique.livraisons.map((l) => (
-                  <tr key={l.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-600">{formaterDate(l.dateLivraison)}</td>
-                    <td className="px-4 py-3 text-right text-gray-700">{Number(l.poidsKg).toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-gray-600">{l.prixUnitaireFcfa}</td>
-                    <td className="px-4 py-3 text-right text-gray-700">{formaterFCFA(l.montantBrutFcfa)}</td>
-                    <td className="px-4 py-3 text-right text-amber-600">
-                      {l.avanceDeduiteFcfa > 0 ? `-${formaterFCFA(l.avanceDeduiteFcfa)}` : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-green-700">{formaterFCFA(l.montantNetFcfa)}</td>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {!historique?.livraisons || historique.livraisons.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center text-gray-400 py-8">Aucune livraison</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  historique.livraisons.map((l) => (
+                    <tr key={l.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-gray-600">{formaterDate(l.dateLivraison)}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{Number(l.poidsKg).toFixed(1)}</td>
+                      <td className="px-4 py-3 text-right text-gray-600">{l.prixUnitaireFcfa}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{formaterFCFA(l.montantBrutFcfa)}</td>
+                      <td className="px-4 py-3 text-right text-amber-600">
+                        {l.avanceDeduiteFcfa > 0 ? `-${formaterFCFA(l.avanceDeduiteFcfa)}` : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-green-700">{formaterFCFA(l.montantNetFcfa)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Parts sociales */}
+        {activeTab === "Parts sociales" && (
+          <div className="p-5 space-y-5">
+            {partsLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+              </div>
+            ) : partsData ? (
+              <>
+                {/* Résumé */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {[
+                    { label: "Parts souscrites", value: partsData.membre.nbrePartsSouscrites, suffix: " parts" },
+                    { label: "Montant souscrit", value: formaterFCFA(partsData.membre.totalSouscritFcfa), suffix: "" },
+                    { label: "Total libéré", value: formaterFCFA(partsData.membre.totalLibereFcfa), suffix: "" },
+                    { label: "Reste à libérer", value: formaterFCFA(partsData.membre.resteALibererFcfa), suffix: "" },
+                  ].map((k) => (
+                    <div key={k.label} className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-xs text-gray-500 mb-1">{k.label}</div>
+                      <div className="font-semibold text-gray-900 text-sm">{k.value}{k.suffix}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Barre de progression */}
+                {partsData.membre.totalSouscritFcfa > 0 && (
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>Progression libération</span>
+                      <span>{pctLibere}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-green-600 h-2 rounded-full transition-all"
+                        style={{ width: `${pctLibere}%` }}
+                      />
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      Valeur nominale : {formaterFCFA(partsData.config.valeurNominaleFcfa)} / part
+                    </div>
+                  </div>
+                )}
+
+                {/* Bouton nouveau versement */}
+                {peutLiberer && partsData.membre.resteALibererFcfa > 0 && (
+                  <div>
+                    <button
+                      onClick={() => setShowLiberationForm((v) => !v)}
+                      className={`${BTN_CLS} bg-green-600 text-white hover:bg-green-700`}
+                    >
+                      <Coins className="w-4 h-4" />
+                      Enregistrer un versement
+                      {showLiberationForm ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+
+                    {showLiberationForm && (
+                      <form onSubmit={handleLiberation} className="mt-3 bg-green-50 rounded-lg p-4 space-y-3 border border-green-200">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Montant FCFA *</label>
+                            <input
+                              type="number"
+                              className={INPUT_CLS}
+                              placeholder={`Max: ${formaterFCFA(partsData.membre.resteALibererFcfa)}`}
+                              max={partsData.membre.resteALibererFcfa}
+                              value={liberationForm.montantFcfa ?? ""}
+                              onChange={(e) => setLiberationForm((f) => ({ ...f, montantFcfa: parseInt(e.target.value) }))}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Date versement *</label>
+                            <input
+                              type="date"
+                              className={INPUT_CLS}
+                              value={liberationForm.dateVersement ?? ""}
+                              onChange={(e) => setLiberationForm((f) => ({ ...f, dateVersement: e.target.value }))}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Code libération</label>
+                            <input
+                              className={INPUT_CLS}
+                              placeholder="Optionnel"
+                              value={liberationForm.codeLiberation ?? ""}
+                              onChange={(e) => setLiberationForm((f) => ({ ...f, codeLiberation: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Mode versement</label>
+                            <input
+                              className={INPUT_CLS}
+                              placeholder="Ex: espèces, banque…"
+                              value={liberationForm.versement ?? ""}
+                              onChange={(e) => setLiberationForm((f) => ({ ...f, versement: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                          <button type="button" onClick={() => setShowLiberationForm(false)} className={`${BTN_CLS} bg-white text-gray-700 border border-gray-200 hover:bg-gray-50`}>
+                            Annuler
+                          </button>
+                          <button type="submit" disabled={liberationMut.isPending} className={`${BTN_CLS} bg-green-600 text-white hover:bg-green-700 disabled:opacity-50`}>
+                            {liberationMut.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                            Enregistrer
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                )}
+
+                {/* Historique des versements */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Historique des versements</h3>
+                  {partsData.liberations.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-4">Aucun versement enregistré</p>
+                  ) : (
+                    <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 overflow-hidden">
+                      {partsData.liberations.map((lib) => (
+                        <div key={lib.id} className="flex items-center justify-between px-4 py-3 bg-white">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{formaterFCFA(lib.montantFcfa)}</div>
+                            <div className="text-xs text-gray-500">
+                              {formaterDate(lib.dateVersement)}
+                              {lib.codeLiberation && ` · ${lib.codeLiberation}`}
+                              {lib.versement && ` · ${lib.versement}`}
+                            </div>
+                          </div>
+                          <Coins className="w-4 h-4 text-green-500" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-10 text-gray-400">
+                <Coins className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                Aucune souscription de parts sociales
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

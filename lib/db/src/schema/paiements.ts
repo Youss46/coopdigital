@@ -1,8 +1,9 @@
-import { pgTable, serial, integer, text, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean, numeric, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { livraisonsTable } from "./livraisons";
 import { membresTable } from "./membres";
+import { campagnesTable } from "./campagnes";
 
 export const modePaiementEnum = pgEnum("mode_paiement", [
   "orange_money",
@@ -24,6 +25,17 @@ export const paiementsTable = pgTable("paiements", {
   membreId: integer("membre_id")
     .notNull()
     .references(() => membresTable.id),
+  campagneId: integer("campagne_id").references(() => campagnesTable.id),
+
+  // Enrichissements règlement achat
+  numeroRecu: text("numero_recu").unique(),
+  libelle: text("libelle"),
+  modeReglement: text("mode_reglement"),
+  montantAPayerFcfa: numeric("montant_a_payer_fcfa", { precision: 12, scale: 2 }),
+  montantVerseFcfa: numeric("montant_verse_fcfa", { precision: 12, scale: 2 }),
+  resteAPayerFcfa: numeric("reste_a_payer_fcfa", { precision: 12, scale: 2 }),
+
+  // Champs existants
   montantFcfa: integer("montant_fcfa").notNull(),
   modePaiement: modePaiementEnum("mode_paiement").notNull().default("especes"),
   referenceTransaction: text("reference_transaction"),
@@ -34,6 +46,7 @@ export const paiementsTable = pgTable("paiements", {
 
 export const insertPaiementSchema = createInsertSchema(paiementsTable).omit({
   id: true,
+  resteAPayerFcfa: true,
   createdAt: true,
 });
 export type InsertPaiement = z.infer<typeof insertPaiementSchema>;

@@ -14,6 +14,11 @@ import etatsFinanciersRouter from "./etatsFinanciers";
 import rapportsRouter from "./rapports";
 import usersRouter from "./users";
 import salairesRouter from "./salaires";
+import campagnesRouter from "./campagnes";
+import partsSocialesRouter from "./partsSociales";
+import refusRouter from "./refus";
+import fournisseursRouter from "./fournisseurs";
+import paiementsRouter from "./paiements";
 
 const router: IRouter = Router();
 
@@ -21,6 +26,8 @@ router.use(healthRouter);
 router.use(authRouter);
 router.use(membresRouter);
 router.use(avancesRouter);
+router.use(campagnesRouter);
+router.use(partsSocialesRouter);
 router.use(livraisonsRouter);
 router.use(dashboardRouter);
 router.use(lotsRouter);
@@ -32,5 +39,8 @@ router.use(etatsFinanciersRouter);
 router.use(rapportsRouter);
 router.use(usersRouter);
 router.use(salairesRouter);
+router.use(refusRouter);
+router.use(fournisseursRouter);
+router.use(paiementsRouter);
 
 export default router;

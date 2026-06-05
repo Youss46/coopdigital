@@ -373,7 +373,11 @@ export const CreateLivraisonBody = zod.object({
   "poidsKg": zod.number(),
   "prixUnitaireFcfa": zod.number(),
   "dateLivraison": zod.string(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes']).optional()
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes']).optional(),
+  "campagneId": zod.number().nullish(),
+  "nombreSacs": zod.number().nullish(),
+  "retenueKg": zod.number().nullish(),
+  "sectionLivraison": zod.string().nullish()
 })
 
 
@@ -1903,5 +1907,475 @@ export const GetHistoriqueMasseResponseItem = zod.object({
   "nbBulletins": zod.number()
 })
 export const GetHistoriqueMasseResponse = zod.array(GetHistoriqueMasseResponseItem)
+
+
+/**
+ * @summary Campagne en cours (statut ouverte)
+ */
+export const GetCampagneActiveResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "libelle": zod.string(),
+  "anneeDebut": zod.number(),
+  "anneeFin": zod.number(),
+  "dateOuverture": zod.coerce.date(),
+  "dateFermeture": zod.coerce.date().nullish(),
+  "statut": zod.enum(['ouverte', 'fermee']),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Liste de toutes les campagnes
+ */
+export const ListCampagnesResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "libelle": zod.string(),
+  "anneeDebut": zod.number(),
+  "anneeFin": zod.number(),
+  "dateOuverture": zod.coerce.date(),
+  "dateFermeture": zod.coerce.date().nullish(),
+  "statut": zod.enum(['ouverte', 'fermee']),
+  "createdAt": zod.coerce.date()
+})
+export const ListCampagnesResponse = zod.array(ListCampagnesResponseItem)
+
+
+/**
+ * @summary Créer une nouvelle campagne
+ */
+export const CreateCampagneBody = zod.object({
+  "libelle": zod.string(),
+  "anneeDebut": zod.number(),
+  "anneeFin": zod.number(),
+  "dateOuverture": zod.coerce.date()
+})
+
+
+/**
+ * @summary Clôturer une campagne
+ */
+export const FermerCampagneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const FermerCampagneBody = zod.object({
+  "dateFermeture": zod.coerce.date().optional()
+})
+
+export const FermerCampagneResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "libelle": zod.string(),
+  "anneeDebut": zod.number(),
+  "anneeFin": zod.number(),
+  "dateOuverture": zod.coerce.date(),
+  "dateFermeture": zod.coerce.date().nullish(),
+  "statut": zod.enum(['ouverte', 'fermee']),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Config parts sociales de la coopérative
+ */
+export const GetConfigPartsResponse = zod.object({
+  "cooperativeId": zod.number(),
+  "valeurNominaleFcfa": zod.number(),
+  "nbrePartsMin": zod.number()
+})
+
+
+/**
+ * @summary Modifier la config parts sociales
+ */
+export const UpdateConfigPartsBody = zod.object({
+  "cooperativeId": zod.number(),
+  "valeurNominaleFcfa": zod.number(),
+  "nbrePartsMin": zod.number()
+})
+
+export const UpdateConfigPartsResponse = zod.object({
+  "cooperativeId": zod.number(),
+  "valeurNominaleFcfa": zod.number(),
+  "nbrePartsMin": zod.number()
+})
+
+
+/**
+ * @summary Rapport global parts sociales
+ */
+export const GetRapportPartsResponse = zod.object({
+  "totalMembresSouscripteurs": zod.number().nullish(),
+  "totalPartsSouscrites": zod.number().nullish(),
+  "totalSouscritFcfa": zod.number().nullish(),
+  "totalLibereFcfa": zod.number().nullish(),
+  "totalResteALibererFcfa": zod.number().nullish()
+})
+
+
+/**
+ * @summary Parts sociales d'un membre
+ */
+export const GetPartsMembreParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPartsMembreResponse = zod.object({
+  "membre": zod.object({
+  "id": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "nbrePartsSouscrites": zod.number(),
+  "valeurNominalePartFcfa": zod.number(),
+  "totalSouscritFcfa": zod.number(),
+  "totalLibereFcfa": zod.number(),
+  "resteALibererFcfa": zod.number()
+}),
+  "liberations": zod.array(zod.object({
+  "id": zod.number(),
+  "membreId": zod.number(),
+  "cooperativeId": zod.number(),
+  "dateVersement": zod.coerce.date(),
+  "codeLiberation": zod.string().nullish(),
+  "versement": zod.string().nullish(),
+  "montantFcfa": zod.number(),
+  "agentId": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "config": zod.object({
+  "cooperativeId": zod.number(),
+  "valeurNominaleFcfa": zod.number(),
+  "nbrePartsMin": zod.number()
+})
+})
+
+
+/**
+ * @summary Enregistrer un versement de libération
+ */
+export const EnregistrerLiberationBody = zod.object({
+  "membreId": zod.number(),
+  "montantFcfa": zod.number(),
+  "dateVersement": zod.coerce.date(),
+  "codeLiberation": zod.string().optional(),
+  "versement": zod.string().optional()
+})
+
+
+/**
+ * @summary Nombre de refus en attente de traitement
+ */
+export const CountRefusEnAttenteResponse = zod.object({
+  "count": zod.number()
+})
+
+
+/**
+ * @summary Statistiques stocks refoulés
+ */
+export const GetStatsRefusResponse = zod.object({
+  "totalRefulesKg": zod.string().optional(),
+  "totalTraitesKg": zod.string().optional(),
+  "totalEnAttenteKg": zod.string().optional(),
+  "nbEnAttente": zod.number().optional(),
+  "nbTraites": zod.number().optional()
+})
+
+
+/**
+ * @summary Liste des stocks refoulés
+ */
+export const ListRefusQueryParams = zod.object({
+  "statut": zod.enum(['en_attente', 'traite']).optional()
+})
+
+export const ListRefusResponseItem = zod.object({
+  "refus": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "venteExportateurId": zod.number(),
+  "poidsRefuleKg": zod.string(),
+  "motifRefus": zod.string().nullable(),
+  "decision": zod.union([zod.literal('retour_stock'),zod.literal('declassement'),zod.literal('autre_acheteur'),zod.literal('perte'),zod.literal(null)]).nullish(),
+  "statut": zod.enum(['en_attente', 'traite']),
+  "traitePar": zod.number().nullish(),
+  "traiteLe": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+}),
+  "vente": zod.object({
+  "exportateurId": zod.number().optional(),
+  "dateVente": zod.string().optional(),
+  "produit": zod.string().nullish(),
+  "nombreSacsRefoules": zod.number().nullish(),
+  "numeroBonSortie": zod.string().nullish()
+}).nullish()
+})
+export const ListRefusResponse = zod.array(ListRefusResponseItem)
+
+
+/**
+ * @summary Traiter un lot refoulé (décision)
+ */
+export const TraiterRefusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const TraiterRefusBody = zod.object({
+  "decision": zod.enum(['retour_stock', 'declassement', 'autre_acheteur', 'perte']),
+  "entrepotRetourId": zod.number().optional(),
+  "ancienGrade": zod.string().optional(),
+  "nouveauGrade": zod.string().optional(),
+  "nouvelExportateurId": zod.number().optional(),
+  "prixUnitaireNouveauFcfa": zod.number().optional(),
+  "motifPerte": zod.string().optional(),
+  "pvConstat": zod.boolean().optional(),
+  "tauxHumidite": zod.number().optional()
+})
+
+export const TraiterRefusResponse = zod.object({
+  "refus": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "venteExportateurId": zod.number(),
+  "poidsRefuleKg": zod.string(),
+  "motifRefus": zod.string().nullable(),
+  "decision": zod.union([zod.literal('retour_stock'),zod.literal('declassement'),zod.literal('autre_acheteur'),zod.literal('perte'),zod.literal(null)]).nullish(),
+  "statut": zod.enum(['en_attente', 'traite']),
+  "traitePar": zod.number().nullish(),
+  "traiteLe": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+}),
+  "vente": zod.object({
+  "exportateurId": zod.number().optional(),
+  "dateVente": zod.string().optional(),
+  "produit": zod.string().nullish(),
+  "nombreSacsRefoules": zod.number().nullish(),
+  "numeroBonSortie": zod.string().nullish()
+}).nullish()
+})
+
+
+/**
+ * @summary Recherche autocomplete fournisseurs
+ */
+export const SearchFournisseursQueryParams = zod.object({
+  "q": zod.coerce.string()
+})
+
+export const SearchFournisseursResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "typeFournisseur": zod.enum(['membre', 'pisteur', 'externe']),
+  "membreId": zod.number().nullish(),
+  "code": zod.string(),
+  "nom": zod.string(),
+  "prenoms": zod.string().nullish(),
+  "sexe": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "nationalite": zod.string().nullish(),
+  "numeroCni": zod.string().nullish(),
+  "origine": zod.string().nullish(),
+  "dateAdhesion": zod.coerce.date().nullish(),
+  "lieuNaissance": zod.string().nullish(),
+  "actif": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+export const SearchFournisseursResponse = zod.array(SearchFournisseursResponseItem)
+
+
+/**
+ * @summary Répartition des fournisseurs par type
+ */
+export const GetRapportTypeFournisseurResponseItem = zod.object({
+  "typeFournisseur": zod.string(),
+  "count": zod.number()
+})
+export const GetRapportTypeFournisseurResponse = zod.array(GetRapportTypeFournisseurResponseItem)
+
+
+/**
+ * @summary Liste des fournisseurs
+ */
+export const ListFournisseursQueryParams = zod.object({
+  "type": zod.enum(['membre', 'pisteur', 'externe']).optional(),
+  "section": zod.coerce.string().optional(),
+  "q": zod.coerce.string().optional()
+})
+
+export const ListFournisseursResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "typeFournisseur": zod.enum(['membre', 'pisteur', 'externe']),
+  "membreId": zod.number().nullish(),
+  "code": zod.string(),
+  "nom": zod.string(),
+  "prenoms": zod.string().nullish(),
+  "sexe": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "nationalite": zod.string().nullish(),
+  "numeroCni": zod.string().nullish(),
+  "origine": zod.string().nullish(),
+  "dateAdhesion": zod.coerce.date().nullish(),
+  "lieuNaissance": zod.string().nullish(),
+  "actif": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+export const ListFournisseursResponse = zod.array(ListFournisseursResponseItem)
+
+
+/**
+ * @summary Créer un fournisseur (pisteur/externe)
+ */
+export const CreateFournisseurBody = zod.object({
+  "typeFournisseur": zod.enum(['pisteur', 'externe']),
+  "nom": zod.string(),
+  "prenoms": zod.string().optional(),
+  "sexe": zod.string().optional(),
+  "telephone": zod.string().optional(),
+  "section": zod.string().optional(),
+  "nationalite": zod.string().optional(),
+  "numeroCni": zod.string().optional(),
+  "origine": zod.string().optional(),
+  "dateAdhesion": zod.coerce.date().optional(),
+  "lieuNaissance": zod.string().optional()
+})
+
+
+/**
+ * @summary Fiche fournisseur
+ */
+export const GetFournisseurByIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetFournisseurByIdResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "typeFournisseur": zod.enum(['membre', 'pisteur', 'externe']),
+  "membreId": zod.number().nullish(),
+  "code": zod.string(),
+  "nom": zod.string(),
+  "prenoms": zod.string().nullish(),
+  "sexe": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "nationalite": zod.string().nullish(),
+  "numeroCni": zod.string().nullish(),
+  "origine": zod.string().nullish(),
+  "dateAdhesion": zod.coerce.date().nullish(),
+  "lieuNaissance": zod.string().nullish(),
+  "actif": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Modifier un fournisseur
+ */
+export const UpdateFournisseurParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateFournisseurBody = zod.object({
+  "typeFournisseur": zod.enum(['pisteur', 'externe']),
+  "nom": zod.string(),
+  "prenoms": zod.string().optional(),
+  "sexe": zod.string().optional(),
+  "telephone": zod.string().optional(),
+  "section": zod.string().optional(),
+  "nationalite": zod.string().optional(),
+  "numeroCni": zod.string().optional(),
+  "origine": zod.string().optional(),
+  "dateAdhesion": zod.coerce.date().optional(),
+  "lieuNaissance": zod.string().optional()
+})
+
+export const UpdateFournisseurResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "typeFournisseur": zod.enum(['membre', 'pisteur', 'externe']),
+  "membreId": zod.number().nullish(),
+  "code": zod.string(),
+  "nom": zod.string(),
+  "prenoms": zod.string().nullish(),
+  "sexe": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "nationalite": zod.string().nullish(),
+  "numeroCni": zod.string().nullish(),
+  "origine": zod.string().nullish(),
+  "dateAdhesion": zod.coerce.date().nullish(),
+  "lieuNaissance": zod.string().nullish(),
+  "actif": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Créer un fournisseur depuis un membre existant
+ */
+export const CreateFournisseurDepuisMembreParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Liste des paiements producteurs
+ */
+export const listPaiementsQueryLimitDefault = 50;
+
+export const ListPaiementsQueryParams = zod.object({
+  "statut": zod.enum(['en_attente', 'confirme', 'echec']).optional(),
+  "membre_id": zod.coerce.number().optional(),
+  "limit": zod.coerce.number().default(listPaiementsQueryLimitDefault)
+})
+
+export const ListPaiementsResponseItem = zod.object({
+  "id": zod.number(),
+  "livraisonId": zod.number(),
+  "membreId": zod.number(),
+  "montantFcfa": zod.number(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes']),
+  "referenceTransaction": zod.string().nullish(),
+  "statut": zod.enum(['en_attente', 'confirme', 'echec']),
+  "createdAt": zod.string(),
+  "membreNom": zod.string().nullish(),
+  "membrePrenoms": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "dateLivraison": zod.string().nullish()
+})
+export const ListPaiementsResponse = zod.array(ListPaiementsResponseItem)
+
+
+/**
+ * @summary Marquer un paiement comme confirmé
+ */
+export const ValiderPaiementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ValiderPaiementBody = zod.object({
+  "referenceTransaction": zod.string().nullish(),
+  "dateReglement": zod.string().nullish()
+})
+
+export const ValiderPaiementResponse = zod.object({
+  "id": zod.number(),
+  "livraisonId": zod.number(),
+  "membreId": zod.number(),
+  "montantFcfa": zod.number(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes']),
+  "referenceTransaction": zod.string().nullish(),
+  "statut": zod.enum(['en_attente', 'confirme', 'echec']),
+  "createdAt": zod.string(),
+  "membreNom": zod.string().nullish(),
+  "membrePrenoms": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "dateLivraison": zod.string().nullish()
+})
 
 
