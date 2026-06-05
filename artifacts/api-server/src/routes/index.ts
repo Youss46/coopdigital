@@ -29,6 +29,7 @@ import prixRouter from "./prix";
 import scoringRouter from "./scoring";
 import anomaliesRouter from "./anomalies";
 import auditRouter from "./audit";
+import notificationsRouter from "./notifications";
 import portailRouter from "./portail";
 
 const router: IRouter = Router();
@@ -64,5 +65,6 @@ router.use(prixRouter);
 router.use(scoringRouter);
 router.use(anomaliesRouter);
 router.use(auditRouter);
+router.use(notificationsRouter);
 
 export default router;

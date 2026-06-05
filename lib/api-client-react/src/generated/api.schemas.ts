@@ -3028,6 +3028,81 @@ export interface AuditSessionsResponse {
   sessions: AuditSession[];
 }
 
+export type NotificationGravite = typeof NotificationGravite[keyof typeof NotificationGravite];
+
+
+export const NotificationGravite = {
+  info: 'info',
+  attention: 'attention',
+  critique: 'critique',
+} as const;
+
+export interface Notification {
+  id: number;
+  cooperative_id?: number | null;
+  user_id: number;
+  type: string;
+  titre: string;
+  message: string;
+  lien?: string | null;
+  lien_libelle?: string | null;
+  gravite: NotificationGravite;
+  lu: boolean;
+  date_lu?: string | null;
+  source_module?: string | null;
+  source_id?: number | null;
+  created_at: string;
+}
+
+export interface NotificationsResponse {
+  notifications: Notification[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface NotificationsCount {
+  total: number;
+  non_lues: number;
+  critiques_non_lues: number;
+}
+
+export interface PreferencesNotifications {
+  notif_stock_faible: boolean;
+  notif_avance_retard: boolean;
+  notif_creance_retard: boolean;
+  notif_refus_non_traite: boolean;
+  notif_anomalie_critique: boolean;
+  notif_certification_expiration: boolean;
+  notif_echeance_emprunt: boolean;
+  notif_bulletin_attente: boolean;
+  notif_ecriture_attente: boolean;
+  notif_ag_planifiee: boolean;
+  notif_message_recu: boolean;
+  notif_budget_depasse: boolean;
+  notif_prix_change: boolean;
+  recevoir_sms: boolean;
+  recevoir_email: boolean;
+}
+
+export interface UpdatePreferencesNotificationsBody {
+  notif_stock_faible?: boolean;
+  notif_avance_retard?: boolean;
+  notif_creance_retard?: boolean;
+  notif_refus_non_traite?: boolean;
+  notif_anomalie_critique?: boolean;
+  notif_certification_expiration?: boolean;
+  notif_echeance_emprunt?: boolean;
+  notif_bulletin_attente?: boolean;
+  notif_ecriture_attente?: boolean;
+  notif_ag_planifiee?: boolean;
+  notif_message_recu?: boolean;
+  notif_budget_depasse?: boolean;
+  notif_prix_change?: boolean;
+  recevoir_sms?: boolean;
+  recevoir_email?: boolean;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -3378,5 +3453,37 @@ date_debut?: string;
 date_fin?: string;
 module?: string;
 user_id?: number;
+};
+
+export type MarquerToutLu200 = {
+  marquees: number;
+};
+
+export type GetNotificationsParams = {
+lu?: GetNotificationsLu;
+gravite?: GetNotificationsGravite;
+page?: number;
+limit?: number;
+};
+
+export type GetNotificationsLu = typeof GetNotificationsLu[keyof typeof GetNotificationsLu];
+
+
+export const GetNotificationsLu = {
+  true: 'true',
+  false: 'false',
+} as const;
+
+export type GetNotificationsGravite = typeof GetNotificationsGravite[keyof typeof GetNotificationsGravite];
+
+
+export const GetNotificationsGravite = {
+  info: 'info',
+  attention: 'attention',
+  critique: 'critique',
+} as const;
+
+export type MarquerNotificationLue200 = {
+  ok: boolean;
 };
 

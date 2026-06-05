@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import cron from "node-cron";
 import { checkEcheancesEnRetard } from "./services/empruntService";
+import { runNotificationsCron } from "./jobs/notificationsCron";
 
 const rawPort = process.env["PORT"];
 
@@ -36,5 +37,12 @@ cron.schedule("0 2 * * *", () => {
 cron.schedule("0 6 * * *", () => {
   checkEcheancesEnRetard().catch((err) => {
     logger.error({ err }, "Erreur cron checkEcheancesEnRetard");
+  });
+});
+
+// CRON notifications : vérifications quotidiennes à 8h00
+cron.schedule("0 8 * * *", () => {
+  runNotificationsCron().catch((err) => {
+    logger.error({ err }, "Erreur cron notifications");
   });
 });

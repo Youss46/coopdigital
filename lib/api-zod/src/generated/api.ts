@@ -4968,3 +4968,139 @@ export const GetAuditModificationsEntiteTypeEntiteIdResponse = zod.object({
 })
 
 
+/**
+ * @summary Comptage des notifications
+ */
+export const GetNotificationsCountResponse = zod.object({
+  "total": zod.number(),
+  "non_lues": zod.number(),
+  "critiques_non_lues": zod.number()
+})
+
+
+/**
+ * @summary Récupérer les préférences de notifications
+ */
+export const GetPreferencesNotificationsResponse = zod.object({
+  "notif_stock_faible": zod.boolean(),
+  "notif_avance_retard": zod.boolean(),
+  "notif_creance_retard": zod.boolean(),
+  "notif_refus_non_traite": zod.boolean(),
+  "notif_anomalie_critique": zod.boolean(),
+  "notif_certification_expiration": zod.boolean(),
+  "notif_echeance_emprunt": zod.boolean(),
+  "notif_bulletin_attente": zod.boolean(),
+  "notif_ecriture_attente": zod.boolean(),
+  "notif_ag_planifiee": zod.boolean(),
+  "notif_message_recu": zod.boolean(),
+  "notif_budget_depasse": zod.boolean(),
+  "notif_prix_change": zod.boolean(),
+  "recevoir_sms": zod.boolean(),
+  "recevoir_email": zod.boolean()
+})
+
+
+/**
+ * @summary Mettre à jour les préférences de notifications
+ */
+export const UpdatePreferencesNotificationsBody = zod.object({
+  "notif_stock_faible": zod.boolean().optional(),
+  "notif_avance_retard": zod.boolean().optional(),
+  "notif_creance_retard": zod.boolean().optional(),
+  "notif_refus_non_traite": zod.boolean().optional(),
+  "notif_anomalie_critique": zod.boolean().optional(),
+  "notif_certification_expiration": zod.boolean().optional(),
+  "notif_echeance_emprunt": zod.boolean().optional(),
+  "notif_bulletin_attente": zod.boolean().optional(),
+  "notif_ecriture_attente": zod.boolean().optional(),
+  "notif_ag_planifiee": zod.boolean().optional(),
+  "notif_message_recu": zod.boolean().optional(),
+  "notif_budget_depasse": zod.boolean().optional(),
+  "notif_prix_change": zod.boolean().optional(),
+  "recevoir_sms": zod.boolean().optional(),
+  "recevoir_email": zod.boolean().optional()
+})
+
+export const UpdatePreferencesNotificationsResponse = zod.object({
+  "notif_stock_faible": zod.boolean(),
+  "notif_avance_retard": zod.boolean(),
+  "notif_creance_retard": zod.boolean(),
+  "notif_refus_non_traite": zod.boolean(),
+  "notif_anomalie_critique": zod.boolean(),
+  "notif_certification_expiration": zod.boolean(),
+  "notif_echeance_emprunt": zod.boolean(),
+  "notif_bulletin_attente": zod.boolean(),
+  "notif_ecriture_attente": zod.boolean(),
+  "notif_ag_planifiee": zod.boolean(),
+  "notif_message_recu": zod.boolean(),
+  "notif_budget_depasse": zod.boolean(),
+  "notif_prix_change": zod.boolean(),
+  "recevoir_sms": zod.boolean(),
+  "recevoir_email": zod.boolean()
+})
+
+
+/**
+ * @summary Marquer toutes les notifications comme lues
+ */
+export const MarquerToutLuResponse = zod.object({
+  "marquees": zod.number()
+})
+
+
+/**
+ * @summary Liste paginée des notifications
+ */
+export const getNotificationsQueryPageDefault = 1;
+export const getNotificationsQueryLimitDefault = 20;
+
+export const GetNotificationsQueryParams = zod.object({
+  "lu": zod.enum(['true', 'false']).optional(),
+  "gravite": zod.enum(['info', 'attention', 'critique']).optional(),
+  "page": zod.coerce.number().default(getNotificationsQueryPageDefault),
+  "limit": zod.coerce.number().default(getNotificationsQueryLimitDefault)
+})
+
+export const GetNotificationsResponse = zod.object({
+  "notifications": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number().nullish(),
+  "user_id": zod.number(),
+  "type": zod.string(),
+  "titre": zod.string(),
+  "message": zod.string(),
+  "lien": zod.string().nullish(),
+  "lien_libelle": zod.string().nullish(),
+  "gravite": zod.enum(['info', 'attention', 'critique']),
+  "lu": zod.boolean(),
+  "date_lu": zod.coerce.date().nullish(),
+  "source_module": zod.string().nullish(),
+  "source_id": zod.number().nullish(),
+  "created_at": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Marquer une notification comme lue
+ */
+export const MarquerNotificationLueParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MarquerNotificationLueResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Supprimer une notification
+ */
+export const SupprimerNotificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+

@@ -34,6 +34,7 @@ import {
   ScrollText,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
+import NotificationPanel from "./NotificationPanel";
 
 const navItems = [
   // ── Dashboards ────────────────────────────────────────────────────────────
@@ -368,7 +369,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             <Menu size={22} />
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center"
               style={{ backgroundColor: "#1a4731" }}
@@ -377,6 +378,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <span className="font-bold text-gray-900 text-base">CoopDigital</span>
           </div>
+          <NotificationPanel />
+        </header>
+
+        {/* Barre supérieure desktop — cloche à droite */}
+        <header className="hidden lg:flex items-center justify-end px-6 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+          <NotificationPanel />
         </header>
 
         {/* Contenu */}

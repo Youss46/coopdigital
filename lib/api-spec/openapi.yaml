@@ -24,6 +24,7 @@ tags:
   - name: users
   - name: salaires
   - name: intrants
+  - name: notifications
 
 paths:
   /healthz:
@@ -4245,6 +4246,123 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuditModificationsResponse"
 
+  /notifications/count:
+    get:
+      operationId: getNotificationsCount
+      tags: [notifications]
+      summary: Comptage des notifications
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Compteurs de notifications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsCount"
+
+  /notifications/preferences:
+    get:
+      operationId: getPreferencesNotifications
+      tags: [notifications]
+      summary: Récupérer les préférences de notifications
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Préférences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesNotifications"
+    put:
+      operationId: updatePreferencesNotifications
+      tags: [notifications]
+      summary: Mettre à jour les préférences de notifications
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePreferencesNotificationsBody"
+      responses:
+        "200":
+          description: Préférences mises à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesNotifications"
+
+  /notifications/tout-lire:
+    put:
+      operationId: marquerToutLu
+      tags: [notifications]
+      summary: Marquer toutes les notifications comme lues
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Nombre de notifications marquées
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [marquees]
+                properties:
+                  marquees: { type: integer }
+
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [notifications]
+      summary: Liste paginée des notifications
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: lu,      in: query, schema: { type: string, enum: ["true","false"] } }
+        - { name: gravite, in: query, schema: { type: string, enum: [info, attention, critique] } }
+        - { name: page,    in: query, schema: { type: integer, default: 1 } }
+        - { name: limit,   in: query, schema: { type: integer, default: 20 } }
+      responses:
+        "200":
+          description: Notifications paginées
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsResponse"
+
+  /notifications/{id}/lire:
+    put:
+      operationId: marquerNotificationLue
+      tags: [notifications]
+      summary: Marquer une notification comme lue
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        "404":
+          description: Notification introuvable
+
+  /notifications/{id}:
+    delete:
+      operationId: supprimerNotification
+      tags: [notifications]
+      summary: Supprimer une notification
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Supprimée
+        "404":
+          description: Notification introuvable
+
 components:
   schemas:
 
@@ -8230,3 +8348,95 @@ components:
       required: [sessions]
       properties:
         sessions: { type: array, items: { $ref: "#/components/schemas/AuditSession" } }
+
+    Notification:
+      type: object
+      required: [id, user_id, type, titre, message, gravite, lu, created_at]
+      properties:
+        id:            { type: integer }
+        cooperative_id: { type: integer, nullable: true }
+        user_id:       { type: integer }
+        type:          { type: string }
+        titre:         { type: string }
+        message:       { type: string }
+        lien:          { type: string, nullable: true }
+        lien_libelle:  { type: string, nullable: true }
+        gravite:       { type: string, enum: [info, attention, critique] }
+        lu:            { type: boolean }
+        date_lu:       { type: string, format: date-time, nullable: true }
+        source_module: { type: string, nullable: true }
+        source_id:     { type: integer, nullable: true }
+        created_at:    { type: string, format: date-time }
+
+    NotificationsResponse:
+      type: object
+      required: [notifications, total, page, limit]
+      properties:
+        notifications:
+          type: array
+          items: { $ref: "#/components/schemas/Notification" }
+        total: { type: integer }
+        page:  { type: integer }
+        limit: { type: integer }
+
+    NotificationsCount:
+      type: object
+      required: [total, non_lues, critiques_non_lues]
+      properties:
+        total:               { type: integer }
+        non_lues:            { type: integer }
+        critiques_non_lues:  { type: integer }
+
+    PreferencesNotifications:
+      type: object
+      required:
+        - notif_stock_faible
+        - notif_avance_retard
+        - notif_creance_retard
+        - notif_refus_non_traite
+        - notif_anomalie_critique
+        - notif_certification_expiration
+        - notif_echeance_emprunt
+        - notif_bulletin_attente
+        - notif_ecriture_attente
+        - notif_ag_planifiee
+        - notif_message_recu
+        - notif_budget_depasse
+        - notif_prix_change
+        - recevoir_sms
+        - recevoir_email
+      properties:
+        notif_stock_faible:             { type: boolean }
+        notif_avance_retard:            { type: boolean }
+        notif_creance_retard:           { type: boolean }
+        notif_refus_non_traite:         { type: boolean }
+        notif_anomalie_critique:        { type: boolean }
+        notif_certification_expiration: { type: boolean }
+        notif_echeance_emprunt:         { type: boolean }
+        notif_bulletin_attente:         { type: boolean }
+        notif_ecriture_attente:         { type: boolean }
+        notif_ag_planifiee:             { type: boolean }
+        notif_message_recu:             { type: boolean }
+        notif_budget_depasse:           { type: boolean }
+        notif_prix_change:              { type: boolean }
+        recevoir_sms:                   { type: boolean }
+        recevoir_email:                 { type: boolean }
+
+    UpdatePreferencesNotificationsBody:
+      type: object
+      properties:
+        notif_stock_faible:             { type: boolean }
+        notif_avance_retard:            { type: boolean }
+        notif_creance_retard:           { type: boolean }
+        notif_refus_non_traite:         { type: boolean }
+        notif_anomalie_critique:        { type: boolean }
+        notif_certification_expiration: { type: boolean }
+        notif_echeance_emprunt:         { type: boolean }
+        notif_bulletin_attente:         { type: boolean }
+        notif_ecriture_attente:         { type: boolean }
+        notif_ag_planifiee:             { type: boolean }
+        notif_message_recu:             { type: boolean }
+        notif_budget_depasse:           { type: boolean }
+        notif_prix_change:              { type: boolean }
+        recevoir_sms:                   { type: boolean }
+        recevoir_email:                 { type: boolean }
