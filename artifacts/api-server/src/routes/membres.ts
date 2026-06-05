@@ -10,12 +10,14 @@ import {
   getMembreByQr,
   getMembreHistorique,
   modifierStatutMembre,
+  exportMembresPdf,
 } from "../controllers/membresController";
 
 const router: IRouter = Router();
 
 router.use(authMiddleware);
 
+router.get("/membres/export-pdf", checkPermission("membres", "exporter"), exportMembresPdf);
 router.get("/membres", checkPermission("membres", "lire"), listMembres);
 router.post("/membres", checkPermission("membres", "creer"), auditMiddleware("membres", "CREATE", { entiteType: "membre" }), createMembre);
 router.get("/membres/qr/:token", checkPermission("membres", "lire"), getMembreByQr);

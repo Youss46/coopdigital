@@ -7,7 +7,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetMembresQueryKey } from "@workspace/api-client-react";
-import { UserPlus, Search, Eye, QrCode } from "lucide-react";
+import { UserPlus, Search, Eye, FileDown, Loader2 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 
 function formaterDate(d: string) {
@@ -21,10 +21,35 @@ export default function Membres() {
   const queryClient = useQueryClient();
 
   const peutCreer = usePermission("membres", "creer");
+  const peutExporter = usePermission("membres", "exporter");
+  const [exportPending, setExportPending] = useState(false);
 
   const [recherche, setRecherche] = useState("");
   const [statut, setStatut] = useState<"" | "actif" | "inactif">("");
   const [modalOuvert, setModalOuvert] = useState(false);
+
+  async function handleExportPdf() {
+    setExportPending(true);
+    try {
+      const params = statut ? `?statut=${statut}` : "";
+      const token = localStorage.getItem("auth_token") ?? "";
+      const res = await fetch(`/api/membres/export-pdf${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Erreur export");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `membres-${statut || "tous"}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Impossible de générer le PDF");
+    } finally {
+      setExportPending(false);
+    }
+  }
 
   const { data, isLoading } = useGetMembres({
     search: recherche || undefined,
@@ -80,16 +105,28 @@ export default function Membres() {
           <h1 className="text-2xl font-bold text-gray-900">Membres</h1>
           <p className="text-gray-500 text-sm mt-0.5">{data?.total ?? 0} membres enregistrés</p>
         </div>
-        {peutCreer && (
-          <button
-            onClick={() => setModalOuvert(true)}
-            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-white text-sm font-medium flex-shrink-0"
-            style={{ backgroundColor: "#1a4731" }}
-          >
-            <UserPlus size={16} />
-            <span className="hidden sm:inline">Nouveau membre</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {peutExporter && (
+            <button
+              onClick={handleExportPdf}
+              disabled={exportPending}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-sm font-medium flex-shrink-0 hover:bg-gray-50 disabled:opacity-60"
+            >
+              {exportPending ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
+              <span className="hidden sm:inline">Exporter PDF</span>
+            </button>
+          )}
+          {peutCreer && (
+            <button
+              onClick={() => setModalOuvert(true)}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-white text-sm font-medium flex-shrink-0"
+              style={{ backgroundColor: "#1a4731" }}
+            >
+              <UserPlus size={16} />
+              <span className="hidden sm:inline">Nouveau membre</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filtres */}

@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express";
+import PDFDocument from "pdfkit";
 import { db, membresTable, livraisonsTable, campagnesTable } from "@workspace/db";
-import { eq, and, or, ilike, sql, desc, notInArray } from "drizzle-orm";
+import { eq, and, or, ilike, sql, desc, notInArray, asc } from "drizzle-orm";
 import { CreateMembreBody, UpdateMembreBody } from "@workspace/api-zod";
 import { computeCodeMembre } from "../services/portailService";
 
@@ -159,6 +160,114 @@ export async function getMembreHistorique(req: Request, res: Response): Promise<
   } catch (err) {
     req.log.error({ err }, "Erreur getMembreHistorique");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function exportMembresPdf(req: Request, res: Response): Promise<void> {
+  try {
+    const statutFilter = req.query["statut"] as string | undefined;
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+
+    const conditions = [eq(membresTable.cooperativeId, cooperativeId)];
+    if (statutFilter === "actif" || statutFilter === "inactif") {
+      conditions.push(eq(membresTable.statut, statutFilter));
+    }
+
+    const membres = await db
+      .select()
+      .from(membresTable)
+      .where(and(...conditions))
+      .orderBy(asc(membresTable.nom));
+
+    const label =
+      statutFilter === "actif" ? "Membres actifs" :
+      statutFilter === "inactif" ? "Membres inactifs" :
+      "Tous les membres";
+
+    const filename = `membres-${statutFilter ?? "tous"}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ margin: 50, size: "A4" });
+    doc.pipe(res);
+
+    const VERT = "#1a4731";
+    const GRIS = "#6b7280";
+    const NOIR = "#111827";
+
+    // En-tête
+    doc.rect(0, 0, doc.page.width, 65).fill(VERT);
+    doc.fillColor("white").fontSize(16).font("Helvetica-Bold")
+      .text("CoopDigital — Liste des membres", 50, 18);
+    doc.fontSize(11).font("Helvetica")
+      .text(`${label} · Exporté le ${new Date().toLocaleDateString("fr-FR")}`, 50, 42);
+    doc.fillColor(NOIR).moveDown(3);
+
+    // Résumé
+    const nbActifs = membres.filter((m) => m.statut === "actif").length;
+    const nbInactifs = membres.filter((m) => m.statut === "inactif").length;
+    doc.fontSize(10).font("Helvetica")
+      .fillColor(GRIS)
+      .text(`Total : ${membres.length} membres   |   Actifs : ${nbActifs}   |   Inactifs : ${nbInactifs}`, 50, doc.y);
+    doc.moveDown(0.8);
+
+    // En-têtes tableau
+    const cols = { nom: 50, code: 200, tel: 285, village: 370, superficie: 450, statut: 510 };
+    const rowH = 22;
+
+    const drawTableHeader = () => {
+      doc.rect(50, doc.y, doc.page.width - 100, rowH).fill("#f0fdf4");
+      const y = doc.y + 6;
+      doc.fillColor(VERT).fontSize(8).font("Helvetica-Bold");
+      doc.text("NOM & PRÉNOMS", cols.nom, y, { width: 145 });
+      doc.text("CODE", cols.code, y, { width: 80 });
+      doc.text("TÉLÉPHONE", cols.tel, y, { width: 80 });
+      doc.text("VILLAGE", cols.village, y, { width: 75 });
+      doc.text("HA", cols.superficie, y, { width: 55, align: "right" });
+      doc.text("STATUT", cols.statut, y, { width: 55 });
+      doc.fillColor(NOIR);
+      doc.y += rowH;
+      doc.moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke("#e5e7eb");
+    };
+
+    drawTableHeader();
+
+    membres.forEach((m, i) => {
+      if (doc.y > doc.page.height - 80) {
+        doc.addPage();
+        drawTableHeader();
+      }
+      const y = doc.y + 5;
+      if (i % 2 === 0) {
+        doc.rect(50, doc.y, doc.page.width - 100, rowH).fill("#f9fafb");
+      }
+      const code = computeCodeMembre(m.id, m.dateAdhesion);
+      doc.fillColor(NOIR).fontSize(8).font("Helvetica");
+      doc.text(`${m.nom} ${m.prenoms}`, cols.nom, y, { width: 145 });
+      doc.fillColor(VERT).font("Helvetica-Bold").text(code, cols.code, y, { width: 80 });
+      doc.fillColor(NOIR).font("Helvetica").text(m.telephone, cols.tel, y, { width: 80 });
+      doc.text(m.village ?? "—", cols.village, y, { width: 75 });
+      doc.text(parseFloat(m.superficieHa).toFixed(2), cols.superficie, y, { width: 55, align: "right" });
+      const statutColor = m.statut === "actif" ? "#16a34a" : "#6b7280";
+      doc.fillColor(statutColor).font("Helvetica-Bold")
+        .text(m.statut === "actif" ? "Actif" : "Inactif", cols.statut, y, { width: 55 });
+      doc.fillColor(NOIR);
+      doc.y += rowH;
+    });
+
+    // Pied de page
+    doc.moveDown(1);
+    doc.moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke("#e5e7eb");
+    doc.moveDown(0.5);
+    doc.fillColor(GRIS).fontSize(8).font("Helvetica")
+      .text(`Document généré automatiquement par CoopDigital · ${membres.length} entrées`, 50, doc.y, {
+        align: "center", width: doc.page.width - 100,
+      });
+
+    doc.end();
+  } catch (err) {
+    req.log.error({ err }, "Erreur exportMembresPdf");
+    if (!res.headersSent) res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
