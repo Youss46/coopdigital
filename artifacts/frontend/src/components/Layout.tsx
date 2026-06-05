@@ -36,6 +36,7 @@ import {
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 
 const navItems = [
+  // ── Dashboards ────────────────────────────────────────────────────────────
   {
     href: "/dashboard/pca",
     label: "Vue PCA",
@@ -48,11 +49,31 @@ const navItems = [
     icon: LayoutDashboard,
     roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
   },
+
+  // ── Membres & Terrain ─────────────────────────────────────────────────────
   {
     href: "/membres",
     label: "Membres",
     icon: Users,
     roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "agent_terrain", "auditeur"],
+  },
+  {
+    href: "/scoring",
+    label: "Scoring Producteurs",
+    icon: Award,
+    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
+  },
+  {
+    href: "/campagnes",
+    label: "Campagnes",
+    icon: CalendarDays,
+    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "agent_terrain", "auditeur"],
+  },
+  {
+    href: "/livraisons/nouvelle",
+    label: "Livraisons",
+    icon: Package,
+    roles: ["pca", "directeur", "agent_terrain", "responsable_tracabilite", "comptable", "auditeur"],
   },
   {
     href: "/tracabilite",
@@ -67,23 +88,33 @@ const navItems = [
     roles: ["pca", "directeur", "magasinier", "comptable", "auditeur"],
   },
   {
+    href: "/refus",
+    label: "Stocks refoulés",
+    icon: PackageX,
+    roles: ["pca", "directeur", "magasinier", "responsable_tracabilite", "comptable", "auditeur"],
+  },
+
+  // ── Finance Membre ────────────────────────────────────────────────────────
+  {
     href: "/avances",
     label: "Avances",
     icon: CreditCard,
     roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
   },
   {
-    href: "/livraisons/nouvelle",
-    label: "Livraisons",
-    icon: Package,
-    roles: ["pca", "directeur", "agent_terrain", "responsable_tracabilite", "comptable", "auditeur"],
+    href: "/intrants",
+    label: "Intrants",
+    icon: Leaf,
+    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur", "magasinier"],
   },
   {
-    href: "/campagnes",
-    label: "Campagnes",
-    icon: CalendarDays,
-    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "agent_terrain", "auditeur"],
+    href: "/reglements",
+    label: "Règlements",
+    icon: CheckCircle2,
+    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
   },
+
+  // ── Commerce & Partenaires ────────────────────────────────────────────────
   {
     href: "/fournisseurs",
     label: "Fournisseurs",
@@ -97,27 +128,29 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
-    href: "/reglements",
-    label: "Règlements",
-    icon: CheckCircle2,
-    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
+    href: "/creances",
+    label: "Créances",
+    icon: Receipt,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
-    href: "/intrants",
-    label: "Intrants",
-    icon: Leaf,
-    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur", "magasinier"],
+    href: "/prix",
+    label: "Suivi des Prix",
+    icon: TrendingUp,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+  },
+
+  // ── Finance Coopérative ───────────────────────────────────────────────────
+  {
+    href: "/budget",
+    label: "Budget",
+    icon: Target,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
     href: "/emprunts",
     label: "Emprunts",
     icon: Landmark,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/budget",
-    label: "Budget",
-    icon: Target,
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
@@ -127,22 +160,25 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
-    href: "/gouvernance",
-    label: "Gouvernance",
-    icon: Gavel,
-    roles: ["pca", "directeur", "secretaire", "auditeur"],
+    href: "/comptabilite",
+    label: "Comptabilité",
+    icon: BookOpen,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+    showBadge: true,
   },
   {
-    href: "/prix",
-    label: "Suivi des Prix",
-    icon: TrendingUp,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    href: "/salaires",
+    label: "Salaires",
+    icon: Banknote,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
+
+  // ── Pilotage & Contrôle ───────────────────────────────────────────────────
   {
-    href: "/scoring",
-    label: "Scoring Producteurs",
-    icon: Award,
-    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
+    href: "/reporting",
+    label: "Reporting",
+    icon: BarChart3,
+    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
   },
   {
     href: "/anomalies",
@@ -157,36 +193,13 @@ const navItems = [
     icon: ScrollText,
     roles: ["pca", "directeur", "auditeur"],
   },
+
+  // ── Organisation ──────────────────────────────────────────────────────────
   {
-    href: "/refus",
-    label: "Stocks refoulés",
-    icon: PackageX,
-    roles: ["pca", "directeur", "magasinier", "responsable_tracabilite", "comptable", "auditeur"],
-  },
-  {
-    href: "/creances",
-    label: "Créances",
-    icon: Receipt,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/comptabilite",
-    label: "Comptabilité",
-    icon: BookOpen,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-    showBadge: true,
-  },
-  {
-    href: "/reporting",
-    label: "Reporting",
-    icon: BarChart3,
-    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
-  },
-  {
-    href: "/salaires",
-    label: "Salaires",
-    icon: Banknote,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
+    href: "/gouvernance",
+    label: "Gouvernance",
+    icon: Gavel,
+    roles: ["pca", "directeur", "secretaire", "auditeur"],
   },
   {
     href: "/communication",
