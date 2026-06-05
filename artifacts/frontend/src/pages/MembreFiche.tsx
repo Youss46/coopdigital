@@ -86,9 +86,9 @@ export default function MembreFiche() {
     if (!membre) return;
     const nouveauStatut = membre.statut === "actif" ? "inactif" : "actif";
     try {
-      await statutMut.mutateAsync({ id, data: { statut: nouveauStatut } });
+      const updated = await statutMut.mutateAsync({ id, data: { statut: nouveauStatut } });
+      qc.setQueryData(getGetMembreByIdQueryKey(id), updated);
       toast({ title: `Membre ${nouveauStatut === "actif" ? "réactivé" : "désactivé"} avec succès` });
-      void qc.invalidateQueries({ queryKey: getGetMembreByIdQueryKey(id) });
     } catch {
       toast({ title: "Erreur lors du changement de statut", variant: "destructive" });
     }
