@@ -2138,7 +2138,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Refus"
 
-  /api/fournisseurs/search:
+  /fournisseurs/search:
     get:
       operationId: searchFournisseurs
       tags: [fournisseurs]
@@ -2160,7 +2160,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/Fournisseur"
 
-  /api/fournisseurs/rapport-type:
+  /fournisseurs/rapport-type:
     get:
       operationId: getRapportTypeFournisseur
       tags: [fournisseurs]
@@ -2182,7 +2182,7 @@ paths:
                     count:
                       type: integer
 
-  /api/fournisseurs:
+  /fournisseurs:
     get:
       operationId: listFournisseurs
       tags: [fournisseurs]
@@ -2230,7 +2230,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Fournisseur"
 
-  /api/fournisseurs/{id}:
+  /fournisseurs/{id}:
     get:
       operationId: getFournisseurById
       tags: [fournisseurs]
@@ -2274,7 +2274,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Fournisseur"
 
-  /api/fournisseurs/depuis-membre/{id}:
+  /fournisseurs/depuis-membre/{id}:
     post:
       operationId: createFournisseurDepuisMembre
       tags: [fournisseurs]

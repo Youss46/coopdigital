@@ -7724,7 +7724,7 @@ export const getSearchFournisseursUrl = (params: SearchFournisseursParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/api/fournisseurs/search?${stringifiedParams}` : `/api/api/fournisseurs/search`
+  return stringifiedParams.length > 0 ? `/api/fournisseurs/search?${stringifiedParams}` : `/api/fournisseurs/search`
 }
 
 /**
@@ -7747,7 +7747,7 @@ export const searchFournisseurs = async (params: SearchFournisseursParams, optio
 
 export const getSearchFournisseursQueryKey = (params?: SearchFournisseursParams,) => {
     return [
-    `/api/api/fournisseurs/search`, ...(params ? [params] : [])
+    `/api/fournisseurs/search`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -7801,7 +7801,7 @@ export const getGetRapportTypeFournisseurUrl = () => {
 
 
 
-  return `/api/api/fournisseurs/rapport-type`
+  return `/api/fournisseurs/rapport-type`
 }
 
 /**
@@ -7824,7 +7824,7 @@ export const getRapportTypeFournisseur = async ( options?: RequestInit): Promise
 
 export const getGetRapportTypeFournisseurQueryKey = () => {
     return [
-    `/api/api/fournisseurs/rapport-type`
+    `/api/fournisseurs/rapport-type`
     ] as const;
     }
 
@@ -7885,7 +7885,7 @@ export const getListFournisseursUrl = (params?: ListFournisseursParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/api/fournisseurs?${stringifiedParams}` : `/api/api/fournisseurs`
+  return stringifiedParams.length > 0 ? `/api/fournisseurs?${stringifiedParams}` : `/api/fournisseurs`
 }
 
 /**
@@ -7908,7 +7908,7 @@ export const listFournisseurs = async (params?: ListFournisseursParams, options?
 
 export const getListFournisseursQueryKey = (params?: ListFournisseursParams,) => {
     return [
-    `/api/api/fournisseurs`, ...(params ? [params] : [])
+    `/api/fournisseurs`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -7962,7 +7962,7 @@ export const getCreateFournisseurUrl = () => {
 
 
 
-  return `/api/api/fournisseurs`
+  return `/api/fournisseurs`
 }
 
 /**
@@ -8033,7 +8033,7 @@ export const getGetFournisseurByIdUrl = (id: number,) => {
 
 
 
-  return `/api/api/fournisseurs/${id}`
+  return `/api/fournisseurs/${id}`
 }
 
 /**
@@ -8056,7 +8056,7 @@ export const getFournisseurById = async (id: number, options?: RequestInit): Pro
 
 export const getGetFournisseurByIdQueryKey = (id: number,) => {
     return [
-    `/api/api/fournisseurs/${id}`
+    `/api/fournisseurs/${id}`
     ] as const;
     }
 
@@ -8110,7 +8110,7 @@ export const getUpdateFournisseurUrl = (id: number,) => {
 
 
 
-  return `/api/api/fournisseurs/${id}`
+  return `/api/fournisseurs/${id}`
 }
 
 /**
@@ -8182,7 +8182,7 @@ export const getCreateFournisseurDepuisMembreUrl = (id: number,) => {
 
 
 
-  return `/api/api/fournisseurs/depuis-membre/${id}`
+  return `/api/fournisseurs/depuis-membre/${id}`
 }
 
 /**
