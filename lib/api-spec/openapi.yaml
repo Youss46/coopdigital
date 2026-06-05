@@ -183,6 +183,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Membre"
 
+  /membres/{id}/statut:
+    patch:
+      operationId: modifierStatutMembre
+      tags: [membres]
+      summary: Modifier manuellement le statut d'un membre
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModifierStatutMembreBody"
+      responses:
+        "200":
+          description: Membre mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membre"
+        "404":
+          description: Membre introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /membres/{id}/historique:
     get:
       operationId: getMembreHistorique
@@ -1906,6 +1937,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ResultatVerifications"
+
+  /campagnes/{id}/desactiver-inactifs:
+    post:
+      operationId: desactiverMembresSansCampagne
+      tags: [campagnes]
+      summary: Désactiver les membres sans livraison sur cette campagne
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Membres désactivés
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [desactivesCount, campagneId]
+                properties:
+                  desactivesCount:
+                    type: integer
+                  campagneId:
+                    type: integer
+        "404":
+          description: Campagne introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /campagnes/{id}/cloture:
     post:
@@ -5156,6 +5219,14 @@ components:
           type: string
         parcelleLng:
           type: string
+
+    ModifierStatutMembreBody:
+      type: object
+      required: [statut]
+      properties:
+        statut:
+          type: string
+          enum: [actif, inactif]
 
     MembrePagination:
       type: object

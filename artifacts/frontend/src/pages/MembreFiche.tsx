@@ -7,6 +7,7 @@ import {
   useGetPartsMembre,
   useEnregistrerLiberation,
   useGetScoringResume,
+  useModifierStatutMembre,
   getGetMembreByIdQueryKey,
   getGetMembreHistoriqueQueryKey,
   getGetAvancesQueryKey,
@@ -18,7 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowLeft, MapPin, Phone, Users, Leaf, Calendar, TrendingDown,
-  Coins, Plus, Loader2, ChevronDown, ChevronUp,
+  Coins, Plus, Loader2, ChevronDown, ChevronUp, UserCheck, UserX,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
@@ -77,7 +78,21 @@ export default function MembreFiche() {
   });
 
   const liberationMut = useEnregistrerLiberation();
+  const statutMut = useModifierStatutMembre();
+  const peutModifier = usePermission("membres", "modifier");
   const avanceEnCours = avancesData?.avances?.find((a) => a.statut === "en_cours");
+
+  async function handleToggleStatut() {
+    if (!membre) return;
+    const nouveauStatut = membre.statut === "actif" ? "inactif" : "actif";
+    try {
+      await statutMut.mutateAsync({ id, data: { statut: nouveauStatut } });
+      toast({ title: `Membre ${nouveauStatut === "actif" ? "réactivé" : "désactivé"} avec succès` });
+      void qc.invalidateQueries({ queryKey: getGetMembreByIdQueryKey(id) });
+    } catch {
+      toast({ title: "Erreur lors du changement de statut", variant: "destructive" });
+    }
+  }
 
   if (!match) return null;
 
@@ -170,6 +185,26 @@ export default function MembreFiche() {
           >
             {membre.statut === "actif" ? "Actif" : "Inactif"}
           </span>
+          {peutModifier && (
+            <button
+              onClick={handleToggleStatut}
+              disabled={statutMut.isPending}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+                membre.statut === "actif"
+                  ? "bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600"
+                  : "bg-green-50 text-green-700 hover:bg-green-100"
+              }`}
+            >
+              {statutMut.isPending ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : membre.statut === "actif" ? (
+                <UserX className="w-3 h-3" />
+              ) : (
+                <UserCheck className="w-3 h-3" />
+              )}
+              {membre.statut === "actif" ? "Désactiver" : "Réactiver"}
+            </button>
+          )}
           {soldeCredit > 0 && (
             <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 flex items-center gap-1">
               <TrendingDown size={11} />

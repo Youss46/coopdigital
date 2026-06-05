@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
-import { db, membresTable } from "@workspace/db";
-import { eq, and, or, ilike, sql, desc } from "drizzle-orm";
+import { db, membresTable, livraisonsTable, campagnesTable } from "@workspace/db";
+import { eq, and, or, ilike, sql, desc, notInArray } from "drizzle-orm";
 import { CreateMembreBody, UpdateMembreBody } from "@workspace/api-zod";
 import { computeCodeMembre } from "../services/portailService";
 
@@ -158,6 +158,76 @@ export async function getMembreHistorique(req: Request, res: Response): Promise<
     res.json({ livraisons, avances, paiements });
   } catch (err) {
     req.log.error({ err }, "Erreur getMembreHistorique");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function modifierStatutMembre(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseInt(String(req.params["id"] ?? "0"));
+    const { statut } = req.body as { statut: string };
+    if (statut !== "actif" && statut !== "inactif") {
+      res.status(400).json({ erreur: "Statut invalide (actif ou inactif attendu)" });
+      return;
+    }
+    const [membre] = await db
+      .update(membresTable)
+      .set({ statut })
+      .where(eq(membresTable.id, id))
+      .returning();
+    if (!membre) {
+      res.status(404).json({ erreur: "Membre introuvable" });
+      return;
+    }
+    res.json(enrichMembre(membre));
+  } catch (err) {
+    req.log.error({ err }, "Erreur modifierStatutMembre");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function desactiverMembresSansCampagne(req: Request, res: Response): Promise<void> {
+  try {
+    const campagneId = parseInt(String(req.params["id"] ?? "0"));
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+
+    const campagne = await db.query.campagnesTable.findFirst({
+      where: and(eq(campagnesTable.id, campagneId), eq(campagnesTable.cooperativeId, cooperativeId)),
+    });
+    if (!campagne) {
+      res.status(404).json({ erreur: "Campagne introuvable" });
+      return;
+    }
+
+    const livraisons = await db
+      .selectDistinct({ membreId: livraisonsTable.membreId })
+      .from(livraisonsTable)
+      .where(eq(livraisonsTable.campagneId, campagneId));
+
+    const membresAvecLivraison = livraisons.map((l) => l.membreId).filter((id): id is number => id !== null);
+
+    let desactivesCount = 0;
+    const baseWhere = and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"));
+
+    if (membresAvecLivraison.length > 0) {
+      const updated = await db
+        .update(membresTable)
+        .set({ statut: "inactif" })
+        .where(and(baseWhere, notInArray(membresTable.id, membresAvecLivraison)))
+        .returning({ id: membresTable.id });
+      desactivesCount = updated.length;
+    } else {
+      const updated = await db
+        .update(membresTable)
+        .set({ statut: "inactif" })
+        .where(baseWhere)
+        .returning({ id: membresTable.id });
+      desactivesCount = updated.length;
+    }
+
+    res.json({ desactivesCount, campagneId });
+  } catch (err) {
+    req.log.error({ err }, "Erreur desactiverMembresSansCampagne");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

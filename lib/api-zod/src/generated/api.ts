@@ -198,6 +198,39 @@ export const UpdateMembreResponse = zod.object({
 
 
 /**
+ * @summary Modifier manuellement le statut d'un membre
+ */
+export const ModifierStatutMembreParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ModifierStatutMembreBody = zod.object({
+  "statut": zod.enum(['actif', 'inactif'])
+})
+
+export const ModifierStatutMembreResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "codeMembre": zod.string().describe('Code membre calculé (ex: MBR-2025-0001)'),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "numeroCni": zod.string().nullish(),
+  "telephone": zod.string(),
+  "village": zod.string().nullish(),
+  "groupement": zod.string().nullish(),
+  "superficieHa": zod.string(),
+  "statut": zod.enum(['actif', 'inactif']),
+  "qrCodeToken": zod.string(),
+  "dateAdhesion": zod.string(),
+  "photoUrl": zod.string().nullish(),
+  "parcelleLat": zod.string().nullish(),
+  "parcelleLng": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
  * @summary Historique livraisons, avances et paiements d'un membre
  */
 export const GetMembreHistoriqueParams = zod.object({
@@ -2089,6 +2122,19 @@ export const VerifierCampagneResponse = zod.object({
   "message": zod.string()
 })),
   "toutOk": zod.boolean()
+})
+
+
+/**
+ * @summary Désactiver les membres sans livraison sur cette campagne
+ */
+export const DesactiverMembresSansCampagneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DesactiverMembresSansCampagneResponse = zod.object({
+  "desactivesCount": zod.number(),
+  "campagneId": zod.number()
 })
 
 

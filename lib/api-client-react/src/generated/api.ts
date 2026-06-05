@@ -81,6 +81,7 @@ import type {
   CreatePersonnelInput,
   CreateUserInput,
   DashboardKpi,
+  DesactiverMembresSansCampagne200,
   Devise,
   DiffuserPrixSmsInput,
   DistributionIntrant,
@@ -176,6 +177,7 @@ import type {
   MembrePagination,
   MembreUpdate,
   ModifierLigneInput,
+  ModifierStatutMembreBody,
   MouvementInput,
   MouvementStock,
   PaiementListItem,
@@ -788,6 +790,78 @@ export const useUpdateMembre = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateMembreMutationOptions(options));
+    }
+
+export const getModifierStatutMembreUrl = (id: number,) => {
+
+
+
+
+  return `/api/membres/${id}/statut`
+}
+
+/**
+ * @summary Modifier manuellement le statut d'un membre
+ */
+export const modifierStatutMembre = async (id: number,
+    modifierStatutMembreBody: ModifierStatutMembreBody, options?: RequestInit): Promise<Membre> => {
+
+  return customFetch<Membre>(getModifierStatutMembreUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      modifierStatutMembreBody,)
+  }
+);}
+
+
+
+
+export const getModifierStatutMembreMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof modifierStatutMembre>>, TError,{id: number;data: BodyType<ModifierStatutMembreBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof modifierStatutMembre>>, TError,{id: number;data: BodyType<ModifierStatutMembreBody>}, TContext> => {
+
+const mutationKey = ['modifierStatutMembre'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof modifierStatutMembre>>, {id: number;data: BodyType<ModifierStatutMembreBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  modifierStatutMembre(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ModifierStatutMembreMutationResult = NonNullable<Awaited<ReturnType<typeof modifierStatutMembre>>>
+    export type ModifierStatutMembreMutationBody = BodyType<ModifierStatutMembreBody>
+    export type ModifierStatutMembreMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Modifier manuellement le statut d'un membre
+ */
+export const useModifierStatutMembre = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof modifierStatutMembre>>, TError,{id: number;data: BodyType<ModifierStatutMembreBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof modifierStatutMembre>>,
+        TError,
+        {id: number;data: BodyType<ModifierStatutMembreBody>},
+        TContext
+      > => {
+      return useMutation(getModifierStatutMembreMutationOptions(options));
     }
 
 export const getGetMembreHistoriqueUrl = (id: number,) => {
@@ -6804,6 +6878,76 @@ export function useVerifierCampagne<TData = Awaited<ReturnType<typeof verifierCa
 
 
 
+
+export const getDesactiverMembresSansCampagneUrl = (id: number,) => {
+
+
+
+
+  return `/api/campagnes/${id}/desactiver-inactifs`
+}
+
+/**
+ * @summary Désactiver les membres sans livraison sur cette campagne
+ */
+export const desactiverMembresSansCampagne = async (id: number, options?: RequestInit): Promise<DesactiverMembresSansCampagne200> => {
+
+  return customFetch<DesactiverMembresSansCampagne200>(getDesactiverMembresSansCampagneUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getDesactiverMembresSansCampagneMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof desactiverMembresSansCampagne>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof desactiverMembresSansCampagne>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['desactiverMembresSansCampagne'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof desactiverMembresSansCampagne>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  desactiverMembresSansCampagne(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DesactiverMembresSansCampagneMutationResult = NonNullable<Awaited<ReturnType<typeof desactiverMembresSansCampagne>>>
+
+    export type DesactiverMembresSansCampagneMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Désactiver les membres sans livraison sur cette campagne
+ */
+export const useDesactiverMembresSansCampagne = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof desactiverMembresSansCampagne>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof desactiverMembresSansCampagne>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDesactiverMembresSansCampagneMutationOptions(options));
+    }
 
 export const getCloturerCampagneUrl = (id: number,) => {
 

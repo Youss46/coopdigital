@@ -718,6 +718,18 @@ export interface MembreUpdate {
   parcelleLng?: string;
 }
 
+export type ModifierStatutMembreBodyStatut = typeof ModifierStatutMembreBodyStatut[keyof typeof ModifierStatutMembreBodyStatut];
+
+
+export const ModifierStatutMembreBodyStatut = {
+  actif: 'actif',
+  inactif: 'inactif',
+} as const;
+
+export interface ModifierStatutMembreBody {
+  statut: ModifierStatutMembreBodyStatut;
+}
+
 export interface MembrePagination {
   membres: Membre[];
   total: number;
@@ -3194,6 +3206,11 @@ export type GetComparaisonCampagnesParams = {
  * IDs séparés par virgule (ex. "1,2,3"). Vide = 5 dernières.
  */
 ids?: string;
+};
+
+export type DesactiverMembresSansCampagne200 = {
+  desactivesCount: number;
+  campagneId: number;
 };
 
 export type EnregistrerLiberation201 = {

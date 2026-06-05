@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { campagnesTable, bilansCampagneTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { campagnesTable, bilansCampagneTable, membresTable, livraisonsTable } from "@workspace/db";
+import { eq, and, desc, notInArray } from "drizzle-orm";
 import {
   verifierAvantCloture,
   genererBilan,
@@ -81,6 +81,27 @@ export async function fermerCampagne(req: Request, res: Response) {
     .returning();
 
   if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
+
+  // Auto-inactivation : membres sans aucune livraison sur cette campagne
+  try {
+    const livraisons = await db
+      .selectDistinct({ membreId: livraisonsTable.membreId })
+      .from(livraisonsTable)
+      .where(eq(livraisonsTable.campagneId, id));
+
+    const membresAvecLivraison = livraisons.map((l) => l.membreId).filter((mid): mid is number => mid !== null);
+    const baseWhere = and(eq(membresTable.cooperativeId, COOP_ID), eq(membresTable.statut, "actif"));
+
+    if (membresAvecLivraison.length > 0) {
+      await db.update(membresTable).set({ statut: "inactif" })
+        .where(and(baseWhere, notInArray(membresTable.id, membresAvecLivraison)));
+    } else {
+      await db.update(membresTable).set({ statut: "inactif" }).where(baseWhere);
+    }
+  } catch (err) {
+    req.log.error({ err }, "Erreur auto-inactivation membres après fermeture campagne");
+  }
+
   return res.json(campagne);
 }
 
