@@ -744,7 +744,7 @@ export default function IntrantsPage() {
       </div>
 
       {/* Onglets */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit overflow-x-auto">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-full overflow-x-auto">
         {onglets.map(({ id, label, badge }) => (
           <button
             key={id}
