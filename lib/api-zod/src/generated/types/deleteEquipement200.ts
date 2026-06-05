@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface RapportAgentPesee {
-  agent_id?: number;
-  nom?: string | null;
-}
+export type DeleteEquipement200 = {
+  success?: boolean;
+};

@@ -24,6 +24,7 @@ import type {
   AgInput,
   AgListItem,
   AlertePrix,
+  AlertesEquipements,
   AnalyseMarge,
   AnomalieItem,
   AnomaliesListResponse,
@@ -57,6 +58,7 @@ import type {
   BulletinPaie,
   Campagne,
   CampagneInput,
+  CategorieEquipement,
   CategorieIntrant,
   Chauffeur,
   CloturerAgInput,
@@ -86,8 +88,10 @@ import type {
   CreateChauffeurBody,
   CreateDocumentBody,
   CreateEntretienVehiculeBody,
+  CreateEquipementBody,
   CreateLitige201,
   CreateLitigeBody,
+  CreateMaintenanceBody,
   CreateMissionTransportBody,
   CreatePersonnelInput,
   CreateUserInput,
@@ -95,6 +99,7 @@ import type {
   CreateVerificationBalance201,
   CreateVerificationBody,
   DashboardKpi,
+  DeleteEquipement200,
   DesactiverMembresSansCampagne200,
   Devise,
   DiffuserPrixSmsInput,
@@ -115,6 +120,7 @@ import type {
   EntreeClassement,
   EntrepotStock,
   EntretienVehicule,
+  Equipement,
   ErrorResponse,
   EvolutionScore,
   ExportateurDetail,
@@ -126,6 +132,7 @@ import type {
   FournisseurInput,
   GenerationResult,
   GenererBulletinsInput,
+  GenererDotationsBody,
   GenererRapportInput,
   GetAnomaliesParams,
   GetAuditExportPdfParams,
@@ -146,6 +153,7 @@ import type {
   GetEmpruntsParams,
   GetEncoursIntrantsMembre200,
   GetEntretiensVehicule200,
+  GetEquipementsParams,
   GetFluxTresorerieParams,
   GetGrandLivreParams,
   GetJournalComptableParams,
@@ -167,6 +175,7 @@ import type {
   GetRapportTypeFournisseur200Item,
   GetScoringParNiveauParams,
   GetScoringTopParams,
+  GetTableauAmortissement200,
   GetTransportAlertes200,
   GetVehicules200,
   GetVentesParams,
@@ -196,6 +205,7 @@ import type {
   LotInput,
   LotStatutInput,
   LotTracabilite,
+  MaintenanceEquipement,
   MargeCampagne,
   MargeCollecte,
   MarquerNotificationLue200,
@@ -233,6 +243,7 @@ import type {
   RapportCampagneIntrants,
   RapportCampagneTransport,
   RapportChange,
+  RapportInventaire,
   RapportMensuel,
   RapportParts,
   RapportVehicule,
@@ -250,6 +261,7 @@ import type {
   ResetUserPassword200,
   ResoudreLitige200,
   ResoudreLitigeBody,
+  ResultatDotations,
   ResultatVerifications,
   ResumeMembre,
   SaisirPrixInput,
@@ -284,6 +296,7 @@ import type {
   UpdateConfigComptableInput,
   UpdateConfigPeseeBody,
   UpdateConfigScoringInput,
+  UpdateEquipementBody,
   UpdatePersonnelInput,
   UpdatePreferencesNotificationsBody,
   UpdateUserInput,
@@ -18986,4 +18999,1060 @@ export const useUpdateConfigPesee = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getUpdateConfigPeseeMutationOptions(options));
     }
+
+export const getGetCategoriesEquipementsUrl = () => {
+
+
+
+
+  return `/api/categories-equipements`
+}
+
+/**
+ * @summary Lister les catégories d'équipements
+ */
+export const getCategoriesEquipements = async ( options?: RequestInit): Promise<CategorieEquipement[]> => {
+
+  return customFetch<CategorieEquipement[]>(getGetCategoriesEquipementsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCategoriesEquipementsQueryKey = () => {
+    return [
+    `/api/categories-equipements`
+    ] as const;
+    }
+
+
+export const getGetCategoriesEquipementsQueryOptions = <TData = Awaited<ReturnType<typeof getCategoriesEquipements>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCategoriesEquipements>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCategoriesEquipementsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCategoriesEquipements>>> = ({ signal }) => getCategoriesEquipements({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCategoriesEquipements>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCategoriesEquipementsQueryResult = NonNullable<Awaited<ReturnType<typeof getCategoriesEquipements>>>
+export type GetCategoriesEquipementsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lister les catégories d'équipements
+ */
+
+export function useGetCategoriesEquipements<TData = Awaited<ReturnType<typeof getCategoriesEquipements>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCategoriesEquipements>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCategoriesEquipementsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEquipementsUrl = (params?: GetEquipementsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/equipements?${stringifiedParams}` : `/api/equipements`
+}
+
+/**
+ * @summary Lister les équipements
+ */
+export const getEquipements = async (params?: GetEquipementsParams, options?: RequestInit): Promise<Equipement[]> => {
+
+  return customFetch<Equipement[]>(getGetEquipementsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEquipementsQueryKey = (params?: GetEquipementsParams,) => {
+    return [
+    `/api/equipements`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetEquipementsQueryOptions = <TData = Awaited<ReturnType<typeof getEquipements>>, TError = ErrorType<unknown>>(params?: GetEquipementsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEquipements>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEquipementsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEquipements>>> = ({ signal }) => getEquipements(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEquipements>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEquipementsQueryResult = NonNullable<Awaited<ReturnType<typeof getEquipements>>>
+export type GetEquipementsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lister les équipements
+ */
+
+export function useGetEquipements<TData = Awaited<ReturnType<typeof getEquipements>>, TError = ErrorType<unknown>>(
+ params?: GetEquipementsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEquipements>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEquipementsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostEquipementUrl = () => {
+
+
+
+
+  return `/api/equipements`
+}
+
+/**
+ * @summary Créer un équipement
+ */
+export const postEquipement = async (createEquipementBody: CreateEquipementBody, options?: RequestInit): Promise<Equipement> => {
+
+  return customFetch<Equipement>(getPostEquipementUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createEquipementBody,)
+  }
+);}
+
+
+
+
+export const getPostEquipementMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEquipement>>, TError,{data: BodyType<CreateEquipementBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postEquipement>>, TError,{data: BodyType<CreateEquipementBody>}, TContext> => {
+
+const mutationKey = ['postEquipement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postEquipement>>, {data: BodyType<CreateEquipementBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postEquipement(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostEquipementMutationResult = NonNullable<Awaited<ReturnType<typeof postEquipement>>>
+    export type PostEquipementMutationBody = BodyType<CreateEquipementBody>
+    export type PostEquipementMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Créer un équipement
+ */
+export const usePostEquipement = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEquipement>>, TError,{data: BodyType<CreateEquipementBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postEquipement>>,
+        TError,
+        {data: BodyType<CreateEquipementBody>},
+        TContext
+      > => {
+      return useMutation(getPostEquipementMutationOptions(options));
+    }
+
+export const getGetEquipementsAmortisUrl = () => {
+
+
+
+
+  return `/api/equipements/amortis`
+}
+
+/**
+ * @summary Équipements totalement amortis
+ */
+export const getEquipementsAmortis = async ( options?: RequestInit): Promise<Equipement[]> => {
+
+  return customFetch<Equipement[]>(getGetEquipementsAmortisUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEquipementsAmortisQueryKey = () => {
+    return [
+    `/api/equipements/amortis`
+    ] as const;
+    }
+
+
+export const getGetEquipementsAmortisQueryOptions = <TData = Awaited<ReturnType<typeof getEquipementsAmortis>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEquipementsAmortis>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEquipementsAmortisQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEquipementsAmortis>>> = ({ signal }) => getEquipementsAmortis({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEquipementsAmortis>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEquipementsAmortisQueryResult = NonNullable<Awaited<ReturnType<typeof getEquipementsAmortis>>>
+export type GetEquipementsAmortisQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Équipements totalement amortis
+ */
+
+export function useGetEquipementsAmortis<TData = Awaited<ReturnType<typeof getEquipementsAmortis>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEquipementsAmortis>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEquipementsAmortisQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEquipementsAlertesUrl = () => {
+
+
+
+
+  return `/api/equipements/alertes`
+}
+
+/**
+ * @summary Alertes équipements
+ */
+export const getEquipementsAlertes = async ( options?: RequestInit): Promise<AlertesEquipements> => {
+
+  return customFetch<AlertesEquipements>(getGetEquipementsAlertesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEquipementsAlertesQueryKey = () => {
+    return [
+    `/api/equipements/alertes`
+    ] as const;
+    }
+
+
+export const getGetEquipementsAlertesQueryOptions = <TData = Awaited<ReturnType<typeof getEquipementsAlertes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEquipementsAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEquipementsAlertesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEquipementsAlertes>>> = ({ signal }) => getEquipementsAlertes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEquipementsAlertes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEquipementsAlertesQueryResult = NonNullable<Awaited<ReturnType<typeof getEquipementsAlertes>>>
+export type GetEquipementsAlertesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Alertes équipements
+ */
+
+export function useGetEquipementsAlertes<TData = Awaited<ReturnType<typeof getEquipementsAlertes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEquipementsAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEquipementsAlertesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRapportInventaireEquipementsUrl = () => {
+
+
+
+
+  return `/api/equipements/rapport-inventaire`
+}
+
+/**
+ * @summary Rapport inventaire OHADA
+ */
+export const getRapportInventaireEquipements = async ( options?: RequestInit): Promise<RapportInventaire> => {
+
+  return customFetch<RapportInventaire>(getGetRapportInventaireEquipementsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRapportInventaireEquipementsQueryKey = () => {
+    return [
+    `/api/equipements/rapport-inventaire`
+    ] as const;
+    }
+
+
+export const getGetRapportInventaireEquipementsQueryOptions = <TData = Awaited<ReturnType<typeof getRapportInventaireEquipements>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRapportInventaireEquipements>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRapportInventaireEquipementsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRapportInventaireEquipements>>> = ({ signal }) => getRapportInventaireEquipements({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRapportInventaireEquipements>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRapportInventaireEquipementsQueryResult = NonNullable<Awaited<ReturnType<typeof getRapportInventaireEquipements>>>
+export type GetRapportInventaireEquipementsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Rapport inventaire OHADA
+ */
+
+export function useGetRapportInventaireEquipements<TData = Awaited<ReturnType<typeof getRapportInventaireEquipements>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRapportInventaireEquipements>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRapportInventaireEquipementsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostGenererDotationsUrl = () => {
+
+
+
+
+  return `/api/equipements/generer-dotations`
+}
+
+/**
+ * @summary Générer les dotations mensuelles
+ */
+export const postGenererDotations = async (genererDotationsBody: GenererDotationsBody, options?: RequestInit): Promise<ResultatDotations> => {
+
+  return customFetch<ResultatDotations>(getPostGenererDotationsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      genererDotationsBody,)
+  }
+);}
+
+
+
+
+export const getPostGenererDotationsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postGenererDotations>>, TError,{data: BodyType<GenererDotationsBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postGenererDotations>>, TError,{data: BodyType<GenererDotationsBody>}, TContext> => {
+
+const mutationKey = ['postGenererDotations'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postGenererDotations>>, {data: BodyType<GenererDotationsBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postGenererDotations(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostGenererDotationsMutationResult = NonNullable<Awaited<ReturnType<typeof postGenererDotations>>>
+    export type PostGenererDotationsMutationBody = BodyType<GenererDotationsBody>
+    export type PostGenererDotationsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Générer les dotations mensuelles
+ */
+export const usePostGenererDotations = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postGenererDotations>>, TError,{data: BodyType<GenererDotationsBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postGenererDotations>>,
+        TError,
+        {data: BodyType<GenererDotationsBody>},
+        TContext
+      > => {
+      return useMutation(getPostGenererDotationsMutationOptions(options));
+    }
+
+export const getGetEquipementsByCategorieUrl = (id: number,) => {
+
+
+
+
+  return `/api/equipements/categorie/${id}`
+}
+
+/**
+ * @summary Équipements par catégorie
+ */
+export const getEquipementsByCategorie = async (id: number, options?: RequestInit): Promise<Equipement[]> => {
+
+  return customFetch<Equipement[]>(getGetEquipementsByCategorieUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEquipementsByCategorieQueryKey = (id: number,) => {
+    return [
+    `/api/equipements/categorie/${id}`
+    ] as const;
+    }
+
+
+export const getGetEquipementsByCategorieQueryOptions = <TData = Awaited<ReturnType<typeof getEquipementsByCategorie>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEquipementsByCategorie>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEquipementsByCategorieQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEquipementsByCategorie>>> = ({ signal }) => getEquipementsByCategorie(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEquipementsByCategorie>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEquipementsByCategorieQueryResult = NonNullable<Awaited<ReturnType<typeof getEquipementsByCategorie>>>
+export type GetEquipementsByCategorieQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Équipements par catégorie
+ */
+
+export function useGetEquipementsByCategorie<TData = Awaited<ReturnType<typeof getEquipementsByCategorie>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEquipementsByCategorie>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEquipementsByCategorieQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEquipementUrl = (id: number,) => {
+
+
+
+
+  return `/api/equipements/${id}`
+}
+
+/**
+ * @summary Détail d'un équipement
+ */
+export const getEquipement = async (id: number, options?: RequestInit): Promise<Equipement> => {
+
+  return customFetch<Equipement>(getGetEquipementUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEquipementQueryKey = (id: number,) => {
+    return [
+    `/api/equipements/${id}`
+    ] as const;
+    }
+
+
+export const getGetEquipementQueryOptions = <TData = Awaited<ReturnType<typeof getEquipement>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEquipement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEquipementQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEquipement>>> = ({ signal }) => getEquipement(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEquipement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEquipementQueryResult = NonNullable<Awaited<ReturnType<typeof getEquipement>>>
+export type GetEquipementQueryError = ErrorType<void>
+
+
+/**
+ * @summary Détail d'un équipement
+ */
+
+export function useGetEquipement<TData = Awaited<ReturnType<typeof getEquipement>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEquipement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEquipementQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPutEquipementUrl = (id: number,) => {
+
+
+
+
+  return `/api/equipements/${id}`
+}
+
+/**
+ * @summary Modifier un équipement
+ */
+export const putEquipement = async (id: number,
+    updateEquipementBody: UpdateEquipementBody, options?: RequestInit): Promise<Equipement> => {
+
+  return customFetch<Equipement>(getPutEquipementUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateEquipementBody,)
+  }
+);}
+
+
+
+
+export const getPutEquipementMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putEquipement>>, TError,{id: number;data: BodyType<UpdateEquipementBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putEquipement>>, TError,{id: number;data: BodyType<UpdateEquipementBody>}, TContext> => {
+
+const mutationKey = ['putEquipement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putEquipement>>, {id: number;data: BodyType<UpdateEquipementBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  putEquipement(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutEquipementMutationResult = NonNullable<Awaited<ReturnType<typeof putEquipement>>>
+    export type PutEquipementMutationBody = BodyType<UpdateEquipementBody>
+    export type PutEquipementMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Modifier un équipement
+ */
+export const usePutEquipement = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putEquipement>>, TError,{id: number;data: BodyType<UpdateEquipementBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putEquipement>>,
+        TError,
+        {id: number;data: BodyType<UpdateEquipementBody>},
+        TContext
+      > => {
+      return useMutation(getPutEquipementMutationOptions(options));
+    }
+
+export const getDeleteEquipementUrl = (id: number,) => {
+
+
+
+
+  return `/api/equipements/${id}`
+}
+
+/**
+ * @summary Supprimer un équipement
+ */
+export const deleteEquipement = async (id: number, options?: RequestInit): Promise<DeleteEquipement200> => {
+
+  return customFetch<DeleteEquipement200>(getDeleteEquipementUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteEquipementMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEquipement>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteEquipement>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteEquipement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteEquipement>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteEquipement(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteEquipementMutationResult = NonNullable<Awaited<ReturnType<typeof deleteEquipement>>>
+
+    export type DeleteEquipementMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Supprimer un équipement
+ */
+export const useDeleteEquipement = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEquipement>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteEquipement>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteEquipementMutationOptions(options));
+    }
+
+export const getPostMaintenanceEquipementUrl = (id: number,) => {
+
+
+
+
+  return `/api/equipements/${id}/maintenance`
+}
+
+/**
+ * @summary Enregistrer une maintenance
+ */
+export const postMaintenanceEquipement = async (id: number,
+    createMaintenanceBody: CreateMaintenanceBody, options?: RequestInit): Promise<MaintenanceEquipement> => {
+
+  return customFetch<MaintenanceEquipement>(getPostMaintenanceEquipementUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createMaintenanceBody,)
+  }
+);}
+
+
+
+
+export const getPostMaintenanceEquipementMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMaintenanceEquipement>>, TError,{id: number;data: BodyType<CreateMaintenanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postMaintenanceEquipement>>, TError,{id: number;data: BodyType<CreateMaintenanceBody>}, TContext> => {
+
+const mutationKey = ['postMaintenanceEquipement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postMaintenanceEquipement>>, {id: number;data: BodyType<CreateMaintenanceBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  postMaintenanceEquipement(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostMaintenanceEquipementMutationResult = NonNullable<Awaited<ReturnType<typeof postMaintenanceEquipement>>>
+    export type PostMaintenanceEquipementMutationBody = BodyType<CreateMaintenanceBody>
+    export type PostMaintenanceEquipementMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer une maintenance
+ */
+export const usePostMaintenanceEquipement = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMaintenanceEquipement>>, TError,{id: number;data: BodyType<CreateMaintenanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postMaintenanceEquipement>>,
+        TError,
+        {id: number;data: BodyType<CreateMaintenanceBody>},
+        TContext
+      > => {
+      return useMutation(getPostMaintenanceEquipementMutationOptions(options));
+    }
+
+export const getGetMaintenancesEquipementUrl = (id: number,) => {
+
+
+
+
+  return `/api/equipements/${id}/maintenances`
+}
+
+/**
+ * @summary Historique maintenances
+ */
+export const getMaintenancesEquipement = async (id: number, options?: RequestInit): Promise<MaintenanceEquipement[]> => {
+
+  return customFetch<MaintenanceEquipement[]>(getGetMaintenancesEquipementUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMaintenancesEquipementQueryKey = (id: number,) => {
+    return [
+    `/api/equipements/${id}/maintenances`
+    ] as const;
+    }
+
+
+export const getGetMaintenancesEquipementQueryOptions = <TData = Awaited<ReturnType<typeof getMaintenancesEquipement>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMaintenancesEquipement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMaintenancesEquipementQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMaintenancesEquipement>>> = ({ signal }) => getMaintenancesEquipement(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMaintenancesEquipement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMaintenancesEquipementQueryResult = NonNullable<Awaited<ReturnType<typeof getMaintenancesEquipement>>>
+export type GetMaintenancesEquipementQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Historique maintenances
+ */
+
+export function useGetMaintenancesEquipement<TData = Awaited<ReturnType<typeof getMaintenancesEquipement>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMaintenancesEquipement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMaintenancesEquipementQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetTableauAmortissementUrl = (id: number,) => {
+
+
+
+
+  return `/api/equipements/${id}/tableau-amortissement`
+}
+
+/**
+ * @summary Tableau d'amortissement complet
+ */
+export const getTableauAmortissement = async (id: number, options?: RequestInit): Promise<GetTableauAmortissement200> => {
+
+  return customFetch<GetTableauAmortissement200>(getGetTableauAmortissementUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTableauAmortissementQueryKey = (id: number,) => {
+    return [
+    `/api/equipements/${id}/tableau-amortissement`
+    ] as const;
+    }
+
+
+export const getGetTableauAmortissementQueryOptions = <TData = Awaited<ReturnType<typeof getTableauAmortissement>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTableauAmortissement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTableauAmortissementQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTableauAmortissement>>> = ({ signal }) => getTableauAmortissement(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTableauAmortissement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTableauAmortissementQueryResult = NonNullable<Awaited<ReturnType<typeof getTableauAmortissement>>>
+export type GetTableauAmortissementQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Tableau d'amortissement complet
+ */
+
+export function useGetTableauAmortissement<TData = Awaited<ReturnType<typeof getTableauAmortissement>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTableauAmortissement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTableauAmortissementQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 

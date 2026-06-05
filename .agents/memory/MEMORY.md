@@ -9,3 +9,4 @@
 - [Object storage signed_url cast](objectstorage-signedfetch.md) — objectStorage.ts `response.json()` returns `unknown`; must cast `as { signed_url: string }` to avoid TS2339.
 - [Frontend toast hook path](frontend-toast-path.md) — toast hook lives at `@/hooks/use-toast`, NOT `@/components/ui/use-toast`.
 - [YAML inline mapping space required](yaml-colon-brace.md) — YAML `key:{...}` (no space after colon) causes orval to fail; must always write `key: { ... }` with a space.
+- [cooperativeId null guard in controllers](coop-id-null-guard.md) — req.user!.cooperativeId is typed `number | null`; always use `req.user?.cooperativeId` with an early-return null check before passing to service functions.

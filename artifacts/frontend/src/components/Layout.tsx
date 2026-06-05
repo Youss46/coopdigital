@@ -230,6 +230,12 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "magasinier"],
   },
   {
+    href: "/equipements",
+    label: "Équipements",
+    icon: Package,
+    roles: ["pca", "directeur", "comptable", "auditeur", "magasinier"],
+  },
+  {
     href: "/parametres",
     label: "Paramètres",
     icon: Settings,

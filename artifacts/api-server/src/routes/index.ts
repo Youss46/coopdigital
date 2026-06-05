@@ -35,6 +35,7 @@ import storageRouter from "./storage";
 import portailRouter from "./portail";
 import transportRouter from "./transport";
 import peseeRouter from "./pesee";
+import equipementsRouter from "./equipements";
 
 const router: IRouter = Router();
 
@@ -74,5 +75,6 @@ router.use(configRouter);
 router.use(storageRouter);
 router.use(transportRouter);
 router.use(peseeRouter);
+router.use(equipementsRouter);
 
 export default router;

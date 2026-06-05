@@ -6052,11 +6052,7 @@ export const GetRapportAgentPeseeParams = zod.object({
 
 export const GetRapportAgentPeseeResponse = zod.object({
   "agent_id": zod.number().optional(),
-  "nom": zod.string().nullish(),
-  "nb_pesees": zod.number().optional(),
-  "ecart_moyen_pct": zod.number().optional(),
-  "nb_anomalies": zod.number().optional(),
-  "nb_litiges": zod.number().optional()
+  "nom": zod.string().nullish()
 })
 
 
@@ -6092,6 +6088,376 @@ export const UpdateConfigPeseeResponse = zod.object({
   "tolerance_balance_g": zod.number().optional(),
   "frequence_verification_jours": zod.number().optional(),
   "updated_at": zod.string().nullish()
+})
+
+
+/**
+ * @summary Lister les catégories d'équipements
+ */
+export const GetCategoriesEquipementsResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "libelle": zod.string().optional(),
+  "duree_amortissement_ans": zod.number().optional(),
+  "methode_amortissement": zod.string().optional(),
+  "compte_immobilisation": zod.string().optional(),
+  "compte_amortissement": zod.string().optional(),
+  "created_at": zod.string().optional()
+})
+export const GetCategoriesEquipementsResponse = zod.array(GetCategoriesEquipementsResponseItem)
+
+
+/**
+ * @summary Lister les équipements
+ */
+export const GetEquipementsQueryParams = zod.object({
+  "categorie_id": zod.coerce.number().optional(),
+  "statut": zod.coerce.string().optional()
+})
+
+export const GetEquipementsResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "categorie_id": zod.number().optional(),
+  "categorie_libelle": zod.string().nullish(),
+  "designation": zod.string().optional(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "numero_serie": zod.string().nullish(),
+  "date_acquisition": zod.string().optional(),
+  "valeur_acquisition_fcfa": zod.string().optional(),
+  "valeur_residuelle_fcfa": zod.string().optional(),
+  "duree_amortissement_ans": zod.number().optional(),
+  "methode_amortissement": zod.string().optional(),
+  "valeur_nette_comptable_fcfa": zod.string().optional(),
+  "cumul_amortissement_fcfa": zod.string().optional(),
+  "statut": zod.string().optional(),
+  "affecte_a": zod.string().nullish(),
+  "affecte_user_id": zod.number().nullish(),
+  "date_mise_service": zod.string().nullish(),
+  "garantie_expiration": zod.string().nullish(),
+  "photo_url": zod.string().nullish(),
+  "created_at": zod.string().optional(),
+  "updated_at": zod.string().optional()
+})
+export const GetEquipementsResponse = zod.array(GetEquipementsResponseItem)
+
+
+/**
+ * @summary Créer un équipement
+ */
+export const PostEquipementBody = zod.object({
+  "categorie_id": zod.number(),
+  "designation": zod.string(),
+  "marque": zod.string().optional(),
+  "modele": zod.string().optional(),
+  "numero_serie": zod.string().optional(),
+  "date_acquisition": zod.coerce.date(),
+  "valeur_acquisition_fcfa": zod.number(),
+  "valeur_residuelle_fcfa": zod.number().optional(),
+  "duree_amortissement_ans": zod.number(),
+  "methode_amortissement": zod.enum(['lineaire', 'degressif']).optional(),
+  "affecte_a": zod.string().optional(),
+  "affecte_user_id": zod.number().optional(),
+  "date_mise_service": zod.coerce.date().optional(),
+  "garantie_expiration": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Équipements totalement amortis
+ */
+export const GetEquipementsAmortisResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "categorie_id": zod.number().optional(),
+  "categorie_libelle": zod.string().nullish(),
+  "designation": zod.string().optional(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "numero_serie": zod.string().nullish(),
+  "date_acquisition": zod.string().optional(),
+  "valeur_acquisition_fcfa": zod.string().optional(),
+  "valeur_residuelle_fcfa": zod.string().optional(),
+  "duree_amortissement_ans": zod.number().optional(),
+  "methode_amortissement": zod.string().optional(),
+  "valeur_nette_comptable_fcfa": zod.string().optional(),
+  "cumul_amortissement_fcfa": zod.string().optional(),
+  "statut": zod.string().optional(),
+  "affecte_a": zod.string().nullish(),
+  "affecte_user_id": zod.number().nullish(),
+  "date_mise_service": zod.string().nullish(),
+  "garantie_expiration": zod.string().nullish(),
+  "photo_url": zod.string().nullish(),
+  "created_at": zod.string().optional(),
+  "updated_at": zod.string().optional()
+})
+export const GetEquipementsAmortisResponse = zod.array(GetEquipementsAmortisResponseItem)
+
+
+/**
+ * @summary Alertes équipements
+ */
+export const GetEquipementsAlertesResponse = zod.object({
+  "maintenances_depassees": zod.array(zod.object({
+
+}).passthrough()).optional(),
+  "garanties_expirees": zod.array(zod.object({
+
+}).passthrough()).optional(),
+  "totalement_amortis": zod.array(zod.object({
+
+}).passthrough()).optional()
+})
+
+
+/**
+ * @summary Rapport inventaire OHADA
+ */
+export const GetRapportInventaireEquipementsResponse = zod.object({
+  "valeur_brute_totale": zod.number().optional(),
+  "cumul_amortissements": zod.number().optional(),
+  "vnc_totale": zod.number().optional(),
+  "par_categorie": zod.array(zod.object({
+  "categorie": zod.string().optional(),
+  "valeur_brute": zod.number().optional(),
+  "cumul_amortissement": zod.number().optional(),
+  "vnc": zod.number().optional(),
+  "nb_equipements": zod.number().optional()
+})).optional()
+})
+
+
+/**
+ * @summary Générer les dotations mensuelles
+ */
+export const postGenererDotationsBodyMoisMax = 12;
+
+
+
+export const PostGenererDotationsBody = zod.object({
+  "mois": zod.number().min(1).max(postGenererDotationsBodyMoisMax),
+  "annee": zod.number()
+})
+
+export const PostGenererDotationsResponse = zod.object({
+  "nb_dotations": zod.number().optional(),
+  "mois": zod.number().optional(),
+  "annee": zod.number().optional()
+})
+
+
+/**
+ * @summary Équipements par catégorie
+ */
+export const GetEquipementsByCategorieParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEquipementsByCategorieResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "categorie_id": zod.number().optional(),
+  "categorie_libelle": zod.string().nullish(),
+  "designation": zod.string().optional(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "numero_serie": zod.string().nullish(),
+  "date_acquisition": zod.string().optional(),
+  "valeur_acquisition_fcfa": zod.string().optional(),
+  "valeur_residuelle_fcfa": zod.string().optional(),
+  "duree_amortissement_ans": zod.number().optional(),
+  "methode_amortissement": zod.string().optional(),
+  "valeur_nette_comptable_fcfa": zod.string().optional(),
+  "cumul_amortissement_fcfa": zod.string().optional(),
+  "statut": zod.string().optional(),
+  "affecte_a": zod.string().nullish(),
+  "affecte_user_id": zod.number().nullish(),
+  "date_mise_service": zod.string().nullish(),
+  "garantie_expiration": zod.string().nullish(),
+  "photo_url": zod.string().nullish(),
+  "created_at": zod.string().optional(),
+  "updated_at": zod.string().optional()
+})
+export const GetEquipementsByCategorieResponse = zod.array(GetEquipementsByCategorieResponseItem)
+
+
+/**
+ * @summary Détail d'un équipement
+ */
+export const GetEquipementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEquipementResponse = zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "categorie_id": zod.number().optional(),
+  "categorie_libelle": zod.string().nullish(),
+  "designation": zod.string().optional(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "numero_serie": zod.string().nullish(),
+  "date_acquisition": zod.string().optional(),
+  "valeur_acquisition_fcfa": zod.string().optional(),
+  "valeur_residuelle_fcfa": zod.string().optional(),
+  "duree_amortissement_ans": zod.number().optional(),
+  "methode_amortissement": zod.string().optional(),
+  "valeur_nette_comptable_fcfa": zod.string().optional(),
+  "cumul_amortissement_fcfa": zod.string().optional(),
+  "statut": zod.string().optional(),
+  "affecte_a": zod.string().nullish(),
+  "affecte_user_id": zod.number().nullish(),
+  "date_mise_service": zod.string().nullish(),
+  "garantie_expiration": zod.string().nullish(),
+  "photo_url": zod.string().nullish(),
+  "created_at": zod.string().optional(),
+  "updated_at": zod.string().optional()
+})
+
+
+/**
+ * @summary Modifier un équipement
+ */
+export const PutEquipementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PutEquipementBody = zod.object({
+  "designation": zod.string().optional(),
+  "marque": zod.string().optional(),
+  "modele": zod.string().optional(),
+  "numero_serie": zod.string().optional(),
+  "date_acquisition": zod.coerce.date().optional(),
+  "valeur_acquisition_fcfa": zod.number().optional(),
+  "valeur_residuelle_fcfa": zod.number().optional(),
+  "duree_amortissement_ans": zod.number().optional(),
+  "methode_amortissement": zod.enum(['lineaire', 'degressif']).optional(),
+  "statut": zod.enum(['actif', 'hors_service', 'cede', 'vole']).optional(),
+  "affecte_a": zod.string().optional(),
+  "affecte_user_id": zod.number().optional(),
+  "date_mise_service": zod.coerce.date().optional(),
+  "garantie_expiration": zod.coerce.date().optional()
+})
+
+export const PutEquipementResponse = zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "categorie_id": zod.number().optional(),
+  "categorie_libelle": zod.string().nullish(),
+  "designation": zod.string().optional(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "numero_serie": zod.string().nullish(),
+  "date_acquisition": zod.string().optional(),
+  "valeur_acquisition_fcfa": zod.string().optional(),
+  "valeur_residuelle_fcfa": zod.string().optional(),
+  "duree_amortissement_ans": zod.number().optional(),
+  "methode_amortissement": zod.string().optional(),
+  "valeur_nette_comptable_fcfa": zod.string().optional(),
+  "cumul_amortissement_fcfa": zod.string().optional(),
+  "statut": zod.string().optional(),
+  "affecte_a": zod.string().nullish(),
+  "affecte_user_id": zod.number().nullish(),
+  "date_mise_service": zod.string().nullish(),
+  "garantie_expiration": zod.string().nullish(),
+  "photo_url": zod.string().nullish(),
+  "created_at": zod.string().optional(),
+  "updated_at": zod.string().optional()
+})
+
+
+/**
+ * @summary Supprimer un équipement
+ */
+export const DeleteEquipementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteEquipementResponse = zod.object({
+  "success": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Enregistrer une maintenance
+ */
+export const PostMaintenanceEquipementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostMaintenanceEquipementBody = zod.object({
+  "type": zod.enum(['preventive', 'corrective', 'revision']),
+  "date_maintenance": zod.coerce.date(),
+  "description": zod.string().optional(),
+  "cout_fcfa": zod.number().optional(),
+  "prestataire": zod.string().optional(),
+  "prochaine_maintenance": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Historique maintenances
+ */
+export const GetMaintenancesEquipementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetMaintenancesEquipementResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "equipement_id": zod.number().optional(),
+  "type": zod.string().optional(),
+  "date_maintenance": zod.string().optional(),
+  "description": zod.string().nullish(),
+  "cout_fcfa": zod.string().nullish(),
+  "prestataire": zod.string().nullish(),
+  "prochaine_maintenance": zod.string().nullish(),
+  "created_at": zod.string().optional()
+})
+export const GetMaintenancesEquipementResponse = zod.array(GetMaintenancesEquipementResponseItem)
+
+
+/**
+ * @summary Tableau d'amortissement complet
+ */
+export const GetTableauAmortissementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetTableauAmortissementResponse = zod.object({
+  "equipement": zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "categorie_id": zod.number().optional(),
+  "categorie_libelle": zod.string().nullish(),
+  "designation": zod.string().optional(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "numero_serie": zod.string().nullish(),
+  "date_acquisition": zod.string().optional(),
+  "valeur_acquisition_fcfa": zod.string().optional(),
+  "valeur_residuelle_fcfa": zod.string().optional(),
+  "duree_amortissement_ans": zod.number().optional(),
+  "methode_amortissement": zod.string().optional(),
+  "valeur_nette_comptable_fcfa": zod.string().optional(),
+  "cumul_amortissement_fcfa": zod.string().optional(),
+  "statut": zod.string().optional(),
+  "affecte_a": zod.string().nullish(),
+  "affecte_user_id": zod.number().nullish(),
+  "date_mise_service": zod.string().nullish(),
+  "garantie_expiration": zod.string().nullish(),
+  "photo_url": zod.string().nullish(),
+  "created_at": zod.string().optional(),
+  "updated_at": zod.string().optional()
+}).optional(),
+  "lignes": zod.array(zod.object({
+  "periode": zod.string().optional(),
+  "exercice": zod.number().optional(),
+  "mois": zod.number().optional(),
+  "dotation_fcfa": zod.number().optional(),
+  "cumul_fcfa": zod.number().optional(),
+  "vnc_fcfa": zod.number().optional()
+})).optional()
 })
 
 

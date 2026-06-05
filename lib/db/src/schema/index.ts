@@ -29,3 +29,4 @@ export * from "./notifications";
 export * from "./parametres";
 export * from "./transport";
 export * from "./pesee";
+export * from "./equipements";

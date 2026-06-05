@@ -4989,6 +4989,265 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ConfigPesee" }
 
+
+  # ── Équipements ─────────────────────────────────────────────────────────────
+
+  /categories-equipements:
+    get:
+      summary: Lister les catégories d'équipements
+      operationId: getCategoriesEquipements
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Liste des catégories
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CategorieEquipement' }
+
+  /equipements:
+    get:
+      summary: Lister les équipements
+      operationId: getEquipements
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: categorie_id
+          schema: { type: integer }
+        - in: query
+          name: statut
+          schema: { type: string }
+      responses:
+        '200':
+          description: Liste des équipements
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Equipement' }
+    post:
+      summary: Créer un équipement
+      operationId: postEquipement
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateEquipementBody' }
+      responses:
+        '201':
+          description: Équipement créé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Equipement' }
+
+  /equipements/amortis:
+    get:
+      summary: Équipements totalement amortis
+      operationId: getEquipementsAmortis
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Liste des équipements amortis
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Equipement' }
+
+  /equipements/alertes:
+    get:
+      summary: Alertes équipements
+      operationId: getEquipementsAlertes
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Alertes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertesEquipements' }
+
+  /equipements/rapport-inventaire:
+    get:
+      summary: Rapport inventaire OHADA
+      operationId: getRapportInventaireEquipements
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Rapport inventaire
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RapportInventaire' }
+
+  /equipements/generer-dotations:
+    post:
+      summary: Générer les dotations mensuelles
+      operationId: postGenererDotations
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GenererDotationsBody' }
+      responses:
+        '200':
+          description: Résultat de la génération
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResultatDotations' }
+
+  /equipements/categorie/{id}:
+    get:
+      summary: Équipements par catégorie
+      operationId: getEquipementsByCategorie
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Liste
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Equipement' }
+
+  /equipements/{id}:
+    get:
+      summary: Détail d'un équipement
+      operationId: getEquipement
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Équipement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Equipement' }
+        '404':
+          description: Introuvable
+    put:
+      summary: Modifier un équipement
+      operationId: putEquipement
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateEquipementBody' }
+      responses:
+        '200':
+          description: Équipement mis à jour
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Equipement' }
+    delete:
+      summary: Supprimer un équipement
+      operationId: deleteEquipement
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Supprimé
+          content:
+            application/json:
+              schema: { type: object, properties: { success: { type: boolean } } }
+
+  /equipements/{id}/maintenance:
+    post:
+      summary: Enregistrer une maintenance
+      operationId: postMaintenanceEquipement
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMaintenanceBody' }
+      responses:
+        '201':
+          description: Maintenance enregistrée
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MaintenanceEquipement' }
+
+  /equipements/{id}/maintenances:
+    get:
+      summary: Historique maintenances
+      operationId: getMaintenancesEquipement
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Historique
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MaintenanceEquipement' }
+
+  /equipements/{id}/tableau-amortissement:
+    get:
+      summary: Tableau d'amortissement complet
+      operationId: getTableauAmortissement
+      tags: [Equipements]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Tableau d'amortissement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  equipement: { $ref: '#/components/schemas/Equipement' }
+                  lignes:
+                    type: array
+                    items: { $ref: '#/components/schemas/LigneAmortissement' }
+
 components:
   schemas:
 
@@ -9577,7 +9836,157 @@ components:
       properties:
         agent_id:       { type: integer }
         nom:            { type: string, nullable: true }
-        nb_pesees:      { type: integer }
-        ecart_moyen_pct: { type: number }
-        nb_anomalies:   { type: integer }
-        nb_litiges:     { type: integer }
+
+    CategorieEquipement:
+      type: object
+      properties:
+        id: { type: integer }
+        cooperative_id: { type: integer }
+        libelle: { type: string }
+        duree_amortissement_ans: { type: integer }
+        methode_amortissement: { type: string }
+        compte_immobilisation: { type: string }
+        compte_amortissement: { type: string }
+        created_at: { type: string }
+
+    Equipement:
+      type: object
+      properties:
+        id: { type: integer }
+        cooperative_id: { type: integer }
+        categorie_id: { type: integer }
+        categorie_libelle: { type: string, nullable: true }
+        designation: { type: string }
+        marque: { type: string, nullable: true }
+        modele: { type: string, nullable: true }
+        numero_serie: { type: string, nullable: true }
+        date_acquisition: { type: string }
+        valeur_acquisition_fcfa: { type: string }
+        valeur_residuelle_fcfa: { type: string }
+        duree_amortissement_ans: { type: integer }
+        methode_amortissement: { type: string }
+        valeur_nette_comptable_fcfa: { type: string }
+        cumul_amortissement_fcfa: { type: string }
+        statut: { type: string }
+        affecte_a: { type: string, nullable: true }
+        affecte_user_id: { type: integer, nullable: true }
+        date_mise_service: { type: string, nullable: true }
+        garantie_expiration: { type: string, nullable: true }
+        photo_url: { type: string, nullable: true }
+        created_at: { type: string }
+        updated_at: { type: string }
+
+    CreateEquipementBody:
+      type: object
+      required: [categorie_id, designation, date_acquisition, valeur_acquisition_fcfa, duree_amortissement_ans]
+      properties:
+        categorie_id: { type: integer }
+        designation: { type: string }
+        marque: { type: string }
+        modele: { type: string }
+        numero_serie: { type: string }
+        date_acquisition: { type: string, format: date }
+        valeur_acquisition_fcfa: { type: number }
+        valeur_residuelle_fcfa: { type: number }
+        duree_amortissement_ans: { type: integer }
+        methode_amortissement: { type: string, enum: [lineaire, degressif] }
+        affecte_a: { type: string }
+        affecte_user_id: { type: integer }
+        date_mise_service: { type: string, format: date }
+        garantie_expiration: { type: string, format: date }
+
+    UpdateEquipementBody:
+      type: object
+      properties:
+        designation: { type: string }
+        marque: { type: string }
+        modele: { type: string }
+        numero_serie: { type: string }
+        date_acquisition: { type: string, format: date }
+        valeur_acquisition_fcfa: { type: number }
+        valeur_residuelle_fcfa: { type: number }
+        duree_amortissement_ans: { type: integer }
+        methode_amortissement: { type: string, enum: [lineaire, degressif] }
+        statut: { type: string, enum: [actif, hors_service, cede, vole] }
+        affecte_a: { type: string }
+        affecte_user_id: { type: integer }
+        date_mise_service: { type: string, format: date }
+        garantie_expiration: { type: string, format: date }
+
+    MaintenanceEquipement:
+      type: object
+      properties:
+        id: { type: integer }
+        equipement_id: { type: integer }
+        type: { type: string }
+        date_maintenance: { type: string }
+        description: { type: string, nullable: true }
+        cout_fcfa: { type: string, nullable: true }
+        prestataire: { type: string, nullable: true }
+        prochaine_maintenance: { type: string, nullable: true }
+        created_at: { type: string }
+
+    CreateMaintenanceBody:
+      type: object
+      required: [type, date_maintenance]
+      properties:
+        type: { type: string, enum: [preventive, corrective, revision] }
+        date_maintenance: { type: string, format: date }
+        description: { type: string }
+        cout_fcfa: { type: number }
+        prestataire: { type: string }
+        prochaine_maintenance: { type: string, format: date }
+
+    LigneAmortissement:
+      type: object
+      properties:
+        periode: { type: string }
+        exercice: { type: integer }
+        mois: { type: integer }
+        dotation_fcfa: { type: number }
+        cumul_fcfa: { type: number }
+        vnc_fcfa: { type: number }
+
+    AlertesEquipements:
+      type: object
+      properties:
+        maintenances_depassees:
+          type: array
+          items: { type: object }
+        garanties_expirees:
+          type: array
+          items: { type: object }
+        totalement_amortis:
+          type: array
+          items: { type: object }
+
+    RapportInventaire:
+      type: object
+      properties:
+        valeur_brute_totale: { type: number }
+        cumul_amortissements: { type: number }
+        vnc_totale: { type: number }
+        par_categorie:
+          type: array
+          items:
+            type: object
+            properties:
+              categorie: { type: string }
+              valeur_brute: { type: number }
+              cumul_amortissement: { type: number }
+              vnc: { type: number }
+              nb_equipements: { type: integer }
+
+    GenererDotationsBody:
+      type: object
+      required: [mois, annee]
+      properties:
+        mois: { type: integer, minimum: 1, maximum: 12 }
+        annee: { type: integer }
+
+    ResultatDotations:
+      type: object
+      properties:
+        nb_dotations: { type: integer }
+        mois: { type: integer }
+        annee: { type: integer }

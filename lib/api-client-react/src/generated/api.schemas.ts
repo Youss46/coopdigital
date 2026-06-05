@@ -3727,10 +3727,184 @@ export interface StatistiquesPesee {
 export interface RapportAgentPesee {
   agent_id?: number;
   nom?: string | null;
-  nb_pesees?: number;
-  ecart_moyen_pct?: number;
-  nb_anomalies?: number;
-  nb_litiges?: number;
+}
+
+export interface CategorieEquipement {
+  id?: number;
+  cooperative_id?: number;
+  libelle?: string;
+  duree_amortissement_ans?: number;
+  methode_amortissement?: string;
+  compte_immobilisation?: string;
+  compte_amortissement?: string;
+  created_at?: string;
+}
+
+export interface Equipement {
+  id?: number;
+  cooperative_id?: number;
+  categorie_id?: number;
+  categorie_libelle?: string | null;
+  designation?: string;
+  marque?: string | null;
+  modele?: string | null;
+  numero_serie?: string | null;
+  date_acquisition?: string;
+  valeur_acquisition_fcfa?: string;
+  valeur_residuelle_fcfa?: string;
+  duree_amortissement_ans?: number;
+  methode_amortissement?: string;
+  valeur_nette_comptable_fcfa?: string;
+  cumul_amortissement_fcfa?: string;
+  statut?: string;
+  affecte_a?: string | null;
+  affecte_user_id?: number | null;
+  date_mise_service?: string | null;
+  garantie_expiration?: string | null;
+  photo_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type CreateEquipementBodyMethodeAmortissement = typeof CreateEquipementBodyMethodeAmortissement[keyof typeof CreateEquipementBodyMethodeAmortissement];
+
+
+export const CreateEquipementBodyMethodeAmortissement = {
+  lineaire: 'lineaire',
+  degressif: 'degressif',
+} as const;
+
+export interface CreateEquipementBody {
+  categorie_id: number;
+  designation: string;
+  marque?: string;
+  modele?: string;
+  numero_serie?: string;
+  date_acquisition: string;
+  valeur_acquisition_fcfa: number;
+  valeur_residuelle_fcfa?: number;
+  duree_amortissement_ans: number;
+  methode_amortissement?: CreateEquipementBodyMethodeAmortissement;
+  affecte_a?: string;
+  affecte_user_id?: number;
+  date_mise_service?: string;
+  garantie_expiration?: string;
+}
+
+export type UpdateEquipementBodyMethodeAmortissement = typeof UpdateEquipementBodyMethodeAmortissement[keyof typeof UpdateEquipementBodyMethodeAmortissement];
+
+
+export const UpdateEquipementBodyMethodeAmortissement = {
+  lineaire: 'lineaire',
+  degressif: 'degressif',
+} as const;
+
+export type UpdateEquipementBodyStatut = typeof UpdateEquipementBodyStatut[keyof typeof UpdateEquipementBodyStatut];
+
+
+export const UpdateEquipementBodyStatut = {
+  actif: 'actif',
+  hors_service: 'hors_service',
+  cede: 'cede',
+  vole: 'vole',
+} as const;
+
+export interface UpdateEquipementBody {
+  designation?: string;
+  marque?: string;
+  modele?: string;
+  numero_serie?: string;
+  date_acquisition?: string;
+  valeur_acquisition_fcfa?: number;
+  valeur_residuelle_fcfa?: number;
+  duree_amortissement_ans?: number;
+  methode_amortissement?: UpdateEquipementBodyMethodeAmortissement;
+  statut?: UpdateEquipementBodyStatut;
+  affecte_a?: string;
+  affecte_user_id?: number;
+  date_mise_service?: string;
+  garantie_expiration?: string;
+}
+
+export interface MaintenanceEquipement {
+  id?: number;
+  equipement_id?: number;
+  type?: string;
+  date_maintenance?: string;
+  description?: string | null;
+  cout_fcfa?: string | null;
+  prestataire?: string | null;
+  prochaine_maintenance?: string | null;
+  created_at?: string;
+}
+
+export type CreateMaintenanceBodyType = typeof CreateMaintenanceBodyType[keyof typeof CreateMaintenanceBodyType];
+
+
+export const CreateMaintenanceBodyType = {
+  preventive: 'preventive',
+  corrective: 'corrective',
+  revision: 'revision',
+} as const;
+
+export interface CreateMaintenanceBody {
+  type: CreateMaintenanceBodyType;
+  date_maintenance: string;
+  description?: string;
+  cout_fcfa?: number;
+  prestataire?: string;
+  prochaine_maintenance?: string;
+}
+
+export interface LigneAmortissement {
+  periode?: string;
+  exercice?: number;
+  mois?: number;
+  dotation_fcfa?: number;
+  cumul_fcfa?: number;
+  vnc_fcfa?: number;
+}
+
+export type AlertesEquipementsMaintenancesDepasseesItem = { [key: string]: unknown };
+
+export type AlertesEquipementsGarantiesExpireesItem = { [key: string]: unknown };
+
+export type AlertesEquipementsTotalementAmortisItem = { [key: string]: unknown };
+
+export interface AlertesEquipements {
+  maintenances_depassees?: AlertesEquipementsMaintenancesDepasseesItem[];
+  garanties_expirees?: AlertesEquipementsGarantiesExpireesItem[];
+  totalement_amortis?: AlertesEquipementsTotalementAmortisItem[];
+}
+
+export type RapportInventaireParCategorieItem = {
+  categorie?: string;
+  valeur_brute?: number;
+  cumul_amortissement?: number;
+  vnc?: number;
+  nb_equipements?: number;
+};
+
+export interface RapportInventaire {
+  valeur_brute_totale?: number;
+  cumul_amortissements?: number;
+  vnc_totale?: number;
+  par_categorie?: RapportInventaireParCategorieItem[];
+}
+
+export interface GenererDotationsBody {
+  /**
+     * @minimum 1
+     * @maximum 12
+     */
+  mois: number;
+  annee: number;
+}
+
+export interface ResultatDotations {
+  nb_dotations?: number;
+  mois?: number;
+  annee?: number;
 }
 
 export type GetMembresParams = {
@@ -4192,5 +4366,19 @@ export type CreateLitige201 = {
 
 export type ResoudreLitige200 = {
   litige?: LitigePesee;
+};
+
+export type GetEquipementsParams = {
+categorie_id?: number;
+statut?: string;
+};
+
+export type DeleteEquipement200 = {
+  success?: boolean;
+};
+
+export type GetTableauAmortissement200 = {
+  equipement?: Equipement;
+  lignes?: LigneAmortissement[];
 };
 
