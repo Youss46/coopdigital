@@ -29,11 +29,13 @@ import prixRouter from "./prix";
 import scoringRouter from "./scoring";
 import anomaliesRouter from "./anomalies";
 import auditRouter from "./audit";
+import portailRouter from "./portail";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(portailRouter);
 router.use(membresRouter);
 router.use(avancesRouter);
 router.use(campagnesRouter);

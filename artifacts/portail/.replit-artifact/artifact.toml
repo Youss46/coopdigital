@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/portail/"
+title = "Portail Membre"
+version = "1.0.0"
+id = "artifacts/portail"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/portail/" ]
+localPort = 20823
+
+[services.development]
+run = "pnpm --filter @workspace/portail run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/portail", "run", "build" ]
+publicDir = "artifacts/portail/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20823"
+BASE_PATH = "/portail/"
