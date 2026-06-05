@@ -32,7 +32,7 @@ export default function Membres() {
     setExportPending(true);
     try {
       const params = statut ? `?statut=${statut}` : "";
-      const token = localStorage.getItem("auth_token") ?? "";
+      const token = localStorage.getItem("coop_token") ?? "";
       const res = await fetch(`/api/membres/export-pdf${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
