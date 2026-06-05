@@ -2343,6 +2343,126 @@ paths:
                   $ref: "#/components/schemas/DistributionIntrant"
 
 
+
+  /devises:
+    get:
+      summary: Liste des devises actives
+      tags: [devises]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Devises
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Devise"
+
+  /devises/taux:
+    get:
+      summary: Taux de change actuels (un par devise)
+      tags: [devises]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Taux actuels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TauxChange"
+    post:
+      summary: Saisir un nouveau taux
+      tags: [devises]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TauxChangeInput"
+      responses:
+        "201":
+          description: Taux créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TauxChange"
+
+  /devises/taux/historique/{devise}:
+    get:
+      summary: Historique 12 mois pour une devise
+      tags: [devises]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: devise
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Historique taux
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TauxChange"
+
+  /devises/taux/actuel/{devise}:
+    get:
+      summary: Taux actuel d'une devise spécifique
+      tags: [devises]
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: devise
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Taux actuel
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TauxActuel"
+
+  /devises/convertir:
+    post:
+      summary: Convertir un montant en FCFA
+      tags: [devises]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversionInput"
+      responses:
+        "200":
+          description: Résultat conversion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversionResult"
+
+  /devises/gain-perte:
+    get:
+      summary: Rapport gains/pertes de change
+      tags: [devises]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Rapport change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RapportChange"
+
   /emprunts/dashboard:
     get:
       summary: KPIs emprunts
@@ -2669,6 +2789,139 @@ paths:
 
 components:
   schemas:
+
+    Devise:
+      type: object
+      required: [id, code, libelle, symbole, actif]
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        libelle:
+          type: string
+        symbole:
+          type: string
+        actif:
+          type: boolean
+
+    TauxChange:
+      type: object
+      required: [id, cooperative_id, devise_source, devise_cible, taux, date_application, source_taux, created_at]
+      properties:
+        id:
+          type: integer
+        cooperative_id:
+          type: integer
+        devise_source:
+          type: string
+        devise_cible:
+          type: string
+        taux:
+          type: string
+        date_application:
+          type: string
+        source_taux:
+          type: string
+        saisi_par_email:
+          type: ["string", "null"]
+        created_at:
+          type: string
+
+    TauxChangeInput:
+      type: object
+      required: [deviseSource, taux, dateApplication, sourceTaux]
+      properties:
+        deviseSource:
+          type: string
+        taux:
+          type: number
+        dateApplication:
+          type: string
+        sourceTaux:
+          type: string
+          enum: [BCEAO, manuel, COFACE]
+
+    TauxActuel:
+      type: object
+      required: [taux, dateApplication, sourceTaux, alerteAncien]
+      properties:
+        taux:
+          type: number
+        dateApplication:
+          type: string
+        sourceTaux:
+          type: string
+        alerteAncien:
+          type: boolean
+
+    ConversionInput:
+      type: object
+      required: [montant, deviseSource, date]
+      properties:
+        montant:
+          type: number
+        deviseSource:
+          type: string
+        date:
+          type: string
+
+    ConversionResult:
+      type: object
+      required: [montantFcfa, tauxApplique, dateApplication, sourceTaux]
+      properties:
+        montantFcfa:
+          type: number
+        tauxApplique:
+          type: number
+        dateApplication:
+          type: string
+        sourceTaux:
+          type: string
+
+    RapportChange:
+      type: object
+      required: [details, totalGain, totalPerte, soldeNet, ecrituresComptables]
+      properties:
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              exportateurId:
+                type: integer
+              exportateurNom:
+                type: ["string", "null"]
+              devise:
+                type: string
+              totalMontantFcfa:
+                type: string
+              totalConverti:
+                type: string
+              totalGainPerte:
+                type: string
+              nbVentes:
+                type: number
+        totalGain:
+          type: number
+        totalPerte:
+          type: number
+        soldeNet:
+          type: number
+        ecrituresComptables:
+          type: array
+          items:
+            type: object
+            properties:
+              debit:
+                type: string
+              credit:
+                type: string
+              montant:
+                type: number
+              libelle:
+                type: string
+
 
     Preteur:
       type: object

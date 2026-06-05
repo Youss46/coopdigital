@@ -105,6 +105,12 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     configurer_alertes: ["pca", "directeur"],
   },
 
+  devises: {
+    voir_taux:      ["pca", "directeur", "comptable", "auditeur"],
+    modifier_taux:  ["pca", "directeur", "comptable"],
+    rapport_change: ["pca", "directeur", "comptable", "auditeur"],
+  },
+
   salaires: {
     lire:                ["pca", "directeur", "comptable", "auditeur"],
     creer_personnel:     ["pca", "directeur"],

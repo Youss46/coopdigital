@@ -5,6 +5,89 @@
  * CoopDigital — API de gestion des coopératives cacaoyères
  * OpenAPI spec version: 0.1.0
  */
+export interface Devise {
+  id: number;
+  code: string;
+  libelle: string;
+  symbole: string;
+  actif: boolean;
+}
+
+export interface TauxChange {
+  id: number;
+  cooperative_id: number;
+  devise_source: string;
+  devise_cible: string;
+  taux: string;
+  date_application: string;
+  source_taux: string;
+  /** @nullable */
+  saisi_par_email?: string | null;
+  created_at: string;
+}
+
+export type TauxChangeInputSourceTaux = typeof TauxChangeInputSourceTaux[keyof typeof TauxChangeInputSourceTaux];
+
+
+export const TauxChangeInputSourceTaux = {
+  BCEAO: 'BCEAO',
+  manuel: 'manuel',
+  COFACE: 'COFACE',
+} as const;
+
+export interface TauxChangeInput {
+  deviseSource: string;
+  taux: number;
+  dateApplication: string;
+  sourceTaux: TauxChangeInputSourceTaux;
+}
+
+export interface TauxActuel {
+  taux: number;
+  dateApplication: string;
+  sourceTaux: string;
+  alerteAncien: boolean;
+}
+
+export interface ConversionInput {
+  montant: number;
+  deviseSource: string;
+  date: string;
+}
+
+export interface ConversionResult {
+  montantFcfa: number;
+  tauxApplique: number;
+  dateApplication: string;
+  sourceTaux: string;
+}
+
+export type RapportChangeDetailsItem = {
+  exportateurId?: number;
+  /** @nullable */
+  exportateurNom?: string | null;
+  devise?: string;
+  totalMontantFcfa?: string;
+  totalConverti?: string;
+  totalGainPerte?: string;
+  nbVentes?: number;
+};
+
+export type RapportChangeEcrituresComptablesItem = {
+  debit?: string;
+  credit?: string;
+  montant?: number;
+  libelle?: string;
+};
+
+export interface RapportChange {
+  details: RapportChangeDetailsItem[];
+  totalGain: number;
+  totalPerte: number;
+  soldeNet: number;
+  ecrituresComptables: RapportChangeEcrituresComptablesItem[];
+}
+
 export type PreteurType = typeof PreteurType[keyof typeof PreteurType];
 
 

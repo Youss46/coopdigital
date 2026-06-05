@@ -2485,6 +2485,125 @@ export const GetDistributionsMembreIntrantsResponse = zod.array(GetDistributions
 
 
 /**
+ * @summary Liste des devises actives
+ */
+export const GetDevisesResponseItem = zod.object({
+  "id": zod.number(),
+  "code": zod.string(),
+  "libelle": zod.string(),
+  "symbole": zod.string(),
+  "actif": zod.boolean()
+})
+export const GetDevisesResponse = zod.array(GetDevisesResponseItem)
+
+
+/**
+ * @summary Taux de change actuels (un par devise)
+ */
+export const GetDevisesTauxResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "devise_source": zod.string(),
+  "devise_cible": zod.string(),
+  "taux": zod.string(),
+  "date_application": zod.string(),
+  "source_taux": zod.string(),
+  "saisi_par_email": zod.string().nullish(),
+  "created_at": zod.string()
+})
+export const GetDevisesTauxResponse = zod.array(GetDevisesTauxResponseItem)
+
+
+/**
+ * @summary Saisir un nouveau taux
+ */
+export const PostDevisesTauxBody = zod.object({
+  "deviseSource": zod.string(),
+  "taux": zod.number(),
+  "dateApplication": zod.string(),
+  "sourceTaux": zod.enum(['BCEAO', 'manuel', 'COFACE'])
+})
+
+
+/**
+ * @summary Historique 12 mois pour une devise
+ */
+export const GetDevisesTauxHistoriqueDeviseParams = zod.object({
+  "devise": zod.coerce.string()
+})
+
+export const GetDevisesTauxHistoriqueDeviseResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "devise_source": zod.string(),
+  "devise_cible": zod.string(),
+  "taux": zod.string(),
+  "date_application": zod.string(),
+  "source_taux": zod.string(),
+  "saisi_par_email": zod.string().nullish(),
+  "created_at": zod.string()
+})
+export const GetDevisesTauxHistoriqueDeviseResponse = zod.array(GetDevisesTauxHistoriqueDeviseResponseItem)
+
+
+/**
+ * @summary Taux actuel d'une devise spécifique
+ */
+export const GetDevisesTauxActuelDeviseParams = zod.object({
+  "devise": zod.coerce.string()
+})
+
+export const GetDevisesTauxActuelDeviseResponse = zod.object({
+  "taux": zod.number(),
+  "dateApplication": zod.string(),
+  "sourceTaux": zod.string(),
+  "alerteAncien": zod.boolean()
+})
+
+
+/**
+ * @summary Convertir un montant en FCFA
+ */
+export const PostDevisesConvertirBody = zod.object({
+  "montant": zod.number(),
+  "deviseSource": zod.string(),
+  "date": zod.string()
+})
+
+export const PostDevisesConvertirResponse = zod.object({
+  "montantFcfa": zod.number(),
+  "tauxApplique": zod.number(),
+  "dateApplication": zod.string(),
+  "sourceTaux": zod.string()
+})
+
+
+/**
+ * @summary Rapport gains/pertes de change
+ */
+export const GetDevisesGainPerteResponse = zod.object({
+  "details": zod.array(zod.object({
+  "exportateurId": zod.number().optional(),
+  "exportateurNom": zod.string().nullish(),
+  "devise": zod.string().optional(),
+  "totalMontantFcfa": zod.string().optional(),
+  "totalConverti": zod.string().optional(),
+  "totalGainPerte": zod.string().optional(),
+  "nbVentes": zod.number().optional()
+})),
+  "totalGain": zod.number(),
+  "totalPerte": zod.number(),
+  "soldeNet": zod.number(),
+  "ecrituresComptables": zod.array(zod.object({
+  "debit": zod.string().optional(),
+  "credit": zod.string().optional(),
+  "montant": zod.number().optional(),
+  "libelle": zod.string().optional()
+}))
+})
+
+
+/**
  * @summary KPIs emprunts
  */
 export const GetEmpruntsDashboardResponse = zod.object({

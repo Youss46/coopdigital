@@ -41,6 +41,8 @@ import type {
   CompteResultat,
   ConfigComptable,
   ConfigPartsSociales,
+  ConversionInput,
+  ConversionResult,
   CountEcrituresEnAttente200,
   CountRefusEnAttente200,
   CreancesSummary,
@@ -48,6 +50,7 @@ import type {
   CreatePersonnelInput,
   CreateUserInput,
   DashboardKpi,
+  Devise,
   DistributionIntrant,
   DistributionIntrantInput,
   EcheanceAlerte,
@@ -129,6 +132,7 @@ import type {
   Preteur,
   PreteurInput,
   RapportCampagneIntrants,
+  RapportChange,
   RapportMensuel,
   RapportParts,
   Refus,
@@ -145,6 +149,9 @@ import type {
   SmsGroupeInput,
   SmsGroupeResult,
   SmsHistorique,
+  TauxActuel,
+  TauxChange,
+  TauxChangeInput,
   ToggleActifInput,
   TraiterRefusInput,
   Tresorerie,
@@ -8231,6 +8238,533 @@ export function useGetDistributionsMembreIntrants<TData = Awaited<ReturnType<typ
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDistributionsMembreIntrantsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetDevisesUrl = () => {
+
+
+
+
+  return `/api/devises`
+}
+
+/**
+ * @summary Liste des devises actives
+ */
+export const getDevises = async ( options?: RequestInit): Promise<Devise[]> => {
+
+  return customFetch<Devise[]>(getGetDevisesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDevisesQueryKey = () => {
+    return [
+    `/api/devises`
+    ] as const;
+    }
+
+
+export const getGetDevisesQueryOptions = <TData = Awaited<ReturnType<typeof getDevises>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDevises>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDevisesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDevises>>> = ({ signal }) => getDevises({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDevises>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDevisesQueryResult = NonNullable<Awaited<ReturnType<typeof getDevises>>>
+export type GetDevisesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des devises actives
+ */
+
+export function useGetDevises<TData = Awaited<ReturnType<typeof getDevises>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDevises>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDevisesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetDevisesTauxUrl = () => {
+
+
+
+
+  return `/api/devises/taux`
+}
+
+/**
+ * @summary Taux de change actuels (un par devise)
+ */
+export const getDevisesTaux = async ( options?: RequestInit): Promise<TauxChange[]> => {
+
+  return customFetch<TauxChange[]>(getGetDevisesTauxUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDevisesTauxQueryKey = () => {
+    return [
+    `/api/devises/taux`
+    ] as const;
+    }
+
+
+export const getGetDevisesTauxQueryOptions = <TData = Awaited<ReturnType<typeof getDevisesTaux>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDevisesTaux>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDevisesTauxQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDevisesTaux>>> = ({ signal }) => getDevisesTaux({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDevisesTaux>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDevisesTauxQueryResult = NonNullable<Awaited<ReturnType<typeof getDevisesTaux>>>
+export type GetDevisesTauxQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Taux de change actuels (un par devise)
+ */
+
+export function useGetDevisesTaux<TData = Awaited<ReturnType<typeof getDevisesTaux>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDevisesTaux>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDevisesTauxQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostDevisesTauxUrl = () => {
+
+
+
+
+  return `/api/devises/taux`
+}
+
+/**
+ * @summary Saisir un nouveau taux
+ */
+export const postDevisesTaux = async (tauxChangeInput: TauxChangeInput, options?: RequestInit): Promise<TauxChange> => {
+
+  return customFetch<TauxChange>(getPostDevisesTauxUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      tauxChangeInput,)
+  }
+);}
+
+
+
+
+export const getPostDevisesTauxMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDevisesTaux>>, TError,{data: BodyType<TauxChangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postDevisesTaux>>, TError,{data: BodyType<TauxChangeInput>}, TContext> => {
+
+const mutationKey = ['postDevisesTaux'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postDevisesTaux>>, {data: BodyType<TauxChangeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postDevisesTaux(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostDevisesTauxMutationResult = NonNullable<Awaited<ReturnType<typeof postDevisesTaux>>>
+    export type PostDevisesTauxMutationBody = BodyType<TauxChangeInput>
+    export type PostDevisesTauxMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Saisir un nouveau taux
+ */
+export const usePostDevisesTaux = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDevisesTaux>>, TError,{data: BodyType<TauxChangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postDevisesTaux>>,
+        TError,
+        {data: BodyType<TauxChangeInput>},
+        TContext
+      > => {
+      return useMutation(getPostDevisesTauxMutationOptions(options));
+    }
+
+export const getGetDevisesTauxHistoriqueDeviseUrl = (devise: string,) => {
+
+
+
+
+  return `/api/devises/taux/historique/${devise}`
+}
+
+/**
+ * @summary Historique 12 mois pour une devise
+ */
+export const getDevisesTauxHistoriqueDevise = async (devise: string, options?: RequestInit): Promise<TauxChange[]> => {
+
+  return customFetch<TauxChange[]>(getGetDevisesTauxHistoriqueDeviseUrl(devise),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDevisesTauxHistoriqueDeviseQueryKey = (devise: string,) => {
+    return [
+    `/api/devises/taux/historique/${devise}`
+    ] as const;
+    }
+
+
+export const getGetDevisesTauxHistoriqueDeviseQueryOptions = <TData = Awaited<ReturnType<typeof getDevisesTauxHistoriqueDevise>>, TError = ErrorType<unknown>>(devise: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDevisesTauxHistoriqueDevise>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDevisesTauxHistoriqueDeviseQueryKey(devise);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDevisesTauxHistoriqueDevise>>> = ({ signal }) => getDevisesTauxHistoriqueDevise(devise, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(devise), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDevisesTauxHistoriqueDevise>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDevisesTauxHistoriqueDeviseQueryResult = NonNullable<Awaited<ReturnType<typeof getDevisesTauxHistoriqueDevise>>>
+export type GetDevisesTauxHistoriqueDeviseQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Historique 12 mois pour une devise
+ */
+
+export function useGetDevisesTauxHistoriqueDevise<TData = Awaited<ReturnType<typeof getDevisesTauxHistoriqueDevise>>, TError = ErrorType<unknown>>(
+ devise: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDevisesTauxHistoriqueDevise>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDevisesTauxHistoriqueDeviseQueryOptions(devise,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetDevisesTauxActuelDeviseUrl = (devise: string,) => {
+
+
+
+
+  return `/api/devises/taux/actuel/${devise}`
+}
+
+/**
+ * @summary Taux actuel d'une devise spécifique
+ */
+export const getDevisesTauxActuelDevise = async (devise: string, options?: RequestInit): Promise<TauxActuel> => {
+
+  return customFetch<TauxActuel>(getGetDevisesTauxActuelDeviseUrl(devise),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDevisesTauxActuelDeviseQueryKey = (devise: string,) => {
+    return [
+    `/api/devises/taux/actuel/${devise}`
+    ] as const;
+    }
+
+
+export const getGetDevisesTauxActuelDeviseQueryOptions = <TData = Awaited<ReturnType<typeof getDevisesTauxActuelDevise>>, TError = ErrorType<unknown>>(devise: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDevisesTauxActuelDevise>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDevisesTauxActuelDeviseQueryKey(devise);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDevisesTauxActuelDevise>>> = ({ signal }) => getDevisesTauxActuelDevise(devise, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(devise), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDevisesTauxActuelDevise>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDevisesTauxActuelDeviseQueryResult = NonNullable<Awaited<ReturnType<typeof getDevisesTauxActuelDevise>>>
+export type GetDevisesTauxActuelDeviseQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Taux actuel d'une devise spécifique
+ */
+
+export function useGetDevisesTauxActuelDevise<TData = Awaited<ReturnType<typeof getDevisesTauxActuelDevise>>, TError = ErrorType<unknown>>(
+ devise: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDevisesTauxActuelDevise>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDevisesTauxActuelDeviseQueryOptions(devise,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostDevisesConvertirUrl = () => {
+
+
+
+
+  return `/api/devises/convertir`
+}
+
+/**
+ * @summary Convertir un montant en FCFA
+ */
+export const postDevisesConvertir = async (conversionInput: ConversionInput, options?: RequestInit): Promise<ConversionResult> => {
+
+  return customFetch<ConversionResult>(getPostDevisesConvertirUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      conversionInput,)
+  }
+);}
+
+
+
+
+export const getPostDevisesConvertirMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDevisesConvertir>>, TError,{data: BodyType<ConversionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postDevisesConvertir>>, TError,{data: BodyType<ConversionInput>}, TContext> => {
+
+const mutationKey = ['postDevisesConvertir'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postDevisesConvertir>>, {data: BodyType<ConversionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postDevisesConvertir(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostDevisesConvertirMutationResult = NonNullable<Awaited<ReturnType<typeof postDevisesConvertir>>>
+    export type PostDevisesConvertirMutationBody = BodyType<ConversionInput>
+    export type PostDevisesConvertirMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Convertir un montant en FCFA
+ */
+export const usePostDevisesConvertir = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDevisesConvertir>>, TError,{data: BodyType<ConversionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postDevisesConvertir>>,
+        TError,
+        {data: BodyType<ConversionInput>},
+        TContext
+      > => {
+      return useMutation(getPostDevisesConvertirMutationOptions(options));
+    }
+
+export const getGetDevisesGainPerteUrl = () => {
+
+
+
+
+  return `/api/devises/gain-perte`
+}
+
+/**
+ * @summary Rapport gains/pertes de change
+ */
+export const getDevisesGainPerte = async ( options?: RequestInit): Promise<RapportChange> => {
+
+  return customFetch<RapportChange>(getGetDevisesGainPerteUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDevisesGainPerteQueryKey = () => {
+    return [
+    `/api/devises/gain-perte`
+    ] as const;
+    }
+
+
+export const getGetDevisesGainPerteQueryOptions = <TData = Awaited<ReturnType<typeof getDevisesGainPerte>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDevisesGainPerte>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDevisesGainPerteQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDevisesGainPerte>>> = ({ signal }) => getDevisesGainPerte({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDevisesGainPerte>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDevisesGainPerteQueryResult = NonNullable<Awaited<ReturnType<typeof getDevisesGainPerte>>>
+export type GetDevisesGainPerteQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Rapport gains/pertes de change
+ */
+
+export function useGetDevisesGainPerte<TData = Awaited<ReturnType<typeof getDevisesGainPerte>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDevisesGainPerte>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDevisesGainPerteQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -52,6 +52,11 @@ export const ventesExportateursTable = pgTable("ventes_exportateurs", {
   montantRecuFcfa: integer("montant_recu_fcfa").notNull().default(0),
   soldeDuFcfa: integer("solde_du_fcfa").notNull(),
   statut: venteStatutEnum("statut").notNull().default("en_attente"),
+  deviseFacturation:        text("devise_facturation").notNull().default("XOF"),
+  montantDeviseEtrangere:   numeric("montant_devise_etrangere", { precision: 18, scale: 4 }),
+  tauxChangeApplique:       numeric("taux_change_applique",     { precision: 18, scale: 6 }),
+  montantFcfaConverti:      numeric("montant_fcfa_converti",    { precision: 16, scale: 2 }),
+  gainPerteChangeFcfa:      numeric("gain_perte_change_fcfa",   { precision: 16, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

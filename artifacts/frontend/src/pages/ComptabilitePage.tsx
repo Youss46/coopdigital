@@ -8,12 +8,25 @@ import {
   useRejeterEcritureEnAttente,
   useValiderToutEcrituresEnAttente,
   useGetJournalComptable,
+  useGetDevisesTaux,
+  usePostDevisesTaux,
+  useGetDevisesTauxHistoriqueDevise,
+  useGetDevisesGainPerte,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getGetConfigComptableQueryKey, getCountEcrituresEnAttenteQueryKey, getListEcrituresEnAttenteQueryKey, getGetJournalComptableQueryKey } from "@workspace/api-client-react";
+import {
+  getGetConfigComptableQueryKey,
+  getCountEcrituresEnAttenteQueryKey,
+  getListEcrituresEnAttenteQueryKey,
+  getGetJournalComptableQueryKey,
+  getGetDevisesTauxQueryKey,
+  getGetDevisesTauxHistoriqueDeviseQueryKey,
+} from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, RefreshCw, DollarSign } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { type TauxChange } from "@workspace/api-client-react";
 
 const VERT = "#1a4731";
 const OR = "#c4962a";
@@ -673,8 +686,347 @@ function OngletJournal() {
   );
 }
 
+// ─── Onglet Devises ───────────────────────────────────────────────────────────
+const DEVISE_COLORS: Record<string, string> = { EUR: "#2563eb", USD: "#16a34a", GBP: "#9333ea" };
+
+function OngletDevises() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const peutModifier = usePermission("devises", "modifier_taux");
+  const [deviseGraphe, setDeviseGraphe] = useState<string>("EUR");
+  const [modalTaux, setModalTaux] = useState(false);
+  const [formTaux, setFormTaux] = useState({ deviseSource: "EUR", taux: "", dateApplication: new Date().toISOString().slice(0, 10), sourceTaux: "BCEAO" as "BCEAO" | "manuel" | "COFACE" });
+
+  const { data: tauxActuels = [] } = useGetDevisesTaux({ query: { queryKey: getGetDevisesTauxQueryKey() } });
+  const { data: historique = [] } = useGetDevisesTauxHistoriqueDevise(deviseGraphe, {
+    query: { queryKey: getGetDevisesTauxHistoriqueDeviseQueryKey(deviseGraphe) },
+  });
+  const { data: rapport } = useGetDevisesGainPerte();
+
+  const mutTaux = usePostDevisesTaux({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetDevisesTauxQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDevisesTauxHistoriqueDeviseQueryKey(formTaux.deviseSource) });
+        setModalTaux(false);
+        setFormTaux({ deviseSource: "EUR", taux: "", dateApplication: new Date().toISOString().slice(0, 10), sourceTaux: "BCEAO" });
+        toast({ title: "Taux enregistré", description: "Le nouveau taux de change a été saisi." });
+      },
+      onError: () => toast({ title: "Erreur", description: "Impossible de sauvegarder le taux.", variant: "destructive" }),
+    },
+  });
+
+  const graphData = (historique as TauxChange[]).map((h) => ({
+    date: h.date_application ? new Date(h.date_application).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "",
+    taux: parseFloat(h.taux ?? "0"),
+  }));
+
+  const details = (rapport as { details?: Record<string, unknown>[] } | undefined)?.details ?? [];
+  const totalGain = (rapport as { totalGain?: number } | undefined)?.totalGain ?? 0;
+  const totalPerte = (rapport as { totalPerte?: number } | undefined)?.totalPerte ?? 0;
+  const soldeNet = (rapport as { soldeNet?: number } | undefined)?.soldeNet ?? 0;
+  const ecritures = (rapport as { ecrituresComptables?: { debit: string; credit: string; montant: number; libelle: string }[] } | undefined)?.ecrituresComptables ?? [];
+
+  return (
+    <div className="space-y-6">
+      {/* Tableau taux actuels */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="font-semibold text-gray-900">Taux de change actuels</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Un taux par devise — source BCEAO ou saisie manuelle</p>
+          </div>
+          {peutModifier && (
+            <button
+              onClick={() => setModalTaux(true)}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white rounded-lg"
+              style={{ backgroundColor: VERT }}
+            >
+              <RefreshCw size={14} />
+              Mettre à jour
+            </button>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="text-left px-4 py-3 font-medium text-gray-500">Devise</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-500">Taux (1 → FCFA)</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-500">Date</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-500">Source</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {tauxActuels.length === 0 ? (
+                <tr><td colSpan={4} className="text-center py-6 text-gray-400 text-sm">Aucun taux enregistré</td></tr>
+              ) : (tauxActuels as TauxChange[]).map((t) => (
+                <tr key={t.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-2 font-semibold text-gray-900">
+                      <span
+                        className="inline-block w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: DEVISE_COLORS[t.devise_source] ?? "#6b7280" }}
+                      />
+                      {t.devise_source} → {t.devise_cible}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">
+                    {parseFloat(t.taux).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-500">
+                    {new Date(t.date_application).toLocaleDateString("fr-FR")}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                      {t.source_taux}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Historique graphique */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold text-gray-900">Historique 12 mois</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Évolution du taux vers FCFA</p>
+          </div>
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            {["EUR", "USD", "GBP"].map((d) => (
+              <button
+                key={d}
+                onClick={() => setDeviseGraphe(d)}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${deviseGraphe === d ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+        {graphData.length < 2 ? (
+          <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Pas assez de données pour {deviseGraphe}</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={graphData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
+              <Tooltip
+                contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                formatter={(v: number) => [`${v.toLocaleString("fr-FR", { minimumFractionDigits: 3 })} FCFA`, `1 ${deviseGraphe}`]}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="taux"
+                name={`1 ${deviseGraphe} (FCFA)`}
+                stroke={DEVISE_COLORS[deviseGraphe] ?? "#6b7280"}
+                strokeWidth={2}
+                dot={graphData.length < 15}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Rapport gains/pertes */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Gains / Pertes de change — campagne en cours</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Ventes exportateurs en devise étrangère vs FCFA</p>
+        </div>
+        <div className="grid grid-cols-3 gap-4 p-5">
+          <div className="bg-green-50 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp size={16} className="text-green-600" />
+              <span className="text-xs text-gray-500 font-medium">Gains de change</span>
+            </div>
+            <p className="text-xl font-bold text-green-700">{FCFA(totalGain)}</p>
+          </div>
+          <div className="bg-red-50 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingDown size={16} className="text-red-600" />
+              <span className="text-xs text-gray-500 font-medium">Pertes de change</span>
+            </div>
+            <p className="text-xl font-bold text-red-700">{FCFA(totalPerte)}</p>
+          </div>
+          <div className={`rounded-lg p-4 ${soldeNet >= 0 ? "bg-blue-50" : "bg-orange-50"}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <DollarSign size={16} className={soldeNet >= 0 ? "text-blue-600" : "text-orange-600"} />
+              <span className="text-xs text-gray-500 font-medium">Solde net</span>
+            </div>
+            <p className={`text-xl font-bold ${soldeNet >= 0 ? "text-blue-700" : "text-orange-700"}`}>{FCFA(Math.abs(soldeNet))}</p>
+          </div>
+        </div>
+
+        {details.length > 0 && (
+          <div className="px-5 pb-5">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Détail par exportateur</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 rounded-lg">
+                    <th className="text-left px-3 py-2 font-medium text-gray-500">Exportateur</th>
+                    <th className="text-center px-3 py-2 font-medium text-gray-500">Devise</th>
+                    <th className="text-right px-3 py-2 font-medium text-gray-500">Facturé (FCFA)</th>
+                    <th className="text-right px-3 py-2 font-medium text-gray-500">Converti (FCFA)</th>
+                    <th className="text-right px-3 py-2 font-medium text-gray-500">Gain / Perte</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {(details as Record<string, unknown>[]).map((d, i) => {
+                    const gp = Number(d["totalGainPerte"] ?? 0);
+                    return (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 font-medium text-gray-900">{String(d["exportateurNom"] ?? "—")}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ backgroundColor: `${DEVISE_COLORS[String(d["devise"] ?? "")] ?? "#6b7280"}20`, color: DEVISE_COLORS[String(d["devise"] ?? "")] ?? "#6b7280" }}>
+                            {String(d["devise"] ?? "—")}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-700">{FCFA(Number(d["totalMontantFcfa"] ?? 0))}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{FCFA(Number(d["totalConverti"] ?? 0))}</td>
+                        <td className={`px-3 py-2 text-right font-semibold ${gp >= 0 ? "text-green-700" : "text-red-700"}`}>
+                          {gp >= 0 ? "+" : ""}{FCFA(gp)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {ecritures.length > 0 && (
+          <div className="mx-5 mb-5 border border-blue-100 rounded-lg bg-blue-50 p-4">
+            <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">Écriture comptable suggérée (OHADA)</p>
+            {ecritures.map((e, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm text-blue-900">
+                <span className="font-mono font-semibold">{e.debit}</span>
+                <span className="text-blue-400">/</span>
+                <span className="font-mono font-semibold">{e.credit}</span>
+                <span className="text-blue-600 ml-2">{FCFA(e.montant)}</span>
+                <span className="text-blue-500 text-xs">— {e.libelle}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {details.length === 0 && (
+          <div className="px-5 pb-5 text-sm text-gray-400">
+            Aucune vente en devise étrangère enregistrée sur la campagne.
+          </div>
+        )}
+      </div>
+
+      {/* Modal saisie taux */}
+      {modalTaux && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">Mettre à jour le taux</h3>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Devise</label>
+                <select
+                  value={formTaux.deviseSource}
+                  onChange={(e) => setFormTaux((f) => ({ ...f, deviseSource: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                >
+                  <option value="EUR">EUR — Euro</option>
+                  <option value="USD">USD — Dollar américain</option>
+                  <option value="GBP">GBP — Livre sterling</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Nouveau taux (1 {formTaux.deviseSource} = ? FCFA)
+                </label>
+                <input
+                  type="number"
+                  step="0.001"
+                  value={formTaux.taux}
+                  onChange={(e) => setFormTaux((f) => ({ ...f, taux: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                  placeholder="ex : 655.957"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Date d'application</label>
+                <input
+                  type="date"
+                  value={formTaux.dateApplication}
+                  onChange={(e) => setFormTaux((f) => ({ ...f, dateApplication: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Source</label>
+                <select
+                  value={formTaux.sourceTaux}
+                  onChange={(e) => setFormTaux((f) => ({ ...f, sourceTaux: e.target.value as typeof formTaux.sourceTaux }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                >
+                  <option value="BCEAO">BCEAO</option>
+                  <option value="manuel">Saisie manuelle</option>
+                  <option value="COFACE">COFACE</option>
+                </select>
+              </div>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button onClick={() => setModalTaux(false)} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700">Annuler</button>
+              <button
+                onClick={() => mutTaux.mutate({ data: { deviseSource: formTaux.deviseSource, taux: parseFloat(formTaux.taux), dateApplication: formTaux.dateApplication, sourceTaux: formTaux.sourceTaux } })}
+                disabled={!formTaux.taux || mutTaux.isPending}
+                className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                style={{ backgroundColor: VERT }}
+              >
+                {mutTaux.isPending ? "Enregistrement…" : "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Widget taux de change (header) ───────────────────────────────────────────
+export function WidgetTauxChange() {
+  const { data: tauxActuels = [] } = useGetDevisesTaux({ query: { queryKey: getGetDevisesTauxQueryKey() } });
+  const peutVoir = usePermission("devises", "voir_taux");
+  if (!peutVoir || tauxActuels.length === 0) return null;
+
+  const pertinentes = (tauxActuels as TauxChange[]).filter((t) => t.devise_source !== "XOF");
+  const derniereMaj = pertinentes[0]?.date_application;
+  const today = new Date().toISOString().slice(0, 10);
+  const majLabel = derniereMaj === today ? "aujourd'hui" : derniereMaj ? new Date(derniereMaj).toLocaleDateString("fr-FR") : "—";
+
+  return (
+    <div className="flex items-center gap-3 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+      <span className="font-medium text-gray-400">Taux</span>
+      {pertinentes.map((t) => (
+        <span key={t.devise_source} className="flex items-center gap-1">
+          <span className="font-semibold text-gray-700">
+            1 {t.devise_source} = {parseFloat(t.taux).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} FCFA
+          </span>
+        </span>
+      ))}
+      <span className="text-gray-400 border-l border-gray-200 pl-3">Mis à jour : {majLabel}</span>
+    </div>
+  );
+}
+
 // ─── Page principale ──────────────────────────────────────────────────────────
-type Onglet = "journal" | "en_attente" | "config";
+type Onglet = "journal" | "en_attente" | "config" | "devises";
 
 export default function ComptabilitePage() {
   const [onglet, setOnglet] = useState<Onglet>("en_attente");
@@ -683,10 +1035,13 @@ export default function ComptabilitePage() {
   const { data: countData } = useCountEcrituresEnAttente({ query: { queryKey: getCountEcrituresEnAttenteQueryKey(), enabled: peutVoirAttente } });
   const nbEnAttente = countData?.count ?? 0;
 
+  const peutVoirTaux = usePermission("devises", "voir_taux");
+
   const tabs: { id: Onglet; label: string; icon: React.ElementType; badge?: number }[] = [
     { id: "en_attente", label: "Écritures en attente", icon: Clock, badge: nbEnAttente > 0 ? nbEnAttente : undefined },
     { id: "journal",    label: "Journal comptable",    icon: BookOpen },
-    ...(peutVoirConfig ? [{ id: "config" as Onglet, label: "Configuration", icon: Settings }] : []),
+    ...(peutVoirTaux  ? [{ id: "devises" as Onglet,   label: "Devises",             icon: DollarSign }] : []),
+    ...(peutVoirConfig ? [{ id: "config" as Onglet,   label: "Configuration",       icon: Settings }] : []),
   ];
 
   return (
@@ -720,8 +1075,15 @@ export default function ComptabilitePage() {
         ))}
       </div>
 
+      {/* Widget taux dans l'onglet devises (en tête de page si visible) */}
+      {peutVoirTaux && onglet !== "devises" && (
+        <div className="mb-4">
+          <WidgetTauxChange />
+        </div>
+      )}
       {onglet === "en_attente" && <OngletEnAttente />}
       {onglet === "journal" && <OngletJournal />}
+      {onglet === "devises" && peutVoirTaux && <OngletDevises />}
       {onglet === "config" && peutVoirConfig && <OngletConfiguration />}
     </div>
   );
