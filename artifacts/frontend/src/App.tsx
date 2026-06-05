@@ -30,6 +30,7 @@ import GouvernancePage from "@/pages/GouvernancePage";
 import PrixPage from "@/pages/PrixPage";
 import ScoringPage from "@/pages/ScoringPage";
 import AnomaliesPage from "@/pages/AnomaliesPage";
+import AuditPage from "@/pages/AuditPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -135,6 +136,9 @@ function AppRoutes() {
       </Route>
       <Route path="/anomalies">
         <ProtectedRoute component={AnomaliesPage} />
+      </Route>
+      <Route path="/audit">
+        <ProtectedRoute component={AuditPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

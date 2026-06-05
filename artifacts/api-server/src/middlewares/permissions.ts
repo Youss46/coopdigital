@@ -217,6 +217,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     modifier:      ["pca", "directeur", "magasinier"],
   },
 
+  // MODULE M15 — PISTE D'AUDIT
+  audit: {
+    voir_journal:           ["pca", "directeur", "auditeur"],
+    voir_stats:             ["pca", "directeur"],
+    exporter:               ["pca", "directeur", "auditeur"],
+    voir_historique_entite: ["pca", "directeur", "comptable", "auditeur"],
+  },
+
 };
 
 // ─── Fonction principale ─────────────────────────────────────────────────────

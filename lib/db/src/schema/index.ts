@@ -24,3 +24,4 @@ export * from "./gouvernance";
 export * from "./prix";
 export * from "./scoring";
 export * from "./anomalies";
+export * from "./audit";

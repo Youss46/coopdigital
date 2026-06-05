@@ -2799,6 +2799,119 @@ export interface TraiterAnomalieInput {
   commentaire?: string;
 }
 
+export type AuditEntryValeursAvant = { [key: string]: unknown } | null;
+
+export type AuditEntryValeursApres = { [key: string]: unknown } | null;
+
+export interface AuditEntry {
+  id: number;
+  cooperative_id?: number;
+  user_id?: number | null;
+  user_nom?: string | null;
+  user_role?: string | null;
+  user_ip?: string | null;
+  user_agent?: string | null;
+  action: string;
+  module: string;
+  entite_type?: string | null;
+  entite_id?: number | null;
+  valeurs_avant?: AuditEntryValeursAvant;
+  valeurs_apres?: AuditEntryValeursApres;
+  champs_modifies?: string[] | null;
+  description?: string | null;
+  ip_address?: string | null;
+  session_id?: string | null;
+  campagne_id?: number | null;
+  created_at: string;
+}
+
+export interface AuditJournalResponse {
+  entries: AuditEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AuditEntiteResponse {
+  entries: AuditEntry[];
+}
+
+export interface AuditUserActionsResponse {
+  entries: AuditEntry[];
+}
+
+export type AuditModificationsItemValeursAvant = { [key: string]: unknown } | null;
+
+export type AuditModificationsItemValeursApres = { [key: string]: unknown } | null;
+
+export interface AuditModificationsItem {
+  id: number;
+  user_id?: number | null;
+  user_nom?: string | null;
+  user_role?: string | null;
+  created_at: string;
+  champs_modifies?: string[] | null;
+  valeurs_avant?: AuditModificationsItemValeursAvant;
+  valeurs_apres?: AuditModificationsItemValeursApres;
+}
+
+export interface AuditModificationsResponse {
+  modifications: AuditModificationsItem[];
+}
+
+export type AuditStatsActionsParModuleItem = {
+  module: string;
+  nb: number;
+};
+
+export type AuditStatsActionsParUserItem = {
+  userId?: number | null;
+  nom?: string | null;
+  role?: string | null;
+  nb: number;
+};
+
+export type AuditStatsEvolutionHoraireItem = {
+  heure: string;
+  nb: number;
+};
+
+export interface AuditStats {
+  nb_actions_aujourd_hui: number;
+  nb_actions_semaine: number;
+  actions_par_module: AuditStatsActionsParModuleItem[];
+  actions_par_user: AuditStatsActionsParUserItem[];
+  modifications_critiques: AuditEntry[];
+  evolution_horaire: AuditStatsEvolutionHoraireItem[];
+}
+
+export type AuditSessionStatut = typeof AuditSessionStatut[keyof typeof AuditSessionStatut];
+
+
+export const AuditSessionStatut = {
+  active: 'active',
+  expiree: 'expiree',
+  deconnectee: 'deconnectee',
+} as const;
+
+export interface AuditSession {
+  id: number;
+  cooperative_id?: number | null;
+  user_id: number;
+  session_token: string;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  date_connexion: string;
+  date_deconnexion?: string | null;
+  duree_session_min?: number | null;
+  nb_actions: number;
+  statut: AuditSessionStatut;
+}
+
+export interface AuditSessionsResponse {
+  sessions: AuditSession[];
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -3109,5 +3222,33 @@ date_debut?: string;
 date_fin?: string;
 limit?: number;
 offset?: number;
+};
+
+export type GetAuditJournalParams = {
+user_id?: number;
+module?: string;
+action?: string;
+entite_id?: number;
+entite_type?: string;
+date_debut?: string;
+date_fin?: string;
+recherche?: string;
+limit?: number;
+offset?: number;
+};
+
+export type GetAuditUserIdParams = {
+limit?: number;
+};
+
+export type GetAuditSessionsParams = {
+limit?: number;
+};
+
+export type GetAuditExportPdfParams = {
+date_debut?: string;
+date_fin?: string;
+module?: string;
+user_id?: number;
 };
 

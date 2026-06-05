@@ -31,6 +31,12 @@ import type {
   ApproIntrant,
   ApproIntrantInput,
   AssembleeGenerale,
+  AuditEntiteResponse,
+  AuditJournalResponse,
+  AuditModificationsResponse,
+  AuditSessionsResponse,
+  AuditStats,
+  AuditUserActionsResponse,
   AuthResponse,
   Avance,
   AvanceAvecPersonnel,
@@ -103,6 +109,10 @@ import type {
   GenererBulletinsInput,
   GenererRapportInput,
   GetAnomaliesParams,
+  GetAuditExportPdfParams,
+  GetAuditJournalParams,
+  GetAuditSessionsParams,
+  GetAuditUserIdParams,
   GetAvancesParams,
   GetAvancesPersonnelParams,
   GetBalanceParams,
@@ -14393,4 +14403,586 @@ export const useTraiterAnomalie = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getTraiterAnomalieMutationOptions(options));
     }
+
+export const getGetAuditJournalUrl = (params?: GetAuditJournalParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/audit/journal?${stringifiedParams}` : `/api/audit/journal`
+}
+
+/**
+ * @summary Journal d'audit paginé avec filtres
+ */
+export const getAuditJournal = async (params?: GetAuditJournalParams, options?: RequestInit): Promise<AuditJournalResponse> => {
+
+  return customFetch<AuditJournalResponse>(getGetAuditJournalUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuditJournalQueryKey = (params?: GetAuditJournalParams,) => {
+    return [
+    `/api/audit/journal`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAuditJournalQueryOptions = <TData = Awaited<ReturnType<typeof getAuditJournal>>, TError = ErrorType<unknown>>(params?: GetAuditJournalParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditJournal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuditJournalQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuditJournal>>> = ({ signal }) => getAuditJournal(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuditJournal>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuditJournalQueryResult = NonNullable<Awaited<ReturnType<typeof getAuditJournal>>>
+export type GetAuditJournalQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Journal d'audit paginé avec filtres
+ */
+
+export function useGetAuditJournal<TData = Awaited<ReturnType<typeof getAuditJournal>>, TError = ErrorType<unknown>>(
+ params?: GetAuditJournalParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditJournal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuditJournalQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAuditEntiteTypeIdUrl = (type: string,
+    id: number,) => {
+
+
+
+
+  return `/api/audit/entite/${type}/${id}`
+}
+
+/**
+ * @summary Historique d'une entité spécifique
+ */
+export const getAuditEntiteTypeId = async (type: string,
+    id: number, options?: RequestInit): Promise<AuditEntiteResponse> => {
+
+  return customFetch<AuditEntiteResponse>(getGetAuditEntiteTypeIdUrl(type,id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuditEntiteTypeIdQueryKey = (type: string,
+    id: number,) => {
+    return [
+    `/api/audit/entite/${type}/${id}`
+    ] as const;
+    }
+
+
+export const getGetAuditEntiteTypeIdQueryOptions = <TData = Awaited<ReturnType<typeof getAuditEntiteTypeId>>, TError = ErrorType<unknown>>(type: string,
+    id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditEntiteTypeId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuditEntiteTypeIdQueryKey(type,id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuditEntiteTypeId>>> = ({ signal }) => getAuditEntiteTypeId(type,id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(type && id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuditEntiteTypeId>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuditEntiteTypeIdQueryResult = NonNullable<Awaited<ReturnType<typeof getAuditEntiteTypeId>>>
+export type GetAuditEntiteTypeIdQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Historique d'une entité spécifique
+ */
+
+export function useGetAuditEntiteTypeId<TData = Awaited<ReturnType<typeof getAuditEntiteTypeId>>, TError = ErrorType<unknown>>(
+ type: string,
+    id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditEntiteTypeId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuditEntiteTypeIdQueryOptions(type,id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAuditUserIdUrl = (id: number,
+    params?: GetAuditUserIdParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/audit/user/${id}?${stringifiedParams}` : `/api/audit/user/${id}`
+}
+
+/**
+ * @summary Actions d'un utilisateur
+ */
+export const getAuditUserId = async (id: number,
+    params?: GetAuditUserIdParams, options?: RequestInit): Promise<AuditUserActionsResponse> => {
+
+  return customFetch<AuditUserActionsResponse>(getGetAuditUserIdUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuditUserIdQueryKey = (id: number,
+    params?: GetAuditUserIdParams,) => {
+    return [
+    `/api/audit/user/${id}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAuditUserIdQueryOptions = <TData = Awaited<ReturnType<typeof getAuditUserId>>, TError = ErrorType<unknown>>(id: number,
+    params?: GetAuditUserIdParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditUserId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuditUserIdQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuditUserId>>> = ({ signal }) => getAuditUserId(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuditUserId>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuditUserIdQueryResult = NonNullable<Awaited<ReturnType<typeof getAuditUserId>>>
+export type GetAuditUserIdQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Actions d'un utilisateur
+ */
+
+export function useGetAuditUserId<TData = Awaited<ReturnType<typeof getAuditUserId>>, TError = ErrorType<unknown>>(
+ id: number,
+    params?: GetAuditUserIdParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditUserId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuditUserIdQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAuditSessionsUrl = (params?: GetAuditSessionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/audit/sessions?${stringifiedParams}` : `/api/audit/sessions`
+}
+
+/**
+ * @summary Liste des sessions utilisateurs
+ */
+export const getAuditSessions = async (params?: GetAuditSessionsParams, options?: RequestInit): Promise<AuditSessionsResponse> => {
+
+  return customFetch<AuditSessionsResponse>(getGetAuditSessionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuditSessionsQueryKey = (params?: GetAuditSessionsParams,) => {
+    return [
+    `/api/audit/sessions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAuditSessionsQueryOptions = <TData = Awaited<ReturnType<typeof getAuditSessions>>, TError = ErrorType<unknown>>(params?: GetAuditSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuditSessionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuditSessions>>> = ({ signal }) => getAuditSessions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuditSessions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuditSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof getAuditSessions>>>
+export type GetAuditSessionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des sessions utilisateurs
+ */
+
+export function useGetAuditSessions<TData = Awaited<ReturnType<typeof getAuditSessions>>, TError = ErrorType<unknown>>(
+ params?: GetAuditSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuditSessionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAuditStatsUrl = () => {
+
+
+
+
+  return `/api/audit/stats`
+}
+
+/**
+ * @summary Statistiques du journal d'audit
+ */
+export const getAuditStats = async ( options?: RequestInit): Promise<AuditStats> => {
+
+  return customFetch<AuditStats>(getGetAuditStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuditStatsQueryKey = () => {
+    return [
+    `/api/audit/stats`
+    ] as const;
+    }
+
+
+export const getGetAuditStatsQueryOptions = <TData = Awaited<ReturnType<typeof getAuditStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuditStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuditStats>>> = ({ signal }) => getAuditStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuditStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuditStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getAuditStats>>>
+export type GetAuditStatsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Statistiques du journal d'audit
+ */
+
+export function useGetAuditStats<TData = Awaited<ReturnType<typeof getAuditStats>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuditStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAuditExportPdfUrl = (params?: GetAuditExportPdfParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/audit/export-pdf?${stringifiedParams}` : `/api/audit/export-pdf`
+}
+
+/**
+ * @summary Export PDF signé du journal d'audit
+ */
+export const getAuditExportPdf = async (params?: GetAuditExportPdfParams, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetAuditExportPdfUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuditExportPdfQueryKey = (params?: GetAuditExportPdfParams,) => {
+    return [
+    `/api/audit/export-pdf`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAuditExportPdfQueryOptions = <TData = Awaited<ReturnType<typeof getAuditExportPdf>>, TError = ErrorType<unknown>>(params?: GetAuditExportPdfParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditExportPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuditExportPdfQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuditExportPdf>>> = ({ signal }) => getAuditExportPdf(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuditExportPdf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuditExportPdfQueryResult = NonNullable<Awaited<ReturnType<typeof getAuditExportPdf>>>
+export type GetAuditExportPdfQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Export PDF signé du journal d'audit
+ */
+
+export function useGetAuditExportPdf<TData = Awaited<ReturnType<typeof getAuditExportPdf>>, TError = ErrorType<unknown>>(
+ params?: GetAuditExportPdfParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditExportPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuditExportPdfQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAuditModificationsEntiteTypeEntiteIdUrl = (entiteType: string,
+    entiteId: number,) => {
+
+
+
+
+  return `/api/audit/modifications/${entiteType}/${entiteId}`
+}
+
+/**
+ * @summary Historique des modifications (avant/après) d'une entité
+ */
+export const getAuditModificationsEntiteTypeEntiteId = async (entiteType: string,
+    entiteId: number, options?: RequestInit): Promise<AuditModificationsResponse> => {
+
+  return customFetch<AuditModificationsResponse>(getGetAuditModificationsEntiteTypeEntiteIdUrl(entiteType,entiteId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuditModificationsEntiteTypeEntiteIdQueryKey = (entiteType: string,
+    entiteId: number,) => {
+    return [
+    `/api/audit/modifications/${entiteType}/${entiteId}`
+    ] as const;
+    }
+
+
+export const getGetAuditModificationsEntiteTypeEntiteIdQueryOptions = <TData = Awaited<ReturnType<typeof getAuditModificationsEntiteTypeEntiteId>>, TError = ErrorType<unknown>>(entiteType: string,
+    entiteId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditModificationsEntiteTypeEntiteId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuditModificationsEntiteTypeEntiteIdQueryKey(entiteType,entiteId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuditModificationsEntiteTypeEntiteId>>> = ({ signal }) => getAuditModificationsEntiteTypeEntiteId(entiteType,entiteId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(entiteType && entiteId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuditModificationsEntiteTypeEntiteId>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuditModificationsEntiteTypeEntiteIdQueryResult = NonNullable<Awaited<ReturnType<typeof getAuditModificationsEntiteTypeEntiteId>>>
+export type GetAuditModificationsEntiteTypeEntiteIdQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Historique des modifications (avant/après) d'une entité
+ */
+
+export function useGetAuditModificationsEntiteTypeEntiteId<TData = Awaited<ReturnType<typeof getAuditModificationsEntiteTypeEntiteId>>, TError = ErrorType<unknown>>(
+ entiteType: string,
+    entiteId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditModificationsEntiteTypeEntiteId>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuditModificationsEntiteTypeEntiteIdQueryOptions(entiteType,entiteId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 

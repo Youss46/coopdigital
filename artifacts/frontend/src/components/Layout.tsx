@@ -31,6 +31,7 @@ import {
   TrendingUp,
   Award,
   ShieldAlert,
+  ScrollText,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 
@@ -143,6 +144,12 @@ const navItems = [
     icon: ShieldAlert,
     roles: ["pca", "directeur", "comptable", "auditeur"],
     showAnomaliesBadge: true,
+  },
+  {
+    href: "/audit",
+    label: "Journal d'audit",
+    icon: ScrollText,
+    roles: ["pca", "directeur", "auditeur"],
   },
   {
     href: "/refus",

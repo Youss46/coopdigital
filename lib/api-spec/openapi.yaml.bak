@@ -3940,7 +3940,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AnomalieItem"
 
-  /audit/journal:
+  /api/audit/journal:
     get:
       summary: Journal d'audit paginé avec filtres
       tags: [audit]
@@ -3964,7 +3964,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuditJournalResponse"
 
-  /audit/entite/{type}/{id}:
+  /api/audit/entite/{type}/{id}:
     get:
       summary: Historique d'une entité spécifique
       tags: [audit]
@@ -3980,7 +3980,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuditEntiteResponse"
 
-  /audit/user/{id}:
+  /api/audit/user/{id}:
     get:
       summary: Actions d'un utilisateur
       tags: [audit]
@@ -3996,7 +3996,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuditUserActionsResponse"
 
-  /audit/sessions:
+  /api/audit/sessions:
     get:
       summary: Liste des sessions utilisateurs
       tags: [audit]
@@ -4011,7 +4011,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuditSessionsResponse"
 
-  /audit/stats:
+  /api/audit/stats:
     get:
       summary: Statistiques du journal d'audit
       tags: [audit]
@@ -4024,7 +4024,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuditStats"
 
-  /audit/export-pdf:
+  /api/audit/export-pdf:
     get:
       summary: Export PDF signé du journal d'audit
       tags: [audit]
@@ -4041,7 +4041,7 @@ paths:
             application/pdf:
               schema: { type: string, format: binary }
 
-  /audit/modifications/{entite_type}/{entite_id}:
+  /api/audit/modifications/{entite_type}/{entite_id}:
     get:
       summary: Historique des modifications (avant/après) d'une entité
       tags: [audit]
@@ -7928,7 +7928,7 @@ components:
         user_agent:       { type: string, nullable: true }
         date_connexion:   { type: string, format: date-time }
         date_deconnexion: { type: string, format: date-time, nullable: true }
-        duree_session_min: { type: integer, nullable: true }
+        duree_session_min:{ type: integer, nullable: true }
         nb_actions:       { type: integer }
         statut:           { type: string, enum: [active, expiree, deconnectee] }
 

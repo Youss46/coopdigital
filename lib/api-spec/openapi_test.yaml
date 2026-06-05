@@ -3940,123 +3940,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/AnomalieItem"
 
-  /audit/journal:
-    get:
-      summary: Journal d'audit paginé avec filtres
-      tags: [audit]
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - { name: user_id,    in: query, schema: { type: integer } }
-        - { name: module,     in: query, schema: { type: string } }
-        - { name: action,     in: query, schema: { type: string } }
-        - { name: entite_id,  in: query, schema: { type: integer } }
-        - { name: entite_type,in: query, schema: { type: string } }
-        - { name: date_debut, in: query, schema: { type: string, format: date } }
-        - { name: date_fin,   in: query, schema: { type: string, format: date } }
-        - { name: recherche,  in: query, schema: { type: string } }
-        - { name: limit,      in: query, schema: { type: integer } }
-        - { name: offset,     in: query, schema: { type: integer } }
-      responses:
-        "200":
-          description: Journal d'audit
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuditJournalResponse"
-
-  /audit/entite/{type}/{id}:
-    get:
-      summary: Historique d'une entité spécifique
-      tags: [audit]
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - { name: type, in: path, required: true, schema: { type: string } }
-        - { name: id,   in: path, required: true, schema: { type: integer } }
-      responses:
-        "200":
-          description: Historique entité
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuditEntiteResponse"
-
-  /audit/user/{id}:
-    get:
-      summary: Actions d'un utilisateur
-      tags: [audit]
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - { name: id,    in: path,  required: true, schema: { type: integer } }
-        - { name: limit, in: query, schema: { type: integer } }
-      responses:
-        "200":
-          description: Actions utilisateur
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuditUserActionsResponse"
-
-  /audit/sessions:
-    get:
-      summary: Liste des sessions utilisateurs
-      tags: [audit]
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - { name: limit, in: query, schema: { type: integer } }
-      responses:
-        "200":
-          description: Sessions
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuditSessionsResponse"
-
-  /audit/stats:
-    get:
-      summary: Statistiques du journal d'audit
-      tags: [audit]
-      security: [{ bearerAuth: [] }]
-      responses:
-        "200":
-          description: Statistiques audit
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuditStats"
-
-  /audit/export-pdf:
-    get:
-      summary: Export PDF signé du journal d'audit
-      tags: [audit]
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - { name: date_debut, in: query, schema: { type: string, format: date } }
-        - { name: date_fin,   in: query, schema: { type: string, format: date } }
-        - { name: module,     in: query, schema: { type: string } }
-        - { name: user_id,    in: query, schema: { type: integer } }
-      responses:
-        "200":
-          description: PDF généré
-          content:
-            application/pdf:
-              schema: { type: string, format: binary }
-
-  /audit/modifications/{entite_type}/{entite_id}:
-    get:
-      summary: Historique des modifications (avant/après) d'une entité
-      tags: [audit]
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - { name: entite_type, in: path, required: true, schema: { type: string } }
-        - { name: entite_id,   in: path, required: true, schema: { type: integer } }
-      responses:
-        "200":
-          description: Modifications
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuditModificationsResponse"
-
 components:
   schemas:
 
@@ -7928,7 +7811,7 @@ components:
         user_agent:       { type: string, nullable: true }
         date_connexion:   { type: string, format: date-time }
         date_deconnexion: { type: string, format: date-time, nullable: true }
-        duree_session_min: { type: integer, nullable: true }
+        duree_session_min:{ type: integer, nullable: true }
         nb_actions:       { type: integer }
         statut:           { type: string, enum: [active, expiree, deconnectee] }
 

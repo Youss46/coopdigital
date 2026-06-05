@@ -4452,3 +4452,237 @@ export const TraiterAnomalieResponse = zod.object({
 })
 
 
+/**
+ * @summary Journal d'audit paginé avec filtres
+ */
+export const GetAuditJournalQueryParams = zod.object({
+  "user_id": zod.coerce.number().optional(),
+  "module": zod.coerce.string().optional(),
+  "action": zod.coerce.string().optional(),
+  "entite_id": zod.coerce.number().optional(),
+  "entite_type": zod.coerce.string().optional(),
+  "date_debut": zod.date().optional(),
+  "date_fin": zod.date().optional(),
+  "recherche": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().optional(),
+  "offset": zod.coerce.number().optional()
+})
+
+export const GetAuditJournalResponse = zod.object({
+  "entries": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number().optional(),
+  "user_id": zod.number().nullish(),
+  "user_nom": zod.string().nullish(),
+  "user_role": zod.string().nullish(),
+  "user_ip": zod.string().nullish(),
+  "user_agent": zod.string().nullish(),
+  "action": zod.string(),
+  "module": zod.string(),
+  "entite_type": zod.string().nullish(),
+  "entite_id": zod.number().nullish(),
+  "valeurs_avant": zod.object({
+
+}).passthrough().nullish(),
+  "valeurs_apres": zod.object({
+
+}).passthrough().nullish(),
+  "champs_modifies": zod.array(zod.string()).nullish(),
+  "description": zod.string().nullish(),
+  "ip_address": zod.string().nullish(),
+  "session_id": zod.string().nullish(),
+  "campagne_id": zod.number().nullish(),
+  "created_at": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "limit": zod.number(),
+  "offset": zod.number()
+})
+
+
+/**
+ * @summary Historique d'une entité spécifique
+ */
+export const GetAuditEntiteTypeIdParams = zod.object({
+  "type": zod.coerce.string(),
+  "id": zod.coerce.number()
+})
+
+export const GetAuditEntiteTypeIdResponse = zod.object({
+  "entries": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number().optional(),
+  "user_id": zod.number().nullish(),
+  "user_nom": zod.string().nullish(),
+  "user_role": zod.string().nullish(),
+  "user_ip": zod.string().nullish(),
+  "user_agent": zod.string().nullish(),
+  "action": zod.string(),
+  "module": zod.string(),
+  "entite_type": zod.string().nullish(),
+  "entite_id": zod.number().nullish(),
+  "valeurs_avant": zod.object({
+
+}).passthrough().nullish(),
+  "valeurs_apres": zod.object({
+
+}).passthrough().nullish(),
+  "champs_modifies": zod.array(zod.string()).nullish(),
+  "description": zod.string().nullish(),
+  "ip_address": zod.string().nullish(),
+  "session_id": zod.string().nullish(),
+  "campagne_id": zod.number().nullish(),
+  "created_at": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Actions d'un utilisateur
+ */
+export const GetAuditUserIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetAuditUserIdQueryParams = zod.object({
+  "limit": zod.coerce.number().optional()
+})
+
+export const GetAuditUserIdResponse = zod.object({
+  "entries": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number().optional(),
+  "user_id": zod.number().nullish(),
+  "user_nom": zod.string().nullish(),
+  "user_role": zod.string().nullish(),
+  "user_ip": zod.string().nullish(),
+  "user_agent": zod.string().nullish(),
+  "action": zod.string(),
+  "module": zod.string(),
+  "entite_type": zod.string().nullish(),
+  "entite_id": zod.number().nullish(),
+  "valeurs_avant": zod.object({
+
+}).passthrough().nullish(),
+  "valeurs_apres": zod.object({
+
+}).passthrough().nullish(),
+  "champs_modifies": zod.array(zod.string()).nullish(),
+  "description": zod.string().nullish(),
+  "ip_address": zod.string().nullish(),
+  "session_id": zod.string().nullish(),
+  "campagne_id": zod.number().nullish(),
+  "created_at": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Liste des sessions utilisateurs
+ */
+export const GetAuditSessionsQueryParams = zod.object({
+  "limit": zod.coerce.number().optional()
+})
+
+export const GetAuditSessionsResponse = zod.object({
+  "sessions": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number().nullish(),
+  "user_id": zod.number(),
+  "session_token": zod.string(),
+  "ip_address": zod.string().nullish(),
+  "user_agent": zod.string().nullish(),
+  "date_connexion": zod.coerce.date(),
+  "date_deconnexion": zod.coerce.date().nullish(),
+  "duree_session_min": zod.number().nullish(),
+  "nb_actions": zod.number(),
+  "statut": zod.enum(['active', 'expiree', 'deconnectee'])
+}))
+})
+
+
+/**
+ * @summary Statistiques du journal d'audit
+ */
+export const GetAuditStatsResponse = zod.object({
+  "nb_actions_aujourd_hui": zod.number(),
+  "nb_actions_semaine": zod.number(),
+  "actions_par_module": zod.array(zod.object({
+  "module": zod.string(),
+  "nb": zod.number()
+})),
+  "actions_par_user": zod.array(zod.object({
+  "userId": zod.number().nullish(),
+  "nom": zod.string().nullish(),
+  "role": zod.string().nullish(),
+  "nb": zod.number()
+})),
+  "modifications_critiques": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number().optional(),
+  "user_id": zod.number().nullish(),
+  "user_nom": zod.string().nullish(),
+  "user_role": zod.string().nullish(),
+  "user_ip": zod.string().nullish(),
+  "user_agent": zod.string().nullish(),
+  "action": zod.string(),
+  "module": zod.string(),
+  "entite_type": zod.string().nullish(),
+  "entite_id": zod.number().nullish(),
+  "valeurs_avant": zod.object({
+
+}).passthrough().nullish(),
+  "valeurs_apres": zod.object({
+
+}).passthrough().nullish(),
+  "champs_modifies": zod.array(zod.string()).nullish(),
+  "description": zod.string().nullish(),
+  "ip_address": zod.string().nullish(),
+  "session_id": zod.string().nullish(),
+  "campagne_id": zod.number().nullish(),
+  "created_at": zod.coerce.date()
+})),
+  "evolution_horaire": zod.array(zod.object({
+  "heure": zod.string(),
+  "nb": zod.number()
+}))
+})
+
+
+/**
+ * @summary Export PDF signé du journal d'audit
+ */
+export const GetAuditExportPdfQueryParams = zod.object({
+  "date_debut": zod.date().optional(),
+  "date_fin": zod.date().optional(),
+  "module": zod.coerce.string().optional(),
+  "user_id": zod.coerce.number().optional()
+})
+
+
+/**
+ * @summary Historique des modifications (avant/après) d'une entité
+ */
+export const GetAuditModificationsEntiteTypeEntiteIdParams = zod.object({
+  "entite_type": zod.coerce.string(),
+  "entite_id": zod.coerce.number()
+})
+
+export const GetAuditModificationsEntiteTypeEntiteIdResponse = zod.object({
+  "modifications": zod.array(zod.object({
+  "id": zod.number(),
+  "user_id": zod.number().nullish(),
+  "user_nom": zod.string().nullish(),
+  "user_role": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "champs_modifies": zod.array(zod.string()).nullish(),
+  "valeurs_avant": zod.object({
+
+}).passthrough().nullish(),
+  "valeurs_apres": zod.object({
+
+}).passthrough().nullish()
+}))
+})
+
+
