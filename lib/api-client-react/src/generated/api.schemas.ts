@@ -647,6 +647,8 @@ export const MembreStatut = {
 export interface Membre {
   id: number;
   cooperativeId: number;
+  /** Code membre calculé (ex: MBR-2025-0001) */
+  codeMembre: string;
   nom: string;
   prenoms: string;
   /** @nullable */

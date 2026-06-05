@@ -148,6 +148,11 @@ export default function MembreFiche() {
 
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold text-gray-900">{membre.nom} {membre.prenoms}</h1>
+          <div className="mt-1 mb-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-200 text-green-800 text-sm font-mono font-bold">
+              {membre.codeMembre ?? "—"}
+            </span>
+          </div>
           <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-500">
             <span className="flex items-center gap-1"><Phone size={13} />{membre.telephone}</span>
             {membre.village && <span className="flex items-center gap-1"><MapPin size={13} />{membre.village}</span>}

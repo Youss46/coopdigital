@@ -2,6 +2,11 @@ import { type Request, type Response } from "express";
 import { db, membresTable } from "@workspace/db";
 import { eq, and, or, ilike, sql, desc } from "drizzle-orm";
 import { CreateMembreBody, UpdateMembreBody } from "@workspace/api-zod";
+import { computeCodeMembre } from "../services/portailService";
+
+function enrichMembre<T extends { id: number; dateAdhesion: string }>(m: T) {
+  return { ...m, codeMembre: computeCodeMembre(m.id, m.dateAdhesion) };
+}
 
 export async function listMembres(req: Request, res: Response): Promise<void> {
   try {
@@ -35,7 +40,7 @@ export async function listMembres(req: Request, res: Response): Promise<void> {
       db.select({ count: sql<number>`count(*)::int` }).from(membresTable).where(where),
     ]);
 
-    res.json({ membres, total: count, page, limit });
+    res.json({ membres: membres.map(enrichMembre), total: count, page, limit });
   } catch (err) {
     req.log.error({ err }, "Erreur listMembres");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
@@ -50,7 +55,7 @@ export async function getMembreById(req: Request, res: Response): Promise<void> 
       res.status(404).json({ erreur: "Membre introuvable" });
       return;
     }
-    res.json(membre);
+    res.json(enrichMembre(membre));
   } catch (err) {
     req.log.error({ err }, "Erreur getMembreById");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
@@ -91,7 +96,7 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
       })
       .returning();
 
-    res.status(201).json(membre);
+    res.status(201).json(enrichMembre(membre));
   } catch (err) {
     req.log.error({ err }, "Erreur createMembre");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
@@ -117,7 +122,7 @@ export async function updateMembre(req: Request, res: Response): Promise<void> {
       res.status(404).json({ erreur: "Membre introuvable" });
       return;
     }
-    res.json(membre);
+    res.json(enrichMembre(membre));
   } catch (err) {
     req.log.error({ err }, "Erreur updateMembre");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
@@ -132,7 +137,7 @@ export async function getMembreByQr(req: Request, res: Response): Promise<void> 
       res.status(404).json({ erreur: "Membre introuvable" });
       return;
     }
-    res.json(membre);
+    res.json(enrichMembre(membre));
   } catch (err) {
     req.log.error({ err }, "Erreur getMembreByQr");
     res.status(500).json({ erreur: "Erreur interne du serveur" });

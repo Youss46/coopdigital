@@ -53,6 +53,7 @@ export const GetMembresResponse = zod.object({
   "membres": zod.array(zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
+  "codeMembre": zod.string().describe('Code membre calculé (ex: MBR-2025-0001)'),
   "nom": zod.string(),
   "prenoms": zod.string(),
   "numeroCni": zod.string().nullish(),
@@ -105,6 +106,7 @@ export const GetMembreByQrParams = zod.object({
 export const GetMembreByQrResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
+  "codeMembre": zod.string().describe('Code membre calculé (ex: MBR-2025-0001)'),
   "nom": zod.string(),
   "prenoms": zod.string(),
   "numeroCni": zod.string().nullish(),
@@ -133,6 +135,7 @@ export const GetMembreByIdParams = zod.object({
 export const GetMembreByIdResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
+  "codeMembre": zod.string().describe('Code membre calculé (ex: MBR-2025-0001)'),
   "nom": zod.string(),
   "prenoms": zod.string(),
   "numeroCni": zod.string().nullish(),
@@ -175,6 +178,7 @@ export const UpdateMembreBody = zod.object({
 export const UpdateMembreResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
+  "codeMembre": zod.string().describe('Code membre calculé (ex: MBR-2025-0001)'),
   "nom": zod.string(),
   "prenoms": zod.string(),
   "numeroCni": zod.string().nullish(),
@@ -574,6 +578,7 @@ export const GetLotTracabiliteResponse = zod.object({
   "membres": zod.array(zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
+  "codeMembre": zod.string().describe('Code membre calculé (ex: MBR-2025-0001)'),
   "nom": zod.string(),
   "prenoms": zod.string(),
   "numeroCni": zod.string().nullish(),

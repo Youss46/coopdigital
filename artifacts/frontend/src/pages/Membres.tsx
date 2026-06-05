@@ -149,9 +149,8 @@ export default function Membres() {
                 <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-900">
                     {m.nom} {m.prenoms}
-                    <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                      <QrCode size={10} />
-                      <span className="font-mono">{m.qrCodeToken.slice(0, 8)}…</span>
+                    <div className="text-xs text-green-700 font-mono font-semibold mt-0.5">
+                      {m.codeMembre}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{m.telephone}</td>

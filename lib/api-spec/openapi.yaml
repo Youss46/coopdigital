@@ -5056,12 +5056,16 @@ components:
 
     Membre:
       type: object
-      required: [id, cooperativeId, nom, prenoms, telephone, superficieHa, statut, qrCodeToken, dateAdhesion, createdAt, updatedAt]
+      required: [id, cooperativeId, codeMembre, nom, prenoms, telephone, superficieHa, statut, qrCodeToken, dateAdhesion, createdAt, updatedAt]
       properties:
         id:
           type: integer
         cooperativeId:
           type: integer
+        codeMembre:
+          type: string
+          description: "Code membre calculé (ex: MBR-2025-0001)"
+          example: "MBR-2025-0001"
         nom:
           type: string
         prenoms:
