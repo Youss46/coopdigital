@@ -78,20 +78,34 @@ export default function MembreFiche() {
   });
 
   const liberationMut = useEnregistrerLiberation();
-  const statutMut = useModifierStatutMembre();
+  const statutMut = useModifierStatutMembre({
+    mutation: {
+      onMutate: async ({ id: membreId, data }) => {
+        await qc.cancelQueries({ queryKey: getGetMembreByIdQueryKey(membreId) });
+        const prev = qc.getQueryData(getGetMembreByIdQueryKey(membreId));
+        qc.setQueryData(getGetMembreByIdQueryKey(membreId), (old: unknown) =>
+          old && typeof old === "object" ? { ...(old as object), statut: data.statut } : old,
+        );
+        return { prev };
+      },
+      onError: (_err, { id: membreId }, context) => {
+        qc.setQueryData(getGetMembreByIdQueryKey(membreId), (context as { prev: unknown } | undefined)?.prev);
+        toast({ title: "Erreur lors du changement de statut", variant: "destructive" });
+      },
+      onSettled: (_data, _err, { id: membreId }) => {
+        void qc.invalidateQueries({ queryKey: getGetMembreByIdQueryKey(membreId) });
+      },
+    },
+  });
   const peutModifier = usePermission("membres", "modifier");
   const avanceEnCours = avancesData?.avances?.find((a) => a.statut === "en_cours");
 
-  async function handleToggleStatut() {
+  function handleToggleStatut() {
     if (!membre) return;
     const nouveauStatut = membre.statut === "actif" ? "inactif" : "actif";
-    try {
-      const updated = await statutMut.mutateAsync({ id, data: { statut: nouveauStatut } });
-      qc.setQueryData(getGetMembreByIdQueryKey(id), updated);
-      toast({ title: `Membre ${nouveauStatut === "actif" ? "réactivé" : "désactivé"} avec succès` });
-    } catch {
-      toast({ title: "Erreur lors du changement de statut", variant: "destructive" });
-    }
+    statutMut.mutate({ id, data: { statut: nouveauStatut } }, {
+      onSuccess: () => toast({ title: `Membre ${nouveauStatut === "actif" ? "réactivé" : "désactivé"} avec succès` }),
+    });
   }
 
   if (!match) return null;
