@@ -8,6 +8,7 @@ import {
   getCooperativeHandler,
   updateCooperativeHandler,
   getPlansHandler,
+  updatePlanHandler,
   genererLicenceHandler,
   activerLicenceHandler,
   renouvelerLicenceHandler,
@@ -32,6 +33,7 @@ router.post("/m15/auth/login", loginM15Handler);
 router.use("/m15", m15AuthMiddleware);
 
 router.get("/m15/plans", getPlansHandler);
+router.put("/m15/plans/:id", requireM15Role("superadmin", "admin"), updatePlanHandler);
 
 router.get("/m15/dashboard", getDashboardHandler);
 

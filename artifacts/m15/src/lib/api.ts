@@ -68,6 +68,18 @@ export async function fetchPlans(): Promise<Plan[]> {
   return request<Plan[]>("/m15/plans");
 }
 
+export async function updatePlan(id: number, data: {
+  prix1anFcfa?: number; prix2ansFcfa?: number;
+  prix3ansFcfa?: number; prix5ansFcfa?: number;
+  nbMembresMax?: number | null; nbUsersMax?: number | null;
+  stockageGo?: number | null; support?: string;
+}): Promise<Plan> {
+  return request<Plan>(`/m15/plans/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 // ─── Coopératives ─────────────────────────────────────────────────────────────
 
 export interface LicenceSummary {

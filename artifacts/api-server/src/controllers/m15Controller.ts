@@ -127,6 +127,40 @@ export async function getPlansHandler(req: Request, res: Response): Promise<void
   }
 }
 
+export async function updatePlanHandler(req: Request, res: Response): Promise<void> {
+  const id = parseInt(String(req.params["id"]), 10);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+
+  const body = req.body as {
+    prix1anFcfa?: number; prix2ansFcfa?: number;
+    prix3ansFcfa?: number; prix5ansFcfa?: number;
+    nbMembresMax?: number | null; nbUsersMax?: number | null;
+    stockageGo?: number | null; support?: string;
+  };
+
+  try {
+    const [updated] = await db
+      .update(plansAbonnementTable)
+      .set({
+        ...(body.prix1anFcfa !== undefined && { prix1anFcfa: String(body.prix1anFcfa) }),
+        ...(body.prix2ansFcfa !== undefined && { prix2ansFcfa: String(body.prix2ansFcfa) }),
+        ...(body.prix3ansFcfa !== undefined && { prix3ansFcfa: String(body.prix3ansFcfa) }),
+        ...(body.prix5ansFcfa !== undefined && { prix5ansFcfa: String(body.prix5ansFcfa) }),
+        ...(body.nbMembresMax !== undefined && { nbMembresMax: body.nbMembresMax }),
+        ...(body.nbUsersMax !== undefined && { nbUsersMax: body.nbUsersMax }),
+        ...(body.stockageGo !== undefined && { stockageGo: body.stockageGo }),
+        ...(body.support !== undefined && { support: body.support }),
+      })
+      .where(eq(plansAbonnementTable.id, id))
+      .returning();
+    if (!updated) { res.status(404).json({ erreur: "Plan introuvable" }); return; }
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "Erreur mise à jour plan M15");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 export async function genererLicenceHandler(req: Request, res: Response): Promise<void> {
   const body = req.body as {
     cooperativeId?: number; planId?: number; dureeAns?: number;
