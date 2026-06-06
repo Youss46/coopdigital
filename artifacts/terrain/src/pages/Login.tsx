@@ -29,7 +29,7 @@ export default function Login() {
 
   return (
     <div className="t-login">
-      <div className="t-login__logo">🌱</div>
+      <img src="/logo-512.png" alt="CoopDigital" className="t-login__logo" style={{ width: "8rem", height: "8rem", borderRadius: "1.5rem", boxShadow: "0 8px 32px rgba(0,0,0,0.18)", objectFit: "contain", margin: "0 auto" }} />
       <div className="t-login__brand">CoopDigital</div>
       <div className="t-login__sub">Agent Terrain</div>
 

@@ -269,12 +269,11 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
     <div className="flex flex-col h-full" style={{ backgroundColor: "#1a4731" }}>
       {/* Logo + close button */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-green-800">
-        <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: "#c4962a" }}
-        >
-          <Leaf className="w-5 h-5 text-white" />
-        </div>
+        <img
+          src="/logo-192.png"
+          alt="CoopDigital"
+          className="w-9 h-9 rounded-lg flex-shrink-0 object-contain"
+        />
         <div className="flex-1">
           <span className="text-white font-bold text-lg leading-tight">CoopDigital</span>
           <p className="text-green-300 text-xs">Gestion coopérative</p>
@@ -403,12 +402,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Menu size={22} />
           </button>
           <div className="flex items-center gap-2 flex-1">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: "#1a4731" }}
-            >
-              <Leaf className="w-4 h-4 text-white" />
-            </div>
+            <img src="/logo-192.png" alt="CoopDigital" className="w-7 h-7 rounded-lg object-contain" />
             <span className="font-bold text-gray-900 text-base">CoopDigital</span>
           </div>
           <NotificationPanel />

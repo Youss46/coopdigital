@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLogin } from "@workspace/api-client-react";
-import { Leaf, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -45,12 +45,11 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
-            style={{ backgroundColor: "#1a4731" }}
-          >
-            <Leaf className="w-8 h-8 text-white" />
-          </div>
+          <img
+            src="/logo-512.png"
+            alt="CoopDigital"
+            className="h-24 w-24 mx-auto rounded-2xl shadow-lg mb-4 object-contain"
+          />
           <h1 className="text-2xl font-bold text-gray-900">CoopDigital</h1>
           <p className="text-gray-500 mt-1 text-sm">Gestion des coopératives cacaoyères</p>
         </div>

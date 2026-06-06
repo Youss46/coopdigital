@@ -31,6 +31,7 @@ export default function Login() {
     <div className="min-h-screen flex bg-background">
       <div className="hidden lg:flex flex-col justify-between w-96 bg-sidebar p-10">
         <div>
+          <img src="/logo-512.png" alt="CoopDigital" className="h-16 w-16 rounded-2xl shadow-lg mb-6 object-contain" />
           <div className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-2">M15 Tech</div>
           <h1 className="text-3xl font-bold text-white leading-tight">CoopDigital</h1>
           <p className="text-white/50 mt-3 text-sm leading-relaxed">

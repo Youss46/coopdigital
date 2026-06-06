@@ -8,9 +8,11 @@ import {
   cloturerCampagne as cloturerCampagneService,
   getComparaisonCampagnes,
 } from "../services/campagneService";
+import path from "path";
 import PDFDocument from "pdfkit";
 
 const COOP_ID = 1;
+const LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
 
 export async function getCampagneActive(req: Request, res: Response) {
   const campagne = await db.query.campagnesTable.findFirst({
@@ -181,10 +183,11 @@ export async function getBilanPdf(req: Request, res: Response) {
 
   const header = (page: string) => {
     doc.rect(0, 0, doc.page.width, 70).fill(VERT);
+    try { doc.image(LOGO_PATH, 50, 12, { width: 46, height: 46 }); } catch (_) { /* logo facultatif */ }
     doc.fillColor("white").fontSize(18).font("Helvetica-Bold")
-      .text("CoopDigital — Bilan de Campagne", 50, 20);
+      .text("CoopDigital — Bilan de Campagne", 104, 18);
     doc.fontSize(12).font("Helvetica")
-      .text(`${campagne.libelle} · ${page}`, 50, 45);
+      .text(`${campagne.libelle} · ${page}`, 104, 44);
     doc.fillColor(NOIR).moveDown(3);
   };
 

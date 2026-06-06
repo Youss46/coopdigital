@@ -1,9 +1,13 @@
 import { type Request, type Response } from "express";
+import path from "path";
 import PDFDocument from "pdfkit";
+
 import { db, membresTable, livraisonsTable, campagnesTable } from "@workspace/db";
 import { eq, and, or, ilike, sql, desc, notInArray, asc } from "drizzle-orm";
 import { CreateMembreBody, UpdateMembreBody } from "@workspace/api-zod";
 import { computeCodeMembre } from "../services/portailService";
+
+const LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
 
 function enrichMembre<T extends { id: number; dateAdhesion: string }>(m: T) {
   return { ...m, codeMembre: computeCodeMembre(m.id, m.dateAdhesion) };
@@ -197,10 +201,11 @@ export async function exportMembresPdf(req: Request, res: Response): Promise<voi
 
     // En-tête
     doc.rect(0, 0, doc.page.width, 65).fill(VERT);
+    try { doc.image(LOGO_PATH, 50, 10, { width: 45, height: 45 }); } catch (_) { /* logo facultatif */ }
     doc.fillColor("white").fontSize(16).font("Helvetica-Bold")
-      .text("CoopDigital — Liste des membres", 50, 18);
+      .text("CoopDigital — Liste des membres", 103, 18);
     doc.fontSize(11).font("Helvetica")
-      .text(`${label} · Exporté le ${new Date().toLocaleDateString("fr-FR")}`, 50, 42);
+      .text(`${label} · Exporté le ${new Date().toLocaleDateString("fr-FR")}`, 103, 42);
     doc.fillColor(NOIR).moveDown(3);
 
     // Résumé

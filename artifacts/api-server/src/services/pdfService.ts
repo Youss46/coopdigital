@@ -2,6 +2,7 @@
  * Service de génération PDF OHADA — pdfkit
  */
 import PDFDocument from "pdfkit";
+import path from "path";
 import {
   db,
   membresTable,
@@ -14,6 +15,8 @@ import {
 } from "@workspace/db";
 import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
+
+const LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
 
 const VERT = "#1a4731";
 const OR = "#c4962a";
@@ -32,10 +35,11 @@ function formaterDate(d: string | Date): string {
 
 function enTeteDoc(doc: InstanceType<typeof PDFDocument>, titre: string) {
   doc.rect(0, 0, PAGE_W, 60).fill(VERT);
+  try { doc.image(LOGO_PATH, MARGIN - 10, 8, { width: 44, height: 44 }); } catch (_) { /* logo facultatif */ }
   doc.fontSize(18).fillColor("white").font("Helvetica-Bold")
-    .text("CoopDigital", MARGIN, 18, { width: 200 });
+    .text("CoopDigital", MARGIN + 46, 14, { width: 220 });
   doc.fontSize(9).fillColor("#d1fae5").font("Helvetica")
-    .text("Gestion des coopératives cacaoyères de Côte d'Ivoire", MARGIN, 40);
+    .text("Gestion des coopératives cacaoyères de Côte d'Ivoire", MARGIN + 46, 36);
   doc.fontSize(14).fillColor("white").font("Helvetica-Bold")
     .text(titre, PAGE_W / 2, 22, { width: PAGE_W / 2 - MARGIN, align: "right" });
   doc.fillColor("black");

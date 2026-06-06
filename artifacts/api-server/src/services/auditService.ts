@@ -1,10 +1,14 @@
 import { type Request } from "express";
 import crypto from "crypto";
+import path from "path";
 import PDFDocument from "pdfkit";
+
 import { db } from "@workspace/db";
 import { auditTrailTable, sessionsUtilisateursTable } from "@workspace/db";
 import { eq, and, gte, lte, desc, sql, type SQL } from "drizzle-orm";
 import { logger } from "../lib/logger";
+
+const LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
 
 const COOP_ID = 1;
 
@@ -286,11 +290,13 @@ export async function exportAuditPDF(
     doc.on("error", reject);
 
     // ─── En-tête ───────────────────────────────────────────────
-    doc
-      .fontSize(18)
-      .fillColor("#1a4731")
-      .text("CoopDigital — Journal d'Audit", { align: "center" })
-      .moveDown(0.3);
+    doc.rect(0, 0, 515, 60).fill("#1a4731");
+    try { doc.image(LOGO_PATH, 40, 8, { width: 44, height: 44 }); } catch (_) { /* logo facultatif */ }
+    doc.fontSize(18).fillColor("white").font("Helvetica-Bold")
+      .text("CoopDigital — Journal d'Audit", 92, 14, { width: 380, align: "left" });
+    doc.fontSize(9).fillColor("#d1fae5").font("Helvetica")
+      .text("Gestion des coopératives cacaoyères de Côte d'Ivoire", 92, 36);
+    doc.fillColor("black").moveDown(3.5);
 
     doc
       .fontSize(10)

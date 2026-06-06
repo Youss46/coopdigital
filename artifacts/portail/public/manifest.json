@@ -1,7 +1,7 @@
 {
-  "name": "CoopDigital — Agent Terrain",
-  "short_name": "Terrain",
-  "description": "Application agent terrain coopérative cacaoyère",
+  "name": "CoopDigital — Portail Membre",
+  "short_name": "CoopDigital",
+  "description": "Portail de consultation pour les membres des coopératives cacaoyères",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",

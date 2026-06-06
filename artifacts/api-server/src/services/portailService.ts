@@ -10,7 +10,10 @@ import {
   scoresMembreTable,
 } from "@workspace/db";
 import { eq, desc, and, sql, count } from "drizzle-orm";
+import path from "path";
 import PDFDocument from "pdfkit";
+
+const LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
 
 // ─── Code membre ─────────────────────────────────────────────────────────────
 
@@ -302,10 +305,11 @@ export async function generateRecuLivraison(membreId: number, livraisonId: numbe
   const W = 419.53;
 
   doc.rect(0, 0, W, 45).fill(VERT);
+  try { doc.image(LOGO_PATH, 10, 5, { width: 35, height: 35 }); } catch (_) { /* logo facultatif */ }
   doc.fontSize(14).fillColor("white").font("Helvetica-Bold")
-    .text("CoopDigital", 30, 12);
+    .text("CoopDigital", 52, 10);
   doc.fontSize(9).fillColor("#d1fae5").font("Helvetica")
-    .text("Reçu de livraison", 30, 30);
+    .text("Reçu de livraison", 52, 28);
   doc.fillColor("black").moveDown(3);
 
   doc.fontSize(10).font("Helvetica-Bold").text("MEMBRE", 30, 60);
