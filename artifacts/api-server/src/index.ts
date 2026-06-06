@@ -59,3 +59,12 @@ cron.schedule("5 8 * * *", () => {
     });
   }).catch((err: unknown) => logger.error({ err }, "Import fiscaliteService"));
 });
+
+// CRON support : alertes tickets haute priorité non pris en charge après 30 min (toutes les 5 min)
+cron.schedule("*/5 * * * *", () => {
+  import("./services/supportService.js").then(({ envoyerAlertesHautePriorite }) => {
+    envoyerAlertesHautePriorite().catch((err: unknown) => {
+      logger.error({ err }, "Erreur cron alertes support haute priorité");
+    });
+  }).catch((err: unknown) => logger.error({ err }, "Import supportService"));
+});

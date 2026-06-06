@@ -8,6 +8,7 @@ import NouvelleCoop from "@/pages/NouvelleCoop";
 import CoopDetail from "@/pages/CoopDetail";
 import Licences from "@/pages/Licences";
 import Revenus from "@/pages/Revenus";
+import Support from "@/pages/Support";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ function AppRoutes() {
       <Route path="/cooperatives"><PrivateRoute component={Cooperatives} /></Route>
       <Route path="/licences"><PrivateRoute component={Licences} /></Route>
       <Route path="/revenus"><PrivateRoute component={Revenus} /></Route>
+      <Route path="/support"><PrivateRoute component={Support} /></Route>
       <Route>
         {token ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
       </Route>

@@ -3,7 +3,7 @@ import { Link, useRoute } from "wouter";
 import { useAuth } from "@/lib/auth";
 import {
   LayoutDashboard, Building2, FileKey, TrendingUp,
-  LogOut, ChevronRight, Menu, X,
+  LogOut, ChevronRight, Menu, X, LifeBuoy,
 } from "lucide-react";
 
 const nav = [
@@ -11,6 +11,7 @@ const nav = [
   { href: "/cooperatives", label: "Coopératives",     icon: Building2 },
   { href: "/licences",     label: "Licences",         icon: FileKey },
   { href: "/revenus",      label: "Revenus",          icon: TrendingUp },
+  { href: "/support",      label: "Support",          icon: LifeBuoy },
 ];
 
 function NavItem({

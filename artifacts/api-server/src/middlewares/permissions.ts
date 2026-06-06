@@ -295,6 +295,12 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     depenser: ["pca", "directeur", "comptable"],
   },
 
+  // MODULE — SUPPORT
+  support: {
+    creer_ticket:  ["pca", "directeur", "comptable", "agent_terrain", "responsable_tracabilite"],
+    voir_tickets:  ["pca", "directeur", "comptable", "agent_terrain", "responsable_tracabilite"],
+  },
+
   // MODULE — FISCALITÉ
   fiscalite: {
     voir:       ["pca", "directeur", "comptable", "auditeur"],

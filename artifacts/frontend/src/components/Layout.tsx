@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
+import HelpPanel from "./HelpPanel";
 
 const navItems = [
   // ── Dashboards ────────────────────────────────────────────────────────────
@@ -468,11 +469,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <img src="/logo-192.png" alt="CoopDigital" className="w-7 h-7 rounded-lg object-contain" />
             <span className="font-bold text-gray-900 text-base">CoopDigital</span>
           </div>
-          <NotificationPanel />
+          <div className="flex items-center gap-1">
+            <HelpPanel />
+            <NotificationPanel />
+          </div>
         </header>
 
         {/* Barre supérieure desktop — cloche à droite */}
-        <header className="hidden lg:flex items-center justify-end px-6 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+        <header className="hidden lg:flex items-center justify-end gap-1 px-6 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+          <HelpPanel />
           <NotificationPanel />
         </header>
 

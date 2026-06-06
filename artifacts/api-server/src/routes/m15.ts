@@ -17,6 +17,13 @@ import {
   supprimerCooperativeHandler,
   getHistoriqueLicenceHandler,
 } from "../controllers/m15Controller.js";
+import {
+  tousLesTicketsM15Handler,
+  detailTicketM15Handler,
+  repondreM15Handler,
+  prendreEnChargeHandler,
+  marquerResoluHandler,
+} from "../controllers/supportController.js";
 
 const router = Router();
 
@@ -42,5 +49,12 @@ router.get("/m15/licences/:id/historique", getHistoriqueLicenceHandler);
 router.put("/m15/cooperatives/:id/suspendre", requireM15Role("superadmin", "admin"), suspendreCooperativeHandler);
 router.put("/m15/cooperatives/:id/reactiver", requireM15Role("superadmin", "admin"), reactiverCooperativeHandler);
 router.delete("/m15/cooperatives/:id", requireM15Role("superadmin"), supprimerCooperativeHandler);
+
+// ─── Support tickets (vue M15) ────────────────────────────────────────────────
+router.get("/m15/support/tickets",                  tousLesTicketsM15Handler);
+router.get("/m15/support/tickets/:id",              detailTicketM15Handler);
+router.post("/m15/support/tickets/:id/repondre",    repondreM15Handler);
+router.put("/m15/support/tickets/:id/prendre",      prendreEnChargeHandler);
+router.put("/m15/support/tickets/:id/resoudre",     marquerResoluHandler);
 
 export default router;
