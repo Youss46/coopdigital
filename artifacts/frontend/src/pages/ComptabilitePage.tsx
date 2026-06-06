@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useQuery, useMutation, useQueryClient as useQC } from "@tanstack/react-query";
 import {
   useGetConfigComptable,
   useUpdateConfigComptable,
@@ -24,7 +25,7 @@ import {
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, RefreshCw, DollarSign } from "lucide-react";
+import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, RefreshCw, DollarSign, List, Sliders, RotateCcw, Plus, Pencil, Ban, ChevronDown, ChevronUp, Search, RotateCw } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { type TauxChange } from "@workspace/api-client-react";
 
@@ -999,6 +1000,771 @@ function OngletDevises() {
   );
 }
 
+// ─── Plan comptable — helpers API ────────────────────────────────────────────
+const tok = () => localStorage.getItem("coop_token") ?? "";
+const hdr = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
+
+async function apiFetch<T>(path: string): Promise<T> {
+  const r = await fetch(path, { headers: hdr() });
+  if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
+  return r.json() as Promise<T>;
+}
+async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const r = await fetch(path, { method: "POST", headers: hdr(), body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
+  return r.json() as Promise<T>;
+}
+async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  const r = await fetch(path, { method: "PUT", headers: hdr(), body: body ? JSON.stringify(body) : undefined });
+  if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
+  return r.json() as Promise<T>;
+}
+async function apiDelete<T>(path: string): Promise<T> {
+  const r = await fetch(path, { method: "DELETE", headers: hdr() });
+  if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
+  return r.json() as Promise<T>;
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface ComptePC {
+  id: number; cooperativeId: number; numeroCompte: string; libelle: string;
+  type: string; classe: number | null; soldeNormal: string; actif: boolean; ordreAffichage: number | null;
+}
+interface ParamModule {
+  id: number; module: string; operation: string; compteDebit: string;
+  compteCredit: string; libelleEcritureAuto: string | null; actif: boolean; updatedAt: string | null;
+}
+interface EcriturePC {
+  id: number; dateEcriture: string; numeroPiece: string | null; libelle: string;
+  compteDebit: string; compteCredit: string; montantFcfa: number;
+  source: string; typeEcriture: string; ecritureSourceId: number | null;
+  motifCorrection: string | null; corrigePar: number | null;
+}
+
+const TYPES_COMPTE: Record<string, { label: string; color: string }> = {
+  actif:   { label: "Actif",   color: "#1d4ed8" },
+  passif:  { label: "Passif",  color: "#7e22ce" },
+  charge:  { label: "Charge",  color: "#b45309" },
+  produit: { label: "Produit", color: "#166534" },
+};
+
+const CLASSES_OHADA: Record<number, string> = {
+  1: "Classe 1 — Capitaux",
+  2: "Classe 2 — Immobilisations",
+  3: "Classe 3 — Stocks",
+  4: "Classe 4 — Tiers",
+  5: "Classe 5 — Trésorerie",
+  6: "Classe 6 — Charges",
+  7: "Classe 7 — Produits",
+};
+
+const MODULES_LABELS: Record<string, string> = {
+  livraisons:     "Livraisons producteurs",
+  avances:        "Avances producteurs",
+  ventes_export:  "Ventes exportateurs",
+  salaires:       "Salaires & paie",
+  dons:           "Dons & subventions",
+  intrants:       "Intrants agricoles",
+  emprunts:       "Emprunts bancaires",
+  transport:      "Transport & logistique",
+  amortissements: "Amortissements",
+  parts_sociales: "Parts sociales",
+};
+
+// ─── Onglet A — Plan comptable ─────────────────────────────────────────────────
+function OngletPlanComptable() {
+  const qc = useQC();
+  const { toast } = useToast();
+  const peutAjouter = usePermission("comptabilite", "ajouter_compte");
+  const peutModifier = usePermission("comptabilite", "modifier_compte");
+  const peutDesactiver = usePermission("comptabilite", "desactiver_compte");
+
+  const [search, setSearch] = useState("");
+  const [classeFiltre, setClasseFiltre] = useState<string>("");
+  const [typeFiltre, setTypeFiltre] = useState<string>("");
+  const [showInactifs, setShowInactifs] = useState(false);
+  const [modalCreate, setModalCreate] = useState(false);
+  const [editCompte, setEditCompte] = useState<ComptePC | null>(null);
+  const [form, setForm] = useState({ numeroCompte: "", libelle: "", type: "actif", classe: "" });
+  const [editLibelle, setEditLibelle] = useState("");
+
+  const { data: comptes = [], isLoading } = useQuery<ComptePC[]>({
+    queryKey: ["plan-comptable"],
+    queryFn: () => apiFetch<ComptePC[]>("/api/comptabilite/plan"),
+  });
+
+  const mutCreate = useMutation({
+    mutationFn: () => apiPost("/api/comptabilite/plan", {
+      ...form,
+      classe: form.classe ? parseInt(form.classe) : undefined,
+    }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["plan-comptable"] });
+      toast({ description: "Compte créé avec succès." });
+      setModalCreate(false);
+      setForm({ numeroCompte: "", libelle: "", type: "actif", classe: "" });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", description: e.message }),
+  });
+
+  const mutUpdate = useMutation({
+    mutationFn: ({ id, libelle }: { id: number; libelle: string }) =>
+      apiPut(`/api/comptabilite/plan/${id}`, { libelle }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["plan-comptable"] });
+      toast({ description: "Libellé mis à jour." });
+      setEditCompte(null);
+    },
+    onError: (e: Error) => toast({ variant: "destructive", description: e.message }),
+  });
+
+  const mutDesactiver = useMutation({
+    mutationFn: (id: number) => apiDelete(`/api/comptabilite/plan/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["plan-comptable"] });
+      toast({ description: "Compte désactivé." });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", description: e.message }),
+  });
+
+  const filtres = comptes.filter((c) => {
+    if (!showInactifs && !c.actif) return false;
+    if (classeFiltre && String(c.classe) !== classeFiltre) return false;
+    if (typeFiltre && c.type !== typeFiltre) return false;
+    if (search) {
+      const s = search.toLowerCase();
+      if (!c.numeroCompte.toLowerCase().includes(s) && !c.libelle.toLowerCase().includes(s)) return false;
+    }
+    return true;
+  });
+
+  const parClasse = filtres.reduce<Record<number, ComptePC[]>>((acc, c) => {
+    const cl = c.classe ?? 0;
+    if (!acc[cl]) acc[cl] = [];
+    acc[cl]!.push(c);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-4">
+      {/* Barre de filtres */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher numéro ou libellé…"
+            className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+          />
+        </div>
+        <select
+          value={classeFiltre}
+          onChange={(e) => setClasseFiltre(e.target.value)}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+        >
+          <option value="">Toutes classes</option>
+          {[1,2,3,4,5,6,7].map((n) => <option key={n} value={String(n)}>Classe {n}</option>)}
+        </select>
+        <select
+          value={typeFiltre}
+          onChange={(e) => setTypeFiltre(e.target.value)}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+        >
+          <option value="">Tous types</option>
+          {Object.entries(TYPES_COMPTE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+          <input type="checkbox" checked={showInactifs} onChange={(e) => setShowInactifs(e.target.checked)} />
+          Voir inactifs
+        </label>
+        {peutAjouter && (
+          <button
+            onClick={() => setModalCreate(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white ml-auto"
+            style={{ backgroundColor: VERT }}
+          >
+            <Plus size={14} /> Nouveau compte
+          </button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="text-center py-12 text-gray-400">Chargement…</div>
+      ) : Object.keys(parClasse).length === 0 ? (
+        <div className="text-center py-12 text-gray-400">Aucun compte trouvé.</div>
+      ) : (
+        Object.entries(parClasse)
+          .sort(([a], [b]) => parseInt(a) - parseInt(b))
+          .map(([cl, rows]) => (
+            <div key={cl} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                <span className="font-semibold text-xs text-gray-600 uppercase tracking-wide">
+                  {CLASSES_OHADA[parseInt(cl)] ?? `Classe ${cl}`}
+                </span>
+                <span className="ml-auto text-xs text-gray-400">{rows.length} compte{rows.length > 1 ? "s" : ""}</span>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase">
+                    <th className="text-left px-4 py-2 font-medium">N°</th>
+                    <th className="text-left px-4 py-2 font-medium">Libellé</th>
+                    <th className="text-left px-4 py-2 font-medium">Type</th>
+                    <th className="text-left px-4 py-2 font-medium">Solde normal</th>
+                    <th className="text-left px-4 py-2 font-medium">Statut</th>
+                    <th className="px-4 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.sort((a,b) => a.numeroCompte.localeCompare(b.numeroCompte)).map((c) => (
+                    <tr key={c.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!c.actif ? "opacity-50" : ""}`}>
+                      <td className="px-4 py-2.5 font-mono font-semibold text-gray-800">{c.numeroCompte}</td>
+                      <td className="px-4 py-2.5 text-gray-700">
+                        {editCompte?.id === c.id ? (
+                          <input
+                            autoFocus
+                            value={editLibelle}
+                            onChange={(e) => setEditLibelle(e.target.value)}
+                            className="border border-green-700 rounded px-2 py-0.5 text-sm w-full"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") mutUpdate.mutate({ id: c.id, libelle: editLibelle });
+                              if (e.key === "Escape") setEditCompte(null);
+                            }}
+                          />
+                        ) : c.libelle}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                          style={{ background: TYPES_COMPTE[c.type]?.color + "22", color: TYPES_COMPTE[c.type]?.color }}>
+                          {TYPES_COMPTE[c.type]?.label ?? c.type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-500 capitalize">{c.soldeNormal}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${c.actif ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+                          {c.actif ? "Actif" : "Inactif"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2 justify-end">
+                          {editCompte?.id === c.id ? (
+                            <>
+                              <button onClick={() => mutUpdate.mutate({ id: c.id, libelle: editLibelle })}
+                                className="text-xs px-2 py-1 rounded bg-green-700 text-white font-medium">
+                                Sauver
+                              </button>
+                              <button onClick={() => setEditCompte(null)} className="text-xs px-2 py-1 rounded border text-gray-500">Annuler</button>
+                            </>
+                          ) : (
+                            <>
+                              {peutModifier && c.actif && (
+                                <button onClick={() => { setEditCompte(c); setEditLibelle(c.libelle); }}
+                                  className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                                  <Pencil size={13} />
+                                </button>
+                              )}
+                              {peutDesactiver && c.actif && (
+                                <button onClick={() => { if (confirm(`Désactiver le compte ${c.numeroCompte} ?`)) mutDesactiver.mutate(c.id); }}
+                                  className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-600">
+                                  <Ban size={13} />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))
+      )}
+
+      {/* Modal créer compte */}
+      {modalCreate && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Nouveau compte OHADA</h3>
+              <button onClick={() => setModalCreate(false)}><X size={18} className="text-gray-400" /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {([["Numéro de compte", "numeroCompte", "ex : 6025"], ["Libellé", "libelle", "ex : Achats hévéa brut"]] as const).map(([label, key, ph]) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                  <input
+                    value={form[key]}
+                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                    placeholder={ph}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                  />
+                </div>
+              ))}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+                  <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    <option value="actif">Actif</option>
+                    <option value="passif">Passif</option>
+                    <option value="charge">Charge</option>
+                    <option value="produit">Produit</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Classe (optionnel)</label>
+                  <select value={form.classe} onChange={(e) => setForm((f) => ({ ...f, classe: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none">
+                    <option value="">Auto</option>
+                    {[1,2,3,4,5,6,7].map((n) => <option key={n} value={String(n)}>{n}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button onClick={() => setModalCreate(false)} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700">Annuler</button>
+              <button
+                onClick={() => mutCreate.mutate()}
+                disabled={!form.numeroCompte || !form.libelle || mutCreate.isPending}
+                className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                style={{ backgroundColor: VERT }}
+              >
+                {mutCreate.isPending ? "Création…" : "Créer le compte"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Onglet B — Comptes des modules ──────────────────────────────────────────
+function OngletComptesModules() {
+  const qc = useQC();
+  const { toast } = useToast();
+  const peutModifier = usePermission("comptabilite", "modifier_params");
+  const peutReset = usePermission("comptabilite", "reset_ohada");
+
+  const { data: params = [], isLoading } = useQuery<ParamModule[]>({
+    queryKey: ["params-comptes-modules"],
+    queryFn: () => apiFetch<ParamModule[]>("/api/comptabilite/params"),
+  });
+
+  const [ouverts, setOuverts] = useState<Record<string, boolean>>({});
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ compteDebit: "", compteCredit: "", libelleEcritureAuto: "" });
+
+  const toggleModule = (m: string) => setOuverts((o) => ({ ...o, [m]: !o[m] }));
+
+  const mutUpdate = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: typeof editForm }) =>
+      apiPut(`/api/comptabilite/params/${id}`, data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["params-comptes-modules"] });
+      toast({ description: "Paramètre mis à jour." });
+      setEditId(null);
+    },
+    onError: (e: Error) => toast({ variant: "destructive", description: e.message }),
+  });
+
+  const mutReset = useMutation({
+    mutationFn: (module: string) => apiPost(`/api/comptabilite/params/reset/${module}`, {}),
+    onSuccess: (_, module) => {
+      void qc.invalidateQueries({ queryKey: ["params-comptes-modules"] });
+      toast({ description: `Module "${module}" réinitialisé avec les valeurs OHADA.` });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", description: e.message }),
+  });
+
+  const parModule = params.reduce<Record<string, ParamModule[]>>((acc, p) => {
+    if (!acc[p.module]) acc[p.module] = [];
+    acc[p.module]!.push(p);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-gray-500">
+        Configurez les comptes OHADA utilisés automatiquement par chaque module lors de la génération d'écritures.
+      </p>
+      {isLoading ? (
+        <div className="text-center py-12 text-gray-400">Chargement…</div>
+      ) : (
+        Object.entries(parModule)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([module, rows]) => {
+            const open = ouverts[module] ?? false;
+            return (
+              <div key={module} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => toggleModule(module)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <Sliders size={15} className="text-gray-400 flex-shrink-0" />
+                  <div className="flex-1 text-left">
+                    <span className="font-semibold text-sm text-gray-800">
+                      {MODULES_LABELS[module] ?? module}
+                    </span>
+                    <span className="ml-2 text-xs text-gray-400">{rows.length} opération{rows.length > 1 ? "s" : ""}</span>
+                  </div>
+                  {peutReset && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Réinitialiser le module "${MODULES_LABELS[module] ?? module}" avec les valeurs OHADA par défaut ?`))
+                          mutReset.mutate(module);
+                      }}
+                      className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 hover:border-amber-400 hover:text-amber-600 mr-2"
+                    >
+                      <RotateCcw size={11} /> Réinitialiser OHADA
+                    </button>
+                  )}
+                  {open ? <ChevronUp size={15} className="text-gray-400" /> : <ChevronDown size={15} className="text-gray-400" />}
+                </button>
+                {open && (
+                  <div className="border-t border-gray-100">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase">
+                          <th className="text-left px-4 py-2 font-medium">Opération</th>
+                          <th className="text-left px-4 py-2 font-medium">Débit</th>
+                          <th className="text-left px-4 py-2 font-medium">Crédit</th>
+                          <th className="text-left px-4 py-2 font-medium">Libellé auto</th>
+                          <th className="px-4 py-2" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.sort((a,b) => a.operation.localeCompare(b.operation)).map((p) => (
+                          <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
+                            <td className="px-4 py-2.5 text-gray-700 font-mono text-xs">{p.operation}</td>
+                            {editId === p.id ? (
+                              <>
+                                <td className="px-4 py-1.5">
+                                  <input value={editForm.compteDebit}
+                                    onChange={(e) => setEditForm((f) => ({ ...f, compteDebit: e.target.value }))}
+                                    className="w-20 border border-gray-200 rounded px-2 py-1 text-sm font-mono" />
+                                </td>
+                                <td className="px-4 py-1.5">
+                                  <input value={editForm.compteCredit}
+                                    onChange={(e) => setEditForm((f) => ({ ...f, compteCredit: e.target.value }))}
+                                    className="w-20 border border-gray-200 rounded px-2 py-1 text-sm font-mono" />
+                                </td>
+                                <td className="px-4 py-1.5">
+                                  <input value={editForm.libelleEcritureAuto}
+                                    onChange={(e) => setEditForm((f) => ({ ...f, libelleEcritureAuto: e.target.value }))}
+                                    className="w-full border border-gray-200 rounded px-2 py-1 text-sm" />
+                                </td>
+                                <td className="px-4 py-1.5">
+                                  <div className="flex gap-2">
+                                    <button onClick={() => mutUpdate.mutate({ id: p.id, data: editForm })}
+                                      className="text-xs px-2 py-1 rounded bg-green-700 text-white font-medium">
+                                      ✓
+                                    </button>
+                                    <button onClick={() => setEditId(null)} className="text-xs px-2 py-1 rounded border text-gray-500">✗</button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-4 py-2.5 font-mono font-semibold text-blue-700">{p.compteDebit}</td>
+                                <td className="px-4 py-2.5 font-mono font-semibold text-purple-700">{p.compteCredit}</td>
+                                <td className="px-4 py-2.5 text-gray-500 text-xs">{p.libelleEcritureAuto ?? "—"}</td>
+                                <td className="px-4 py-2.5 text-right">
+                                  {peutModifier && (
+                                    <button
+                                      onClick={() => { setEditId(p.id); setEditForm({ compteDebit: p.compteDebit, compteCredit: p.compteCredit, libelleEcritureAuto: p.libelleEcritureAuto ?? "" }); }}
+                                      className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                                      <Pencil size={13} />
+                                    </button>
+                                  )}
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })
+      )}
+    </div>
+  );
+}
+
+// ─── Onglet C — Corriger une écriture ────────────────────────────────────────
+function OngletCorrigerEcriture() {
+  const qc = useQC();
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selected, setSelected] = useState<EcriturePC | null>(null);
+  const [historique, setHistorique] = useState<{ original: EcriturePC; corrections: EcriturePC[] } | null>(null);
+  const [showHistorique, setShowHistorique] = useState(false);
+  const [form, setForm] = useState({
+    nouveauCompteDebit: "", nouveauCompteCredit: "",
+    nouveauMontant: "", nouveauLibelle: "", motifCorrection: "",
+  });
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const { data: resultats = [] } = useQuery<EcriturePC[]>({
+    queryKey: ["ecritures-search", searchQuery],
+    queryFn: () => searchQuery.length >= 2
+      ? apiFetch<EcriturePC[]>(`/api/comptabilite/ecritures/search?q=${encodeURIComponent(searchQuery)}`)
+      : Promise.resolve([]),
+    enabled: searchQuery.length >= 2,
+  });
+
+  const mutCorrect = useMutation({
+    mutationFn: (id: number) => apiPut(`/api/comptabilite/ecritures/${id}/corriger`, {
+      nouveauCompteDebit:  form.nouveauCompteDebit || undefined,
+      nouveauCompteCredit: form.nouveauCompteCredit || undefined,
+      nouveauMontant:      form.nouveauMontant ? parseInt(form.nouveauMontant) : undefined,
+      nouveauLibelle:      form.nouveauLibelle || undefined,
+      motifCorrection:     form.motifCorrection,
+    }),
+    onSuccess: () => {
+      toast({ description: "Contre-passation + écriture corrective enregistrées." });
+      setSelected(null);
+      setForm({ nouveauCompteDebit: "", nouveauCompteCredit: "", nouveauMontant: "", nouveauLibelle: "", motifCorrection: "" });
+      setSearchQuery("");
+      void qc.invalidateQueries({ queryKey: ["ecritures-search"] });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", description: e.message }),
+  });
+
+  const chargerHistorique = async (e: EcriturePC) => {
+    try {
+      const h = await apiFetch<{ original: EcriturePC; corrections: EcriturePC[] }>(`/api/comptabilite/ecritures/${e.id}/historique`);
+      setHistorique(h);
+      setShowHistorique(true);
+    } catch (err) {
+      toast({ variant: "destructive", description: (err as Error).message });
+    }
+  };
+
+  const TYPE_BADGE: Record<string, { label: string; bg: string; text: string }> = {
+    normale:     { label: "Normale",     bg: "#f0fdf4", text: "#166534" },
+    annulation:  { label: "Annulation",  bg: "#fef3c7", text: "#92400e" },
+    correction:  { label: "Correction",  bg: "#dbeafe", text: "#1e40af" },
+  };
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      <div>
+        <p className="text-sm text-gray-500 mb-4">
+          La correction crée une <strong>contre-passation</strong> (annulation) puis une <strong>écriture corrective</strong>.
+          L'écriture originale est conservée dans l'audit trail complet.
+        </p>
+
+        {/* Recherche écriture */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+          <label className="block text-sm font-semibold text-gray-700">1. Sélectionner l'écriture à corriger</label>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+              }}
+              placeholder="Rechercher par libellé ou numéro de pièce…"
+              className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+            />
+          </div>
+          {resultats.length > 0 && !selected && (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              {resultats.map((e) => (
+                <button
+                  key={e.id}
+                  onClick={() => { setSelected(e); setForm((f) => ({ ...f, nouveauMontant: String(e.montantFcfa) })); }}
+                  className={`w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 ${e.typeEcriture !== "normale" ? "opacity-50" : ""}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">{e.dateEcriture}</span>
+                      <span className="font-mono text-xs text-gray-500">{e.numeroPiece ?? `#${e.id}`}</span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                        style={{ background: TYPE_BADGE[e.typeEcriture]?.bg, color: TYPE_BADGE[e.typeEcriture]?.text }}>
+                        {TYPE_BADGE[e.typeEcriture]?.label ?? e.typeEcriture}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-800 mt-0.5 truncate">{e.libelle}</p>
+                    <p className="text-xs text-gray-500">
+                      <span className="font-mono">{e.compteDebit}</span>
+                      <span className="mx-1">→</span>
+                      <span className="font-mono">{e.compteCredit}</span>
+                      <span className="ml-2 font-semibold">{FCFA(e.montantFcfa)}</span>
+                    </p>
+                  </div>
+                  {e.typeEcriture !== "normale" && <span className="text-xs text-red-400">Non corrigeable</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selected && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-amber-700 font-semibold">Écriture sélectionnée</p>
+                <p className="text-sm text-amber-900 mt-0.5">{selected.libelle}</p>
+                <p className="text-xs text-amber-700 font-mono">{selected.compteDebit} → {selected.compteCredit} — {FCFA(selected.montantFcfa)}</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => chargerHistorique(selected)}
+                  className="text-xs px-2 py-1 rounded border border-amber-300 text-amber-700 hover:bg-amber-100">
+                  Historique
+                </button>
+                <button onClick={() => setSelected(null)} className="p-1 rounded hover:bg-amber-100 text-amber-600"><X size={14} /></button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Formulaire de correction */}
+        {selected && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4 mt-4">
+            <label className="block text-sm font-semibold text-gray-700">2. Paramètres de la correction (laissez vide pour conserver l'original)</label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Nouveau compte débit <span className="text-gray-400">(actuellement : {selected.compteDebit})</span>
+                </label>
+                <input value={form.nouveauCompteDebit}
+                  onChange={(e) => setForm((f) => ({ ...f, nouveauCompteDebit: e.target.value }))}
+                  placeholder={selected.compteDebit}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-700" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Nouveau compte crédit <span className="text-gray-400">(actuellement : {selected.compteCredit})</span>
+                </label>
+                <input value={form.nouveauCompteCredit}
+                  onChange={(e) => setForm((f) => ({ ...f, nouveauCompteCredit: e.target.value }))}
+                  placeholder={selected.compteCredit}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-700" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Nouveau montant FCFA <span className="text-gray-400">(actuellement : {FCFA(selected.montantFcfa)})</span>
+                </label>
+                <input type="number" value={form.nouveauMontant}
+                  onChange={(e) => setForm((f) => ({ ...f, nouveauMontant: e.target.value }))}
+                  placeholder={String(selected.montantFcfa)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Nouveau libellé</label>
+                <input value={form.nouveauLibelle}
+                  onChange={(e) => setForm((f) => ({ ...f, nouveauLibelle: e.target.value }))}
+                  placeholder={selected.libelle}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Motif de correction <span className="text-red-500">*</span></label>
+              <textarea
+                value={form.motifCorrection}
+                onChange={(e) => setForm((f) => ({ ...f, motifCorrection: e.target.value }))}
+                placeholder="Expliquez la raison de cette correction…"
+                rows={2}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 resize-none"
+              />
+            </div>
+            <button
+              onClick={() => mutCorrect.mutate(selected.id)}
+              disabled={!form.motifCorrection || mutCorrect.isPending}
+              className="w-full py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ backgroundColor: VERT }}
+            >
+              {mutCorrect.isPending ? <RotateCw size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+              {mutCorrect.isPending ? "Correction en cours…" : "Appliquer la correction (contre-passation + nouvelle écriture)"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Modal historique */}
+      {showHistorique && historique && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Historique des corrections</h3>
+              <button onClick={() => setShowHistorique(false)}><X size={18} className="text-gray-400" /></button>
+            </div>
+            <div className="px-6 py-5 space-y-3 max-h-[60vh] overflow-y-auto">
+              {[historique.original, ...historique.corrections].map((e) => (
+                <div key={e.id} className="border border-gray-100 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs text-gray-400">{e.dateEcriture}</span>
+                    <span className="font-mono text-xs text-gray-500">{e.numeroPiece ?? `#${e.id}`}</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                      style={{ background: { normale: "#f0fdf4", annulation: "#fef3c7", correction: "#dbeafe" }[e.typeEcriture] ?? "#f3f4f6",
+                               color: { normale: "#166534", annulation: "#92400e", correction: "#1e40af" }[e.typeEcriture] ?? "#374151" }}>
+                      {{ normale: "Originale", annulation: "Contre-passation", correction: "Correction" }[e.typeEcriture] ?? e.typeEcriture}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-800">{e.libelle}</p>
+                  <p className="text-xs text-gray-500 font-mono">{e.compteDebit} → {e.compteCredit} — {FCFA(e.montantFcfa)}</p>
+                  {e.motifCorrection && <p className="text-xs text-amber-700 mt-1 italic">Motif : {e.motifCorrection}</p>}
+                </div>
+              ))}
+            </div>
+            <div className="px-6 pb-5">
+              <button onClick={() => setShowHistorique(false)}
+                className="w-full py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700">
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Onglet Plan comptable (avec 3 sous-onglets) ──────────────────────────────
+type SousOngletPlan = "plan" | "modules" | "corriger";
+
+function OngletPlanComptableContainer() {
+  const [sousOnglet, setSousOnglet] = useState<SousOngletPlan>("plan");
+  const peutVoirPlan = usePermission("comptabilite", "voir_plan");
+  const peutVoirParams = usePermission("comptabilite", "voir_params");
+  const peutCorriger = usePermission("comptabilite", "corriger");
+
+  const sousOnglets: { id: SousOngletPlan; label: string; visible: boolean }[] = [
+    { id: "plan",     label: "Plan comptable",     visible: peutVoirPlan },
+    { id: "modules",  label: "Comptes des modules", visible: peutVoirParams },
+    { id: "corriger", label: "Corriger une écriture", visible: peutCorriger },
+  ];
+
+  return (
+    <div>
+      <div className="flex gap-1 border-b border-gray-200 mb-5 -mt-1">
+        {sousOnglets.filter((s) => s.visible).map(({ id, label }) => (
+          <button
+            key={id}
+            onClick={() => setSousOnglet(id)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              sousOnglet === id
+                ? "border-green-700 text-green-800"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {sousOnglet === "plan"     && peutVoirPlan    && <OngletPlanComptable />}
+      {sousOnglet === "modules"  && peutVoirParams  && <OngletComptesModules />}
+      {sousOnglet === "corriger" && peutCorriger     && <OngletCorrigerEcriture />}
+    </div>
+  );
+}
+
 // ─── Widget taux de change (header) ───────────────────────────────────────────
 export function WidgetTauxChange() {
   const { data: tauxActuels = [] } = useGetDevisesTaux({ query: { queryKey: getGetDevisesTauxQueryKey() } });
@@ -1026,22 +1792,24 @@ export function WidgetTauxChange() {
 }
 
 // ─── Page principale ──────────────────────────────────────────────────────────
-type Onglet = "journal" | "en_attente" | "config" | "devises";
+type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable";
 
 export default function ComptabilitePage() {
   const [onglet, setOnglet] = useState<Onglet>("en_attente");
-  const peutVoirConfig = usePermission("comptabilite", "voir_config");
+  const peutVoirConfig  = usePermission("comptabilite", "voir_config");
   const peutVoirAttente = usePermission("comptabilite", "voir_ecritures_attente");
+  const peutVoirPlan    = usePermission("comptabilite", "voir_plan");
   const { data: countData } = useCountEcrituresEnAttente({ query: { queryKey: getCountEcrituresEnAttenteQueryKey(), enabled: peutVoirAttente } });
   const nbEnAttente = countData?.count ?? 0;
 
   const peutVoirTaux = usePermission("devises", "voir_taux");
 
   const tabs: { id: Onglet; label: string; icon: React.ElementType; badge?: number }[] = [
-    { id: "en_attente", label: "Écritures en attente", icon: Clock, badge: nbEnAttente > 0 ? nbEnAttente : undefined },
-    { id: "journal",    label: "Journal comptable",    icon: BookOpen },
-    ...(peutVoirTaux  ? [{ id: "devises" as Onglet,   label: "Devises",             icon: DollarSign }] : []),
-    ...(peutVoirConfig ? [{ id: "config" as Onglet,   label: "Configuration",       icon: Settings }] : []),
+    { id: "en_attente",     label: "Écritures en attente", icon: Clock,     badge: nbEnAttente > 0 ? nbEnAttente : undefined },
+    { id: "journal",        label: "Journal comptable",    icon: BookOpen },
+    ...(peutVoirTaux  ? [{ id: "devises" as Onglet,        label: "Devises",             icon: DollarSign }] : []),
+    ...(peutVoirPlan  ? [{ id: "plan_comptable" as Onglet, label: "Plan comptable",      icon: List }] : []),
+    ...(peutVoirConfig ? [{ id: "config" as Onglet,        label: "Configuration",       icon: Settings }] : []),
   ];
 
   return (
@@ -1052,7 +1820,7 @@ export default function ComptabilitePage() {
       </div>
 
       {/* Onglets */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
+      <div className="flex flex-wrap gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
         {tabs.map(({ id, label, icon: Icon, badge }) => (
           <button
             key={id}
@@ -1081,10 +1849,11 @@ export default function ComptabilitePage() {
           <WidgetTauxChange />
         </div>
       )}
-      {onglet === "en_attente" && <OngletEnAttente />}
-      {onglet === "journal" && <OngletJournal />}
-      {onglet === "devises" && peutVoirTaux && <OngletDevises />}
-      {onglet === "config" && peutVoirConfig && <OngletConfiguration />}
+      {onglet === "en_attente"    && <OngletEnAttente />}
+      {onglet === "journal"       && <OngletJournal />}
+      {onglet === "devises"       && peutVoirTaux  && <OngletDevises />}
+      {onglet === "plan_comptable"&& peutVoirPlan  && <OngletPlanComptableContainer />}
+      {onglet === "config"        && peutVoirConfig && <OngletConfiguration />}
     </div>
   );
 }

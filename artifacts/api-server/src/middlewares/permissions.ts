@@ -80,21 +80,33 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE M05 — COMPTABILITÉ
   comptabilite: {
-    lire:                       ["pca", "directeur", "comptable", "auditeur"],
-    saisir_ecriture_manuelle:   ["pca", "directeur", "comptable"],
-    modifier_ecriture:          ["pca", "directeur"],
-    supprimer_ecriture:         ["pca"],
-    cloture_exercice:           ["pca", "directeur"],
-    voir_grand_livre:           ["pca", "directeur", "comptable", "auditeur"],
-    voir_balance:               ["pca", "directeur", "comptable", "auditeur"],
-    voir_bilan:                 ["pca", "directeur", "comptable", "auditeur"],
-    voir_compte_resultat:       ["pca", "directeur", "comptable", "auditeur"],
-    voir_config:                ["pca", "directeur", "comptable"],
-    modifier_config:            ["pca", "directeur", "comptable"],
-    voir_ecritures_attente:     ["pca", "directeur", "comptable"],
-    valider_ecriture:           ["pca", "directeur", "comptable"],
-    rejeter_ecriture:           ["pca", "directeur", "comptable"],
-    valider_tout:               ["pca", "directeur", "comptable"],
+    lire:                             ["pca", "directeur", "comptable", "auditeur"],
+    saisir_ecriture_manuelle:         ["pca", "directeur", "comptable"],
+    modifier_ecriture:                ["pca", "directeur"],
+    supprimer_ecriture:               ["pca"],
+    cloture_exercice:                 ["pca", "directeur"],
+    voir_grand_livre:                 ["pca", "directeur", "comptable", "auditeur"],
+    voir_balance:                     ["pca", "directeur", "comptable", "auditeur"],
+    voir_bilan:                       ["pca", "directeur", "comptable", "auditeur"],
+    voir_compte_resultat:             ["pca", "directeur", "comptable", "auditeur"],
+    voir_config:                      ["pca", "directeur", "comptable"],
+    modifier_config:                  ["pca", "directeur", "comptable"],
+    voir_ecritures_attente:           ["pca", "directeur", "comptable"],
+    valider_ecriture:                 ["pca", "directeur", "comptable"],
+    rejeter_ecriture:                 ["pca", "directeur", "comptable"],
+    valider_tout:                     ["pca", "directeur", "comptable"],
+    // Plan comptable personnalisé
+    voir_plan:                        ["pca", "directeur", "comptable", "auditeur"],
+    ajouter_compte:                   ["pca", "directeur", "comptable"],
+    modifier_compte:                  ["pca", "directeur", "comptable"],
+    desactiver_compte:                ["pca", "directeur"],
+    // Paramètres comptes modules
+    voir_params:                      ["pca", "directeur", "comptable", "auditeur"],
+    modifier_params:                  ["pca", "directeur", "comptable"],
+    reset_ohada:                      ["pca", "directeur"],
+    // Corrections d'écritures
+    corriger:                         ["pca", "directeur", "comptable"],
+    voir_historique_corrections:      ["pca", "directeur", "comptable", "auditeur"],
   },
 
   // MODULE M06 — REPORTING
