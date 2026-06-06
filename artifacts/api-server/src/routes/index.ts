@@ -52,11 +52,13 @@ import fiscaliteRouter from "./fiscalite";
 import reconciliationRouter from "./reconciliation";
 import investissementsRouter from "./investissements";
 import supportRouter from "./support";
+import setupRouter from "./setup";
 
 const router: IRouter = Router();
 
 // Routers publics / auth propre (avant le guard global)
 router.use(healthRouter);
+router.use(setupRouter);
 router.use(authRouter);
 router.use(portailRouter);
 router.use(terrainRouter);
