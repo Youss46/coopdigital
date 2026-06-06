@@ -1,8 +1,25 @@
+import path from "path";
 import app from "./app";
 import { logger } from "./lib/logger";
+import { runMigrations } from "@workspace/db/migrate";
 import cron from "node-cron";
 import { checkEcheancesEnRetard } from "./services/empruntService";
 import { runNotificationsCron } from "./jobs/notificationsCron";
+
+// ─── Migrations automatiques (production uniquement) ─────────────────────────
+// En développement, le schéma est synchronisé via `drizzle-kit push`.
+// En production (Railway), les migrations SQL sont appliquées au démarrage :
+// toutes les tables manquantes sont créées, sans jamais supprimer de données.
+if (process.env.NODE_ENV === "production") {
+  try {
+    const migrationsFolder = path.join(__dirname, "migrations");
+    await runMigrations(migrationsFolder);
+    logger.info("Migrations appliquées avec succès");
+  } catch (err) {
+    logger.error({ err }, "Erreur critique lors des migrations — démarrage annulé");
+    process.exit(1);
+  }
+}
 
 const rawPort = process.env["PORT"];
 

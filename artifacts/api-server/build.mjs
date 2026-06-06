@@ -125,6 +125,12 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   const pdfkitDataDir = path.resolve(path.dirname(_require.resolve("pdfkit")), "../js/data");
   const pdfkitDataDest = path.resolve(artifactDir, "dist/data");
   await cp(pdfkitDataDir, pdfkitDataDest, { recursive: true });
+
+  // Drizzle migration SQL files — copiés dans dist/migrations/ pour être
+  // disponibles à l'exécution sur Railway (drizzle-orm/migrator lit du SQL brut).
+  const migrationsSource = path.resolve(artifactDir, "../../lib/db/drizzle");
+  const migrationsDest = path.resolve(artifactDir, "dist/migrations");
+  await cp(migrationsSource, migrationsDest, { recursive: true });
 }
 
 buildAll().catch((err) => {
