@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { api, setToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { Loader2, Leaf, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 
 export default function ConnexionPage() {
   const [, setLoc] = useLocation();
@@ -34,8 +34,8 @@ export default function ConnexionPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-white/10 backdrop-blur mb-5">
-            <Leaf className="w-10 h-10 text-green-300" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-white mb-5 overflow-hidden shadow-lg">
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="CoopDigital" className="w-16 h-16 object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-white">CoopDigital</h1>
           <p className="text-green-300 mt-1 text-base">Espace membre</p>
