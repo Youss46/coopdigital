@@ -1,9 +1,9 @@
 import { pgTable, pgEnum, serial, integer, varchar, date, timestamp, boolean, text } from "drizzle-orm/pg-core";
 
 export const typeCompteEnum = pgEnum("type_compte", ["actif", "passif", "charge", "produit"]);
-export const sourceEcritureEnum = pgEnum("source_ecriture", ["livraison", "vente", "avance", "paiement", "manuel", "encaissement", "salaire", "stock"]);
+export const sourceEcritureEnum = pgEnum("source_ecriture", ["livraison", "vente", "avance", "paiement", "manuel", "encaissement", "salaire", "stock", "don"]);
 export const statutExerciceEnum = pgEnum("statut_exercice", ["ouvert", "cloture"]);
-export const sourceEcritureAttenteEnum = pgEnum("source_ecriture_attente", ["livraison", "paiement", "avance", "vente", "encaissement", "salaire", "stock"]);
+export const sourceEcritureAttenteEnum = pgEnum("source_ecriture_attente", ["livraison", "paiement", "avance", "vente", "encaissement", "salaire", "stock", "don"]);
 export const statutEcritureAttenteEnum = pgEnum("statut_ecriture_attente", ["en_attente", "validee", "rejetee", "modifiee"]);
 
 export const planComptableTable = pgTable("plan_comptable", {
@@ -49,6 +49,7 @@ export const configComptableTable = pgTable("config_comptable", {
   autoEncaissements: boolean("auto_encaissements").notNull().default(false),
   autoSalaires: boolean("auto_salaires").notNull().default(false),
   autoStocks: boolean("auto_stocks").notNull().default(false),
+  autoDons: boolean("auto_dons").notNull().default(false),
   modifiePar: integer("modifie_par"),
   updatedAt: timestamp("updated_at", { withTimezone: true }),
 });

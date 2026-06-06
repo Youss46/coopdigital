@@ -12,7 +12,7 @@ import { logger } from "../lib/logger";
 
 const COOP_ID = 1;
 
-export type SourceEcriture = "livraison" | "paiement" | "avance" | "vente" | "encaissement" | "salaire" | "stock";
+export type SourceEcriture = "livraison" | "paiement" | "avance" | "vente" | "encaissement" | "salaire" | "stock" | "don";
 
 interface ProposerEcriturePayload {
   source: SourceEcriture;
@@ -33,6 +33,7 @@ const AUTO_KEY_MAP: Record<SourceEcriture, keyof typeof configComptableTable.$in
   encaissement: "autoEncaissements",
   salaire:      "autoSalaires",
   stock:        "autoStocks",
+  don:          "autoDons",
 };
 
 async function getConfigComptable(cooperativeId: number) {

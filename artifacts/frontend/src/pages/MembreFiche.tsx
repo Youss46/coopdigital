@@ -15,14 +15,92 @@ import {
   getGetScoringResumeQueryKey,
   type LiberationInput,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowLeft, MapPin, Phone, Users, Leaf, Calendar, TrendingDown,
-  Coins, Plus, Loader2, ChevronDown, ChevronUp, UserCheck, UserX,
+  Coins, Plus, Loader2, ChevronDown, ChevronUp, UserCheck, UserX, Gift,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
+
+// ── Composant dons reçus d'un membre ─────────────────────────────────────────
+const tokFn = () => localStorage.getItem("coop_token") ?? "";
+
+interface DonMembre {
+  id: number; reference?: string; libelle: string; dateDon: string;
+  forme: string; montantFcfa?: string; valeurEstimeeFcfa?: string;
+  categorieLibelle?: string;
+}
+
+function DonsRecusMembre({ membreId }: { membreId: number }) {
+  const { data, isLoading } = useQuery<{ dons: DonMembre[]; totalRecu: number }>({
+    queryKey: ["dons-membre", membreId],
+    queryFn: async () => {
+      const r = await fetch(`/api/dons/membre/${membreId}`, {
+        headers: { Authorization: `Bearer ${tokFn()}` },
+      });
+      if (!r.ok) throw new Error("Erreur chargement dons");
+      return r.json() as Promise<{ dons: DonMembre[]; totalRecu: number }>;
+    },
+    enabled: !!membreId,
+  });
+
+  const FCFA = (n: number | string) =>
+    new Intl.NumberFormat("fr-FR").format(typeof n === "string" ? parseFloat(n) || 0 : n) + " F";
+
+  const montant = (d: DonMembre) =>
+    d.forme === "especes"
+      ? parseFloat(d.montantFcfa ?? "0")
+      : parseFloat(d.valeurEstimeeFcfa ?? "0");
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12 text-gray-400">
+        <Loader2 size={18} className="animate-spin mr-2" /> Chargement…
+      </div>
+    );
+  }
+
+  const dons = data?.dons ?? [];
+  const total = data?.totalRecu ?? 0;
+
+  if (dons.length === 0) {
+    return (
+      <div className="text-center py-10 text-gray-400">
+        <Gift className="w-8 h-8 mx-auto mb-2 opacity-30" />
+        <p className="text-sm">Aucun don enregistré pour ce membre</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y">
+      {/* Total */}
+      <div className="px-5 py-4 bg-green-50 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-green-700">
+          <Gift size={16} />
+          <span className="text-sm font-semibold">Total dons reçus</span>
+        </div>
+        <span className="text-lg font-bold text-green-700">{FCFA(total)}</span>
+      </div>
+      {dons.map((d) => (
+        <div key={d.id} className="flex items-start justify-between px-5 py-3.5">
+          <div className="min-w-0">
+            <div className="text-sm font-medium truncate">{d.libelle}</div>
+            <div className="text-xs text-gray-400 mt-0.5">
+              {String(d.dateDon).slice(0, 10)}
+              {d.reference && <> · <span className="font-mono">{d.reference}</span></>}
+              {d.categorieLibelle && <> · {d.categorieLibelle}</>}
+              <> · {d.forme === "especes" ? "Espèces" : "Nature"}</>
+            </div>
+          </div>
+          <div className="ml-4 text-sm font-semibold text-green-700 shrink-0">{FCFA(montant(d))}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const INPUT_CLS =
   "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white";
@@ -36,7 +114,7 @@ function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const TABS = ["Avances", "Livraisons", "Parts sociales", "Score"] as const;
+const TABS = ["Avances", "Livraisons", "Parts sociales", "Score", "Dons reçus"] as const;
 type Tab = (typeof TABS)[number];
 
 const NIVEAUX_SCORE: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
@@ -486,6 +564,9 @@ export default function MembreFiche() {
             )}
           </div>
         )}
+        {/* Dons reçus */}
+        {activeTab === "Dons reçus" && <DonsRecusMembre membreId={id} />}
+
         {/* Score */}
         {activeTab === "Score" && (
           <div className="p-5 space-y-5">

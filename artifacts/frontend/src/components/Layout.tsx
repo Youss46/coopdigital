@@ -36,6 +36,7 @@ import {
   Truck,
   Scale,
   MapPinned,
+  Gift,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -174,6 +175,12 @@ const navItems = [
     href: "/subventions",
     label: "Subventions",
     icon: HandCoins,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/dons",
+    label: "Dons",
+    icon: Gift,
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
