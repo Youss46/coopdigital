@@ -57,25 +57,15 @@ export default function SplashScreen({ onTermine }: Props) {
               width: 96,
               height: 96,
               borderRadius: 24,
-              backgroundColor: "rgba(255,255,255,0.16)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              overflow: "hidden",
               boxShadow: "0 20px 40px rgba(0,0,0,0.25)",
             }}
           >
-            <svg viewBox="0 0 48 48" fill="none" style={{ width: 56, height: 56 }}>
-              <path
-                d="M8 40C8 40 12 20 32 14C32 14 28 28 8 40Z"
-                fill="white"
-                fillOpacity="0.85"
-              />
-              <path
-                d="M40 8C40 8 20 16 14 36C14 36 30 24 40 8Z"
-                fill="white"
-              />
-              <circle cx="24" cy="28" r="2.5" fill="white" fillOpacity="0.65" />
-            </svg>
+            <img
+              src="/logo-512.png"
+              alt="CoopDigital"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
           </div>
         </div>
 
