@@ -10,7 +10,7 @@ import { usePermission } from "@/hooks/usePermission";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = import.meta.env.VITE_API_URL ?? "";
 
 function getToken() {
   return localStorage.getItem("authToken") ?? "";

@@ -1,4 +1,4 @@
-const BASE = "/api/portail";
+const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api/portail`;
 const TOKEN_KEY = "portail_token";
 
 export function getToken(): string | null {

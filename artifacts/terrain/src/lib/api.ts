@@ -2,7 +2,7 @@ import { getToken } from "./auth";
 import { queueOp, type PendingOpType } from "./idb";
 import type { CollecteInput, PaiementInput, AvanceInput } from "./types";
 
-const BASE = "/api/terrain";
+const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api/terrain`;
 
 async function apiFetch<T>(
   path: string,
