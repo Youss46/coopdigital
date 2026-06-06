@@ -220,6 +220,16 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     modifier:      ["pca", "directeur", "magasinier"],
   },
 
+  // MODULE PARCELLES & EUDR
+  parcelles: {
+    voir_carte:       ["pca", "directeur", "comptable", "responsable_tracabilite", "agent_terrain", "auditeur"],
+    creer_parcelle:   ["pca", "directeur", "agent_terrain", "responsable_tracabilite"],
+    modifier_parcelle:["pca", "directeur", "agent_terrain", "responsable_tracabilite"],
+    verifier_eudr:    ["pca", "directeur", "responsable_tracabilite", "auditeur"],
+    exporter_geojson: ["pca", "directeur", "responsable_tracabilite", "auditeur"],
+    importer_zones:   ["pca", "directeur"],
+  },
+
   // MODULE M15 — PISTE D'AUDIT
   audit: {
     voir_journal:           ["pca", "directeur", "auditeur"],

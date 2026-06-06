@@ -35,6 +35,7 @@ import {
   Settings,
   Truck,
   Scale,
+  MapPinned,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -84,6 +85,12 @@ const navItems = [
     label: "Traçabilité",
     icon: QrCode,
     roles: ["pca", "directeur", "responsable_tracabilite", "auditeur"],
+  },
+  {
+    href: "/parcelles",
+    label: "Parcelles & EUDR",
+    icon: MapPinned,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
   },
   {
     href: "/stocks",

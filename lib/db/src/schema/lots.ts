@@ -1,21 +1,9 @@
 import { pgTable, serial, integer, numeric, text, uuid, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { membresTable } from "./membres";
 import { cooperativesTable } from "./cooperatives";
 import { livraisonsTable } from "./livraisons";
 import { campagnesTable } from "./campagnes";
-
-export const parcellesTable = pgTable("parcelles", {
-  id: serial("id").primaryKey(),
-  membreId: integer("membre_id").notNull().references(() => membresTable.id),
-  superficieHa: numeric("superficie_ha", { precision: 8, scale: 2 }).notNull(),
-  latitude: numeric("latitude", { precision: 10, scale: 7 }),
-  longitude: numeric("longitude", { precision: 10, scale: 7 }),
-  village: text("village"),
-  culturePrincipale: text("culture_principale").notNull().default("cacao"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
 export const lotStatutEnum = pgEnum("lot_statut", ["en_stock", "vendu", "transit"]);
 

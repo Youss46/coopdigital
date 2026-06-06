@@ -11,3 +11,4 @@
 - [YAML inline mapping space required](yaml-colon-brace.md) — YAML `key:{...}` (no space after colon) causes orval to fail; must always write `key: { ... }` with a space.
 - [cooperativeId null guard in controllers](coop-id-null-guard.md) — req.user!.cooperativeId is typed `number | null`; always use `req.user?.cooperativeId` with an early-return null check before passing to service functions.
 - [DB schema drift — migrations not applied](db-schema-drift.md) — Drizzle schema (lib/db/src/schema/) can be ahead of the actual DB; check `\d <table>` before writing service queries. Missing migrations 011, 012, 018 needed manual `psql -f` to apply; membres/livraisons/paiements also needed ALTER TABLE for extended columns.
+- [lots.ts had shadow parcellesTable](lots-shadow-parcelles.md) — lib/db/src/schema/lots.ts had a minimal `parcellesTable` (unused, old schema) that conflicted with the new one; removed it before adding `export * from "./parcelles"` to schema/index.ts.
