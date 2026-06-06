@@ -48,6 +48,7 @@ import {
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
 import HelpPanel from "./HelpPanel";
+import InstallButton from "./InstallButton";
 
 const navItems = [
   // ── Dashboards ────────────────────────────────────────────────────────────
@@ -475,8 +476,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Barre supérieure desktop — cloche à droite */}
-        <header className="hidden lg:flex items-center justify-end gap-1 px-6 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+        {/* Barre supérieure desktop — boutons à droite */}
+        <header className="hidden lg:flex items-center justify-end gap-2 px-6 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+          <InstallButton />
           <HelpPanel />
           <NotificationPanel />
         </header>
