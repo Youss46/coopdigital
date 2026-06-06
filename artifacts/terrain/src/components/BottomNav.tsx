@@ -1,11 +1,11 @@
 import { Link, useLocation } from "wouter";
 
 const ITEMS = [
-  { path: "/", icon: "🏠", label: "Accueil" },
-  { path: "/collecte", icon: "⚖️", label: "Collecte" },
-  { path: "/paiement", icon: "💵", label: "Paiement" },
-  { path: "/avance", icon: "💰", label: "Avance" },
-  { path: "/bilan", icon: "📊", label: "Bilan" },
+  { path: "/",          icon: "🏠", label: "Accueil"  },
+  { path: "/collecte",  icon: "⚖️", label: "Collecte" },
+  { path: "/paiement",  icon: "💵", label: "Paiement" },
+  { path: "/avance",    icon: "💰", label: "Avance"   },
+  { path: "/historique",icon: "🔄", label: "Sync"     },
 ];
 
 export default function BottomNav() {

@@ -155,3 +155,58 @@ export async function cachePrix(prix: PrixActuel): Promise<void> {
 export async function getCachedPrix(): Promise<PrixActuel | null> {
   return getCache<PrixActuel>("prix");
 }
+
+export async function incrementTentatives(localId: string): Promise<number> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_ops", "readwrite", db);
+    const getReq = store.get(localId);
+    getReq.onsuccess = () => {
+      const op = getReq.result as PendingOp | undefined;
+      if (op) {
+        const next = (op.tentatives ?? 0) + 1;
+        op.tentatives = next;
+        const putReq = store.put(op);
+        putReq.onsuccess = () => resolve(next);
+        putReq.onerror = () => reject(putReq.error);
+      } else {
+        resolve(0);
+      }
+    };
+    getReq.onerror = () => reject(getReq.error);
+  });
+}
+
+export async function markOpSyncedWithTs(localId: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_ops", "readwrite", db);
+    const getReq = store.get(localId);
+    getReq.onsuccess = () => {
+      const op = getReq.result as PendingOp;
+      if (op) {
+        op.status = "synced";
+        op.syncedAt = Date.now();
+        const putReq = store.put(op);
+        putReq.onsuccess = () => resolve();
+        putReq.onerror = () => reject(putReq.error);
+      } else {
+        resolve();
+      }
+    };
+    getReq.onerror = () => reject(getReq.error);
+  });
+}
+
+export async function getAllOps(): Promise<PendingOp[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_ops", "readonly", db);
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const results = (req.result as PendingOp[]).sort((a, b) => b.timestamp - a.timestamp);
+      resolve(results.slice(0, 50));
+    };
+    req.onerror = () => reject(req.error);
+  });
+}

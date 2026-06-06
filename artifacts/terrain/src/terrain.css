@@ -521,6 +521,60 @@ body {
   background: var(--t-success);
 }
 
+.t-offline-banner--offline {
+  background: #ea580c;
+}
+
+.t-offline-banner--pending {
+  background: var(--t-warning);
+}
+
+.t-offline-banner--error {
+  background: var(--t-danger);
+}
+
+.t-offline-banner__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.t-banner-btn {
+  background: rgba(255,255,255,.2);
+  border: 1px solid rgba(255,255,255,.5);
+  color: #fff;
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: .8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.t-banner-btn:hover { background: rgba(255,255,255,.35); }
+
+.t-banner-count {
+  background: rgba(255,255,255,.25);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: .85rem;
+}
+
+.t-spinner-inline {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: t-spin .7s linear infinite;
+  flex-shrink: 0;
+}
+
 /* ── Success screen ─────────────────────────────────────────── */
 .t-success-screen {
   display: flex;

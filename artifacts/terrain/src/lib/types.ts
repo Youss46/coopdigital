@@ -94,6 +94,8 @@ export interface PendingOp {
   timestamp: number;
   status: "pending" | "synced" | "error";
   errorMsg?: string;
+  tentatives?: number;
+  syncedAt?: number;
 }
 
 export interface PrixActuel {

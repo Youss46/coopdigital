@@ -7,6 +7,7 @@ import CollecteFlow from "./pages/CollecteFlow";
 import PaiementFlow from "./pages/PaiementFlow";
 import AvanceFlow from "./pages/AvanceFlow";
 import Bilan from "./pages/Bilan";
+import SyncHistorique from "./pages/SyncHistorique";
 
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
@@ -22,6 +23,7 @@ function AppRoutes() {
       <Route path="/paiement" component={PaiementFlow} />
       <Route path="/avance" component={AvanceFlow} />
       <Route path="/bilan" component={Bilan} />
+      <Route path="/historique" component={SyncHistorique} />
       <Route>
         <Redirect to="/" />
       </Route>
