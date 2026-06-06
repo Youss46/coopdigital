@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { api, type Livraison, type Avance, type PartsSociales, type Score } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { Loader2, TrendingUp } from "lucide-react";
+import { Loader2, TrendingUp, LogOut } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
 const fmt = (n: number | string) => Number(n).toLocaleString("fr-FR");
@@ -24,13 +24,14 @@ function NiveauBadge({ niveau }: { niveau: string | null }) {
 }
 
 export default function DashboardPage() {
-  const { profil } = useAuth();
+  const { profil, logout } = useAuth();
   const [, setLoc] = useLocation();
   const [livraisons, setLivraisons] = useState<Livraison[]>([]);
   const [avances, setAvances] = useState<Avance[]>([]);
   const [parts, setParts] = useState<PartsSociales | null>(null);
   const [score, setScore] = useState<Score>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
 
   useEffect(() => {
     Promise.all([api.livraisons(), api.avances(), api.partsSociales(), api.score()])
@@ -60,7 +61,14 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
-      <div className="bg-green-700 px-5 pt-8 pb-8">
+      <div className="bg-green-700 px-5 pt-8 pb-8 relative">
+        <button
+          onClick={() => setConfirmDeconnexion(true)}
+          className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
+          title="Déconnexion"
+        >
+          <LogOut className="w-5 h-5 text-white/70" />
+        </button>
         <p className="text-green-300 text-base mb-1">Bonjour 👋</p>
         <h1 className="text-3xl font-bold text-white">
           {profil?.prenoms} {profil?.nom}
@@ -223,6 +231,34 @@ export default function DashboardPage() {
       </div>
 
       <BottomNav />
+
+      {/* Modal confirmation déconnexion */}
+      {confirmDeconnexion && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">Déconnexion</h3>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-gray-600">Voulez-vous vraiment vous déconnecter ?</p>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setConfirmDeconnexion(false)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => { setConfirmDeconnexion(false); logout(); }}
+                className="flex-1 py-2.5 rounded-xl text-white text-sm font-medium bg-red-600 hover:bg-red-700"
+              >
+                Se déconnecter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ export default function Accueil() {
   const [bilan, setBilan] = useState<BilanJour | null>(null);
   const [prix, setPrix] = useState<PrixActuel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
 
   useEffect(() => {
     if (!isOnline) { setLoading(false); return; }
@@ -39,7 +40,7 @@ export default function Accueil() {
           <span className="t-header__badge">📴 {pendingCount}</span>
         )}
         <button
-          onClick={logout}
+          onClick={() => setConfirmDeconnexion(true)}
           style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, color: "#fff", padding: "6px 12px", fontSize: ".8rem", fontWeight: 700, cursor: "pointer" }}
         >
           ⎋
@@ -148,6 +149,34 @@ export default function Accueil() {
           </Link>
         ))}
       </nav>
+
+      {/* Modal confirmation déconnexion */}
+      {confirmDeconnexion && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 320, boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
+            <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f0f0f0" }}>
+              <div style={{ fontWeight: 700, fontSize: "1rem", color: "#111" }}>Déconnexion</div>
+            </div>
+            <div style={{ padding: "16px 24px" }}>
+              <div style={{ fontSize: ".9rem", color: "#555" }}>Voulez-vous vraiment vous déconnecter ?</div>
+            </div>
+            <div style={{ padding: "0 24px 20px", display: "flex", gap: 12 }}>
+              <button
+                onClick={() => setConfirmDeconnexion(false)}
+                style={{ flex: 1, padding: "10px", border: "1px solid #e0e0e0", borderRadius: 10, fontSize: ".85rem", fontWeight: 600, cursor: "pointer", background: "#fff", color: "#333" }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => { setConfirmDeconnexion(false); logout(); }}
+                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 10, fontSize: ".85rem", fontWeight: 600, cursor: "pointer", background: "#dc2626", color: "#fff" }}
+              >
+                Se déconnecter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

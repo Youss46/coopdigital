@@ -73,12 +73,18 @@ function SidebarContent({ onNav, user, logout }: {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
+
+  const demanderDeconnexion = () => {
+    setOpen(false);
+    setConfirmDeconnexion(true);
+  };
 
   return (
     <div className="flex h-screen overflow-hidden">
       {/* ── Sidebar desktop ───────────────────────────────────────── */}
       <aside className="hidden md:flex w-60 shrink-0 bg-sidebar text-sidebar-foreground flex-col">
-        <SidebarContent user={user} logout={logout} />
+        <SidebarContent user={user} logout={demanderDeconnexion} />
       </aside>
 
       {/* ── Drawer mobile ─────────────────────────────────────────── */}
@@ -97,7 +103,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               <X size={18} />
             </button>
-            <SidebarContent user={user} logout={logout} onNav={() => setOpen(false)} />
+            <SidebarContent user={user} logout={demanderDeconnexion} onNav={() => setOpen(false)} />
           </aside>
         </div>
       )}
@@ -125,6 +131,34 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {/* Modal confirmation déconnexion */}
+      {confirmDeconnexion && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">Déconnexion</h3>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-gray-600">Voulez-vous vraiment vous déconnecter ?</p>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setConfirmDeconnexion(false)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => { setConfirmDeconnexion(false); logout(); }}
+                className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium bg-red-600 hover:bg-red-700"
+              >
+                Se déconnecter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
