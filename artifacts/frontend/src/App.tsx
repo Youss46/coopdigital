@@ -43,6 +43,7 @@ import EquipementsPage from "@/pages/EquipementsPage";
 import PrevisionsPage from "@/pages/PrevisionsPage";
 import DonsPage from "@/pages/DonsPage";
 import PlanningCollectePage from "@/pages/PlanningCollectePage";
+import FormationsPage from "@/pages/FormationsPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -187,6 +188,9 @@ function AppRoutes() {
       </Route>
       <Route path="/planning">
         <ProtectedRoute component={PlanningCollectePage} />
+      </Route>
+      <Route path="/formations">
+        <ProtectedRoute component={FormationsPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

@@ -271,6 +271,16 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_historique_entite: ["pca", "directeur", "comptable", "auditeur"],
   },
 
+  // MODULE — FORMATIONS & RENFORCEMENT DE CAPACITÉS
+  formation: {
+    voir:                  ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    planifier:             ["pca", "directeur", "responsable_tracabilite"],
+    inscrire:              ["pca", "directeur", "responsable_tracabilite"],
+    gerer_presences:       ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
+    generer_attestation:   ["pca", "directeur", "responsable_tracabilite"],
+    voir_stats:            ["pca", "directeur", "comptable", "auditeur"],
+  },
+
   // MODULE — PLANIFICATION DES COLLECTES
   planning_collecte: {
     voir:        ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],

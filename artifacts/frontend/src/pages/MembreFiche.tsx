@@ -20,12 +20,149 @@ import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowLeft, MapPin, Phone, Users, Leaf, Calendar, TrendingDown,
   Coins, Plus, Loader2, ChevronDown, ChevronUp, UserCheck, UserX, Gift,
+  GraduationCap, Award, Download,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
 
-// ── Composant dons reçus d'un membre ─────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const tokFn = () => localStorage.getItem("coop_token") ?? "";
+const BASE_FICHE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+// ── Composant formations d'un membre ─────────────────────────────────────────
+interface FormationMembre {
+  session_id: number; titre: string; thematique: string | null;
+  date_session: string; duree_heures: string | null;
+  statut: string; numero_attestation: string | null; pdf_url: string | null;
+}
+
+interface FormationsMembreStats {
+  nbFormations: number; heuresTotales: number;
+  thematiques: string[]; formations: FormationMembre[];
+}
+
+const THEMATIQUES_FICHE: Record<string, string> = {
+  bonnes_pratiques: "Bonnes pratiques", qualite_cacao: "Qualité du cacao",
+  eudr: "EUDR", gestion_financiere: "Gestion financière",
+  sante_securite: "Santé & sécurité", agroforesterie: "Agroforesterie",
+  certification: "Certification", numerique: "Numérique",
+};
+
+const PRESENCE_COLORS_FICHE: Record<string, string> = {
+  inscrit: "bg-blue-100 text-blue-700", present: "bg-green-100 text-green-700",
+  absent:  "bg-red-100 text-red-700",  excuse:  "bg-yellow-100 text-yellow-700",
+};
+
+function FormationsMembre({ membreId }: { membreId: number }) {
+  const { data, isLoading } = useQuery<FormationsMembreStats>({
+    queryKey: ["formations-membre", membreId],
+    queryFn: async () => {
+      const r = await fetch(`${BASE_FICHE}/api/formations/membre/${membreId}`, {
+        headers: { Authorization: `Bearer ${tokFn()}` },
+      });
+      if (!r.ok) throw new Error("Erreur chargement formations");
+      return r.json() as Promise<FormationsMembreStats>;
+    },
+    enabled: !!membreId,
+  });
+
+  function downloadAttestation(sessionId: number) {
+    const a = document.createElement("a");
+    a.href = `${BASE_FICHE}/api/formations/sessions/${sessionId}/attestation/${membreId}`;
+    a.setAttribute("download", `attestation-${sessionId}-${membreId}.pdf`);
+    a.click();
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12 text-gray-400">
+        <Loader2 size={18} className="animate-spin mr-2" />Chargement…
+      </div>
+    );
+  }
+
+  const formations = data?.formations ?? [];
+
+  if (formations.length === 0) {
+    return (
+      <div className="text-center py-10 text-gray-400">
+        <GraduationCap className="w-8 h-8 mx-auto mb-2 opacity-30" />
+        <p className="text-sm">Aucune formation enregistrée pour ce membre</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y">
+      {/* Résumé */}
+      <div className="px-5 py-4 bg-green-50 grid grid-cols-3 gap-4">
+        <div className="text-center">
+          <p className="text-2xl font-bold text-green-700">{data?.nbFormations ?? 0}</p>
+          <p className="text-xs text-gray-500 mt-0.5">formation(s)</p>
+        </div>
+        <div className="text-center">
+          <p className="text-2xl font-bold text-green-700">{data?.heuresTotales ?? 0}h</p>
+          <p className="text-xs text-gray-500 mt-0.5">heures</p>
+        </div>
+        <div className="text-center">
+          <p className="text-2xl font-bold text-purple-700">{formations.filter((f) => f.numero_attestation).length}</p>
+          <p className="text-xs text-gray-500 mt-0.5">attestation(s)</p>
+        </div>
+      </div>
+
+      {/* Tableau des formations */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-left">
+              <th className="px-4 py-2.5 text-xs font-semibold text-gray-500">Date</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-gray-500">Formation</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-gray-500">Thématique</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 text-center">Durée</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 text-center">Statut</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 text-center">Attestation</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {formations.map((f) => (
+              <tr key={f.session_id} className="hover:bg-gray-50">
+                <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                  {new Date(f.date_session + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                </td>
+                <td className="px-4 py-2.5 font-medium text-gray-900 max-w-40 truncate">{f.titre}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-500">
+                  {f.thematique ? (THEMATIQUES_FICHE[f.thematique] ?? f.thematique) : "—"}
+                </td>
+                <td className="px-4 py-2.5 text-center text-xs text-gray-500">
+                  {f.duree_heures ? `${f.duree_heures}h` : "—"}
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${PRESENCE_COLORS_FICHE[f.statut] ?? "bg-gray-100 text-gray-600"}`}>
+                    {f.statut}
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  {f.numero_attestation ? (
+                    <button onClick={() => downloadAttestation(f.session_id)}
+                      title={f.numero_attestation}
+                      className="inline-flex items-center gap-1 text-xs text-green-700 hover:text-green-900 transition-colors">
+                      <Award className="w-3.5 h-3.5" />
+                      <Download className="w-3 h-3" />
+                    </button>
+                  ) : (
+                    <span className="text-gray-300 text-xs">—</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Composant dons reçus d'un membre ─────────────────────────────────────────
 
 interface DonMembre {
   id: number; reference?: string; libelle: string; dateDon: string;
@@ -114,7 +251,7 @@ function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const TABS = ["Avances", "Livraisons", "Parts sociales", "Score", "Dons reçus"] as const;
+const TABS = ["Avances", "Livraisons", "Parts sociales", "Score", "Dons reçus", "Formations"] as const;
 type Tab = (typeof TABS)[number];
 
 const NIVEAUX_SCORE: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
@@ -566,6 +703,9 @@ export default function MembreFiche() {
         )}
         {/* Dons reçus */}
         {activeTab === "Dons reçus" && <DonsRecusMembre membreId={id} />}
+
+        {/* Formations */}
+        {activeTab === "Formations" && <FormationsMembre membreId={id} />}
 
         {/* Score */}
         {activeTab === "Score" && (
