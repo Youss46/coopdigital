@@ -76,8 +76,15 @@ export default function Login() {
         });
         navigate("/dashboard");
       },
-      onError: () => {
-        setErreur("Email ou mot de passe incorrect");
+      onError: (err: unknown) => {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (!status) {
+          setErreur("Impossible de contacter le serveur. Vérifiez votre connexion.");
+        } else if (status === 401) {
+          setErreur("Email ou mot de passe incorrect");
+        } else {
+          setErreur("Une erreur est survenue. Réessayez.");
+        }
       },
     },
   });
