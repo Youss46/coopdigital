@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLogin } from "@workspace/api-client-react";
@@ -28,42 +28,41 @@ const slides = [
   },
 ];
 
+const TRANSITION_MS = 900;
+const SLIDE_DURATION_MS = 5500;
+
 export default function Login() {
   const [, navigate] = useLocation();
   const { login } = useAuth();
 
   const [current, setCurrent] = useState(0);
-  const [animating, setAnimating] = useState(false);
+  const [slideKey, setSlideKey] = useState(0);
+  const crossingRef = useRef(false);
+  const currentRef = useRef(0);
 
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
   const [afficherMdp, setAfficherMdp] = useState(false);
   const [erreur, setErreur] = useState("");
 
-  const goTo = useCallback(
-    (index: number) => {
-      if (index === current) return;
-      setAnimating(true);
-      setTimeout(() => {
-        setCurrent(index);
-        setAnimating(false);
-      }, 400);
-    },
-    [current],
-  );
-
-  const goToNext = useCallback(() => {
-    setAnimating(true);
+  const goTo = useCallback((index: number) => {
+    if (index === currentRef.current || crossingRef.current) return;
+    crossingRef.current = true;
+    currentRef.current = index;
+    setCurrent(index);
+    setSlideKey((k) => k + 1);
     setTimeout(() => {
-      setCurrent((prev) => (prev + 1) % slides.length);
-      setAnimating(false);
-    }, 400);
+      crossingRef.current = false;
+    }, TRANSITION_MS);
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(goToNext, 5000);
+    const timer = setInterval(() => {
+      const next = (currentRef.current + 1) % slides.length;
+      goTo(next);
+    }, SLIDE_DURATION_MS);
     return () => clearInterval(timer);
-  }, [goToNext]);
+  }, [goTo]);
 
   const mutation = useLogin({
     mutation: {
@@ -98,108 +97,112 @@ export default function Login() {
   return (
     <div className="min-h-screen flex">
 
-      {/* ── HERO CARROUSEL (desktop/tablette uniquement) ── */}
-      <div className="hidden lg:flex lg:w-3/5 relative overflow-hidden bg-[#1a4731]">
+      {/* ── HERO CARROUSEL ── */}
+      <div className="hidden lg:flex lg:w-3/5 relative overflow-hidden bg-[#0d2b1a]">
 
-        {/* Barres de progression en haut */}
-        <div className="absolute top-0 left-0 right-0 z-20 flex gap-1 p-3">
+        {/* Barres de progression */}
+        <div className="absolute top-0 left-0 right-0 z-30 flex gap-1 p-3">
           {slides.map((_, i) => (
             <div
               key={i}
-              className="flex-1 h-0.5 bg-white/30 rounded-full overflow-hidden"
+              className="flex-1 h-0.5 bg-white/25 rounded-full overflow-hidden"
             >
               {i === current && (
                 <div
-                  key={`progress-${current}`}
-                  className="h-full bg-[#c4962a] animate-progress-bar"
+                  key={`progress-${slideKey}`}
+                  className="h-full bg-[#c4962a] hero-progress"
                 />
               )}
               {i < current && (
-                <div className="h-full bg-white/70 w-full" />
+                <div className="h-full bg-white/60 w-full" />
               )}
             </div>
           ))}
         </div>
 
-        {/* Logo CoopDigital en haut à gauche */}
-        <div className="absolute top-7 left-8 z-20 flex items-center gap-3">
+        {/* Logo */}
+        <div className="absolute top-7 left-8 z-30 flex items-center gap-3">
           <img
             src="/logo-192.png"
             alt="CoopDigital"
             className="w-12 h-12 rounded-xl shadow-lg"
           />
           <div>
-            <p className="text-white font-bold text-xl leading-none">
-              CoopDigital
-            </p>
-            <p className="text-white/70 text-sm">by M15 Tech</p>
+            <p className="text-white font-bold text-xl leading-none">CoopDigital</p>
+            <p className="text-white/60 text-sm">by M15 Tech</p>
           </div>
         </div>
 
-        {/* Image de fond avec transition */}
-        <div
-          className={`absolute inset-0 transition-opacity duration-500 ${
-            animating ? "opacity-0" : "opacity-100"
-          }`}
-        >
-          <img
-            src={slide.image}
-            alt={slide.titre}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0d2b1a]/90 via-[#0d2b1a]/20 to-transparent" />
-        </div>
+        {/* Slides empilées — cross-fade */}
+        {slides.map((s, i) => (
+          <div
+            key={i}
+            className="absolute inset-0"
+            style={{
+              opacity: i === current ? 1 : 0,
+              transition: `opacity ${TRANSITION_MS}ms ease-in-out`,
+              zIndex: i === current ? 2 : 1,
+            }}
+          >
+            {/* Image Ken Burns — remontée via key pour redémarrer l'animation */}
+            <img
+              key={i === current ? `kb-${slideKey}` : `idle-${i}`}
+              src={s.image}
+              alt={s.titre}
+              className="w-full h-full object-cover hero-ken-burns"
+            />
+            {/* Dégradé bas */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0a1f12]/95 via-[#0d2b1a]/30 to-transparent" />
+            {/* Dégradé côté gauche léger */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0d2b1a]/20 to-transparent" />
+          </div>
+        ))}
 
-        {/* Contenu overlay en bas */}
+        {/* Texte — remonté via key pour stagger */}
         <div
-          className={`absolute bottom-0 left-0 right-0 z-10 p-10 transition-all duration-500 ${
-            animating
-              ? "opacity-0 translate-y-4"
-              : "opacity-100 translate-y-0"
-          }`}
+          key={`text-${slideKey}`}
+          className="absolute bottom-0 left-0 right-0 z-10 p-10"
         >
           {/* Badge stat */}
-          <div className="inline-flex items-center gap-2 bg-[#c4962a]/90 text-white px-4 py-1.5 rounded-full text-sm font-semibold mb-4">
+          <div className="hero-anim-badge inline-flex items-center gap-2 bg-[#c4962a]/90 backdrop-blur-sm text-white px-4 py-1.5 rounded-full text-sm font-semibold mb-5">
             <span>📊</span>
             <span>{slide.stat}</span>
           </div>
 
           {/* Titre */}
-          <h2 className="text-white text-3xl font-bold leading-tight mb-3">
+          <h2 className="hero-anim-title text-white text-3xl font-bold leading-tight mb-3 drop-shadow-lg">
             {slide.titre}
           </h2>
 
           {/* Citation */}
-          <p className="text-white/85 text-lg leading-relaxed mb-8 max-w-lg">
+          <p className="hero-anim-cite text-white/80 text-lg leading-relaxed mb-8 max-w-lg">
             "{slide.citation}"
           </p>
 
-          {/* Dots + navigation */}
-          <div className="flex items-center gap-3">
+          {/* Navigation */}
+          <div className="hero-anim-nav flex items-center gap-3">
             {slides.map((_, i) => (
               <button
                 key={i}
                 onClick={() => goTo(i)}
-                className={`transition-all duration-300 rounded-full ${
+                className={`transition-all duration-400 rounded-full ${
                   i === current
                     ? "w-8 h-3 bg-[#c4962a]"
-                    : "w-3 h-3 bg-white/50 hover:bg-white/80"
+                    : "w-3 h-3 bg-white/40 hover:bg-white/75"
                 }`}
               />
             ))}
 
             <div className="ml-auto flex gap-2">
               <button
-                onClick={() =>
-                  goTo((current - 1 + slides.length) % slides.length)
-                }
-                className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 text-white text-xl flex items-center justify-center transition-all"
+                onClick={() => goTo((current - 1 + slides.length) % slides.length)}
+                className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/35 border border-white/20 text-white text-xl flex items-center justify-center transition-all backdrop-blur-sm"
               >
                 ‹
               </button>
               <button
                 onClick={() => goTo((current + 1) % slides.length)}
-                className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 text-white text-xl flex items-center justify-center transition-all"
+                className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/35 border border-white/20 text-white text-xl flex items-center justify-center transition-all backdrop-blur-sm"
               >
                 ›
               </button>
@@ -208,11 +211,10 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ── FORMULAIRE DE CONNEXION ── */}
+      {/* ── FORMULAIRE ── */}
       <div className="w-full lg:w-2/5 flex items-center justify-center p-8 bg-white min-h-screen">
         <div className="w-full max-w-sm">
 
-          {/* Logo mobile uniquement */}
           <div className="lg:hidden flex justify-center mb-8">
             <img
               src="/logo-512.png"
@@ -221,17 +223,13 @@ export default function Login() {
             />
           </div>
 
-          {/* Titre */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-[#1a4731] mb-2">
-              Connexion
-            </h1>
+            <h1 className="text-3xl font-bold text-[#1a4731] mb-2">Connexion</h1>
             <p className="text-gray-500 text-base">
               Accédez à votre espace CoopDigital
             </p>
           </div>
 
-          {/* Message d'erreur */}
           {erreur && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-2">
               <span>⚠️</span>
@@ -240,7 +238,6 @@ export default function Login() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Champ email */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Adresse email
@@ -260,7 +257,6 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Champ mot de passe */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Mot de passe
@@ -287,7 +283,6 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Bouton connexion */}
             <button
               type="submit"
               disabled={mutation.isPending}
@@ -307,11 +302,8 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Lien agent terrain */}
           <div className="mt-6 text-center">
-            <p className="text-gray-500 text-sm mb-2">
-              Vous êtes agent terrain ?
-            </p>
+            <p className="text-gray-500 text-sm mb-2">Vous êtes agent terrain ?</p>
             <a
               href="/terrain/login"
               className="text-[#1a4731] font-semibold text-sm hover:underline"
@@ -320,17 +312,51 @@ export default function Login() {
             </a>
           </div>
 
-          {/* Footer */}
           <div className="mt-10 pt-6 border-t border-gray-100 text-center">
-            <p className="text-gray-400 text-xs">
-              CoopDigital — M15 Tech, Yamoussoukro
-            </p>
-            <p className="text-gray-400 text-xs mt-1">
-              Support : 0714174082 · m15tech.ci
-            </p>
+            <p className="text-gray-400 text-xs">CoopDigital — M15 Tech, Yamoussoukro</p>
+            <p className="text-gray-400 text-xs mt-1">Support : 0714174082 · m15tech.ci</p>
           </div>
         </div>
       </div>
+
+      <style>{`
+        /* ── Ken Burns : zoom lent sur l'image active ─────────────── */
+        @keyframes kenBurns {
+          0%   { transform: scale(1)    translate(0,     0);    }
+          100% { transform: scale(1.08) translate(-1.5%, -0.8%); }
+        }
+        .hero-ken-burns {
+          animation: kenBurns ${SLIDE_DURATION_MS + TRANSITION_MS}ms ease-out forwards;
+          will-change: transform;
+        }
+
+        /* ── Barre de progression ──────────────────────────────────── */
+        @keyframes progressBar {
+          from { width: 0%; }
+          to   { width: 100%; }
+        }
+        .hero-progress {
+          animation: progressBar ${SLIDE_DURATION_MS}ms linear forwards;
+        }
+
+        /* ── Entrée staggerée du texte ─────────────────────────────── */
+        @keyframes heroRise {
+          from { opacity: 0; transform: translateY(22px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .hero-anim-badge {
+          animation: heroRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+        }
+        .hero-anim-title {
+          animation: heroRise 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+        }
+        .hero-anim-cite {
+          animation: heroRise 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
+        }
+        .hero-anim-nav {
+          animation: heroRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both;
+        }
+      `}</style>
     </div>
   );
 }
