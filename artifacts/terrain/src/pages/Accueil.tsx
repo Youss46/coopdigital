@@ -1,0 +1,153 @@
+import { useEffect, useState } from "react";
+import { Link } from "wouter";
+import { getProfil } from "../lib/api";
+import { useAuth } from "../contexts/AuthContext";
+import { useOffline } from "../contexts/OfflineContext";
+import OfflineBanner from "../components/OfflineBanner";
+import type { BilanJour, PrixActuel } from "../lib/types";
+
+export default function Accueil() {
+  const { user, logout } = useAuth();
+  const { isOnline, pendingCount } = useOffline();
+  const [bilan, setBilan] = useState<BilanJour | null>(null);
+  const [prix, setPrix] = useState<PrixActuel | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isOnline) { setLoading(false); return; }
+    getProfil()
+      .then((p) => {
+        setBilan(p.statsJour);
+        setPrix(p.prixActuel);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [isOnline]);
+
+  const today = new Date().toLocaleDateString("fr-FR", {
+    weekday: "long", day: "numeric", month: "long",
+  });
+
+  return (
+    <div className="t-app">
+      <header className="t-header">
+        <div style={{ flex: 1 }}>
+          <div className="t-header__title">Bonjour, {user?.nom} 👋</div>
+          <div className="t-header__sub">{today}</div>
+        </div>
+        {pendingCount > 0 && (
+          <span className="t-header__badge">📴 {pendingCount}</span>
+        )}
+        <button
+          onClick={logout}
+          style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, color: "#fff", padding: "6px 12px", fontSize: ".8rem", fontWeight: 700, cursor: "pointer" }}
+        >
+          ⎋
+        </button>
+      </header>
+
+      <OfflineBanner />
+
+      <main className="t-main">
+        {prix && (
+          <div style={{ background: "var(--t-primary)", color: "#fff", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: ".85rem", opacity: .8 }}>Prix bord champ</span>
+            <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>{prix.prixBordChampFcfa.toLocaleString("fr-FR")} FCFA/kg</span>
+          </div>
+        )}
+
+        {/* Stats du jour */}
+        {!loading && bilan && (
+          <div className="t-stats">
+            <div className="t-stat">
+              <div className="t-stat__value">{bilan.collectes.nb}</div>
+              <div className="t-stat__label">Collectes</div>
+            </div>
+            <div className="t-stat">
+              <div className="t-stat__value">{(bilan.collectes.tonnage / 1000).toFixed(1)} T</div>
+              <div className="t-stat__label">Tonnage</div>
+            </div>
+            <div className="t-stat">
+              <div className="t-stat__value">{bilan.paiements.nb}</div>
+              <div className="t-stat__label">Paiements</div>
+            </div>
+            <div className="t-stat">
+              <div className="t-stat__value">{bilan.avances.nb}</div>
+              <div className="t-stat__label">Avances</div>
+            </div>
+          </div>
+        )}
+
+        {loading && <div className="t-spinner" />}
+
+        {/* Actions */}
+        <div className="t-actions">
+          <Link href="/collecte" className="t-action t-action--collecte">
+            <span className="t-action__icon">⚖️</span>
+            <span className="t-action__label">Collecte</span>
+          </Link>
+          <Link href="/paiement" className="t-action t-action--paiement">
+            <span className="t-action__icon">💵</span>
+            <span className="t-action__label">Paiement</span>
+          </Link>
+          <Link href="/avance" className="t-action t-action--avance">
+            <span className="t-action__icon">💰</span>
+            <span className="t-action__label">Avance</span>
+          </Link>
+          <Link href="/bilan" className="t-action t-action--bilan">
+            <span className="t-action__icon">📊</span>
+            <span className="t-action__label">Bilan du jour</span>
+          </Link>
+        </div>
+
+        {/* Dernières opérations */}
+        {bilan && bilan.dernieresOps.length > 0 && (
+          <>
+            <div className="t-section-title">Dernières opérations</div>
+            <div style={{ padding: "0 16px 16px" }}>
+              {bilan.dernieresOps.map((op, i) => (
+                <div key={i} className="t-card" style={{ marginBottom: 10, display: "flex", gap: 12, alignItems: "center" }}>
+                  <span style={{ fontSize: "1.4rem" }}>
+                    {op.type === "collecte" ? "⚖️" : op.type === "paiement" ? "💵" : "💰"}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: ".9rem" }}>{op.label}</div>
+                    <div className="t-text-muted">{op.heure}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Section info */}
+        {user?.section && (
+          <div style={{ padding: "0 16px 16px" }}>
+            <div className="t-card" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <span style={{ fontSize: "1.2rem" }}>📍</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: ".9rem" }}>Section : {user.section}</div>
+                <div className="t-text-muted">Zone d'intervention</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      <nav className="t-nav">
+        {[
+          { path: "/", icon: "🏠", label: "Accueil" },
+          { path: "/collecte", icon: "⚖️", label: "Collecte" },
+          { path: "/paiement", icon: "💵", label: "Paiement" },
+          { path: "/avance", icon: "💰", label: "Avance" },
+          { path: "/bilan", icon: "📊", label: "Bilan" },
+        ].map((item) => (
+          <Link key={item.path} href={item.path} className={`t-nav__item${location.pathname === item.path ? " t-nav__item--active" : ""}`}>
+            <span className="t-nav__icon">{item.icon}</span>
+            <span>{item.label}</span>
+          </Link>
+        ))}
+      </nav>
+    </div>
+  );
+}

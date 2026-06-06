@@ -24,6 +24,7 @@ export const usersTable = pgTable("users", {
   telephone: varchar("telephone", { length: 20 }),
   passwordHash: text("password_hash").notNull(),
   role: varchar("role", { length: 30 }).$type<UserRole>().notNull().default("agent_terrain"),
+  section: text("section"),
   actif: boolean("actif").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -37,12 +37,14 @@ import transportRouter from "./transport";
 import peseeRouter from "./pesee";
 import equipementsRouter from "./equipements";
 import previsionsRouter from "./previsions";
+import terrainRouter from "./terrain";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
 router.use(portailRouter);
+router.use(terrainRouter);
 router.use(membresRouter);
 router.use(avancesRouter);
 router.use(campagnesRouter);

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/terrain/"
+title = "Agent Terrain"
+version = "1.0.0"
+id = "artifacts/terrain"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/terrain/" ]
+localPort = 25014
+
+[services.development]
+run = "pnpm --filter @workspace/terrain run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/terrain", "run", "build" ]
+publicDir = "artifacts/terrain/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25014"
+BASE_PATH = "/terrain/"
