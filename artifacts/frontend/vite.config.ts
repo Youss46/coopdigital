@@ -79,7 +79,9 @@ export default defineConfig({
       workbox: {
         navigateFallback: `${base}index.html`,
         navigateFallbackDenylist: [/^\/api\//],
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],
+        globIgnores: ["**/hero/**"],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
