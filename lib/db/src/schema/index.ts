@@ -35,3 +35,4 @@ export * from "./saas";
 export * from "./parcelles";
 export * from "./rse";
 export * from "./dons";
+export * from "./planning";

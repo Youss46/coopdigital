@@ -37,6 +37,7 @@ import {
   Scale,
   MapPinned,
   Gift,
+  ClipboardList,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -182,6 +183,12 @@ const navItems = [
     label: "Dons",
     icon: Gift,
     roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/planning",
+    label: "Planif. collectes",
+    icon: ClipboardList,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "agent_terrain"],
   },
   {
     href: "/comptabilite",

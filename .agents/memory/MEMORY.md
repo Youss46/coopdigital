@@ -17,3 +17,4 @@
 - [Avances table has no cooperative_id](avances-no-coop-id.md) — avancesTable only has membreId; to filter by cooperative, join with membresTable on eq(membresTable.id, avancesTable.membreId) then filter by membresTable.cooperativeId.
 - [Terrain offline arch — raw IDB, no idb package](terrain-offline-arch.md) — terrain uses raw IndexedDB API (no `idb` npm package); SW in public/sw.js registered PROD-only in main.tsx; sync via batch endpoint /api/terrain/sync; retry tracked with `tentatives` field on PendingOp.
 - [Plan comptable module — sans codegen](plan-comptable-no-codegen.md) — pages utilisant uniquement l'API interne (plan, params, corrections) peuvent se passer d'Orval; utiliser apiFetch/apiPost/apiPut locaux + useQuery/useMutation directement plutôt que les hooks générés.
+- [cooperatives.nom not libelle](cooperatives-nom.md) — cooperatives table uses `nom` column (not `libelle`); columns are: id, nom, ville, region, created_at.
