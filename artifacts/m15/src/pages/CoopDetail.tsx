@@ -486,13 +486,16 @@ export default function CoopDetail() {
                 className={inputCls + " resize-none"} placeholder="Raison…" />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Tapez <span className="font-mono text-destructive">SUPPRIMER</span> pour confirmer</label>
-              <input value={confirSupp} onChange={(e) => setConfirSupp(e.target.value)} className={inputCls} placeholder="SUPPRIMER" />
+              <label className="text-sm font-medium mb-1.5 block">
+                Tapez <span className="font-mono text-destructive">SUPPRIMER {data?.cooperative.nom.toUpperCase()}</span> pour confirmer
+              </label>
+              <input value={confirSupp} onChange={(e) => setConfirSupp(e.target.value)} className={inputCls}
+                placeholder={`SUPPRIMER ${data?.cooperative.nom.toUpperCase() ?? ""}`} />
             </div>
             {actionError && <div className="text-destructive text-sm flex items-center gap-1"><AlertCircle size={14} /> {actionError}</div>}
             <div className="flex gap-3">
               <button onClick={() => setShowSupprimer(false)} className="flex-1 py-2.5 border rounded-lg text-sm">Annuler</button>
-              <button onClick={doSupprimer} disabled={actionLoading || confirSupp !== "SUPPRIMER" || !motifSupp}
+              <button onClick={doSupprimer} disabled={actionLoading || confirSupp !== `SUPPRIMER ${data?.cooperative.nom.toUpperCase() ?? ""}` || !motifSupp}
                 className="flex-1 py-2.5 bg-destructive text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
                 {actionLoading && <Loader2 size={14} className="animate-spin" />} Supprimer définitivement
               </button>
