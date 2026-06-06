@@ -1,0 +1,196 @@
+2026-06-06T14:21:18.060565478Z [inf]  scheduling build on Metal builder "builder-qidoml"
+2026-06-06T14:21:20.743583648Z [inf]  unpacking archive
+2026-06-06T14:21:21.069021222Z [inf]  using build driver nixpacks-v1.41.0
+2026-06-06T14:21:21.239480508Z [inf]  uploading snapshot
+2026-06-06T14:21:21.489469530Z [inf]  
+2026-06-06T14:21:21.489478634Z [inf]  ╔══════════════════════════════ Nixpacks v1.41.0 ══════════════════════════════╗
+2026-06-06T14:21:21.489481528Z [inf]  ║ setup      │ nodejs_18, pnpm-9_x, openssl                                    ║
+2026-06-06T14:21:21.489498944Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-06T14:21:21.489528789Z [inf]  ║ install    │ npm install -g pnpm@10 --quiet                                  ║
+2026-06-06T14:21:21.489529761Z [inf]  ║            │ pnpm install --no-frozen-lockfile                               ║
+2026-06-06T14:21:21.489531443Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-06T14:21:21.489532264Z [inf]  ║ build      │ pnpm run typecheck:libs && pnpm --filter @workspace/api-server  ║
+2026-06-06T14:21:21.489533055Z [inf]  ║            │ run build                                                       ║
+2026-06-06T14:21:21.489534408Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-06T14:21:21.489535319Z [inf]  ║ start      │ pnpm --filter @workspace/api-server run start                   ║
+2026-06-06T14:21:21.489536821Z [inf]  ╚══════════════════════════════════════════════════════════════════════════════╝
+2026-06-06T14:21:21.489537472Z [inf]  
+2026-06-06T14:21:21.489918354Z [inf]  
+2026-06-06T14:21:21.489922169Z [inf]  Saved output to:
+2026-06-06T14:21:21.489923812Z [inf]    snapshot-target-unpack
+2026-06-06T14:21:21.814592002Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:21:21.814868767Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:21:21.815236829Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:21:21.925816012Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:21:21.949154348Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-06-06T14:21:22.402523551Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-06-06T14:21:22.403343921Z [inf]  [internal] load .dockerignore
+2026-06-06T14:21:22.403445383Z [inf]  [internal] load .dockerignore
+2026-06-06T14:21:22.403670171Z [inf]  [internal] load .dockerignore
+2026-06-06T14:21:22.535107008Z [inf]  [internal] load .dockerignore
+2026-06-06T14:21:22.572291840Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "JWT_SECRET") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-06T14:21:22.572860403Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "JWT_SECRET") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-06T14:21:22.573028856Z [wrn]  UndefinedVar: Usage of undefined variable '$NIXPACKS_PATH' (line 18)(https://docs.docker.com/go/dockerfile/rule/undefined-var/)
+ details: Variables should be defined before their use
+
+2026-06-06T14:21:22.577993845Z [inf]  [stage-0 11/11] COPY . /app
+2026-06-06T14:21:22.577996028Z [inf]  [stage-0 10/11] RUN printf '\nPATH=/app/node_modules/.bin:$PATH' >> /root/.profile
+2026-06-06T14:21:22.577996970Z [inf]  [stage-0  9/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-node_modules/cache,target=/app/node_modules/.cache pnpm run typecheck:libs && pnpm --filter @workspace/api-server run build
+2026-06-06T14:21:22.577997831Z [inf]  [stage-0  8/11] COPY . /app/.
+2026-06-06T14:21:22.577999073Z [inf]  [stage-0  7/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm install --no-frozen-lockfile
+2026-06-06T14:21:22.578000335Z [inf]  [stage-0  6/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 npm install -g pnpm@10 --quiet
+2026-06-06T14:21:22.578001156Z [inf]  [stage-0  5/11] COPY . /app/.
+2026-06-06T14:21:22.578001977Z [inf]  [stage-0  4/11] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-06-06T14:21:22.578002868Z [inf]  [stage-0  3/11] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2026-06-06T14:21:22.578003870Z [inf]  [internal] load build context
+2026-06-06T14:21:22.578004751Z [inf]  [stage-0  2/11] WORKDIR /app/
+2026-06-06T14:21:22.578005613Z [inf]  [stage-0  1/11] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-06T14:21:22.578236379Z [inf]  [stage-0  1/11] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-06T14:21:22.578237861Z [inf]  [internal] load build context
+2026-06-06T14:21:22.578317500Z [inf]  [internal] load build context
+2026-06-06T14:21:22.578537450Z [inf]  [internal] load build context
+2026-06-06T14:21:22.596375995Z [inf]  [stage-0  1/11] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-06T14:21:23.156699862Z [inf]  [internal] load build context
+2026-06-06T14:21:23.230293631Z [inf]  [stage-0  2/11] WORKDIR /app/
+2026-06-06T14:21:23.230295314Z [inf]  [stage-0  3/11] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2026-06-06T14:21:23.230295534Z [inf]  [stage-0  4/11] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-06-06T14:21:23.230297718Z [inf]  [stage-0  5/11] COPY . /app/.
+2026-06-06T14:21:23.696756930Z [inf]  [stage-0  5/11] COPY . /app/.
+2026-06-06T14:21:23.720810600Z [inf]  [stage-0  6/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 npm install -g pnpm@10 --quiet
+2026-06-06T14:21:24.551163155Z [inf]  npm warn config production Use `--omit=dev` instead.
+
+2026-06-06T14:21:25.798523507Z [inf]  
+added 1 package in 1s
+
+1 package is looking for funding
+  run `npm fund` for details
+
+2026-06-06T14:21:26.042507278Z [inf]  [stage-0  6/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 npm install -g pnpm@10 --quiet
+2026-06-06T14:21:26.081344619Z [inf]  [stage-0  7/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm install --no-frozen-lockfile
+2026-06-06T14:21:26.837140761Z [inf]  Scope: all 13 workspace projects
+
+2026-06-06T14:21:27.202719052Z [inf]  Progress: resolved 0, reused 0, downloaded 1, added 0
+
+2026-06-06T14:21:27.261620928Z [inf]  artifacts/api-server                     |  WARN  deprecated @types/bcryptjs@3.0.0
+
+2026-06-06T14:21:27.437235599Z [inf]  artifacts/frontend                       |  WARN  deprecated @types/qrcode.react@3.0.0
+
+2026-06-06T14:21:27.453201304Z [inf]  artifacts/frontend                       |  WARN  deprecated recharts@2.15.4
+
+2026-06-06T14:21:28.204466307Z [inf]  Progress: resolved 112, reused 0, downloaded 112, added 0
+
+2026-06-06T14:21:29.204807182Z [inf]  Progress: resolved 572, reused 0, downloaded 497, added 0
+
+2026-06-06T14:21:30.205760786Z [inf]  Progress: resolved 1041, reused 0, downloaded 900, added 0
+
+2026-06-06T14:21:30.957846571Z [inf]   WARN  7 deprecated subdependencies found: @esbuild-kit/core-utils@3.3.2, @esbuild-kit/esm-loader@2.6.5, glob@11.1.0, node-domexception@1.0.0, source-map@0.8.0-beta.0, uuid@8.3.2, uuid@9.0.1
+
+2026-06-06T14:21:30.97824041Z [inf]  Packages: +914
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+2026-06-06T14:21:31.205429793Z [inf]  Progress: resolved 1055, reused 0, downloaded 914, added 206
+
+2026-06-06T14:21:32.206290638Z [inf]  Progress: resolved 1055, reused 0, downloaded 914, added 865
+
+2026-06-06T14:21:32.842010718Z [inf]  Progress: resolved 1055, reused 0, downloaded 914, added 914, done
+
+2026-06-06T14:21:33.321722605Z [inf]  .../esbuild@0.18.20/node_modules/esbuild postinstall$ node install.js
+
+2026-06-06T14:21:33.32303871Z [inf]  .../esbuild@0.27.3/node_modules/esbuild postinstall$ node install.js
+
+2026-06-06T14:21:33.323864989Z [inf]  .../esbuild@0.27.7/node_modules/esbuild postinstall$ node install.js
+
+2026-06-06T14:21:33.325170558Z [inf]  .../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+
+2026-06-06T14:21:33.507157741Z [inf]  .../esbuild@0.18.20/node_modules/esbuild postinstall: Done
+
+2026-06-06T14:21:33.507536759Z [inf]  .../esbuild@0.27.3/node_modules/esbuild postinstall: Done
+
+2026-06-06T14:21:33.521359719Z [inf]  .../esbuild@0.27.7/node_modules/esbuild postinstall: Done
+
+2026-06-06T14:21:33.586194988Z [inf]  .../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+
+2026-06-06T14:21:35.710748223Z [inf]  . preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac'
+
+2026-06-06T14:21:35.766322026Z [inf]  . preinstall: Done
+
+2026-06-06T14:21:35.960257816Z [inf]  
+devDependencies:
++ prettier 3.8.3
++ typescript 5.9.3 (6.0.3 is available)
+
+
+2026-06-06T14:21:35.962898177Z [inf]   WARN  Issues with peer dependencies found
+artifacts/api-server
+└─┬ esbuild-plugin-pino 2.3.3
+  └── ✕ unmet peer esbuild@">=0.25.0 <=0.25.8": found 0.27.3
+
+
+2026-06-06T14:21:36.106530322Z [inf]  Done in 9.7s using pnpm v9.15.9
+
+2026-06-06T14:21:36.885090629Z [inf]  [stage-0  7/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm install --no-frozen-lockfile
+2026-06-06T14:21:36.917858404Z [inf]  [stage-0  8/11] COPY . /app/.
+2026-06-06T14:21:37.732255169Z [inf]  [stage-0  8/11] COPY . /app/.
+2026-06-06T14:21:37.752348247Z [inf]  [stage-0  9/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-node_modules/cache,target=/app/node_modules/.cache pnpm run typecheck:libs && pnpm --filter @workspace/api-server run build
+2026-06-06T14:21:38.492191663Z [inf]  
+> workspace@0.0.0 typecheck:libs /app
+> tsc --build
+
+
+2026-06-06T14:21:52.633058907Z [inf]  
+> @workspace/api-server@0.0.0 build /app/artifacts/api-server
+> node ./build.mjs
+
+
+2026-06-06T14:21:53.202417699Z [inf]  
+  dist/index.mjs                       8.2mb ⚠️
+  dist/pino-worker.mjs               153.4kb
+  dist/pino-file.mjs                 142.0kb
+  dist/pino-pretty.mjs               114.6kb
+  dist/thread-stream-worker.mjs        7.3kb
+  dist/index.mjs.map                  13.2mb
+  dist/pino-worker.mjs.map           256.9kb
+  dist/pino-file.mjs.map             229.0kb
+  dist/pino-pretty.mjs.map           204.0kb
+  dist/thread-stream-worker.mjs.map   12.0kb
+
+⚡ Done in 493ms
+
+2026-06-06T14:21:53.435525102Z [inf]  [stage-0  9/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-node_modules/cache,target=/app/node_modules/.cache pnpm run typecheck:libs && pnpm --filter @workspace/api-server run build
+2026-06-06T14:21:53.457119522Z [inf]  [stage-0 10/11] RUN printf '\nPATH=/app/node_modules/.bin:$PATH' >> /root/.profile
+2026-06-06T14:21:53.929688021Z [inf]  [stage-0 10/11] RUN printf '\nPATH=/app/node_modules/.bin:$PATH' >> /root/.profile
+2026-06-06T14:21:53.951873037Z [inf]  [stage-0 11/11] COPY . /app
+2026-06-06T14:21:54.477581787Z [inf]  [stage-0 11/11] COPY . /app
+2026-06-06T14:21:54.503063680Z [inf]  exporting to docker image format
+2026-06-06T14:22:02.409661017Z [inf]  exporting to docker image format
+2026-06-06T14:22:02.460361427Z [inf]  containerimage.descriptor: eyJtZWRpYVR5cGUiOiJhcHBsaWNhdGlvbi92bmQub2NpLmltYWdlLm1hbmlmZXN0LnYxK2pzb24iLCJkaWdlc3QiOiJzaGEyNTY6MTM1NDUyMTE0ZGZiZmVhZTBkYmFjNDlhNTlkZDQ0ZTNkZTIyMGY5MjEzMzcxYzJiNGE3YThmODBkMzlkN2Q1OCIsInNpemUiOjI5NjIsImFubm90YXRpb25zIjp7Im9yZy5vcGVuY29udGFpbmVycy5pbWFnZS5jcmVhdGVkIjoiMjAyNi0wNi0wNlQxNDoyMjowMFoifSwicGxhdGZvcm0iOnsiYXJjaGl0ZWN0dXJlIjoiYW1kNjQiLCJvcyI6ImxpbnV4In19
+2026-06-06T14:22:02.460365834Z [inf]  containerimage.config.digest: sha256:a25b2ac264a974737b0f1d5c9b6a65a0384186ce2fe2bf2359b3e4c131f08345
+2026-06-06T14:22:02.460368468Z [inf]  containerimage.digest: sha256:135452114dfbfeae0dbac49a59dd44e3de220f9213371c2b4a7a8f80d39d7d58
+2026-06-06T14:22:16.978500849Z [inf]  image push
+2026-06-06T14:22:16.978600158Z [inf]  image push
+2026-06-06T14:22:26.530821995Z [inf]  
+2026-06-06T14:22:26.530824706Z [inf]  [35m====================
+Starting Healthcheck
+====================
+[0m
+2026-06-06T14:22:26.530825461Z [inf]  [37mPath: /api/healthz[0m
+2026-06-06T14:22:26.530826109Z [inf]  [37mRetry window: 5m0s[0m
+2026-06-06T14:22:26.530826794Z [inf]  
+2026-06-06T14:22:36.725640417Z [inf]  [93mAttempt #1 failed with service unavailable. Continuing to retry for 4m49s[0m
+2026-06-06T14:22:47.876764545Z [inf]  [93mAttempt #2 failed with service unavailable. Continuing to retry for 4m38s[0m
+2026-06-06T14:23:00.027163933Z [inf]  [93mAttempt #3 failed with service unavailable. Continuing to retry for 4m26s[0m
+2026-06-06T14:23:14.176685129Z [inf]  [93mAttempt #4 failed with service unavailable. Continuing to retry for 4m12s[0m
+2026-06-06T14:23:32.329488724Z [inf]  [93mAttempt #5 failed with service unavailable. Continuing to retry for 3m54s[0m
+2026-06-06T14:23:58.480635505Z [inf]  [93mAttempt #6 failed with service unavailable. Continuing to retry for 3m28s[0m
+2026-06-06T14:24:38.637010984Z [inf]  [93mAttempt #7 failed with service unavailable. Continuing to retry for 2m47s[0m
+2026-06-06T14:25:18.788584074Z [inf]  [93mAttempt #8 failed with service unavailable. Continuing to retry for 2m7s[0m
+2026-06-06T14:25:58.939919700Z [inf]  [93mAttempt #9 failed with service unavailable. Continuing to retry for 1m27s[0m
+2026-06-06T14:26:39.095695980Z [inf]  [93mAttempt #10 failed with service unavailable. Continuing to retry for 47s[0m
+2026-06-06T14:27:19.352096751Z [inf]  [93mAttempt #11 failed with service unavailable. Continuing to retry for 7s[0m
+2026-06-06T14:27:19.413044808Z [inf]  
+2026-06-06T14:27:19.413047022Z [inf]  [91m1/1 replicas never became healthy![0m
+2026-06-06T14:27:19.413047801Z [inf]  [91mHealthcheck failed![0m
