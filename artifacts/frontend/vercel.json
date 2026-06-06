@@ -7,6 +7,8 @@
     { "source": "/m15/(.*)", "destination": "/m15/index.html" },
     { "source": "/portail", "destination": "/portail/index.html" },
     { "source": "/portail/(.*)", "destination": "/portail/index.html" },
+    { "source": "/terrain", "destination": "/terrain/index.html" },
+    { "source": "/terrain/(.*)", "destination": "/terrain/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "env": {
