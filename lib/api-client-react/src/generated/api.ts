@@ -25,6 +25,7 @@ import type {
   AgListItem,
   AlertePrix,
   AlertesEquipements,
+  AlertesPrevisions,
   AnalyseMarge,
   AnomalieItem,
   AnomaliesListResponse,
@@ -170,6 +171,7 @@ import type {
   GetPrixAnalyseMargeParams,
   GetPrixHistoriqueParams,
   GetPrixSimulationParams,
+  GetProjectionTresorerieParams,
   GetRapportCampagneIntrantsParams,
   GetRapportCampagneTransportParams,
   GetRapportTypeFournisseur200Item,
@@ -184,6 +186,7 @@ import type {
   HistoriqueMasse,
   HistoriquePrix,
   HypotheseBudget,
+  HypothesesBody,
   HypothesesInput,
   Intrant,
   IntrantInput,
@@ -236,6 +239,8 @@ import type {
   PresenceResult,
   Preteur,
   PreteurInput,
+  ProjectionCampagne,
+  ProjectionTresorerie,
   RapportAgentPesee,
   RapportBailleur,
   RapportBailleurResponse,
@@ -262,12 +267,15 @@ import type {
   ResoudreLitige200,
   ResoudreLitigeBody,
   ResultatDotations,
+  ResultatSimulation,
   ResultatVerifications,
   ResumeMembre,
   SaisirPrixInput,
   ScoreMembreDetail,
   SearchFournisseursParams,
+  Simulation,
   SimulationMarge,
+  SimulerBody,
   SmsDiffusionResult,
   SmsGroupeInput,
   SmsGroupeResult,
@@ -2464,15 +2472,15 @@ export const getGetStockAlertesUrl = () => {
 
 
 
-  return `/api/intrants/stock-alerte`
+  return `/api/stocks/alertes`
 }
 
 /**
- * @summary Intrants sous le seuil minimum
+ * @summary Entrepôts sous seuil minimum
  */
-export const getStockAlertes = async ( options?: RequestInit): Promise<IntrantResume[]> => {
+export const getStockAlertes = async ( options?: RequestInit): Promise<EntrepotStock[]> => {
 
-  return customFetch<IntrantResume[]>(getGetStockAlertesUrl(),
+  return customFetch<EntrepotStock[]>(getGetStockAlertesUrl(),
   {
     ...options,
     method: 'GET'
@@ -2487,7 +2495,7 @@ export const getStockAlertes = async ( options?: RequestInit): Promise<IntrantRe
 
 export const getGetStockAlertesQueryKey = () => {
     return [
-    `/api/intrants/stock-alerte`
+    `/api/stocks/alertes`
     ] as const;
     }
 
@@ -2515,7 +2523,7 @@ export type GetStockAlertesQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Intrants sous le seuil minimum
+ * @summary Entrepôts sous seuil minimum
  */
 
 export function useGetStockAlertes<TData = Awaited<ReturnType<typeof getStockAlertes>>, TError = ErrorType<unknown>>(
@@ -8679,6 +8687,83 @@ export function useListCategoriesIntrants<TData = Awaited<ReturnType<typeof list
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListCategoriesIntrantsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetIntrantsStockAlertesUrl = () => {
+
+
+
+
+  return `/api/intrants/stock-alerte`
+}
+
+/**
+ * @summary Intrants sous le seuil minimum
+ */
+export const getIntrantsStockAlertes = async ( options?: RequestInit): Promise<IntrantResume[]> => {
+
+  return customFetch<IntrantResume[]>(getGetIntrantsStockAlertesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetIntrantsStockAlertesQueryKey = () => {
+    return [
+    `/api/intrants/stock-alerte`
+    ] as const;
+    }
+
+
+export const getGetIntrantsStockAlertesQueryOptions = <TData = Awaited<ReturnType<typeof getIntrantsStockAlertes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntrantsStockAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetIntrantsStockAlertesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIntrantsStockAlertes>>> = ({ signal }) => getIntrantsStockAlertes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIntrantsStockAlertes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetIntrantsStockAlertesQueryResult = NonNullable<Awaited<ReturnType<typeof getIntrantsStockAlertes>>>
+export type GetIntrantsStockAlertesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Intrants sous le seuil minimum
+ */
+
+export function useGetIntrantsStockAlertes<TData = Awaited<ReturnType<typeof getIntrantsStockAlertes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntrantsStockAlertes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetIntrantsStockAlertesQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -20044,6 +20129,541 @@ export function useGetTableauAmortissement<TData = Awaited<ReturnType<typeof get
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetTableauAmortissementQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListPrevisionsCampagnesUrl = () => {
+
+
+
+
+  return `/api/previsions/campagnes`
+}
+
+/**
+ * @summary Liste des campagnes de la coopérative
+ */
+export const listPrevisionsCampagnes = async ( options?: RequestInit): Promise<Campagne[]> => {
+
+  return customFetch<Campagne[]>(getListPrevisionsCampagnesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPrevisionsCampagnesQueryKey = () => {
+    return [
+    `/api/previsions/campagnes`
+    ] as const;
+    }
+
+
+export const getListPrevisionsCampagnesQueryOptions = <TData = Awaited<ReturnType<typeof listPrevisionsCampagnes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPrevisionsCampagnes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPrevisionsCampagnesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPrevisionsCampagnes>>> = ({ signal }) => listPrevisionsCampagnes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPrevisionsCampagnes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPrevisionsCampagnesQueryResult = NonNullable<Awaited<ReturnType<typeof listPrevisionsCampagnes>>>
+export type ListPrevisionsCampagnesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des campagnes de la coopérative
+ */
+
+export function useListPrevisionsCampagnes<TData = Awaited<ReturnType<typeof listPrevisionsCampagnes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPrevisionsCampagnes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPrevisionsCampagnesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetProjectionCampagneUrl = (id: number,) => {
+
+
+
+
+  return `/api/previsions/campagne/${id}`
+}
+
+/**
+ * @summary Projection fin de campagne
+ */
+export const getProjectionCampagne = async (id: number, options?: RequestInit): Promise<ProjectionCampagne> => {
+
+  return customFetch<ProjectionCampagne>(getGetProjectionCampagneUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectionCampagneQueryKey = (id: number,) => {
+    return [
+    `/api/previsions/campagne/${id}`
+    ] as const;
+    }
+
+
+export const getGetProjectionCampagneQueryOptions = <TData = Awaited<ReturnType<typeof getProjectionCampagne>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectionCampagne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectionCampagneQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectionCampagne>>> = ({ signal }) => getProjectionCampagne(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectionCampagne>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectionCampagneQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectionCampagne>>>
+export type GetProjectionCampagneQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Projection fin de campagne
+ */
+
+export function useGetProjectionCampagne<TData = Awaited<ReturnType<typeof getProjectionCampagne>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectionCampagne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectionCampagneQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostHypothesesUrl = (id: number,) => {
+
+
+
+
+  return `/api/previsions/campagne/${id}/hypotheses`
+}
+
+/**
+ * @summary Saisir ou modifier les hypothèses de prévision
+ */
+export const postHypotheses = async (id: number,
+    hypothesesBody: HypothesesBody, options?: RequestInit): Promise<ProjectionCampagne> => {
+
+  return customFetch<ProjectionCampagne>(getPostHypothesesUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      hypothesesBody,)
+  }
+);}
+
+
+
+
+export const getPostHypothesesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postHypotheses>>, TError,{id: number;data: BodyType<HypothesesBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postHypotheses>>, TError,{id: number;data: BodyType<HypothesesBody>}, TContext> => {
+
+const mutationKey = ['postHypotheses'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postHypotheses>>, {id: number;data: BodyType<HypothesesBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  postHypotheses(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostHypothesesMutationResult = NonNullable<Awaited<ReturnType<typeof postHypotheses>>>
+    export type PostHypothesesMutationBody = BodyType<HypothesesBody>
+    export type PostHypothesesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Saisir ou modifier les hypothèses de prévision
+ */
+export const usePostHypotheses = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postHypotheses>>, TError,{id: number;data: BodyType<HypothesesBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postHypotheses>>,
+        TError,
+        {id: number;data: BodyType<HypothesesBody>},
+        TContext
+      > => {
+      return useMutation(getPostHypothesesMutationOptions(options));
+    }
+
+export const getGetProjectionTresorerieUrl = (params?: GetProjectionTresorerieParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/previsions/tresorerie?${stringifiedParams}` : `/api/previsions/tresorerie`
+}
+
+/**
+ * @summary Projection trésorerie sur N jours
+ */
+export const getProjectionTresorerie = async (params?: GetProjectionTresorerieParams, options?: RequestInit): Promise<ProjectionTresorerie> => {
+
+  return customFetch<ProjectionTresorerie>(getGetProjectionTresorerieUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectionTresorerieQueryKey = (params?: GetProjectionTresorerieParams,) => {
+    return [
+    `/api/previsions/tresorerie`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetProjectionTresorerieQueryOptions = <TData = Awaited<ReturnType<typeof getProjectionTresorerie>>, TError = ErrorType<unknown>>(params?: GetProjectionTresorerieParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectionTresorerie>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectionTresorerieQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectionTresorerie>>> = ({ signal }) => getProjectionTresorerie(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectionTresorerie>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectionTresorerieQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectionTresorerie>>>
+export type GetProjectionTresorerieQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Projection trésorerie sur N jours
+ */
+
+export function useGetProjectionTresorerie<TData = Awaited<ReturnType<typeof getProjectionTresorerie>>, TError = ErrorType<unknown>>(
+ params?: GetProjectionTresorerieParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectionTresorerie>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectionTresorerieQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostSimulerUrl = () => {
+
+
+
+
+  return `/api/previsions/simuler`
+}
+
+/**
+ * @summary Lancer une simulation
+ */
+export const postSimuler = async (simulerBody: SimulerBody, options?: RequestInit): Promise<ResultatSimulation> => {
+
+  return customFetch<ResultatSimulation>(getPostSimulerUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      simulerBody,)
+  }
+);}
+
+
+
+
+export const getPostSimulerMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSimuler>>, TError,{data: BodyType<SimulerBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postSimuler>>, TError,{data: BodyType<SimulerBody>}, TContext> => {
+
+const mutationKey = ['postSimuler'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postSimuler>>, {data: BodyType<SimulerBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postSimuler(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostSimulerMutationResult = NonNullable<Awaited<ReturnType<typeof postSimuler>>>
+    export type PostSimulerMutationBody = BodyType<SimulerBody>
+    export type PostSimulerMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Lancer une simulation
+ */
+export const usePostSimuler = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSimuler>>, TError,{data: BodyType<SimulerBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postSimuler>>,
+        TError,
+        {data: BodyType<SimulerBody>},
+        TContext
+      > => {
+      return useMutation(getPostSimulerMutationOptions(options));
+    }
+
+export const getListSimulationsUrl = () => {
+
+
+
+
+  return `/api/previsions/simulations`
+}
+
+/**
+ * @summary Historique des simulations
+ */
+export const listSimulations = async ( options?: RequestInit): Promise<Simulation[]> => {
+
+  return customFetch<Simulation[]>(getListSimulationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSimulationsQueryKey = () => {
+    return [
+    `/api/previsions/simulations`
+    ] as const;
+    }
+
+
+export const getListSimulationsQueryOptions = <TData = Awaited<ReturnType<typeof listSimulations>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSimulations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSimulationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSimulations>>> = ({ signal }) => listSimulations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSimulations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSimulationsQueryResult = NonNullable<Awaited<ReturnType<typeof listSimulations>>>
+export type ListSimulationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Historique des simulations
+ */
+
+export function useListSimulations<TData = Awaited<ReturnType<typeof listSimulations>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSimulations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSimulationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAlertesPrevisionsUrl = () => {
+
+
+
+
+  return `/api/previsions/alertes`
+}
+
+/**
+ * @summary Alertes prévisionnelles
+ */
+export const getAlertesPrevisions = async ( options?: RequestInit): Promise<AlertesPrevisions> => {
+
+  return customFetch<AlertesPrevisions>(getGetAlertesPrevisionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAlertesPrevisionsQueryKey = () => {
+    return [
+    `/api/previsions/alertes`
+    ] as const;
+    }
+
+
+export const getGetAlertesPrevisionsQueryOptions = <TData = Awaited<ReturnType<typeof getAlertesPrevisions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAlertesPrevisions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAlertesPrevisionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAlertesPrevisions>>> = ({ signal }) => getAlertesPrevisions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAlertesPrevisions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAlertesPrevisionsQueryResult = NonNullable<Awaited<ReturnType<typeof getAlertesPrevisions>>>
+export type GetAlertesPrevisionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Alertes prévisionnelles
+ */
+
+export function useGetAlertesPrevisions<TData = Awaited<ReturnType<typeof getAlertesPrevisions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAlertesPrevisions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAlertesPrevisionsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

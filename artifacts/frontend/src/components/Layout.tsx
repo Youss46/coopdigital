@@ -236,6 +236,12 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "auditeur", "magasinier"],
   },
   {
+    href: "/previsions",
+    label: "Prévisions",
+    icon: TrendingUp,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
     href: "/parametres",
     label: "Paramètres",
     icon: Settings,

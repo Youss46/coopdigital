@@ -2434,7 +2434,7 @@ paths:
 
   /intrants/stock-alerte:
     get:
-      operationId: getStockAlertes
+      operationId: getIntrantsStockAlertes
       tags: [intrants]
       summary: Intrants sous le seuil minimum
       security: [{ bearerAuth: [] }]
@@ -5247,6 +5247,111 @@ paths:
                   lignes:
                     type: array
                     items: { $ref: '#/components/schemas/LigneAmortissement' }
+
+  /previsions/campagnes:
+    get:
+      operationId: listPrevisionsCampagnes
+      summary: Liste des campagnes de la coopérative
+      tags: [Previsions]
+      responses:
+        "200":
+          description: Liste campagnes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Campagne" }
+
+  /previsions/campagne/{id}:
+    get:
+      operationId: getProjectionCampagne
+      summary: Projection fin de campagne
+      tags: [Previsions]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Projection campagne
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectionCampagne" }
+
+  /previsions/campagne/{id}/hypotheses:
+    post:
+      operationId: postHypotheses
+      summary: Saisir ou modifier les hypothèses de prévision
+      tags: [Previsions]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HypothesesBody" }
+      responses:
+        "200":
+          description: Projection mise à jour
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectionCampagne" }
+
+  /previsions/tresorerie:
+    get:
+      operationId: getProjectionTresorerie
+      summary: Projection trésorerie sur N jours
+      tags: [Previsions]
+      parameters:
+        - { name: jours, in: query, schema: { type: integer, default: 90 } }
+      responses:
+        "200":
+          description: Projection trésorerie
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectionTresorerie" }
+
+  /previsions/simuler:
+    post:
+      operationId: postSimuler
+      summary: Lancer une simulation
+      tags: [Previsions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SimulerBody" }
+      responses:
+        "201":
+          description: Résultat simulation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResultatSimulation" }
+
+  /previsions/simulations:
+    get:
+      operationId: listSimulations
+      summary: Historique des simulations
+      tags: [Previsions]
+      responses:
+        "200":
+          description: Liste simulations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Simulation" }
+
+  /previsions/alertes:
+    get:
+      operationId: getAlertesPrevisions
+      summary: Alertes prévisionnelles
+      tags: [Previsions]
+      responses:
+        "200":
+          description: Alertes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertesPrevisions" }
+
 
 components:
   schemas:
@@ -9990,3 +10095,147 @@ components:
         nb_dotations: { type: integer }
         mois: { type: integer }
         annee: { type: integer }
+
+    HypothesesBody:
+      type: object
+      properties:
+        tonnage_prevu_kg: { type: number }
+        prix_achat_prevu_fcfa: { type: number }
+        prix_vente_prevu_fcfa: { type: number }
+        nb_membres_prevus: { type: integer }
+        nb_semaines_campagne: { type: integer }
+
+    LigneHistorique:
+      type: object
+      properties:
+        semaine: { type: integer }
+        date: { type: string }
+        tonnage_reel: { type: number, nullable: true }
+        tonnage_projete: { type: number }
+        objectif: { type: number }
+        est_passe: { type: boolean }
+
+    ProjectionCampagne:
+      type: object
+      properties:
+        campagne:
+          type: object
+          properties:
+            id: { type: integer }
+            libelle: { type: string }
+            date_ouverture: { type: string }
+            date_fermeture: { type: string, nullable: true }
+            statut: { type: string }
+        prevision:
+          type: object
+          nullable: true
+        reel:
+          type: object
+          properties:
+            tonnage_actuel_kg: { type: number }
+            prix_achat_moyen_fcfa: { type: number }
+            nb_livraisons: { type: integer }
+            nb_membres: { type: integer }
+        projection:
+          type: object
+          properties:
+            semaines_ecoulees: { type: number }
+            semaines_totales: { type: number }
+            semaines_restantes: { type: number }
+            rythme_hebdo_kg: { type: number }
+            tonnage_projete_kg: { type: number }
+            tonnage_prevu_kg: { type: number }
+            ca_projete_fcfa: { type: number }
+            ca_prevu_fcfa: { type: number }
+            marge_projetee_fcfa: { type: number }
+            ecart_tonnage_pct: { type: number }
+            ecart_ca_pct: { type: number }
+        historique_hebdo:
+          type: array
+          items: { $ref: "#/components/schemas/LigneHistorique" }
+        interpretation: { type: string }
+
+    SemainesTresorerie:
+      type: object
+      properties:
+        semaine: { type: integer }
+        date_debut: { type: string }
+        date_fin: { type: string }
+        encaissements: { type: number }
+        decaissements: { type: number }
+        solde_net: { type: number }
+        solde_cumul: { type: number }
+
+    ProjectionTresorerie:
+      type: object
+      properties:
+        tresorerie_actuelle: { type: number }
+        nb_jours: { type: integer }
+        semaines:
+          type: array
+          items: { $ref: "#/components/schemas/SemainesTresorerie" }
+        risque_rupture: { type: boolean }
+        jours_avant_rupture: { type: integer, nullable: true }
+        avances_en_cours_fcfa: { type: number }
+        horizon: { type: string }
+
+    SimulerBody:
+      type: object
+      required: [parametres, nom_simulation]
+      properties:
+        campagne_id: { type: integer }
+        nom_simulation: { type: string }
+        type: { type: string, enum: [prix, tonnage, membres, mix] }
+        parametres:
+          type: object
+          required: [prix_achat, prix_vente, tonnage]
+          properties:
+            prix_achat: { type: number }
+            prix_vente: { type: number }
+            tonnage: { type: number }
+            nb_membres: { type: integer }
+
+    ResultatSimulationData:
+      type: object
+      properties:
+        ca_fcfa: { type: number }
+        cout_fcfa: { type: number }
+        marge_fcfa: { type: number }
+        marge_kg: { type: number }
+        variation_vs_actuel_pct: { type: number, nullable: true }
+
+    Simulation:
+      type: object
+      properties:
+        id: { type: integer }
+        cooperative_id: { type: integer }
+        campagne_id: { type: integer, nullable: true }
+        nom_simulation: { type: string }
+        type: { type: string }
+        parametres: { type: object }
+        resultats: { type: object }
+        created_by: { type: integer, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    ResultatSimulation:
+      type: object
+      properties:
+        simulation: { $ref: "#/components/schemas/Simulation" }
+        resultats: { $ref: "#/components/schemas/ResultatSimulationData" }
+
+    AlerteItem:
+      type: object
+      properties:
+        type: { type: string }
+        niveau: { type: string, enum: [rouge, orange, vert, bleu] }
+        message: { type: string }
+        valeur: { type: number, nullable: true }
+
+    AlertesPrevisions:
+      type: object
+      properties:
+        alertes:
+          type: array
+          items: { $ref: "#/components/schemas/AlerteItem" }
+        campagne_active_id: { type: integer, nullable: true }
+

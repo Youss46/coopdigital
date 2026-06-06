@@ -38,6 +38,7 @@ import ParametresPage from "@/pages/ParametresPage";
 import TransportPage from "@/pages/TransportPage";
 import PeseePage from "@/pages/PeseePage";
 import EquipementsPage from "@/pages/EquipementsPage";
+import PrevisionsPage from "@/pages/PrevisionsPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -167,6 +168,9 @@ function AppRoutes() {
       </Route>
       <Route path="/equipements">
         <ProtectedRoute component={EquipementsPage} />
+      </Route>
+      <Route path="/previsions">
+        <ProtectedRoute component={PrevisionsPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

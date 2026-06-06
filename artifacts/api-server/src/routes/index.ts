@@ -36,6 +36,7 @@ import portailRouter from "./portail";
 import transportRouter from "./transport";
 import peseeRouter from "./pesee";
 import equipementsRouter from "./equipements";
+import previsionsRouter from "./previsions";
 
 const router: IRouter = Router();
 
@@ -76,5 +77,6 @@ router.use(storageRouter);
 router.use(transportRouter);
 router.use(peseeRouter);
 router.use(equipementsRouter);
+router.use(previsionsRouter);
 
 export default router;

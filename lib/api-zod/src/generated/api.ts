@@ -710,15 +710,19 @@ export const SortieStockBody = zod.object({
 
 
 /**
- * @summary Intrants sous le seuil minimum
+ * @summary Entrepôts sous seuil minimum
  */
 export const GetStockAlertesResponseItem = zod.object({
   "id": zod.number(),
+  "cooperativeId": zod.number(),
   "nom": zod.string(),
-  "unite": zod.string(),
-  "stockActuel": zod.string(),
-  "stockMinimum": zod.string(),
-  "prixUnitaireFcfa": zod.string()
+  "ville": zod.string(),
+  "capaciteKg": zod.string(),
+  "seuilAlerteKg": zod.string().nullish(),
+  "stockActuelKg": zod.number(),
+  "pourcentageRemplissage": zod.number().optional(),
+  "enAlerte": zod.boolean().optional(),
+  "createdAt": zod.string()
 })
 export const GetStockAlertesResponse = zod.array(GetStockAlertesResponseItem)
 
@@ -2673,6 +2677,20 @@ export const ListCategoriesIntrantsResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 })
 export const ListCategoriesIntrantsResponse = zod.array(ListCategoriesIntrantsResponseItem)
+
+
+/**
+ * @summary Intrants sous le seuil minimum
+ */
+export const GetIntrantsStockAlertesResponseItem = zod.object({
+  "id": zod.number(),
+  "nom": zod.string(),
+  "unite": zod.string(),
+  "stockActuel": zod.string(),
+  "stockMinimum": zod.string(),
+  "prixUnitaireFcfa": zod.string()
+})
+export const GetIntrantsStockAlertesResponse = zod.array(GetIntrantsStockAlertesResponseItem)
 
 
 /**
@@ -6458,6 +6476,208 @@ export const GetTableauAmortissementResponse = zod.object({
   "cumul_fcfa": zod.number().optional(),
   "vnc_fcfa": zod.number().optional()
 })).optional()
+})
+
+
+/**
+ * @summary Liste des campagnes de la coopérative
+ */
+export const ListPrevisionsCampagnesResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "libelle": zod.string(),
+  "anneeDebut": zod.number(),
+  "anneeFin": zod.number(),
+  "dateOuverture": zod.coerce.date(),
+  "dateFermeture": zod.coerce.date().nullish(),
+  "statut": zod.enum(['ouverte', 'fermee']),
+  "createdAt": zod.coerce.date()
+})
+export const ListPrevisionsCampagnesResponse = zod.array(ListPrevisionsCampagnesResponseItem)
+
+
+/**
+ * @summary Projection fin de campagne
+ */
+export const GetProjectionCampagneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetProjectionCampagneResponse = zod.object({
+  "campagne": zod.object({
+  "id": zod.number().optional(),
+  "libelle": zod.string().optional(),
+  "date_ouverture": zod.string().optional(),
+  "date_fermeture": zod.string().nullish(),
+  "statut": zod.string().optional()
+}).optional(),
+  "prevision": zod.object({
+
+}).passthrough().nullish(),
+  "reel": zod.object({
+  "tonnage_actuel_kg": zod.number().optional(),
+  "prix_achat_moyen_fcfa": zod.number().optional(),
+  "nb_livraisons": zod.number().optional(),
+  "nb_membres": zod.number().optional()
+}).optional(),
+  "projection": zod.object({
+  "semaines_ecoulees": zod.number().optional(),
+  "semaines_totales": zod.number().optional(),
+  "semaines_restantes": zod.number().optional(),
+  "rythme_hebdo_kg": zod.number().optional(),
+  "tonnage_projete_kg": zod.number().optional(),
+  "tonnage_prevu_kg": zod.number().optional(),
+  "ca_projete_fcfa": zod.number().optional(),
+  "ca_prevu_fcfa": zod.number().optional(),
+  "marge_projetee_fcfa": zod.number().optional(),
+  "ecart_tonnage_pct": zod.number().optional(),
+  "ecart_ca_pct": zod.number().optional()
+}).optional(),
+  "historique_hebdo": zod.array(zod.object({
+  "semaine": zod.number().optional(),
+  "date": zod.string().optional(),
+  "tonnage_reel": zod.number().nullish(),
+  "tonnage_projete": zod.number().optional(),
+  "objectif": zod.number().optional(),
+  "est_passe": zod.boolean().optional()
+})).optional(),
+  "interpretation": zod.string().optional()
+})
+
+
+/**
+ * @summary Saisir ou modifier les hypothèses de prévision
+ */
+export const PostHypothesesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostHypothesesBody = zod.object({
+  "tonnage_prevu_kg": zod.number().optional(),
+  "prix_achat_prevu_fcfa": zod.number().optional(),
+  "prix_vente_prevu_fcfa": zod.number().optional(),
+  "nb_membres_prevus": zod.number().optional(),
+  "nb_semaines_campagne": zod.number().optional()
+})
+
+export const PostHypothesesResponse = zod.object({
+  "campagne": zod.object({
+  "id": zod.number().optional(),
+  "libelle": zod.string().optional(),
+  "date_ouverture": zod.string().optional(),
+  "date_fermeture": zod.string().nullish(),
+  "statut": zod.string().optional()
+}).optional(),
+  "prevision": zod.object({
+
+}).passthrough().nullish(),
+  "reel": zod.object({
+  "tonnage_actuel_kg": zod.number().optional(),
+  "prix_achat_moyen_fcfa": zod.number().optional(),
+  "nb_livraisons": zod.number().optional(),
+  "nb_membres": zod.number().optional()
+}).optional(),
+  "projection": zod.object({
+  "semaines_ecoulees": zod.number().optional(),
+  "semaines_totales": zod.number().optional(),
+  "semaines_restantes": zod.number().optional(),
+  "rythme_hebdo_kg": zod.number().optional(),
+  "tonnage_projete_kg": zod.number().optional(),
+  "tonnage_prevu_kg": zod.number().optional(),
+  "ca_projete_fcfa": zod.number().optional(),
+  "ca_prevu_fcfa": zod.number().optional(),
+  "marge_projetee_fcfa": zod.number().optional(),
+  "ecart_tonnage_pct": zod.number().optional(),
+  "ecart_ca_pct": zod.number().optional()
+}).optional(),
+  "historique_hebdo": zod.array(zod.object({
+  "semaine": zod.number().optional(),
+  "date": zod.string().optional(),
+  "tonnage_reel": zod.number().nullish(),
+  "tonnage_projete": zod.number().optional(),
+  "objectif": zod.number().optional(),
+  "est_passe": zod.boolean().optional()
+})).optional(),
+  "interpretation": zod.string().optional()
+})
+
+
+/**
+ * @summary Projection trésorerie sur N jours
+ */
+export const getProjectionTresorerieQueryJoursDefault = 90;
+
+export const GetProjectionTresorerieQueryParams = zod.object({
+  "jours": zod.coerce.number().default(getProjectionTresorerieQueryJoursDefault)
+})
+
+export const GetProjectionTresorerieResponse = zod.object({
+  "tresorerie_actuelle": zod.number().optional(),
+  "nb_jours": zod.number().optional(),
+  "semaines": zod.array(zod.object({
+  "semaine": zod.number().optional(),
+  "date_debut": zod.string().optional(),
+  "date_fin": zod.string().optional(),
+  "encaissements": zod.number().optional(),
+  "decaissements": zod.number().optional(),
+  "solde_net": zod.number().optional(),
+  "solde_cumul": zod.number().optional()
+})).optional(),
+  "risque_rupture": zod.boolean().optional(),
+  "jours_avant_rupture": zod.number().nullish(),
+  "avances_en_cours_fcfa": zod.number().optional(),
+  "horizon": zod.string().optional()
+})
+
+
+/**
+ * @summary Lancer une simulation
+ */
+export const PostSimulerBody = zod.object({
+  "campagne_id": zod.number().optional(),
+  "nom_simulation": zod.string(),
+  "type": zod.enum(['prix', 'tonnage', 'membres', 'mix']).optional(),
+  "parametres": zod.object({
+  "prix_achat": zod.number(),
+  "prix_vente": zod.number(),
+  "tonnage": zod.number(),
+  "nb_membres": zod.number().optional()
+})
+})
+
+
+/**
+ * @summary Historique des simulations
+ */
+export const ListSimulationsResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "cooperative_id": zod.number().optional(),
+  "campagne_id": zod.number().nullish(),
+  "nom_simulation": zod.string().optional(),
+  "type": zod.string().optional(),
+  "parametres": zod.object({
+
+}).passthrough().optional(),
+  "resultats": zod.object({
+
+}).passthrough().optional(),
+  "created_by": zod.number().nullish(),
+  "created_at": zod.coerce.date().optional()
+})
+export const ListSimulationsResponse = zod.array(ListSimulationsResponseItem)
+
+
+/**
+ * @summary Alertes prévisionnelles
+ */
+export const GetAlertesPrevisionsResponse = zod.object({
+  "alertes": zod.array(zod.object({
+  "type": zod.string().optional(),
+  "niveau": zod.enum(['rouge', 'orange', 'vert', 'bleu']).optional(),
+  "message": zod.string().optional(),
+  "valeur": zod.number().nullish()
+})).optional(),
+  "campagne_active_id": zod.number().nullish()
 })
 
 

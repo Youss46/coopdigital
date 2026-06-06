@@ -3907,6 +3907,158 @@ export interface ResultatDotations {
   annee?: number;
 }
 
+export interface HypothesesBody {
+  tonnage_prevu_kg?: number;
+  prix_achat_prevu_fcfa?: number;
+  prix_vente_prevu_fcfa?: number;
+  nb_membres_prevus?: number;
+  nb_semaines_campagne?: number;
+}
+
+export interface LigneHistorique {
+  semaine?: number;
+  date?: string;
+  tonnage_reel?: number | null;
+  tonnage_projete?: number;
+  objectif?: number;
+  est_passe?: boolean;
+}
+
+export type ProjectionCampagneCampagne = {
+  id?: number;
+  libelle?: string;
+  date_ouverture?: string;
+  date_fermeture?: string | null;
+  statut?: string;
+};
+
+export type ProjectionCampagnePrevision = { [key: string]: unknown } | null;
+
+export type ProjectionCampagneReel = {
+  tonnage_actuel_kg?: number;
+  prix_achat_moyen_fcfa?: number;
+  nb_livraisons?: number;
+  nb_membres?: number;
+};
+
+export type ProjectionCampagneProjection = {
+  semaines_ecoulees?: number;
+  semaines_totales?: number;
+  semaines_restantes?: number;
+  rythme_hebdo_kg?: number;
+  tonnage_projete_kg?: number;
+  tonnage_prevu_kg?: number;
+  ca_projete_fcfa?: number;
+  ca_prevu_fcfa?: number;
+  marge_projetee_fcfa?: number;
+  ecart_tonnage_pct?: number;
+  ecart_ca_pct?: number;
+};
+
+export interface ProjectionCampagne {
+  campagne?: ProjectionCampagneCampagne;
+  prevision?: ProjectionCampagnePrevision;
+  reel?: ProjectionCampagneReel;
+  projection?: ProjectionCampagneProjection;
+  historique_hebdo?: LigneHistorique[];
+  interpretation?: string;
+}
+
+export interface SemainesTresorerie {
+  semaine?: number;
+  date_debut?: string;
+  date_fin?: string;
+  encaissements?: number;
+  decaissements?: number;
+  solde_net?: number;
+  solde_cumul?: number;
+}
+
+export interface ProjectionTresorerie {
+  tresorerie_actuelle?: number;
+  nb_jours?: number;
+  semaines?: SemainesTresorerie[];
+  risque_rupture?: boolean;
+  jours_avant_rupture?: number | null;
+  avances_en_cours_fcfa?: number;
+  horizon?: string;
+}
+
+export type SimulerBodyType = typeof SimulerBodyType[keyof typeof SimulerBodyType];
+
+
+export const SimulerBodyType = {
+  prix: 'prix',
+  tonnage: 'tonnage',
+  membres: 'membres',
+  mix: 'mix',
+} as const;
+
+export type SimulerBodyParametres = {
+  prix_achat: number;
+  prix_vente: number;
+  tonnage: number;
+  nb_membres?: number;
+};
+
+export interface SimulerBody {
+  campagne_id?: number;
+  nom_simulation: string;
+  type?: SimulerBodyType;
+  parametres: SimulerBodyParametres;
+}
+
+export interface ResultatSimulationData {
+  ca_fcfa?: number;
+  cout_fcfa?: number;
+  marge_fcfa?: number;
+  marge_kg?: number;
+  variation_vs_actuel_pct?: number | null;
+}
+
+export type SimulationParametres = { [key: string]: unknown };
+
+export type SimulationResultats = { [key: string]: unknown };
+
+export interface Simulation {
+  id?: number;
+  cooperative_id?: number;
+  campagne_id?: number | null;
+  nom_simulation?: string;
+  type?: string;
+  parametres?: SimulationParametres;
+  resultats?: SimulationResultats;
+  created_by?: number | null;
+  created_at?: string;
+}
+
+export interface ResultatSimulation {
+  simulation?: Simulation;
+  resultats?: ResultatSimulationData;
+}
+
+export type AlerteItemNiveau = typeof AlerteItemNiveau[keyof typeof AlerteItemNiveau];
+
+
+export const AlerteItemNiveau = {
+  rouge: 'rouge',
+  orange: 'orange',
+  vert: 'vert',
+  bleu: 'bleu',
+} as const;
+
+export interface AlerteItem {
+  type?: string;
+  niveau?: AlerteItemNiveau;
+  message?: string;
+  valeur?: number | null;
+}
+
+export interface AlertesPrevisions {
+  alertes?: AlerteItem[];
+  campagne_active_id?: number | null;
+}
+
 export type GetMembresParams = {
 page?: number;
 limit?: number;
@@ -4380,5 +4532,9 @@ export type DeleteEquipement200 = {
 export type GetTableauAmortissement200 = {
   equipement?: Equipement;
   lignes?: LigneAmortissement[];
+};
+
+export type GetProjectionTresorerieParams = {
+jours?: number;
 };
 
