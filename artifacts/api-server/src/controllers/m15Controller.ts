@@ -63,7 +63,9 @@ export async function createCooperativeHandler(req: Request, res: Response): Pro
     pcaNom?: string; pcaPrenoms?: string; pcaTelephone?: string; pcaEmail?: string;
   };
 
-  if (!body.nom || !body.ville || !body.region || !body.planId || !body.dureeAns ||
+  const trialMode = body.trialActif === true;
+  if (!body.nom || !body.ville || !body.region ||
+      (!trialMode && (!body.planId || !body.dureeAns)) ||
       !body.pcaNom || !body.pcaPrenoms || !body.pcaTelephone) {
     res.status(400).json({ erreur: "Champs obligatoires manquants" });
     return;

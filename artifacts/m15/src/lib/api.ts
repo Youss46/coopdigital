@@ -101,7 +101,7 @@ export async function fetchCooperative(id: number): Promise<CoopDetail> {
 
 export async function createCooperative(data: {
   nom: string; ville: string; region: string;
-  planId: number; dureeAns: number;
+  planId: number | null; dureeAns: number;
   renouvellementAuto?: boolean; trialActif?: boolean; dureeTrialJours?: number;
   montantPaye?: number; modePaiement?: string; referencePaiement?: string; notesInternes?: string;
   pcaNom: string; pcaPrenoms: string; pcaTelephone: string; pcaEmail?: string;

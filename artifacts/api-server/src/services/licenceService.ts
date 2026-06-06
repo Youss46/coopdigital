@@ -729,8 +729,8 @@ export async function creerCooperativeM15(data: {
   ville: string;
   region: string;
   telephone?: string;
-  planId: number;
-  dureeAns: number;
+  planId?: number | null;
+  dureeAns?: number;
   renouvellementAuto?: boolean;
   trialActif?: boolean;
   dureeTrialJours?: number;
@@ -743,13 +743,16 @@ export async function creerCooperativeM15(data: {
   pcaTelephone: string;
   pcaEmail?: string;
 }, m15UserId: number) {
-  const [plan] = await db
-    .select()
-    .from(plansAbonnementTable)
-    .where(eq(plansAbonnementTable.id, data.planId))
-    .limit(1);
-
-  if (!plan) throw new Error("Plan introuvable");
+  let plan: typeof plansAbonnementTable.$inferSelect | undefined;
+  if (!data.trialActif && data.planId) {
+    const rows = await db
+      .select()
+      .from(plansAbonnementTable)
+      .where(eq(plansAbonnementTable.id, data.planId))
+      .limit(1);
+    plan = rows[0];
+    if (!plan) throw new Error("Plan introuvable");
+  }
 
   const [coop] = await db
     .insert(cooperativesTable)
@@ -789,15 +792,15 @@ export async function creerCooperativeM15(data: {
     statut = "active";
     dateActivation = today.toISOString().slice(0, 10);
     const exp = new Date(today);
-    exp.setDate(exp.getDate() + data.dureeAns * 365);
+    exp.setDate(exp.getDate() + (data.dureeAns ?? 1) * 365);
     dateExpiration = exp.toISOString().slice(0, 10);
   }
 
   const [licence] = await db.insert(licencesTable).values({
     cooperativeId: coop.id,
-    planId: data.planId,
+    planId: data.planId ?? null,
     cleLicence,
-    dureeAns: data.dureeAns,
+    dureeAns: data.dureeAns ?? 1,
     statut,
     dateActivation: dateActivation ?? null,
     dateExpiration: dateExpiration ?? null,
@@ -820,7 +823,7 @@ export async function creerCooperativeM15(data: {
     action: statut === "active" ? "activation" : "creation",
     ancienStatut: null,
     nouveauStatut: statut,
-    details: { planNom: plan.nom, dureeAns: data.dureeAns, cleLicence },
+    details: { planNom: plan?.nom ?? "Trial", dureeAns: data.dureeAns, cleLicence },
     effectuePar: m15UserId,
   });
 

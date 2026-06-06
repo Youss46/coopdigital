@@ -61,7 +61,7 @@ export default function NouvelleCoop() {
   const montantAttendu = selectedPlan && !isTrial ? prix(selectedPlan, duree) : 0;
 
   async function submit() {
-    if (!planId) return;
+    if (!isTrial && !planId) return;
     setSubmitting(true); setError("");
     try {
       await createCooperative({
