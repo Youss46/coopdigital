@@ -7,6 +7,19 @@ import { CheckCircle2, ChevronRight, Loader2, AlertCircle } from "lucide-react";
 const DUREES = [1, 2, 3, 5] as const;
 type Duree = 1 | 2 | 3 | 5;
 
+const inputCls = "w-full px-3 py-2.5 border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1.5">
+        {label} {required && <span className="text-destructive">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 function prix(plan: Plan, duree: Duree): number {
   const map: Record<Duree, string> = {
     1: plan.prix1anFcfa, 2: plan.prix2ansFcfa,
@@ -70,19 +83,6 @@ export default function NouvelleCoop() {
   }
 
   const steps = ["Coopérative", "Licence", "Paiement"];
-
-  function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-    return (
-      <div>
-        <label className="block text-sm font-medium mb-1.5">
-          {label} {required && <span className="text-destructive">*</span>}
-        </label>
-        {children}
-      </div>
-    );
-  }
-
-  const inputCls = "w-full px-3 py-2.5 border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
     <Layout>
