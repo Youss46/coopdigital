@@ -1,0 +1,98 @@
+2026-06-06T14:17:35.352296183Z [inf]  scheduling build on Metal builder "builder-srqewa"
+2026-06-06T14:17:37.498825430Z [inf]  uploading snapshot
+2026-06-06T14:17:38.485616233Z [inf]  fetched snapshot sha256:2c401200c61fcf7efa79e9b59a70a0c74b29409ca6b9edc54f00e7613109b329 (39 MB bytes)
+2026-06-06T14:17:38.485697305Z [inf]  fetching snapshot
+2026-06-06T14:17:38.768153473Z [inf]  modified file: artifacts/api-server/railway.json (435b -> 398b)
+2026-06-06T14:17:39.015771740Z [inf]  unpacking archive
+2026-06-06T14:17:39.093089925Z [inf]  using build driver nixpacks-v1.41.0
+2026-06-06T14:17:39.297755380Z [inf]  
+2026-06-06T14:17:39.297766146Z [inf]  ╔══════════════════════════════ Nixpacks v1.41.0 ══════════════════════════════╗
+2026-06-06T14:17:39.297769891Z [inf]  ║ setup      │ nodejs_24                                                       ║
+2026-06-06T14:17:39.297773477Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-06T14:17:39.297774518Z [inf]  ║ install    │ npm install -g pnpm@10 --quiet                                  ║
+2026-06-06T14:17:39.297776061Z [inf]  ║            │ pnpm install --no-frozen-lockfile                               ║
+2026-06-06T14:17:39.297777553Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-06T14:17:39.297778344Z [inf]  ║ build      │ pnpm run typecheck:libs && pnpm --filter @workspace/api-server  ║
+2026-06-06T14:17:39.297779526Z [inf]  ║            │ run build                                                       ║
+2026-06-06T14:17:39.297780868Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-06T14:17:39.297781579Z [inf]  ║ start      │ pnpm --filter @workspace/api-server run start                   ║
+2026-06-06T14:17:39.297786737Z [inf]  ╚══════════════════════════════════════════════════════════════════════════════╝
+2026-06-06T14:17:39.297787628Z [inf]  
+2026-06-06T14:17:39.298163401Z [inf]  
+2026-06-06T14:17:39.298167297Z [inf]  Saved output to:
+2026-06-06T14:17:39.298170482Z [inf]    snapshot-target-unpack
+2026-06-06T14:17:39.380985671Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:17:39.381160173Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:17:39.381237008Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:17:39.443369291Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:17:39.458874602Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-06-06T14:17:39.646311341Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-06-06T14:17:39.647036939Z [inf]  [internal] load .dockerignore
+2026-06-06T14:17:39.647366554Z [inf]  [internal] load .dockerignore
+2026-06-06T14:17:39.647552993Z [inf]  [internal] load .dockerignore
+2026-06-06T14:17:39.712929852Z [inf]  [internal] load .dockerignore
+2026-06-06T14:17:39.732227760Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "JWT_SECRET") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-06T14:17:39.732574701Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "JWT_SECRET") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-06T14:17:39.732636073Z [wrn]  UndefinedVar: Usage of undefined variable '$NIXPACKS_PATH' (line 18)(https://docs.docker.com/go/dockerfile/rule/undefined-var/)
+ details: Variables should be defined before their use
+
+2026-06-06T14:17:39.737112916Z [inf]  [stage-0  8/11] COPY . /app/.
+2026-06-06T14:17:39.737114669Z [inf]  [stage-0  7/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm install --no-frozen-lockfile
+2026-06-06T14:17:39.737115661Z [inf]  [stage-0  6/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 npm install -g pnpm@10 --quiet
+2026-06-06T14:17:39.737116452Z [inf]  [stage-0 10/11] RUN printf '\nPATH=/app/node_modules/.bin:$PATH' >> /root/.profile
+2026-06-06T14:17:39.737117283Z [inf]  [stage-0  4/11] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-06-06T14:17:39.737118144Z [inf]  [stage-0  3/11] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2026-06-06T14:17:39.737119006Z [inf]  [internal] load build context
+2026-06-06T14:17:39.737119887Z [inf]  [stage-0 2/8] WORKDIR /app/
+2026-06-06T14:17:39.737120768Z [inf]  [stage-0 11/11] COPY . /app
+2026-06-06T14:17:39.737121599Z [inf]  [stage-0  9/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-node_modules/cache,target=/app/node_modules/.cache pnpm run typecheck:libs && pnpm --filter @workspace/api-server run build
+2026-06-06T14:17:39.737122481Z [inf]  [stage-0  5/11] COPY . /app/.
+2026-06-06T14:17:39.737123312Z [inf]  [stage-0 1/8] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-06T14:17:39.737124133Z [inf]  [stage-0 1/8] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-06T14:17:39.737306387Z [inf]  [internal] load build context
+2026-06-06T14:17:39.737745725Z [inf]  [internal] load build context
+2026-06-06T14:17:40.056709230Z [inf]  [internal] load build context
+2026-06-06T14:17:40.071374392Z [inf]  [stage-0 2/8] WORKDIR /app/
+2026-06-06T14:17:40.071382574Z [inf]  [stage-0 2/8] WORKDIR /app/
+2026-06-06T14:17:40.071554953Z [inf]  [stage-0  3/11] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2026-06-06T14:17:40.559811228Z [inf]  [stage-0  3/11] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2026-06-06T14:17:40.581330758Z [inf]  [stage-0  4/11] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-06-06T14:17:41.099552619Z [inf]  unpacking 'https://github.com/NixOS/nixpkgs/archive/ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.tar.gz' into the Git cache...
+
+2026-06-06T14:18:05.142904027Z [inf]  unpacking 'https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz' into the Git cache...
+
+2026-06-06T14:18:05.713164895Z [inf]  installing 'ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7-env'
+
+2026-06-06T14:18:06.0131434Z [inf]  error:
+       … while calling the 'derivationStrict' builtin
+         at <nix/derivation-internal.nix>:37:12:
+           36|
+           37|   strict = derivationStrict drvAttrs;
+             |            ^
+           38|
+
+       … while evaluating derivation 'ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7-env'
+         whose name attribute is located at /nix/store/lwi59jcfwk2lnrakmm1y5vw85hj3n1bi-source/pkgs/stdenv/generic/make-derivation.nix:375:7
+
+       … while evaluating attribute 'passAsFile' of derivation 'ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7-env'
+         at /nix/store/lwi59jcfwk2lnrakmm1y5vw85hj3n1bi-source/pkgs/build-support/trivial-builders/default.nix:60:9:
+           59|         inherit buildCommand name;
+           60|         passAsFile = [ "buildCommand" ]
+             |         ^
+           61|           ++ (derivationArgs.passAsFile or [ ]);
+
+       (stack trace truncated; use '--show-trace' to show the full, detailed trace)
+
+       error: undefined variable 'nodejs_24'
+       at /app/.nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix:19:9:
+           18|         '')
+           19|         nodejs_24
+             |         ^
+           20|       ];
+
+2026-06-06T14:18:06.893741267Z [err]  [stage-0  4/11] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-06-06T14:18:06.950405891Z [err]  Build Failed: build daemon returned an error < failed to solve: process "/bin/bash -ol pipefail -c nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d" did not complete successfully: exit code: 1 >
