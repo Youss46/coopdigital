@@ -6,6 +6,7 @@ import LivraisonsPage from "@/pages/LivraisonsPage";
 import AvancesPage from "@/pages/AvancesPage";
 import PartsSocialesPage from "@/pages/PartsSocialesPage";
 import DocumentsPage from "@/pages/DocumentsPage";
+import { InstallBanner, OfflineBanner, OnlineToast } from "@/components/InstallPrompt";
 import { Loader2 } from "lucide-react";
 
 function AppRoutes() {
@@ -44,7 +45,10 @@ export default function App() {
   return (
     <AuthProvider>
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+        <OfflineBanner />
+        <OnlineToast />
         <AppRoutes />
+        <InstallBanner />
       </WouterRouter>
     </AuthProvider>
   );

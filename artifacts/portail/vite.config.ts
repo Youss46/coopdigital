@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { VitePWA } from "vite-plugin-pwa";
 
 const rawPort = process.env.PORT;
 
@@ -26,12 +27,107 @@ if (!basePath) {
   );
 }
 
+// Normalise: "/portail/"
+const base = basePath.endsWith("/") ? basePath : `${basePath}/`;
+
 export default defineConfig({
-  base: basePath,
+  base,
   plugins: [
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    VitePWA({
+      registerType: "autoUpdate",
+      injectRegister: "auto",
+      scope: base,
+      base,
+      manifest: {
+        name: "CoopDigital — Espace Membre",
+        short_name: "CoopDigital",
+        description: "Portail de consultation pour les membres des coopératives cacaoyères en Côte d'Ivoire",
+        start_url: base,
+        scope: base,
+        display: "standalone",
+        background_color: "#1a4731",
+        theme_color: "#1a4731",
+        lang: "fr",
+        orientation: "portrait",
+        categories: ["productivity", "finance"],
+        icons: [
+          {
+            src: `${base}logo-192.png`,
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any",
+          },
+          {
+            src: `${base}logo-512.png`,
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any",
+          },
+          {
+            src: `${base}logo-512.png`,
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
+        ],
+        shortcuts: [
+          {
+            name: "Mes livraisons",
+            url: `${base}livraisons`,
+            icons: [{ src: `${base}logo-192.png`, sizes: "192x192" }],
+          },
+          {
+            name: "Mes avances",
+            url: `${base}avances`,
+            icons: [{ src: `${base}logo-192.png`, sizes: "192x192" }],
+          },
+        ],
+      },
+      workbox: {
+        navigateFallback: `${base}index.html`,
+        navigateFallbackDenylist: [/^\/api\//],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            urlPattern: /^\/api\/portail\//,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "api-portail-v1",
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24,
+              },
+              networkTimeoutSeconds: 5,
+            },
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\//,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "google-fonts-stylesheets",
+            },
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\//,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "google-fonts-webfonts",
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365,
+              },
+            },
+          },
+        ],
+      },
+      devOptions: {
+        enabled: false,
+      },
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
