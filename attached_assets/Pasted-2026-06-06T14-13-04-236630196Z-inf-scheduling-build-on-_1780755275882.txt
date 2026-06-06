@@ -1,0 +1,70 @@
+2026-06-06T14:13:04.236630196Z [inf]  scheduling build on Metal builder "builder-srqewa"
+2026-06-06T14:13:06.548461273Z [inf]  fetched snapshot sha256:7bd94b0a128b224c6b5ee7641666fe823bac656aeb9bbeb3bb3d6bab53b568ea (33 MB bytes)
+2026-06-06T14:13:06.548541744Z [inf]  fetching snapshot
+2026-06-06T14:13:06.873212327Z [inf]  modified file: artifacts/api-server/railway.json (432b -> 435b)
+2026-06-06T14:13:07.149860807Z [inf]  unpacking archive
+2026-06-06T14:13:07.249957651Z [inf]  using build driver nixpacks-v1.41.0
+2026-06-06T14:13:07.347101577Z [inf]  uploading snapshot
+2026-06-06T14:13:07.477493862Z [inf]  
+2026-06-06T14:13:07.477501514Z [inf]  ╔══════════════════════════════ Nixpacks v1.41.0 ══════════════════════════════╗
+2026-06-06T14:13:07.477505951Z [inf]  ║ setup      │ nodejs_18, pnpm-9_x, openssl                                    ║
+2026-06-06T14:13:07.477510968Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-06T14:13:07.477512500Z [inf]  ║ install    │ pnpm i --frozen-lockfile                                        ║
+2026-06-06T14:13:07.477514593Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-06T14:13:07.477515966Z [inf]  ║ build      │ pnpm install --no-frozen-lockfile && pnpm run typecheck:libs && ║
+2026-06-06T14:13:07.477517428Z [inf]  ║            │ pnpm --filter @workspace/api-server run build                   ║
+2026-06-06T14:13:07.477519671Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-06T14:13:07.477521173Z [inf]  ║ start      │ pnpm --filter @workspace/api-server run start                   ║
+2026-06-06T14:13:07.477523447Z [inf]  ╚══════════════════════════════════════════════════════════════════════════════╝
+2026-06-06T14:13:07.477524679Z [inf]  
+2026-06-06T14:13:07.477913191Z [inf]  
+2026-06-06T14:13:07.477917287Z [inf]  Saved output to:
+2026-06-06T14:13:07.477918940Z [inf]    snapshot-target-unpack
+2026-06-06T14:13:07.585059457Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:13:07.585301139Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:13:07.585406467Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:13:07.750715062Z [inf]  [internal] load build definition from Dockerfile
+2026-06-06T14:13:07.766847074Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-06-06T14:13:07.939598590Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-06-06T14:13:07.940313643Z [inf]  [internal] load .dockerignore
+2026-06-06T14:13:07.940611419Z [inf]  [internal] load .dockerignore
+2026-06-06T14:13:07.940622516Z [inf]  [internal] load .dockerignore
+2026-06-06T14:13:08.009403920Z [inf]  [internal] load .dockerignore
+2026-06-06T14:13:08.026491995Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "JWT_SECRET") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-06T14:13:08.026730352Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "JWT_SECRET") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-06T14:13:08.027109291Z [wrn]  UndefinedVar: Usage of undefined variable '$NIXPACKS_PATH' (line 18)(https://docs.docker.com/go/dockerfile/rule/undefined-var/)
+ details: Variables should be defined before their use
+
+2026-06-06T14:13:08.030545283Z [inf]  [stage-0 10/10] COPY . /app
+2026-06-06T14:13:08.030546335Z [inf]  [stage-0  9/10] RUN printf '\nPATH=/app/node_modules/.bin:$PATH' >> /root/.profile
+2026-06-06T14:13:08.030546976Z [inf]  [stage-0  8/10] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-node_modules/cache,target=/app/node_modules/.cache pnpm install --no-frozen-lockfile && pnpm run typecheck:libs && pnpm --filter @workspace/api-server run build
+2026-06-06T14:13:08.030549399Z [inf]  [stage-0  7/10] COPY . /app/.
+2026-06-06T14:13:08.030550151Z [inf]  [stage-0  6/10] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm i --frozen-lockfile
+2026-06-06T14:13:08.030550631Z [inf]  [stage-0  5/10] COPY . /app/.
+2026-06-06T14:13:08.030551142Z [inf]  [stage-0  4/10] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-06-06T14:13:08.030551613Z [inf]  [stage-0  3/10] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2026-06-06T14:13:08.030552103Z [inf]  [internal] load build context
+2026-06-06T14:13:08.030552584Z [inf]  [stage-0  2/15] WORKDIR /app/
+2026-06-06T14:13:08.030553085Z [inf]  [stage-0  1/15] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-06T14:13:08.030554647Z [inf]  [stage-0  1/15] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-06T14:13:08.030668829Z [inf]  [internal] load build context
+2026-06-06T14:13:08.031080616Z [inf]  [internal] load build context
+2026-06-06T14:13:08.444180447Z [inf]  [internal] load build context
+2026-06-06T14:13:08.683483464Z [inf]  [stage-0  2/15] WORKDIR /app/
+2026-06-06T14:13:08.683485307Z [inf]  [stage-0  3/10] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2026-06-06T14:13:08.683485997Z [inf]  [stage-0  4/10] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-06-06T14:13:08.683502402Z [inf]  [stage-0  5/10] COPY . /app/.
+2026-06-06T14:13:10.283207576Z [inf]  [stage-0  5/10] COPY . /app/.
+2026-06-06T14:13:10.303457623Z [inf]  [stage-0  6/10] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm i --frozen-lockfile
+2026-06-06T14:13:11.547540218Z [inf]  Scope: all 13 workspace projects
+
+2026-06-06T14:13:11.632460173Z [inf]   ERR_PNPM_LOCKFILE_CONFIG_MISMATCH  Cannot proceed with the frozen installation. The current "overrides" configuration doesn't match the value found in the lockfile
+
+Update your lockfile using "pnpm install --no-frozen-lockfile"
+
+2026-06-06T14:13:11.828710579Z [err]  [stage-0  6/10] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm i --frozen-lockfile
+2026-06-06T14:13:11.894125274Z [err]  Build Failed: build daemon returned an error < failed to solve: process "/bin/bash -ol pipefail -c pnpm i --frozen-lockfile" did not complete successfully: exit code: 1 >
