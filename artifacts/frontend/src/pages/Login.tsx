@@ -319,6 +319,15 @@ export default function Login() {
             </a>
           </div>
 
+          <div className="mt-3 text-center">
+            <a
+              href="/m15/"
+              className="text-gray-400 text-xs hover:text-gray-600 hover:underline"
+            >
+              Espace M15 Tech →
+            </a>
+          </div>
+
           <div className="mt-10 pt-6 border-t border-gray-100 text-center">
             <p className="text-gray-400 text-xs">CoopDigital — M15 Tech, Yamoussoukro</p>
             <p className="text-gray-400 text-xs mt-1">Support : 0714174082 · contacteyouss@gmail.com</p>
