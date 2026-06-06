@@ -39,3 +39,4 @@ export * from "./planning";
 export * from "./formations";
 export * from "./caisse";
 export * from "./fiscalite";
+export * from "./reconciliation";

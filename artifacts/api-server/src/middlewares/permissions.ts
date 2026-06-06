@@ -281,6 +281,13 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_alertes:     ["pca", "directeur", "comptable"],
   },
 
+  // MODULE — RÉCONCILIATION BANCAIRE
+  reconciliation: {
+    voir:        ["pca", "directeur", "comptable", "auditeur"],
+    importer:    ["pca", "directeur", "comptable"],
+    reconcilier: ["pca", "directeur", "comptable"],
+  },
+
   // MODULE — FISCALITÉ
   fiscalite: {
     voir:       ["pca", "directeur", "comptable", "auditeur"],

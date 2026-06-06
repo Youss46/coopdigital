@@ -49,6 +49,7 @@ import planningCollecteRouter from "./planning-collecte";
 import formationsRouter from "./formations";
 import caisseRouter from "./caisse";
 import fiscaliteRouter from "./fiscalite";
+import reconciliationRouter from "./reconciliation";
 
 const router: IRouter = Router();
 
@@ -106,5 +107,6 @@ router.use(planningCollecteRouter);
 router.use(formationsRouter);
 router.use(caisseRouter);
 router.use(fiscaliteRouter);
+router.use(reconciliationRouter);
 
 export default router;

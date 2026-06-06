@@ -41,6 +41,7 @@ import {
   GraduationCap,
   Wallet,
   Calculator,
+  GitMerge,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -209,6 +210,12 @@ const navItems = [
     href: "/fiscalite",
     label: "Fiscalité",
     icon: Calculator,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/reconciliation",
+    label: "Réconciliation",
+    icon: GitMerge,
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
