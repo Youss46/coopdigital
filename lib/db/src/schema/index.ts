@@ -33,3 +33,4 @@ export * from "./equipements";
 export * from "./previsions";
 export * from "./saas";
 export * from "./parcelles";
+export * from "./rse";

@@ -27,6 +27,10 @@ export const membresTable = pgTable("membres", {
   parcelleLat: numeric("parcelle_lat", { precision: 10, scale: 7 }),
   parcelleLng: numeric("parcelle_lng", { precision: 10, scale: 7 }),
 
+  // Données démographiques (RSE)
+  sexe:           text("sexe"),
+  dateNaissance:  date("date_naissance", { mode: "string" }),
+
   // Parts sociales & enrichissement GESTCOOP
   typeFournisseur: text("type_fournisseur"),
   section: text("section"),

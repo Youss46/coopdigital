@@ -93,6 +93,12 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
   },
   {
+    href: "/rse",
+    label: "RSE & Durabilité",
+    icon: Leaf,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
     href: "/stocks",
     label: "Stocks",
     icon: Warehouse,

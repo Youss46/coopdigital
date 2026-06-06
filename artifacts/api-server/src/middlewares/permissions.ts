@@ -230,6 +230,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     importer_zones:   ["pca", "directeur"],
   },
 
+  // MODULE RSE — RESPONSABILITÉ SOCIALE DES ENTREPRISES
+  rse: {
+    voir:                 ["pca", "directeur", "comptable", "auditeur"],
+    calculer:             ["pca", "directeur"],
+    enregistrer_formation:["pca", "directeur", "responsable_tracabilite"],
+    generer_rapport:      ["pca", "directeur", "comptable"],
+  },
+
   // MODULE M15 — PISTE D'AUDIT
   audit: {
     voir_journal:           ["pca", "directeur", "auditeur"],

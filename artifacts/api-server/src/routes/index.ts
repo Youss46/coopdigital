@@ -43,6 +43,7 @@ import equipementsRouter from "./equipements";
 import previsionsRouter from "./previsions";
 import terrainRouter from "./terrain";
 import parcellesRouter from "./parcelles";
+import rseRouter from "./rse";
 
 const router: IRouter = Router();
 
@@ -94,5 +95,6 @@ router.use(peseeRouter);
 router.use(equipementsRouter);
 router.use(previsionsRouter);
 router.use(parcellesRouter);
+router.use(rseRouter);
 
 export default router;
