@@ -6,6 +6,28 @@ import { eq } from "drizzle-orm";
 import { LoginBody } from "@workspace/api-zod";
 import * as auditService from "../services/auditService";
 
+export async function changerMotDePasse(req: Request, res: Response): Promise<void> {
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ erreur: "Non authentifié" }); return; }
+
+  const { nouveauMotDePasse } = req.body as { nouveauMotDePasse?: string };
+  if (!nouveauMotDePasse || nouveauMotDePasse.length < 8) {
+    res.status(400).json({ erreur: "Le nouveau mot de passe doit contenir au moins 8 caractères" });
+    return;
+  }
+
+  try {
+    const hash = await bcrypt.hash(nouveauMotDePasse, 10);
+    await db.update(usersTable)
+      .set({ passwordHash: hash, motDePasseTemporaire: false })
+      .where(eq(usersTable.id, userId));
+    res.json({ message: "Mot de passe modifié avec succès" });
+  } catch (err) {
+    req.log.error({ err }, "Erreur changement mot de passe");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 function extractIp(req: Request): string {
   const forwarded = req.headers["x-forwarded-for"];
   if (typeof forwarded === "string") return forwarded.split(",")[0]!.trim();
@@ -81,11 +103,12 @@ export async function login(req: Request, res: Response): Promise<void> {
     res.json({
       token,
       utilisateur: {
-        id:            user.id,
-        nom:           user.nom,
-        prenoms:       user.prenoms,
-        role:          user.role,
-        cooperativeId: user.cooperativeId ?? null,
+        id:                    user.id,
+        nom:                   user.nom,
+        prenoms:               user.prenoms,
+        role:                  user.role,
+        cooperativeId:         user.cooperativeId ?? null,
+        motDePasseTemporaire:  user.motDePasseTemporaire ?? false,
       },
     });
   } catch (err) {

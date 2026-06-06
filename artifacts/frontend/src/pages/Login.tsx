@@ -74,7 +74,11 @@ export default function Login() {
           role: data.utilisateur.role,
           cooperativeId: data.utilisateur.cooperativeId ?? null,
         });
-        navigate("/dashboard");
+        if (data.utilisateur.motDePasseTemporaire) {
+          navigate("/changer-mot-de-passe");
+        } else {
+          navigate("/dashboard");
+        }
       },
       onError: (err: unknown) => {
         const status = (err as { response?: { status?: number } })?.response?.status;

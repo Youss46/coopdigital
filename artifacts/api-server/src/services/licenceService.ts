@@ -661,8 +661,8 @@ export async function getCooperativeDetailM15(cooperativeId: number) {
 
   if (!coop) return null;
 
-  const licences = await db
-    .select({
+  const [licences, historique, nbMembresRow, nbUsersRow, pcaRow] = await Promise.all([
+    db.select({
       id: licencesTable.id,
       cleLicence: licencesTable.cleLicence,
       statut: licencesTable.statut,
@@ -674,13 +674,12 @@ export async function getCooperativeDetailM15(cooperativeId: number) {
       montantPayeFcfa: licencesTable.montantPayeFcfa,
       planNom: plansAbonnementTable.nom,
     })
-    .from(licencesTable)
-    .leftJoin(plansAbonnementTable, eq(licencesTable.planId, plansAbonnementTable.id))
-    .where(eq(licencesTable.cooperativeId, cooperativeId))
-    .orderBy(desc(licencesTable.createdAt));
+      .from(licencesTable)
+      .leftJoin(plansAbonnementTable, eq(licencesTable.planId, plansAbonnementTable.id))
+      .where(eq(licencesTable.cooperativeId, cooperativeId))
+      .orderBy(desc(licencesTable.createdAt)),
 
-  const historique = await db
-    .select({
+    db.select({
       id: historiqueLicencesTable.id,
       action: historiqueLicencesTable.action,
       ancienStatut: historiqueLicencesTable.ancienStatut,
@@ -689,21 +688,32 @@ export async function getCooperativeDetailM15(cooperativeId: number) {
       createdAt: historiqueLicencesTable.createdAt,
       effectuePar: m15UsersTable.nom,
     })
-    .from(historiqueLicencesTable)
-    .leftJoin(m15UsersTable, eq(historiqueLicencesTable.effectuePar, m15UsersTable.id))
-    .where(eq(historiqueLicencesTable.cooperativeId, cooperativeId))
-    .orderBy(desc(historiqueLicencesTable.createdAt))
-    .limit(50);
+      .from(historiqueLicencesTable)
+      .leftJoin(m15UsersTable, eq(historiqueLicencesTable.effectuePar, m15UsersTable.id))
+      .where(eq(historiqueLicencesTable.cooperativeId, cooperativeId))
+      .orderBy(desc(historiqueLicencesTable.createdAt))
+      .limit(50),
 
-  const [nbMembres] = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(membresTable)
-    .where(eq(membresTable.cooperativeId, cooperativeId));
+    db.select({ count: sql<number>`COUNT(*)` }).from(membresTable)
+      .where(eq(membresTable.cooperativeId, cooperativeId)),
 
-  const [nbUsers] = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(usersTable)
-    .where(eq(usersTable.cooperativeId, cooperativeId));
+    db.select({ count: sql<number>`COUNT(*)` }).from(usersTable)
+      .where(eq(usersTable.cooperativeId, cooperativeId)),
+
+    db.select({
+      id: usersTable.id,
+      nom: usersTable.nom,
+      prenoms: usersTable.prenoms,
+      email: usersTable.email,
+      telephone: usersTable.telephone,
+      actif: usersTable.actif,
+      motDePasseTemporaire: usersTable.motDePasseTemporaire,
+      createdAt: usersTable.createdAt,
+    })
+      .from(usersTable)
+      .where(and(eq(usersTable.cooperativeId, cooperativeId), eq(usersTable.role, "pca")))
+      .limit(1),
+  ]);
 
   const licenceCourante = licences[0] ?? null;
   const joursRestants = licenceCourante?.dateExpiration
@@ -715,11 +725,27 @@ export async function getCooperativeDetailM15(cooperativeId: number) {
     licenceCourante,
     joursRestants,
     historique,
+    pca: pcaRow[0] ?? null,
     stats: {
-      nbMembres: Number(nbMembres?.count ?? 0),
-      nbUsers: Number(nbUsers?.count ?? 0),
+      nbMembres: Number(nbMembresRow[0]?.count ?? 0),
+      nbUsers: Number(nbUsersRow[0]?.count ?? 0),
     },
   };
+}
+
+// ─── Génération mot de passe temporaire ──────────────────────────────────────
+
+const MOTS_MDP = [
+  "Cacao", "Vert", "Forêt", "Soleil", "Fleuve", "Savane", "Palme",
+  "Abidjan", "Divo", "Gagnoa", "Yamousso", "Côte", "Agri", "Coopé",
+];
+
+export function genererMotDePasseTemp(): string {
+  const m1 = MOTS_MDP[crypto.randomBytes(1)[0]! % MOTS_MDP.length]!;
+  let m2: string;
+  do { m2 = MOTS_MDP[crypto.randomBytes(1)[0]! % MOTS_MDP.length]!; } while (m2 === m1);
+  const n = 1000 + (crypto.randomBytes(2).readUInt16BE(0) % 9000);
+  return `${m1}-${m2}-${n}`;
 }
 
 // ─── Créer coopérative ────────────────────────────────────────────────────────
@@ -761,18 +787,20 @@ export async function creerCooperativeM15(data: {
 
   if (!coop) throw new Error("Erreur création coopérative");
 
-  const motDePasse = `Coop${Math.random().toString(36).slice(2, 8).toUpperCase()}!`;
+  const motDePasse = genererMotDePasseTemp();
   const hash = await bcrypt.hash(motDePasse, 10);
+  const pcaEmail = data.pcaEmail ?? `pca.${coop.id}@${data.nom.toLowerCase().replace(/[^a-z0-9]/g, "")}.ci`;
 
   await db.insert(usersTable).values({
     cooperativeId: coop.id,
     nom: data.pcaNom,
     prenoms: data.pcaPrenoms,
-    email: data.pcaEmail ?? `pca.${coop.id}@${data.nom.toLowerCase().replace(/\s+/g, "")}.ci`,
+    email: pcaEmail,
     telephone: data.pcaTelephone,
     passwordHash: hash,
     role: "pca",
     actif: true,
+    motDePasseTemporaire: true,
   });
 
   const cleLicence = await genererCleLicence();
@@ -827,11 +855,20 @@ export async function creerCooperativeM15(data: {
     effectuePar: m15UserId,
   });
 
+  let smsEnvoye = false;
+  const smsMessage =
+    `Bonjour, votre espace CoopDigital est prêt !\n` +
+    `Coopérative : ${data.nom}\n` +
+    `Lien : coopdigital.m15-edutech.ci\n` +
+    `Email : ${pcaEmail}\n` +
+    `Mot de passe : ${motDePasse}\n` +
+    `Licence : ${cleLicence}\n` +
+    `⚠️ Changez votre mot de passe à la 1ère connexion.\n` +
+    `Support : 0714174082 — M15 Tech`;
+
   if (data.pcaTelephone) {
-    await sendSMS(
-      data.pcaTelephone,
-      `Bienvenue sur CoopDigital ! ${data.nom}\nVotre clé de licence : ${cleLicence}\nEmail : ${data.pcaEmail ?? ""}\nMot de passe provisoire : ${motDePasse}\nM15 Tech — 0714174082`
-    );
+    const result = await sendSMS(data.pcaTelephone, smsMessage);
+    smsEnvoye = result.succes;
   }
 
   return {
@@ -839,7 +876,82 @@ export async function creerCooperativeM15(data: {
     licence,
     cleLicence,
     dateExpiration: dateExpiration ?? null,
+    motdepasse_clair: motDePasse,
+    sms_envoye: smsEnvoye,
+    pcaEmail,
+    pcaTelephone: data.pcaTelephone,
   };
+}
+
+// ─── Réinitialisation mot de passe PCA ───────────────────────────────────────
+
+export async function resetMotDePassePCA(cooperativeId: number) {
+  const [pca] = await db
+    .select()
+    .from(usersTable)
+    .where(and(eq(usersTable.cooperativeId, cooperativeId), eq(usersTable.role, "pca")))
+    .limit(1);
+
+  if (!pca) throw new Error("Aucun PCA trouvé pour cette coopérative");
+
+  const motDePasse = genererMotDePasseTemp();
+  const hash = await bcrypt.hash(motDePasse, 10);
+
+  await db.update(usersTable)
+    .set({ passwordHash: hash, motDePasseTemporaire: true })
+    .where(eq(usersTable.id, pca.id));
+
+  let smsEnvoye = false;
+  if (pca.telephone) {
+    const smsMessage =
+      `Votre mot de passe CoopDigital a été réinitialisé par M15 Tech.\n` +
+      `Nouveau mot de passe : ${motDePasse}\n` +
+      `Changez-le à votre prochaine connexion.\n` +
+      `Support : 0714174082`;
+    const result = await sendSMS(pca.telephone, smsMessage);
+    smsEnvoye = result.succes;
+  }
+
+  return {
+    motdepasse_clair: motDePasse,
+    telephone: pca.telephone ?? null,
+    email: pca.email,
+    sms_envoye: smsEnvoye,
+  };
+}
+
+// ─── Mise à jour infos PCA ────────────────────────────────────────────────────
+
+export async function updatePcaInfo(cooperativeId: number, data: {
+  nom?: string; prenoms?: string; telephone?: string; email?: string;
+}) {
+  const [pca] = await db
+    .select()
+    .from(usersTable)
+    .where(and(eq(usersTable.cooperativeId, cooperativeId), eq(usersTable.role, "pca")))
+    .limit(1);
+
+  if (!pca) throw new Error("Aucun PCA trouvé pour cette coopérative");
+
+  const ancienTel = pca.telephone;
+
+  const [updated] = await db.update(usersTable)
+    .set({
+      ...(data.nom && { nom: data.nom }),
+      ...(data.prenoms && { prenoms: data.prenoms }),
+      ...(data.telephone && { telephone: data.telephone }),
+      ...(data.email && { email: data.email }),
+    })
+    .where(eq(usersTable.id, pca.id))
+    .returning();
+
+  if (data.telephone && data.telephone !== ancienTel) {
+    await sendSMS(data.telephone,
+      `Votre numéro de téléphone CoopDigital a été mis à jour. Support : 0714174082 — M15 Tech`
+    );
+  }
+
+  return updated;
 }
 
 // ─── Initialisation des CRONs ─────────────────────────────────────────────────

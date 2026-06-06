@@ -4,18 +4,22 @@ import Layout from "@/components/Layout";
 import {
   fetchCooperative, fetchPlans, renouvelerLicence, suspendreCooperative,
   reactiverCooperative, supprimerCooperative, toggleRenouvellementAuto,
+  resetPasswordPca, updatePca,
   formatDate, formatFcfa, statutColor, joursColor,
   type CoopDetail as CoopDetailType, type Plan,
 } from "@/lib/api";
 import {
   Loader2, AlertCircle, ArrowLeft, CheckCircle2, PauseCircle, XCircle,
   RefreshCw, Trash2, RotateCcw, Clock, History, BarChart3, FileKey,
+  User, KeyRound, Copy, Check, ShieldAlert, Pencil, Phone, Mail,
 } from "lucide-react";
 
-type Tab = "licence" | "stats" | "historique";
+type Tab = "licence" | "pca" | "stats" | "historique";
 
 const DUREES = [1, 2, 3, 5] as const;
 type Duree = 1 | 2 | 3 | 5;
+
+const inputCls = "w-full px-3 py-2.5 border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -25,6 +29,16 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
         {children}
       </div>
     </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button onClick={() => { void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+      className="p-1.5 rounded-md hover:bg-muted" title="Copier">
+      {copied ? <Check size={13} className="text-green-600" /> : <Copy size={13} className="text-muted-foreground" />}
+    </button>
   );
 }
 
@@ -41,6 +55,8 @@ export default function CoopDetail() {
   const [showRenouveler, setShowRenouveler] = useState(false);
   const [showSuspendre, setShowSuspendre] = useState(false);
   const [showSupprimer, setShowSupprimer] = useState(false);
+  const [showResetPca, setShowResetPca] = useState(false);
+  const [showEditPca, setShowEditPca] = useState(false);
 
   const [renouvDuree, setRenouvDuree] = useState<Duree>(1);
   const [renouvMontant, setRenouvMontant] = useState("");
@@ -52,6 +68,15 @@ export default function CoopDetail() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
 
+  // Reset PCA result
+  const [resetResult, setResetResult] = useState<{ motdepasse_clair: string; email: string; sms_envoye: boolean; telephone: string | null } | null>(null);
+
+  // Edit PCA form
+  const [editNom, setEditNom] = useState("");
+  const [editPrenoms, setEditPrenoms] = useState("");
+  const [editTel, setEditTel] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+
   async function load() {
     setLoading(true); setError("");
     try {
@@ -62,6 +87,16 @@ export default function CoopDetail() {
   }
 
   useEffect(() => { void load(); }, [id]);
+
+  function openEditPca() {
+    if (!data?.pca) return;
+    setEditNom(data.pca.nom);
+    setEditPrenoms(data.pca.prenoms);
+    setEditTel(data.pca.telephone ?? "");
+    setEditEmail(data.pca.email);
+    setActionError("");
+    setShowEditPca(true);
+  }
 
   async function doRenouveler() {
     if (!data?.licenceCourante) return;
@@ -106,9 +141,28 @@ export default function CoopDetail() {
     finally { setActionLoading(false); }
   }
 
-  const inputCls = "w-full px-3 py-2.5 border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+  async function doResetPca() {
+    setActionLoading(true); setActionError("");
+    try {
+      const res = await resetPasswordPca(id);
+      setResetResult(res);
+    } catch (e) { setActionError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setActionLoading(false); }
+  }
+
+  async function doUpdatePca() {
+    setActionLoading(true); setActionError("");
+    try {
+      await updatePca(id, { nom: editNom, prenoms: editPrenoms, telephone: editTel, email: editEmail });
+      setShowEditPca(false);
+      await load();
+    } catch (e) { setActionError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setActionLoading(false); }
+  }
+
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: "licence", label: "Licence", icon: FileKey },
+    { id: "pca", label: "PCA", icon: User },
     { id: "stats", label: "Statistiques", icon: BarChart3 },
     { id: "historique", label: "Historique", icon: History },
   ];
@@ -187,37 +241,113 @@ export default function CoopDetail() {
             {tab === "licence" && (
               <div className="space-y-4">
                 {data.licenceCourante ? (
-                  <>
-                    <div className="bg-card border rounded-xl p-5 grid grid-cols-2 gap-4 text-sm">
-                      <div><span className="text-muted-foreground">Plan</span><div className="font-semibold mt-0.5">{data.licenceCourante.planNom ?? "—"}</div></div>
-                      <div><span className="text-muted-foreground">Clé de licence</span><div className="font-mono text-xs mt-0.5 bg-muted px-2 py-1 rounded">{data.licenceCourante.cleLicence}</div></div>
-                      <div><span className="text-muted-foreground">Activation</span><div className="font-medium mt-0.5">{formatDate(data.licenceCourante.dateActivation)}</div></div>
-                      <div><span className="text-muted-foreground">Expiration</span>
-                        <div className={`font-medium mt-0.5 ${joursColor(data.joursRestants)}`}>
-                          {formatDate(data.licenceCourante.dateExpiration)}
-                          {data.joursRestants !== null && (
-                            <span className="ml-1 text-xs">({data.joursRestants <= 0 ? "expirée" : `J-${data.joursRestants}`})</span>
-                          )}
-                        </div>
-                      </div>
-                      <div><span className="text-muted-foreground">Durée</span><div className="font-medium mt-0.5">{data.licenceCourante.dureeAns} an{data.licenceCourante.dureeAns > 1 ? "s" : ""}</div></div>
-                      <div>
-                        <span className="text-muted-foreground">Renouvellement auto</span>
-                        <div className="flex items-center gap-2 mt-1">
-                          <button onClick={() => doToggleAuto(!data.licenceCourante!.renouvellementAuto)} disabled={actionLoading}
-                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${data.licenceCourante.renouvellementAuto ? "bg-primary" : "bg-muted-foreground/30"}`}>
-                            <span className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow transition-transform ${data.licenceCourante.renouvellementAuto ? "translate-x-4" : "translate-x-0"}`} />
-                          </button>
-                          <span className="text-xs text-muted-foreground">{data.licenceCourante.renouvellementAuto ? "Activé" : "Désactivé"}</span>
-                        </div>
+                  <div className="bg-card border rounded-xl p-5 grid grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-muted-foreground">Plan</span><div className="font-semibold mt-0.5">{data.licenceCourante.planNom ?? "—"}</div></div>
+                    <div><span className="text-muted-foreground">Clé de licence</span><div className="font-mono text-xs mt-0.5 bg-muted px-2 py-1 rounded">{data.licenceCourante.cleLicence}</div></div>
+                    <div><span className="text-muted-foreground">Activation</span><div className="font-medium mt-0.5">{formatDate(data.licenceCourante.dateActivation)}</div></div>
+                    <div><span className="text-muted-foreground">Expiration</span>
+                      <div className={`font-medium mt-0.5 ${joursColor(data.joursRestants)}`}>
+                        {formatDate(data.licenceCourante.dateExpiration)}
+                        {data.joursRestants !== null && (
+                          <span className="ml-1 text-xs">({data.joursRestants <= 0 ? "expirée" : `J-${data.joursRestants}`})</span>
+                        )}
                       </div>
                     </div>
-                  </>
+                    <div><span className="text-muted-foreground">Durée</span><div className="font-medium mt-0.5">{data.licenceCourante.dureeAns} an{data.licenceCourante.dureeAns > 1 ? "s" : ""}</div></div>
+                    <div>
+                      <span className="text-muted-foreground">Renouvellement auto</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <button onClick={() => doToggleAuto(!data.licenceCourante!.renouvellementAuto)} disabled={actionLoading}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${data.licenceCourante.renouvellementAuto ? "bg-primary" : "bg-muted-foreground/30"}`}>
+                          <span className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow transition-transform ${data.licenceCourante.renouvellementAuto ? "translate-x-4" : "translate-x-0"}`} />
+                        </button>
+                        <span className="text-xs text-muted-foreground">{data.licenceCourante.renouvellementAuto ? "Activé" : "Désactivé"}</span>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="bg-card border rounded-xl p-8 text-center text-muted-foreground">
                     <XCircle size={32} className="mx-auto mb-3 opacity-30" />
                     <div className="font-medium">Aucune licence active</div>
                     <div className="text-sm mt-1">Cette coopérative n'a pas de licence en cours.</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PCA Tab */}
+            {tab === "pca" && (
+              <div className="space-y-4">
+                {data.pca ? (
+                  <>
+                    <div className="bg-card border rounded-xl p-5">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
+                            <User size={20} className="text-primary" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-base">{data.pca.prenoms} {data.pca.nom}</div>
+                            <div className="text-xs text-muted-foreground">PCA / Directeur de coopérative</div>
+                          </div>
+                        </div>
+                        <button onClick={openEditPca}
+                          className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-muted">
+                          <Pencil size={13} /> Modifier
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Mail size={11} /> Email</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium">{data.pca.email}</span>
+                            <CopyButton text={data.pca.email} />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Phone size={11} /> Téléphone</div>
+                          <div className="font-medium">{data.pca.telephone ?? "—"}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Statut compte</div>
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${data.pca.actif ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                            {data.pca.actif ? "Actif" : "Inactif"}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Mot de passe</div>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${data.pca.motDePasseTemporaire ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}`}>
+                            {data.pca.motDePasseTemporaire ? <><ShieldAlert size={10} /> Temporaire (non changé)</> : <><CheckCircle2 size={10} /> Personnel</>}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Compte créé le</div>
+                          <div className="font-medium">{formatDate(data.pca.createdAt)}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Reset password */}
+                    <div className="bg-card border rounded-xl p-5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="font-semibold text-sm mb-0.5 flex items-center gap-2"><KeyRound size={14} /> Réinitialisation du mot de passe</div>
+                          <div className="text-xs text-muted-foreground">Génère un nouveau mot de passe temporaire et l'envoie par SMS au PCA.</div>
+                        </div>
+                        <button
+                          onClick={() => { setShowResetPca(true); setResetResult(null); setActionError(""); }}
+                          className="flex items-center gap-1.5 px-3 py-2 border border-orange-200 text-orange-700 rounded-lg text-sm hover:bg-orange-50 shrink-0 ml-4">
+                          <KeyRound size={13} /> Réinitialiser
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="bg-card border rounded-xl p-8 text-center text-muted-foreground">
+                    <User size={32} className="mx-auto mb-3 opacity-30" />
+                    <div className="font-medium">Aucun compte PCA</div>
+                    <div className="text-sm mt-1">Ce compte sera créé lors de l'activation de la licence.</div>
                   </div>
                 )}
               </div>
@@ -365,6 +495,102 @@ export default function CoopDetail() {
               <button onClick={doSupprimer} disabled={actionLoading || confirSupp !== "SUPPRIMER" || !motifSupp}
                 className="flex-1 py-2.5 bg-destructive text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
                 {actionLoading && <Loader2 size={14} className="animate-spin" />} Supprimer définitivement
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal Reset Mot de passe PCA */}
+      {showResetPca && (
+        <Modal title="Réinitialiser le mot de passe PCA" onClose={() => { if (!resetResult) setShowResetPca(false); }}>
+          {resetResult ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-green-700 font-semibold">
+                <CheckCircle2 size={18} /> Mot de passe réinitialisé avec succès
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Nouveau mot de passe temporaire</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 font-mono text-sm bg-yellow-50 border border-yellow-200 text-yellow-900 px-3 py-2 rounded-lg font-bold tracking-wider">
+                    {resetResult.motdepasse_clair}
+                  </code>
+                  <CopyButton text={resetResult.motdepasse_clair} />
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Email du PCA</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-sm bg-muted px-3 py-2 rounded-lg">{resetResult.email}</code>
+                  <CopyButton text={resetResult.email} />
+                </div>
+              </div>
+              <div className={`text-xs rounded-lg px-3 py-2 flex items-center gap-2 ${resetResult.sms_envoye ? "bg-green-50 text-green-800" : "bg-yellow-50 text-yellow-800"}`}>
+                {resetResult.sms_envoye
+                  ? `✓ SMS envoyé au ${resetResult.telephone}`
+                  : "⚠️ SMS non envoyé — communiquer le mot de passe manuellement"}
+              </div>
+              <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+                ⚠️ Ce mot de passe ne sera plus affiché après fermeture.
+              </div>
+              <button onClick={() => { setShowResetPca(false); setResetResult(null); void load(); }}
+                className="w-full py-2.5 bg-primary text-white rounded-lg text-sm font-medium">
+                Fermer
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Un nouveau mot de passe temporaire sera généré et envoyé par SMS au numéro du PCA.
+                Le PCA sera invité à le changer à sa prochaine connexion.
+              </p>
+              {data?.pca?.telephone && (
+                <div className="bg-muted/50 rounded-lg px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">SMS envoyé à : </span>
+                  <span className="font-medium">{data.pca.telephone}</span>
+                </div>
+              )}
+              {actionError && <div className="text-destructive text-sm flex items-center gap-1"><AlertCircle size={14} /> {actionError}</div>}
+              <div className="flex gap-3">
+                <button onClick={() => setShowResetPca(false)} className="flex-1 py-2.5 border rounded-lg text-sm">Annuler</button>
+                <button onClick={doResetPca} disabled={actionLoading}
+                  className="flex-1 py-2.5 bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
+                  {actionLoading && <Loader2 size={14} className="animate-spin" />} Réinitialiser
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* Modal Modifier PCA */}
+      {showEditPca && (
+        <Modal title="Modifier les informations du PCA" onClose={() => setShowEditPca(false)}>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Nom</label>
+                <input value={editNom} onChange={(e) => setEditNom(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Prénoms</label>
+                <input value={editPrenoms} onChange={(e) => setEditPrenoms(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Téléphone</label>
+              <input value={editTel} onChange={(e) => setEditTel(e.target.value)} className={inputCls} placeholder="+225 07 XX XX XX XX" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Email de connexion</label>
+              <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className={inputCls} type="email" />
+            </div>
+            {actionError && <div className="text-destructive text-sm flex items-center gap-1"><AlertCircle size={14} /> {actionError}</div>}
+            <div className="flex gap-3">
+              <button onClick={() => setShowEditPca(false)} className="flex-1 py-2.5 border rounded-lg text-sm">Annuler</button>
+              <button onClick={doUpdatePca} disabled={actionLoading}
+                className="flex-1 py-2.5 bg-primary text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
+                {actionLoading && <Loader2 size={14} className="animate-spin" />} Enregistrer
               </button>
             </div>
           </div>

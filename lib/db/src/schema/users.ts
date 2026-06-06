@@ -26,6 +26,7 @@ export const usersTable = pgTable("users", {
   role: varchar("role", { length: 30 }).$type<UserRole>().notNull().default("agent_terrain"),
   section: text("section"),
   actif: boolean("actif").notNull().default(true),
+  motDePasseTemporaire: boolean("mot_de_passe_temporaire").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

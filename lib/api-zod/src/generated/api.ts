@@ -31,7 +31,8 @@ export const LoginResponse = zod.object({
   "nom": zod.string(),
   "prenoms": zod.string(),
   "role": zod.string(),
-  "cooperativeId": zod.number().nullish()
+  "cooperativeId": zod.number().nullish(),
+  "motDePasseTemporaire": zod.boolean().optional()
 })
 })
 

@@ -17,6 +17,8 @@ import {
   reactiverCooperativeHandler,
   supprimerCooperativeHandler,
   getHistoriqueLicenceHandler,
+  resetPasswordPcaHandler,
+  updatePcaHandler,
 } from "../controllers/m15Controller.js";
 import {
   tousLesTicketsM15Handler,
@@ -50,6 +52,8 @@ router.get("/m15/licences/:id/historique", getHistoriqueLicenceHandler);
 
 router.put("/m15/cooperatives/:id/suspendre", requireM15Role("superadmin", "admin"), suspendreCooperativeHandler);
 router.put("/m15/cooperatives/:id/reactiver", requireM15Role("superadmin", "admin"), reactiverCooperativeHandler);
+router.post("/m15/cooperatives/:id/reset-password-pca", requireM15Role("superadmin", "admin"), resetPasswordPcaHandler);
+router.put("/m15/cooperatives/:id/pca", requireM15Role("superadmin", "admin"), updatePcaHandler);
 router.delete("/m15/cooperatives/:id", requireM15Role("superadmin"), supprimerCooperativeHandler);
 
 // ─── Support tickets (vue M15) ────────────────────────────────────────────────

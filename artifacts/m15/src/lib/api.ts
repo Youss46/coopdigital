@@ -96,6 +96,11 @@ export async function fetchCooperatives(): Promise<CoopItem[]> {
   return request<CoopItem[]>("/m15/cooperatives");
 }
 
+export interface PcaInfo {
+  id: number; nom: string; prenoms: string; email: string;
+  telephone: string | null; actif: boolean; motDePasseTemporaire: boolean; createdAt: string;
+}
+
 export interface CoopDetail {
   cooperative: { id: number; nom: string; ville: string; region: string; createdAt: string };
   licenceCourante: LicenceSummary | null;
@@ -104,11 +109,22 @@ export interface CoopDetail {
     id: number; action: string; ancienStatut: string | null; nouveauStatut: string | null;
     details: Record<string, unknown> | null; createdAt: string; effectuePar: string | null;
   }>;
+  pca: PcaInfo | null;
   stats: { nbMembres: number; nbUsers: number };
 }
 
 export async function fetchCooperative(id: number): Promise<CoopDetail> {
   return request<CoopDetail>(`/m15/cooperatives/${id}`);
+}
+
+export interface CreationCoopResult {
+  cooperative: CoopDetail["cooperative"];
+  cleLicence: string;
+  dateExpiration: string | null;
+  motdepasse_clair: string;
+  sms_envoye: boolean;
+  pcaEmail: string;
+  pcaTelephone: string;
 }
 
 export async function createCooperative(data: {
@@ -117,9 +133,24 @@ export async function createCooperative(data: {
   renouvellementAuto?: boolean; trialActif?: boolean; dureeTrialJours?: number;
   montantPaye?: number; modePaiement?: string; referencePaiement?: string; notesInternes?: string;
   pcaNom: string; pcaPrenoms: string; pcaTelephone: string; pcaEmail?: string;
-}) {
-  return request<{ cooperative: CoopDetail["cooperative"]; cleLicence: string; dateExpiration: string | null }>("/m15/cooperatives", {
+}): Promise<CreationCoopResult> {
+  return request<CreationCoopResult>("/m15/cooperatives", {
     method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function resetPasswordPca(coopId: number): Promise<{
+  motdepasse_clair: string; telephone: string | null; email: string; sms_envoye: boolean;
+}> {
+  return request(`/m15/cooperatives/${coopId}/reset-password-pca`, { method: "POST", body: "{}" });
+}
+
+export async function updatePca(coopId: number, data: {
+  nom?: string; prenoms?: string; telephone?: string; email?: string;
+}): Promise<{ id: number; nom: string; prenoms: string; email: string; telephone: string | null }> {
+  return request(`/m15/cooperatives/${coopId}/pca`, {
+    method: "PUT",
     body: JSON.stringify(data),
   });
 }

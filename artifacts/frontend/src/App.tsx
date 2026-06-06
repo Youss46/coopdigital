@@ -48,6 +48,7 @@ import CaissePage from "@/pages/CaissePage";
 import FiscalitePage from "@/pages/FiscalitePage";
 import ReconciliationPage from "@/pages/ReconciliationPage";
 import InvestissementsPage from "@/pages/InvestissementsPage";
+import ChangerMotDePassePage from "@/pages/ChangerMotDePassePage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -73,6 +74,7 @@ function AppRoutes() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/changer-mot-de-passe" component={ChangerMotDePassePage} />
       <Route path="/">
         {estConnecte ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
       </Route>

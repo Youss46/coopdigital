@@ -4,6 +4,31 @@ import { db } from "@workspace/db";
 import { plansAbonnementTable, licencesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
+export async function resetPasswordPcaHandler(req: Request, res: Response): Promise<void> {
+  const id = parseInt(String(req.params["id"]), 10);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    const result = await licenceService.resetMotDePassePCA(id);
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "Erreur reset mot de passe PCA");
+    res.status(400).json({ erreur: (err as Error).message });
+  }
+}
+
+export async function updatePcaHandler(req: Request, res: Response): Promise<void> {
+  const id = parseInt(String(req.params["id"]), 10);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  const body = req.body as { nom?: string; prenoms?: string; telephone?: string; email?: string };
+  try {
+    const result = await licenceService.updatePcaInfo(id, body);
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "Erreur mise à jour PCA");
+    res.status(400).json({ erreur: (err as Error).message });
+  }
+}
+
 function m15UserId(req: Request): number {
   return req.m15User!.id;
 }

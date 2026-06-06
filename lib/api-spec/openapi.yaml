@@ -6224,6 +6224,8 @@ components:
           type: string
         cooperativeId:
           type: ["integer", "null"]
+        motDePasseTemporaire:
+          type: boolean
 
     Membre:
       type: object

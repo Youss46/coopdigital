@@ -13,4 +13,5 @@ export interface UserProfile {
   role: string;
   /** @nullable */
   cooperativeId?: number | null;
+  motDePasseTemporaire?: boolean;
 }
