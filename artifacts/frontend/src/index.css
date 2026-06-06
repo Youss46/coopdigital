@@ -300,6 +300,15 @@
  * Even without handling focused or not, this is six possible combinations that
  * need to be distinguished from eachother visually.
  */
+@keyframes progressBar {
+  from { width: 0% }
+  to   { width: 100% }
+}
+
+@theme inline {
+  --animate-progress-bar: progressBar 5s linear forwards;
+}
+
 @layer utilities {
 
   /* Hide ugly search cancel button in Chrome until we can style it properly */
