@@ -31,18 +31,18 @@ router.get("/dons/rapport-pdf", checkPermission("dons", "rapport_ag"), getRappor
 // Dons d'un membre
 router.get("/dons/membre/:membre_id", checkPermission("dons", "voir"), getDonsMembreHandler);
 
-// CRUD dons
-router.get("/dons",            checkPermission("dons", "voir"),    listerDonsHandler);
-router.post("/dons",           checkPermission("dons", "creer"),   creerDonHandler);
-router.get("/dons/:id",        checkPermission("dons", "voir"),    getDonHandler);
-router.put("/dons/:id",        checkPermission("dons", "modifier"), modifierDonHandler);
-router.put("/dons/:id/valider", checkPermission("dons", "valider"), validerDonHandler);
-router.put("/dons/:id/annuler", checkPermission("dons", "annuler"), annulerDonHandler);
-router.get("/dons/:id/pv-pdf", checkPermission("dons", "generer_pv"), getPVRemiseHandler);
-
-// Programmes
-router.get("/dons/programmes",         checkPermission("dons", "voir"),             listerProgrammesHandler);
-router.post("/dons/programmes",        checkPermission("dons", "gerer_programmes"), creerProgrammeHandler);
+// Programmes (avant /:id pour éviter la capture paramétrée)
+router.get("/dons/programmes",              checkPermission("dons", "voir"),             listerProgrammesHandler);
+router.post("/dons/programmes",             checkPermission("dons", "gerer_programmes"), creerProgrammeHandler);
 router.put("/dons/programmes/:id/cloturer", checkPermission("dons", "gerer_programmes"), cloturerProgrammeHandler);
+
+// CRUD dons
+router.get("/dons",             checkPermission("dons", "voir"),      listerDonsHandler);
+router.post("/dons",            checkPermission("dons", "creer"),     creerDonHandler);
+router.get("/dons/:id",         checkPermission("dons", "voir"),      getDonHandler);
+router.put("/dons/:id",         checkPermission("dons", "modifier"),  modifierDonHandler);
+router.put("/dons/:id/valider", checkPermission("dons", "valider"),   validerDonHandler);
+router.put("/dons/:id/annuler", checkPermission("dons", "annuler"),   annulerDonHandler);
+router.get("/dons/:id/pv-pdf",  checkPermission("dons", "generer_pv"), getPVRemiseHandler);
 
 export default router;

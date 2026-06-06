@@ -105,7 +105,6 @@ export async function creerDon(payload: CreerDonPayload) {
         quantite: String(l.quantite),
         unite: l.unite,
         valeurUnitaireFcfa: String(l.valeurUnitaireFcfa),
-        valeurTotaleFcfa: String(l.quantite * l.valeurUnitaireFcfa),
       })),
     );
     await calculerValeurNature(don.id);
@@ -239,7 +238,6 @@ export async function modifierDon(donId: number, payload: Partial<CreerDonPayloa
         quantite: String(l.quantite),
         unite: l.unite,
         valeurUnitaireFcfa: String(l.valeurUnitaireFcfa),
-        valeurTotaleFcfa: String(l.quantite * l.valeurUnitaireFcfa),
       })),
     );
     await calculerValeurNature(donId);

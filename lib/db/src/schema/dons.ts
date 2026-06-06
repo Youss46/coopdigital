@@ -1,6 +1,7 @@
 import {
   pgTable, serial, integer, varchar, text, date, timestamp, boolean, numeric,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const categoriesDonsTable = pgTable("categories_dons", {
   id: serial("id").primaryKey(),
@@ -71,7 +72,9 @@ export const lignesDonNatureTable = pgTable("lignes_don_nature", {
   quantite: numeric("quantite").notNull(),
   unite: varchar("unite", { length: 50 }).notNull(),
   valeurUnitaireFcfa: numeric("valeur_unitaire_fcfa").notNull(),
-  valeurTotaleFcfa: numeric("valeur_totale_fcfa").notNull(),
+  valeurTotaleFcfa: numeric("valeur_totale_fcfa").generatedAlwaysAs(
+    sql`quantite * valeur_unitaire_fcfa`,
+  ),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

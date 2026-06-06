@@ -22,7 +22,7 @@ const router = Router();
 
 router.post("/m15/auth/login", loginM15Handler);
 
-router.use(m15AuthMiddleware);
+router.use("/m15", m15AuthMiddleware);
 
 router.get("/m15/plans", getPlansHandler);
 
