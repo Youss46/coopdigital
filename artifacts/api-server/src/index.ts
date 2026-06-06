@@ -30,6 +30,10 @@ app.listen(port, (err) => {
 // CRON : vérification quotidienne des échéances en retard (chaque jour à 06h00)
 // CRON budget : sync réalisé toutes les nuits à 02h00
 import { syncTousLesBudgets } from "./services/budgetService";
+import { initLicenceCrons } from "./services/licenceService";
+
+initLicenceCrons();
+
 cron.schedule("0 2 * * *", () => {
   syncTousLesBudgets().catch((err) => logger.error({ err }, "Erreur cron syncBudget"));
 });

@@ -1,6 +1,10 @@
 import { Router, type IRouter } from "express";
+import { authMiddleware } from "../middlewares/auth";
+import { tenantGuard } from "../middlewares/tenantGuard";
 import healthRouter from "./health";
 import authRouter from "./auth";
+import m15Router from "./m15";
+import saasRouter from "./saas";
 import membresRouter from "./membres";
 import avancesRouter from "./avances";
 import livraisonsRouter from "./livraisons";
@@ -41,10 +45,18 @@ import terrainRouter from "./terrain";
 
 const router: IRouter = Router();
 
+// Routers publics / auth propre (avant le guard global)
 router.use(healthRouter);
 router.use(authRouter);
 router.use(portailRouter);
 router.use(terrainRouter);
+router.use(m15Router);
+router.use(saasRouter);
+
+// Guard global : auth + vérification licence pour toutes les routes coopérative
+router.use(authMiddleware);
+router.use(tenantGuard);
+
 router.use(membresRouter);
 router.use(avancesRouter);
 router.use(campagnesRouter);

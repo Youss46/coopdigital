@@ -387,6 +387,7 @@ export async function octroierAvance(
     soldeRestantFcfa: data.montantFcfa,
     motif: data.motif,
     statut: "en_cours",
+    dateOctroi: new Date().toISOString().slice(0, 10),
   }).returning();
 
   return { avanceId: avance?.id ?? 0 };

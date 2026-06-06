@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/m15/"
+title = "M15 Tech — Dashboard"
+version = "1.0.0"
+id = "artifacts/m15"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/m15/" ]
+localPort = 23492
+
+[services.development]
+run = "pnpm --filter @workspace/m15 run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/m15", "run", "build" ]
+publicDir = "artifacts/m15/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23492"
+BASE_PATH = "/m15/"
