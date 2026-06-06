@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { fetchPlans, createCooperative, formatFcfa, type Plan, type CreationCoopResult } from "@/lib/api";
-import { CheckCircle2, ChevronRight, Loader2, AlertCircle, Copy, Check, Printer, ArrowLeft, MessageSquare } from "lucide-react";
+import { CheckCircle2, ChevronRight, Loader2, AlertCircle, Copy, Check, Printer, ArrowLeft } from "lucide-react";
 
 const DUREES = [1, 2, 3, 5] as const;
 type Duree = 1 | 2 | 3 | 5;
@@ -28,13 +28,36 @@ function prix(plan: Plan, duree: Duree): number {
   return parseInt(map[duree] || "0");
 }
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button onClick={() => { void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-      className="p-1.5 rounded-md hover:bg-muted transition-colors" title="Copier">
-      {copied ? <Check size={13} className="text-green-600" /> : <Copy size={13} className="text-muted-foreground" />}
+    <button
+      onClick={() => { void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+      className="flex items-center gap-1.5 p-1.5 rounded-md hover:bg-muted transition-colors text-xs text-muted-foreground"
+      title="Copier"
+    >
+      {copied ? <Check size={13} className="text-green-600" /> : <Copy size={13} />}
+      {label && <span>{copied ? "Copié !" : label}</span>}
     </button>
+  );
+}
+
+function WhatsAppButton({ message }: { message: string }) {
+  const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
+      style={{ backgroundColor: "#25D366" }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+        <path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.558 4.118 1.532 5.845L.054 23.447a.5.5 0 0 0 .617.608l5.77-1.513A11.943 11.943 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.694-.528-5.218-1.443l-.374-.223-3.878 1.018 1.034-3.77-.244-.388A9.956 9.956 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+      </svg>
+      Partager via WhatsApp
+    </a>
   );
 }
 
@@ -47,6 +70,23 @@ function SuccessScreen({ result, coopNom, pcaNom, pcaPrenoms, isTrial, planNom, 
   planNom: string;
   duree: number;
 }) {
+  const whatsappMessage =
+    `Bonjour ${pcaPrenoms} ${pcaNom},\n\n` +
+    `Votre espace *CoopDigital* est prêt !\n\n` +
+    `🏢 *Coopérative :* ${coopNom}\n` +
+    `🔗 *Lien :* coopdigital.m15-edutech.ci\n` +
+    (result.pcaEmail ? `📧 *Email :* ${result.pcaEmail}\n` : "") +
+    (result.motdepasse_clair ? `🔑 *Mot de passe temporaire :* ${result.motdepasse_clair}\n` : "") +
+    `🎫 *Clé de licence :* ${result.cleLicence}\n\n` +
+    `⚠️ Changez votre mot de passe à la 1ère connexion.\n` +
+    `Support : 0714174082 — M15 Tech`;
+
+  const copyAll =
+    `Coopérative : ${coopNom}\n` +
+    `Email : ${result.pcaEmail ?? ""}\n` +
+    `Mot de passe : ${result.motdepasse_clair ?? ""}\n` +
+    `Clé de licence : ${result.cleLicence}`;
+
   return (
     <Layout>
       <div className="p-6 max-w-2xl mx-auto">
@@ -60,7 +100,10 @@ function SuccessScreen({ result, coopNom, pcaNom, pcaPrenoms, isTrial, planNom, 
 
         {/* Identifiants PCA */}
         <div className="bg-card border rounded-xl p-5 mb-4">
-          <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Identifiants PCA</div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Identifiants PCA</div>
+            <CopyButton text={copyAll} label="Tout copier" />
+          </div>
 
           <div className="mb-4">
             <div className="text-xs text-muted-foreground mb-1">PCA</div>
@@ -69,42 +112,25 @@ function SuccessScreen({ result, coopNom, pcaNom, pcaPrenoms, isTrial, planNom, 
 
           <div className="mb-4">
             <div className="text-xs text-muted-foreground mb-1">Email de connexion</div>
-            {result.pcaEmail ? (
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-sm font-mono bg-muted px-3 py-2 rounded-lg">{result.pcaEmail}</code>
-                <CopyButton text={result.pcaEmail} />
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground italic px-3 py-2 bg-muted rounded-lg">
-                Envoyé par SMS — vérifiez le téléphone du PCA
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-sm font-mono bg-muted px-3 py-2 rounded-lg">
+                {result.pcaEmail ?? <span className="text-muted-foreground italic">Non disponible</span>}
+              </code>
+              {result.pcaEmail && <CopyButton text={result.pcaEmail} />}
+            </div>
           </div>
 
-          <div className="mb-4">
+          <div className="mb-5">
             <div className="text-xs text-muted-foreground mb-1">Mot de passe temporaire</div>
-            {result.motdepasse_clair ? (
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-sm font-mono bg-yellow-50 border border-yellow-200 text-yellow-900 px-3 py-2 rounded-lg font-bold tracking-wider">
-                  {result.motdepasse_clair}
-                </code>
-                <CopyButton text={result.motdepasse_clair} />
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground italic px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                Généré et envoyé par SMS — vérifiez le téléphone du PCA
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-sm font-mono bg-yellow-50 border border-yellow-200 text-yellow-900 px-3 py-2 rounded-lg font-bold tracking-wider">
+                {result.motdepasse_clair ?? <span className="text-muted-foreground italic font-normal">Non disponible</span>}
+              </code>
+              {result.motdepasse_clair && <CopyButton text={result.motdepasse_clair} />}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
-            <AlertCircle size={12} />
-            {result.sms_envoye
-              ? `SMS envoyé au ${result.pcaTelephone ?? "PCA"}`
-              : result.pcaTelephone
-              ? "SMS non envoyé (simulé) · Le mot de passe ne sera pas affiché à nouveau"
-              : "Identifiants générés et transmis au PCA"}
-          </div>
+          <WhatsAppButton message={whatsappMessage} />
         </div>
 
         {/* Licence */}
@@ -404,11 +430,6 @@ export default function NouvelleCoop() {
                         <div className="flex justify-between"><span className="text-muted-foreground">Durée</span><span>{duree} an{duree > 1 ? "s" : ""}</span></div>
                       </>
                     )}
-                  </div>
-
-                  <div className="border rounded-lg p-3 bg-blue-50 border-blue-200 text-xs text-blue-800 flex items-start gap-2">
-                    <MessageSquare size={13} className="mt-0.5 shrink-0" />
-                    Un SMS avec les identifiants sera automatiquement envoyé au PCA après création.
                   </div>
 
                   {error && (

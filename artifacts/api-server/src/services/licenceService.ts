@@ -855,29 +855,12 @@ export async function creerCooperativeM15(data: {
     effectuePar: m15UserId,
   });
 
-  let smsEnvoye = false;
-  const smsMessage =
-    `Bonjour, votre espace CoopDigital est prêt !\n` +
-    `Coopérative : ${data.nom}\n` +
-    `Lien : coopdigital.m15-edutech.ci\n` +
-    `Email : ${pcaEmail}\n` +
-    `Mot de passe : ${motDePasse}\n` +
-    `Licence : ${cleLicence}\n` +
-    `⚠️ Changez votre mot de passe à la 1ère connexion.\n` +
-    `Support : 0714174082 — M15 Tech`;
-
-  if (data.pcaTelephone) {
-    const result = await sendSMS(data.pcaTelephone, smsMessage);
-    smsEnvoye = result.succes;
-  }
-
   return {
     cooperative: coop,
     licence,
     cleLicence,
     dateExpiration: dateExpiration ?? null,
     motdepasse_clair: motDePasse,
-    sms_envoye: smsEnvoye,
     pcaEmail,
     pcaTelephone: data.pcaTelephone,
   };
@@ -901,22 +884,10 @@ export async function resetMotDePassePCA(cooperativeId: number) {
     .set({ passwordHash: hash, motDePasseTemporaire: true })
     .where(eq(usersTable.id, pca.id));
 
-  let smsEnvoye = false;
-  if (pca.telephone) {
-    const smsMessage =
-      `Votre mot de passe CoopDigital a été réinitialisé par M15 Tech.\n` +
-      `Nouveau mot de passe : ${motDePasse}\n` +
-      `Changez-le à votre prochaine connexion.\n` +
-      `Support : 0714174082`;
-    const result = await sendSMS(pca.telephone, smsMessage);
-    smsEnvoye = result.succes;
-  }
-
   return {
     motdepasse_clair: motDePasse,
     telephone: pca.telephone ?? null,
     email: pca.email,
-    sms_envoye: smsEnvoye,
   };
 }
 
