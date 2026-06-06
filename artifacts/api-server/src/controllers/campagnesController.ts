@@ -8,11 +8,10 @@ import {
   cloturerCampagne as cloturerCampagneService,
   getComparaisonCampagnes,
 } from "../services/campagneService";
-import path from "path";
 import PDFDocument from "pdfkit";
+import { drawHeader, drawFooter } from "../services/pdfHeaderService";
 
 const COOP_ID = 1;
-const LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
 
 export async function getCampagneActive(req: Request, res: Response) {
   const campagne = await db.query.campagnesTable.findFirst({
@@ -166,12 +165,17 @@ export async function getBilanPdf(req: Request, res: Response) {
     `attachment; filename="bilan-campagne-${campagne.libelle.replace(/\s+/g, "-")}.pdf"`
   );
 
-  const doc = new PDFDocument({ margin: 50, size: "A4" });
-  doc.pipe(res);
+  const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+  const bilanChunks: Buffer[] = [];
+  const bilanEndPromise = new Promise<Buffer>((resolve, reject) => {
+    doc.on("data", (c: Buffer) => bilanChunks.push(c));
+    doc.on("end",  () => resolve(Buffer.concat(bilanChunks)));
+    doc.on("error", reject);
+  });
 
-  const VERT = "#16a34a";
-  const GRIS = "#6b7280";
-  const NOIR = "#111827";
+  const VERT  = "#16a34a";
+  const GRIS  = "#6b7280";
+  const NOIR  = "#111827";
   const ROUGE = "#dc2626";
 
   const fmt = (n: string | number | null | undefined) =>
@@ -181,14 +185,11 @@ export async function getBilanPdf(req: Request, res: Response) {
     return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
   };
 
-  const header = (page: string) => {
-    doc.rect(0, 0, doc.page.width, 70).fill(VERT);
-    try { doc.image(LOGO_PATH, 50, 12, { width: 46, height: 46 }); } catch (_) { /* logo facultatif */ }
-    doc.fillColor("white").fontSize(18).font("Helvetica-Bold")
-      .text("CoopDigital — Bilan de Campagne", 104, 18);
-    doc.fontSize(12).font("Helvetica")
-      .text(`${campagne.libelle} · ${page}`, 104, 44);
-    doc.fillColor(NOIR).moveDown(3);
+  const header = async (pageLabel: string) => {
+    await drawHeader(doc, COOP_ID, {
+      titre_document: "Bilan de Campagne",
+      reference: `${campagne.libelle} · ${pageLabel}`,
+    });
   };
 
   const kpiGrid = (items: { label: string; valeur: string; sous?: string }[], cols = 3) => {
@@ -221,7 +222,7 @@ export async function getBilanPdf(req: Request, res: Response) {
     doc.moveDown(0.5).fillColor(NOIR);
   };
 
-  header("Page 1/5 — Résumé Exécutif");
+  await header("Page 1/5 — Résumé Exécutif");
   kpiGrid([
     { label: "TONNAGE COLLECTÉ", valeur: `${fmt(bilan.tonnageTotalKg)} kg`, sous: `${fmt(bilan.nbLivraisons)} livraisons` },
     { label: "CA VENTES", valeur: `${fmt(bilan.caVentesFcfa)} FCFA`, sous: `${fmt(bilan.nbExportateurs)} exportateurs` },
@@ -247,7 +248,7 @@ export async function getBilanPdf(req: Request, res: Response) {
   }
 
   doc.addPage();
-  header("Page 2/5 — Production");
+  await header("Page 2/5 — Production");
   sectionTitle("Tonnage par type de fournisseur");
   kpiGrid([
     { label: "MEMBRES", valeur: `${fmt(bilan.tonnageMembresKg)} kg` },
@@ -262,7 +263,7 @@ export async function getBilanPdf(req: Request, res: Response) {
   doc.text(`Coût total d'achat : ${fmt(bilan.coutAchatTotalFcfa)} FCFA`);
 
   doc.addPage();
-  header("Page 3/5 — Ventes & Financier");
+  await header("Page 3/5 — Ventes & Financier");
   sectionTitle("Ventes aux exportateurs");
   kpiGrid([
     { label: "TONNAGE VENDU", valeur: `${fmt(bilan.tonnageVenduKg)} kg` },
@@ -288,7 +289,7 @@ export async function getBilanPdf(req: Request, res: Response) {
   doc.fillColor(NOIR);
 
   doc.addPage();
-  header("Page 4/5 — Avances & Social");
+  await header("Page 4/5 — Avances & Social");
   sectionTitle("Avances membres");
   kpiGrid([
     { label: "OCTROYÉES", valeur: `${fmt(bilan.avancesOctroYeesFcfa)} FCFA` },
@@ -307,7 +308,7 @@ export async function getBilanPdf(req: Request, res: Response) {
   ]);
 
   doc.addPage();
-  header("Page 5/5 — Résolutions & Perspectives");
+  await header("Page 5/5 — Résolutions & Perspectives");
   sectionTitle("Résumé de la campagne");
   doc.fontSize(10).font("Helvetica").fillColor(NOIR);
   doc.text(`Campagne : ${campagne.libelle}`);
@@ -319,7 +320,14 @@ export async function getBilanPdf(req: Request, res: Response) {
   doc.moveDown();
   doc.text(`Bilan généré le : ${new Date(bilan.dateGeneration ?? Date.now()).toLocaleString("fr-FR")}`);
 
+  const bilanRange = doc.bufferedPageRange();
+  for (let i = 0; i < bilanRange.count; i++) {
+    doc.switchToPage(i);
+    await drawFooter(doc, COOP_ID, i + 1, bilanRange.count);
+  }
   doc.end();
+  const bilanBuffer = await bilanEndPromise;
+  res.send(bilanBuffer);
   return;
 }
 

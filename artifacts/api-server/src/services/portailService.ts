@@ -11,9 +11,12 @@ import {
 } from "@workspace/db";
 import { eq, desc, and, sql, count } from "drizzle-orm";
 import path from "path";
+import fs from "fs";
 import PDFDocument from "pdfkit";
+import { getConfig } from "./configService";
 
-const LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
+const DEFAULT_LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
+const COOP_ID = 1;
 
 // ─── Code membre ─────────────────────────────────────────────────────────────
 
@@ -293,6 +296,9 @@ export async function generateRecuLivraison(membreId: number, livraisonId: numbe
 
   if (!liv) throw new Error("Livraison introuvable");
 
+  const coopConfig = await getConfig(COOP_ID);
+  const coopNom = coopConfig?.nomComplet ?? "CoopDigital";
+
   const doc = new PDFDocument({ size: "A5", margin: 30 });
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
@@ -301,13 +307,22 @@ export async function generateRecuLivraison(membreId: number, livraisonId: numbe
   const fmtDate = (d: string) => new Date(d).toLocaleDateString("fr-FR");
   const codeMembre = computeCodeMembre(liv.membreId, liv.dateAdhesion ?? "2025-01-01");
 
-  const VERT = "#1a4731";
+  const VERT = coopConfig?.couleurPrimaire || "#1a4731";
   const W = 419.53;
 
   doc.rect(0, 0, W, 45).fill(VERT);
-  try { doc.image(LOGO_PATH, 10, 5, { width: 35, height: 35 }); } catch (_) { /* logo facultatif */ }
+  try {
+    let logoBuffer: Buffer | null = null;
+    if (coopConfig?.logoUrl) {
+      try {
+        const resp = await fetch(`http://localhost:80${coopConfig.logoUrl}`);
+        if (resp.ok) logoBuffer = Buffer.from(await resp.arrayBuffer());
+      } catch (_) { /* logo coop inaccessible, utiliser défaut */ }
+    }
+    doc.image(logoBuffer ?? fs.readFileSync(DEFAULT_LOGO_PATH), 10, 5, { width: 35, height: 35 });
+  } catch (_) { /* logo facultatif */ }
   doc.fontSize(14).fillColor("white").font("Helvetica-Bold")
-    .text("CoopDigital", 52, 10);
+    .text(coopNom, 52, 10);
   doc.fontSize(9).fillColor("#d1fae5").font("Helvetica")
     .text("Reçu de livraison", 52, 28);
   doc.fillColor("black").moveDown(3);

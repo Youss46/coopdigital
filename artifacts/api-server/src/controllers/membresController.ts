@@ -1,13 +1,11 @@
 import { type Request, type Response } from "express";
-import path from "path";
 import PDFDocument from "pdfkit";
 
 import { db, membresTable, livraisonsTable, campagnesTable } from "@workspace/db";
 import { eq, and, or, ilike, sql, desc, notInArray, asc } from "drizzle-orm";
 import { CreateMembreBody, UpdateMembreBody } from "@workspace/api-zod";
 import { computeCodeMembre } from "../services/portailService";
-
-const LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
+import { drawHeader, drawFooter } from "../services/pdfHeaderService";
 
 function enrichMembre<T extends { id: number; dateAdhesion: string }>(m: T) {
   return { ...m, codeMembre: computeCodeMembre(m.id, m.dateAdhesion) };
@@ -192,21 +190,23 @@ export async function exportMembresPdf(req: Request, res: Response): Promise<voi
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    const doc = new PDFDocument({ margin: 50, size: "A4" });
-    doc.pipe(res);
+    const coopId = req.user?.cooperativeId ?? 1;
+    const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+    const pdfChunks: Buffer[] = [];
+    const pdfEndPromise = new Promise<Buffer>((resolve, reject) => {
+      doc.on("data", (c: Buffer) => pdfChunks.push(c));
+      doc.on("end",  () => resolve(Buffer.concat(pdfChunks)));
+      doc.on("error", reject);
+    });
 
     const VERT = "#1a4731";
     const GRIS = "#6b7280";
     const NOIR = "#111827";
 
-    // En-tête
-    doc.rect(0, 0, doc.page.width, 65).fill(VERT);
-    try { doc.image(LOGO_PATH, 50, 10, { width: 45, height: 45 }); } catch (_) { /* logo facultatif */ }
-    doc.fillColor("white").fontSize(16).font("Helvetica-Bold")
-      .text("CoopDigital — Liste des membres", 103, 18);
-    doc.fontSize(11).font("Helvetica")
-      .text(`${label} · Exporté le ${new Date().toLocaleDateString("fr-FR")}`, 103, 42);
-    doc.fillColor(NOIR).moveDown(3);
+    await drawHeader(doc, coopId, {
+      titre_document: "Liste des membres",
+      reference: `${label} · ${new Date().toLocaleDateString("fr-FR")}`,
+    });
 
     // Résumé
     const nbActifs = membres.filter((m) => m.statut === "actif").length;
@@ -260,16 +260,14 @@ export async function exportMembresPdf(req: Request, res: Response): Promise<voi
       doc.y += rowH;
     });
 
-    // Pied de page
-    doc.moveDown(1);
-    doc.moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke("#e5e7eb");
-    doc.moveDown(0.5);
-    doc.fillColor(GRIS).fontSize(8).font("Helvetica")
-      .text(`Document généré automatiquement par CoopDigital · ${membres.length} entrées`, 50, doc.y, {
-        align: "center", width: doc.page.width - 100,
-      });
-
+    const membresRange = doc.bufferedPageRange();
+    for (let i = 0; i < membresRange.count; i++) {
+      doc.switchToPage(i);
+      await drawFooter(doc, coopId, i + 1, membresRange.count);
+    }
     doc.end();
+    const pdfBuf = await pdfEndPromise;
+    res.send(pdfBuf);
   } catch (err) {
     req.log.error({ err }, "Erreur exportMembresPdf");
     if (!res.headersSent) res.status(500).json({ erreur: "Erreur interne du serveur" });

@@ -8,6 +8,7 @@ import {
   createDocumentOfficiel,
   deleteDocumentOfficiel,
 } from "../services/configService";
+import { invalidateLogoCache } from "../services/pdfHeaderService";
 import { ObjectStorageService } from "../lib/objectStorage";
 
 const objectStorageService = new ObjectStorageService();
@@ -113,6 +114,7 @@ export async function handleUploadLogo(req: Request, res: Response): Promise<voi
     const logoUrl = `/api/storage${objectPath}`;
 
     await updateLogoUrl(cooperativeId, userId, logoUrl);
+    invalidateLogoCache(cooperativeId);
 
     res.json({ uploadURL, objectPath, logo_url: logoUrl });
   } catch (err) {

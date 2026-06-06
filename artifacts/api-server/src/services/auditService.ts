@@ -1,14 +1,12 @@
 import { type Request } from "express";
 import crypto from "crypto";
-import path from "path";
 import PDFDocument from "pdfkit";
 
 import { db } from "@workspace/db";
 import { auditTrailTable, sessionsUtilisateursTable } from "@workspace/db";
 import { eq, and, gte, lte, desc, sql, type SQL } from "drizzle-orm";
 import { logger } from "../lib/logger";
-
-const LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
+import { drawHeader, drawFooter } from "./pdfHeaderService";
 
 const COOP_ID = 1;
 
@@ -282,21 +280,16 @@ export async function exportAuditPDF(
   const hashInput = `${contenu}|${timestamp}|${COOP_ID}`;
   const hash      = crypto.createHash("sha256").update(hashInput).digest("hex");
 
-  return new Promise((resolve, reject) => {
-    const doc    = new PDFDocument({ margin: 40, size: "A4" });
-    const chunks: Buffer[] = [];
+  const doc = new PDFDocument({ margin: 40, size: "A4", bufferPages: true });
+  const chunks: Buffer[] = [];
+  const endPromise = new Promise<Buffer>((resolve, reject) => {
     doc.on("data", (c: Buffer) => chunks.push(c));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("end",  () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
+  });
 
-    // ─── En-tête ───────────────────────────────────────────────
-    doc.rect(0, 0, 515, 60).fill("#1a4731");
-    try { doc.image(LOGO_PATH, 40, 8, { width: 44, height: 44 }); } catch (_) { /* logo facultatif */ }
-    doc.fontSize(18).fillColor("white").font("Helvetica-Bold")
-      .text("CoopDigital — Journal d'Audit", 92, 14, { width: 380, align: "left" });
-    doc.fontSize(9).fillColor("#d1fae5").font("Helvetica")
-      .text("Gestion des coopératives cacaoyères de Côte d'Ivoire", 92, 36);
-    doc.fillColor("black").moveDown(3.5);
+  // ─── En-tête ───────────────────────────────────────────────────────────────
+  await drawHeader(doc, COOP_ID, { titre_document: "Journal d'Audit" });
 
     doc
       .fontSize(10)
@@ -377,6 +370,6 @@ export async function exportAuditPDF(
         { align: "center" },
       );
 
-    doc.end();
-  });
+  doc.end();
+  return endPromise;
 }
