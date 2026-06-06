@@ -42,6 +42,8 @@ import {
   Wallet,
   Calculator,
   GitMerge,
+  TrendingUp as TrendingUpInvest,
+  FolderKanban,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -216,6 +218,12 @@ const navItems = [
     href: "/reconciliation",
     label: "Réconciliation",
     icon: GitMerge,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/investissements",
+    label: "Investissements",
+    icon: FolderKanban,
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {

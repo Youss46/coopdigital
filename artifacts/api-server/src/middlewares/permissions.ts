@@ -288,6 +288,13 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     reconcilier: ["pca", "directeur", "comptable"],
   },
 
+  // MODULE — INVESTISSEMENTS
+  investissements: {
+    voir:     ["pca", "directeur", "comptable", "auditeur"],
+    creer:    ["pca", "directeur"],
+    depenser: ["pca", "directeur", "comptable"],
+  },
+
   // MODULE — FISCALITÉ
   fiscalite: {
     voir:       ["pca", "directeur", "comptable", "auditeur"],

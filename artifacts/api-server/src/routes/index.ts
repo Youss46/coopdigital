@@ -50,6 +50,7 @@ import formationsRouter from "./formations";
 import caisseRouter from "./caisse";
 import fiscaliteRouter from "./fiscalite";
 import reconciliationRouter from "./reconciliation";
+import investissementsRouter from "./investissements";
 
 const router: IRouter = Router();
 
@@ -108,5 +109,6 @@ router.use(formationsRouter);
 router.use(caisseRouter);
 router.use(fiscaliteRouter);
 router.use(reconciliationRouter);
+router.use(investissementsRouter);
 
 export default router;
