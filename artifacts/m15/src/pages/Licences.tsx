@@ -4,6 +4,47 @@ import Layout from "@/components/Layout";
 import { fetchCooperatives, formatDate, statutColor, joursColor, type CoopItem } from "@/lib/api";
 import { FileKey, Loader2, RefreshCw, AlertTriangle, Search, ChevronRight } from "lucide-react";
 
+function LicenceCard({ c }: { c: CoopItem }) {
+  return (
+    <Link href={`/cooperatives/${c.id}`}>
+      <div className="flex items-start gap-3 px-4 py-3.5 hover:bg-muted/40 cursor-pointer transition-colors border-b last:border-0">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-sm">{c.nom}</span>
+            {c.licence && (
+              <span className={`inline-flex px-1.5 py-0.5 rounded-full text-xs font-medium ${statutColor(c.licence.statut)}`}>
+                {c.licence.statut}
+              </span>
+            )}
+          </div>
+          {c.licence ? (
+            <>
+              <div className="text-xs text-muted-foreground mt-0.5">{c.licence.planNom ?? "—"}</div>
+              <div className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded mt-1 inline-block">
+                {c.licence.cleLicence}
+              </div>
+              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                <span>Expire {formatDate(c.licence.dateExpiration)}</span>
+                {c.joursRestants !== null && (
+                  <span className={`font-medium ${joursColor(c.joursRestants)}`}>
+                    {c.joursRestants <= 0 ? "Expirée" : `J-${c.joursRestants}`}
+                  </span>
+                )}
+                <span className={c.licence.renouvellementAuto ? "text-green-600" : "text-muted-foreground"}>
+                  {c.licence.renouvellementAuto ? "· Auto ✓" : "· Manuel"}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="text-xs text-muted-foreground mt-0.5">Sans licence</div>
+          )}
+        </div>
+        <ChevronRight size={15} className="text-muted-foreground shrink-0 mt-1" />
+      </div>
+    </Link>
+  );
+}
+
 export default function Licences() {
   const [coops, setCoops] = useState<CoopItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,37 +62,35 @@ export default function Licences() {
   useEffect(() => { void load(); }, []);
 
   const filtered = coops
-    .filter((c) => {
-      if (filtre === "tous") return true;
-      return c.licence?.statut === filtre;
-    })
+    .filter((c) => filtre === "tous" || c.licence?.statut === filtre)
     .filter((c) =>
       c.nom.toLowerCase().includes(search.toLowerCase()) ||
-      c.licence?.cleLicence.toLowerCase().includes(search.toLowerCase())
+      (c.licence?.cleLicence ?? "").toLowerCase().includes(search.toLowerCase())
     );
 
   const stats = {
-    active: coops.filter((c) => c.licence?.statut === "active").length,
-    trial: coops.filter((c) => c.licence?.statut === "trial").length,
+    active:    coops.filter((c) => c.licence?.statut === "active").length,
+    trial:     coops.filter((c) => c.licence?.statut === "trial").length,
     suspendue: coops.filter((c) => c.licence?.statut === "suspendue").length,
-    expiree: coops.filter((c) => c.licence?.statut === "expiree").length,
+    expiree:   coops.filter((c) => c.licence?.statut === "expiree").length,
     expirant30: coops.filter((c) => c.joursRestants !== null && c.joursRestants >= 0 && c.joursRestants <= 30).length,
   };
 
   const filtres = [
-    { id: "tous", label: "Toutes", count: coops.length },
-    { id: "active", label: "Actives", count: stats.active },
-    { id: "trial", label: "Trial", count: stats.trial },
+    { id: "tous",      label: "Toutes",     count: coops.length },
+    { id: "active",    label: "Actives",    count: stats.active },
+    { id: "trial",     label: "Trial",      count: stats.trial },
     { id: "suspendue", label: "Suspendues", count: stats.suspendue },
-    { id: "expiree", label: "Expirées", count: stats.expiree },
+    { id: "expiree",   label: "Expirées",   count: stats.expiree },
   ];
 
   return (
     <Layout>
-      <div className="p-8 max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-2xl font-bold">Licences</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Licences</h1>
             <p className="text-muted-foreground text-sm mt-0.5">Gestion et suivi de toutes les licences</p>
           </div>
           <button onClick={load} className="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm hover:bg-muted">
@@ -59,22 +98,27 @@ export default function Licences() {
           </button>
         </div>
 
+        {/* Alerte expirations */}
         {stats.expirant30 > 0 && (
-          <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 mb-5 text-sm text-orange-800">
+          <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 mb-4 text-sm text-orange-800">
             <AlertTriangle size={16} className="shrink-0 text-orange-500" />
             <span>{stats.expirant30} licence{stats.expirant30 > 1 ? "s" : ""} expire{stats.expirant30 > 1 ? "nt" : ""} dans les 30 prochains jours</span>
           </div>
         )}
 
-        <div className="flex gap-2 mb-5 flex-wrap">
+        {/* Filtres */}
+        <div className="flex gap-2 mb-4 flex-wrap">
           {filtres.map((f) => (
             <button key={f.id} onClick={() => setFiltre(f.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${filtre === f.id ? "bg-primary text-white border-primary" : "bg-card hover:bg-muted border-border"}`}>
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                filtre === f.id ? "bg-primary text-white border-primary" : "bg-card hover:bg-muted border-border"
+              }`}>
               {f.label} <span className="ml-1 opacity-70 text-xs">({f.count})</span>
             </button>
           ))}
         </div>
 
+        {/* Recherche */}
         <div className="relative mb-4">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input value={search} onChange={(e) => setSearch(e.target.value)}
@@ -97,55 +141,65 @@ export default function Licences() {
                 <div className="font-medium">Aucune licence trouvée</div>
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-muted/40 border-b">
-                    <th className="text-left px-5 py-3 font-medium text-muted-foreground">Coopérative</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Clé</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Plan</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Statut</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Expiration</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Auto</th>
-                    <th className="w-10" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filtered.map((c) => (
-                    <Link key={c.id} href={`/cooperatives/${c.id}`}>
-                      <tr className="hover:bg-muted/30 cursor-pointer transition-colors">
-                        <td className="px-5 py-3.5 font-medium">{c.nom}</td>
-                        <td className="px-4 py-3.5">
-                          {c.licence ? (
-                            <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{c.licence.cleLicence}</span>
-                          ) : <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="px-4 py-3.5 text-muted-foreground">{c.licence?.planNom ?? "—"}</td>
-                        <td className="px-4 py-3.5">
-                          {c.licence ? (
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statutColor(c.licence.statut)}`}>
-                              {c.licence.statut}
-                            </span>
-                          ) : <span className="text-muted-foreground text-xs">—</span>}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="text-xs text-muted-foreground">{formatDate(c.licence?.dateExpiration)}</div>
-                          {c.joursRestants !== null && (
-                            <div className={`text-xs font-medium ${joursColor(c.joursRestants)}`}>
-                              {c.joursRestants <= 0 ? "Expirée" : `J-${c.joursRestants}`}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className={`text-xs ${c.licence?.renouvellementAuto ? "text-green-600" : "text-muted-foreground"}`}>
-                            {c.licence?.renouvellementAuto ? "✓ Oui" : "Non"}
-                          </span>
-                        </td>
-                        <td className="pr-4"><ChevronRight size={15} className="text-muted-foreground" /></td>
+              <>
+                {/* Vue carte — mobile */}
+                <div className="sm:hidden divide-y">
+                  {filtered.map((c) => <LicenceCard key={c.id} c={c} />)}
+                </div>
+
+                {/* Vue table — desktop */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/40 border-b">
+                        <th className="text-left px-5 py-3 font-medium text-muted-foreground">Coopérative</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Clé</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Plan</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Statut</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Expiration</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Auto</th>
+                        <th className="w-10" />
                       </tr>
-                    </Link>
-                  ))}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className="divide-y">
+                      {filtered.map((c) => (
+                        <Link key={c.id} href={`/cooperatives/${c.id}`}>
+                          <tr className="hover:bg-muted/30 cursor-pointer transition-colors">
+                            <td className="px-5 py-3.5 font-medium">{c.nom}</td>
+                            <td className="px-4 py-3.5">
+                              {c.licence ? (
+                                <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{c.licence.cleLicence}</span>
+                              ) : <span className="text-muted-foreground">—</span>}
+                            </td>
+                            <td className="px-4 py-3.5 text-muted-foreground">{c.licence?.planNom ?? "—"}</td>
+                            <td className="px-4 py-3.5">
+                              {c.licence ? (
+                                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statutColor(c.licence.statut)}`}>
+                                  {c.licence.statut}
+                                </span>
+                              ) : <span className="text-muted-foreground text-xs">—</span>}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="text-xs text-muted-foreground">{formatDate(c.licence?.dateExpiration)}</div>
+                              {c.joursRestants !== null && (
+                                <div className={`text-xs font-medium ${joursColor(c.joursRestants)}`}>
+                                  {c.joursRestants <= 0 ? "Expirée" : `J-${c.joursRestants}`}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span className={`text-xs ${c.licence?.renouvellementAuto ? "text-green-600" : "text-muted-foreground"}`}>
+                                {c.licence?.renouvellementAuto ? "✓ Oui" : "Non"}
+                              </span>
+                            </td>
+                            <td className="pr-4"><ChevronRight size={15} className="text-muted-foreground" /></td>
+                          </tr>
+                        </Link>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         )}

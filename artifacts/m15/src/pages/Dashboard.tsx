@@ -12,13 +12,13 @@ function KpiCard({ label, value, icon: Icon, color, sub }: {
   color: string; sub?: string;
 }) {
   return (
-    <div className="bg-card rounded-xl border p-5 flex items-start gap-4">
-      <div className={`size-11 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
-        <Icon size={20} />
+    <div className="bg-card rounded-xl border p-4 flex items-start gap-3">
+      <div className={`size-10 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
+        <Icon size={18} />
       </div>
-      <div>
-        <div className="text-2xl font-bold">{value}</div>
-        <div className="text-sm text-muted-foreground">{label}</div>
+      <div className="min-w-0">
+        <div className="text-xl font-bold leading-tight">{value}</div>
+        <div className="text-sm text-muted-foreground leading-snug">{label}</div>
         {sub && <div className="text-xs text-muted-foreground/70 mt-0.5">{sub}</div>}
       </div>
     </div>
@@ -41,19 +41,22 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="p-8 max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
-            <h1 className="text-2xl font-bold">Tableau de bord</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Tableau de bord</h1>
             <p className="text-muted-foreground text-sm mt-0.5">Vue d'ensemble des coopératives et licences</p>
           </div>
           <div className="flex gap-2">
             <button onClick={load} className="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm hover:bg-muted transition-colors">
-              <RefreshCw size={14} /> Actualiser
+              <RefreshCw size={14} />
+              <span className="hidden sm:inline">Actualiser</span>
             </button>
             <Link href="/cooperatives/nouvelle">
-              <button className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-                <Plus size={14} /> Nouvelle coop
+              <button className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+                <Plus size={14} />
+                <span>Nouvelle coop</span>
               </button>
             </Link>
           </div>
@@ -68,28 +71,31 @@ export default function Dashboard() {
 
         {data && (
           <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <KpiCard label="Coops actives" value={data.actives} icon={CheckCircle2} color="bg-green-100 text-green-700" />
-              <KpiCard label="En trial" value={data.trials} icon={Clock} color="bg-yellow-100 text-yellow-700" />
-              <KpiCard label="Suspendues" value={data.suspendues} icon={PauseCircle} color="bg-red-100 text-red-700" />
-              <KpiCard label="Expirées" value={data.expirees} icon={XCircle} color="bg-gray-200 text-gray-600" />
+            {/* KPIs statuts — 2 cols mobile, 4 cols desktop */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              <KpiCard label="Coops actives"  value={data.actives}    icon={CheckCircle2} color="bg-green-100 text-green-700" />
+              <KpiCard label="En trial"        value={data.trials}     icon={Clock}        color="bg-yellow-100 text-yellow-700" />
+              <KpiCard label="Suspendues"      value={data.suspendues} icon={PauseCircle}  color="bg-red-100 text-red-700" />
+              <KpiCard label="Expirées"        value={data.expirees}   icon={XCircle}      color="bg-gray-200 text-gray-600" />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
-              <KpiCard label="Revenus totaux licences" value={formatFcfa(data.revenus)} icon={TrendingUp} color="bg-primary/10 text-primary" />
-              <KpiCard label="Total membres gérés" value={data.totalMembres.toLocaleString("fr-FR")} icon={Users} color="bg-blue-100 text-blue-700" />
-              <KpiCard label="Expirations dans 30 j" value={data.expirantDans30j} icon={AlertTriangle} color="bg-orange-100 text-orange-700" sub="licences à renouveler" />
+            {/* KPIs métriques — 1 col mobile, 3 cols desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+              <KpiCard label="Revenus totaux licences"  value={formatFcfa(data.revenus)}                           icon={TrendingUp}    color="bg-primary/10 text-primary" />
+              <KpiCard label="Total membres gérés"       value={data.totalMembres.toLocaleString("fr-FR")}          icon={Users}         color="bg-blue-100 text-blue-700" />
+              <KpiCard label="Expirations dans 30 j"     value={data.expirantDans30j}                               icon={AlertTriangle}  color="bg-orange-100 text-orange-700" sub="licences à renouveler" />
             </div>
 
+            {/* Table expirations */}
             {data.expirations.length > 0 && (
               <div className="bg-card border rounded-xl overflow-hidden">
-                <div className="px-5 py-4 border-b flex items-center justify-between">
-                  <h2 className="font-semibold flex items-center gap-2">
+                <div className="px-4 sm:px-5 py-4 border-b flex items-center justify-between">
+                  <h2 className="font-semibold flex items-center gap-2 text-sm sm:text-base">
                     <AlertTriangle size={16} className="text-orange-500" />
                     Expirations imminentes
                   </h2>
                   <Link href="/licences">
-                    <span className="text-xs text-primary hover:underline cursor-pointer">Voir toutes les licences →</span>
+                    <span className="text-xs text-primary hover:underline cursor-pointer">Voir toutes →</span>
                   </Link>
                 </div>
                 <div className="divide-y">
@@ -97,12 +103,14 @@ export default function Dashboard() {
                     const jours = Math.ceil((new Date(e.dateExpiration).getTime() - Date.now()) / 86400000);
                     return (
                       <Link key={e.id} href={`/cooperatives/${e.cooperativeId}`}>
-                        <div className="flex items-center justify-between px-5 py-3 hover:bg-muted/40 cursor-pointer transition-colors">
-                          <div>
-                            <div className="text-sm font-medium">Coop #{e.cooperativeId}</div>
-                            <div className="text-xs text-muted-foreground">{e.planNom ?? "—"} · expire le {formatDate(e.dateExpiration)}</div>
+                        <div className="flex items-center justify-between px-4 sm:px-5 py-3 hover:bg-muted/40 cursor-pointer transition-colors">
+                          <div className="min-w-0 mr-4">
+                            <div className="text-sm font-medium truncate">Coop #{e.cooperativeId}</div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {e.planNom ?? "—"} · {formatDate(e.dateExpiration)}
+                            </div>
                           </div>
-                          <div className={`text-sm font-semibold ${jours <= 0 ? "text-red-600" : jours <= 30 ? "text-orange-500" : "text-green-600"}`}>
+                          <div className={`text-sm font-semibold shrink-0 ${jours <= 0 ? "text-red-600" : jours <= 30 ? "text-orange-500" : "text-green-600"}`}>
                             {jours <= 0 ? "Expirée" : `J-${jours}`}
                           </div>
                         </div>
