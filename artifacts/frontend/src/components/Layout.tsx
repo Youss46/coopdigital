@@ -40,6 +40,7 @@ import {
   ClipboardList,
   GraduationCap,
   Wallet,
+  Calculator,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -203,6 +204,12 @@ const navItems = [
     label: "Caisse",
     icon: Wallet,
     roles: ["pca", "directeur", "comptable", "auditeur", "agent_terrain"],
+  },
+  {
+    href: "/fiscalite",
+    label: "Fiscalité",
+    icon: Calculator,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
     href: "/comptabilite",

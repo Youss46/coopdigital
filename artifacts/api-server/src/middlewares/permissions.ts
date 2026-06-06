@@ -281,6 +281,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_alertes:     ["pca", "directeur", "comptable"],
   },
 
+  // MODULE — FISCALITÉ
+  fiscalite: {
+    voir:       ["pca", "directeur", "comptable", "auditeur"],
+    generer:    ["pca", "directeur", "comptable"],
+    payer:      ["pca", "directeur", "comptable"],
+    configurer: ["pca", "directeur"],
+  },
+
   // MODULE — FORMATIONS & RENFORCEMENT DE CAPACITÉS
   formation: {
     voir:                  ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],

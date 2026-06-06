@@ -50,3 +50,12 @@ cron.schedule("0 8 * * *", () => {
     logger.error({ err }, "Erreur cron notifications");
   });
 });
+
+// CRON fiscalité : vérification des échéances fiscales à 8h05
+cron.schedule("5 8 * * *", () => {
+  import("./services/fiscaliteService.js").then(({ checkEcheancesFiscales }) => {
+    checkEcheancesFiscales().catch((err: unknown) => {
+      logger.error({ err }, "Erreur cron checkEcheancesFiscales");
+    });
+  }).catch((err: unknown) => logger.error({ err }, "Import fiscaliteService"));
+});
