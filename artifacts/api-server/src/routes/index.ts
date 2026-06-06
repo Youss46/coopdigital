@@ -47,6 +47,7 @@ import rseRouter from "./rse";
 import donsRouter from "./dons";
 import planningCollecteRouter from "./planning-collecte";
 import formationsRouter from "./formations";
+import caisseRouter from "./caisse";
 
 const router: IRouter = Router();
 
@@ -102,5 +103,6 @@ router.use(rseRouter);
 router.use(donsRouter);
 router.use(planningCollecteRouter);
 router.use(formationsRouter);
+router.use(caisseRouter);
 
 export default router;

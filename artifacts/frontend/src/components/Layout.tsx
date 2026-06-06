@@ -39,6 +39,7 @@ import {
   Gift,
   ClipboardList,
   GraduationCap,
+  Wallet,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -196,6 +197,12 @@ const navItems = [
     label: "Formations",
     icon: GraduationCap,
     roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "agent_terrain"],
+  },
+  {
+    href: "/caisse",
+    label: "Caisse",
+    icon: Wallet,
+    roles: ["pca", "directeur", "comptable", "auditeur", "agent_terrain"],
   },
   {
     href: "/comptabilite",

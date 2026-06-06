@@ -271,6 +271,16 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_historique_entite: ["pca", "directeur", "comptable", "auditeur"],
   },
 
+  // MODULE — GESTION DE CAISSE
+  caisse: {
+    voir:             ["pca", "directeur", "comptable", "auditeur"],
+    ouvrir_session:   ["pca", "directeur", "comptable"],
+    enregistrer_mvt:  ["pca", "directeur", "comptable", "agent_terrain"],
+    fermer_session:   ["pca", "directeur", "comptable"],
+    creer_caisse:     ["pca", "directeur"],
+    voir_alertes:     ["pca", "directeur", "comptable"],
+  },
+
   // MODULE — FORMATIONS & RENFORCEMENT DE CAPACITÉS
   formation: {
     voir:                  ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],

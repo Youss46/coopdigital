@@ -37,3 +37,4 @@ export * from "./rse";
 export * from "./dons";
 export * from "./planning";
 export * from "./formations";
+export * from "./caisse";
