@@ -314,7 +314,7 @@ export default function Login() {
 
           <div className="mt-10 pt-6 border-t border-gray-100 text-center">
             <p className="text-gray-400 text-xs">CoopDigital — M15 Tech, Yamoussoukro</p>
-            <p className="text-gray-400 text-xs mt-1">Support : 0714174082 · m15tech.ci</p>
+            <p className="text-gray-400 text-xs mt-1">Support : 0714174082 · contacteyouss@gmail.com</p>
           </div>
         </div>
       </div>
