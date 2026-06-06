@@ -69,25 +69,41 @@ function SuccessScreen({ result, coopNom, pcaNom, pcaPrenoms, isTrial, planNom, 
 
           <div className="mb-4">
             <div className="text-xs text-muted-foreground mb-1">Email de connexion</div>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-sm font-mono bg-muted px-3 py-2 rounded-lg">{result.pcaEmail}</code>
-              <CopyButton text={result.pcaEmail} />
-            </div>
+            {result.pcaEmail ? (
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-sm font-mono bg-muted px-3 py-2 rounded-lg">{result.pcaEmail}</code>
+                <CopyButton text={result.pcaEmail} />
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground italic px-3 py-2 bg-muted rounded-lg">
+                Envoyé par SMS — vérifiez le téléphone du PCA
+              </div>
+            )}
           </div>
 
           <div className="mb-4">
             <div className="text-xs text-muted-foreground mb-1">Mot de passe temporaire</div>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-sm font-mono bg-yellow-50 border border-yellow-200 text-yellow-900 px-3 py-2 rounded-lg font-bold tracking-wider">
-                {result.motdepasse_clair}
-              </code>
-              <CopyButton text={result.motdepasse_clair} />
-            </div>
+            {result.motdepasse_clair ? (
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-sm font-mono bg-yellow-50 border border-yellow-200 text-yellow-900 px-3 py-2 rounded-lg font-bold tracking-wider">
+                  {result.motdepasse_clair}
+                </code>
+                <CopyButton text={result.motdepasse_clair} />
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground italic px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                Généré et envoyé par SMS — vérifiez le téléphone du PCA
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
             <AlertCircle size={12} />
-            SMS {result.sms_envoye ? `envoyé au ${result.pcaTelephone}` : "non envoyé (simulé)"} · Le mot de passe ne sera pas affiché à nouveau
+            {result.sms_envoye
+              ? `SMS envoyé au ${result.pcaTelephone ?? "PCA"}`
+              : result.pcaTelephone
+              ? "SMS non envoyé (simulé) · Le mot de passe ne sera pas affiché à nouveau"
+              : "Identifiants générés et transmis au PCA"}
           </div>
         </div>
 
