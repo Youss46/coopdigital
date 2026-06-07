@@ -8,7 +8,7 @@ import {
   ventesExportateursTable,
   exportateursTable,
 } from "@workspace/db";
-import { eq, inArray, sql, desc } from "drizzle-orm";
+import { eq, inArray, sql, desc, and } from "drizzle-orm";
 import { CreateLotBody, UpdateLotStatutBody } from "@workspace/api-zod";
 
 const livraisonSelect = {
@@ -27,8 +27,17 @@ const livraisonSelect = {
 };
 
 export async function listLots(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const statut = req.query["statut"] as string | undefined;
+
+    const conditions: ReturnType<typeof eq>[] = [eq(lotsTable.cooperativeId, cooperativeId)];
+    if (statut) conditions.push(eq(lotsTable.statut, statut as "en_stock" | "vendu" | "transit"));
 
     const rows = await db
       .select({
@@ -46,7 +55,7 @@ export async function listLots(req: Request, res: Response): Promise<void> {
       .from(lotsTable)
       .leftJoin(lotLivraisonsTable, eq(lotLivraisonsTable.lotId, lotsTable.id))
       .leftJoin(livraisonsTable, eq(livraisonsTable.id, lotLivraisonsTable.livraisonId))
-      .where(statut ? eq(lotsTable.statut, statut as "en_stock" | "vendu" | "transit") : undefined)
+      .where(and(...conditions))
       .groupBy(lotsTable.id)
       .orderBy(desc(lotsTable.createdAt));
 
@@ -58,13 +67,19 @@ export async function listLots(req: Request, res: Response): Promise<void> {
 }
 
 export async function createLot(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const parse = CreateLotBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
     return;
   }
 
-  const { cooperativeId, livraisonIds, entrepot } = parse.data;
+  const { livraisonIds, entrepot } = parse.data;
 
   try {
     // Vérifier que les livraisons existent et ne sont pas déjà dans un lot
@@ -132,6 +147,12 @@ export async function createLot(req: Request, res: Response): Promise<void> {
 }
 
 export async function getLotByQr(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const code = String(req.params["code"] ?? "");
   try {
     const [lot] = await db
@@ -150,7 +171,7 @@ export async function getLotByQr(req: Request, res: Response): Promise<void> {
       .from(lotsTable)
       .leftJoin(lotLivraisonsTable, eq(lotLivraisonsTable.lotId, lotsTable.id))
       .leftJoin(livraisonsTable, eq(livraisonsTable.id, lotLivraisonsTable.livraisonId))
-      .where(eq(lotsTable.qrCodeLot, code))
+      .where(and(eq(lotsTable.qrCodeLot, code), eq(lotsTable.cooperativeId, cooperativeId)))
       .groupBy(lotsTable.id);
 
     if (!lot) {
@@ -165,6 +186,12 @@ export async function getLotByQr(req: Request, res: Response): Promise<void> {
 }
 
 export async function updateLotStatut(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const id = parseInt(String(req.params["id"] ?? "0"));
   const parse = UpdateLotStatutBody.safeParse(req.body);
   if (!parse.success) {
@@ -176,7 +203,7 @@ export async function updateLotStatut(req: Request, res: Response): Promise<void
     const [lot] = await db
       .update(lotsTable)
       .set({ statut: parse.data.statut })
-      .where(eq(lotsTable.id, id))
+      .where(and(eq(lotsTable.id, id), eq(lotsTable.cooperativeId, cooperativeId)))
       .returning();
 
     if (!lot) {
@@ -191,6 +218,12 @@ export async function updateLotStatut(req: Request, res: Response): Promise<void
 }
 
 export async function getLotTracabilite(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const id = parseInt(String(req.params["id"] ?? "0"));
   try {
     const [lot] = await db
@@ -209,7 +242,7 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
       .from(lotsTable)
       .leftJoin(lotLivraisonsTable, eq(lotLivraisonsTable.lotId, lotsTable.id))
       .leftJoin(livraisonsTable, eq(livraisonsTable.id, lotLivraisonsTable.livraisonId))
-      .where(eq(lotsTable.id, id))
+      .where(and(eq(lotsTable.id, id), eq(lotsTable.cooperativeId, cooperativeId)))
       .groupBy(lotsTable.id);
 
     if (!lot) {

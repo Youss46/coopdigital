@@ -9,16 +9,16 @@ import { eq, and, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { proposerEcriture } from "../services/comptabiliteService";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 export async function getConfigParts(req: Request, res: Response) {
   let config = await db.query.configPartsSocialesTable.findFirst({
-    where: eq(configPartsSocialesTable.cooperativeId, COOP_ID),
+    where: eq(configPartsSocialesTable.cooperativeId, coopId(req)),
   });
   if (!config) {
     const [created] = await db
       .insert(configPartsSocialesTable)
-      .values({ cooperativeId: COOP_ID, valeurNominaleFcfa: 5000, nbrePartsMin: 5 })
+      .values({ cooperativeId: coopId(req), valeurNominaleFcfa: 5000, nbrePartsMin: 5 })
       .onConflictDoNothing()
       .returning();
     config = created;
@@ -35,7 +35,7 @@ export async function updateConfigParts(req: Request, res: Response) {
   const [config] = await db
     .insert(configPartsSocialesTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: coopId(req),
       valeurNominaleFcfa: valeurNominaleFcfa ?? 5000,
       nbrePartsMin: nbrePartsMin ?? 1,
     })
@@ -56,20 +56,20 @@ export async function getPartsMembre(req: Request, res: Response) {
   const membreId = parseInt(String(req.params["id"] ?? "0"));
 
   const membre = await db.query.membresTable.findFirst({
-    where: and(eq(membresTable.id, membreId), eq(membresTable.cooperativeId, COOP_ID)),
+    where: and(eq(membresTable.id, membreId), eq(membresTable.cooperativeId, coopId(req))),
   });
   if (!membre) return res.status(404).json({ erreur: "Membre introuvable" });
 
   const liberations = await db.query.liberationsPartsTable.findMany({
     where: and(
       eq(liberationsPartsTable.membreId, membreId),
-      eq(liberationsPartsTable.cooperativeId, COOP_ID)
+      eq(liberationsPartsTable.cooperativeId, coopId(req))
     ),
     orderBy: [desc(liberationsPartsTable.dateVersement)],
   });
 
   const config = await db.query.configPartsSocialesTable.findFirst({
-    where: eq(configPartsSocialesTable.cooperativeId, COOP_ID),
+    where: eq(configPartsSocialesTable.cooperativeId, coopId(req)),
   });
 
   return res.json({
@@ -108,7 +108,7 @@ export async function enregistrerLiberation(req: Request, res: Response) {
   }
 
   const membre = await db.query.membresTable.findFirst({
-    where: and(eq(membresTable.id, membreId), eq(membresTable.cooperativeId, COOP_ID)),
+    where: and(eq(membresTable.id, membreId), eq(membresTable.cooperativeId, coopId(req))),
   });
   if (!membre) return res.status(404).json({ erreur: "Membre introuvable" });
 
@@ -124,7 +124,7 @@ export async function enregistrerLiberation(req: Request, res: Response) {
   await db.transaction(async (tx) => {
     await tx.insert(liberationsPartsTable).values({
       membreId,
-      cooperativeId: COOP_ID,
+      cooperativeId: coopId(req),
       dateVersement,
       codeLiberation,
       versement,
@@ -146,7 +146,7 @@ export async function enregistrerLiberation(req: Request, res: Response) {
   });
 
   // Écriture comptable : Débit 521 Banque / Crédit 101 Capital
-  void proposerEcriture(COOP_ID, {
+  void proposerEcriture(coopId(req), {
     source: "encaissement",
     sourceId: membreId,
     libelle: `Libération parts sociales — ${membre.prenoms} ${membre.nom}`,
@@ -173,7 +173,7 @@ export async function getRapportParts(req: Request, res: Response) {
       totalResteALibererFcfa: sql<number>`SUM(reste_a_liberer_fcfa)`,
     })
     .from(membresTable)
-    .where(eq(membresTable.cooperativeId, COOP_ID));
+    .where(eq(membresTable.cooperativeId, coopId(req)));
 
   return res.json(result[0]);
 }

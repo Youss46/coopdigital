@@ -9,7 +9,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { proposerEcriture } from "../services/comptabiliteService";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 export async function listRefus(req: Request, res: Response) {
   const { statut } = req.query as { statut?: string };
@@ -32,7 +32,7 @@ export async function listRefus(req: Request, res: Response) {
     )
     .where(
       and(
-        eq(traitementsRefusTable.cooperativeId, COOP_ID),
+        eq(traitementsRefusTable.cooperativeId, coopId(req)),
         statut ? eq(traitementsRefusTable.statut, statut as "en_attente" | "traite") : undefined
       )
     )
@@ -51,7 +51,7 @@ export async function getStatsRefus(req: Request, res: Response) {
       nbTraites: sql<number>`COUNT(CASE WHEN statut='traite' THEN 1 END)`,
     })
     .from(traitementsRefusTable)
-    .where(eq(traitementsRefusTable.cooperativeId, COOP_ID));
+    .where(eq(traitementsRefusTable.cooperativeId, coopId(req)));
 
   return res.json(stats[0]);
 }
@@ -87,7 +87,7 @@ export async function traiterRefus(req: Request, res: Response) {
   const refus = await db.query.traitementsRefusTable.findFirst({
     where: and(
       eq(traitementsRefusTable.id, id),
-      eq(traitementsRefusTable.cooperativeId, COOP_ID)
+      eq(traitementsRefusTable.cooperativeId, coopId(req))
     ),
   });
 
@@ -136,7 +136,7 @@ export async function traiterRefus(req: Request, res: Response) {
   const dateOp = new Date().toISOString().slice(0, 10);
 
   if (decision === "retour_stock") {
-    void proposerEcriture(COOP_ID, {
+    void proposerEcriture(coopId(req), {
       source: "stock",
       sourceId: refus.id,
       libelle: `Retour stock lot refoulé #${refus.venteExportateurId}`,
@@ -146,7 +146,7 @@ export async function traiterRefus(req: Request, res: Response) {
       date: dateOp,
     });
   } else if (decision === "perte") {
-    void proposerEcriture(COOP_ID, {
+    void proposerEcriture(coopId(req), {
       source: "stock",
       sourceId: refus.id,
       libelle: `Perte lot refoulé #${refus.venteExportateurId}`,
@@ -157,7 +157,7 @@ export async function traiterRefus(req: Request, res: Response) {
     });
   } else if (decision === "autre_acheteur" && prixUnitaireNouveauFcfa) {
     const montant = Math.round(Number(refus.poidsRefuleKg) * prixUnitaireNouveauFcfa);
-    void proposerEcriture(COOP_ID, {
+    void proposerEcriture(coopId(req), {
       source: "vente",
       sourceId: refus.id,
       libelle: `Vente lot refoulé nouvel acheteur #${refus.venteExportateurId}`,
@@ -181,7 +181,7 @@ export async function countRefusEnAttente(req: Request, res: Response) {
     .from(traitementsRefusTable)
     .where(
       and(
-        eq(traitementsRefusTable.cooperativeId, COOP_ID),
+        eq(traitementsRefusTable.cooperativeId, coopId(req)),
         eq(traitementsRefusTable.statut, "en_attente")
       )
     );

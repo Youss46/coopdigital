@@ -2,7 +2,7 @@ import { type Request, type Response } from "express";
 import { db, ecrituresComptablesTable, planComptableTable, ventesExportateursTable, livraisonsTable, avancesTable } from "@workspace/db";
 import { eq, sql, gte } from "drizzle-orm";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 function exerciceCourant(): number {
   return new Date().getFullYear();
@@ -24,9 +24,9 @@ export async function getBilan(req: Request, res: Response): Promise<void> {
       FROM plan_comptable p
       LEFT JOIN ecritures_comptables e
         ON (e.compte_debit = p.numero_compte OR e.compte_credit = p.numero_compte)
-        AND e.cooperative_id = ${COOP_ID}
+        AND e.cooperative_id = ${coopId(req)}
         AND e.exercice = ${exercice}
-      WHERE p.cooperative_id = ${COOP_ID}
+      WHERE p.cooperative_id = ${coopId(req)}
       GROUP BY p.id, p.numero_compte, p.libelle, p.type
       ORDER BY p.numero_compte
     `);
@@ -81,9 +81,9 @@ export async function getCompteResultat(req: Request, res: Response): Promise<vo
       FROM plan_comptable p
       LEFT JOIN ecritures_comptables e
         ON (e.compte_debit = p.numero_compte OR e.compte_credit = p.numero_compte)
-        AND e.cooperative_id = ${COOP_ID}
+        AND e.cooperative_id = ${coopId(req)}
         AND e.exercice = ${exercice}
-      WHERE p.cooperative_id = ${COOP_ID} AND p.type IN ('produit', 'charge')
+      WHERE p.cooperative_id = ${coopId(req)} AND p.type IN ('produit', 'charge')
       GROUP BY p.id, p.numero_compte, p.libelle, p.type
       ORDER BY p.numero_compte
     `);
@@ -103,7 +103,7 @@ export async function getCompteResultat(req: Request, res: Response): Promise<vo
         COALESCE(SUM(CASE WHEN compte_credit = '701' THEN montant_fcfa ELSE 0 END), 0)::int AS "produitsFcfa",
         COALESCE(SUM(CASE WHEN compte_debit IN ('601','621','641','661') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
       FROM ecritures_comptables
-      WHERE cooperative_id = ${COOP_ID} AND exercice = ${exercice}
+      WHERE cooperative_id = ${coopId(req)} AND exercice = ${exercice}
       GROUP BY mois
       ORDER BY mois
     `);
@@ -137,7 +137,7 @@ export async function getFluxTresorerie(req: Request, res: Response): Promise<vo
         COALESCE(SUM(CASE WHEN compte_debit = '521' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalEntrees",
         COALESCE(SUM(CASE WHEN compte_credit = '521' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalSorties"
       FROM ecritures_comptables
-      WHERE cooperative_id = ${COOP_ID} AND exercice = ${exercice}
+      WHERE cooperative_id = ${coopId(req)} AND exercice = ${exercice}
     `);
 
     const r = rows.rows[0] as {
@@ -183,7 +183,7 @@ export async function getMargeCampagnes(req: Request, res: Response): Promise<vo
         COALESCE(SUM(CASE WHEN compte_debit = '601' THEN montant_fcfa ELSE 0 END), 0)::int AS "coutAchatsFcfa",
         COALESCE(SUM(CASE WHEN compte_debit IN ('621','641','661') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
       FROM ecritures_comptables
-      WHERE cooperative_id = ${COOP_ID}
+      WHERE cooperative_id = ${coopId(req)}
       GROUP BY exercice
       ORDER BY exercice DESC
     `);

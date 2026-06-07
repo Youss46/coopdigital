@@ -6,7 +6,7 @@ import {
 import { eq, and, sql, desc, asc, gte, lte, between } from "drizzle-orm";
 import { generateEcheancier, computeEcheancier } from "../services/empruntService";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 // ─── PRÊTEURS ─────────────────────────────────────────────────────────────────
 
@@ -15,7 +15,7 @@ export async function listPreteurs(req: Request, res: Response): Promise<void> {
     const rows = await db
       .select()
       .from(preteursTable)
-      .where(eq(preteursTable.cooperativeId, COOP_ID))
+      .where(eq(preteursTable.cooperativeId, coopId(req)))
       .orderBy(asc(preteursTable.nom));
     res.json(rows);
   } catch (err) {
@@ -28,7 +28,7 @@ export async function createPreteur(req: Request, res: Response): Promise<void> 
   try {
     const { type, nom, contact, ville } = req.body as Record<string, unknown>;
     const [row] = await db.insert(preteursTable).values({
-      cooperativeId: COOP_ID,
+      cooperativeId: coopId(req),
       type: (type as "banque") ?? "banque",
       nom: String(nom ?? ""),
       contact: contact ? String(contact) : null,
@@ -72,7 +72,7 @@ export async function listEmprunts(req: Request, res: Response): Promise<void> {
       .leftJoin(preteursTable, eq(empruntsTable.preteurId, preteursTable.id))
       .where(
         and(
-          eq(empruntsTable.cooperativeId, COOP_ID),
+          eq(empruntsTable.cooperativeId, coopId(req)),
           statut ? eq(empruntsTable.statut, statut as "en_cours") : undefined,
         )
       )
@@ -112,7 +112,7 @@ export async function getEmpruntById(req: Request, res: Response): Promise<void>
       })
       .from(empruntsTable)
       .leftJoin(preteursTable, eq(empruntsTable.preteurId, preteursTable.id))
-      .where(and(eq(empruntsTable.id, id), eq(empruntsTable.cooperativeId, COOP_ID)))
+      .where(and(eq(empruntsTable.id, id), eq(empruntsTable.cooperativeId, coopId(req))))
       .limit(1);
 
     if (!emprunt) { res.status(404).json({ erreur: "Emprunt introuvable" }); return; }
@@ -149,7 +149,7 @@ export async function createEmprunt(req: Request, res: Response): Promise<void> 
     const dateEcheanceFin = dateEch.toISOString().slice(0, 10);
 
     const [emprunt] = await db.insert(empruntsTable).values({
-      cooperativeId:        COOP_ID,
+      cooperativeId:        coopId(req),
       preteurId:            Number(preteurId),
       libelle:              String(libelle ?? ""),
       montantFcfa:          String(montant),
@@ -233,7 +233,7 @@ export async function enregistrerRemboursement(req: Request, res: Response): Pro
     const [emprunt] = await db
       .select()
       .from(empruntsTable)
-      .where(and(eq(empruntsTable.id, empruntId), eq(empruntsTable.cooperativeId, COOP_ID)))
+      .where(and(eq(empruntsTable.id, empruntId), eq(empruntsTable.cooperativeId, coopId(req))))
       .limit(1);
     if (!emprunt) { res.status(404).json({ erreur: "Emprunt introuvable" }); return; }
 
@@ -304,7 +304,7 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
       .leftJoin(preteursTable,  eq(empruntsTable.preteurId, preteursTable.id))
       .where(
         and(
-          eq(empruntsTable.cooperativeId, COOP_ID),
+          eq(empruntsTable.cooperativeId, coopId(req)),
           between(echeancierEmpruntsTable.dateEcheance, todayStr, in30Str),
         )
       )
@@ -327,7 +327,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         nbActifs:         sql<number>`COUNT(*) FILTER (WHERE statut IN ('en_cours','en_retard'))`,
       })
       .from(empruntsTable)
-      .where(eq(empruntsTable.cooperativeId, COOP_ID));
+      .where(eq(empruntsTable.cooperativeId, coopId(req)));
 
     const today = new Date().toISOString().slice(0, 10);
     const [prochaineEch] = await db
@@ -342,7 +342,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       .leftJoin(preteursTable, eq(empruntsTable.preteurId, preteursTable.id))
       .where(
         and(
-          eq(empruntsTable.cooperativeId, COOP_ID),
+          eq(empruntsTable.cooperativeId, coopId(req)),
           eq(echeancierEmpruntsTable.statut, "a_payer"),
           gte(echeancierEmpruntsTable.dateEcheance, today),
         )

@@ -21,6 +21,12 @@ const venteSelect = {
 };
 
 export async function listExportateurs(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const rows = await db
       .select({
@@ -41,6 +47,7 @@ export async function listExportateurs(req: Request, res: Response): Promise<voi
           sql`${ventesExportateursTable.statut} != 'regle'`
         )
       )
+      .where(eq(exportateursTable.cooperativeId, cooperativeId))
       .groupBy(exportateursTable.id)
       .orderBy(exportateursTable.nom);
 
@@ -52,6 +59,12 @@ export async function listExportateurs(req: Request, res: Response): Promise<voi
 }
 
 export async function createExportateur(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const parse = CreateExportateurBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
@@ -61,7 +74,7 @@ export async function createExportateur(req: Request, res: Response): Promise<vo
   try {
     const [exp] = await db
       .insert(exportateursTable)
-      .values(parse.data)
+      .values({ ...parse.data, cooperativeId })
       .returning();
 
     res.status(201).json({ ...exp, soldeTotalDuFcfa: 0 });
@@ -72,6 +85,12 @@ export async function createExportateur(req: Request, res: Response): Promise<vo
 }
 
 export async function getExportateurById(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const id = parseInt(String(req.params["id"] ?? "0"));
   try {
     const [exp] = await db
@@ -93,7 +112,7 @@ export async function getExportateurById(req: Request, res: Response): Promise<v
           sql`${ventesExportateursTable.statut} != 'regle'`
         )
       )
-      .where(eq(exportateursTable.id, id))
+      .where(and(eq(exportateursTable.id, id), eq(exportateursTable.cooperativeId, cooperativeId)))
       .groupBy(exportateursTable.id);
 
     if (!exp) {
@@ -116,11 +135,17 @@ export async function getExportateurById(req: Request, res: Response): Promise<v
 }
 
 export async function listVentes(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const exportateurId = req.query["exportateur_id"] ? parseInt(String(req.query["exportateur_id"])) : undefined;
     const statut = req.query["statut"] as string | undefined;
 
-    const conditions = [];
+    const conditions: ReturnType<typeof eq>[] = [eq(exportateursTable.cooperativeId, cooperativeId)];
     if (exportateurId) conditions.push(eq(ventesExportateursTable.exportateurId, exportateurId));
     if (statut)
       conditions.push(
@@ -131,7 +156,7 @@ export async function listVentes(req: Request, res: Response): Promise<void> {
       .select(venteSelect)
       .from(ventesExportateursTable)
       .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(ventesExportateursTable.dateVente));
 
     res.json(rows);
@@ -142,6 +167,12 @@ export async function listVentes(req: Request, res: Response): Promise<void> {
 }
 
 export async function createVente(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const parse = CreateVenteBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
@@ -150,6 +181,10 @@ export async function createVente(req: Request, res: Response): Promise<void> {
 
   try {
     const { exportateurId, lotId, poidsKg, prixUnitaireFcfa, dateVente, dateEcheanceReglement } = parse.data;
+
+    const [exp] = await db.select({ id: exportateursTable.id }).from(exportateursTable)
+      .where(and(eq(exportateursTable.id, exportateurId), eq(exportateursTable.cooperativeId, cooperativeId))).limit(1);
+    if (!exp) { res.status(403).json({ erreur: "Exportateur introuvable ou non autorisé" }); return; }
     const montantTotalFcfa = Math.round(poidsKg * prixUnitaireFcfa);
 
     const [vente] = await db
@@ -189,6 +224,12 @@ export async function createVente(req: Request, res: Response): Promise<void> {
 }
 
 export async function encaisserVente(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const id = parseInt(String(req.params["id"] ?? "0"));
   const parse = EncaisserVenteBody.safeParse(req.body);
   if (!parse.success) {
@@ -200,22 +241,25 @@ export async function encaisserVente(req: Request, res: Response): Promise<void>
     const [current] = await db
       .select()
       .from(ventesExportateursTable)
-      .where(eq(ventesExportateursTable.id, id));
+      .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
+      .where(and(eq(ventesExportateursTable.id, id), eq(exportateursTable.cooperativeId, cooperativeId)));
 
     if (!current) {
       res.status(404).json({ erreur: "Vente non trouvée" });
       return;
     }
 
-    const montantEncaisse = current.montantRecuFcfa + parse.data.montantFcfa;
-    const solde = current.montantTotalFcfa - montantEncaisse;
+    const vente = current.ventes_exportateurs;
+
+    const montantEncaisse = vente.montantRecuFcfa + parse.data.montantFcfa;
+    const solde = vente.montantTotalFcfa - montantEncaisse;
 
     let statut: "en_attente" | "partiel" | "regle" | "en_retard" = "partiel";
     if (solde <= 0) {
       statut = "regle";
     } else if (
-      current.dateEcheanceReglement &&
-      new Date(current.dateEcheanceReglement) < new Date()
+      vente.dateEcheanceReglement &&
+      new Date(vente.dateEcheanceReglement) < new Date()
     ) {
       statut = "en_retard";
     }
@@ -251,6 +295,12 @@ export async function encaisserVente(req: Request, res: Response): Promise<void>
 }
 
 export async function getCreances(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const aujourd_hui = new Date().toISOString().split("T")[0]!;
     const dansUneSemaine = new Date();
@@ -261,7 +311,7 @@ export async function getCreances(req: Request, res: Response): Promise<void> {
       .select(venteSelect)
       .from(ventesExportateursTable)
       .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
-      .where(sql`${ventesExportateursTable.statut} != 'regle'`)
+      .where(and(sql`${ventesExportateursTable.statut} != 'regle'`, eq(exportateursTable.cooperativeId, cooperativeId)))
       .orderBy(ventesExportateursTable.dateEcheanceReglement);
 
     const totalDuFcfa = ventes.reduce((s, v) => s + v.soldeDuFcfa, 0);

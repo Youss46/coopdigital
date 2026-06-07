@@ -4,7 +4,7 @@ import { tauxChangeTable, devisesTable, ventesExportateursTable, exportateursTab
 import { eq, and, desc, asc, gte, sql } from "drizzle-orm";
 import { getTauxActuel, convertir } from "../services/deviseService";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 // ─── DEVISES ─────────────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ export async function getTauxActuels(req: Request, res: Response): Promise<void>
         u.email AS saisi_par_email
       FROM taux_change t
       LEFT JOIN users u ON u.id = t.saisi_par
-      WHERE t.cooperative_id = ${COOP_ID}
+      WHERE t.cooperative_id = ${coopId(req)}
       ORDER BY devise_source, date_application DESC, id DESC
     `);
     res.json(rows.rows);
@@ -50,7 +50,7 @@ export async function createTaux(req: Request, res: Response): Promise<void> {
     const userId = req.user?.id;
 
     const [row] = await db.insert(tauxChangeTable).values({
-      cooperativeId:   COOP_ID,
+      cooperativeId:   coopId(req),
       deviseSource:    String(deviseSource ?? ""),
       deviseCible:     "XOF",
       taux:            String(Number(taux ?? 0)),
@@ -83,7 +83,7 @@ export async function getHistoriqueTaux(req: Request, res: Response): Promise<vo
       .from(tauxChangeTable)
       .where(
         and(
-          eq(tauxChangeTable.cooperativeId, COOP_ID),
+          eq(tauxChangeTable.cooperativeId, coopId(req)),
           eq(tauxChangeTable.deviseSource, devise),
           gte(tauxChangeTable.dateApplication, dateLimitStr),
         )
@@ -139,7 +139,7 @@ export async function getRapportGainPerte(req: Request, res: Response): Promise<
       .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
       .where(
         and(
-          eq(exportateursTable.cooperativeId, COOP_ID),
+          eq(exportateursTable.cooperativeId, coopId(req)),
           sql`${ventesExportateursTable.deviseFacturation} != 'XOF'`,
         )
       )

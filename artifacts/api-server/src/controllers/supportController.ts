@@ -11,7 +11,7 @@ import {
   getFaq,
 } from "../services/supportService.js";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ export async function creerTicketHandler(req: Request, res: Response) {
     }
 
     const ticket = await creerTicket({
-      cooperativeId:   COOP_ID,
+      cooperativeId:   coopId(req),
       ouvertPar:       userId,
       titre:           String(titre),
       description:     String(description),
@@ -57,7 +57,7 @@ export async function mesTicketsHandler(req: Request, res: Response) {
   try {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: "Non authentifié" });
-    const tickets = await mesTickets(COOP_ID, userId);
+    const tickets = await mesTickets(coopId(req), userId);
     return res.json(tickets);
   } catch (err) {
     req.log.error({ err }, "mesTickets");
@@ -73,7 +73,7 @@ export async function detailTicketHandler(req: Request, res: Response) {
     const userRole = req.user?.role ?? "";
     if (!userId) return res.status(401).json({ error: "Non authentifié" });
     const id = Number(req.params.id);
-    const ticket = await detailTicket(id, COOP_ID);
+    const ticket = await detailTicket(id, coopId(req));
     if (!ticket) return res.status(404).json({ error: "Ticket introuvable" });
     if (!["pca","directeur","comptable"].includes(userRole) && ticket.ouvertPar !== userId) {
       return res.status(403).json({ error: "Accès refusé" });
@@ -97,7 +97,7 @@ export async function ajouterMessageHandler(req: Request, res: Response) {
 
     const msg = await ajouterMessage({
       ticketId:       id,
-      cooperativeId:  COOP_ID,
+      cooperativeId:  coopId(req),
       auteurType:     "client",
       auteurId:       userId,
       auteurNom:      `Utilisateur #${userId}`,
@@ -122,7 +122,7 @@ export async function fermerTicketHandler(req: Request, res: Response) {
     const { satisfaction } = req.body as Record<string, unknown>;
     const ticket = await fermerTicket({
       ticketId:     id,
-      cooperativeId: COOP_ID,
+      cooperativeId: coopId(req),
       satisfaction: satisfaction ? Number(satisfaction) : undefined,
     });
     if (!ticket) return res.status(404).json({ error: "Ticket introuvable" });

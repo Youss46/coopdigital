@@ -4,24 +4,29 @@ import * as svc from "../services/caisseService.js";
 // ─── Caisses ──────────────────────────────────────────────────────────────────
 
 export async function getCaisses(req: Request, res: Response): Promise<void> {
-  try { res.json(await svc.listCaisses()); }
+  const cooperativeId = req.user?.cooperativeId ?? 1;
+  try { res.json(await svc.listCaisses(cooperativeId)); }
   catch (err) { req.log.error({ err }, "getCaisses"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function postCaisse(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ error: "Coopérative non associée à ce compte" }); return; }
   try {
     const { nom, responsableId, soldeinitial, fondMinimum } = req.body as {
       nom: string; responsableId?: number; soldeinitial?: number; fondMinimum?: number;
     };
     if (!nom) { res.status(400).json({ error: "nom requis" }); return; }
-    res.status(201).json(await svc.creerCaisse({ nom, responsableId, soldeinitial, fondMinimum }));
+    res.status(201).json(await svc.creerCaisse({ nom, responsableId, soldeinitial, fondMinimum }, cooperativeId));
   } catch (err) { req.log.error({ err }, "postCaisse"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function putCaisse(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ error: "Coopérative non associée à ce compte" }); return; }
   try {
     const id = parseInt(String(req.params["id"]), 10);
-    const row = await svc.updateCaisse(id, req.body);
+    const row = await svc.updateCaisse(id, req.body, cooperativeId);
     if (!row) { res.status(404).json({ error: "Caisse introuvable" }); return; }
     res.json(row);
   } catch (err) { req.log.error({ err }, "putCaisse"); res.status(500).json({ error: "Erreur serveur" }); }
@@ -116,12 +121,14 @@ export async function getRapportPdf(req: Request, res: Response): Promise<void> 
 // ─── Soldes & Alertes ─────────────────────────────────────────────────────────
 
 export async function getSoldes(req: Request, res: Response): Promise<void> {
-  try { res.json(await svc.getSoldes()); }
+  const cooperativeId = req.user?.cooperativeId ?? 1;
+  try { res.json(await svc.getSoldes(cooperativeId)); }
   catch (err) { req.log.error({ err }, "getSoldes"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function getAlertes(req: Request, res: Response): Promise<void> {
-  try { res.json(await svc.getAlertes()); }
+  const cooperativeId = req.user?.cooperativeId ?? 1;
+  try { res.json(await svc.getAlertes(cooperativeId)); }
   catch (err) { req.log.error({ err }, "getAlertes"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 

@@ -10,7 +10,7 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 const pid = (v: string | string[]): number => parseInt(Array.isArray(v) ? v[0] : v, 10);
 
@@ -20,7 +20,7 @@ export async function listerBailleurs(req: Request, res: Response): Promise<void
   const rows = await db
     .select()
     .from(bailleursTable)
-    .where(eq(bailleursTable.cooperativeId, COOP_ID))
+    .where(eq(bailleursTable.cooperativeId, coopId(req)))
     .orderBy(asc(bailleursTable.nom));
   res.json(rows);
 }
@@ -32,7 +32,7 @@ export async function creerBailleur(req: Request, res: Response): Promise<void> 
   if (!nom) { res.status(400).json({ erreur: "nom requis" }); return; }
 
   const [row] = await db.insert(bailleursTable).values({
-    cooperativeId:    COOP_ID,
+    cooperativeId:    coopId(req),
     nom,
     type:             (type as "ong" | "institution" | "etat" | "prive") ?? "ong",
     pays,
@@ -51,7 +51,7 @@ export async function modifierBailleur(req: Request, res: Response): Promise<voi
   const [row] = await db
     .update(bailleursTable)
     .set({ nom, type: type as "ong" | "institution" | "etat" | "prive" | undefined, pays, contactNom, contactEmail, contactTelephone })
-    .where(and(eq(bailleursTable.id, id), eq(bailleursTable.cooperativeId, COOP_ID)))
+    .where(and(eq(bailleursTable.id, id), eq(bailleursTable.cooperativeId, coopId(req))))
     .returning();
   if (!row) { res.status(404).json({ erreur: "Bailleur introuvable" }); return; }
   res.json(row);
@@ -60,7 +60,7 @@ export async function modifierBailleur(req: Request, res: Response): Promise<voi
 export async function supprimerBailleur(req: Request, res: Response): Promise<void> {
   const id = pid(req.params.id);
   await db.delete(bailleursTable)
-    .where(and(eq(bailleursTable.id, id), eq(bailleursTable.cooperativeId, COOP_ID)));
+    .where(and(eq(bailleursTable.id, id), eq(bailleursTable.cooperativeId, coopId(req))));
   res.status(204).end();
 }
 
@@ -71,7 +71,7 @@ export async function listerSubventions(req: Request, res: Response): Promise<vo
     .select({ subvention: subventionsTable, bailleur: bailleursTable })
     .from(subventionsTable)
     .leftJoin(bailleursTable, eq(subventionsTable.bailleurId, bailleursTable.id))
-    .where(eq(subventionsTable.cooperativeId, COOP_ID))
+    .where(eq(subventionsTable.cooperativeId, coopId(req)))
     .orderBy(desc(subventionsTable.createdAt));
 
   const aujourd_hui = new Date();
@@ -116,7 +116,7 @@ export async function creerSubvention(req: Request, res: Response): Promise<void
   }
 
   const [sub] = await db.insert(subventionsTable).values({
-    cooperativeId:        COOP_ID,
+    cooperativeId:        coopId(req),
     bailleurId,
     reference,
     libelle,
@@ -152,7 +152,7 @@ export async function getSubventionDetail(req: Request, res: Response): Promise<
     .select({ subvention: subventionsTable, bailleur: bailleursTable })
     .from(subventionsTable)
     .leftJoin(bailleursTable, eq(subventionsTable.bailleurId, bailleursTable.id))
-    .where(and(eq(subventionsTable.id, id), eq(subventionsTable.cooperativeId, COOP_ID)))
+    .where(and(eq(subventionsTable.id, id), eq(subventionsTable.cooperativeId, coopId(req))))
     .limit(1);
 
   if (!found) { res.status(404).json({ erreur: "Subvention introuvable" }); return; }
@@ -179,7 +179,7 @@ export async function enregistrerTranche(req: Request, res: Response): Promise<v
   const [sub] = await db
     .select()
     .from(subventionsTable)
-    .where(and(eq(subventionsTable.id, id), eq(subventionsTable.cooperativeId, COOP_ID)))
+    .where(and(eq(subventionsTable.id, id), eq(subventionsTable.cooperativeId, coopId(req))))
     .limit(1);
   if (!sub) { res.status(404).json({ erreur: "Subvention introuvable" }); return; }
 
@@ -212,7 +212,7 @@ export async function enregistrerTranche(req: Request, res: Response): Promise<v
 
   // Écriture comptable : Débit 521 (Banque) / Crédit 141 (Subventions reçues)
   await db.insert(ecrituresComptablesTable).values({
-    cooperativeId: COOP_ID,
+    cooperativeId: coopId(req),
     libelle:       `Réception tranche subvention - ${sub.reference}`,
     compteDebit:   "521",
     compteCredit:  "141",
@@ -270,7 +270,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
   const rows = await db
     .select()
     .from(subventionsTable)
-    .where(and(eq(subventionsTable.cooperativeId, COOP_ID), sql`statut != 'cloture'`));
+    .where(and(eq(subventionsTable.cooperativeId, coopId(req)), sql`statut != 'cloture'`));
 
   let totalRecu = 0, totalSolde = 0, totalTotal = 0;
   for (const s of rows) {
@@ -286,7 +286,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
     .from(tranchesSubventionTable)
     .innerJoin(subventionsTable, eq(tranchesSubventionTable.subventionId, subventionsTable.id))
     .where(and(
-      eq(subventionsTable.cooperativeId, COOP_ID),
+      eq(subventionsTable.cooperativeId, coopId(req)),
       eq(tranchesSubventionTable.statut, "attendue"),
     ))
     .orderBy(asc(tranchesSubventionTable.datePrevue))
@@ -312,7 +312,7 @@ export async function genererRapport(req: Request, res: Response): Promise<void>
     .select({ subvention: subventionsTable, bailleur: bailleursTable })
     .from(subventionsTable)
     .leftJoin(bailleursTable, eq(subventionsTable.bailleurId, bailleursTable.id))
-    .where(and(eq(subventionsTable.id, id), eq(subventionsTable.cooperativeId, COOP_ID)))
+    .where(and(eq(subventionsTable.id, id), eq(subventionsTable.cooperativeId, coopId(req))))
     .limit(1);
   if (!found) { res.status(404).json({ erreur: "Subvention introuvable" }); return; }
 
@@ -322,10 +322,10 @@ export async function genererRapport(req: Request, res: Response): Promise<void>
   ]);
 
   const tonnageResult = await db.execute<{ tonnage: string }>(
-    sql`SELECT COALESCE(SUM(poids_kg), 0)::text AS tonnage FROM livraisons WHERE cooperative_id = ${COOP_ID}`
+    sql`SELECT COALESCE(SUM(poids_kg), 0)::text AS tonnage FROM livraisons WHERE cooperative_id = ${coopId(req)}`
   );
   const membresResult = await db.execute<{ nb: string }>(
-    sql`SELECT COUNT(*)::text AS nb FROM membres WHERE cooperative_id = ${COOP_ID} AND statut = 'actif'`
+    sql`SELECT COUNT(*)::text AS nb FROM membres WHERE cooperative_id = ${coopId(req)} AND statut = 'actif'`
   );
 
   const contenuJson = {
@@ -354,7 +354,7 @@ export async function genererRapport(req: Request, res: Response): Promise<void>
 
   const [rapport] = await db.insert(rapportsBailleursTable).values({
     subventionId:  id,
-    cooperativeId: COOP_ID,
+    cooperativeId: coopId(req),
     periode,
     typeRapport,
     statut:        "brouillon",

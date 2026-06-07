@@ -4,7 +4,6 @@ import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 
-const COOP_ID = 1;
 
 // ─── Mapping motif → comptes OHADA ────────────────────────────────────────────
 // Entrée caisse : Débit 571 / Crédit [compte]
@@ -49,14 +48,14 @@ async function getSession(id: number) {
   return rows[0] ?? null;
 }
 
-async function getCoopNom(): Promise<string> {
-  const r = await db.execute<{ nom: string }>(sql`SELECT nom FROM cooperatives WHERE id = ${COOP_ID} LIMIT 1`);
+async function getCoopNom(cooperativeId: number): Promise<string> {
+  const r = await db.execute<{ nom: string }>(sql`SELECT nom FROM cooperatives WHERE id = ${cooperativeId} LIMIT 1`);
   return r.rows[0]?.nom ?? "CoopDigital";
 }
 
 // ─── CRUD Caisses ─────────────────────────────────────────────────────────────
 
-export async function listCaisses() {
+export async function listCaisses(cooperativeId: number) {
   const result = await db.execute<{
     id: number; nom: string; responsable_id: number | null; responsable_nom: string | null;
     solde_actuel_fcfa: string; fond_caisse_minimum_fcfa: string; actif: boolean;
@@ -72,7 +71,7 @@ export async function listCaisses() {
     LEFT JOIN users u ON u.id = c.responsable_id
     LEFT JOIN sessions_caisse s
       ON s.caisse_id = c.id AND s.date_session = CURRENT_DATE AND s.statut = 'ouverte'
-    WHERE c.cooperative_id = ${COOP_ID} AND c.actif = true
+    WHERE c.cooperative_id = ${cooperativeId} AND c.actif = true
     ORDER BY c.nom
   `);
   return result.rows;
@@ -81,9 +80,9 @@ export async function listCaisses() {
 export async function creerCaisse(data: {
   nom: string; responsableId?: number;
   soldeinitial?: number; fondMinimum?: number;
-}) {
+}, cooperativeId: number) {
   const [row] = await db.insert(caissesTable).values({
-    cooperativeId: COOP_ID,
+    cooperativeId,
     nom: data.nom,
     responsableId: data.responsableId ?? null,
     soldeActuelFcfa: (data.soldeinitial ?? 0).toString(),
@@ -94,13 +93,13 @@ export async function creerCaisse(data: {
 
 export async function updateCaisse(id: number, data: Partial<{
   nom: string; responsableId: number; fondMinimum: number; actif: boolean;
-}>) {
+}>, cooperativeId: number) {
   const [row] = await db.update(caissesTable).set({
     ...(data.nom           !== undefined && { nom: data.nom }),
     ...(data.responsableId !== undefined && { responsableId: data.responsableId }),
     ...(data.fondMinimum   !== undefined && { fondCaisseMinimumFcfa: data.fondMinimum.toString() }),
     ...(data.actif         !== undefined && { actif: data.actif }),
-  }).where(and(eq(caissesTable.id, id), eq(caissesTable.cooperativeId, COOP_ID))).returning();
+  }).where(and(eq(caissesTable.id, id), eq(caissesTable.cooperativeId, cooperativeId))).returning();
   return row ?? null;
 }
 
@@ -122,7 +121,6 @@ export async function getSessionActive(caisseId: number) {
     WHERE s.caisse_id = ${caisseId}
       AND s.date_session = CURRENT_DATE
       AND s.statut = 'ouverte'
-      AND s.cooperative_id = ${COOP_ID}
     GROUP BY s.id
     LIMIT 1
   `);
@@ -139,7 +137,7 @@ export async function ouvrirSession(caisseId: number, userId: number) {
 
   const [session] = await db.insert(sessionsCaisseTable).values({
     caisseId,
-    cooperativeId: COOP_ID,
+    cooperativeId: caisse.cooperativeId,
     dateSession: today(),
     ouvertPar: userId,
     soldeOuvertureFcfa: caisse.soldeActuelFcfa,
@@ -191,7 +189,7 @@ export async function enregistrerMouvement(
   const [mouvement] = await db.insert(mouvementsCaisseTable).values({
     caisseId,
     sessionId: session.id,
-    cooperativeId: COOP_ID,
+    cooperativeId: caisse.cooperativeId,
     type: data.type,
     motif: data.motif,
     montantFcfa: montant.toString(),
@@ -211,7 +209,7 @@ export async function enregistrerMouvement(
     const comptes = comptesForMouvement(data.type, data.motif);
     const exercice = new Date().getFullYear();
     await db.insert(ecrituresComptablesTable).values({
-      cooperativeId: COOP_ID,
+      cooperativeId: caisse.cooperativeId,
       dateEcriture:  today(),
       libelle:       data.libelle ?? `Caisse — ${data.motif}`,
       compteDebit:   comptes.debit,
@@ -314,7 +312,6 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
     LEFT JOIN users u ON u.id = m.enregistre_par
     WHERE m.caisse_id = ${caisseId}
       AND s.date_session BETWEEN ${dateD} AND ${dateF}
-      AND m.cooperative_id = ${COOP_ID}
     ORDER BY m.created_at
   `);
 
@@ -327,14 +324,14 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
 
 // ─── Soldes temps réel ────────────────────────────────────────────────────────
 
-export async function getSoldes() {
-  return listCaisses();
+export async function getSoldes(cooperativeId: number) {
+  return listCaisses(cooperativeId);
 }
 
 // ─── Alertes ──────────────────────────────────────────────────────────────────
 
-export async function getAlertes() {
-  const caisses = await listCaisses();
+export async function getAlertes(cooperativeId: number) {
+  const caisses = await listCaisses(cooperativeId);
   return caisses.filter((c) => {
     const solde = parseFloat(c.solde_actuel_fcfa);
     const min   = parseFloat(c.fond_caisse_minimum_fcfa);
@@ -364,7 +361,7 @@ export async function listSessions(caisseId: number, opts?: { dateDebut?: string
     LEFT JOIN users u1 ON u1.id = s.ouvert_par
     LEFT JOIN users u2 ON u2.id = s.ferme_par
     LEFT JOIN mouvements_caisse m ON m.session_id = s.id
-    WHERE s.caisse_id = ${caisseId} AND s.cooperative_id = ${COOP_ID}
+    WHERE s.caisse_id = ${caisseId}
       ${opts?.dateDebut ? sql`AND s.date_session >= ${opts.dateDebut}` : sql``}
       ${opts?.dateFin   ? sql`AND s.date_session <= ${opts.dateFin}`   : sql``}
     GROUP BY s.id, u1.nom, u2.nom
@@ -399,7 +396,7 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
   if (!caisse) throw new Error("Caisse introuvable");
 
   const journal = await getJournal(caisseId, { dateDebut: dateStr, dateFin: dateStr });
-  const coopNom = await getCoopNom();
+  const coopNom = await getCoopNom(caisse.cooperativeId);
 
   // Infos session
   const sessionResult = await db.execute<{
@@ -427,7 +424,7 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
 
-  await drawHeader(doc, COOP_ID, {
+  await drawHeader(doc, caisse.cooperativeId, {
     titre_document: "RAPPORT DE CAISSE",
     reference: dateStr,
     hauteur_reservee: 90,
@@ -545,7 +542,7 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
-    await drawFooter(doc, COOP_ID, i + 1, range.count);
+    await drawFooter(doc, caisse.cooperativeId, i + 1, range.count);
   }
 
   doc.end();

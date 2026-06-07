@@ -12,7 +12,7 @@ import { eq, and, sql, desc, asc } from "drizzle-orm";
 import { sendBulkSMS } from "../services/smsService";
 import { generatePvAg } from "../services/pdfService";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 const pid = (v: string | string[]): number => parseInt(Array.isArray(v) ? v[0] : v, 10);
 
@@ -26,7 +26,7 @@ export async function listerAGs(req: Request, res: Response): Promise<void> {
       nbVotes:   sql<number>`(SELECT COUNT(*) FROM votes_ag WHERE ag_id = ${assembleesGeneralesTable.id})::int`,
     })
     .from(assembleesGeneralesTable)
-    .where(eq(assembleesGeneralesTable.cooperativeId, COOP_ID))
+    .where(eq(assembleesGeneralesTable.cooperativeId, coopId(req)))
     .orderBy(desc(assembleesGeneralesTable.dateAg));
 
   res.json(rows);
@@ -50,10 +50,10 @@ export async function planifierAG(req: Request, res: Response): Promise<void> {
   // Compter membres actifs pour nb_convoques
   const [nbMembres] = await db.select({ nb: sql<number>`COUNT(*)::int` })
     .from(membresTable)
-    .where(and(eq(membresTable.cooperativeId, COOP_ID), eq(membresTable.statut, "actif")));
+    .where(and(eq(membresTable.cooperativeId, coopId(req)), eq(membresTable.statut, "actif")));
 
   const [ag] = await db.insert(assembleesGeneralesTable).values({
-    cooperativeId:     COOP_ID,
+    cooperativeId:     coopId(req),
     type:              (type as "ordinaire"|"extraordinaire"|"constitutive") ?? "ordinaire",
     libelle,
     dateAg,
@@ -90,7 +90,7 @@ export async function getAgDetail(req: Request, res: Response): Promise<void> {
   const [ag] = await db
     .select()
     .from(assembleesGeneralesTable)
-    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, COOP_ID)))
+    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, coopId(req))))
     .limit(1);
 
   if (!ag) { res.status(404).json({ erreur: "AG introuvable" }); return; }
@@ -130,7 +130,7 @@ export async function modifierAG(req: Request, res: Response): Promise<void> {
       ordreDuJour:      ordreDuJour ?? undefined,
       updatedAt:        new Date(),
     })
-    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, COOP_ID)))
+    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, coopId(req))))
     .returning();
 
   if (!updated) { res.status(404).json({ erreur: "AG introuvable" }); return; }
@@ -142,7 +142,7 @@ export async function ouvrirSeance(req: Request, res: Response): Promise<void> {
   const [updated] = await db
     .update(assembleesGeneralesTable)
     .set({ statut: "ouverte", updatedAt: new Date() })
-    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, COOP_ID)))
+    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, coopId(req))))
     .returning();
   if (!updated) { res.status(404).json({ erreur: "AG introuvable" }); return; }
   req.log.info({ agId: id }, "Séance AG ouverte");
@@ -156,7 +156,7 @@ export async function cloturerSeance(req: Request, res: Response): Promise<void>
   const [updated] = await db
     .update(assembleesGeneralesTable)
     .set({ statut: "cloturee", heureFin: heureFin ?? undefined, updatedAt: new Date() })
-    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, COOP_ID)))
+    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, coopId(req))))
     .returning();
   if (!updated) { res.status(404).json({ erreur: "AG introuvable" }); return; }
   req.log.info({ agId: id }, "Séance AG clôturée");
@@ -172,14 +172,14 @@ export async function envoyerConvocations(req: Request, res: Response): Promise<
   const [ag] = await db
     .select()
     .from(assembleesGeneralesTable)
-    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, COOP_ID)))
+    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, coopId(req))))
     .limit(1);
   if (!ag) { res.status(404).json({ erreur: "AG introuvable" }); return; }
 
   const membres = await db
     .select({ telephone: membresTable.telephone, nom: membresTable.nom, prenoms: membresTable.prenoms })
     .from(membresTable)
-    .where(and(eq(membresTable.cooperativeId, COOP_ID), eq(membresTable.statut, "actif")));
+    .where(and(eq(membresTable.cooperativeId, coopId(req)), eq(membresTable.statut, "actif")));
 
   const heureStr = ag.heureDebut ? ` à ${ag.heureDebut.slice(0, 5)}` : "";
   const ordrePts = (ag.ordreDuJour ?? []).slice(0, 3).join(", ");
@@ -242,7 +242,7 @@ export async function enregistrerPresence(req: Request, res: Response): Promise<
 
   const [ag] = await db.select()
     .from(assembleesGeneralesTable)
-    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, COOP_ID)))
+    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, coopId(req))))
     .limit(1);
   if (!ag) { res.status(404).json({ erreur: "AG introuvable" }); return; }
 
@@ -335,7 +335,7 @@ export async function getPvPdf(req: Request, res: Response): Promise<void> {
   const [ag] = await db
     .select()
     .from(assembleesGeneralesTable)
-    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, COOP_ID)))
+    .where(and(eq(assembleesGeneralesTable.id, id), eq(assembleesGeneralesTable.cooperativeId, coopId(req))))
     .limit(1);
   if (!ag) { res.status(404).json({ erreur: "AG introuvable" }); return; }
 

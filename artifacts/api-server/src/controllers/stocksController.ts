@@ -20,6 +20,12 @@ async function calcStockActuel(entrepotId: number): Promise<number> {
 }
 
 export async function getEntrepots(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const entrepots = await db
       .select({
@@ -41,6 +47,7 @@ export async function getEntrepots(req: Request, res: Response): Promise<void> {
       })
       .from(entrepotsTable)
       .leftJoin(mouvementsStockTable, eq(mouvementsStockTable.entrepotId, entrepotsTable.id))
+      .where(eq(entrepotsTable.cooperativeId, cooperativeId))
       .groupBy(entrepotsTable.id)
       .orderBy(entrepotsTable.nom);
 
@@ -58,12 +65,18 @@ export async function getEntrepots(req: Request, res: Response): Promise<void> {
 }
 
 export async function getMouvements(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const entrepotId = req.query["entrepot_id"] ? parseInt(String(req.query["entrepot_id"])) : undefined;
     const dateDebut = req.query["date_debut"] as string | undefined;
     const dateFin = req.query["date_fin"] as string | undefined;
 
-    const conditions = [];
+    const conditions: ReturnType<typeof eq>[] = [eq(entrepotsTable.cooperativeId, cooperativeId)];
     if (entrepotId) conditions.push(eq(mouvementsStockTable.entrepotId, entrepotId));
     if (dateDebut) conditions.push(gte(mouvementsStockTable.createdAt, new Date(dateDebut)));
     if (dateFin) conditions.push(lte(mouvementsStockTable.createdAt, new Date(dateFin + "T23:59:59Z")));
@@ -82,7 +95,7 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
       })
       .from(mouvementsStockTable)
       .leftJoin(entrepotsTable, eq(entrepotsTable.id, mouvementsStockTable.entrepotId))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(mouvementsStockTable.createdAt))
       .limit(200);
 
@@ -94,6 +107,12 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
 }
 
 export async function entreeStock(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const parse = EntreeStockBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
@@ -101,6 +120,10 @@ export async function entreeStock(req: Request, res: Response): Promise<void> {
   }
 
   try {
+    const [entrepot] = await db.select({ id: entrepotsTable.id }).from(entrepotsTable)
+      .where(and(eq(entrepotsTable.id, parse.data.entrepotId), eq(entrepotsTable.cooperativeId, cooperativeId))).limit(1);
+    if (!entrepot) { res.status(403).json({ erreur: "Entrepôt introuvable ou non autorisé" }); return; }
+
     const agentId = (req as Request & { user?: { id: number } }).user?.id ?? null;
     const [mouvement] = await db
       .insert(mouvementsStockTable)
@@ -138,6 +161,12 @@ export async function entreeStock(req: Request, res: Response): Promise<void> {
 }
 
 export async function sortieStock(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const parse = SortieStockBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
@@ -145,6 +174,10 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
   }
 
   try {
+    const [entrepot] = await db.select({ id: entrepotsTable.id }).from(entrepotsTable)
+      .where(and(eq(entrepotsTable.id, parse.data.entrepotId), eq(entrepotsTable.cooperativeId, cooperativeId))).limit(1);
+    if (!entrepot) { res.status(403).json({ erreur: "Entrepôt introuvable ou non autorisé" }); return; }
+
     // Vérifier stock suffisant
     const stockActuel = await calcStockActuel(parse.data.entrepotId);
     if (stockActuel < parse.data.poidsKg) {
@@ -214,6 +247,12 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
 }
 
 export async function getAlertes(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const entrepots = await db
       .select({
@@ -235,6 +274,7 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
       })
       .from(entrepotsTable)
       .leftJoin(mouvementsStockTable, eq(mouvementsStockTable.entrepotId, entrepotsTable.id))
+      .where(eq(entrepotsTable.cooperativeId, cooperativeId))
       .groupBy(entrepotsTable.id);
 
     const alertes = entrepots

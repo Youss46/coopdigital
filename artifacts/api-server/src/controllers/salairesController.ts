@@ -11,7 +11,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { generateBulletin, generateMasse } from "../services/paieService";
 import { generateEcrituresSalaire } from "../services/comptabiliteService";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 function parseId(raw: unknown): number {
   return parseInt(String(raw ?? "0"), 10);
@@ -29,7 +29,7 @@ export async function listPersonnel(
     const rows = await db
       .select()
       .from(personnelTable)
-      .where(eq(personnelTable.cooperativeId, COOP_ID))
+      .where(eq(personnelTable.cooperativeId, coopId(req)))
       .orderBy(personnelTable.nom);
     res.json(rows);
   } catch (err) {
@@ -50,7 +50,7 @@ export async function getPersonnelById(
       .where(
         and(
           eq(personnelTable.id, id),
-          eq(personnelTable.cooperativeId, COOP_ID),
+          eq(personnelTable.cooperativeId, coopId(req)),
         ),
       )
       .limit(1);
@@ -85,7 +85,7 @@ export async function createPersonnel(
     const [row] = await db
       .insert(personnelTable)
       .values({
-        cooperativeId: COOP_ID,
+        cooperativeId: coopId(req),
         nom: String(nom),
         prenoms: String(prenoms),
         poste: String(poste),
@@ -143,7 +143,7 @@ export async function updatePersonnel(
       .where(
         and(
           eq(personnelTable.id, id),
-          eq(personnelTable.cooperativeId, COOP_ID),
+          eq(personnelTable.cooperativeId, coopId(req)),
         ),
       )
       .returning();
@@ -171,7 +171,7 @@ export async function archiverPersonnel(
       .where(
         and(
           eq(personnelTable.id, id),
-          eq(personnelTable.cooperativeId, COOP_ID),
+          eq(personnelTable.cooperativeId, coopId(req)),
         ),
       )
       .returning();
@@ -199,7 +199,7 @@ export async function getPersonnelHistorique(
       .where(
         and(
           eq(personnelTable.id, id),
-          eq(personnelTable.cooperativeId, COOP_ID),
+          eq(personnelTable.cooperativeId, coopId(req)),
         ),
       )
       .limit(1);
@@ -240,7 +240,7 @@ export async function listComposantes(
     const rows = await db
       .select()
       .from(composantesSalaireTable)
-      .where(eq(composantesSalaireTable.cooperativeId, COOP_ID));
+      .where(eq(composantesSalaireTable.cooperativeId, coopId(req)));
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "listComposantes");
@@ -272,7 +272,7 @@ export async function genererBulletins(
     if (personnelIds && personnelIds.length > 0) {
       results = await Promise.allSettled(
         personnelIds.map((pid) =>
-          generateBulletin(pid, mois, annee, COOP_ID),
+          generateBulletin(pid, mois, annee, coopId(req)),
         ),
       );
       const mapped = personnelIds.map((pid, i) => {
@@ -282,7 +282,7 @@ export async function genererBulletins(
       });
       res.json(mapped);
     } else {
-      const masse = await generateMasse(COOP_ID, mois, annee);
+      const masse = await generateMasse(coopId(req), mois, annee);
       res.json(masse);
     }
   } catch (err) {
@@ -300,7 +300,7 @@ export async function listBulletins(
     const annee = req.query["annee"] ? parseInt(String(req.query["annee"])) : undefined;
     const statut = req.query["statut"] ? String(req.query["statut"]) : undefined;
 
-    const conditions = [eq(bulletinsPaieTable.cooperativeId, COOP_ID)];
+    const conditions = [eq(bulletinsPaieTable.cooperativeId, coopId(req))];
     if (mois) conditions.push(eq(bulletinsPaieTable.mois, mois));
     if (annee) conditions.push(eq(bulletinsPaieTable.annee, annee));
     if (statut) conditions.push(eq(bulletinsPaieTable.statut, statut as "brouillon" | "valide" | "paye"));
@@ -352,7 +352,7 @@ export async function getBulletinById(
       .where(
         and(
           eq(bulletinsPaieTable.id, id),
-          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+          eq(bulletinsPaieTable.cooperativeId, coopId(req)),
         ),
       )
       .limit(1);
@@ -386,7 +386,7 @@ export async function validerBulletin(
       .where(
         and(
           eq(bulletinsPaieTable.id, id),
-          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+          eq(bulletinsPaieTable.cooperativeId, coopId(req)),
         ),
       )
       .limit(1);
@@ -424,7 +424,7 @@ export async function payerBulletin(
       .where(
         and(
           eq(bulletinsPaieTable.id, id),
-          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+          eq(bulletinsPaieTable.cooperativeId, coopId(req)),
         ),
       )
       .limit(1);
@@ -484,7 +484,7 @@ export async function deleteBulletin(
       .where(
         and(
           eq(bulletinsPaieTable.id, id),
-          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+          eq(bulletinsPaieTable.cooperativeId, coopId(req)),
         ),
       )
       .limit(1);
@@ -527,7 +527,7 @@ export async function listAvancesPersonnel(
       : undefined;
     const statut = req.query["statut"] ? String(req.query["statut"]) : undefined;
 
-    const conditions = [eq(avancesPersonnelTable.cooperativeId, COOP_ID)];
+    const conditions = [eq(avancesPersonnelTable.cooperativeId, coopId(req))];
     if (personnelId) conditions.push(eq(avancesPersonnelTable.personnelId, personnelId));
     if (statut) conditions.push(eq(avancesPersonnelTable.statut, statut as "en_cours" | "rembourse"));
 
@@ -576,7 +576,7 @@ export async function createAvancePersonnel(
       .where(
         and(
           eq(personnelTable.id, Number(personnelId)),
-          eq(personnelTable.cooperativeId, COOP_ID),
+          eq(personnelTable.cooperativeId, coopId(req)),
         ),
       )
       .limit(1);
@@ -589,7 +589,7 @@ export async function createAvancePersonnel(
       .insert(avancesPersonnelTable)
       .values({
         personnelId: Number(personnelId),
-        cooperativeId: COOP_ID,
+        cooperativeId: coopId(req),
         montantFcfa: Number(montantFcfa),
         dateOctroi: String(dateOctroi),
         motif: motif ? String(motif) : null,
@@ -666,7 +666,7 @@ export async function getRapportMensuel(
       .from(bulletinsPaieTable)
       .where(
         and(
-          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+          eq(bulletinsPaieTable.cooperativeId, coopId(req)),
           eq(bulletinsPaieTable.mois, mois),
           eq(bulletinsPaieTable.annee, annee),
         ),
@@ -686,7 +686,7 @@ export async function getRapportMensuel(
       )
       .where(
         and(
-          eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+          eq(bulletinsPaieTable.cooperativeId, coopId(req)),
           eq(bulletinsPaieTable.mois, mois),
           eq(bulletinsPaieTable.annee, annee),
         ),
@@ -698,7 +698,7 @@ export async function getRapportMensuel(
       .from(personnelTable)
       .where(
         and(
-          eq(personnelTable.cooperativeId, COOP_ID),
+          eq(personnelTable.cooperativeId, coopId(req)),
           eq(personnelTable.statut, "actif"),
         ),
       );
@@ -739,7 +739,7 @@ export async function getHistoriqueMasse(
         nbBulletins: sql<number>`count(*)::int`,
       })
       .from(bulletinsPaieTable)
-      .where(eq(bulletinsPaieTable.cooperativeId, COOP_ID))
+      .where(eq(bulletinsPaieTable.cooperativeId, coopId(req)))
       .groupBy(
         bulletinsPaieTable.mois,
         bulletinsPaieTable.annee,

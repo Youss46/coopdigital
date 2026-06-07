@@ -6,7 +6,7 @@ import {
 import { eq, and, asc, sql } from "drizzle-orm";
 import { syncRealise, getAlertesDepassement } from "../services/budgetService";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 const LIGNES_DEFAULT = [
   { categorie: "recette"            as const, libelle: "Ventes cacao exportateurs",     ordre: 1 },
@@ -30,7 +30,7 @@ export async function creerOuGetBudget(req: Request, res: Response): Promise<voi
     const [campagne] = await db
       .select()
       .from(campagnesTable)
-      .where(and(eq(campagnesTable.id, campagneId), eq(campagnesTable.cooperativeId, COOP_ID)))
+      .where(and(eq(campagnesTable.id, campagneId), eq(campagnesTable.cooperativeId, coopId(req))))
       .limit(1);
 
     if (!campagne) {
@@ -42,7 +42,7 @@ export async function creerOuGetBudget(req: Request, res: Response): Promise<voi
     const [existing] = await db
       .select()
       .from(budgetsCampagneTable)
-      .where(and(eq(budgetsCampagneTable.campagneId, campagneId), eq(budgetsCampagneTable.cooperativeId, COOP_ID)))
+      .where(and(eq(budgetsCampagneTable.campagneId, campagneId), eq(budgetsCampagneTable.cooperativeId, coopId(req))))
       .limit(1);
 
     if (existing) {
@@ -52,7 +52,7 @@ export async function creerOuGetBudget(req: Request, res: Response): Promise<voi
 
     // Crée le budget
     const [budget] = await db.insert(budgetsCampagneTable).values({
-      cooperativeId: COOP_ID,
+      cooperativeId: coopId(req),
       campagneId,
       statut: "brouillon",
     }).returning();
@@ -77,7 +77,7 @@ export async function getBudgetCampagne(req: Request, res: Response): Promise<vo
     const [budget] = await db
       .select()
       .from(budgetsCampagneTable)
-      .where(and(eq(budgetsCampagneTable.campagneId, campagneId), eq(budgetsCampagneTable.cooperativeId, COOP_ID)))
+      .where(and(eq(budgetsCampagneTable.campagneId, campagneId), eq(budgetsCampagneTable.cooperativeId, coopId(req))))
       .limit(1);
 
     if (!budget) {
@@ -176,7 +176,7 @@ export async function validerBudget(req: Request, res: Response): Promise<void> 
     const [updated] = await db
       .update(budgetsCampagneTable)
       .set({ statut: "valide", validePar: userId ?? null, dateValidation: new Date(), updatedAt: new Date() })
-      .where(and(eq(budgetsCampagneTable.id, budgetId), eq(budgetsCampagneTable.cooperativeId, COOP_ID)))
+      .where(and(eq(budgetsCampagneTable.id, budgetId), eq(budgetsCampagneTable.cooperativeId, coopId(req))))
       .returning();
 
     if (!updated) {

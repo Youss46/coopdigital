@@ -128,12 +128,13 @@ export async function getParcellesCarte(req: Request, res: Response): Promise<vo
 
 export async function getParcelleById(req: Request, res: Response): Promise<void> {
   try {
+    const coopId = COOP_ID(req);
     const id = parseInt(String(req.params["id"] ?? "0"));
     const [row] = await db
       .select({ parcelle: parcellesTable, membreNom: membresTable.nom, membrePrenoms: membresTable.prenoms })
       .from(parcellesTable)
       .innerJoin(membresTable, eq(parcellesTable.membreId, membresTable.id))
-      .where(eq(parcellesTable.id, id))
+      .where(and(eq(parcellesTable.id, id), eq(parcellesTable.cooperativeId, coopId)))
       .limit(1);
 
     if (!row) { res.status(404).json({ erreur: "Parcelle introuvable" }); return; }
@@ -208,10 +209,12 @@ export async function createParcelle(req: Request, res: Response): Promise<void>
 
 export async function updateParcelle(req: Request, res: Response): Promise<void> {
   try {
+    const coopId = COOP_ID(req);
     const id = parseInt(String(req.params["id"] ?? "0"));
     const body = req.body as Record<string, unknown>;
 
-    const [existing] = await db.select().from(parcellesTable).where(eq(parcellesTable.id, id)).limit(1);
+    const [existing] = await db.select().from(parcellesTable)
+      .where(and(eq(parcellesTable.id, id), eq(parcellesTable.cooperativeId, coopId))).limit(1);
     if (!existing) { res.status(404).json({ erreur: "Parcelle introuvable" }); return; }
 
     const polygone = body["polygone"] as [number, number][] | undefined;
@@ -242,7 +245,8 @@ export async function updateParcelle(req: Request, res: Response): Promise<void>
     if ("derniere_campagne_kg"   in body) updates.derniereCampagneKg     = String(body["derniere_campagne_kg"]);
     if ("actif"                  in body) updates.actif                  = Boolean(body["actif"]);
 
-    const [updated] = await db.update(parcellesTable).set(updates).where(eq(parcellesTable.id, id)).returning();
+    const [updated] = await db.update(parcellesTable).set(updates)
+      .where(and(eq(parcellesTable.id, id), eq(parcellesTable.cooperativeId, coopId))).returning();
 
     if (polygoneChanged && polygone && polygone.length >= 3) {
       verifierEUDR(id).catch(e =>
@@ -261,11 +265,12 @@ export async function updateParcelle(req: Request, res: Response): Promise<void>
 
 export async function getParcellesMembre(req: Request, res: Response): Promise<void> {
   try {
+    const coopId = COOP_ID(req);
     const membreId = parseInt(String(req.params["membre_id"] ?? "0"));
     const parcelles = await db
       .select()
       .from(parcellesTable)
-      .where(and(eq(parcellesTable.membreId, membreId), eq(parcellesTable.actif, true)))
+      .where(and(eq(parcellesTable.membreId, membreId), eq(parcellesTable.cooperativeId, coopId), eq(parcellesTable.actif, true)))
       .orderBy(desc(parcellesTable.createdAt));
     res.json(parcelles);
   } catch (err) {
@@ -367,7 +372,11 @@ export async function importZonesRisque(req: Request, res: Response): Promise<vo
 
 export async function verifierEUDRController(req: Request, res: Response): Promise<void> {
   try {
+    const coopId = COOP_ID(req);
     const id = parseInt(String(req.params["id"] ?? "0"));
+    const [check] = await db.select({ id: parcellesTable.id }).from(parcellesTable)
+      .where(and(eq(parcellesTable.id, id), eq(parcellesTable.cooperativeId, coopId))).limit(1);
+    if (!check) { res.status(404).json({ erreur: "Parcelle introuvable" }); return; }
     await verifierEUDR(id);
     const [updated] = await db.select().from(parcellesTable).where(eq(parcellesTable.id, id)).limit(1);
     res.json(updated);

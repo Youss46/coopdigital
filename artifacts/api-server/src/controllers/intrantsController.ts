@@ -3,7 +3,7 @@ import { db, intrantsTable, categoriesIntrantsTable, distributionsIntrantsTable,
 import { eq, and, sql, lt, desc, asc, gte } from "drizzle-orm";
 import { getEncoursMembre } from "../services/intrantsService";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 // ─── CATALOGUE ────────────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ export async function listIntrants(req: Request, res: Response): Promise<void> {
       .leftJoin(categoriesIntrantsTable, eq(intrantsTable.categorieId, categoriesIntrantsTable.id))
       .where(
         and(
-          eq(intrantsTable.cooperativeId, COOP_ID),
+          eq(intrantsTable.cooperativeId, coopId(req)),
           actifSeulement ? eq(intrantsTable.actif, true) : undefined
         )
       )
@@ -52,7 +52,7 @@ export async function getIntrantById(req: Request, res: Response): Promise<void>
     const [row] = await db
       .select()
       .from(intrantsTable)
-      .where(and(eq(intrantsTable.id, id), eq(intrantsTable.cooperativeId, COOP_ID)))
+      .where(and(eq(intrantsTable.id, id), eq(intrantsTable.cooperativeId, coopId(req))))
       .limit(1);
 
     if (!row) { res.status(404).json({ erreur: "Intrant introuvable" }); return; }
@@ -75,7 +75,7 @@ export async function createIntrant(req: Request, res: Response): Promise<void> 
     const [intrant] = await db
       .insert(intrantsTable)
       .values({
-        cooperativeId: COOP_ID,
+        cooperativeId: coopId(req),
         nom: String(nom),
         description: description ? String(description) : null,
         unite: String(unite),
@@ -113,7 +113,7 @@ export async function updateIntrant(req: Request, res: Response): Promise<void> 
         actif: actif !== undefined ? Boolean(actif) : undefined,
         updatedAt: new Date(),
       })
-      .where(and(eq(intrantsTable.id, id), eq(intrantsTable.cooperativeId, COOP_ID)))
+      .where(and(eq(intrantsTable.id, id), eq(intrantsTable.cooperativeId, coopId(req))))
       .returning();
 
     if (!updated) { res.status(404).json({ erreur: "Intrant introuvable" }); return; }
@@ -138,7 +138,7 @@ export async function getStockAlertes(req: Request, res: Response): Promise<void
       .from(intrantsTable)
       .where(
         and(
-          eq(intrantsTable.cooperativeId, COOP_ID),
+          eq(intrantsTable.cooperativeId, coopId(req)),
           eq(intrantsTable.actif, true),
           sql`stock_actuel < stock_minimum`
         )
@@ -159,7 +159,7 @@ export async function listCategories(req: Request, res: Response): Promise<void>
     const rows = await db
       .select()
       .from(categoriesIntrantsTable)
-      .where(eq(categoriesIntrantsTable.cooperativeId, COOP_ID))
+      .where(eq(categoriesIntrantsTable.cooperativeId, coopId(req)))
       .orderBy(asc(categoriesIntrantsTable.libelle));
     res.json(rows);
   } catch (err) {
@@ -187,7 +187,7 @@ export async function createAppro(req: Request, res: Response): Promise<void> {
       const [appro] = await tx
         .insert(approvisionnmentsIntrantsTable)
         .values({
-          cooperativeId: COOP_ID,
+          cooperativeId: coopId(req),
           intrantId: Number(intrantId),
           campagneId: campagneId ? Number(campagneId) : null,
           dateAppro: String(dateAppro),
@@ -254,7 +254,7 @@ export async function createDistribution(req: Request, res: Response): Promise<v
       const [dist] = await tx
         .insert(distributionsIntrantsTable)
         .values({
-          cooperativeId: COOP_ID,
+          cooperativeId: coopId(req),
           intrantId: Number(intrantId),
           membreId: Number(membreId),
           campagneId: campagneId ? Number(campagneId) : null,
@@ -315,7 +315,7 @@ export async function getDistributionsMembre(req: Request, res: Response): Promi
       .where(
         and(
           eq(distributionsIntrantsTable.membreId, membreId),
-          eq(distributionsIntrantsTable.cooperativeId, COOP_ID)
+          eq(distributionsIntrantsTable.cooperativeId, coopId(req))
         )
       )
       .orderBy(desc(distributionsIntrantsTable.dateDistribution));
@@ -347,7 +347,7 @@ export async function getEncours(req: Request, res: Response): Promise<void> {
       .leftJoin(membresTable, eq(distributionsIntrantsTable.membreId, membresTable.id))
       .where(
         and(
-          eq(distributionsIntrantsTable.cooperativeId, COOP_ID),
+          eq(distributionsIntrantsTable.cooperativeId, coopId(req)),
           sql`statut_remboursement != 'rembourse'`,
           sql`montant_membre_fcfa > montant_rembourse_fcfa`
         )
@@ -437,7 +437,7 @@ export async function getRapportCampagne(req: Request, res: Response): Promise<v
     const campagneId = req.query["campagne_id"] ? parseInt(String(req.query["campagne_id"])) : null;
 
     const where = and(
-      eq(distributionsIntrantsTable.cooperativeId, COOP_ID),
+      eq(distributionsIntrantsTable.cooperativeId, coopId(req)),
       campagneId ? eq(distributionsIntrantsTable.campagneId, campagneId) : undefined
     );
 

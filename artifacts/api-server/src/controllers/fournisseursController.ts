@@ -4,7 +4,7 @@ import { fournisseursTable, membresTable } from "@workspace/db";
 import { eq, and, or, ilike, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 function genCode(type: "membre" | "pisteur" | "externe", annee: number, seq: number) {
   const prefix = { membre: "MBR", pisteur: "PST", externe: "EXT" }[type];
@@ -20,7 +20,7 @@ export async function listFournisseurs(req: Request, res: Response) {
 
   const fournisseurs = await db.query.fournisseursTable.findMany({
     where: and(
-      eq(fournisseursTable.cooperativeId, COOP_ID),
+      eq(fournisseursTable.cooperativeId, coopId(req)),
       eq(fournisseursTable.actif, true),
       type ? eq(fournisseursTable.typeFournisseur, type as "membre" | "pisteur" | "externe") : undefined,
       section ? eq(fournisseursTable.section, section) : undefined,
@@ -45,7 +45,7 @@ export async function searchFournisseurs(req: Request, res: Response) {
 
   const results = await db.query.fournisseursTable.findMany({
     where: and(
-      eq(fournisseursTable.cooperativeId, COOP_ID),
+      eq(fournisseursTable.cooperativeId, coopId(req)),
       eq(fournisseursTable.actif, true),
       or(
         ilike(fournisseursTable.nom, `%${q}%`),
@@ -66,7 +66,7 @@ export async function getFournisseurById(req: Request, res: Response) {
   const fournisseur = await db.query.fournisseursTable.findFirst({
     where: and(
       eq(fournisseursTable.id, id),
-      eq(fournisseursTable.cooperativeId, COOP_ID)
+      eq(fournisseursTable.cooperativeId, coopId(req))
     ),
   });
 
@@ -103,7 +103,7 @@ export async function createFournisseur(req: Request, res: Response) {
     .from(fournisseursTable)
     .where(
       and(
-        eq(fournisseursTable.cooperativeId, COOP_ID),
+        eq(fournisseursTable.cooperativeId, coopId(req)),
         eq(fournisseursTable.typeFournisseur, type)
       )
     );
@@ -113,7 +113,7 @@ export async function createFournisseur(req: Request, res: Response) {
   const [fournisseur] = await db
     .insert(fournisseursTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: coopId(req),
       typeFournisseur: type,
       code,
       nom: body.nom,
@@ -138,7 +138,7 @@ export async function createFournisseurDepuisMembre(req: Request, res: Response)
   const membre = await db.query.membresTable.findFirst({
     where: and(
       eq(membresTable.id, membreId),
-      eq(membresTable.cooperativeId, COOP_ID)
+      eq(membresTable.cooperativeId, coopId(req))
     ),
   });
   if (!membre) return res.status(404).json({ erreur: "Membre introuvable" });
@@ -146,7 +146,7 @@ export async function createFournisseurDepuisMembre(req: Request, res: Response)
   const existant = await db.query.fournisseursTable.findFirst({
     where: and(
       eq(fournisseursTable.membreId, membreId),
-      eq(fournisseursTable.cooperativeId, COOP_ID)
+      eq(fournisseursTable.cooperativeId, coopId(req))
     ),
   });
   if (existant) return res.json(existant);
@@ -157,7 +157,7 @@ export async function createFournisseurDepuisMembre(req: Request, res: Response)
     .from(fournisseursTable)
     .where(
       and(
-        eq(fournisseursTable.cooperativeId, COOP_ID),
+        eq(fournisseursTable.cooperativeId, coopId(req)),
         eq(fournisseursTable.typeFournisseur, "membre")
       )
     );
@@ -167,7 +167,7 @@ export async function createFournisseurDepuisMembre(req: Request, res: Response)
   const [fournisseur] = await db
     .insert(fournisseursTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: coopId(req),
       typeFournisseur: "membre",
       membreId,
       code,
@@ -215,7 +215,7 @@ export async function updateFournisseur(req: Request, res: Response) {
     .where(
       and(
         eq(fournisseursTable.id, id),
-        eq(fournisseursTable.cooperativeId, COOP_ID)
+        eq(fournisseursTable.cooperativeId, coopId(req))
       )
     )
     .returning();
@@ -233,7 +233,7 @@ export async function getRapportTypeFournisseur(req: Request, res: Response) {
     .from(fournisseursTable)
     .where(
       and(
-        eq(fournisseursTable.cooperativeId, COOP_ID),
+        eq(fournisseursTable.cooperativeId, coopId(req)),
         eq(fournisseursTable.actif, true)
       )
     )

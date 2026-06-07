@@ -4,7 +4,7 @@ import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, confi
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
 
-const COOP_ID = 1;
+const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
 
 function exerciceCourant(): number {
   return new Date().getFullYear();
@@ -20,7 +20,7 @@ export async function getGrandLivre(req: Request, res: Response): Promise<void> 
     const limit = Math.min(200, parseInt(String(req.query["limit"] ?? "50")));
     const offset = (page - 1) * limit;
 
-    const conditions = [eq(ecrituresComptablesTable.cooperativeId, COOP_ID)];
+    const conditions = [eq(ecrituresComptablesTable.cooperativeId, coopId(req))];
     if (exercice) conditions.push(eq(ecrituresComptablesTable.exercice, exercice));
     if (dateDebut) conditions.push(gte(ecrituresComptablesTable.dateEcriture, dateDebut));
     if (dateFin) conditions.push(lte(ecrituresComptablesTable.dateEcriture, dateFin));
@@ -68,9 +68,9 @@ export async function getBalance(req: Request, res: Response): Promise<void> {
       FROM plan_comptable p
       LEFT JOIN ecritures_comptables e
         ON (e.compte_debit = p.numero_compte OR e.compte_credit = p.numero_compte)
-        AND e.cooperative_id = ${COOP_ID}
+        AND e.cooperative_id = ${coopId(req)}
         AND e.exercice = ${exercice}
-      WHERE p.cooperative_id = ${COOP_ID}
+      WHERE p.cooperative_id = ${coopId(req)}
       GROUP BY p.id, p.numero_compte, p.libelle, p.type
       HAVING (
         COALESCE(SUM(CASE WHEN e.compte_debit = p.numero_compte THEN e.montant_fcfa ELSE 0 END), 0) > 0 OR
@@ -94,7 +94,7 @@ export async function getJournalComptable(req: Request, res: Response): Promise<
     const offset = (page - 1) * limit;
 
     const where = and(
-      eq(ecrituresComptablesTable.cooperativeId, COOP_ID),
+      eq(ecrituresComptablesTable.cooperativeId, coopId(req)),
       eq(ecrituresComptablesTable.exercice, exercice)
     );
 
@@ -140,7 +140,7 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
     const anomaliesAttention = anomaliesDetectees.filter((a) => a.niveauGravite !== "critique");
 
     const [ecriture] = await db.insert(ecrituresComptablesTable).values({
-      cooperativeId: COOP_ID,
+      cooperativeId: coopId(req),
       dateEcriture,
       numeroPiece: numeroPiece ?? null,
       libelle,
@@ -172,7 +172,7 @@ export async function getMargeCollecte(req: Request, res: Response): Promise<voi
         COALESCE(SUM(CASE WHEN compte_debit = '601' THEN montant_fcfa ELSE 0 END), 0)::int AS "coutAchatsFcfa",
         COALESCE(SUM(CASE WHEN compte_debit IN ('621', '641', '661') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
       FROM ecritures_comptables
-      WHERE cooperative_id = ${COOP_ID} AND exercice = ${exercice}
+      WHERE cooperative_id = ${coopId(req)} AND exercice = ${exercice}
     `);
 
     const r = rows.rows[0] as { caVentesFcfa: number; coutAchatsFcfa: number; chargesFcfa: number };
@@ -198,7 +198,7 @@ export async function getTresorerie(req: Request, res: Response): Promise<void> 
         COALESCE(SUM(CASE WHEN compte_debit = '571' THEN montant_fcfa ELSE 0 END) -
                  SUM(CASE WHEN compte_credit = '571' THEN montant_fcfa ELSE 0 END), 0)::int AS "soldeCaisseFcfa"
       FROM ecritures_comptables
-      WHERE cooperative_id = ${COOP_ID}
+      WHERE cooperative_id = ${coopId(req)}
     `);
 
     const r = rows.rows[0] as { soldeBanqueFcfa: number; soldeCaisseFcfa: number };
@@ -224,12 +224,12 @@ export async function getConfigComptable(req: Request, res: Response): Promise<v
     const rows = await db
       .select()
       .from(configComptableTable)
-      .where(eq(configComptableTable.cooperativeId, COOP_ID))
+      .where(eq(configComptableTable.cooperativeId, coopId(req)))
       .limit(1);
 
     if (rows.length === 0) {
-      await db.insert(configComptableTable).values({ cooperativeId: COOP_ID }).onConflictDoNothing();
-      const created = await db.select().from(configComptableTable).where(eq(configComptableTable.cooperativeId, COOP_ID)).limit(1);
+      await db.insert(configComptableTable).values({ cooperativeId: coopId(req) }).onConflictDoNothing();
+      const created = await db.select().from(configComptableTable).where(eq(configComptableTable.cooperativeId, coopId(req))).limit(1);
       res.json(created[0]);
       return;
     }
@@ -259,12 +259,12 @@ export async function updateConfigComptable(req: Request, res: Response): Promis
         modifiePar: req.user?.id ?? null,
         updatedAt: new Date(),
       })
-      .where(eq(configComptableTable.cooperativeId, COOP_ID))
+      .where(eq(configComptableTable.cooperativeId, coopId(req)))
       .returning();
 
     if (!updated) {
-      await db.insert(configComptableTable).values({ cooperativeId: COOP_ID, ...body, modifiePar: req.user?.id ?? null, updatedAt: new Date() }).onConflictDoNothing();
-      const created = await db.select().from(configComptableTable).where(eq(configComptableTable.cooperativeId, COOP_ID)).limit(1);
+      await db.insert(configComptableTable).values({ cooperativeId: coopId(req), ...body, modifiePar: req.user?.id ?? null, updatedAt: new Date() }).onConflictDoNothing();
+      const created = await db.select().from(configComptableTable).where(eq(configComptableTable.cooperativeId, coopId(req))).limit(1);
       res.json(created[0]);
       return;
     }
@@ -284,7 +284,7 @@ export async function listEcrituresEnAttente(req: Request, res: Response): Promi
     const dateDebut = req.query["date_debut"] as string | undefined;
     const dateFin = req.query["date_fin"] as string | undefined;
 
-    const conditions = [eq(ecrituresEnAttenteTable.cooperativeId, COOP_ID)];
+    const conditions = [eq(ecrituresEnAttenteTable.cooperativeId, coopId(req))];
     if (source) conditions.push(eq(ecrituresEnAttenteTable.source, source as "livraison" | "paiement" | "avance" | "vente" | "encaissement" | "salaire" | "stock"));
     if (statut) conditions.push(eq(ecrituresEnAttenteTable.statut, statut as "en_attente" | "validee" | "rejetee" | "modifiee"));
     if (dateDebut) conditions.push(gte(ecrituresEnAttenteTable.dateProposee, dateDebut));
@@ -309,7 +309,7 @@ export async function countEcrituresEnAttente(req: Request, res: Response): Prom
       .select({ count: sql<number>`count(*)::int` })
       .from(ecrituresEnAttenteTable)
       .where(and(
-        eq(ecrituresEnAttenteTable.cooperativeId, COOP_ID),
+        eq(ecrituresEnAttenteTable.cooperativeId, coopId(req)),
         eq(ecrituresEnAttenteTable.statut, "en_attente"),
       ));
     res.json({ count: count ?? 0 });
@@ -327,7 +327,7 @@ export async function validerEcritureEnAttente(req: Request, res: Response): Pro
     const [ecriture] = await db
       .select()
       .from(ecrituresEnAttenteTable)
-      .where(and(eq(ecrituresEnAttenteTable.id, id), eq(ecrituresEnAttenteTable.cooperativeId, COOP_ID)))
+      .where(and(eq(ecrituresEnAttenteTable.id, id), eq(ecrituresEnAttenteTable.cooperativeId, coopId(req))))
       .limit(1);
 
     if (!ecriture) { res.status(404).json({ erreur: "Écriture introuvable" }); return; }
@@ -366,7 +366,7 @@ export async function validerEcritureEnAttente(req: Request, res: Response): Pro
     };
 
     await db.insert(ecrituresComptablesTable).values({
-      cooperativeId: COOP_ID,
+      cooperativeId: coopId(req),
       dateEcriture: ecriture.dateProposee,
       libelle: modifie ? `${libelle} [modifiée]` : libelle,
       compteDebit,
@@ -403,7 +403,7 @@ export async function rejeterEcritureEnAttente(req: Request, res: Response): Pro
     const [ecriture] = await db
       .select()
       .from(ecrituresEnAttenteTable)
-      .where(and(eq(ecrituresEnAttenteTable.id, id), eq(ecrituresEnAttenteTable.cooperativeId, COOP_ID)))
+      .where(and(eq(ecrituresEnAttenteTable.id, id), eq(ecrituresEnAttenteTable.cooperativeId, coopId(req))))
       .limit(1);
 
     if (!ecriture) { res.status(404).json({ erreur: "Écriture introuvable" }); return; }
@@ -436,7 +436,7 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
       .select()
       .from(ecrituresEnAttenteTable)
       .where(and(
-        eq(ecrituresEnAttenteTable.cooperativeId, COOP_ID),
+        eq(ecrituresEnAttenteTable.cooperativeId, coopId(req)),
         eq(ecrituresEnAttenteTable.statut, "en_attente"),
       ));
 
@@ -452,7 +452,7 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
 
     await db.insert(ecrituresComptablesTable).values(
       enAttente.map((e) => ({
-        cooperativeId: COOP_ID,
+        cooperativeId: coopId(req),
         dateEcriture: e.dateProposee,
         libelle: e.libelleProppose,
         compteDebit: e.compteDebitPropose,
