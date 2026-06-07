@@ -174,7 +174,8 @@ export async function getMembreHistorique(req: Request, res: Response): Promise<
 export async function exportMembresPdf(req: Request, res: Response): Promise<void> {
   try {
     const statutFilter = req.query["statut"] as string | undefined;
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
 
     const conditions = [eq(membresTable.cooperativeId, cooperativeId)];
     if (statutFilter === "actif" || statutFilter === "inactif") {
@@ -307,7 +308,8 @@ export async function modifierStatutMembre(req: Request, res: Response): Promise
 export async function desactiverMembresSansCampagne(req: Request, res: Response): Promise<void> {
   try {
     const campagneId = parseInt(String(req.params["id"] ?? "0"));
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
 
     const campagne = await db.query.campagnesTable.findFirst({
       where: and(eq(campagnesTable.id, campagneId), eq(campagnesTable.cooperativeId, cooperativeId)),

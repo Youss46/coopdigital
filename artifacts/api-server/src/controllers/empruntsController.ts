@@ -6,7 +6,17 @@ import {
 import { eq, and, sql, desc, asc, gte, lte, between } from "drizzle-orm";
 import { generateEcheancier, computeEcheancier } from "../services/empruntService";
 
-const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const coopId = (req: import("express").Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 // ─── PRÊTEURS ─────────────────────────────────────────────────────────────────
 
@@ -19,6 +29,7 @@ export async function listPreteurs(req: Request, res: Response): Promise<void> {
       .orderBy(asc(preteursTable.nom));
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur listPreteurs");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -36,6 +47,7 @@ export async function createPreteur(req: Request, res: Response): Promise<void> 
     }).returning();
     res.status(201).json(row);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur createPreteur");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -80,6 +92,7 @@ export async function listEmprunts(req: Request, res: Response): Promise<void> {
 
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur listEmprunts");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -125,6 +138,7 @@ export async function getEmpruntById(req: Request, res: Response): Promise<void>
 
     res.json({ ...emprunt, echeancier });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getEmpruntById");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -175,6 +189,7 @@ export async function createEmprunt(req: Request, res: Response): Promise<void> 
 
     res.status(201).json(emprunt);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur createEmprunt");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -190,6 +205,7 @@ export async function getEcheancier(req: Request, res: Response): Promise<void> 
       .orderBy(asc(echeancierEmpruntsTable.numeroEcheance));
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getEcheancier");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -211,6 +227,7 @@ export async function previewEcheancier(req: Request, res: Response): Promise<vo
     });
     res.json(lignes);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur previewEcheancier");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -274,6 +291,7 @@ export async function enregistrerRemboursement(req: Request, res: Response): Pro
 
     res.status(201).json(rem);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur enregistrerRemboursement");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -312,6 +330,7 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
 
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getAlertes");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -358,6 +377,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       prochaineEcheance: prochaineEch ?? null,
     });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getDashboard emprunts");
     res.status(500).json({ erreur: "Erreur interne" });
   }

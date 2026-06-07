@@ -3,7 +3,17 @@ import { db, intrantsTable, categoriesIntrantsTable, distributionsIntrantsTable,
 import { eq, and, sql, lt, desc, asc, gte } from "drizzle-orm";
 import { getEncoursMembre } from "../services/intrantsService";
 
-const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const coopId = (req: import("express").Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 // ─── CATALOGUE ────────────────────────────────────────────────────────────────
 
@@ -41,6 +51,7 @@ export async function listIntrants(req: Request, res: Response): Promise<void> {
 
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur listIntrants");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -58,6 +69,7 @@ export async function getIntrantById(req: Request, res: Response): Promise<void>
     if (!row) { res.status(404).json({ erreur: "Intrant introuvable" }); return; }
     res.json(row);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getIntrantById");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -89,6 +101,7 @@ export async function createIntrant(req: Request, res: Response): Promise<void> 
 
     res.status(201).json(intrant);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur createIntrant");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -119,6 +132,7 @@ export async function updateIntrant(req: Request, res: Response): Promise<void> 
     if (!updated) { res.status(404).json({ erreur: "Intrant introuvable" }); return; }
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur updateIntrant");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -147,6 +161,7 @@ export async function getStockAlertes(req: Request, res: Response): Promise<void
 
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getStockAlertes");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -163,6 +178,7 @@ export async function listCategories(req: Request, res: Response): Promise<void>
       .orderBy(asc(categoriesIntrantsTable.libelle));
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur listCategories");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -210,6 +226,7 @@ export async function createAppro(req: Request, res: Response): Promise<void> {
 
     res.status(201).json(result);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur createAppro");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -322,6 +339,7 @@ export async function getDistributionsMembre(req: Request, res: Response): Promi
 
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getDistributionsMembre");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -362,6 +380,7 @@ export async function getEncours(req: Request, res: Response): Promise<void> {
 
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getEncours");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -497,6 +516,7 @@ export async function getRapportCampagne(req: Request, res: Response): Promise<v
       top10,
     });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getRapportCampagne");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -505,10 +525,12 @@ export async function getRapportCampagne(req: Request, res: Response): Promise<v
 export async function getEncoursMemberApi(req: Request, res: Response): Promise<void> {
   try {
     const membreId = parseInt(String(req.params["id"] ?? "0"));
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const encours = await getEncoursMembre(cooperativeId, membreId);
     res.json({ membreId, encoursFcfa: encours });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getEncoursMemberApi");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }

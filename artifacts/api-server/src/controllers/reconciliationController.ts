@@ -37,7 +37,8 @@ export async function postPreview(req: Request, res: Response): Promise<void> {
 
 export async function postImporter(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     if (!req.file) { res.status(400).json({ error: "Fichier requis" }); return; }
     const { banque, numero_compte, user_mapping } = req.body as {
       banque?: string; numero_compte?: string; user_mapping?: string;
@@ -65,7 +66,8 @@ export async function postImporter(req: Request, res: Response): Promise<void> {
 
 export async function getReleves(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     res.json(await svc.listReleves(cooperativeId));
   }
   catch (err) { req.log.error({ err }, "getReleves"); res.status(500).json({ error: "Erreur serveur" }); }
@@ -75,7 +77,8 @@ export async function getReleves(req: Request, res: Response): Promise<void> {
 
 export async function getReleve(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id   = parseInt(String(req.params["id"]), 10);
     const data = await svc.getReleve(cooperativeId, id);
     if (!data) { res.status(404).json({ error: "Relevé introuvable" }); return; }
@@ -87,7 +90,8 @@ export async function getReleve(req: Request, res: Response): Promise<void> {
 
 export async function postAuto(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     res.json(await svc.reconcilierAutomatiquement(cooperativeId, id));
   } catch (err) {
@@ -126,7 +130,8 @@ export async function putIgnorer(req: Request, res: Response): Promise<void> {
 
 export async function getEcritures(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const q       = String(req.query["q"] ?? "");
     const montant = req.query["montant"] ? parseInt(String(req.query["montant"]), 10) : undefined;
     res.json(await svc.rechercherEcritures(cooperativeId, q, montant));
@@ -137,7 +142,8 @@ export async function getEcritures(req: Request, res: Response): Promise<void> {
 
 export async function getRapportPdf(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id  = parseInt(String(req.params["id"]), 10);
     const buf = await svc.genererRapportPdf(cooperativeId, id);
     res.setHeader("Content-Type", "application/pdf");

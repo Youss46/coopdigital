@@ -79,15 +79,17 @@ export async function login(req: Request, res: Response): Promise<void> {
     const ip        = extractIp(req);
     const userAgent = req.headers["user-agent"]?.slice(0, 500);
 
-    // Enregistrement de la session
-    void db.insert(sessionsUtilisateursTable).values({
-      cooperativeId: user.cooperativeId ?? 1,
-      userId:        user.id,
-      sessionToken:  token.slice(-64),
-      ipAddress:     ip === "unknown" ? undefined : ip,
-      userAgent,
-      statut:        "active",
-    }).catch(() => {/* silencieux */});
+    // Enregistrement de la session (uniquement si l'utilisateur est lié à une coopérative)
+    if (user.cooperativeId) {
+      void db.insert(sessionsUtilisateursTable).values({
+        cooperativeId: user.cooperativeId,
+        userId:        user.id,
+        sessionToken:  token.slice(-64),
+        ipAddress:     ip === "unknown" ? undefined : ip,
+        userAgent,
+        statut:        "active",
+      }).catch(() => {/* silencieux */});
+    }
 
     // Audit LOGIN
     void auditService.logRaw({

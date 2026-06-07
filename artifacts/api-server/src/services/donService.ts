@@ -64,7 +64,7 @@ export interface CreerDonPayload {
 }
 
 export async function creerDon(cooperativeId: number, payload: CreerDonPayload) {
-  const reference = await genererReference(payload.sens);
+  const reference = await genererReference(cooperativeId, payload.sens);
 
   const [don] = await db
     .insert(donsTable)
@@ -180,7 +180,7 @@ export async function validerDon(donId: number, userId: number) {
     }
   }
 
-  return await getDonDetail(donId);
+  return await getDonDetail(don.cooperativeId, donId);
 }
 
 // ── Annuler un don ─────────────────────────────────────────────────────────────
@@ -344,7 +344,7 @@ export async function getDonsMembre(cooperativeId: number, membreId: number) {
 
 // ── Statistiques ───────────────────────────────────────────────────────────────
 
-export async function getStatsDons(campagneId?: number) {
+export async function getStatsDons(cooperativeId: number, campagneId?: number) {
   const cond = [eq(donsTable.cooperativeId, cooperativeId), eq(donsTable.statut, "valide")];
   if (campagneId) cond.push(eq(donsTable.campagneId, campagneId));
 
@@ -424,7 +424,7 @@ export async function getStatsDons(campagneId?: number) {
 
 // ── Catégories ─────────────────────────────────────────────────────────────────
 
-export async function getCategories(sens?: "effectue" | "recu") {
+export async function getCategories(cooperativeId: number, sens?: "effectue" | "recu") {
   const cond = [eq(categoriesDonsTable.cooperativeId, cooperativeId)];
   if (sens) cond.push(eq(categoriesDonsTable.sens, sens));
   return db
@@ -476,13 +476,13 @@ export async function cloturerProgramme(cooperativeId: number, programmeId: numb
 
 // ── Rapport PDF ─────────────────────────────────────────────────────────────────
 
-export async function generateRapportDonsPDF(res: import("express").Response, campagneId?: number) {
+export async function generateRapportDonsPDF(cooperativeId: number, res: import("express").Response, campagneId?: number) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const PDFDocument = require("pdfkit") as typeof import("pdfkit");
-  const stats = await getStatsDons(campagneId);
-  const donsEffectues = (await listerDons({ sens: "effectue", statut: "valide" }));
-  const donsRecus = (await listerDons({ sens: "recu", statut: "valide" }));
-  const programmes = await listerProgrammes();
+  const stats = await getStatsDons(cooperativeId, campagneId);
+  const donsEffectues = (await listerDons(cooperativeId, { sens: "effectue", statut: "valide" }));
+  const donsRecus = (await listerDons(cooperativeId, { sens: "recu", statut: "valide" }));
+  const programmes = await listerProgrammes(cooperativeId);
   const annee = new Date().getFullYear();
 
   const doc = new PDFDocument({ margin: 40, size: "A4" });
@@ -587,7 +587,9 @@ export async function generateRapportDonsPDF(res: import("express").Response, ca
 export async function generatePVRemisePDF(donId: number, res: import("express").Response) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const PDFDocument = require("pdfkit") as typeof import("pdfkit");
-  const don = await getDonDetail(donId);
+  const [donRow] = await db.select({ cooperativeId: donsTable.cooperativeId }).from(donsTable).where(eq(donsTable.id, donId)).limit(1);
+  if (!donRow) throw new Error("Don introuvable");
+  const don = await getDonDetail(donRow.cooperativeId, donId);
   if (!don) throw new Error("Don introuvable");
 
   const doc = new PDFDocument({ margin: 50, size: "A4" });

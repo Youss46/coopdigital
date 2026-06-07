@@ -4,7 +4,17 @@ import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, confi
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
 
-const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const coopId = (req: import("express").Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 function exerciceCourant(): number {
   return new Date().getFullYear();
@@ -45,6 +55,7 @@ export async function getGrandLivre(req: Request, res: Response): Promise<void> 
 
     res.json({ ecritures, total: count ?? 0, page, limit });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getGrandLivre");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -81,6 +92,7 @@ export async function getBalance(req: Request, res: Response): Promise<void> {
 
     res.json(rows.rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getBalance");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -109,6 +121,7 @@ export async function getJournalComptable(req: Request, res: Response): Promise<
 
     res.json({ ecritures, total: count ?? 0, page, limit });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getJournalComptable");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -157,6 +170,7 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
     }
     res.status(201).json(ecriture);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur createEcritureManuelle");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -184,6 +198,7 @@ export async function getMargeCollecte(req: Request, res: Response): Promise<voi
 
     res.json({ caVentesFcfa, coutAchatsFcfa, chargesFcfa, margeNetteFcfa, exercice, tauxMarge });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getMargeCollecte");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -212,6 +227,7 @@ export async function getTresorerie(req: Request, res: Response): Promise<void> 
       dateCalcul: new Date().toISOString(),
     });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getTresorerie");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -235,6 +251,7 @@ export async function getConfigComptable(req: Request, res: Response): Promise<v
     }
     res.json(rows[0]);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "getConfigComptable");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -270,6 +287,7 @@ export async function updateConfigComptable(req: Request, res: Response): Promis
     }
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "updateConfigComptable");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -298,6 +316,7 @@ export async function listEcrituresEnAttente(req: Request, res: Response): Promi
 
     res.json(ecritures);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "listEcrituresEnAttente");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -314,6 +333,7 @@ export async function countEcrituresEnAttente(req: Request, res: Response): Prom
       ));
     res.json({ count: count ?? 0 });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "countEcrituresEnAttente");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -390,6 +410,7 @@ export async function validerEcritureEnAttente(req: Request, res: Response): Pro
 
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "validerEcritureEnAttente");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -425,6 +446,7 @@ export async function rejeterEcritureEnAttente(req: Request, res: Response): Pro
 
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "rejeterEcritureEnAttente");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -472,6 +494,7 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
 
     res.json({ validees: enAttente.length });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "validerToutEcrituresEnAttente");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }

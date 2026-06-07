@@ -246,7 +246,7 @@ export async function getTendance(cooperativeId: number) {
 }
 
 // ─── Analyse de marge par lot ─────────────────────────────────────────────────
-export async function analyserMarge(params: { campagneId?: number }) {
+export async function analyserMarge(cooperativeId: number, params: { campagneId?: number }) {
   // Récupérer toutes les ventes exportateurs avec infos lot + campagne
   const conditions = [eq(ventesExportateursTable.campagneId ?? 0 as unknown as typeof ventesExportateursTable.campagneId, params.campagneId ?? 0)];
 

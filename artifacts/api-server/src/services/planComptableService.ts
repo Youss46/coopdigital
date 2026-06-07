@@ -38,7 +38,8 @@ export async function listerPlanComptable(opts: {
   actif?: boolean;
   search?: string;
 }) {
-  const coopId = opts.cooperativeId ?? 1;
+  const coopId = opts.cooperativeId;
+  if (!coopId) throw new Error("cooperativeId requis");
   const rows = await db
     .select()
     .from(planComptableTable)
@@ -67,7 +68,8 @@ export async function ajouterCompte(payload: {
   soldeNormal?: string;
   ordreAffichage?: number;
 }) {
-  const coopId = payload.cooperativeId ?? 1;
+  const coopId = payload.cooperativeId;
+  if (!coopId) throw new Error("cooperativeId requis");
   // Calculer classe automatiquement depuis le numéro si non fourni
   const classe = payload.classe ?? (payload.numeroCompte ? parseInt(payload.numeroCompte[0]!) : undefined);
 

@@ -12,7 +12,8 @@ import PDFDocument from "pdfkit";
 import { drawHeader, drawFooter } from "../services/pdfHeaderService";
 
 export async function getCampagneActive(req: Request, res: Response) {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const campagne = await db.query.campagnesTable.findFirst({
     where: and(
       eq(campagnesTable.cooperativeId, cooperativeId),
@@ -25,7 +26,8 @@ export async function getCampagneActive(req: Request, res: Response) {
 }
 
 export async function listCampagnes(req: Request, res: Response) {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const campagnes = await db.query.campagnesTable.findMany({
     where: eq(campagnesTable.cooperativeId, cooperativeId),
     orderBy: [desc(campagnesTable.anneeDebut)],
@@ -34,7 +36,8 @@ export async function listCampagnes(req: Request, res: Response) {
 }
 
 export async function getCampagne(req: Request, res: Response) {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const id = parseInt(String(req.params["id"] ?? "0"));
   const campagne = await db.query.campagnesTable.findFirst({
     where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)),
@@ -44,7 +47,8 @@ export async function getCampagne(req: Request, res: Response) {
 }
 
 export async function createCampagne(req: Request, res: Response) {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const { libelle, anneeDebut, anneeFin, dateOuverture, dateFermeture } = req.body as {
     libelle: string;
     anneeDebut: number;
@@ -74,7 +78,8 @@ export async function createCampagne(req: Request, res: Response) {
 }
 
 export async function fermerCampagne(req: Request, res: Response) {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const id = parseInt(String(req.params["id"] ?? "0"));
   const { dateFermeture } = req.body as { dateFermeture?: string };
 
@@ -110,7 +115,8 @@ export async function fermerCampagne(req: Request, res: Response) {
 }
 
 export async function verifierCampagne(req: Request, res: Response) {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const id = parseInt(String(req.params["id"] ?? "0"));
   const campagne = await db.query.campagnesTable.findFirst({
     where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)),
@@ -122,7 +128,8 @@ export async function verifierCampagne(req: Request, res: Response) {
 }
 
 export async function cloturerCampagne(req: Request, res: Response) {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const id = parseInt(String(req.params["id"] ?? "0"));
   const userId = (req as Request & { user?: { id: number } }).user?.id ?? 0;
 
@@ -137,7 +144,8 @@ export async function cloturerCampagne(req: Request, res: Response) {
 }
 
 export async function getBilan(req: Request, res: Response) {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const id = parseInt(String(req.params["id"] ?? "0"));
   const campagne = await db.query.campagnesTable.findFirst({
     where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)),
@@ -157,7 +165,8 @@ export async function getBilan(req: Request, res: Response) {
 }
 
 export async function getBilanPdf(req: Request, res: Response) {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const id = parseInt(String(req.params["id"] ?? "0"));
   const campagne = await db.query.campagnesTable.findFirst({
     where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)),
@@ -344,7 +353,8 @@ export async function getComparaison(req: Request, res: Response) {
     ? idsParam.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n))
     : [];
 
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const result = await getComparaisonCampagnes(cooperativeId, ids);
   return res.json(result);
 }

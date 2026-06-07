@@ -4,7 +4,17 @@ import { tauxChangeTable, devisesTable, ventesExportateursTable, exportateursTab
 import { eq, and, desc, asc, gte, sql } from "drizzle-orm";
 import { getTauxActuel, convertir } from "../services/deviseService";
 
-const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const coopId = (req: import("express").Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 // ─── DEVISES ─────────────────────────────────────────────────────────────────
 
@@ -17,6 +27,7 @@ export async function listDevises(req: Request, res: Response): Promise<void> {
       .orderBy(asc(devisesTable.code));
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur listDevises");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -39,6 +50,7 @@ export async function getTauxActuels(req: Request, res: Response): Promise<void>
     `);
     res.json(rows.rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getTauxActuels");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -61,6 +73,7 @@ export async function createTaux(req: Request, res: Response): Promise<void> {
 
     res.status(201).json(row);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur createTaux");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -92,6 +105,7 @@ export async function getHistoriqueTaux(req: Request, res: Response): Promise<vo
 
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getHistoriqueTaux");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -100,10 +114,12 @@ export async function getHistoriqueTaux(req: Request, res: Response): Promise<vo
 export async function getTauxActuelDevise(req: Request, res: Response): Promise<void> {
   try {
     const devise = String(req.params["devise"] ?? "EUR");
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const result = await getTauxActuel(cooperativeId, devise);
     res.json(result);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getTauxActuelDevise");
     res.status(404).json({ erreur: String(err) });
   }
@@ -113,10 +129,12 @@ export async function convertirMontant(req: Request, res: Response): Promise<voi
   try {
     const { montant, deviseSource, date } = req.body as Record<string, unknown>;
     const dateStr = String(date ?? new Date().toISOString().slice(0, 10));
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const result = await convertir(cooperativeId, Number(montant ?? 0), String(deviseSource ?? "EUR"), dateStr);
     res.json(result);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur convertirMontant");
     res.status(400).json({ erreur: String(err) });
   }
@@ -177,6 +195,7 @@ export async function getRapportGainPerte(req: Request, res: Response): Promise<
         : [],
     });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getRapportGainPerte");
     res.status(500).json({ erreur: "Erreur interne" });
   }

@@ -12,7 +12,17 @@ import { eq, and, sql, desc, asc } from "drizzle-orm";
 import { sendBulkSMS } from "../services/smsService";
 import { generatePvAg } from "../services/pdfService";
 
-const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const coopId = (req: import("express").Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 const pid = (v: string | string[]): number => parseInt(Array.isArray(v) ? v[0] : v, 10);
 

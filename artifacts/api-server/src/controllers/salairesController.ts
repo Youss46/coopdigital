@@ -11,7 +11,17 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { generateBulletin, generateMasse } from "../services/paieService";
 import { generateEcrituresSalaire } from "../services/comptabiliteService";
 
-const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const coopId = (req: import("express").Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 function parseId(raw: unknown): number {
   return parseInt(String(raw ?? "0"), 10);
@@ -33,6 +43,7 @@ export async function listPersonnel(
       .orderBy(personnelTable.nom);
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "listPersonnel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -60,6 +71,7 @@ export async function getPersonnelById(
     }
     res.json(row);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "getPersonnelById");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -105,6 +117,7 @@ export async function createPersonnel(
 
     res.status(201).json(row);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "createPersonnel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -154,6 +167,7 @@ export async function updatePersonnel(
     }
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "updatePersonnel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -181,6 +195,7 @@ export async function archiverPersonnel(
     }
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "archiverPersonnel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -223,6 +238,7 @@ export async function getPersonnelHistorique(
 
     res.json({ personnel: emp, bulletins, avances });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "getPersonnelHistorique");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -243,6 +259,7 @@ export async function listComposantes(
       .where(eq(composantesSalaireTable.cooperativeId, coopId(req)));
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "listComposantes");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -286,6 +303,7 @@ export async function genererBulletins(
       res.json(masse);
     }
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "genererBulletins");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -327,6 +345,7 @@ export async function listBulletins(
 
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "listBulletins");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -369,6 +388,7 @@ export async function getBulletinById(
 
     res.json({ ...row, lignes });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "getBulletinById");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -405,6 +425,7 @@ export async function validerBulletin(
       .returning();
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "validerBulletin");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -467,6 +488,7 @@ export async function payerBulletin(
 
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "payerBulletin");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -501,6 +523,7 @@ export async function deleteBulletin(
       .where(eq(bulletinsPaieTable.id, id));
     res.status(204).send();
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "deleteBulletin");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -551,6 +574,7 @@ export async function listAvancesPersonnel(
 
     res.json(rows);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "listAvancesPersonnel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -597,6 +621,7 @@ export async function createAvancePersonnel(
       .returning();
     res.status(201).json(row);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "createAvancePersonnel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -635,6 +660,7 @@ export async function rembourserAvance(
       .returning();
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "rembourserAvance");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -714,6 +740,7 @@ export async function getRapportMensuel(
       detailsParPoste: parPoste,
     });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "getRapportMensuel");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -750,6 +777,7 @@ export async function getHistoriqueMasse(
 
     res.json(rows.reverse());
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "getHistoriqueMasse");
     res.status(500).json({ erreur: "Erreur interne" });
   }

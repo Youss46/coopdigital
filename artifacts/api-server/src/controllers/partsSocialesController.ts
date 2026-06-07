@@ -9,7 +9,17 @@ import { eq, and, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { proposerEcriture } from "../services/comptabiliteService";
 
-const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const coopId = (req: import("express").Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 export async function getConfigParts(req: Request, res: Response) {
   let config = await db.query.configPartsSocialesTable.findFirst({

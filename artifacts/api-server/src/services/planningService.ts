@@ -81,7 +81,7 @@ export async function updateZone(
   return row ?? null;
 }
 
-export async function deleteZone(id: number) {
+export async function deleteZone(cooperativeId: number, id: number) {
   await db
     .delete(zonesCollecteTable)
     .where(
@@ -169,7 +169,7 @@ export async function getPlanningsSemaine(cooperativeId: number) {
   const diff = day === 0 ? -6 : 1 - day;
   lundi.setDate(lundi.getDate() + diff);
   const lundiStr = lundi.toISOString().slice(0, 10);
-  return listPlannings({ semaine: lundiStr });
+  return listPlannings(cooperativeId, { semaine: lundiStr });
 }
 
 export async function getPlanning(cooperativeId: number, id: number) {
@@ -305,7 +305,7 @@ export async function demarrerPlanning(cooperativeId: number, id: number) {
 // ──────────────────────────────────────────────
 
 export async function notifierMembresZone(cooperativeId: number, planningId: number) {
-  const planning = await getPlanning(planningId);
+  const planning = await getPlanning(cooperativeId, planningId);
   if (!planning) throw new Error(`Planning ${planningId} introuvable`);
 
   // Récupérer la coopérative (pour le nom)
@@ -403,7 +403,7 @@ export async function notifierMembresZone(cooperativeId: number, planningId: num
 // ──────────────────────────────────────────────
 
 export async function cloturerPlanning(cooperativeId: number, planningId: number) {
-  const planning = await getPlanning(planningId);
+  const planning = await getPlanning(cooperativeId, planningId);
   if (!planning) throw new Error(`Planning ${planningId} introuvable`);
 
   const villagesZone: string[] =
@@ -476,7 +476,7 @@ export async function cloturerPlanning(cooperativeId: number, planningId: number
 // ──────────────────────────────────────────────
 
 export async function getRapportPlanning(cooperativeId: number, planningId: number) {
-  const planning = await getPlanning(planningId);
+  const planning = await getPlanning(cooperativeId, planningId);
   if (!planning) return null;
 
   const villagesZone: string[] =

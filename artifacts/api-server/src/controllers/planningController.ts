@@ -5,7 +5,8 @@ import * as planningService from "../services/planningService.js";
 
 export async function getZones(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const zones = await planningService.listZones(cooperativeId);
     res.json(zones);
   } catch (err) {
@@ -16,7 +17,8 @@ export async function getZones(req: Request, res: Response): Promise<void> {
 
 export async function postZone(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const { nom, section, villages, agentResponsableId, objectifTonnageKg } = req.body as {
       nom: string;
       section?: string;
@@ -35,7 +37,8 @@ export async function postZone(req: Request, res: Response): Promise<void> {
 
 export async function putZone(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     const zone = await planningService.updateZone(cooperativeId, id, req.body);
     if (!zone) { res.status(404).json({ error: "Zone introuvable" }); return; }
@@ -47,9 +50,11 @@ export async function putZone(req: Request, res: Response): Promise<void> {
 }
 
 export async function deleteZone(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   try {
     const id = parseInt(String(req.params["id"]), 10);
-    await planningService.deleteZone(id);
+    await planningService.deleteZone(cooperativeId, id);
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "deleteZone");
@@ -61,7 +66,8 @@ export async function deleteZone(req: Request, res: Response): Promise<void> {
 
 export async function getPlannings(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const { agent_id, zone, semaine, statut } = req.query as Record<string, string | undefined>;
     const plannings = await planningService.listPlannings(cooperativeId, {
       agentId:  agent_id ? parseInt(agent_id, 10) : undefined,
@@ -78,7 +84,8 @@ export async function getPlannings(req: Request, res: Response): Promise<void> {
 
 export async function getPlanningsSemaine(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const plannings = await planningService.getPlanningsSemaine(cooperativeId);
     res.json(plannings);
   } catch (err) {
@@ -89,7 +96,8 @@ export async function getPlanningsSemaine(req: Request, res: Response): Promise<
 
 export async function postPlanning(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const body = req.body as {
       campagneId?: number;
       zoneCollecteId: number;
@@ -116,7 +124,8 @@ export async function postPlanning(req: Request, res: Response): Promise<void> {
 
 export async function putPlanning(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     const planning = await planningService.updatePlanning(cooperativeId, id, req.body);
     if (!planning) { res.status(404).json({ error: "Planning introuvable" }); return; }
@@ -129,7 +138,8 @@ export async function putPlanning(req: Request, res: Response): Promise<void> {
 
 export async function demarrerPlanning(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     const planning = await planningService.demarrerPlanning(cooperativeId, id);
     if (!planning) { res.status(404).json({ error: "Planning introuvable" }); return; }
@@ -142,7 +152,8 @@ export async function demarrerPlanning(req: Request, res: Response): Promise<voi
 
 export async function terminerPlanning(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     const result = await planningService.cloturerPlanning(cooperativeId, id);
     res.json(result);
@@ -154,7 +165,8 @@ export async function terminerPlanning(req: Request, res: Response): Promise<voi
 
 export async function annulerPlanning(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     const planning = await planningService.annulerPlanning(cooperativeId, id);
     if (!planning) { res.status(404).json({ error: "Planning introuvable" }); return; }
@@ -167,7 +179,8 @@ export async function annulerPlanning(req: Request, res: Response): Promise<void
 
 export async function notifierMembres(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     const result = await planningService.notifierMembresZone(cooperativeId, id);
     res.json(result);
@@ -179,7 +192,8 @@ export async function notifierMembres(req: Request, res: Response): Promise<void
 
 export async function getRapportPlanning(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     const rapport = await planningService.getRapportPlanning(cooperativeId, id);
     if (!rapport) { res.status(404).json({ error: "Planning introuvable" }); return; }
@@ -192,7 +206,8 @@ export async function getRapportPlanning(req: Request, res: Response): Promise<v
 
 export async function getStatsPlannings(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const stats = await planningService.getStatsPlannings(cooperativeId);
     res.json(stats);
   } catch (err) {
@@ -203,7 +218,8 @@ export async function getStatsPlannings(req: Request, res: Response): Promise<vo
 
 export async function getStatsZones(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const stats = await planningService.getStatsZones(cooperativeId);
     res.json(stats);
   } catch (err) {

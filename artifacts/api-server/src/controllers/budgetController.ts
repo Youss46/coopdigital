@@ -6,7 +6,17 @@ import {
 import { eq, and, asc, sql } from "drizzle-orm";
 import { syncRealise, getAlertesDepassement } from "../services/budgetService";
 
-const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const coopId = (req: import("express").Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 const LIGNES_DEFAULT = [
   { categorie: "recette"            as const, libelle: "Ventes cacao exportateurs",     ordre: 1 },
@@ -64,6 +74,7 @@ export async function creerOuGetBudget(req: Request, res: Response): Promise<voi
 
     res.status(201).json({ budget, cree: true });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur creerOuGetBudget");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -126,6 +137,7 @@ export async function getBudgetCampagne(req: Request, res: Response): Promise<vo
       },
     });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getBudgetCampagne");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -162,6 +174,7 @@ export async function modifierLigne(req: Request, res: Response): Promise<void> 
 
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur modifierLigne");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -186,6 +199,7 @@ export async function validerBudget(req: Request, res: Response): Promise<void> 
 
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur validerBudget");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -198,6 +212,7 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
     const alertes  = await getAlertesDepassement(budgetId);
     res.json(alertes);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getAlertes");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -248,6 +263,7 @@ export async function getRapport(req: Request, res: Response): Promise<void> {
 
     res.json({ parCategorie, totalPrev, totalReel, tauxExecution });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getRapport");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -294,6 +310,7 @@ export async function saisirHypotheses(req: Request, res: Response): Promise<voi
 
     res.json(result);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur saisirHypotheses");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -306,6 +323,7 @@ export async function triggerSync(req: Request, res: Response): Promise<void> {
     await syncRealise(budgetId);
     res.json({ ok: true, message: "Synchronisation réalisé effectuée" });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur triggerSync");
     res.status(500).json({ erreur: String(err) });
   }

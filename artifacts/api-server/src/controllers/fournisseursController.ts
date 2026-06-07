@@ -4,7 +4,17 @@ import { fournisseursTable, membresTable } from "@workspace/db";
 import { eq, and, or, ilike, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
-const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const coopId = (req: import("express").Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 function genCode(type: "membre" | "pisteur" | "externe", annee: number, seq: number) {
   const prefix = { membre: "MBR", pisteur: "PST", externe: "EXT" }[type];

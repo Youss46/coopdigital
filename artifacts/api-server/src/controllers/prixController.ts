@@ -5,14 +5,16 @@ const pid = (v: string | string[]) => parseInt(Array.isArray(v) ? v[0] : v, 10);
 
 // GET /api/prix/actuel
 export async function getPrixActuel(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const historique = await prixService.getHistorique(cooperativeId, { limit: 1 });
   res.json(historique[0] ?? null);
 }
 
 // POST /api/prix
 export async function saisirPrix(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const { campagneId, datePrix, prixBordChampFcfa, prixVenteExportFcfa, source } = req.body as {
     campagneId?: number;
     datePrix: string;
@@ -39,7 +41,8 @@ export async function saisirPrix(req: Request, res: Response): Promise<void> {
 
 // GET /api/prix/historique
 export async function getHistorique(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const { campagneId, dateDebut, dateFin, limit } = req.query as Record<string, string>;
   const rows = await prixService.getHistorique(cooperativeId, {
     campagneId: campagneId ? parseInt(campagneId) : undefined,
@@ -52,7 +55,8 @@ export async function getHistorique(req: Request, res: Response): Promise<void> 
 
 // GET /api/prix/analyse-marge
 export async function getAnalyseMarge(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const { campagneId } = req.query as { campagneId?: string };
   const result = await prixService.analyserMarge(cooperativeId, {
     campagneId: campagneId ? parseInt(campagneId) : undefined,
@@ -62,21 +66,24 @@ export async function getAnalyseMarge(req: Request, res: Response): Promise<void
 
 // GET /api/prix/comparaison
 export async function getComparaison(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const rows = await prixService.getComparaison(cooperativeId);
   res.json(rows);
 }
 
 // GET /api/prix/tendance
 export async function getTendance(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const result = await prixService.getTendance(cooperativeId);
   res.json(result ?? { direction: "stable", moyenneMobile: 0, variationSemainePct: 0, dernierPrix: null, series: [] });
 }
 
 // PUT /api/prix/config
 export async function updateConfig(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const { seuilMargeMinimumFcfa, seuilVariationAlertePct, diffusionAutoSms } = req.body as {
     seuilMargeMinimumFcfa?: number;
     seuilVariationAlertePct?: number;
@@ -88,14 +95,16 @@ export async function updateConfig(req: Request, res: Response): Promise<void> {
 
 // GET /api/prix/config
 export async function getConfig(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const config = await prixService.getConfig(cooperativeId);
   res.json(config ?? { seuilMargeMinimumFcfa: 100, seuilVariationAlertePct: 10, diffusionAutoSms: false });
 }
 
 // GET /api/prix/alertes
 export async function getAlertes(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const nonLuesSeulement = req.query.nonLues === "true";
   const alertes = await prixService.getAlertes(cooperativeId, nonLuesSeulement);
   res.json(alertes);
@@ -103,7 +112,8 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
 
 // PUT /api/prix/alertes/:id/lu
 export async function marquerAlerteLue(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const id = pid(req.params.id!);
   const alerte = await prixService.marquerAlerteLue(cooperativeId, id);
   if (!alerte) { res.status(404).json({ erreur: "Alerte introuvable" }); return; }
@@ -112,7 +122,8 @@ export async function marquerAlerteLue(req: Request, res: Response): Promise<voi
 
 // POST /api/prix/diffuser-sms
 export async function diffuserSMS(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const { prix, date } = req.body as { prix: number; date: string };
   if (!prix || !date) {
     res.status(400).json({ erreur: "prix et date requis" });
@@ -124,7 +135,8 @@ export async function diffuserSMS(req: Request, res: Response): Promise<void> {
 
 // GET /api/prix/simulation
 export async function getSimulation(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const { prixHypothetique } = req.query as { prixHypothetique?: string };
   if (!prixHypothetique) {
     res.status(400).json({ erreur: "prixHypothetique requis" });

@@ -2,7 +2,17 @@ import { type Request, type Response } from "express";
 import { db, ecrituresComptablesTable, planComptableTable, ventesExportateursTable, livraisonsTable, avancesTable } from "@workspace/db";
 import { eq, sql, gte } from "drizzle-orm";
 
-const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const coopId = (req: import("express").Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 function exerciceCourant(): number {
   return new Date().getFullYear();
@@ -57,6 +67,7 @@ export async function getBilan(req: Request, res: Response): Promise<void> {
       exercice,
     });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getBilan");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -120,6 +131,7 @@ export async function getCompteResultat(req: Request, res: Response): Promise<vo
 
     res.json({ produits, charges, totalProduitsFcfa: totalProduits, totalChargesFcfa: totalCharges, resultatNetFcfa: resultatNet, exercice, ventilationMensuelle });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getCompteResultat");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -169,6 +181,7 @@ export async function getFluxTresorerie(req: Request, res: Response): Promise<vo
       exercice,
     });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getFluxTresorerie");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -197,6 +210,7 @@ export async function getMargeCampagnes(req: Request, res: Response): Promise<vo
 
     res.json(result);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getMargeCampagnes");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }

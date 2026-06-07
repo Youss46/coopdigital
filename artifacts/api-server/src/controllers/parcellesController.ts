@@ -9,7 +9,17 @@ import {
   calculerConformiteGlobale,
 } from "../services/parcelleService";
 
-const COOP_ID = (req: Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const COOP_ID = (req: Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 // ── Liste ─────────────────────────────────────────────────────────────────────
 
@@ -73,6 +83,7 @@ export async function listParcelles(req: Request, res: Response): Promise<void> 
       limit,
     });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur listParcelles");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -119,6 +130,7 @@ export async function getParcellesCarte(req: Request, res: Response): Promise<vo
 
     res.json({ parcelles: rows, zones });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getParcellesCarte");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -140,6 +152,7 @@ export async function getParcelleById(req: Request, res: Response): Promise<void
     if (!row) { res.status(404).json({ erreur: "Parcelle introuvable" }); return; }
     res.json({ ...row.parcelle, membre_nom: `${row.membreNom} ${row.membrePrenoms}` });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getParcelleById");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -200,6 +213,7 @@ export async function createParcelle(req: Request, res: Response): Promise<void>
 
     res.status(201).json(nouvelle);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur createParcelle");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -256,6 +270,7 @@ export async function updateParcelle(req: Request, res: Response): Promise<void>
 
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur updateParcelle");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -274,6 +289,7 @@ export async function getParcellesMembre(req: Request, res: Response): Promise<v
       .orderBy(desc(parcellesTable.createdAt));
     res.json(parcelles);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getParcellesMembre");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -296,6 +312,7 @@ export async function getHistoriqueRendements(req: Request, res: Response): Prom
 
     res.json(rows.map(r => ({ ...r.hist, campagne_libelle: r.campagneLibelle })));
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getHistoriqueRendements");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -314,6 +331,7 @@ export async function exportGeoJSONController(req: Request, res: Response): Prom
     res.setHeader("Content-Disposition", `attachment; filename="eudr_export_coop${coopId}_${date}.geojson"`);
     res.json(geojson);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur exportGeoJSON");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -327,6 +345,7 @@ export async function getConformite(req: Request, res: Response): Promise<void> 
     const stats = await calculerConformiteGlobale(coopId);
     res.json(stats);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getConformite");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -363,6 +382,7 @@ export async function importZonesRisque(req: Request, res: Response): Promise<vo
     const inserted = await db.insert(zonesRisqueEudrTable).values(values).returning();
     res.status(201).json({ importees: inserted.length, zones: inserted });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur importZonesRisque");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -381,6 +401,7 @@ export async function verifierEUDRController(req: Request, res: Response): Promi
     const [updated] = await db.select().from(parcellesTable).where(eq(parcellesTable.id, id)).limit(1);
     res.json(updated);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur verifierEUDR");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -407,6 +428,7 @@ export async function verifierTout(req: Request, res: Response): Promise<void> {
 
     res.json({ verifiees: ok, total: nonVerifiees.length });
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur verifierTout");
     res.status(500).json({ erreur: "Erreur interne" });
   }

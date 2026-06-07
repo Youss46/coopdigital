@@ -5,7 +5,8 @@ import * as svc from "../services/planComptableService.js";
 
 export async function listPlanComptableHandler(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const classe = req.query["classe"] ? parseInt(String(req.query["classe"])) : undefined;
     const type = req.query["type"] as string | undefined;
     const actifStr = req.query["actif"] as string | undefined;
@@ -21,7 +22,8 @@ export async function listPlanComptableHandler(req: Request, res: Response): Pro
 
 export async function createCompteHandler(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const { numeroCompte, libelle, type, classe, compteParent, soldeNormal, ordreAffichage } = req.body as {
       numeroCompte?: string; libelle?: string; type?: string;
       classe?: number; compteParent?: string; soldeNormal?: string; ordreAffichage?: number;
@@ -44,7 +46,8 @@ export async function createCompteHandler(req: Request, res: Response): Promise<
 
 export async function updateCompteHandler(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"] ?? "0"));
     const { libelle, actif, ordreAffichage } = req.body as { libelle?: string; actif?: boolean; ordreAffichage?: number };
     const compte = await svc.modifierCompte(cooperativeId, id, { libelle, actif, ordreAffichage });
@@ -58,7 +61,8 @@ export async function updateCompteHandler(req: Request, res: Response): Promise<
 
 export async function deleteCompteHandler(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"] ?? "0"));
     const compte = await svc.desactiverCompte(cooperativeId, id);
     res.json(compte);
@@ -95,7 +99,8 @@ export async function listParamsModuleHandler(req: Request, res: Response): Prom
 
 export async function updateParamsHandler(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"] ?? "0"));
     const { compteDebit, compteCredit, libelleEcritureAuto } = req.body as {
       compteDebit?: string; compteCredit?: string; libelleEcritureAuto?: string;
@@ -112,7 +117,8 @@ export async function updateParamsHandler(req: Request, res: Response): Promise<
 
 export async function resetModuleHandler(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const module = String(req.params["module"] ?? "");
     const modifiePar = req.user?.id;
     const result = await svc.resetModuleOhada(cooperativeId, module, modifiePar);
@@ -128,7 +134,8 @@ export async function resetModuleHandler(req: Request, res: Response): Promise<v
 
 export async function searchEcrituresHandler(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const q = String(req.query["q"] ?? "");
     if (q.length < 2) { res.json([]); return; }
     const rows = await svc.rechercherEcritures(cooperativeId, q);
@@ -141,7 +148,8 @@ export async function searchEcrituresHandler(req: Request, res: Response): Promi
 
 export async function corrigerEcritureHandler(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"] ?? "0"));
     const { nouveauCompteDebit, nouveauCompteCredit, nouveauMontant, nouveauLibelle, motifCorrection } = req.body as {
       nouveauCompteDebit?: string; nouveauCompteCredit?: string;
@@ -169,7 +177,8 @@ export async function corrigerEcritureHandler(req: Request, res: Response): Prom
 
 export async function getHistoriqueEcritureHandler(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"] ?? "0"));
     const result = await svc.getHistoriqueCorrections(cooperativeId, id);
     res.json(result);
@@ -182,7 +191,8 @@ export async function getHistoriqueEcritureHandler(req: Request, res: Response):
 
 export async function validerNumeroCompteHandler(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const numero = String(req.query["numero"] ?? "");
     if (!numero) { res.status(400).json({ erreur: "numero requis" }); return; }
     const result = await svc.validerNumeroCompte(cooperativeId, numero);

@@ -3,7 +3,8 @@ import * as auditService from "../services/auditService";
 
 export async function getJournal(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const {
       user_id, module, action, entite_id, entite_type,
       date_debut, date_fin, recherche,
@@ -32,7 +33,8 @@ export async function getJournal(req: Request, res: Response): Promise<void> {
 
 export async function getEntiteHistorique(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const type = String(req.params["type"]);
     const id   = String(req.params["id"]);
     const entries = await auditService.getHistoriqueEntite(cooperativeId, type, parseInt(id));
@@ -45,7 +47,8 @@ export async function getEntiteHistorique(req: Request, res: Response): Promise<
 
 export async function getUserActions(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = String(req.params["id"]);
     const { limit } = req.query as { limit?: string };
     const entries = await auditService.getUserActions(cooperativeId, parseInt(id), limit ? parseInt(limit) : 100);
@@ -58,7 +61,8 @@ export async function getUserActions(req: Request, res: Response): Promise<void>
 
 export async function getSessions(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const { limit } = req.query as { limit?: string };
     const sessions = await auditService.getSessions(cooperativeId, limit ? parseInt(limit) : 50);
     res.json({ sessions });
@@ -70,7 +74,8 @@ export async function getSessions(req: Request, res: Response): Promise<void> {
 
 export async function getStats(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const stats = await auditService.getStats(cooperativeId);
     res.json(stats);
   } catch (err) {
@@ -87,7 +92,8 @@ export async function exportPdf(req: Request, res: Response): Promise<void> {
 
     const generatedBy = req.user?.role ?? "inconnu";
 
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const pdfBuffer = await auditService.exportAuditPDF(
       cooperativeId,
       {
@@ -113,7 +119,8 @@ export async function exportPdf(req: Request, res: Response): Promise<void> {
 
 export async function getModifications(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const entite_type = String(req.params["entite_type"]);
     const entite_id   = String(req.params["entite_id"]);
     const entries = await auditService.getHistoriqueEntite(cooperativeId, entite_type, parseInt(entite_id));

@@ -15,7 +15,8 @@ export async function sendSmsGroupe(req: Request, res: Response): Promise<void> 
 
   try {
     const user = (req as Request & { user?: { id: number; cooperativeId?: number | null } }).user;
-    const cooperativeId = user?.cooperativeId ?? 1;
+    const cooperativeId = user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
 
     const conditions = [eq(membresTable.statut, "actif"), eq(membresTable.cooperativeId, cooperativeId)];
     if (groupement) conditions.push(eq(membresTable.groupement, groupement));
@@ -53,7 +54,8 @@ export async function sendSmsGroupe(req: Request, res: Response): Promise<void> 
 export async function getCommunicationHistorique(req: Request, res: Response): Promise<void> {
   try {
     const user = (req as Request & { user?: { cooperativeId?: number | null } }).user;
-    const cooperativeId = user?.cooperativeId ?? 1;
+    const cooperativeId = user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
 
     const rows = await db
       .select({

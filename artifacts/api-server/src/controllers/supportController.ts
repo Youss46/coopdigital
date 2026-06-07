@@ -11,7 +11,17 @@ import {
   getFaq,
 } from "../services/supportService.js";
 
-const coopId = (req: import("express").Request) => req.user?.cooperativeId ?? 1;
+class TenantError extends Error {
+  readonly status = 401;
+  readonly erreur = "Coopérative non associée au compte";
+  constructor() { super("TENANT_REQUIRED"); }
+}
+
+const coopId = (req: import("express").Request): number => {
+  const id = req.user?.cooperativeId;
+  if (!id) throw new TenantError();
+  return id;
+};
 
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
 
@@ -46,6 +56,7 @@ export async function creerTicketHandler(req: Request, res: Response) {
 
     return res.status(201).json(ticket);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "creerTicket");
     return res.status(500).json({ error: "Erreur serveur" });
   }
@@ -60,6 +71,7 @@ export async function mesTicketsHandler(req: Request, res: Response) {
     const tickets = await mesTickets(coopId(req), userId);
     return res.json(tickets);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "mesTickets");
     return res.status(500).json({ error: "Erreur serveur" });
   }
@@ -80,6 +92,7 @@ export async function detailTicketHandler(req: Request, res: Response) {
     }
     return res.json(ticket);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "detailTicket");
     return res.status(500).json({ error: "Erreur serveur" });
   }
@@ -128,6 +141,7 @@ export async function fermerTicketHandler(req: Request, res: Response) {
     if (!ticket) return res.status(404).json({ error: "Ticket introuvable" });
     return res.json(ticket);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "fermerTicket");
     return res.status(500).json({ error: "Erreur serveur" });
   }
@@ -143,6 +157,7 @@ export async function tousLesTicketsM15Handler(req: Request, res: Response) {
     const tickets = await tousLesTickets({ priorite, statut, cooperativeId });
     return res.json(tickets);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "tousLesTicketsM15");
     return res.status(500).json({ error: "Erreur serveur" });
   }
@@ -157,6 +172,7 @@ export async function detailTicketM15Handler(req: Request, res: Response) {
     if (!ticket) return res.status(404).json({ error: "Ticket introuvable" });
     return res.json(ticket);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "detailTicketM15");
     return res.status(500).json({ error: "Erreur serveur" });
   }
@@ -198,6 +214,7 @@ export async function prendreEnChargeHandler(req: Request, res: Response) {
     if (!ticket) return res.status(404).json({ error: "Ticket introuvable" });
     return res.json(ticket);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "prendreEnCharge");
     return res.status(500).json({ error: "Erreur serveur" });
   }
@@ -212,6 +229,7 @@ export async function marquerResoluHandler(req: Request, res: Response) {
     if (!ticket) return res.status(404).json({ error: "Ticket introuvable" });
     return res.json(ticket);
   } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "marquerResolu");
     return res.status(500).json({ error: "Erreur serveur" });
   }

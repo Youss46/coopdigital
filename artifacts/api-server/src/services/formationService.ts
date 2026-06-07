@@ -78,7 +78,7 @@ export async function deleteProgramme(cooperativeId: number, id: number) {
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
-export async function listSessions(opts?: { statut?: string; programmeId?: number; upcoming?: boolean }) {
+export async function listSessions(cooperativeId: number, opts?: { statut?: string; programmeId?: number; upcoming?: boolean }) {
   const result = await db.execute<{
     id: number; cooperative_id: number; programme_id: number | null;
     programme_titre: string | null; titre: string; thematique: string | null;
@@ -380,7 +380,7 @@ export async function genererAttestations(sessionId: number): Promise<{ generees
   return { generees, dejaExistantes };
 }
 
-export async function listAttestations(opts?: { sessionId?: number; membreId?: number; search?: string }) {
+export async function listAttestations(cooperativeId: number, opts?: { sessionId?: number; membreId?: number; search?: string }) {
   const result = await db.execute<{
     id: number; session_id: number; membre_id: number; numero_attestation: string;
     date_emission: string; pdf_url: string | null; session_titre: string;

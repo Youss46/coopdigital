@@ -6,7 +6,8 @@ const pid = (v: string | string[]): number => parseInt(Array.isArray(v) ? (v[0] 
 // ── Catégories ─────────────────────────────────────────────────────────────────
 
 export async function getCategoriesHandler(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const sens = req.query.sens as "effectue" | "recu" | undefined;
   const rows = await donService.getCategories(cooperativeId, sens);
   res.json(rows);
@@ -15,7 +16,8 @@ export async function getCategoriesHandler(req: Request, res: Response): Promise
 // ── Statistiques ───────────────────────────────────────────────────────────────
 
 export async function getStatsDonsHandler(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const campagneId = req.query.campagne_id ? pid(req.query.campagne_id as string) : undefined;
   const stats = await donService.getStatsDons(cooperativeId, campagneId);
   res.json(stats);
@@ -24,7 +26,8 @@ export async function getStatsDonsHandler(req: Request, res: Response): Promise<
 // ── Liste des dons ─────────────────────────────────────────────────────────────
 
 export async function listerDonsHandler(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const { sens, forme, statut, categorie_id, date_debut, date_fin, beneficiaire_membre_id } = req.query as Record<string, string>;
   const dons = await donService.listerDons(cooperativeId, {
     sens,
@@ -41,7 +44,8 @@ export async function listerDonsHandler(req: Request, res: Response): Promise<vo
 // ── Créer un don ───────────────────────────────────────────────────────────────
 
 export async function creerDonHandler(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const body = req.body as donService.CreerDonPayload & { lignes_nature?: donService.CreerDonPayload["lignesNature"] };
   if (!body.sens || !body.forme || !body.libelle || !body.dateDon) {
     res.status(400).json({ erreur: "sens, forme, libelle et dateDon sont obligatoires" });
@@ -68,7 +72,8 @@ export async function creerDonHandler(req: Request, res: Response): Promise<void
 // ── Détail d'un don ────────────────────────────────────────────────────────────
 
 export async function getDonHandler(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   try {
     const don = await donService.getDonDetail(cooperativeId, pid(req.params.id));
     res.json(don);
@@ -125,7 +130,8 @@ export async function getPVRemiseHandler(req: Request, res: Response): Promise<v
 // ── Rapport PDF ────────────────────────────────────────────────────────────────
 
 export async function getRapportDonsHandler(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const campagneId = req.query.campagne_id ? pid(req.query.campagne_id as string) : undefined;
   await donService.generateRapportDonsPDF(cooperativeId, res, campagneId);
 }
@@ -133,7 +139,8 @@ export async function getRapportDonsHandler(req: Request, res: Response): Promis
 // ── Dons d'un membre ───────────────────────────────────────────────────────────
 
 export async function getDonsMembreHandler(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const data = await donService.getDonsMembre(cooperativeId, pid(req.params.membre_id));
   res.json(data);
 }
@@ -141,13 +148,15 @@ export async function getDonsMembreHandler(req: Request, res: Response): Promise
 // ── Programmes ─────────────────────────────────────────────────────────────────
 
 export async function listerProgrammesHandler(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const progs = await donService.listerProgrammes(cooperativeId);
   res.json(progs);
 }
 
 export async function creerProgrammeHandler(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const body = req.body as Parameters<typeof donService.creerProgramme>[1];
   if (!body.libelle || !body.budgetAlloueFcfa) {
     res.status(400).json({ erreur: "libelle et budgetAlloueFcfa sont obligatoires" });
@@ -158,7 +167,8 @@ export async function creerProgrammeHandler(req: Request, res: Response): Promis
 }
 
 export async function cloturerProgrammeHandler(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   try {
     const prog = await donService.cloturerProgramme(cooperativeId, pid(req.params.id));
     res.json(prog);

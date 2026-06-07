@@ -53,7 +53,7 @@ export async function listObligations(cooperativeId: number) {
 
 // ─── Calcul base depuis bulletins ─────────────────────────────────────────────
 
-async function getBasesCnpsIts(mois: number, annee: number) {
+async function getBasesCnpsIts(cooperativeId: number, mois: number, annee: number) {
   const ZERO = { totalBrut: 0, totalCnpsPatr: 0, totalTa: 0, totalFpc: 0, totalIts: 0 };
   try {
     const bulletins = await db.select({
@@ -97,7 +97,7 @@ async function getBasesCnpsIts(mois: number, annee: number) {
   }
 }
 
-async function getBasesAnnuelles(annee: number) {
+async function getBasesAnnuelles(cooperativeId: number, annee: number) {
   const ZERO = { totalBrut: 0, totalCnpsPatr: 0, totalTa: 0, totalFpc: 0 };
   try {
     const result = await db.execute<{
@@ -130,10 +130,10 @@ async function getBasesAnnuelles(annee: number) {
 
 export async function genererDeclarationsMensuelles(cooperativeId: number, mois: number, annee: number) {
   const periode = `${nomMois(mois)} ${annee}`;
-  const obligations = await listObligations();
+  const obligations = await listObligations(cooperativeId);
   const mensuelles = obligations.filter(o => o.periodicite === "mensuel");
 
-  const bases = await getBasesCnpsIts(mois, annee);
+  const bases = await getBasesCnpsIts(cooperativeId, mois, annee);
   const generees: typeof declarationsFiscalesTable.$inferSelect[] = [];
 
   for (const obl of mensuelles) {
@@ -182,9 +182,9 @@ export async function genererDeclarationsMensuelles(cooperativeId: number, mois:
 // ─── Génération déclarations annuelles ────────────────────────────────────────
 
 export async function genererDeclarationsAnnuelles(cooperativeId: number, annee: number) {
-  const obligations = await listObligations();
+  const obligations = await listObligations(cooperativeId);
   const annuelles = obligations.filter(o => o.periodicite === "annuel");
-  const bases = await getBasesAnnuelles(annee);
+  const bases = await getBasesAnnuelles(cooperativeId, annee);
   const generees: typeof declarationsFiscalesTable.$inferSelect[] = [];
 
   for (const obl of annuelles) {
@@ -232,7 +232,7 @@ export async function genererDeclarationsAnnuelles(cooperativeId: number, annee:
 
 // ─── Liste déclarations ───────────────────────────────────────────────────────
 
-export async function listDeclarations(opts?: {
+export async function listDeclarations(cooperativeId: number, opts?: {
   statut?: string; typeTaxe?: string; periode?: string;
 }) {
   const result = await db.execute<{
@@ -410,7 +410,7 @@ export async function checkEcheancesFiscales(cooperativeId: number) {
   for (const d of result.rows) {
     if (d.jours < 0) {
       // En retard → calculer pénalité + marquer en_retard
-      await calculerPenaliteRetard(d.id);
+      await calculerPenaliteRetard(cooperativeId, d.id);
       logger.warn({ id: d.id, libelle: d.libelle }, `Déclaration fiscale EN RETARD`);
     } else if (d.jours === 0) {
       logger.warn({ id: d.id }, `DÉCLARATION ${d.libelle} DUE AUJOURD'HUI`);
@@ -461,7 +461,7 @@ export async function getRapportAnnuel(cooperativeId: number, annee: number) {
 // ─── Rapport PDF annuel ────────────────────────────────────────────────────────
 
 export async function genererRapportPdf(cooperativeId: number, annee: number): Promise<Buffer> {
-  const rapport = await getRapportAnnuel(annee);
+  const rapport = await getRapportAnnuel(cooperativeId, annee);
   const coopNom = await db.execute<{ nom: string }>(sql`SELECT nom FROM cooperatives WHERE id = ${cooperativeId} LIMIT 1`)
     .then(r => r.rows[0]?.nom ?? "CoopDigital");
 

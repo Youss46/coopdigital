@@ -1,23 +1,30 @@
-import { db, avancesTable } from "@workspace/db";
-import { eq, and, lt, sql } from "drizzle-orm";
+import { db, avancesTable, cooperativesTable, membresTable } from "@workspace/db";
+import { eq, and, lt, sql, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { notifierParRole } from "../services/notificationService";
 
-const COOP_ID = 1;
+// ─── Récupère toutes les coopératives actives ─────────────────────────────────
+
+async function getAllCoopIds(): Promise<number[]> {
+  const rows = await db.select({ id: cooperativesTable.id }).from(cooperativesTable);
+  return rows.map((r) => r.id);
+}
 
 // ─── Avances en retard ────────────────────────────────────────────────────────
 
-async function checkAvancesEnRetard(): Promise<void> {
+async function checkAvancesEnRetard(cooperativeId: number): Promise<void> {
   try {
     const today = new Date().toISOString().split("T")[0]!;
 
     const avancesRetard = await db
       .select({ id: avancesTable.id, montant: avancesTable.soldeRestantFcfa })
       .from(avancesTable)
+      .innerJoin(membresTable, eq(membresTable.id, avancesTable.membreId))
       .where(
         and(
           eq(avancesTable.statut, "en_cours"),
           lt(avancesTable.dateEcheance, today),
+          eq(membresTable.cooperativeId, cooperativeId),
         ),
       );
 
@@ -25,7 +32,7 @@ async function checkAvancesEnRetard(): Promise<void> {
 
     const total = avancesRetard.reduce((s, a) => s + a.montant, 0);
 
-    await notifierParRole(COOP_ID, ["pca", "directeur", "comptable"], {
+    await notifierParRole(cooperativeId, ["pca", "directeur", "comptable"], {
       type:         "avance_retard",
       gravite:      "attention",
       titre:        `${avancesRetard.length} avance${avancesRetard.length > 1 ? "s" : ""} en retard`,
@@ -36,6 +43,7 @@ async function checkAvancesEnRetard(): Promise<void> {
     });
 
     // Mettre à jour le statut en retard
+    const ids = avancesRetard.map((a) => a.id);
     await db
       .update(avancesTable)
       .set({ statut: "en_retard" })
@@ -43,26 +51,27 @@ async function checkAvancesEnRetard(): Promise<void> {
         and(
           eq(avancesTable.statut, "en_cours"),
           lt(avancesTable.dateEcheance, today),
+          inArray(avancesTable.id, ids),
         ),
       );
 
-    logger.info({ nb: avancesRetard.length }, "Notifications avances en retard envoyées");
+    logger.info({ nb: avancesRetard.length, cooperativeId }, "Notifications avances en retard envoyées");
   } catch (err) {
-    logger.error({ err }, "Erreur checkAvancesEnRetard (notif)");
+    logger.error({ err, cooperativeId }, "Erreur checkAvancesEnRetard (notif)");
   }
 }
 
 // ─── Écritures comptables en attente ─────────────────────────────────────────
 
-async function checkEcrituresEnAttente(): Promise<void> {
+async function checkEcrituresEnAttente(cooperativeId: number): Promise<void> {
   try {
     const result = await db.execute<{ nb: string }>(
-      sql`SELECT COUNT(*)::int AS nb FROM ecritures_comptables WHERE statut = 'brouillon'`,
+      sql`SELECT COUNT(*)::int AS nb FROM ecritures_comptables WHERE statut = 'brouillon' AND cooperative_id = ${cooperativeId}`,
     );
     const nb = parseInt(String(result.rows[0]?.nb ?? "0"));
     if (nb === 0) return;
 
-    await notifierParRole(COOP_ID, ["pca", "directeur", "comptable"], {
+    await notifierParRole(cooperativeId, ["pca", "directeur", "comptable"], {
       type:         "ecriture_attente",
       gravite:      "info",
       titre:        `${nb} écriture${nb > 1 ? "s" : ""} en attente de validation`,
@@ -72,13 +81,13 @@ async function checkEcrituresEnAttente(): Promise<void> {
       sourceModule: "comptabilite",
     });
   } catch (err) {
-    logger.error({ err }, "Erreur checkEcrituresEnAttente (notif)");
+    logger.error({ err, cooperativeId }, "Erreur checkEcrituresEnAttente (notif)");
   }
 }
 
 // ─── Emprunts dont l'échéance approche dans 7 jours ──────────────────────────
 
-async function checkEcheancesEmprunt(): Promise<void> {
+async function checkEcheancesEmprunt(cooperativeId: number): Promise<void> {
   try {
     const dans7j = new Date();
     dans7j.setDate(dans7j.getDate() + 7);
@@ -89,12 +98,13 @@ async function checkEcheancesEmprunt(): Promise<void> {
       sql`SELECT COUNT(*)::int AS nb
           FROM echeances_emprunts
           WHERE statut = 'en_attente'
-            AND date_echeance BETWEEN ${today} AND ${dateStr}`,
+            AND date_echeance BETWEEN ${today} AND ${dateStr}
+            AND cooperative_id = ${cooperativeId}`,
     );
     const nb = parseInt(String(result.rows[0]?.nb ?? "0"));
     if (nb === 0) return;
 
-    await notifierParRole(COOP_ID, ["pca", "directeur", "comptable"], {
+    await notifierParRole(cooperativeId, ["pca", "directeur", "comptable"], {
       type:         "echeance_emprunt",
       gravite:      "attention",
       titre:        `${nb} échéance${nb > 1 ? "s" : ""} d'emprunt dans 7 jours`,
@@ -104,24 +114,26 @@ async function checkEcheancesEmprunt(): Promise<void> {
       sourceModule: "emprunts",
     });
   } catch (err) {
-    logger.error({ err }, "Erreur checkEcheancesEmprunt (notif)");
+    logger.error({ err, cooperativeId }, "Erreur checkEcheancesEmprunt (notif)");
   }
 }
 
 // ─── Budget dépassé > 10% ─────────────────────────────────────────────────────
 
-async function checkBudgetDepasse(): Promise<void> {
+async function checkBudgetDepasse(cooperativeId: number): Promise<void> {
   try {
     const result = await db.execute<{ nb: string }>(
       sql`SELECT COUNT(*)::int AS nb
-          FROM lignes_budget
-          WHERE montant_prevu > 0
-            AND montant_realise > montant_prevu * 1.10`,
+          FROM lignes_budget lb
+          JOIN budgets_campagne bc ON bc.id = lb.budget_id
+          WHERE lb.montant_prevu > 0
+            AND lb.montant_realise > lb.montant_prevu * 1.10
+            AND bc.cooperative_id = ${cooperativeId}`,
     );
     const nb = parseInt(String(result.rows[0]?.nb ?? "0"));
     if (nb === 0) return;
 
-    await notifierParRole(COOP_ID, ["pca", "directeur", "comptable"], {
+    await notifierParRole(cooperativeId, ["pca", "directeur", "comptable"], {
       type:         "budget_depasse",
       gravite:      "attention",
       titre:        `${nb} ligne${nb > 1 ? "s" : ""} budgétaire${nb > 1 ? "s" : ""} dépassée${nb > 1 ? "s" : ""} de plus de 10 %`,
@@ -131,7 +143,7 @@ async function checkBudgetDepasse(): Promise<void> {
       sourceModule: "budget",
     });
   } catch (err) {
-    logger.error({ err }, "Erreur checkBudgetDepasse (notif)");
+    logger.error({ err, cooperativeId }, "Erreur checkBudgetDepasse (notif)");
   }
 }
 
@@ -139,11 +151,28 @@ async function checkBudgetDepasse(): Promise<void> {
 
 export async function runNotificationsCron(): Promise<void> {
   logger.info("Démarrage du CRON notifications");
-  await Promise.allSettled([
-    checkAvancesEnRetard(),
-    checkEcrituresEnAttente(),
-    checkEcheancesEmprunt(),
-    checkBudgetDepasse(),
-  ]);
-  logger.info("CRON notifications terminé");
+
+  let coopIds: number[];
+  try {
+    coopIds = await getAllCoopIds();
+  } catch (err) {
+    logger.error({ err }, "Impossible de récupérer les coopératives — CRON annulé");
+    return;
+  }
+
+  if (coopIds.length === 0) {
+    logger.info("Aucune coopérative trouvée — CRON terminé");
+    return;
+  }
+
+  await Promise.allSettled(
+    coopIds.flatMap((coopId) => [
+      checkAvancesEnRetard(coopId),
+      checkEcrituresEnAttente(coopId),
+      checkEcheancesEmprunt(coopId),
+      checkBudgetDepasse(coopId),
+    ]),
+  );
+
+  logger.info({ nb: coopIds.length }, "CRON notifications terminé");
 }

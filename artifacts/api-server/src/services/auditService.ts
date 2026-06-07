@@ -66,7 +66,7 @@ function extractIp(req: Request): string {
  */
 export async function log(req: Request, params: AuditLogParams): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId ?? null;
     const champsModifies = calcChampsModifies(
       params.valeursAvant ?? null,
       params.valeursApres ?? null,
@@ -106,7 +106,7 @@ export async function logRaw(params: AuditLogParams & {
   cooperativeId?: number;
 }): Promise<void> {
   try {
-    const cooperativeId = params.cooperativeId ?? 1;
+    const cooperativeId = params.cooperativeId ?? null;
     await db.insert(auditTrailTable).values({
       cooperativeId:  cooperativeId,
       userId:         params.userId,

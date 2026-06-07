@@ -5,7 +5,8 @@ import * as svc from "../services/formationService.js";
 
 export async function getProgrammes(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     res.json(await svc.listProgrammes(cooperativeId));
   }
   catch (err) { req.log.error({ err }, "getProgrammes"); res.status(500).json({ error: "Erreur serveur" }); }
@@ -13,7 +14,8 @@ export async function getProgrammes(req: Request, res: Response): Promise<void> 
 
 export async function postProgramme(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const body = req.body as { titre: string; description?: string; thematiques?: string[]; financeur?: string; budgetFcfa?: number; dateDebut?: string; dateFin?: string; };
     if (!body.titre) { res.status(400).json({ error: "titre requis" }); return; }
     res.status(201).json(await svc.createProgramme(cooperativeId, body));
@@ -22,7 +24,8 @@ export async function postProgramme(req: Request, res: Response): Promise<void> 
 
 export async function putProgramme(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     const row = await svc.updateProgramme(cooperativeId, id, req.body);
     if (!row) { res.status(404).json({ error: "Programme introuvable" }); return; }
@@ -32,7 +35,8 @@ export async function putProgramme(req: Request, res: Response): Promise<void> {
 
 export async function deleteProgramme(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     await svc.deleteProgramme(cooperativeId, parseInt(String(req.params["id"]), 10));
     res.json({ ok: true });
   } catch (err) { req.log.error({ err }, "deleteProgramme"); res.status(500).json({ error: "Erreur serveur" }); }
@@ -42,7 +46,8 @@ export async function deleteProgramme(req: Request, res: Response): Promise<void
 
 export async function getSessions(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const { statut, programme_id, upcoming } = req.query as Record<string, string | undefined>;
     res.json(await svc.listSessions(cooperativeId, {
       statut,
@@ -54,7 +59,8 @@ export async function getSessions(req: Request, res: Response): Promise<void> {
 
 export async function postSession(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const body = req.body as { titre: string; dateSession: string; [k: string]: unknown };
     if (!body.titre || !body.dateSession) { res.status(400).json({ error: "titre et dateSession requis" }); return; }
     res.status(201).json(await svc.createSession(cooperativeId, body as Parameters<typeof svc.createSession>[1]));
@@ -63,7 +69,8 @@ export async function postSession(req: Request, res: Response): Promise<void> {
 
 export async function putSession(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     const row = await svc.updateSession(cooperativeId, id, req.body);
     if (!row) { res.status(404).json({ error: "Session introuvable" }); return; }
@@ -75,7 +82,8 @@ export async function putSession(req: Request, res: Response): Promise<void> {
 
 export async function postInscrire(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     const { membreIds, zone, section, tous } = req.body as { membreIds?: number[]; zone?: string; section?: string; tous?: boolean };
     const result = await svc.inscrireMembres(cooperativeId, id, { membreIds, zone, section, tous });
@@ -85,7 +93,8 @@ export async function postInscrire(req: Request, res: Response): Promise<void> {
 
 export async function getInscrits(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     res.json(await svc.getInscrits(cooperativeId, id));
   } catch (err) { req.log.error({ err }, "getInscrits"); res.status(500).json({ error: "Erreur serveur" }); }
@@ -115,7 +124,8 @@ export async function putPresences(req: Request, res: Response): Promise<void> {
 
 export async function postConvoquer(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     res.json(await svc.envoyerConvocations(cooperativeId, id));
   } catch (err) { req.log.error({ err }, "postConvoquer"); res.status(500).json({ error: "Erreur serveur" }); }
@@ -123,7 +133,8 @@ export async function postConvoquer(req: Request, res: Response): Promise<void> 
 
 export async function postRappel(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     res.json(await svc.envoyerRappels(cooperativeId, id));
   } catch (err) { req.log.error({ err }, "postRappel"); res.status(500).json({ error: "Erreur serveur" }); }
@@ -140,7 +151,8 @@ export async function postAttestations(req: Request, res: Response): Promise<voi
 
 export async function getAttestation(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const sessionId = parseInt(String(req.params["id"]), 10);
     const membreId  = parseInt(String(req.params["membreId"]), 10);
     const buffer = await svc.genererPdfAttestation(cooperativeId, sessionId, membreId);
@@ -152,7 +164,8 @@ export async function getAttestation(req: Request, res: Response): Promise<void>
 
 export async function getListeAttestations(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const { session_id, membre_id, q } = req.query as Record<string, string | undefined>;
     res.json(await svc.listAttestations(cooperativeId, {
       sessionId: session_id ? parseInt(session_id, 10) : undefined,
@@ -166,7 +179,8 @@ export async function getListeAttestations(req: Request, res: Response): Promise
 
 export async function getStatsMembre(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["membreId"]), 10);
     res.json(await svc.getStatsMembre(cooperativeId, id));
   } catch (err) { req.log.error({ err }, "getStatsMembre"); res.status(500).json({ error: "Erreur serveur" }); }
@@ -176,7 +190,8 @@ export async function getStatsMembre(req: Request, res: Response): Promise<void>
 
 export async function getStats(req: Request, res: Response): Promise<void> {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     res.json(await svc.getStats(cooperativeId));
   }
   catch (err) { req.log.error({ err }, "getStats formations"); res.status(500).json({ error: "Erreur serveur" }); }

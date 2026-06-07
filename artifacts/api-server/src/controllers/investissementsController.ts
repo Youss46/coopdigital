@@ -13,7 +13,8 @@ import {
 
 export async function tableauBord(req: Request, res: Response) {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const data = await getTableauBord(cooperativeId);
     return res.json(data);
   } catch (err) {
@@ -26,7 +27,8 @@ export async function tableauBord(req: Request, res: Response) {
 
 export async function listeProjets(req: Request, res: Response) {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const statut    = typeof req.query.statut    === "string" ? req.query.statut    : undefined;
     const categorie = typeof req.query.categorie === "string" ? req.query.categorie : undefined;
     const projets = await listProjets(cooperativeId, statut, categorie);
@@ -41,7 +43,8 @@ export async function listeProjets(req: Request, res: Response) {
 
 export async function detailProjet(req: Request, res: Response) {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = Number(req.params.id);
     const projet = await getProjet(cooperativeId, id);
     if (!projet) return res.status(404).json({ error: "Projet introuvable" });
@@ -56,7 +59,8 @@ export async function detailProjet(req: Request, res: Response) {
 
 export async function creerProjet(req: Request, res: Response) {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const {
       titre, description, categorie, montantEstimeFcfa, sourceFinancement,
       empruntId, subventionId, dateDebutPrevue, dateFinPrevue,
@@ -93,7 +97,8 @@ export async function creerProjet(req: Request, res: Response) {
 
 export async function modifierProjet(req: Request, res: Response) {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = Number(req.params.id);
     const body = req.body as Record<string, unknown>;
 
@@ -126,7 +131,8 @@ export async function modifierProjet(req: Request, res: Response) {
 
 export async function supprimerProjet(req: Request, res: Response) {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = Number(req.params.id);
     const ok = await deleteProjet(cooperativeId, id);
     if (!ok) return res.status(404).json({ error: "Projet introuvable" });
@@ -141,7 +147,8 @@ export async function supprimerProjet(req: Request, res: Response) {
 
 export async function ajouterDepenseCtrl(req: Request, res: Response) {
   try {
-    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const projetId = Number(req.params.id);
     const {
       dateDepense, libelle, montantFcfa,

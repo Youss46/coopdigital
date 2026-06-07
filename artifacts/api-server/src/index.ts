@@ -70,11 +70,17 @@ cron.schedule("0 8 * * *", () => {
 
 // CRON fiscalité : vérification des échéances fiscales à 8h05
 cron.schedule("5 8 * * *", () => {
-  import("./services/fiscaliteService.js").then(({ checkEcheancesFiscales }) => {
-    checkEcheancesFiscales().catch((err: unknown) => {
-      logger.error({ err }, "Erreur cron checkEcheancesFiscales");
-    });
-  }).catch((err: unknown) => logger.error({ err }, "Import fiscaliteService"));
+  Promise.all([
+    import("./services/fiscaliteService.js"),
+    import("@workspace/db").then(async ({ db, cooperativesTable }) => {
+      const { sql: drizzleSql } = await import("drizzle-orm");
+      return db.execute<{ id: number }>(drizzleSql`SELECT id FROM cooperatives`).then(r => r.rows);
+    }),
+  ]).then(([{ checkEcheancesFiscales }, coops]) => {
+    return Promise.allSettled(coops.map(c => checkEcheancesFiscales(c.id)));
+  }).then(results => {
+    results.forEach(r => { if (r.status === "rejected") logger.error({ err: r.reason }, "Erreur cron checkEcheancesFiscales"); });
+  }).catch((err: unknown) => logger.error({ err }, "Erreur cron fiscaliteService"));
 });
 
 // CRON support : alertes tickets haute priorité non pris en charge après 30 min (toutes les 5 min)

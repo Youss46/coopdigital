@@ -27,8 +27,9 @@ export async function loginTerrainHandler(req: Request, res: Response): Promise<
 
 export async function getProfilHandler(req: Request, res: Response): Promise<void> {
   const { id, cooperativeId } = getAgent(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
   try {
-    const profil = await terrainService.getProfilAgent(id, cooperativeId ?? 1);
+    const profil = await terrainService.getProfilAgent(id, cooperativeId);
     res.json(profil);
   } catch (err) {
     req.log.error({ err }, "Erreur profil terrain");
@@ -38,8 +39,9 @@ export async function getProfilHandler(req: Request, res: Response): Promise<voi
 
 export async function getPrixHandler(req: Request, res: Response): Promise<void> {
   const { cooperativeId } = getAgent(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
   try {
-    const prix = await terrainService.getPrixActuel(cooperativeId ?? 1);
+    const prix = await terrainService.getPrixActuel(cooperativeId);
     res.json(prix);
   } catch (err) {
     req.log.error({ err }, "Erreur prix terrain");
@@ -49,10 +51,11 @@ export async function getPrixHandler(req: Request, res: Response): Promise<void>
 
 export async function getFournisseursHandler(req: Request, res: Response): Promise<void> {
   const { cooperativeId } = getAgent(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
   const search = req.query["search"] as string | undefined;
   const section = req.query["section"] as string | undefined;
   try {
-    const fournisseurs = await terrainService.getFournisseurs(cooperativeId ?? 1, section, search);
+    const fournisseurs = await terrainService.getFournisseurs(cooperativeId, section, search);
     res.json(fournisseurs);
   } catch (err) {
     req.log.error({ err }, "Erreur fournisseurs terrain");
@@ -62,10 +65,11 @@ export async function getFournisseursHandler(req: Request, res: Response): Promi
 
 export async function getFournisseurRecapHandler(req: Request, res: Response): Promise<void> {
   const { cooperativeId } = getAgent(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
   const membreId = Number(req.params["id"]);
   if (isNaN(membreId)) { res.status(400).json({ erreur: "ID invalide" }); return; }
   try {
-    const recap = await terrainService.getFournisseurRecap(membreId, cooperativeId ?? 1);
+    const recap = await terrainService.getFournisseurRecap(membreId, cooperativeId);
     if (!recap) { res.status(404).json({ erreur: "Fournisseur introuvable" }); return; }
     res.json(recap);
   } catch (err) {
@@ -76,6 +80,7 @@ export async function getFournisseurRecapHandler(req: Request, res: Response): P
 
 export async function postCollecteHandler(req: Request, res: Response): Promise<void> {
   const { id, cooperativeId } = getAgent(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
   const { membreId, nombreSacs, poidsBrutKg, retenueKg, modePaiement } = req.body as {
     membreId?: number;
     nombreSacs?: number;
@@ -88,7 +93,7 @@ export async function postCollecteHandler(req: Request, res: Response): Promise<
     return;
   }
   try {
-    const result = await terrainService.enregistrerCollecte(id, cooperativeId ?? 1, {
+    const result = await terrainService.enregistrerCollecte(id, cooperativeId, {
       membreId,
       nombreSacs: nombreSacs ?? 1,
       poidsBrutKg,
@@ -104,6 +109,7 @@ export async function postCollecteHandler(req: Request, res: Response): Promise<
 
 export async function postPaiementHandler(req: Request, res: Response): Promise<void> {
   const { id, cooperativeId } = getAgent(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
   const { membreId, livraisonId, modePaiement } = req.body as {
     membreId?: number;
     livraisonId?: number;
@@ -114,7 +120,7 @@ export async function postPaiementHandler(req: Request, res: Response): Promise<
     return;
   }
   try {
-    const result = await terrainService.enregistrerPaiement(id, cooperativeId ?? 1, { membreId, livraisonId, modePaiement });
+    const result = await terrainService.enregistrerPaiement(id, cooperativeId, { membreId, livraisonId, modePaiement });
     res.status(201).json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur paiement terrain");
@@ -124,6 +130,7 @@ export async function postPaiementHandler(req: Request, res: Response): Promise<
 
 export async function postAvanceHandler(req: Request, res: Response): Promise<void> {
   const { id, cooperativeId } = getAgent(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
   const { membreId, montantFcfa, motif } = req.body as {
     membreId?: number;
     montantFcfa?: number;
@@ -134,7 +141,7 @@ export async function postAvanceHandler(req: Request, res: Response): Promise<vo
     return;
   }
   try {
-    const result = await terrainService.octroierAvance(id, cooperativeId ?? 1, { membreId, montantFcfa, motif });
+    const result = await terrainService.octroierAvance(id, cooperativeId, { membreId, montantFcfa, motif });
     res.status(201).json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur avance terrain");
@@ -144,8 +151,9 @@ export async function postAvanceHandler(req: Request, res: Response): Promise<vo
 
 export async function getBilanJourHandler(req: Request, res: Response): Promise<void> {
   const { id, cooperativeId } = getAgent(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
   try {
-    const bilan = await terrainService.getBilanJour(id, cooperativeId ?? 1);
+    const bilan = await terrainService.getBilanJour(id, cooperativeId);
     res.json(bilan);
   } catch (err) {
     req.log.error({ err }, "Erreur bilan jour terrain");
@@ -155,6 +163,7 @@ export async function getBilanJourHandler(req: Request, res: Response): Promise<
 
 export async function postSyncHandler(req: Request, res: Response): Promise<void> {
   const { id, cooperativeId } = getAgent(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
   const { operations } = req.body as { operations?: unknown[] };
   if (!Array.isArray(operations)) {
     res.status(400).json({ erreur: "operations doit être un tableau" });
@@ -163,7 +172,7 @@ export async function postSyncHandler(req: Request, res: Response): Promise<void
   try {
     const result = await terrainService.syncOperations(
       id,
-      cooperativeId ?? 1,
+      cooperativeId,
       operations as Parameters<typeof terrainService.syncOperations>[2]
     );
     res.json(result);
@@ -175,8 +184,9 @@ export async function postSyncHandler(req: Request, res: Response): Promise<void
 
 export async function postRapportHandler(req: Request, res: Response): Promise<void> {
   const { id, cooperativeId } = getAgent(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
   try {
-    const result = await terrainService.envoyerRapportJournalier(id, cooperativeId ?? 1);
+    const result = await terrainService.envoyerRapportJournalier(id, cooperativeId);
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur rapport terrain");
