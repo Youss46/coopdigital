@@ -4,22 +4,27 @@ import * as svc from "../services/formationService.js";
 // ─── Programmes ───────────────────────────────────────────────────────────────
 
 export async function getProgrammes(req: Request, res: Response): Promise<void> {
-  try { res.json(await svc.listProgrammes()); }
+  try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    res.json(await svc.listProgrammes(cooperativeId));
+  }
   catch (err) { req.log.error({ err }, "getProgrammes"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function postProgramme(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const body = req.body as { titre: string; description?: string; thematiques?: string[]; financeur?: string; budgetFcfa?: number; dateDebut?: string; dateFin?: string; };
     if (!body.titre) { res.status(400).json({ error: "titre requis" }); return; }
-    res.status(201).json(await svc.createProgramme(body));
+    res.status(201).json(await svc.createProgramme(cooperativeId, body));
   } catch (err) { req.log.error({ err }, "postProgramme"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function putProgramme(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    const row = await svc.updateProgramme(id, req.body);
+    const row = await svc.updateProgramme(cooperativeId, id, req.body);
     if (!row) { res.status(404).json({ error: "Programme introuvable" }); return; }
     res.json(row);
   } catch (err) { req.log.error({ err }, "putProgramme"); res.status(500).json({ error: "Erreur serveur" }); }
@@ -27,7 +32,8 @@ export async function putProgramme(req: Request, res: Response): Promise<void> {
 
 export async function deleteProgramme(req: Request, res: Response): Promise<void> {
   try {
-    await svc.deleteProgramme(parseInt(String(req.params["id"]), 10));
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    await svc.deleteProgramme(cooperativeId, parseInt(String(req.params["id"]), 10));
     res.json({ ok: true });
   } catch (err) { req.log.error({ err }, "deleteProgramme"); res.status(500).json({ error: "Erreur serveur" }); }
 }
@@ -36,8 +42,9 @@ export async function deleteProgramme(req: Request, res: Response): Promise<void
 
 export async function getSessions(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const { statut, programme_id, upcoming } = req.query as Record<string, string | undefined>;
-    res.json(await svc.listSessions({
+    res.json(await svc.listSessions(cooperativeId, {
       statut,
       programmeId: programme_id ? parseInt(programme_id, 10) : undefined,
       upcoming: upcoming === "1" || upcoming === "true",
@@ -47,16 +54,18 @@ export async function getSessions(req: Request, res: Response): Promise<void> {
 
 export async function postSession(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const body = req.body as { titre: string; dateSession: string; [k: string]: unknown };
     if (!body.titre || !body.dateSession) { res.status(400).json({ error: "titre et dateSession requis" }); return; }
-    res.status(201).json(await svc.createSession(body as Parameters<typeof svc.createSession>[0]));
+    res.status(201).json(await svc.createSession(cooperativeId, body as Parameters<typeof svc.createSession>[1]));
   } catch (err) { req.log.error({ err }, "postSession"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function putSession(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    const row = await svc.updateSession(id, req.body);
+    const row = await svc.updateSession(cooperativeId, id, req.body);
     if (!row) { res.status(404).json({ error: "Session introuvable" }); return; }
     res.json(row);
   } catch (err) { req.log.error({ err }, "putSession"); res.status(500).json({ error: "Erreur serveur" }); }
@@ -66,17 +75,19 @@ export async function putSession(req: Request, res: Response): Promise<void> {
 
 export async function postInscrire(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
     const { membreIds, zone, section, tous } = req.body as { membreIds?: number[]; zone?: string; section?: string; tous?: boolean };
-    const result = await svc.inscrireMembres(id, { membreIds, zone, section, tous });
+    const result = await svc.inscrireMembres(cooperativeId, id, { membreIds, zone, section, tous });
     res.json(result);
   } catch (err) { req.log.error({ err }, "postInscrire"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function getInscrits(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    res.json(await svc.getInscrits(id));
+    res.json(await svc.getInscrits(cooperativeId, id));
   } catch (err) { req.log.error({ err }, "getInscrits"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
@@ -104,15 +115,17 @@ export async function putPresences(req: Request, res: Response): Promise<void> {
 
 export async function postConvoquer(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    res.json(await svc.envoyerConvocations(id));
+    res.json(await svc.envoyerConvocations(cooperativeId, id));
   } catch (err) { req.log.error({ err }, "postConvoquer"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function postRappel(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    res.json(await svc.envoyerRappels(id));
+    res.json(await svc.envoyerRappels(cooperativeId, id));
   } catch (err) { req.log.error({ err }, "postRappel"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
@@ -127,9 +140,10 @@ export async function postAttestations(req: Request, res: Response): Promise<voi
 
 export async function getAttestation(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const sessionId = parseInt(String(req.params["id"]), 10);
     const membreId  = parseInt(String(req.params["membreId"]), 10);
-    const buffer = await svc.genererPdfAttestation(sessionId, membreId);
+    const buffer = await svc.genererPdfAttestation(cooperativeId, sessionId, membreId);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="attestation-${sessionId}-${membreId}.pdf"`);
     res.send(buffer);
@@ -138,8 +152,9 @@ export async function getAttestation(req: Request, res: Response): Promise<void>
 
 export async function getListeAttestations(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const { session_id, membre_id, q } = req.query as Record<string, string | undefined>;
-    res.json(await svc.listAttestations({
+    res.json(await svc.listAttestations(cooperativeId, {
       sessionId: session_id ? parseInt(session_id, 10) : undefined,
       membreId:  membre_id  ? parseInt(membre_id, 10)  : undefined,
       search:    q,
@@ -151,14 +166,18 @@ export async function getListeAttestations(req: Request, res: Response): Promise
 
 export async function getStatsMembre(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["membreId"]), 10);
-    res.json(await svc.getStatsMembre(id));
+    res.json(await svc.getStatsMembre(cooperativeId, id));
   } catch (err) { req.log.error({ err }, "getStatsMembre"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 // ─── Stats globales ───────────────────────────────────────────────────────────
 
 export async function getStats(req: Request, res: Response): Promise<void> {
-  try { res.json(await svc.getStats()); }
+  try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    res.json(await svc.getStats(cooperativeId));
+  }
   catch (err) { req.log.error({ err }, "getStats formations"); res.status(500).json({ error: "Erreur serveur" }); }
 }

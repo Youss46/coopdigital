@@ -117,7 +117,7 @@ export async function verifierCampagne(req: Request, res: Response) {
   });
   if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
 
-  const result = await verifierAvantCloture(id);
+  const result = await verifierAvantCloture(cooperativeId, id);
   return res.json(result);
 }
 
@@ -132,7 +132,7 @@ export async function cloturerCampagne(req: Request, res: Response) {
   if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
   if (campagne.statut === "fermee") return res.status(400).json({ erreur: "Campagne déjà clôturée" });
 
-  const bilanData = await cloturerCampagneService(id, userId);
+  const bilanData = await cloturerCampagneService(cooperativeId, id, userId);
   return res.json(bilanData);
 }
 
@@ -149,7 +149,7 @@ export async function getBilan(req: Request, res: Response) {
   });
 
   if (!bilan) {
-    const bilanData = await genererBilan(id);
+    const bilanData = await genererBilan(cooperativeId, id);
     return res.json(bilanData);
   }
 
@@ -164,7 +164,7 @@ export async function getBilanPdf(req: Request, res: Response) {
   });
   if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
 
-  const { bilan } = await genererBilan(id);
+  const { bilan } = await genererBilan(cooperativeId, id);
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
@@ -344,6 +344,7 @@ export async function getComparaison(req: Request, res: Response) {
     ? idsParam.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n))
     : [];
 
-  const result = await getComparaisonCampagnes(ids);
+  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const result = await getComparaisonCampagnes(cooperativeId, ids);
   return res.json(result);
 }

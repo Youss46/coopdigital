@@ -13,8 +13,6 @@ import {
 import { eq, and, desc, gte, lt, avg, count, sql, gt } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
-const COOP_ID = 1;
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type AnomalieDetectee = {
@@ -29,16 +27,16 @@ export type AnomalieDetectee = {
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-export async function getConfigAnomalie() {
+export async function getConfigAnomalie(cooperativeId: number) {
   const [cfg] = await db
     .select()
     .from(configAnomaliesTable)
-    .where(eq(configAnomaliesTable.cooperativeId, COOP_ID))
+    .where(eq(configAnomaliesTable.cooperativeId, cooperativeId))
     .limit(1);
   return cfg ?? null;
 }
 
-export async function updateConfigAnomalie(data: {
+export async function updateConfigAnomalie(cooperativeId: number, data: {
   poidsMaxLivraisonKg?:      number;
   poidsMoyenMultiplicateur?: number;
   delaiMinEntreLivraisonsH?: number;
@@ -65,7 +63,7 @@ export async function updateConfigAnomalie(data: {
   const [updated] = await db
     .update(configAnomaliesTable)
     .set(set)
-    .where(eq(configAnomaliesTable.cooperativeId, COOP_ID))
+    .where(eq(configAnomaliesTable.cooperativeId, cooperativeId))
     .returning();
   return updated;
 }
@@ -73,6 +71,7 @@ export async function updateConfigAnomalie(data: {
 // ─── Persistence ─────────────────────────────────────────────────────────────
 
 export async function creerAnomalies(
+  cooperativeId: number,
   anomalies: AnomalieDetectee[],
   moduleSource: string,
   extras?: { entiteId?: number; entiteType?: string },
@@ -81,7 +80,7 @@ export async function creerAnomalies(
   try {
     await db.insert(anomaliesTable).values(
       anomalies.map((a) => ({
-        cooperativeId:  COOP_ID,
+        cooperativeId:  cooperativeId,
         typeAnomalie:   a.typeAnomalie,
         niveauGravite:  a.niveauGravite,
         moduleSource,
@@ -102,14 +101,14 @@ export async function creerAnomalies(
 
 // ─── Détecteurs ───────────────────────────────────────────────────────────────
 
-export async function checkLivraison(params: {
+export async function checkLivraison(cooperativeId: number, params: {
   membreId:        number;
   poidsKg:         number;
   prixUnitaireFcfa: number;
   campagneIdResolu: number | null;
   agentId:         number | null;
 }): Promise<AnomalieDetectee[]> {
-  const cfg = await getConfigAnomalie();
+  const cfg = await getConfigAnomalie(cooperativeId);
   if (!cfg) return [];
 
   const { membreId, poidsKg, prixUnitaireFcfa, campagneIdResolu, agentId } = params;
@@ -198,7 +197,7 @@ export async function checkLivraison(params: {
   const [dernierPrix] = await db
     .select({ prix: historiquePrixTable.prixBordChampFcfa })
     .from(historiquePrixTable)
-    .where(eq(historiquePrixTable.cooperativeId, COOP_ID))
+    .where(eq(historiquePrixTable.cooperativeId, cooperativeId))
     .orderBy(desc(historiquePrixTable.datePrix))
     .limit(1);
   if (dernierPrix) {
@@ -219,12 +218,12 @@ export async function checkLivraison(params: {
   return anomalies;
 }
 
-export async function checkAvance(params: {
+export async function checkAvance(cooperativeId: number, params: {
   membreId:           number;
   montantOctroyeFcfa: number;
   agentId:            number | null;
 }): Promise<AnomalieDetectee[]> {
-  const cfg = await getConfigAnomalie();
+  const cfg = await getConfigAnomalie(cooperativeId);
   if (!cfg) return [];
 
   const { membreId, montantOctroyeFcfa, agentId } = params;
@@ -280,13 +279,13 @@ export async function checkAvance(params: {
   return anomalies;
 }
 
-export async function checkPaiement(params: {
+export async function checkPaiement(cooperativeId: number, params: {
   membreId:    number;
   montantFcfa: number;
   livraisonId: number | null;
   agentId:     number | null;
 }): Promise<AnomalieDetectee[]> {
-  const cfg = await getConfigAnomalie();
+  const cfg = await getConfigAnomalie(cooperativeId);
   if (!cfg) return [];
 
   const { membreId, montantFcfa, livraisonId, agentId } = params;
@@ -331,13 +330,13 @@ export async function checkPaiement(params: {
   return anomalies;
 }
 
-export async function checkStock(params: {
+export async function checkStock(cooperativeId: number, params: {
   entrepotId: number;
   poidsKg:    number;
   stockActuel: number;
   agentId:    number | null;
 }): Promise<AnomalieDetectee[]> {
-  const cfg = await getConfigAnomalie();
+  const cfg = await getConfigAnomalie(cooperativeId);
   if (!cfg) return [];
 
   const { entrepotId, poidsKg, stockActuel, agentId } = params;
@@ -374,11 +373,11 @@ export async function checkStock(params: {
   return anomalies;
 }
 
-export async function checkEcriture(params: {
+export async function checkEcriture(cooperativeId: number, params: {
   montantFcfa: number;
   agentId:     number | null;
 }): Promise<AnomalieDetectee[]> {
-  const cfg = await getConfigAnomalie();
+  const cfg = await getConfigAnomalie(cooperativeId);
   if (!cfg) return [];
 
   const { montantFcfa, agentId } = params;
@@ -427,7 +426,7 @@ export async function checkEcriture(params: {
 
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
-export async function listAnomalies(filters: {
+export async function listAnomalies(cooperativeId: number, filters: {
   gravite?:    string;
   statut?:     string;
   module?:     string;
@@ -438,7 +437,7 @@ export async function listAnomalies(filters: {
   limit?:      number;
   offset?:     number;
 }) {
-  const conditions = [eq(anomaliesTable.cooperativeId, COOP_ID)];
+  const conditions = [eq(anomaliesTable.cooperativeId, cooperativeId)];
   if (filters.gravite)   conditions.push(eq(anomaliesTable.niveauGravite, filters.gravite as "info" | "attention" | "critique"));
   if (filters.statut)    conditions.push(eq(anomaliesTable.statut, filters.statut as "nouvelle" | "en_cours" | "resolue" | "ignoree" | "faux_positif"));
   if (filters.module)    conditions.push(eq(anomaliesTable.moduleSource, filters.module));
@@ -467,6 +466,7 @@ export async function listAnomalies(filters: {
 }
 
 export async function traiterAnomalie(
+  cooperativeId: number,
   id: number,
   data: { statut: "resolue" | "ignoree" | "faux_positif"; commentaire?: string; traitePar: number },
 ) {
@@ -478,12 +478,12 @@ export async function traiterAnomalie(
       traiteLe:              new Date(),
       commentaireTraitement: data.commentaire ?? null,
     })
-    .where(and(eq(anomaliesTable.id, id), eq(anomaliesTable.cooperativeId, COOP_ID)))
+    .where(and(eq(anomaliesTable.id, id), eq(anomaliesTable.cooperativeId, cooperativeId)))
     .returning();
   return updated ?? null;
 }
 
-export async function getStats() {
+export async function getStats(cooperativeId: number) {
   const debut_mois = new Date();
   debut_mois.setDate(1); debut_mois.setHours(0, 0, 0, 0);
 
@@ -497,7 +497,7 @@ export async function getStats() {
       nb_faux_positifs: sql<number>`COUNT(*) FILTER (WHERE statut = 'faux_positif' AND created_at >= ${debut_mois})`,
     })
     .from(anomaliesTable)
-    .where(eq(anomaliesTable.cooperativeId, COOP_ID));
+    .where(eq(anomaliesTable.cooperativeId, cooperativeId));
 
   const parModule = await db
     .select({
@@ -505,7 +505,7 @@ export async function getStats() {
       nb:       count(),
     })
     .from(anomaliesTable)
-    .where(eq(anomaliesTable.cooperativeId, COOP_ID))
+    .where(eq(anomaliesTable.cooperativeId, cooperativeId))
     .groupBy(anomaliesTable.moduleSource)
     .orderBy(desc(count()));
 
@@ -515,7 +515,7 @@ export async function getStats() {
       nb:       count(),
     })
     .from(anomaliesTable)
-    .where(and(eq(anomaliesTable.cooperativeId, COOP_ID), gt(anomaliesTable.agentId, 0)))
+    .where(and(eq(anomaliesTable.cooperativeId, cooperativeId), gt(anomaliesTable.agentId, 0)))
     .groupBy(anomaliesTable.agentId)
     .orderBy(desc(count()))
     .limit(5);
@@ -526,7 +526,7 @@ export async function getStats() {
       nb:        count(),
     })
     .from(anomaliesTable)
-    .where(and(eq(anomaliesTable.cooperativeId, COOP_ID), gt(anomaliesTable.membreId, 0)))
+    .where(and(eq(anomaliesTable.cooperativeId, cooperativeId), gt(anomaliesTable.membreId, 0)))
     .groupBy(anomaliesTable.membreId)
     .orderBy(desc(count()))
     .limit(5);
@@ -540,7 +540,7 @@ export async function getStats() {
     })
     .from(anomaliesTable)
     .where(and(
-      eq(anomaliesTable.cooperativeId, COOP_ID),
+      eq(anomaliesTable.cooperativeId, cooperativeId),
       gte(anomaliesTable.createdAt, depuis30j),
     ))
     .groupBy(sql`DATE(created_at)`)

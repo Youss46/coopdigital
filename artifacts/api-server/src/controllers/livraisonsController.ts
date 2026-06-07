@@ -89,14 +89,14 @@ export async function createLivraison(req: Request, res: Response): Promise<void
     }
 
     // ── Détection anomalies AVANT la transaction ──────────────────────────
-    const anomaliesDetectees = await checkLivraison({
+    const anomaliesDetectees = await checkLivraison(cooperativeId, {
       membreId, poidsKg, prixUnitaireFcfa,
       campagneIdResolu,
       agentId: req.user?.id ?? null,
     });
     const anomaliesCritiques = anomaliesDetectees.filter((a) => a.niveauGravite === "critique");
     if (anomaliesCritiques.length > 0) {
-      void creerAnomalies(anomaliesCritiques, "livraisons");
+      void creerAnomalies(cooperativeId, anomaliesCritiques, "livraisons");
       res.status(422).json({
         erreur: anomaliesCritiques[0]!.description,
         anomalie: "bloquee",
@@ -107,7 +107,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
     const anomaliesAttention = anomaliesDetectees.filter((a) => a.niveauGravite !== "critique");
 
     // Récupérer l'encours intrants AVANT la transaction (lecture seule)
-    const encoursIntrants = await getEncoursMembre(membreId);
+    const encoursIntrants = await getEncoursMembre(cooperativeId, membreId);
 
     const result = await db.transaction(async (tx) => {
       const montantBrut = Math.round(poidsKg * prixUnitaireFcfa);
@@ -183,7 +183,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
 
       // Remboursement automatique des intrants par déduction livraison
       if (intrantsDeduits > 0) {
-        await enregistrerRemboursementParLivraison(tx, membreId, intrantsDeduits, dateStr);
+        await enregistrerRemboursementParLivraison(tx, cooperativeId, membreId, intrantsDeduits, dateStr);
       }
 
       return {
@@ -194,13 +194,13 @@ export async function createLivraison(req: Request, res: Response): Promise<void
     });
 
     if (anomaliesAttention.length > 0) {
-      void creerAnomalies(anomaliesAttention, "livraisons", {
+      void creerAnomalies(cooperativeId, anomaliesAttention, "livraisons", {
         entiteId: result.livraison.id,
         entiteType: "livraison",
       });
     }
 
-    void generateEcrituresLivraison({
+    void generateEcrituresLivraison(cooperativeId, {
       livraisonId: result.livraison.id,
       membreNom: `${result.livraison.membrePrenoms} ${result.livraison.membreNom}`,
       montantBrutFcfa: result.livraison.montantBrutFcfa,

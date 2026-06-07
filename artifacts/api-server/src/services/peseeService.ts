@@ -11,7 +11,7 @@ import {
 import { eq, and, lte, isNotNull, desc, avg, count, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
-const COOP_ID = 1;
+
 const TAUX_HUMIDITE_STANDARD = 8; // 8 % d'humidité tolérée
 
 // ─── Config pesée ─────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@ import {
 import { eq, and, sql, desc, asc } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
-const COOP_ID = 1;
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function attribuerNiveau(score: number, seuils: {
@@ -23,13 +23,13 @@ function attribuerNiveau(score: number, seuils: {
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-export async function getConfig() {
+export async function getConfig(cooperativeId: number) {
   const rows = await db.select().from(configScoringTable)
-    .where(eq(configScoringTable.cooperativeId, COOP_ID)).limit(1);
+    .where(eq(configScoringTable.cooperativeId, cooperativeId)).limit(1);
   return rows[0] ?? null;
 }
 
-export async function updateConfig(data: Partial<{
+export async function updateConfig(cooperativeId: number, data: Partial<{
   poidsVolumePct: number; poidsQualitePct: number; poidsRegularitePct: number;
   poidsRemboursementPct: number; poidsFidelitePct: number; poidsCotisationPct: number;
   seuilBronze: number; seuilArgent: number; seuilOr: number; seuilPlatine: number;
@@ -37,7 +37,7 @@ export async function updateConfig(data: Partial<{
 }>) {
   const toStr = (v: number | undefined) => v != null ? String(v) : undefined;
   const vals = {
-    cooperativeId:          COOP_ID,
+    cooperativeId:          cooperativeId,
     poidsVolumePct:         toStr(data.poidsVolumePct),
     poidsQualitePct:        toStr(data.poidsQualitePct),
     poidsRegularitePct:     toStr(data.poidsRegularitePct),
@@ -63,8 +63,8 @@ export async function updateConfig(data: Partial<{
 }
 
 // ─── Calculer score individuel ────────────────────────────────────────────────
-export async function calculerScore(membreId: number, campagneId: number) {
-  const cfg = await getConfig();
+export async function calculerScore(cooperativeId: number, membreId: number, campagneId: number) {
+  const cfg = await getConfig(cooperativeId);
   if (!cfg) throw new Error("config_scoring introuvable");
 
   const seuils = {
@@ -198,7 +198,7 @@ export async function calculerScore(membreId: number, campagneId: number) {
 
   // Upsert dans scores_membres
   const rows = await db.insert(scoresMembreTable).values({
-    cooperativeId:      COOP_ID,
+    cooperativeId:      cooperativeId,
     membreId,
     campagneId,
     scoreVolume:        String(Math.round(scoreVolume * 100) / 100),
@@ -229,21 +229,21 @@ export async function calculerScore(membreId: number, campagneId: number) {
 }
 
 // ─── Recalculer tous les membres d'une campagne ───────────────────────────────
-export async function recalculerTous(campagneId: number) {
+export async function recalculerTous(cooperativeId: number, campagneId: number) {
   // Membres actifs ayant au moins 1 livraison dans la campagne
   const membres = await db.execute<{ membre_id: number }>(sql`
     SELECT DISTINCT l.membre_id
     FROM livraisons l
     INNER JOIN membres m ON m.id = l.membre_id
     WHERE l.campagne_id = ${campagneId}
-      AND m.cooperative_id = ${COOP_ID}
+      AND m.cooperative_id = ${cooperativeId}
       AND m.statut = 'actif'
   `);
 
   let calculés = 0;
   for (const row of membres.rows) {
     try {
-      await calculerScore(row.membre_id, campagneId);
+      await calculerScore(cooperativeId, row.membre_id, campagneId);
       calculés++;
     } catch (err) {
       logger.warn({ err, membre_id: row.membre_id }, "Erreur calcul score membre");
@@ -257,7 +257,7 @@ export async function recalculerTous(campagneId: number) {
     FROM (
       SELECT id, RANK() OVER (PARTITION BY campagne_id ORDER BY score_global DESC) AS rang
       FROM scores_membres
-      WHERE campagne_id = ${campagneId} AND cooperative_id = ${COOP_ID}
+      WHERE campagne_id = ${campagneId} AND cooperative_id = ${cooperativeId}
     ) r
     WHERE sm.id = r.id
   `);
@@ -266,7 +266,7 @@ export async function recalculerTous(campagneId: number) {
 }
 
 // ─── Classement complet d'une campagne ───────────────────────────────────────
-export async function getClassementCampagne(campagneId: number) {
+export async function getClassementCampagne(cooperativeId: number, campagneId: number) {
   const rows = await db.execute<{
     id: number; membre_id: number; score_global: string; niveau: string; rang: number;
     score_volume: string; score_qualite: string; score_regularite: string;
@@ -286,7 +286,7 @@ export async function getClassementCampagne(campagneId: number) {
     FROM scores_membres sm
     INNER JOIN membres m ON m.id = sm.membre_id
     LEFT JOIN livraisons l ON l.membre_id = sm.membre_id AND l.campagne_id = ${campagneId}
-    WHERE sm.campagne_id = ${campagneId} AND sm.cooperative_id = ${COOP_ID}
+    WHERE sm.campagne_id = ${campagneId} AND sm.cooperative_id = ${cooperativeId}
     GROUP BY sm.id, m.id
     ORDER BY sm.rang ASC NULLS LAST, sm.score_global DESC
   `);
@@ -294,7 +294,7 @@ export async function getClassementCampagne(campagneId: number) {
 }
 
 // ─── Score détaillé d'un membre ───────────────────────────────────────────────
-export async function getScoreMembre(membreId: number) {
+export async function getScoreMembre(cooperativeId: number, membreId: number) {
   const rows = await db.execute<{
     id: number; campagne_id: number; score_global: string; niveau: string; rang: number;
     score_volume: string; score_qualite: string; score_regularite: string;
@@ -307,7 +307,7 @@ export async function getScoreMembre(membreId: number) {
       CONCAT(c.annee_debut, '-', c.annee_fin) AS nom_campagne
     FROM scores_membres sm
     INNER JOIN campagnes c ON c.id = sm.campagne_id
-    WHERE sm.membre_id = ${membreId} AND sm.cooperative_id = ${COOP_ID}
+    WHERE sm.membre_id = ${membreId} AND sm.cooperative_id = ${cooperativeId}
     ORDER BY sm.date_calcul DESC
     LIMIT 5
   `);
@@ -315,7 +315,7 @@ export async function getScoreMembre(membreId: number) {
 }
 
 // ─── Évolution sur N campagnes ────────────────────────────────────────────────
-export async function getEvolution(membreId: number) {
+export async function getEvolution(cooperativeId: number, membreId: number) {
   const rows = await db.execute<{
     campagne_id: number; nom_campagne: string;
     score_global: string; niveau: string; rang: number; date_calcul: string;
@@ -326,7 +326,7 @@ export async function getEvolution(membreId: number) {
       sm.score_global, sm.niveau, sm.rang, sm.date_calcul
     FROM scores_membres sm
     INNER JOIN campagnes c ON c.id = sm.campagne_id
-    WHERE sm.membre_id = ${membreId} AND sm.cooperative_id = ${COOP_ID}
+    WHERE sm.membre_id = ${membreId} AND sm.cooperative_id = ${cooperativeId}
     ORDER BY c.annee_debut DESC
     LIMIT 10
   `);
@@ -334,7 +334,7 @@ export async function getEvolution(membreId: number) {
 }
 
 // ─── Top N producteurs ────────────────────────────────────────────────────────
-export async function getTopN(campagneId: number, n: number) {
+export async function getTopN(cooperativeId: number, campagneId: number, n: number) {
   const rows = await db.execute<{
     rang: number; membre_id: number; nom: string; prenoms: string;
     village: string | null; score_global: string; niveau: string;
@@ -347,7 +347,7 @@ export async function getTopN(campagneId: number, n: number) {
     FROM scores_membres sm
     INNER JOIN membres m ON m.id = sm.membre_id
     LEFT JOIN livraisons l ON l.membre_id = sm.membre_id AND l.campagne_id = ${campagneId}
-    WHERE sm.campagne_id = ${campagneId} AND sm.cooperative_id = ${COOP_ID}
+    WHERE sm.campagne_id = ${campagneId} AND sm.cooperative_id = ${cooperativeId}
       AND sm.rang IS NOT NULL
     GROUP BY sm.id, m.id
     ORDER BY sm.rang ASC
@@ -357,7 +357,7 @@ export async function getTopN(campagneId: number, n: number) {
 }
 
 // ─── Membres par niveau ───────────────────────────────────────────────────────
-export async function getParNiveau(campagneId: number, niveau: string) {
+export async function getParNiveau(cooperativeId: number, campagneId: number, niveau: string) {
   const rows = await db.execute<{
     membre_id: number; nom: string; prenoms: string; village: string | null;
     groupement: string | null; score_global: string; rang: number;
@@ -365,7 +365,7 @@ export async function getParNiveau(campagneId: number, niveau: string) {
     SELECT sm.membre_id, m.nom, m.prenoms, m.village, m.groupement, sm.score_global, sm.rang
     FROM scores_membres sm
     INNER JOIN membres m ON m.id = sm.membre_id
-    WHERE sm.campagne_id = ${campagneId} AND sm.cooperative_id = ${COOP_ID}
+    WHERE sm.campagne_id = ${campagneId} AND sm.cooperative_id = ${cooperativeId}
       AND sm.niveau = ${niveau}
     ORDER BY sm.rang ASC
   `);
@@ -373,7 +373,7 @@ export async function getParNiveau(campagneId: number, niveau: string) {
 }
 
 // ─── Score résumé pour un membre (pour fiche + formulaire avance) ─────────────
-export async function getResumeMembre(membreId: number) {
+export async function getResumeMembre(cooperativeId: number, membreId: number) {
   const rows = await db.execute<{
     score_global: string; niveau: string; rang: number;
     date_calcul: string; campagne_id: number;
@@ -381,7 +381,7 @@ export async function getResumeMembre(membreId: number) {
     SELECT sm.score_global, sm.niveau, sm.rang, sm.date_calcul, sm.campagne_id
     FROM scores_membres sm
     INNER JOIN campagnes c ON c.id = sm.campagne_id
-    WHERE sm.membre_id = ${membreId} AND sm.cooperative_id = ${COOP_ID}
+    WHERE sm.membre_id = ${membreId} AND sm.cooperative_id = ${cooperativeId}
     ORDER BY sm.date_calcul DESC
     LIMIT 1
   `);

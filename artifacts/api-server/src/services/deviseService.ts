@@ -3,13 +3,11 @@ import { tauxChangeTable } from "@workspace/db";
 import { eq, and, lte, desc } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
-const COOP_ID = 1;
-
 /**
  * Retourne le taux le plus récent pour une devise source.
  * Lève une alerte si aucun taux dans les 7 derniers jours.
  */
-export async function getTauxActuel(deviseSource: string): Promise<{
+export async function getTauxActuel(cooperativeId: number, deviseSource: string): Promise<{
   taux: number;
   dateApplication: string;
   sourceTaux: string;
@@ -20,7 +18,7 @@ export async function getTauxActuel(deviseSource: string): Promise<{
     .from(tauxChangeTable)
     .where(
       and(
-        eq(tauxChangeTable.cooperativeId, COOP_ID),
+        eq(tauxChangeTable.cooperativeId, cooperativeId),
         eq(tauxChangeTable.deviseSource, deviseSource),
       )
     )
@@ -52,6 +50,7 @@ export async function getTauxActuel(deviseSource: string): Promise<{
  * Utilise le taux du jour ou le plus proche avant la date donnée.
  */
 export async function convertir(
+  cooperativeId: number,
   montant: number,
   deviseSource: string,
   date: string,
@@ -65,7 +64,7 @@ export async function convertir(
     .from(tauxChangeTable)
     .where(
       and(
-        eq(tauxChangeTable.cooperativeId, COOP_ID),
+        eq(tauxChangeTable.cooperativeId, cooperativeId),
         eq(tauxChangeTable.deviseSource, deviseSource),
         lte(tauxChangeTable.dateApplication, date),
       )
@@ -80,7 +79,7 @@ export async function convertir(
       .from(tauxChangeTable)
       .where(
         and(
-          eq(tauxChangeTable.cooperativeId, COOP_ID),
+          eq(tauxChangeTable.cooperativeId, cooperativeId),
           eq(tauxChangeTable.deviseSource, deviseSource),
         )
       )

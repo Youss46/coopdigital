@@ -2,7 +2,7 @@ import { db, planComptableTable, parametresComptesModulesTable, ecrituresComptab
 import { eq, and, asc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
-const COOP_ID = 1;
+
 
 // ── Cache in-memory (10 min TTL) ─────────────────────────────────────────────
 interface CacheEntry<T> { data: T; expiresAt: number }
@@ -38,7 +38,7 @@ export async function listerPlanComptable(opts: {
   actif?: boolean;
   search?: string;
 }) {
-  const coopId = opts.cooperativeId ?? COOP_ID;
+  const coopId = opts.cooperativeId ?? 1;
   const rows = await db
     .select()
     .from(planComptableTable)
@@ -67,7 +67,7 @@ export async function ajouterCompte(payload: {
   soldeNormal?: string;
   ordreAffichage?: number;
 }) {
-  const coopId = payload.cooperativeId ?? COOP_ID;
+  const coopId = payload.cooperativeId ?? 1;
   // Calculer classe automatiquement depuis le numéro si non fourni
   const classe = payload.classe ?? (payload.numeroCompte ? parseInt(payload.numeroCompte[0]!) : undefined);
 
@@ -89,7 +89,7 @@ export async function ajouterCompte(payload: {
   return compte;
 }
 
-export async function modifierCompte(id: number, payload: {
+export async function modifierCompte(cooperativeId: number, id: number, payload: {
   libelle?: string;
   actif?: boolean;
   ordreAffichage?: number;
@@ -97,18 +97,18 @@ export async function modifierCompte(id: number, payload: {
   const [updated] = await db
     .update(planComptableTable)
     .set({ ...payload, updatedAt: new Date() })
-    .where(and(eq(planComptableTable.id, id), eq(planComptableTable.cooperativeId, COOP_ID)))
+    .where(and(eq(planComptableTable.id, id), eq(planComptableTable.cooperativeId, cooperativeId)))
     .returning();
   if (!updated) throw new Error("Compte introuvable");
   return updated;
 }
 
-export async function desactiverCompte(id: number) {
+export async function desactiverCompte(cooperativeId: number, id: number) {
   // Vérifier si le compte a des écritures
   const compte = await db
     .select()
     .from(planComptableTable)
-    .where(and(eq(planComptableTable.id, id), eq(planComptableTable.cooperativeId, COOP_ID)))
+    .where(and(eq(planComptableTable.id, id), eq(planComptableTable.cooperativeId, cooperativeId)))
     .limit(1);
   if (!compte[0]) throw new Error("Compte introuvable");
 
@@ -118,7 +118,7 @@ export async function desactiverCompte(id: number) {
     .from(ecrituresComptablesTable)
     .where(
       and(
-        eq(ecrituresComptablesTable.cooperativeId, COOP_ID),
+        eq(ecrituresComptablesTable.cooperativeId, cooperativeId),
         sql`(${ecrituresComptablesTable.compteDebit} = ${num} OR ${ecrituresComptablesTable.compteCredit} = ${num})`
       )
     );
@@ -152,7 +152,7 @@ export async function validerNumeroCompte(cooperativeId: number, numero: string)
 // ── Paramètres comptes modules ────────────────────────────────────────────────
 
 export async function listerParams(cooperativeId?: number, module?: string) {
-  const coopId = cooperativeId ?? COOP_ID;
+  const coopId = cooperativeId ?? cooperativeId;
   const rows = await db
     .select()
     .from(parametresComptesModulesTable)
@@ -232,7 +232,7 @@ const OHADA_DEFAULTS: Record<string, { compteDebit: string; compteCredit: string
   "parts_sociales:liberation_parts":      { compteDebit: "521",  compteCredit: "101",  libelle: "Parts sociales {membre}" },
 };
 
-export async function modifierParams(id: number, payload: {
+export async function modifierParams(cooperativeId: number, id: number, payload: {
   compteDebit?: string;
   compteCredit?: string;
   libelleEcritureAuto?: string;
@@ -240,12 +240,12 @@ export async function modifierParams(id: number, payload: {
 }) {
   // Valider les comptes
   if (payload.compteDebit) {
-    const chk = await validerNumeroCompte(COOP_ID, payload.compteDebit);
+    const chk = await validerNumeroCompte(cooperativeId, payload.compteDebit);
     if (!chk.valide) throw new Error(`Compte débit "${payload.compteDebit}" introuvable dans le plan comptable`);
     if (!chk.actif) throw new Error(`Compte débit "${payload.compteDebit}" est désactivé`);
   }
   if (payload.compteCredit) {
-    const chk = await validerNumeroCompte(COOP_ID, payload.compteCredit);
+    const chk = await validerNumeroCompte(cooperativeId, payload.compteCredit);
     if (!chk.valide) throw new Error(`Compte crédit "${payload.compteCredit}" introuvable dans le plan comptable`);
     if (!chk.actif) throw new Error(`Compte crédit "${payload.compteCredit}" est désactivé`);
   }
@@ -261,15 +261,15 @@ export async function modifierParams(id: number, payload: {
     })
     .where(and(
       eq(parametresComptesModulesTable.id, id),
-      eq(parametresComptesModulesTable.cooperativeId, COOP_ID),
+      eq(parametresComptesModulesTable.cooperativeId, cooperativeId),
     ))
     .returning();
   if (!updated) throw new Error("Paramètre introuvable");
-  invaliderCacheParams(COOP_ID);
+  invaliderCacheParams(cooperativeId);
   return updated;
 }
 
-export async function resetModuleOhada(module: string, modifiePar?: number) {
+export async function resetModuleOhada(cooperativeId: number, module: string, modifiePar?: number) {
   const defaults = Object.entries(OHADA_DEFAULTS)
     .filter(([k]) => k.startsWith(`${module}:`))
     .map(([k, v]) => ({ operation: k.split(":")[1]!, ...v }));
@@ -287,18 +287,19 @@ export async function resetModuleOhada(module: string, modifiePar?: number) {
         updatedAt: new Date(),
       })
       .where(and(
-        eq(parametresComptesModulesTable.cooperativeId, COOP_ID),
+        eq(parametresComptesModulesTable.cooperativeId, cooperativeId),
         eq(parametresComptesModulesTable.module, module),
         eq(parametresComptesModulesTable.operation, d.operation),
       ));
   }
-  invaliderCacheParams(COOP_ID);
+  invaliderCacheParams(cooperativeId);
   return { module, operations: defaults.length };
 }
 
 // ── Correction d'écriture ─────────────────────────────────────────────────────
 
 export async function corrigerEcriture(
+  cooperativeId: number,
   ecritureId: number,
   payload: {
     nouveauCompteDebit?: string;
@@ -315,7 +316,7 @@ export async function corrigerEcriture(
     .from(ecrituresComptablesTable)
     .where(and(
       eq(ecrituresComptablesTable.id, ecritureId),
-      eq(ecrituresComptablesTable.cooperativeId, COOP_ID),
+      eq(ecrituresComptablesTable.cooperativeId, cooperativeId),
     ))
     .limit(1);
   if (!original) throw new Error("Écriture introuvable");
@@ -323,11 +324,11 @@ export async function corrigerEcriture(
 
   // 2. Valider les nouveaux comptes si fournis
   if (payload.nouveauCompteDebit) {
-    const chk = await validerNumeroCompte(COOP_ID, payload.nouveauCompteDebit);
+    const chk = await validerNumeroCompte(cooperativeId, payload.nouveauCompteDebit);
     if (!chk.valide) throw new Error(`Compte débit "${payload.nouveauCompteDebit}" introuvable`);
   }
   if (payload.nouveauCompteCredit) {
-    const chk = await validerNumeroCompte(COOP_ID, payload.nouveauCompteCredit);
+    const chk = await validerNumeroCompte(cooperativeId, payload.nouveauCompteCredit);
     if (!chk.valide) throw new Error(`Compte crédit "${payload.nouveauCompteCredit}" introuvable`);
   }
 
@@ -337,7 +338,7 @@ export async function corrigerEcriture(
   const [annulation] = await db
     .insert(ecrituresComptablesTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: cooperativeId,
       dateEcriture: original.dateEcriture,
       numeroPiece: `ANN-${pieceBase}`,
       libelle: `ANNULATION - ${original.libelle}`,
@@ -361,7 +362,7 @@ export async function corrigerEcriture(
   const [correction] = await db
     .insert(ecrituresComptablesTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: cooperativeId,
       dateEcriture: original.dateEcriture,
       numeroPiece: `COR-${pieceBase}`,
       libelle: `CORRECTION - ${payload.nouveauLibelle ?? original.libelle}`,
@@ -392,13 +393,13 @@ export async function corrigerEcriture(
   return { original, annulation, correction };
 }
 
-export async function getHistoriqueCorrections(ecritureId: number) {
+export async function getHistoriqueCorrections(cooperativeId: number, ecritureId: number) {
   const [original] = await db
     .select()
     .from(ecrituresComptablesTable)
     .where(and(
       eq(ecrituresComptablesTable.id, ecritureId),
-      eq(ecrituresComptablesTable.cooperativeId, COOP_ID),
+      eq(ecrituresComptablesTable.cooperativeId, cooperativeId),
     ))
     .limit(1);
   if (!original) throw new Error("Écriture introuvable");
@@ -407,7 +408,7 @@ export async function getHistoriqueCorrections(ecritureId: number) {
     .select()
     .from(ecrituresComptablesTable)
     .where(and(
-      eq(ecrituresComptablesTable.cooperativeId, COOP_ID),
+      eq(ecrituresComptablesTable.cooperativeId, cooperativeId),
       eq(ecrituresComptablesTable.ecritureSourceId, ecritureId),
     ))
     .orderBy(asc(ecrituresComptablesTable.id));
@@ -415,12 +416,12 @@ export async function getHistoriqueCorrections(ecritureId: number) {
   return { original, corrections: liees };
 }
 
-export async function rechercherEcritures(query: string) {
+export async function rechercherEcritures(cooperativeId: number, query: string) {
   const rows = await db
     .select()
     .from(ecrituresComptablesTable)
     .where(and(
-      eq(ecrituresComptablesTable.cooperativeId, COOP_ID),
+      eq(ecrituresComptablesTable.cooperativeId, cooperativeId),
       sql`(
         ${ecrituresComptablesTable.numeroPiece} ILIKE ${"%" + query + "%"} OR
         ${ecrituresComptablesTable.libelle} ILIKE ${"%" + query + "%"}

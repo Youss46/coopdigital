@@ -11,7 +11,7 @@ import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 
-const COOP_ID = 1;
+
 
 // ─── Comptes OHADA par type de taxe ───────────────────────────────────────────
 const COMPTE_DEBIT: Record<string, string> = {
@@ -45,9 +45,9 @@ function dateEcheanceAnnuelle(annee: number, jourEcheance: number, typeTaxe: str
 
 // ─── Obligations ──────────────────────────────────────────────────────────────
 
-export async function listObligations() {
+export async function listObligations(cooperativeId: number) {
   return db.select().from(obligationsFiscalesTable)
-    .where(and(eq(obligationsFiscalesTable.cooperativeId, COOP_ID),
+    .where(and(eq(obligationsFiscalesTable.cooperativeId, cooperativeId),
                eq(obligationsFiscalesTable.actif, true)));
 }
 
@@ -64,7 +64,7 @@ async function getBasesCnpsIts(mois: number, annee: number) {
       fpcCharge: bulletinsPaieTable.chargesFpcFcfa,
     }).from(bulletinsPaieTable)
       .where(and(
-        eq(bulletinsPaieTable.cooperativeId, COOP_ID),
+        eq(bulletinsPaieTable.cooperativeId, cooperativeId),
         eq(bulletinsPaieTable.mois, mois),
         eq(bulletinsPaieTable.annee, annee),
         eq(bulletinsPaieTable.statut, "paye"),
@@ -109,7 +109,7 @@ async function getBasesAnnuelles(annee: number) {
         COALESCE(SUM(charges_taxe_apprentissage_fcfa), 0)::text AS total_ta,
         COALESCE(SUM(charges_fpc_fcfa), 0)::text             AS total_fpc
       FROM bulletins_paie
-      WHERE cooperative_id = ${COOP_ID}
+      WHERE cooperative_id = ${cooperativeId}
         AND annee = ${annee}
         AND statut = 'paye'
     `);
@@ -128,7 +128,7 @@ async function getBasesAnnuelles(annee: number) {
 
 // ─── Génération déclarations mensuelles ───────────────────────────────────────
 
-export async function genererDeclarationsMensuelles(mois: number, annee: number) {
+export async function genererDeclarationsMensuelles(cooperativeId: number, mois: number, annee: number) {
   const periode = `${nomMois(mois)} ${annee}`;
   const obligations = await listObligations();
   const mensuelles = obligations.filter(o => o.periodicite === "mensuel");
@@ -141,7 +141,7 @@ export async function genererDeclarationsMensuelles(mois: number, annee: number)
     const existing = await db.select({ id: declarationsFiscalesTable.id })
       .from(declarationsFiscalesTable)
       .where(and(
-        eq(declarationsFiscalesTable.cooperativeId, COOP_ID),
+        eq(declarationsFiscalesTable.cooperativeId, cooperativeId),
         eq(declarationsFiscalesTable.obligationId, obl.id),
         eq(declarationsFiscalesTable.periode, periode),
       )).limit(1);
@@ -164,7 +164,7 @@ export async function genererDeclarationsMensuelles(mois: number, annee: number)
     const echeance = dateEcheanceMensuelle(mois, annee, obl.jourEcheance ?? 15);
 
     const [decl] = await db.insert(declarationsFiscalesTable).values({
-      cooperativeId:      COOP_ID,
+      cooperativeId:      cooperativeId,
       obligationId:       obl.id,
       periode,
       baseImposableFcfa:  baseImposable.toString(),
@@ -181,7 +181,7 @@ export async function genererDeclarationsMensuelles(mois: number, annee: number)
 
 // ─── Génération déclarations annuelles ────────────────────────────────────────
 
-export async function genererDeclarationsAnnuelles(annee: number) {
+export async function genererDeclarationsAnnuelles(cooperativeId: number, annee: number) {
   const obligations = await listObligations();
   const annuelles = obligations.filter(o => o.periodicite === "annuel");
   const bases = await getBasesAnnuelles(annee);
@@ -192,7 +192,7 @@ export async function genererDeclarationsAnnuelles(annee: number) {
     const existing = await db.select({ id: declarationsFiscalesTable.id })
       .from(declarationsFiscalesTable)
       .where(and(
-        eq(declarationsFiscalesTable.cooperativeId, COOP_ID),
+        eq(declarationsFiscalesTable.cooperativeId, cooperativeId),
         eq(declarationsFiscalesTable.obligationId, obl.id),
         eq(declarationsFiscalesTable.periode, periode),
       )).limit(1);
@@ -215,7 +215,7 @@ export async function genererDeclarationsAnnuelles(annee: number) {
     const echeance = dateEcheanceAnnuelle(annee, obl.jourEcheance ?? 31, obl.typeTaxe);
 
     const [decl] = await db.insert(declarationsFiscalesTable).values({
-      cooperativeId:      COOP_ID,
+      cooperativeId:      cooperativeId,
       obligationId:       obl.id,
       periode,
       baseImposableFcfa:  baseImposable.toString(),
@@ -254,7 +254,7 @@ export async function listDeclarations(opts?: {
         THEN (CURRENT_DATE - d.date_echeance)::integer ELSE NULL END AS jours_retard
     FROM declarations_fiscales d
     JOIN obligations_fiscales o ON o.id = d.obligation_id
-    WHERE d.cooperative_id = ${COOP_ID}
+    WHERE d.cooperative_id = ${cooperativeId}
       ${opts?.statut   ? sql`AND d.statut = ${opts.statut}`          : sql``}
       ${opts?.typeTaxe ? sql`AND o.type_taxe = ${opts.typeTaxe}`     : sql``}
       ${opts?.periode  ? sql`AND d.periode = ${opts.periode}`        : sql``}
@@ -265,7 +265,7 @@ export async function listDeclarations(opts?: {
 
 // ─── Enregistrer paiement ─────────────────────────────────────────────────────
 
-export async function enregistrerPaiement(id: number, data: {
+export async function enregistrerPaiement(cooperativeId: number, id: number, data: {
   montantPaye: number;
   reference?: string;
   datePaiement?: string;
@@ -273,7 +273,7 @@ export async function enregistrerPaiement(id: number, data: {
   const today = new Date().toISOString().slice(0, 10);
   const [decl] = await db.select().from(declarationsFiscalesTable)
     .where(and(eq(declarationsFiscalesTable.id, id),
-               eq(declarationsFiscalesTable.cooperativeId, COOP_ID))).limit(1);
+               eq(declarationsFiscalesTable.cooperativeId, cooperativeId))).limit(1);
   if (!decl) throw new Error("Déclaration introuvable");
 
   // Écriture comptable
@@ -283,7 +283,7 @@ export async function enregistrerPaiement(id: number, data: {
   if (obl) {
     try {
       await db.insert(ecrituresComptablesTable).values({
-        cooperativeId: COOP_ID,
+        cooperativeId: cooperativeId,
         dateEcriture:  data.datePaiement ?? today,
         libelle:       `Paiement ${obl.libelle} — ${decl.periode}`,
         compteDebit:   COMPTE_DEBIT[obl.typeTaxe] ?? "447",
@@ -312,7 +312,7 @@ export async function enregistrerPaiement(id: number, data: {
 
 // ─── Calendrier 3 mois ────────────────────────────────────────────────────────
 
-export async function getCalendrier() {
+export async function getCalendrier(cooperativeId: number) {
   const today = new Date();
   const fin   = new Date(today);
   fin.setMonth(fin.getMonth() + 3);
@@ -330,7 +330,7 @@ export async function getCalendrier() {
       (d.date_echeance - CURRENT_DATE)::integer AS jours_restants
     FROM declarations_fiscales d
     JOIN obligations_fiscales o ON o.id = d.obligation_id
-    WHERE d.cooperative_id = ${COOP_ID}
+    WHERE d.cooperative_id = ${cooperativeId}
       AND d.date_echeance BETWEEN CURRENT_DATE - 7 AND CURRENT_DATE + 90
       AND d.statut NOT IN ('paye','exonere')
     ORDER BY d.date_echeance
@@ -340,7 +340,7 @@ export async function getCalendrier() {
 
 // ─── Alertes ──────────────────────────────────────────────────────────────────
 
-export async function getAlertes() {
+export async function getAlertes(cooperativeId: number) {
   const result = await db.execute<{
     id: number; periode: string; montant_calcule_fcfa: string;
     date_echeance: string; statut: string; penalite_retard_fcfa: string;
@@ -353,7 +353,7 @@ export async function getAlertes() {
       (d.date_echeance - CURRENT_DATE)::integer AS jours_restants
     FROM declarations_fiscales d
     JOIN obligations_fiscales o ON o.id = d.obligation_id
-    WHERE d.cooperative_id = ${COOP_ID}
+    WHERE d.cooperative_id = ${cooperativeId}
       AND d.statut NOT IN ('paye','exonere')
       AND d.date_echeance <= CURRENT_DATE + 15
     ORDER BY d.date_echeance
@@ -363,10 +363,10 @@ export async function getAlertes() {
 
 // ─── Calcul pénalité de retard ────────────────────────────────────────────────
 
-export async function calculerPenaliteRetard(id: number) {
+export async function calculerPenaliteRetard(cooperativeId: number, id: number) {
   const [decl] = await db.select().from(declarationsFiscalesTable)
     .where(and(eq(declarationsFiscalesTable.id, id),
-               eq(declarationsFiscalesTable.cooperativeId, COOP_ID))).limit(1);
+               eq(declarationsFiscalesTable.cooperativeId, cooperativeId))).limit(1);
   if (!decl || !decl.dateEcheance) return null;
 
   const echeance   = new Date(decl.dateEcheance);
@@ -390,7 +390,7 @@ export async function calculerPenaliteRetard(id: number) {
 
 // ─── Check échéances (CRON) ───────────────────────────────────────────────────
 
-export async function checkEcheancesFiscales() {
+export async function checkEcheancesFiscales(cooperativeId: number) {
   const result = await db.execute<{
     id: number; libelle: string; periode: string; date_echeance: string;
     statut: string; montant_calcule_fcfa: string;
@@ -402,7 +402,7 @@ export async function checkEcheancesFiscales() {
       (d.date_echeance - CURRENT_DATE)::integer AS jours
     FROM declarations_fiscales d
     JOIN obligations_fiscales o ON o.id = d.obligation_id
-    WHERE d.cooperative_id = ${COOP_ID}
+    WHERE d.cooperative_id = ${cooperativeId}
       AND d.statut NOT IN ('paye','exonere')
       AND d.date_echeance BETWEEN CURRENT_DATE - 1 AND CURRENT_DATE + 15
   `);
@@ -426,7 +426,7 @@ export async function checkEcheancesFiscales() {
 
 // ─── Rapport annuel ───────────────────────────────────────────────────────────
 
-export async function getRapportAnnuel(annee: number) {
+export async function getRapportAnnuel(cooperativeId: number, annee: number) {
   const declarations = await db.execute<{
     type_taxe: string; libelle: string; periodicite: string;
     nb_declarations: string; montant_calcule_total: string;
@@ -443,9 +443,9 @@ export async function getRapportAnnuel(annee: number) {
     FROM obligations_fiscales o
     LEFT JOIN declarations_fiscales d
       ON d.obligation_id = o.id
-      AND d.cooperative_id = ${COOP_ID}
+      AND d.cooperative_id = ${cooperativeId}
       AND (d.periode LIKE ${`%${annee}%`})
-    WHERE o.cooperative_id = ${COOP_ID} AND o.actif = true
+    WHERE o.cooperative_id = ${cooperativeId} AND o.actif = true
     GROUP BY o.id, o.type_taxe, o.libelle, o.periodicite
     ORDER BY o.periodicite, o.type_taxe
   `);
@@ -460,9 +460,9 @@ export async function getRapportAnnuel(annee: number) {
 
 // ─── Rapport PDF annuel ────────────────────────────────────────────────────────
 
-export async function genererRapportPdf(annee: number): Promise<Buffer> {
+export async function genererRapportPdf(cooperativeId: number, annee: number): Promise<Buffer> {
   const rapport = await getRapportAnnuel(annee);
-  const coopNom = await db.execute<{ nom: string }>(sql`SELECT nom FROM cooperatives WHERE id = ${COOP_ID} LIMIT 1`)
+  const coopNom = await db.execute<{ nom: string }>(sql`SELECT nom FROM cooperatives WHERE id = ${cooperativeId} LIMIT 1`)
     .then(r => r.rows[0]?.nom ?? "CoopDigital");
 
   const FCFA = (n: number | string) =>
@@ -472,7 +472,7 @@ export async function genererRapportPdf(annee: number): Promise<Buffer> {
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
 
-  await drawHeader(doc, COOP_ID, {
+  await drawHeader(doc, cooperativeId, {
     titre_document: "RAPPORT FISCAL ANNUEL",
     reference:      `Exercice ${annee}`,
     hauteur_reservee: 90,
@@ -564,7 +564,7 @@ export async function genererRapportPdf(annee: number): Promise<Buffer> {
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
-    await drawFooter(doc, COOP_ID, i + 1, range.count);
+    await drawFooter(doc, cooperativeId, i + 1, range.count);
   }
 
   doc.end();

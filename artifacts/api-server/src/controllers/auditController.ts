@@ -3,13 +3,14 @@ import * as auditService from "../services/auditService";
 
 export async function getJournal(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const {
       user_id, module, action, entite_id, entite_type,
       date_debut, date_fin, recherche,
       limit, offset,
     } = req.query as Record<string, string>;
 
-    const result = await auditService.getJournal({
+    const result = await auditService.getJournal(cooperativeId, {
       userId:     user_id    ? parseInt(user_id)    : undefined,
       module:     module     || undefined,
       action:     action     || undefined,
@@ -31,9 +32,10 @@ export async function getJournal(req: Request, res: Response): Promise<void> {
 
 export async function getEntiteHistorique(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const type = String(req.params["type"]);
     const id   = String(req.params["id"]);
-    const entries = await auditService.getHistoriqueEntite(type, parseInt(id));
+    const entries = await auditService.getHistoriqueEntite(cooperativeId, type, parseInt(id));
     res.json({ entries });
   } catch (err) {
     req.log.error({ err }, "Erreur getEntiteHistorique");
@@ -43,9 +45,10 @@ export async function getEntiteHistorique(req: Request, res: Response): Promise<
 
 export async function getUserActions(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = String(req.params["id"]);
     const { limit } = req.query as { limit?: string };
-    const entries = await auditService.getUserActions(parseInt(id), limit ? parseInt(limit) : 100);
+    const entries = await auditService.getUserActions(cooperativeId, parseInt(id), limit ? parseInt(limit) : 100);
     res.json({ entries });
   } catch (err) {
     req.log.error({ err }, "Erreur getUserActions");
@@ -55,8 +58,9 @@ export async function getUserActions(req: Request, res: Response): Promise<void>
 
 export async function getSessions(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const { limit } = req.query as { limit?: string };
-    const sessions = await auditService.getSessions(limit ? parseInt(limit) : 50);
+    const sessions = await auditService.getSessions(cooperativeId, limit ? parseInt(limit) : 50);
     res.json({ sessions });
   } catch (err) {
     req.log.error({ err }, "Erreur getSessions");
@@ -66,7 +70,8 @@ export async function getSessions(req: Request, res: Response): Promise<void> {
 
 export async function getStats(req: Request, res: Response): Promise<void> {
   try {
-    const stats = await auditService.getStats();
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const stats = await auditService.getStats(cooperativeId);
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "Erreur getStats");
@@ -82,7 +87,9 @@ export async function exportPdf(req: Request, res: Response): Promise<void> {
 
     const generatedBy = req.user?.role ?? "inconnu";
 
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const pdfBuffer = await auditService.exportAuditPDF(
+      cooperativeId,
       {
         dateDebut: date_debut || undefined,
         dateFin:   date_fin   || undefined,
@@ -106,9 +113,10 @@ export async function exportPdf(req: Request, res: Response): Promise<void> {
 
 export async function getModifications(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const entite_type = String(req.params["entite_type"]);
     const entite_id   = String(req.params["entite_id"]);
-    const entries = await auditService.getHistoriqueEntite(entite_type, parseInt(entite_id));
+    const entries = await auditService.getHistoriqueEntite(cooperativeId, entite_type, parseInt(entite_id));
 
     // Filtre uniquement UPDATE pour les avant/après
     const modifications = entries

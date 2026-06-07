@@ -454,7 +454,7 @@ export async function payerBulletin(
         .where(eq(personnelTable.id, b.personnelId))
         .limit(1);
       if (p && updated) {
-        await generateEcrituresSalaire({
+        await generateEcrituresSalaire(coopId(req), {
           bulletinId: updated.id,
           personnelNom: `${p.prenoms} ${p.nom}`,
           salaireNetFcfa: updated.salaireNetFcfa,

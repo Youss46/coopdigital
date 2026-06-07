@@ -209,7 +209,7 @@ export async function createVente(req: Request, res: Response): Promise<void> {
       .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
       .where(eq(ventesExportateursTable.id, vente!.id));
 
-    void generateEcrituresVente({
+    void generateEcrituresVente(cooperativeId, {
       venteId: vente!.id,
       exportateurNom: detail?.exportateurNom ?? `exp-${exportateurId}`,
       montantFcfa: montantTotalFcfa,
@@ -280,7 +280,7 @@ export async function encaisserVente(req: Request, res: Response): Promise<void>
       .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
       .where(eq(ventesExportateursTable.id, updated!.id));
 
-    void generateEcrituresEncaissement({
+    void generateEcrituresEncaissement(cooperativeId, {
       venteId: id,
       exportateurNom: detail?.exportateurNom ?? `exp-${id}`,
       montantFcfa: parse.data.montantFcfa,

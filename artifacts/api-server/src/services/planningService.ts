@@ -10,13 +10,13 @@ import {
 import { eq, and, gte, lte, inArray, sql, desc } from "drizzle-orm";
 import { sendBulkSMS } from "./smsService.js";
 
-const COOP_ID = 1;
+
 
 // ──────────────────────────────────────────────
 // Zones
 // ──────────────────────────────────────────────
 
-export async function listZones() {
+export async function listZones(cooperativeId: number) {
   const rows = await db
     .select({
       id: zonesCollecteTable.id,
@@ -28,12 +28,12 @@ export async function listZones() {
       createdAt: zonesCollecteTable.createdAt,
     })
     .from(zonesCollecteTable)
-    .where(eq(zonesCollecteTable.cooperativeId, COOP_ID))
+    .where(eq(zonesCollecteTable.cooperativeId, cooperativeId))
     .orderBy(zonesCollecteTable.nom);
   return rows;
 }
 
-export async function createZone(data: {
+export async function createZone(cooperativeId: number, data: {
   nom: string;
   section?: string;
   villages?: string[];
@@ -43,7 +43,7 @@ export async function createZone(data: {
   const [row] = await db
     .insert(zonesCollecteTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: cooperativeId,
       nom: data.nom,
       section: data.section ?? null,
       villages: data.villages ?? [],
@@ -55,6 +55,7 @@ export async function createZone(data: {
 }
 
 export async function updateZone(
+  cooperativeId: number,
   id: number,
   data: {
     nom?: string;
@@ -74,7 +75,7 @@ export async function updateZone(
       objectifTonnageKg: data.objectifTonnageKg?.toString(),
     })
     .where(
-      and(eq(zonesCollecteTable.id, id), eq(zonesCollecteTable.cooperativeId, COOP_ID))
+      and(eq(zonesCollecteTable.id, id), eq(zonesCollecteTable.cooperativeId, cooperativeId))
     )
     .returning();
   return row ?? null;
@@ -84,7 +85,7 @@ export async function deleteZone(id: number) {
   await db
     .delete(zonesCollecteTable)
     .where(
-      and(eq(zonesCollecteTable.id, id), eq(zonesCollecteTable.cooperativeId, COOP_ID))
+      and(eq(zonesCollecteTable.id, id), eq(zonesCollecteTable.cooperativeId, cooperativeId))
     );
 }
 
@@ -92,7 +93,7 @@ export async function deleteZone(id: number) {
 // Plannings
 // ──────────────────────────────────────────────
 
-export async function listPlannings(opts: {
+export async function listPlannings(cooperativeId: number, opts: {
   agentId?: number;
   zoneId?: number;
   semaine?: string; // date ISO du lundi de la semaine
@@ -146,7 +147,7 @@ export async function listPlannings(opts: {
     FROM plannings_collecte p
     LEFT JOIN zones_collecte  z ON z.id = p.zone_collecte_id
     LEFT JOIN users           u ON u.id = p.agent_id
-    WHERE p.cooperative_id = ${COOP_ID}
+    WHERE p.cooperative_id = ${cooperativeId}
       ${opts.agentId ? sql`AND p.agent_id = ${opts.agentId}` : sql``}
       ${opts.zoneId  ? sql`AND p.zone_collecte_id = ${opts.zoneId}` : sql``}
       ${opts.statut  ? sql`AND p.statut = ${opts.statut}` : sql``}
@@ -161,7 +162,7 @@ export async function listPlannings(opts: {
   return result.rows;
 }
 
-export async function getPlanningsSemaine() {
+export async function getPlanningsSemaine(cooperativeId: number) {
   // lundi de la semaine courante
   const lundi = new Date();
   const day = lundi.getDay();
@@ -171,7 +172,7 @@ export async function getPlanningsSemaine() {
   return listPlannings({ semaine: lundiStr });
 }
 
-export async function getPlanning(id: number) {
+export async function getPlanning(cooperativeId: number, id: number) {
   const result = await db.execute<{
     id: number;
     zone_collecte_id: number | null;
@@ -216,12 +217,12 @@ export async function getPlanning(id: number) {
     FROM plannings_collecte p
     LEFT JOIN zones_collecte z ON z.id = p.zone_collecte_id
     LEFT JOIN users          u ON u.id = p.agent_id
-    WHERE p.id = ${id} AND p.cooperative_id = ${COOP_ID}
+    WHERE p.id = ${id} AND p.cooperative_id = ${cooperativeId}
   `);
   return result.rows[0] ?? null;
 }
 
-export async function createPlanning(data: {
+export async function createPlanning(cooperativeId: number, data: {
   campagneId?: number;
   zoneCollecteId: number;
   agentId?: number;
@@ -236,7 +237,7 @@ export async function createPlanning(data: {
   const [row] = await db
     .insert(planningsCollecteTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: cooperativeId,
       campagneId: data.campagneId ?? null,
       zoneCollecteId: data.zoneCollecteId,
       agentId: data.agentId ?? null,
@@ -253,6 +254,7 @@ export async function createPlanning(data: {
 }
 
 export async function updatePlanning(
+  cooperativeId: number,
   id: number,
   data: {
     zoneCollecteId?: number;
@@ -281,18 +283,18 @@ export async function updatePlanning(
       updatedAt: new Date(),
     })
     .where(
-      and(eq(planningsCollecteTable.id, id), eq(planningsCollecteTable.cooperativeId, COOP_ID))
+      and(eq(planningsCollecteTable.id, id), eq(planningsCollecteTable.cooperativeId, cooperativeId))
     )
     .returning();
   return row ?? null;
 }
 
-export async function demarrerPlanning(id: number) {
+export async function demarrerPlanning(cooperativeId: number, id: number) {
   const [row] = await db
     .update(planningsCollecteTable)
     .set({ statut: "en_cours", updatedAt: new Date() })
     .where(
-      and(eq(planningsCollecteTable.id, id), eq(planningsCollecteTable.cooperativeId, COOP_ID))
+      and(eq(planningsCollecteTable.id, id), eq(planningsCollecteTable.cooperativeId, cooperativeId))
     )
     .returning();
   return row ?? null;
@@ -302,13 +304,13 @@ export async function demarrerPlanning(id: number) {
 // Notifier les membres de la zone
 // ──────────────────────────────────────────────
 
-export async function notifierMembresZone(planningId: number) {
+export async function notifierMembresZone(cooperativeId: number, planningId: number) {
   const planning = await getPlanning(planningId);
   if (!planning) throw new Error(`Planning ${planningId} introuvable`);
 
   // Récupérer la coopérative (pour le nom)
   const coopResult = await db.execute<{ nom: string }>(sql`
-    SELECT nom FROM cooperatives WHERE id = ${COOP_ID} LIMIT 1
+    SELECT nom FROM cooperatives WHERE id = ${cooperativeId} LIMIT 1
   `);
   const coopNom = coopResult.rows[0]?.nom ?? "votre coopérative";
 
@@ -329,7 +331,7 @@ export async function notifierMembresZone(planningId: number) {
       .from(membresTable)
       .where(
         and(
-          eq(membresTable.cooperativeId, COOP_ID),
+          eq(membresTable.cooperativeId, cooperativeId),
           eq(membresTable.statut, "actif"),
           inArray(membresTable.village as typeof membresTable.village, villagesZone as [string, ...string[]])
         )
@@ -344,7 +346,7 @@ export async function notifierMembresZone(planningId: number) {
         village: membresTable.village,
       })
       .from(membresTable)
-      .where(and(eq(membresTable.cooperativeId, COOP_ID), eq(membresTable.statut, "actif")));
+      .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif")));
   }
 
   if (membres.length === 0) {
@@ -400,7 +402,7 @@ export async function notifierMembresZone(planningId: number) {
 // Clôturer un planning
 // ──────────────────────────────────────────────
 
-export async function cloturerPlanning(planningId: number) {
+export async function cloturerPlanning(cooperativeId: number, planningId: number) {
   const planning = await getPlanning(planningId);
   if (!planning) throw new Error(`Planning ${planningId} introuvable`);
 
@@ -422,7 +424,7 @@ export async function cloturerPlanning(planningId: number) {
       FROM livraisons l
       JOIN membres m ON m.id = l.membre_id
       WHERE l.date_livraison = ${planning.date_collecte}::date
-        AND m.cooperative_id = ${COOP_ID}
+        AND m.cooperative_id = ${cooperativeId}
         AND m.village = ANY(${sql.raw(`ARRAY[${villagesZone.map((v) => `'${v.replace(/'/g, "''")}'`).join(",")}]`)}::text[])
     `);
     tonnage = parseFloat(livResult.rows[0]?.total_kg ?? "0") || 0;
@@ -452,7 +454,7 @@ export async function cloturerPlanning(planningId: number) {
   try {
     const directeurs = await db.execute<{ telephone: string }>(sql`
       SELECT telephone FROM users
-      WHERE cooperative_id = ${COOP_ID}
+      WHERE cooperative_id = ${cooperativeId}
         AND role = 'directeur'
         AND actif = true
         AND telephone IS NOT NULL
@@ -473,7 +475,7 @@ export async function cloturerPlanning(planningId: number) {
 // Rapport
 // ──────────────────────────────────────────────
 
-export async function getRapportPlanning(planningId: number) {
+export async function getRapportPlanning(cooperativeId: number, planningId: number) {
   const planning = await getPlanning(planningId);
   if (!planning) return null;
 
@@ -496,7 +498,7 @@ export async function getRapportPlanning(planningId: number) {
       FROM livraisons l
       JOIN membres m ON m.id = l.membre_id
       WHERE l.date_livraison = ${planning.date_collecte}::date
-        AND m.cooperative_id = ${COOP_ID}
+        AND m.cooperative_id = ${cooperativeId}
         AND m.village = ANY(${sql.raw(`ARRAY[${villagesZone.map((v) => `'${v.replace(/'/g, "''")}'`).join(",")}]`)}::text[])
       ORDER BY m.nom
     `);
@@ -519,7 +521,7 @@ export async function getRapportPlanning(planningId: number) {
 // Statistiques
 // ──────────────────────────────────────────────
 
-export async function getStatsPlannings() {
+export async function getStatsPlannings(cooperativeId: number) {
   const statsResult = await db.execute<{
     nb_plannings: string;
     tonnage_prevu: string;
@@ -534,14 +536,14 @@ export async function getStatsPlannings() {
       COUNT(*) FILTER (WHERE statut = 'termine')              AS nb_termines,
       COUNT(*) FILTER (WHERE statut = 'annule')               AS nb_annules
     FROM plannings_collecte
-    WHERE cooperative_id = ${COOP_ID}
+    WHERE cooperative_id = ${cooperativeId}
   `);
 
   const agentResult = await db.execute<{ agent_nom: string; nb: string }>(sql`
     SELECT u.nom AS agent_nom, COUNT(*) AS nb
     FROM plannings_collecte p
     JOIN users u ON u.id = p.agent_id
-    WHERE p.cooperative_id = ${COOP_ID} AND p.statut = 'termine'
+    WHERE p.cooperative_id = ${cooperativeId} AND p.statut = 'termine'
     GROUP BY u.nom
     ORDER BY nb DESC
     LIMIT 1
@@ -567,7 +569,7 @@ export async function getStatsPlannings() {
 // Stats par zone
 // ──────────────────────────────────────────────
 
-export async function getStatsZones() {
+export async function getStatsZones(cooperativeId: number) {
   const result = await db.execute<{
     zone_id: number;
     zone_nom: string;
@@ -583,7 +585,7 @@ export async function getStatsZones() {
       COALESCE(SUM(p.tonnage_realise_kg), 0)               AS tonnage_realise
     FROM zones_collecte z
     LEFT JOIN plannings_collecte p ON p.zone_collecte_id = z.id
-    WHERE z.cooperative_id = ${COOP_ID}
+    WHERE z.cooperative_id = ${cooperativeId}
     GROUP BY z.id, z.nom
     ORDER BY z.nom
   `);
@@ -602,12 +604,12 @@ export async function getStatsZones() {
 }
 
 // Annuler un planning
-export async function annulerPlanning(id: number) {
+export async function annulerPlanning(cooperativeId: number, id: number) {
   const [row] = await db
     .update(planningsCollecteTable)
     .set({ statut: "annule", updatedAt: new Date() })
     .where(
-      and(eq(planningsCollecteTable.id, id), eq(planningsCollecteTable.cooperativeId, COOP_ID))
+      and(eq(planningsCollecteTable.id, id), eq(planningsCollecteTable.cooperativeId, cooperativeId))
     )
     .returning();
   return row ?? null;

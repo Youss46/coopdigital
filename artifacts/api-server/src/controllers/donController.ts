@@ -6,24 +6,27 @@ const pid = (v: string | string[]): number => parseInt(Array.isArray(v) ? (v[0] 
 // ── Catégories ─────────────────────────────────────────────────────────────────
 
 export async function getCategoriesHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const sens = req.query.sens as "effectue" | "recu" | undefined;
-  const rows = await donService.getCategories(sens);
+  const rows = await donService.getCategories(cooperativeId, sens);
   res.json(rows);
 }
 
 // ── Statistiques ───────────────────────────────────────────────────────────────
 
 export async function getStatsDonsHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const campagneId = req.query.campagne_id ? pid(req.query.campagne_id as string) : undefined;
-  const stats = await donService.getStatsDons(campagneId);
+  const stats = await donService.getStatsDons(cooperativeId, campagneId);
   res.json(stats);
 }
 
 // ── Liste des dons ─────────────────────────────────────────────────────────────
 
 export async function listerDonsHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const { sens, forme, statut, categorie_id, date_debut, date_fin, beneficiaire_membre_id } = req.query as Record<string, string>;
-  const dons = await donService.listerDons({
+  const dons = await donService.listerDons(cooperativeId, {
     sens,
     forme,
     statut,
@@ -38,6 +41,7 @@ export async function listerDonsHandler(req: Request, res: Response): Promise<vo
 // ── Créer un don ───────────────────────────────────────────────────────────────
 
 export async function creerDonHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const body = req.body as donService.CreerDonPayload & { lignes_nature?: donService.CreerDonPayload["lignesNature"] };
   if (!body.sens || !body.forme || !body.libelle || !body.dateDon) {
     res.status(400).json({ erreur: "sens, forme, libelle et dateDon sont obligatoires" });
@@ -53,7 +57,7 @@ export async function creerDonHandler(req: Request, res: Response): Promise<void
   }
 
   const userId = (req as Request & { user?: { id: number } }).user?.id;
-  const don = await donService.creerDon({
+  const don = await donService.creerDon(cooperativeId, {
     ...body,
     lignesNature: body.lignesNature ?? body.lignes_nature,
     enregistrePar: userId,
@@ -64,8 +68,9 @@ export async function creerDonHandler(req: Request, res: Response): Promise<void
 // ── Détail d'un don ────────────────────────────────────────────────────────────
 
 export async function getDonHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   try {
-    const don = await donService.getDonDetail(pid(req.params.id));
+    const don = await donService.getDonDetail(cooperativeId, pid(req.params.id));
     res.json(don);
   } catch {
     res.status(404).json({ erreur: "Don introuvable" });
@@ -120,37 +125,42 @@ export async function getPVRemiseHandler(req: Request, res: Response): Promise<v
 // ── Rapport PDF ────────────────────────────────────────────────────────────────
 
 export async function getRapportDonsHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const campagneId = req.query.campagne_id ? pid(req.query.campagne_id as string) : undefined;
-  await donService.generateRapportDonsPDF(res, campagneId);
+  await donService.generateRapportDonsPDF(cooperativeId, res, campagneId);
 }
 
 // ── Dons d'un membre ───────────────────────────────────────────────────────────
 
 export async function getDonsMembreHandler(req: Request, res: Response): Promise<void> {
-  const data = await donService.getDonsMembre(pid(req.params.membre_id));
+  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const data = await donService.getDonsMembre(cooperativeId, pid(req.params.membre_id));
   res.json(data);
 }
 
 // ── Programmes ─────────────────────────────────────────────────────────────────
 
 export async function listerProgrammesHandler(req: Request, res: Response): Promise<void> {
-  const progs = await donService.listerProgrammes();
+  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const progs = await donService.listerProgrammes(cooperativeId);
   res.json(progs);
 }
 
 export async function creerProgrammeHandler(req: Request, res: Response): Promise<void> {
-  const body = req.body as Parameters<typeof donService.creerProgramme>[0];
+  const cooperativeId = req.user?.cooperativeId ?? 1;
+  const body = req.body as Parameters<typeof donService.creerProgramme>[1];
   if (!body.libelle || !body.budgetAlloueFcfa) {
     res.status(400).json({ erreur: "libelle et budgetAlloueFcfa sont obligatoires" });
     return;
   }
-  const prog = await donService.creerProgramme(body);
+  const prog = await donService.creerProgramme(cooperativeId, body);
   res.status(201).json(prog);
 }
 
 export async function cloturerProgrammeHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   try {
-    const prog = await donService.cloturerProgramme(pid(req.params.id));
+    const prog = await donService.cloturerProgramme(cooperativeId, pid(req.params.id));
     res.json(prog);
   } catch (err) {
     res.status(400).json({ erreur: err instanceof Error ? err.message : "Erreur" });

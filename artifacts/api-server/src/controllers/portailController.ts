@@ -147,7 +147,7 @@ export async function getRecuLivraisonHandler(req: Request, res: Response): Prom
     return;
   }
   try {
-    const pdf = await generateRecuLivraison(req.membre!.membreId, livraisonId);
+    const pdf = await generateRecuLivraison(req.membre!.cooperativeId, req.membre!.membreId, livraisonId);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="recu-livraison-${livraisonId}.pdf"`);
     res.send(pdf);

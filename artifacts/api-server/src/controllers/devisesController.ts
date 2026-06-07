@@ -100,7 +100,8 @@ export async function getHistoriqueTaux(req: Request, res: Response): Promise<vo
 export async function getTauxActuelDevise(req: Request, res: Response): Promise<void> {
   try {
     const devise = String(req.params["devise"] ?? "EUR");
-    const result = await getTauxActuel(devise);
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const result = await getTauxActuel(cooperativeId, devise);
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur getTauxActuelDevise");
@@ -112,7 +113,8 @@ export async function convertirMontant(req: Request, res: Response): Promise<voi
   try {
     const { montant, deviseSource, date } = req.body as Record<string, unknown>;
     const dateStr = String(date ?? new Date().toISOString().slice(0, 10));
-    const result = await convertir(Number(montant ?? 0), String(deviseSource ?? "EUR"), dateStr);
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const result = await convertir(cooperativeId, Number(montant ?? 0), String(deviseSource ?? "EUR"), dateStr);
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur convertirMontant");

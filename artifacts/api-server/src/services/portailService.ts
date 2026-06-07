@@ -16,7 +16,7 @@ import PDFDocument from "pdfkit";
 import { getConfig } from "./configService";
 
 const DEFAULT_LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
-const COOP_ID = 1;
+
 
 // ─── Code membre ─────────────────────────────────────────────────────────────
 
@@ -270,7 +270,7 @@ export async function getScoreMembre(membreId: number) {
 
 // ─── PDF reçu livraison ───────────────────────────────────────────────────────
 
-export async function generateRecuLivraison(membreId: number, livraisonId: number): Promise<Buffer> {
+export async function generateRecuLivraison(cooperativeId: number, membreId: number, livraisonId: number): Promise<Buffer> {
   const [liv] = await db
     .select({
       id: livraisonsTable.id,
@@ -296,7 +296,7 @@ export async function generateRecuLivraison(membreId: number, livraisonId: numbe
 
   if (!liv) throw new Error("Livraison introuvable");
 
-  const coopConfig = await getConfig(COOP_ID);
+  const coopConfig = await getConfig(cooperativeId);
   const coopNom = coopConfig?.nomComplet ?? "CoopDigital";
 
   const doc = new PDFDocument({ size: "A5", margin: 30 });

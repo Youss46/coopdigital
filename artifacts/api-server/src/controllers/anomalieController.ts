@@ -9,8 +9,9 @@ import {
 
 export async function getAnomalies(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const { gravite, statut, module, membre_id, agent_id, date_debut, date_fin, limit, offset } = req.query as Record<string, string>;
-    const result = await listAnomalies({
+    const result = await listAnomalies(cooperativeId, {
       gravite:   gravite   || undefined,
       statut:    statut    || undefined,
       module:    module    || undefined,
@@ -30,7 +31,8 @@ export async function getAnomalies(req: Request, res: Response): Promise<void> {
 
 export async function getStatsAnomalies(req: Request, res: Response): Promise<void> {
   try {
-    const stats = await getStats();
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const stats = await getStats(cooperativeId);
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "Erreur getStatsAnomalies");
@@ -52,7 +54,8 @@ export async function traiter(req: Request, res: Response): Promise<void> {
   if (!traitePar) { res.status(401).json({ erreur: "Non authentifié" }); return; }
 
   try {
-    const anomalie = await traiterAnomalie(id, {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const anomalie = await traiterAnomalie(cooperativeId, id, {
       statut: statut as "resolue" | "ignoree" | "faux_positif",
       commentaire,
       traitePar,
@@ -67,7 +70,8 @@ export async function traiter(req: Request, res: Response): Promise<void> {
 
 export async function getConfig(req: Request, res: Response): Promise<void> {
   try {
-    const cfg = await getConfigAnomalie();
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const cfg = await getConfigAnomalie(cooperativeId);
     if (!cfg) { res.status(404).json({ erreur: "Configuration introuvable" }); return; }
     res.json(cfg);
   } catch (err) {
@@ -90,7 +94,8 @@ export async function putConfig(req: Request, res: Response): Promise<void> {
       ecritureMontantMaxFcfa?:   number;
       ecartReconciliationPct?:   number;
     };
-    const updated = await updateConfigAnomalie(body);
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const updated = await updateConfigAnomalie(cooperativeId, body);
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur putConfig");

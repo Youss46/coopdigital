@@ -13,7 +13,8 @@ import {
 
 export async function tableauBord(req: Request, res: Response) {
   try {
-    const data = await getTableauBord();
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const data = await getTableauBord(cooperativeId);
     return res.json(data);
   } catch (err) {
     req.log.error({ err }, "tableauBord investissements");
@@ -25,9 +26,10 @@ export async function tableauBord(req: Request, res: Response) {
 
 export async function listeProjets(req: Request, res: Response) {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const statut    = typeof req.query.statut    === "string" ? req.query.statut    : undefined;
     const categorie = typeof req.query.categorie === "string" ? req.query.categorie : undefined;
-    const projets = await listProjets(statut, categorie);
+    const projets = await listProjets(cooperativeId, statut, categorie);
     return res.json(projets);
   } catch (err) {
     req.log.error({ err }, "listeProjets");
@@ -39,8 +41,9 @@ export async function listeProjets(req: Request, res: Response) {
 
 export async function detailProjet(req: Request, res: Response) {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = Number(req.params.id);
-    const projet = await getProjet(id);
+    const projet = await getProjet(cooperativeId, id);
     if (!projet) return res.status(404).json({ error: "Projet introuvable" });
     return res.json(projet);
   } catch (err) {
@@ -53,6 +56,7 @@ export async function detailProjet(req: Request, res: Response) {
 
 export async function creerProjet(req: Request, res: Response) {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const {
       titre, description, categorie, montantEstimeFcfa, sourceFinancement,
       empruntId, subventionId, dateDebutPrevue, dateFinPrevue,
@@ -63,7 +67,7 @@ export async function creerProjet(req: Request, res: Response) {
       return res.status(400).json({ error: "titre et montantEstimeFcfa requis" });
     }
 
-    const projet = await createProjet({
+    const projet = await createProjet(cooperativeId, {
       titre:             String(titre),
       description:       description ? String(description) : undefined,
       categorie:         categorie ? String(categorie) : "autre",
@@ -89,10 +93,11 @@ export async function creerProjet(req: Request, res: Response) {
 
 export async function modifierProjet(req: Request, res: Response) {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = Number(req.params.id);
     const body = req.body as Record<string, unknown>;
 
-    const updated = await updateProjet(id, {
+    const updated = await updateProjet(cooperativeId, id, {
       titre:             body.titre             ? String(body.titre)             : undefined,
       description:       body.description !== undefined ? String(body.description ?? "") : undefined,
       categorie:         body.categorie         ? String(body.categorie)         : undefined,
@@ -121,8 +126,9 @@ export async function modifierProjet(req: Request, res: Response) {
 
 export async function supprimerProjet(req: Request, res: Response) {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = Number(req.params.id);
-    const ok = await deleteProjet(id);
+    const ok = await deleteProjet(cooperativeId, id);
     if (!ok) return res.status(404).json({ error: "Projet introuvable" });
     return res.status(204).end();
   } catch (err) {
@@ -135,6 +141,7 @@ export async function supprimerProjet(req: Request, res: Response) {
 
 export async function ajouterDepenseCtrl(req: Request, res: Response) {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const projetId = Number(req.params.id);
     const {
       dateDepense, libelle, montantFcfa,
@@ -145,7 +152,7 @@ export async function ajouterDepenseCtrl(req: Request, res: Response) {
       return res.status(400).json({ error: "dateDepense, libelle et montantFcfa requis" });
     }
 
-    const depense = await ajouterDepense({
+    const depense = await ajouterDepense(cooperativeId, {
       projetId,
       dateDepense:      String(dateDepense),
       libelle:          String(libelle),

@@ -190,7 +190,7 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
     const agentId = (req as Request & { user?: { id: number } }).user?.id ?? null;
 
     // ── Détection anomalies ──────────────────────────────────────────────
-    const anomaliesDetectees = await checkStock({
+    const anomaliesDetectees = await checkStock(cooperativeId, {
       entrepotId: parse.data.entrepotId,
       poidsKg: parse.data.poidsKg,
       stockActuel,
@@ -198,7 +198,7 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
     });
     const anomaliesCritiques = anomaliesDetectees.filter((a) => a.niveauGravite === "critique");
     if (anomaliesCritiques.length > 0) {
-      void creerAnomalies(anomaliesCritiques, "stocks");
+      void creerAnomalies(cooperativeId, anomaliesCritiques, "stocks");
       res.status(422).json({
         erreur: anomaliesCritiques[0]!.description,
         anomalie: "bloquee",
@@ -237,7 +237,7 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
       .where(eq(mouvementsStockTable.id, mouvement!.id));
 
     if (anomaliesAttention.length > 0) {
-      void creerAnomalies(anomaliesAttention, "stocks", { entiteId: mouvement!.id, entiteType: "mouvement_stock" });
+      void creerAnomalies(cooperativeId, anomaliesAttention, "stocks", { entiteId: mouvement!.id, entiteType: "mouvement_stock" });
     }
     res.status(201).json(withNom);
   } catch (err) {

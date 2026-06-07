@@ -10,8 +10,6 @@ import { db, ecrituresComptablesTable, configComptableTable, ecrituresEnAttenteT
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
-const COOP_ID = 1;
-
 export type SourceEcriture = "livraison" | "paiement" | "avance" | "vente" | "encaissement" | "salaire" | "stock" | "don";
 
 interface ProposerEcriturePayload {
@@ -106,7 +104,7 @@ export async function proposerEcriture(
  * 2) 401 / 521 = montant net (décaissement banque)
  * 3) 401 / 416 = avance déduite (imputation créance)
  */
-export async function generateEcrituresLivraison(params: {
+export async function generateEcrituresLivraison(cooperativeId: number, params: {
   livraisonId: number;
   membreNom: string;
   montantBrutFcfa: number;
@@ -119,7 +117,7 @@ export async function generateEcrituresLivraison(params: {
   const promises: Promise<unknown>[] = [];
 
   if (montantBrutFcfa > 0) {
-    promises.push(proposerEcriture(COOP_ID, {
+    promises.push(proposerEcriture(cooperativeId, {
       source: "livraison", sourceId: livraisonId,
       libelle: `Achat cacao – ${membreNom}`,
       compteDebit: "601", compteCredit: "401",
@@ -127,7 +125,7 @@ export async function generateEcrituresLivraison(params: {
     }));
   }
   if (montantNetFcfa > 0) {
-    promises.push(proposerEcriture(COOP_ID, {
+    promises.push(proposerEcriture(cooperativeId, {
       source: "livraison", sourceId: livraisonId,
       libelle: `Paiement net livraison – ${membreNom}`,
       compteDebit: "401", compteCredit: "521",
@@ -135,7 +133,7 @@ export async function generateEcrituresLivraison(params: {
     }));
   }
   if (avanceDeduiteFcfa > 0) {
-    promises.push(proposerEcriture(COOP_ID, {
+    promises.push(proposerEcriture(cooperativeId, {
       source: "livraison", sourceId: livraisonId,
       libelle: `Déduction avance sur livraison – ${membreNom}`,
       compteDebit: "401", compteCredit: "416",
@@ -149,13 +147,13 @@ export async function generateEcrituresLivraison(params: {
 /**
  * Avance octroyée : 416 / 521
  */
-export async function generateEcrituresAvance(params: {
+export async function generateEcrituresAvance(cooperativeId: number, params: {
   avanceId: number;
   membreNom: string;
   montantFcfa: number;
   dateOctroi: string;
 }) {
-  await proposerEcriture(COOP_ID, {
+  await proposerEcriture(cooperativeId, {
     source: "avance", sourceId: params.avanceId,
     libelle: `Avance octroyée – ${params.membreNom}`,
     compteDebit: "416", compteCredit: "521",
@@ -167,13 +165,13 @@ export async function generateEcrituresAvance(params: {
 /**
  * Vente exportateur : 4111 / 701
  */
-export async function generateEcrituresVente(params: {
+export async function generateEcrituresVente(cooperativeId: number, params: {
   venteId: number;
   exportateurNom: string;
   montantFcfa: number;
   dateVente: string;
 }) {
-  await proposerEcriture(COOP_ID, {
+  await proposerEcriture(cooperativeId, {
     source: "vente", sourceId: params.venteId,
     libelle: `Vente cacao – ${params.exportateurNom}`,
     compteDebit: "4111", compteCredit: "701",
@@ -185,13 +183,13 @@ export async function generateEcrituresVente(params: {
 /**
  * Encaissement exportateur : 521 / 4111
  */
-export async function generateEcrituresEncaissement(params: {
+export async function generateEcrituresEncaissement(cooperativeId: number, params: {
   venteId: number;
   exportateurNom: string;
   montantFcfa: number;
   date: string;
 }) {
-  await proposerEcriture(COOP_ID, {
+  await proposerEcriture(cooperativeId, {
     source: "encaissement", sourceId: params.venteId,
     libelle: `Encaissement exportateur – ${params.exportateurNom}`,
     compteDebit: "521", compteCredit: "4111",
@@ -206,7 +204,7 @@ export async function generateEcrituresEncaissement(params: {
  * 421 / 521 = versement net au salarié
  * 432 / 421 = cotisations CNPS salarié (si > 0)
  */
-export async function generateEcrituresSalaire(params: {
+export async function generateEcrituresSalaire(cooperativeId: number, params: {
   bulletinId: number;
   personnelNom: string;
   salaireNetFcfa: number;
@@ -218,13 +216,13 @@ export async function generateEcrituresSalaire(params: {
   const piece = `SAL-${bulletinId}`;
 
   const promises: Promise<unknown>[] = [
-    proposerEcriture(COOP_ID, {
+    proposerEcriture(cooperativeId, {
       source: "salaire", sourceId: bulletinId,
       libelle: `Charge de personnel – ${personnelNom}`,
       compteDebit: "661", compteCredit: "421",
       montantFcfa: salaireBrutFcfa, date: datePaiement, numeroPiece: piece,
     }),
-    proposerEcriture(COOP_ID, {
+    proposerEcriture(cooperativeId, {
       source: "salaire", sourceId: bulletinId,
       libelle: `Versement salaire net – ${personnelNom}`,
       compteDebit: "421", compteCredit: "521",
@@ -233,7 +231,7 @@ export async function generateEcrituresSalaire(params: {
   ];
 
   if (cotisationsSalarieFcfa > 0) {
-    promises.push(proposerEcriture(COOP_ID, {
+    promises.push(proposerEcriture(cooperativeId, {
       source: "salaire", sourceId: bulletinId,
       libelle: `Cotisations CNPS salarié – ${personnelNom}`,
       compteDebit: "432", compteCredit: "421",

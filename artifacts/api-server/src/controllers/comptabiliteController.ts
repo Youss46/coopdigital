@@ -126,10 +126,10 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
 
   try {
     // ── Détection anomalies ──────────────────────────────────────────────
-    const anomaliesDetectees = await checkEcriture({ montantFcfa, agentId: (req.user as { id?: number } | undefined)?.id ?? null });
+    const anomaliesDetectees = await checkEcriture(coopId(req), { montantFcfa, agentId: (req.user as { id?: number } | undefined)?.id ?? null });
     const anomaliesCritiques = anomaliesDetectees.filter((a) => a.niveauGravite === "critique");
     if (anomaliesCritiques.length > 0) {
-      void creerAnomalies(anomaliesCritiques, "comptabilite");
+      void creerAnomalies(coopId(req), anomaliesCritiques, "comptabilite");
       res.status(422).json({
         erreur: anomaliesCritiques[0]!.description,
         anomalie: "bloquee",
@@ -153,7 +153,7 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
     }).returning();
 
     if (anomaliesAttention.length > 0) {
-      void creerAnomalies(anomaliesAttention, "comptabilite", { entiteId: ecriture!.id, entiteType: "ecriture" });
+      void creerAnomalies(coopId(req), anomaliesAttention, "comptabilite", { entiteId: ecriture!.id, entiteType: "ecriture" });
     }
     res.status(201).json(ecriture);
   } catch (err) {

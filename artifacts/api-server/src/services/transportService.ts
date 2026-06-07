@@ -8,7 +8,7 @@ import {
 import { eq, and, sql, desc, lte, gte } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
-const COOP_ID = 1;
+
 
 // ─── VÉHICULES ────────────────────────────────────────────────────────────────
 

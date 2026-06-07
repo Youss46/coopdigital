@@ -80,13 +80,13 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     }
 
     // ── Détection anomalies ──────────────────────────────────────────────
-    const anomaliesDetectees = await checkAvance({
+    const anomaliesDetectees = await checkAvance(cooperativeId, {
       membreId, montantOctroyeFcfa,
       agentId: req.user?.id ?? null,
     });
     const anomaliesCritiques = anomaliesDetectees.filter((a) => a.niveauGravite === "critique");
     if (anomaliesCritiques.length > 0) {
-      void creerAnomalies(anomaliesCritiques, "avances");
+      void creerAnomalies(cooperativeId, anomaliesCritiques, "avances");
       res.status(422).json({
         erreur: anomaliesCritiques[0]!.description,
         anomalie: "bloquee",
@@ -111,10 +111,10 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
       .returning();
 
     if (anomaliesAttention.length > 0) {
-      void creerAnomalies(anomaliesAttention, "avances", { entiteId: avance!.id, entiteType: "avance" });
+      void creerAnomalies(cooperativeId, anomaliesAttention, "avances", { entiteId: avance!.id, entiteType: "avance" });
     }
 
-    void generateEcrituresAvance({
+    void generateEcrituresAvance(cooperativeId, {
       avanceId: avance!.id,
       membreNom: `${membre.prenoms} ${membre.nom}`,
       montantFcfa: montantOctroyeFcfa,

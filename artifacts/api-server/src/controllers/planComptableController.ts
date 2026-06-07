@@ -5,12 +5,13 @@ import * as svc from "../services/planComptableService.js";
 
 export async function listPlanComptableHandler(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const classe = req.query["classe"] ? parseInt(String(req.query["classe"])) : undefined;
     const type = req.query["type"] as string | undefined;
     const actifStr = req.query["actif"] as string | undefined;
     const actif = actifStr === "true" ? true : actifStr === "false" ? false : undefined;
     const search = req.query["search"] as string | undefined;
-    const comptes = await svc.listerPlanComptable({ classe, type, actif, search });
+    const comptes = await svc.listerPlanComptable({ cooperativeId, classe, type, actif, search });
     res.json(comptes);
   } catch (err) {
     req.log.error({ err }, "listPlanComptable");
@@ -20,6 +21,7 @@ export async function listPlanComptableHandler(req: Request, res: Response): Pro
 
 export async function createCompteHandler(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const { numeroCompte, libelle, type, classe, compteParent, soldeNormal, ordreAffichage } = req.body as {
       numeroCompte?: string; libelle?: string; type?: string;
       classe?: number; compteParent?: string; soldeNormal?: string; ordreAffichage?: number;
@@ -29,7 +31,7 @@ export async function createCompteHandler(req: Request, res: Response): Promise<
       return;
     }
     const compte = await svc.ajouterCompte({
-      numeroCompte, libelle, type: type as "actif" | "passif" | "charge" | "produit",
+      cooperativeId, numeroCompte, libelle, type: type as "actif" | "passif" | "charge" | "produit",
       classe, compteParent, soldeNormal, ordreAffichage,
     });
     res.status(201).json(compte);
@@ -42,9 +44,10 @@ export async function createCompteHandler(req: Request, res: Response): Promise<
 
 export async function updateCompteHandler(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"] ?? "0"));
     const { libelle, actif, ordreAffichage } = req.body as { libelle?: string; actif?: boolean; ordreAffichage?: number };
-    const compte = await svc.modifierCompte(id, { libelle, actif, ordreAffichage });
+    const compte = await svc.modifierCompte(cooperativeId, id, { libelle, actif, ordreAffichage });
     res.json(compte);
   } catch (err: unknown) {
     req.log.error({ err }, "updateCompte");
@@ -55,8 +58,9 @@ export async function updateCompteHandler(req: Request, res: Response): Promise<
 
 export async function deleteCompteHandler(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"] ?? "0"));
-    const compte = await svc.desactiverCompte(id);
+    const compte = await svc.desactiverCompte(cooperativeId, id);
     res.json(compte);
   } catch (err: unknown) {
     req.log.error({ err }, "deleteCompte");
@@ -91,12 +95,13 @@ export async function listParamsModuleHandler(req: Request, res: Response): Prom
 
 export async function updateParamsHandler(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"] ?? "0"));
     const { compteDebit, compteCredit, libelleEcritureAuto } = req.body as {
       compteDebit?: string; compteCredit?: string; libelleEcritureAuto?: string;
     };
     const modifiePar = req.user?.id;
-    const updated = await svc.modifierParams(id, { compteDebit, compteCredit, libelleEcritureAuto, modifiePar });
+    const updated = await svc.modifierParams(cooperativeId, id, { compteDebit, compteCredit, libelleEcritureAuto, modifiePar });
     res.json(updated);
   } catch (err: unknown) {
     req.log.error({ err }, "updateParams");
@@ -107,9 +112,10 @@ export async function updateParamsHandler(req: Request, res: Response): Promise<
 
 export async function resetModuleHandler(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const module = String(req.params["module"] ?? "");
     const modifiePar = req.user?.id;
-    const result = await svc.resetModuleOhada(module, modifiePar);
+    const result = await svc.resetModuleOhada(cooperativeId, module, modifiePar);
     res.json(result);
   } catch (err: unknown) {
     req.log.error({ err }, "resetModule");
@@ -122,9 +128,10 @@ export async function resetModuleHandler(req: Request, res: Response): Promise<v
 
 export async function searchEcrituresHandler(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const q = String(req.query["q"] ?? "");
     if (q.length < 2) { res.json([]); return; }
-    const rows = await svc.rechercherEcritures(q);
+    const rows = await svc.rechercherEcritures(cooperativeId, q);
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "searchEcritures");
@@ -134,6 +141,7 @@ export async function searchEcrituresHandler(req: Request, res: Response): Promi
 
 export async function corrigerEcritureHandler(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"] ?? "0"));
     const { nouveauCompteDebit, nouveauCompteCredit, nouveauMontant, nouveauLibelle, motifCorrection } = req.body as {
       nouveauCompteDebit?: string; nouveauCompteCredit?: string;
@@ -146,7 +154,7 @@ export async function corrigerEcritureHandler(req: Request, res: Response): Prom
     const corrigePar = req.user?.id;
     if (!corrigePar) { res.status(401).json({ erreur: "Non authentifié" }); return; }
 
-    const result = await svc.corrigerEcriture(id, {
+    const result = await svc.corrigerEcriture(cooperativeId, id, {
       nouveauCompteDebit, nouveauCompteCredit, nouveauMontant, nouveauLibelle,
       motifCorrection, corrigePar,
     });
@@ -161,8 +169,9 @@ export async function corrigerEcritureHandler(req: Request, res: Response): Prom
 
 export async function getHistoriqueEcritureHandler(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"] ?? "0"));
-    const result = await svc.getHistoriqueCorrections(id);
+    const result = await svc.getHistoriqueCorrections(cooperativeId, id);
     res.json(result);
   } catch (err: unknown) {
     req.log.error({ err }, "getHistoriqueEcriture");
@@ -173,9 +182,10 @@ export async function getHistoriqueEcritureHandler(req: Request, res: Response):
 
 export async function validerNumeroCompteHandler(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const numero = String(req.query["numero"] ?? "");
     if (!numero) { res.status(400).json({ erreur: "numero requis" }); return; }
-    const result = await svc.validerNumeroCompte(1, numero);
+    const result = await svc.validerNumeroCompte(cooperativeId, numero);
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "validerNumeroCompte");

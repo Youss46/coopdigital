@@ -505,7 +505,8 @@ export async function getRapportCampagne(req: Request, res: Response): Promise<v
 export async function getEncoursMemberApi(req: Request, res: Response): Promise<void> {
   try {
     const membreId = parseInt(String(req.params["id"] ?? "0"));
-    const encours = await getEncoursMembre(membreId);
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const encours = await getEncoursMembre(cooperativeId, membreId);
     res.json({ membreId, encoursFcfa: encours });
   } catch (err) {
     req.log.error({ err }, "Erreur getEncoursMemberApi");

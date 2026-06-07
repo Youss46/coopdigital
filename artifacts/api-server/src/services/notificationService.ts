@@ -8,7 +8,7 @@ import {
 import { eq, and, desc, count, sql, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
-const COOP_ID = 1;
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,8 +136,8 @@ export async function notifierParRole(
 
 // ─── Triggers automatiques ────────────────────────────────────────────────────
 
-export async function notifStockFaible(intrant: string, stockActuel: number, seuilMin: number): Promise<void> {
-  await notifierParRole(COOP_ID, ["pca", "directeur", "magasinier"], {
+export async function notifStockFaible(cooperativeId: number, intrant: string, stockActuel: number, seuilMin: number): Promise<void> {
+  await notifierParRole(cooperativeId, ["pca", "directeur", "magasinier"], {
     type:         "stock_faible",
     gravite:      "attention",
     titre:        `Stock faible — ${intrant}`,
@@ -148,8 +148,8 @@ export async function notifStockFaible(intrant: string, stockActuel: number, seu
   });
 }
 
-export async function notifAnomalieCritique(description: string, anomalieId: number): Promise<void> {
-  await notifierParRole(COOP_ID, ["pca", "directeur"], {
+export async function notifAnomalieCritique(cooperativeId: number, description: string, anomalieId: number): Promise<void> {
+  await notifierParRole(cooperativeId, ["pca", "directeur"], {
     type:         "anomalie_critique",
     gravite:      "critique",
     titre:        "Anomalie critique détectée",
@@ -161,8 +161,8 @@ export async function notifAnomalieCritique(description: string, anomalieId: num
   });
 }
 
-export async function notifPrixChange(prixKg: number): Promise<void> {
-  await notifierParRole(COOP_ID, ["pca", "directeur", "agent_terrain"], {
+export async function notifPrixChange(cooperativeId: number, prixKg: number): Promise<void> {
+  await notifierParRole(cooperativeId, ["pca", "directeur", "agent_terrain"], {
     type:         "prix_change",
     gravite:      "info",
     titre:        "Prix bord champ mis à jour",
@@ -173,8 +173,8 @@ export async function notifPrixChange(prixKg: number): Promise<void> {
   });
 }
 
-export async function notifMessageRecu(expediteur: string, messageId: number): Promise<void> {
-  await notifierParRole(COOP_ID, ["pca", "directeur"], {
+export async function notifMessageRecu(cooperativeId: number, expediteur: string, messageId: number): Promise<void> {
+  await notifierParRole(cooperativeId, ["pca", "directeur"], {
     type:         "message_recu",
     gravite:      "info",
     titre:        `Nouveau message de ${expediteur}`,
@@ -186,8 +186,8 @@ export async function notifMessageRecu(expediteur: string, messageId: number): P
   });
 }
 
-export async function notifBulletinAttente(nb: number): Promise<void> {
-  await notifierParRole(COOP_ID, ["pca", "directeur", "comptable"], {
+export async function notifBulletinAttente(cooperativeId: number, nb: number): Promise<void> {
+  await notifierParRole(cooperativeId, ["pca", "directeur", "comptable"], {
     type:         "bulletin_attente",
     gravite:      "attention",
     titre:        `${nb} bulletin${nb > 1 ? "s" : ""} en attente de validation`,

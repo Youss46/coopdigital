@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import PDFDocument from "pdfkit";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 
-const COOP_ID = 1;
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -195,7 +195,7 @@ export function parseFileBuffer(buffer: Buffer, mimetype: string, originalname: 
 
 // ─── Importer relevé ─────────────────────────────────────────────────────────
 
-export async function importerReleve(opts: {
+export async function importerReleve(cooperativeId: number, opts: {
   buffer: Buffer;
   mimetype: string;
   originalname: string;
@@ -217,7 +217,7 @@ export async function importerReleve(opts: {
   const fin   = dates[dates.length - 1]!;
 
   const [releve] = await db.insert(relevesBancairesTable).values({
-    cooperativeId: COOP_ID,
+    cooperativeId: cooperativeId,
     banque:        opts.banque ?? "Banque",
     numeroCompte:  opts.numeroCompte ?? null,
     periodeDebut:  debut,
@@ -250,7 +250,7 @@ export async function importerReleve(opts: {
 
 // ─── Réconciliation automatique ───────────────────────────────────────────────
 
-export async function reconcilierAutomatiquement(releveId: number) {
+export async function reconcilierAutomatiquement(cooperativeId: number, releveId: number) {
   const lignes = await db.select().from(lignesReleveTable)
     .where(and(
       eq(lignesReleveTable.releveId, releveId),
@@ -274,7 +274,7 @@ export async function reconcilierAutomatiquement(releveId: number) {
     }>(sql`
       SELECT id, date_ecriture::text, libelle, compte_debit, compte_credit, montant_fcfa
       FROM ecritures_comptables
-      WHERE cooperative_id = ${COOP_ID}
+      WHERE cooperative_id = ${cooperativeId}
         AND ABS(montant_fcfa) = ${montant}
         AND (compte_debit IN ('521','522') OR compte_credit IN ('521','522'))
         AND id NOT IN (
@@ -326,7 +326,7 @@ export async function reconcilierAutomatiquement(releveId: number) {
 
 // ─── Liste des relevés ────────────────────────────────────────────────────────
 
-export async function listReleves() {
+export async function listReleves(cooperativeId: number) {
   const result = await db.execute<{
     id: number; banque: string; numero_compte: string; statut: string;
     periode_debut: string; periode_fin: string;
@@ -344,7 +344,7 @@ export async function listReleves() {
     FROM releves_bancaires r
     LEFT JOIN users u ON u.id = r.importe_par
     LEFT JOIN lignes_releve l ON l.releve_id = r.id
-    WHERE r.cooperative_id = ${COOP_ID}
+    WHERE r.cooperative_id = ${cooperativeId}
     GROUP BY r.id, u.nom, u.prenoms
     ORDER BY r.created_at DESC
   `);
@@ -353,9 +353,9 @@ export async function listReleves() {
 
 // ─── Détail d'un relevé avec ses lignes ──────────────────────────────────────
 
-export async function getReleve(id: number) {
+export async function getReleve(cooperativeId: number, id: number) {
   const releves = await db.select().from(relevesBancairesTable)
-    .where(and(eq(relevesBancairesTable.id, id), eq(relevesBancairesTable.cooperativeId, COOP_ID)));
+    .where(and(eq(relevesBancairesTable.id, id), eq(relevesBancairesTable.cooperativeId, cooperativeId)));
   if (!releves[0]) return null;
 
   const lignes = await db.execute<{
@@ -416,14 +416,14 @@ export async function ignorerLigne(ligneId: number, motif?: string) {
 
 // ─── Recherche d'écritures pour autocomplete ─────────────────────────────────
 
-export async function rechercherEcritures(q: string, montant?: number) {
+export async function rechercherEcritures(cooperativeId: number, q: string, montant?: number) {
   const result = await db.execute<{
     id: number; date_ecriture: string; libelle: string;
     compte_debit: string; compte_credit: string; montant_fcfa: number;
   }>(sql`
     SELECT id, date_ecriture::text, libelle, compte_debit, compte_credit, montant_fcfa
     FROM ecritures_comptables
-    WHERE cooperative_id = ${COOP_ID}
+    WHERE cooperative_id = ${cooperativeId}
       AND (compte_debit IN ('521','522') OR compte_credit IN ('521','522'))
       ${q ? sql`AND LOWER(libelle) LIKE ${"%" + q.toLowerCase() + "%"}` : sql``}
       ${montant ? sql`AND ABS(montant_fcfa) = ${montant}` : sql``}
@@ -435,13 +435,13 @@ export async function rechercherEcritures(q: string, montant?: number) {
 
 // ─── Rapport PDF ──────────────────────────────────────────────────────────────
 
-export async function genererRapportPdf(releveId: number): Promise<Buffer> {
-  const data = await getReleve(releveId);
+export async function genererRapportPdf(cooperativeId: number, releveId: number): Promise<Buffer> {
+  const data = await getReleve(cooperativeId, releveId);
   if (!data) throw new Error("Relevé introuvable");
   const { releve, lignes } = data;
 
   const coopNom = await db.execute<{ nom: string }>(
-    sql`SELECT nom FROM cooperatives WHERE id = ${COOP_ID} LIMIT 1`
+    sql`SELECT nom FROM cooperatives WHERE id = ${cooperativeId} LIMIT 1`
   ).then(r => r.rows[0]?.nom ?? "CoopDigital");
 
   const FCFA = (n: number | string) =>
@@ -451,7 +451,7 @@ export async function genererRapportPdf(releveId: number): Promise<Buffer> {
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
 
-  await drawHeader(doc, COOP_ID, {
+  await drawHeader(doc, cooperativeId, {
     titre_document: "RAPPORT DE RÉCONCILIATION BANCAIRE",
     reference:      `Relevé #${releve.id} — ${releve.banque ?? "Banque"}`,
     hauteur_reservee: 90,
@@ -521,7 +521,7 @@ export async function genererRapportPdf(releveId: number): Promise<Buffer> {
   for (const [idx, l] of lignes.entries()) {
     if (rowCount > 0 && rowCount % ROWS_PER_PAGE === 0) {
       doc.addPage();
-      await drawHeader(doc, COOP_ID, { titre_document: "RÉCONCILIATION (suite)", hauteur_reservee: 60 });
+      await drawHeader(doc, cooperativeId, { titre_document: "RÉCONCILIATION (suite)", hauteur_reservee: 60 });
       tableY = doc.y + 8;
     }
 
@@ -553,7 +553,7 @@ export async function genererRapportPdf(releveId: number): Promise<Buffer> {
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
-    await drawFooter(doc, COOP_ID, i + 1, range.count);
+    await drawFooter(doc, cooperativeId, i + 1, range.count);
   }
 
   doc.end();

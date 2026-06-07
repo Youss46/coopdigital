@@ -8,7 +8,7 @@ import { eq, and, gte, lte, desc, sql, type SQL } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
 
-const COOP_ID = 1;
+
 
 export type AuditAction =
   | "CREATE" | "UPDATE" | "DELETE"
@@ -66,6 +66,7 @@ function extractIp(req: Request): string {
  */
 export async function log(req: Request, params: AuditLogParams): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const champsModifies = calcChampsModifies(
       params.valeursAvant ?? null,
       params.valeursApres ?? null,
@@ -73,7 +74,7 @@ export async function log(req: Request, params: AuditLogParams): Promise<void> {
     const ip = extractIp(req);
 
     await db.insert(auditTrailTable).values({
-      cooperativeId:  COOP_ID,
+      cooperativeId:  cooperativeId,
       userId:         req.user?.id,
       userNom:        (req.user as { nom?: string } | undefined)?.nom,
       userRole:       req.user?.role,
@@ -102,10 +103,12 @@ export async function logRaw(params: AuditLogParams & {
   userRole?: string;
   ip?: string;
   userAgent?: string;
+  cooperativeId?: number;
 }): Promise<void> {
   try {
+    const cooperativeId = params.cooperativeId ?? 1;
     await db.insert(auditTrailTable).values({
-      cooperativeId:  COOP_ID,
+      cooperativeId:  cooperativeId,
       userId:         params.userId,
       userRole:       params.userRole,
       userIp:         params.ip,
@@ -123,8 +126,8 @@ export async function logRaw(params: AuditLogParams & {
 }
 
 /** Journal filtré avec pagination */
-export async function getJournal(filters: AuditFilters) {
-  const conditions: SQL[] = [eq(auditTrailTable.cooperativeId, COOP_ID)];
+export async function getJournal(cooperativeId: number, filters: AuditFilters) {
+  const conditions: SQL[] = [eq(auditTrailTable.cooperativeId, cooperativeId)];
 
   if (filters.userId)    conditions.push(eq(auditTrailTable.userId, filters.userId));
   if (filters.module)    conditions.push(eq(auditTrailTable.module, filters.module));
@@ -161,13 +164,13 @@ export async function getJournal(filters: AuditFilters) {
 }
 
 /** Historique complet d'un enregistrement */
-export async function getHistoriqueEntite(entiteType: string, entiteId: number) {
+export async function getHistoriqueEntite(cooperativeId: number, entiteType: string, entiteId: number) {
   return db
     .select()
     .from(auditTrailTable)
     .where(
       and(
-        eq(auditTrailTable.cooperativeId, COOP_ID),
+        eq(auditTrailTable.cooperativeId, cooperativeId),
         eq(auditTrailTable.entiteType, entiteType),
         eq(auditTrailTable.entiteId, entiteId),
       ),
@@ -176,13 +179,13 @@ export async function getHistoriqueEntite(entiteType: string, entiteId: number) 
 }
 
 /** Toutes les actions d'un utilisateur */
-export async function getUserActions(userId: number, limit = 100) {
+export async function getUserActions(cooperativeId: number, userId: number, limit = 100) {
   return db
     .select()
     .from(auditTrailTable)
     .where(
       and(
-        eq(auditTrailTable.cooperativeId, COOP_ID),
+        eq(auditTrailTable.cooperativeId, cooperativeId),
         eq(auditTrailTable.userId, userId),
       ),
     )
@@ -191,7 +194,7 @@ export async function getUserActions(userId: number, limit = 100) {
 }
 
 /** Statistiques du journal */
-export async function getStats() {
+export async function getStats(cooperativeId: number) {
   const now      = new Date();
   const debutJour = new Date(now); debutJour.setHours(0, 0, 0, 0);
   const debutSemaine = new Date(now); debutSemaine.setDate(now.getDate() - 7);
@@ -200,22 +203,22 @@ export async function getStats() {
   const [aujourd, semaine, parModule, parUser, sensibles, evolution] = await Promise.all([
     db.select({ count: sql<string>`COUNT(*)` })
       .from(auditTrailTable)
-      .where(and(eq(auditTrailTable.cooperativeId, COOP_ID), gte(auditTrailTable.createdAt, debutJour))),
+      .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debutJour))),
 
     db.select({ count: sql<string>`COUNT(*)` })
       .from(auditTrailTable)
-      .where(and(eq(auditTrailTable.cooperativeId, COOP_ID), gte(auditTrailTable.createdAt, debutSemaine))),
+      .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debutSemaine))),
 
     db.select({ module: auditTrailTable.module, nb: sql<string>`COUNT(*)` })
       .from(auditTrailTable)
-      .where(and(eq(auditTrailTable.cooperativeId, COOP_ID), gte(auditTrailTable.createdAt, debut30j)))
+      .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debut30j)))
       .groupBy(auditTrailTable.module)
       .orderBy(desc(sql`COUNT(*)`))
       .limit(10),
 
     db.select({ userId: auditTrailTable.userId, userNom: auditTrailTable.userNom, userRole: auditTrailTable.userRole, nb: sql<string>`COUNT(*)` })
       .from(auditTrailTable)
-      .where(and(eq(auditTrailTable.cooperativeId, COOP_ID), gte(auditTrailTable.createdAt, debut30j)))
+      .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debut30j)))
       .groupBy(auditTrailTable.userId, auditTrailTable.userNom, auditTrailTable.userRole)
       .orderBy(desc(sql`COUNT(*)`))
       .limit(10),
@@ -224,7 +227,7 @@ export async function getStats() {
       .from(auditTrailTable)
       .where(
         and(
-          eq(auditTrailTable.cooperativeId, COOP_ID),
+          eq(auditTrailTable.cooperativeId, cooperativeId),
           gte(auditTrailTable.createdAt, debut30j),
           sql`${auditTrailTable.action} IN ('DELETE', 'CONFIG_CHANGE')`,
         ),
@@ -238,7 +241,7 @@ export async function getStats() {
         nb: sql<string>`COUNT(*)`,
       })
       .from(auditTrailTable)
-      .where(and(eq(auditTrailTable.cooperativeId, COOP_ID), gte(auditTrailTable.createdAt, debutSemaine)))
+      .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debutSemaine)))
       .groupBy(
         sql`DATE_TRUNC('day', ${auditTrailTable.createdAt})`,
         sql`DATE_TRUNC('hour', ${auditTrailTable.createdAt})`,
@@ -257,27 +260,28 @@ export async function getStats() {
 }
 
 /** Liste des sessions */
-export async function getSessions(limit = 50) {
+export async function getSessions(cooperativeId: number, limit = 50) {
   return db
     .select()
     .from(sessionsUtilisateursTable)
-    .where(eq(sessionsUtilisateursTable.cooperativeId, COOP_ID))
+    .where(eq(sessionsUtilisateursTable.cooperativeId, cooperativeId))
     .orderBy(desc(sessionsUtilisateursTable.dateConnexion))
     .limit(limit);
 }
 
 /** Génère un PDF du journal signé avec hash SHA256 */
 export async function exportAuditPDF(
+  cooperativeId: number,
   filters: AuditFilters,
   generatedBy: string,
 ): Promise<Buffer> {
-  const { entries } = await getJournal({ ...filters, limit: 500, offset: 0 });
+  const { entries } = await getJournal(cooperativeId, { ...filters, limit: 500, offset: 0 });
   const timestamp   = new Date().toISOString();
 
   const contenu = entries
     .map((e) => `${e.createdAt.toISOString()}|${e.action}|${e.module}|${e.userId}|${e.description ?? ""}`)
     .join("\n");
-  const hashInput = `${contenu}|${timestamp}|${COOP_ID}`;
+  const hashInput = `${contenu}|${timestamp}|${cooperativeId}`;
   const hash      = crypto.createHash("sha256").update(hashInput).digest("hex");
 
   const doc = new PDFDocument({ margin: 40, size: "A4", bufferPages: true });
@@ -289,7 +293,7 @@ export async function exportAuditPDF(
   });
 
   // ─── En-tête ───────────────────────────────────────────────────────────────
-  await drawHeader(doc, COOP_ID, { titre_document: "Journal d'Audit" });
+  await drawHeader(doc, cooperativeId, { titre_document: "Journal d'Audit" });
 
     doc
       .fontSize(10)

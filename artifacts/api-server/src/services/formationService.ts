@@ -5,7 +5,7 @@ import { sendBulkSMS } from "./smsService.js";
 import PDFDocument from "pdfkit";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 
-const COOP_ID = 1;
+
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -13,22 +13,22 @@ function fmtDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
-async function getCoopNom(): Promise<string> {
-  const r = await db.execute<{ nom: string }>(sql`SELECT nom FROM cooperatives WHERE id = ${COOP_ID} LIMIT 1`);
+async function getCoopNom(cooperativeId: number): Promise<string> {
+  const r = await db.execute<{ nom: string }>(sql`SELECT nom FROM cooperatives WHERE id = ${cooperativeId} LIMIT 1`);
   return r.rows[0]?.nom ?? "CoopDigital";
 }
 
 // ─── Programmes ───────────────────────────────────────────────────────────────
 
-export async function listProgrammes() {
+export async function listProgrammes(cooperativeId: number) {
   return db
     .select()
     .from(programmesFormationTable)
-    .where(eq(programmesFormationTable.cooperativeId, COOP_ID))
+    .where(eq(programmesFormationTable.cooperativeId, cooperativeId))
     .orderBy(desc(programmesFormationTable.createdAt));
 }
 
-export async function createProgramme(data: {
+export async function createProgramme(cooperativeId: number, data: {
   titre: string;
   description?: string;
   thematiques?: string[];
@@ -38,7 +38,7 @@ export async function createProgramme(data: {
   dateFin?: string;
 }) {
   const [row] = await db.insert(programmesFormationTable).values({
-    cooperativeId: COOP_ID,
+    cooperativeId: cooperativeId,
     titre: data.titre,
     description: data.description ?? null,
     thematiques: data.thematiques ?? [],
@@ -50,7 +50,7 @@ export async function createProgramme(data: {
   return row;
 }
 
-export async function updateProgramme(id: number, data: Partial<{
+export async function updateProgramme(cooperativeId: number, id: number, data: Partial<{
   titre: string; description: string; thematiques: string[];
   financeur: string; budgetFcfa: number; dateDebut: string; dateFin: string; statut: string;
 }>) {
@@ -65,14 +65,14 @@ export async function updateProgramme(id: number, data: Partial<{
       ...(data.dateFin      !== undefined && { dateFin: data.dateFin }),
       ...(data.statut       !== undefined && { statut: data.statut }),
     })
-    .where(and(eq(programmesFormationTable.id, id), eq(programmesFormationTable.cooperativeId, COOP_ID)))
+    .where(and(eq(programmesFormationTable.id, id), eq(programmesFormationTable.cooperativeId, cooperativeId)))
     .returning();
   return row ?? null;
 }
 
-export async function deleteProgramme(id: number) {
+export async function deleteProgramme(cooperativeId: number, id: number) {
   await db.delete(programmesFormationTable).where(
-    and(eq(programmesFormationTable.id, id), eq(programmesFormationTable.cooperativeId, COOP_ID))
+    and(eq(programmesFormationTable.id, id), eq(programmesFormationTable.cooperativeId, cooperativeId))
   );
 }
 
@@ -99,7 +99,7 @@ export async function listSessions(opts?: { statut?: string; programmeId?: numbe
     FROM sessions_formation s
     LEFT JOIN programmes_formation p ON p.id = s.programme_id
     LEFT JOIN inscriptions_formation i ON i.session_id = s.id
-    WHERE s.cooperative_id = ${COOP_ID}
+    WHERE s.cooperative_id = ${cooperativeId}
       ${opts?.statut      ? sql`AND s.statut = ${opts.statut}` : sql``}
       ${opts?.programmeId ? sql`AND s.programme_id = ${opts.programmeId}` : sql``}
       ${opts?.upcoming    ? sql`AND s.date_session >= CURRENT_DATE` : sql``}
@@ -109,7 +109,7 @@ export async function listSessions(opts?: { statut?: string; programmeId?: numbe
   return result.rows;
 }
 
-export async function getSession(id: number) {
+export async function getSession(cooperativeId: number, id: number) {
   const result = await db.execute<{
     id: number; titre: string; thematique: string | null; formateur: string | null;
     organisme_formateur: string | null; lieu: string | null; date_session: string;
@@ -129,20 +129,20 @@ export async function getSession(id: number) {
     FROM sessions_formation s
     LEFT JOIN programmes_formation p ON p.id = s.programme_id
     LEFT JOIN inscriptions_formation i ON i.session_id = s.id
-    WHERE s.id = ${id} AND s.cooperative_id = ${COOP_ID}
+    WHERE s.id = ${id} AND s.cooperative_id = ${cooperativeId}
     GROUP BY s.id, p.titre
   `);
   return result.rows[0] ?? null;
 }
 
-export async function createSession(data: {
+export async function createSession(cooperativeId: number, data: {
   titre: string; programmeId?: number; campagneId?: number; thematique?: string;
   formateur?: string; organismeFormateur?: string; lieu?: string; dateSession: string;
   heureDebut?: string; heureFin?: string; dureeHeures?: number; nbPlaces?: number;
   coutFcfa?: number; supportUrl?: string;
 }) {
   const [row] = await db.insert(sessionsFormationTable).values({
-    cooperativeId: COOP_ID,
+    cooperativeId: cooperativeId,
     titre: data.titre,
     programmeId: data.programmeId ?? null,
     campagneId: data.campagneId ?? null,
@@ -161,7 +161,7 @@ export async function createSession(data: {
   return row;
 }
 
-export async function updateSession(id: number, data: Partial<{
+export async function updateSession(cooperativeId: number, id: number, data: Partial<{
   titre: string; thematique: string; formateur: string; organismeFormateur: string;
   lieu: string; dateSession: string; heureDebut: string; heureFin: string;
   dureeHeures: number; nbPlaces: number; coutFcfa: number; statut: string; supportUrl: string;
@@ -181,7 +181,7 @@ export async function updateSession(id: number, data: Partial<{
     ...(data.statut             !== undefined && { statut: data.statut }),
     ...(data.supportUrl         !== undefined && { supportUrl: data.supportUrl }),
     updatedAt: new Date(),
-  }).where(and(eq(sessionsFormationTable.id, id), eq(sessionsFormationTable.cooperativeId, COOP_ID)))
+  }).where(and(eq(sessionsFormationTable.id, id), eq(sessionsFormationTable.cooperativeId, cooperativeId)))
     .returning();
   return row ?? null;
 }
@@ -189,6 +189,7 @@ export async function updateSession(id: number, data: Partial<{
 // ─── Inscriptions ─────────────────────────────────────────────────────────────
 
 export async function inscrireMembres(
+  cooperativeId: number,
   sessionId: number,
   opts: { membreIds?: number[]; zone?: string; section?: string; tous?: boolean }
 ): Promise<{ inscrits: number; dejaInscrits: number }> {
@@ -198,8 +199,8 @@ export async function inscrireMembres(
   if (opts.tous || opts.zone || opts.section) {
     const rows = await db.execute<{ id: number }>(sql`
       SELECT id FROM membres
-      WHERE cooperative_id = ${COOP_ID} AND statut = 'actif'
-        ${opts.zone    ? sql`AND village = ANY(SELECT nom FROM zones_collecte WHERE nom = ${opts.zone} AND cooperative_id = ${COOP_ID})` : sql``}
+      WHERE cooperative_id = ${cooperativeId} AND statut = 'actif'
+        ${opts.zone    ? sql`AND village = ANY(SELECT nom FROM zones_collecte WHERE nom = ${opts.zone} AND cooperative_id = ${cooperativeId})` : sql``}
         ${opts.section ? sql`AND section = ${opts.section}` : sql``}
     `);
     membreIds = rows.rows.map((r) => r.id);
@@ -228,7 +229,7 @@ export async function inscrireMembres(
   return { inscrits: nouveaux.length, dejaInscrits: existingSet.size };
 }
 
-export async function getInscrits(sessionId: number) {
+export async function getInscrits(cooperativeId: number, sessionId: number) {
   const result = await db.execute<{
     id: number; membre_id: number; nom: string; prenoms: string | null;
     telephone: string; village: string | null; section: string | null;
@@ -272,12 +273,12 @@ export async function enregistrerPresences(
 
 // ─── SMS Convocations ─────────────────────────────────────────────────────────
 
-export async function envoyerConvocations(sessionId: number) {
-  const session = await getSession(sessionId);
+export async function envoyerConvocations(cooperativeId: number, sessionId: number) {
+  const session = await getSession(cooperativeId, sessionId);
   if (!session) throw new Error("Session introuvable");
 
-  const coopNom = await getCoopNom();
-  const inscrits = await getInscrits(sessionId);
+  const coopNom = await getCoopNom(cooperativeId);
+  const inscrits = await getInscrits(cooperativeId, sessionId);
   const aEnvoyer = inscrits.filter((i) => !i.sms_convocation_envoye && i.telephone);
 
   if (aEnvoyer.length === 0) return { envoyes: 0, echecs: 0 };
@@ -304,11 +305,11 @@ export async function envoyerConvocations(sessionId: number) {
   return result;
 }
 
-export async function envoyerRappels(sessionId: number) {
-  const session = await getSession(sessionId);
+export async function envoyerRappels(cooperativeId: number, sessionId: number) {
+  const session = await getSession(cooperativeId, sessionId);
   if (!session) throw new Error("Session introuvable");
 
-  const inscrits = await getInscrits(sessionId);
+  const inscrits = await getInscrits(cooperativeId, sessionId);
   const aEnvoyer = inscrits.filter((i) => !i.sms_rappel_envoye && i.telephone);
 
   if (aEnvoyer.length === 0) return { envoyes: 0, echecs: 0 };
@@ -396,7 +397,7 @@ export async function listAttestations(opts?: { sessionId?: number; membreId?: n
     FROM attestations_formation a
     JOIN sessions_formation s ON s.id = a.session_id
     JOIN membres m ON m.id = a.membre_id
-    WHERE s.cooperative_id = ${COOP_ID}
+    WHERE s.cooperative_id = ${cooperativeId}
       ${opts?.sessionId ? sql`AND a.session_id = ${opts.sessionId}` : sql``}
       ${opts?.membreId  ? sql`AND a.membre_id  = ${opts.membreId}`  : sql``}
       ${opts?.search    ? sql`AND (m.nom ILIKE ${'%' + opts.search + '%'} OR a.numero_attestation ILIKE ${'%' + opts.search + '%'})` : sql``}
@@ -407,14 +408,14 @@ export async function listAttestations(opts?: { sessionId?: number; membreId?: n
 
 // ─── Génération PDF attestation ────────────────────────────────────────────────
 
-export async function genererPdfAttestation(sessionId: number, membreId: number): Promise<Buffer> {
+export async function genererPdfAttestation(cooperativeId: number, sessionId: number, membreId: number): Promise<Buffer> {
   // Récupérer les données
   const sessionRes = await db.execute<{
     titre: string; thematique: string | null; formateur: string | null;
     organisme_formateur: string | null; lieu: string | null;
     date_session: string; heure_debut: string | null; heure_fin: string | null;
     duree_heures: string | null;
-  }>(sql`SELECT titre, thematique, formateur, organisme_formateur, lieu, date_session::text, heure_debut::text, heure_fin::text, duree_heures FROM sessions_formation WHERE id = ${sessionId} AND cooperative_id = ${COOP_ID} LIMIT 1`);
+  }>(sql`SELECT titre, thematique, formateur, organisme_formateur, lieu, date_session::text, heure_debut::text, heure_fin::text, duree_heures FROM sessions_formation WHERE id = ${sessionId} AND cooperative_id = ${cooperativeId} LIMIT 1`);
   const session = sessionRes.rows[0];
   if (!session) throw new Error("Session introuvable");
 
@@ -437,7 +438,7 @@ export async function genererPdfAttestation(sessionId: number, membreId: number)
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
 
-  await drawHeader(doc, COOP_ID, {
+  await drawHeader(doc, cooperativeId, {
     titre_document: "ATTESTATION\nDE PARTICIPATION",
     reference: numeroAttestation,
   });
@@ -529,7 +530,7 @@ export async function genererPdfAttestation(sessionId: number, membreId: number)
   const pageRange = doc.bufferedPageRange();
   for (let i = 0; i < pageRange.count; i++) {
     doc.switchToPage(pageRange.start + i);
-    await drawFooter(doc, COOP_ID, i + 1, pageRange.count);
+    await drawFooter(doc, cooperativeId, i + 1, pageRange.count);
   }
 
   doc.end();
@@ -540,7 +541,7 @@ export async function genererPdfAttestation(sessionId: number, membreId: number)
 
 // ─── Stats membre ─────────────────────────────────────────────────────────────
 
-export async function getStatsMembre(membreId: number) {
+export async function getStatsMembre(cooperativeId: number, membreId: number) {
   const result = await db.execute<{
     nb_formations: string;
     heures_totales: string;
@@ -584,7 +585,7 @@ export async function getStatsMembre(membreId: number) {
 
 // ─── Stats globales ───────────────────────────────────────────────────────────
 
-export async function getStats() {
+export async function getStats(cooperativeId: number) {
   const result = await db.execute<{
     nb_sessions: string; nb_beneficiaires: string;
     heures_dispensees: string; nb_attestations: string;
@@ -595,21 +596,21 @@ export async function getStats() {
       COALESCE(SUM(s.duree_heures), 0)                   AS heures_dispensees,
       (SELECT COUNT(*) FROM attestations_formation a
        JOIN sessions_formation ss ON ss.id = a.session_id
-       WHERE ss.cooperative_id = ${COOP_ID})             AS nb_attestations
+       WHERE ss.cooperative_id = ${cooperativeId})             AS nb_attestations
     FROM sessions_formation s
     LEFT JOIN inscriptions_formation i ON i.session_id = s.id
-    WHERE s.cooperative_id = ${COOP_ID}
+    WHERE s.cooperative_id = ${cooperativeId}
   `);
 
   const totalMembres = await db.execute<{ total: string }>(sql`
-    SELECT COUNT(*) AS total FROM membres WHERE cooperative_id = ${COOP_ID} AND statut = 'actif'
+    SELECT COUNT(*) AS total FROM membres WHERE cooperative_id = ${cooperativeId} AND statut = 'actif'
   `);
   const totalM = parseInt(totalMembres.rows[0]?.total ?? "0");
 
   const thematiques = await db.execute<{ thematique: string; nb: string }>(sql`
     SELECT thematique, COUNT(*) AS nb
     FROM sessions_formation
-    WHERE cooperative_id = ${COOP_ID} AND thematique IS NOT NULL
+    WHERE cooperative_id = ${cooperativeId} AND thematique IS NOT NULL
     GROUP BY thematique ORDER BY nb DESC
   `);
 
@@ -619,7 +620,7 @@ export async function getStats() {
     FROM inscriptions_formation i
     JOIN membres m ON m.id = i.membre_id
     JOIN sessions_formation s ON s.id = i.session_id
-    WHERE s.cooperative_id = ${COOP_ID} AND i.statut IN ('inscrit','present')
+    WHERE s.cooperative_id = ${cooperativeId} AND i.statut IN ('inscrit','present')
     GROUP BY m.nom ORDER BY nb DESC LIMIT 10
   `);
 

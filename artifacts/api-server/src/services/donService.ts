@@ -3,7 +3,7 @@ import { eq, and, sql, desc, asc, gte, lte, isNotNull } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { proposerEcriture } from "./comptabiliteService.js";
 
-const COOP_ID = 1;
+
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ function toDateStr(d: Date | string): string {
 
 // ── Génération de référence ────────────────────────────────────────────────────
 
-export async function genererReference(sens: "effectue" | "recu"): Promise<string> {
+export async function genererReference(cooperativeId: number, sens: "effectue" | "recu"): Promise<string> {
   const annee = new Date().getFullYear();
   const prefix = sens === "effectue" ? "DON-EFF" : "DON-REC";
   const [row] = await db
@@ -21,7 +21,7 @@ export async function genererReference(sens: "effectue" | "recu"): Promise<strin
     .from(donsTable)
     .where(
       and(
-        eq(donsTable.cooperativeId, COOP_ID),
+        eq(donsTable.cooperativeId, cooperativeId),
         eq(donsTable.sens, sens),
         sql`EXTRACT(year FROM date_don) = ${annee}`,
       ),
@@ -63,13 +63,13 @@ export interface CreerDonPayload {
   enregistrePar?: number;
 }
 
-export async function creerDon(payload: CreerDonPayload) {
+export async function creerDon(cooperativeId: number, payload: CreerDonPayload) {
   const reference = await genererReference(payload.sens);
 
   const [don] = await db
     .insert(donsTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: cooperativeId,
       campagneId: payload.campagneId ?? null,
       sens: payload.sens,
       forme: payload.forme,
@@ -258,8 +258,8 @@ export interface FiltreDons {
   beneficiaireMembreId?: number;
 }
 
-export async function listerDons(filtres: FiltreDons = {}) {
-  const conditions = [eq(donsTable.cooperativeId, COOP_ID)];
+export async function listerDons(cooperativeId: number, filtres: FiltreDons = {}) {
+  const conditions = [eq(donsTable.cooperativeId, cooperativeId)];
   if (filtres.sens) conditions.push(eq(donsTable.sens, filtres.sens));
   if (filtres.forme) conditions.push(eq(donsTable.forme, filtres.forme));
   if (filtres.statut) conditions.push(eq(donsTable.statut, filtres.statut));
@@ -288,12 +288,12 @@ export async function listerDons(filtres: FiltreDons = {}) {
 
 // ── Détail d'un don ────────────────────────────────────────────────────────────
 
-export async function getDonDetail(donId: number) {
+export async function getDonDetail(cooperativeId: number, donId: number) {
   const [row] = await db
     .select({ don: donsTable, categorie: categoriesDonsTable })
     .from(donsTable)
     .leftJoin(categoriesDonsTable, eq(donsTable.categorieId, categoriesDonsTable.id))
-    .where(and(eq(donsTable.id, donId), eq(donsTable.cooperativeId, COOP_ID)))
+    .where(and(eq(donsTable.id, donId), eq(donsTable.cooperativeId, cooperativeId)))
     .limit(1);
   if (!row) throw new Error("Don introuvable");
 
@@ -312,14 +312,14 @@ export async function getDonDetail(donId: number) {
 
 // ── Historique dons d'un membre ────────────────────────────────────────────────
 
-export async function getDonsMembre(membreId: number) {
+export async function getDonsMembre(cooperativeId: number, membreId: number) {
   const rows = await db
     .select({ don: donsTable, categorie: categoriesDonsTable })
     .from(donsTable)
     .leftJoin(categoriesDonsTable, eq(donsTable.categorieId, categoriesDonsTable.id))
     .where(
       and(
-        eq(donsTable.cooperativeId, COOP_ID),
+        eq(donsTable.cooperativeId, cooperativeId),
         eq(donsTable.beneficiaireMembreId, membreId),
         eq(donsTable.statut, "valide"),
       ),
@@ -345,7 +345,7 @@ export async function getDonsMembre(membreId: number) {
 // ── Statistiques ───────────────────────────────────────────────────────────────
 
 export async function getStatsDons(campagneId?: number) {
-  const cond = [eq(donsTable.cooperativeId, COOP_ID), eq(donsTable.statut, "valide")];
+  const cond = [eq(donsTable.cooperativeId, cooperativeId), eq(donsTable.statut, "valide")];
   if (campagneId) cond.push(eq(donsTable.campagneId, campagneId));
 
   const rows = await db
@@ -425,7 +425,7 @@ export async function getStatsDons(campagneId?: number) {
 // ── Catégories ─────────────────────────────────────────────────────────────────
 
 export async function getCategories(sens?: "effectue" | "recu") {
-  const cond = [eq(categoriesDonsTable.cooperativeId, COOP_ID)];
+  const cond = [eq(categoriesDonsTable.cooperativeId, cooperativeId)];
   if (sens) cond.push(eq(categoriesDonsTable.sens, sens));
   return db
     .select()
@@ -436,15 +436,15 @@ export async function getCategories(sens?: "effectue" | "recu") {
 
 // ── Programmes ─────────────────────────────────────────────────────────────────
 
-export async function listerProgrammes() {
+export async function listerProgrammes(cooperativeId: number) {
   return db
     .select()
     .from(programmeDonsTable)
-    .where(eq(programmeDonsTable.cooperativeId, COOP_ID))
+    .where(eq(programmeDonsTable.cooperativeId, cooperativeId))
     .orderBy(desc(programmeDonsTable.createdAt));
 }
 
-export async function creerProgramme(payload: {
+export async function creerProgramme(cooperativeId: number, payload: {
   libelle: string;
   description?: string;
   budgetAlloueFcfa: number;
@@ -454,7 +454,7 @@ export async function creerProgramme(payload: {
   const [prog] = await db
     .insert(programmeDonsTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: cooperativeId,
       libelle: payload.libelle,
       description: payload.description ?? null,
       budgetAlloueFcfa: String(payload.budgetAlloueFcfa),
@@ -465,11 +465,11 @@ export async function creerProgramme(payload: {
   return prog;
 }
 
-export async function cloturerProgramme(programmeId: number) {
+export async function cloturerProgramme(cooperativeId: number, programmeId: number) {
   const [prog] = await db
     .update(programmeDonsTable)
     .set({ statut: "cloture" })
-    .where(and(eq(programmeDonsTable.id, programmeId), eq(programmeDonsTable.cooperativeId, COOP_ID)))
+    .where(and(eq(programmeDonsTable.id, programmeId), eq(programmeDonsTable.cooperativeId, cooperativeId)))
     .returning();
   return prog;
 }

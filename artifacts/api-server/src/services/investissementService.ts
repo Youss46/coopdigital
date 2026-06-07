@@ -6,7 +6,7 @@ import {
 import { eq, and, sql, lt, desc } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
-const COOP_ID = 1;
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ function toInt(v: unknown): number {
 
 // ─── Projets ──────────────────────────────────────────────────────────────────
 
-export async function listProjets(statut?: string, categorie?: string) {
+export async function listProjets(cooperativeId: number, statut?: string, categorie?: string) {
   const rows = await db
     .select({
       id:                  projetsInvestissementTable.id,
@@ -75,7 +75,7 @@ export async function listProjets(statut?: string, categorie?: string) {
     .from(projetsInvestissementTable)
     .where(
       and(
-        eq(projetsInvestissementTable.cooperativeId, COOP_ID),
+        eq(projetsInvestissementTable.cooperativeId, cooperativeId),
         statut    ? eq(projetsInvestissementTable.statut,    statut)    : undefined,
         categorie ? eq(projetsInvestissementTable.categorie, categorie) : undefined,
       )
@@ -93,14 +93,14 @@ export async function listProjets(statut?: string, categorie?: string) {
   }));
 }
 
-export async function getProjet(id: number) {
+export async function getProjet(cooperativeId: number, id: number) {
   const [projet] = await db
     .select()
     .from(projetsInvestissementTable)
     .where(
       and(
         eq(projetsInvestissementTable.id, id),
-        eq(projetsInvestissementTable.cooperativeId, COOP_ID)
+        eq(projetsInvestissementTable.cooperativeId, cooperativeId)
       )
     )
     .limit(1);
@@ -127,11 +127,11 @@ export async function getProjet(id: number) {
   };
 }
 
-export async function createProjet(data: CreateProjetInput) {
+export async function createProjet(cooperativeId: number, data: CreateProjetInput) {
   const [projet] = await db
     .insert(projetsInvestissementTable)
     .values({
-      cooperativeId:    COOP_ID,
+      cooperativeId:    cooperativeId,
       titre:            data.titre,
       description:      data.description,
       categorie:        data.categorie,
@@ -149,7 +149,7 @@ export async function createProjet(data: CreateProjetInput) {
   return projet;
 }
 
-export async function updateProjet(id: number, data: UpdateProjetInput) {
+export async function updateProjet(cooperativeId: number, id: number, data: UpdateProjetInput) {
   const updates: Record<string, unknown> = {
     updatedAt: new Date(),
   };
@@ -174,20 +174,20 @@ export async function updateProjet(id: number, data: UpdateProjetInput) {
     .where(
       and(
         eq(projetsInvestissementTable.id, id),
-        eq(projetsInvestissementTable.cooperativeId, COOP_ID)
+        eq(projetsInvestissementTable.cooperativeId, cooperativeId)
       )
     )
     .returning();
   return updated ?? null;
 }
 
-export async function deleteProjet(id: number) {
+export async function deleteProjet(cooperativeId: number, id: number) {
   const [deleted] = await db
     .delete(projetsInvestissementTable)
     .where(
       and(
         eq(projetsInvestissementTable.id, id),
-        eq(projetsInvestissementTable.cooperativeId, COOP_ID)
+        eq(projetsInvestissementTable.cooperativeId, cooperativeId)
       )
     )
     .returning({ id: projetsInvestissementTable.id });
@@ -196,7 +196,7 @@ export async function deleteProjet(id: number) {
 
 // ─── Dépenses ─────────────────────────────────────────────────────────────────
 
-export async function ajouterDepense(data: CreateDepenseInput) {
+export async function ajouterDepense(cooperativeId: number, data: CreateDepenseInput) {
   return await db.transaction(async (tx) => {
     const [projet] = await tx
       .select({ id: projetsInvestissementTable.id, statut: projetsInvestissementTable.statut })
@@ -204,7 +204,7 @@ export async function ajouterDepense(data: CreateDepenseInput) {
       .where(
         and(
           eq(projetsInvestissementTable.id, data.projetId),
-          eq(projetsInvestissementTable.cooperativeId, COOP_ID)
+          eq(projetsInvestissementTable.cooperativeId, cooperativeId)
         )
       )
       .limit(1)
@@ -219,7 +219,7 @@ export async function ajouterDepense(data: CreateDepenseInput) {
       .insert(depensesInvestissementTable)
       .values({
         projetId:         data.projetId,
-        cooperativeId:    COOP_ID,
+        cooperativeId:    cooperativeId,
         dateDepense:      data.dateDepense,
         libelle:          data.libelle,
         montantFcfa:      String(data.montantFcfa),
@@ -244,7 +244,7 @@ export async function ajouterDepense(data: CreateDepenseInput) {
 
 // ─── Tableau de bord ──────────────────────────────────────────────────────────
 
-export async function getTableauBord() {
+export async function getTableauBord(cooperativeId: number) {
   const today = new Date().toISOString().slice(0, 10);
 
   const statsRes = await db.execute<{
@@ -257,7 +257,7 @@ export async function getTableauBord() {
       COALESCE(SUM(montant_estime_fcfa),  0)::text AS total_estime,
       COALESCE(SUM(montant_realise_fcfa), 0)::text AS total_realise
     FROM projets_investissement
-    WHERE cooperative_id = ${COOP_ID}
+    WHERE cooperative_id = ${cooperativeId}
       AND statut NOT IN ('annule')
   `);
   const stats = statsRes.rows[0];
@@ -265,7 +265,7 @@ export async function getTableauBord() {
   const retardRes = await db.execute<{ projets_en_retard: string }>(sql`
     SELECT COUNT(*)::text AS projets_en_retard
     FROM projets_investissement
-    WHERE cooperative_id = ${COOP_ID}
+    WHERE cooperative_id = ${cooperativeId}
       AND statut IN ('planifie','en_cours')
       AND date_fin_prevue IS NOT NULL
       AND date_fin_prevue < ${today}
@@ -275,7 +275,7 @@ export async function getTableauBord() {
   const parStatutRes = await db.execute<{ statut: string; nb: string }>(sql`
     SELECT statut, COUNT(*)::text AS nb
     FROM projets_investissement
-    WHERE cooperative_id = ${COOP_ID}
+    WHERE cooperative_id = ${cooperativeId}
     GROUP BY statut
   `);
 
@@ -285,7 +285,7 @@ export async function getTableauBord() {
       COUNT(*)::text                              AS nb,
       COALESCE(SUM(montant_estime_fcfa), 0)::text AS total
     FROM projets_investissement
-    WHERE cooperative_id = ${COOP_ID}
+    WHERE cooperative_id = ${cooperativeId}
       AND statut NOT IN ('annule')
     GROUP BY categorie
   `);

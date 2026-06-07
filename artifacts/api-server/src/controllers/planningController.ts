@@ -5,7 +5,8 @@ import * as planningService from "../services/planningService.js";
 
 export async function getZones(req: Request, res: Response): Promise<void> {
   try {
-    const zones = await planningService.listZones();
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const zones = await planningService.listZones(cooperativeId);
     res.json(zones);
   } catch (err) {
     req.log.error({ err }, "getZones");
@@ -15,6 +16,7 @@ export async function getZones(req: Request, res: Response): Promise<void> {
 
 export async function postZone(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const { nom, section, villages, agentResponsableId, objectifTonnageKg } = req.body as {
       nom: string;
       section?: string;
@@ -23,7 +25,7 @@ export async function postZone(req: Request, res: Response): Promise<void> {
       objectifTonnageKg?: number;
     };
     if (!nom) { res.status(400).json({ error: "nom requis" }); return; }
-    const zone = await planningService.createZone({ nom, section, villages, agentResponsableId, objectifTonnageKg });
+    const zone = await planningService.createZone(cooperativeId, { nom, section, villages, agentResponsableId, objectifTonnageKg });
     res.status(201).json(zone);
   } catch (err) {
     req.log.error({ err }, "postZone");
@@ -33,8 +35,9 @@ export async function postZone(req: Request, res: Response): Promise<void> {
 
 export async function putZone(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    const zone = await planningService.updateZone(id, req.body);
+    const zone = await planningService.updateZone(cooperativeId, id, req.body);
     if (!zone) { res.status(404).json({ error: "Zone introuvable" }); return; }
     res.json(zone);
   } catch (err) {
@@ -58,8 +61,9 @@ export async function deleteZone(req: Request, res: Response): Promise<void> {
 
 export async function getPlannings(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const { agent_id, zone, semaine, statut } = req.query as Record<string, string | undefined>;
-    const plannings = await planningService.listPlannings({
+    const plannings = await planningService.listPlannings(cooperativeId, {
       agentId:  agent_id ? parseInt(agent_id, 10) : undefined,
       zoneId:   zone     ? parseInt(zone, 10)      : undefined,
       semaine,
@@ -74,7 +78,8 @@ export async function getPlannings(req: Request, res: Response): Promise<void> {
 
 export async function getPlanningsSemaine(req: Request, res: Response): Promise<void> {
   try {
-    const plannings = await planningService.getPlanningsSemaine();
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const plannings = await planningService.getPlanningsSemaine(cooperativeId);
     res.json(plannings);
   } catch (err) {
     req.log.error({ err }, "getPlanningsSemaine");
@@ -84,6 +89,7 @@ export async function getPlanningsSemaine(req: Request, res: Response): Promise<
 
 export async function postPlanning(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const body = req.body as {
       campagneId?: number;
       zoneCollecteId: number;
@@ -100,7 +106,7 @@ export async function postPlanning(req: Request, res: Response): Promise<void> {
       res.status(400).json({ error: "zoneCollecteId et dateCollecte requis" });
       return;
     }
-    const planning = await planningService.createPlanning(body);
+    const planning = await planningService.createPlanning(cooperativeId, body);
     res.status(201).json(planning);
   } catch (err) {
     req.log.error({ err }, "postPlanning");
@@ -110,8 +116,9 @@ export async function postPlanning(req: Request, res: Response): Promise<void> {
 
 export async function putPlanning(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    const planning = await planningService.updatePlanning(id, req.body);
+    const planning = await planningService.updatePlanning(cooperativeId, id, req.body);
     if (!planning) { res.status(404).json({ error: "Planning introuvable" }); return; }
     res.json(planning);
   } catch (err) {
@@ -122,8 +129,9 @@ export async function putPlanning(req: Request, res: Response): Promise<void> {
 
 export async function demarrerPlanning(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    const planning = await planningService.demarrerPlanning(id);
+    const planning = await planningService.demarrerPlanning(cooperativeId, id);
     if (!planning) { res.status(404).json({ error: "Planning introuvable" }); return; }
     res.json(planning);
   } catch (err) {
@@ -134,8 +142,9 @@ export async function demarrerPlanning(req: Request, res: Response): Promise<voi
 
 export async function terminerPlanning(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    const result = await planningService.cloturerPlanning(id);
+    const result = await planningService.cloturerPlanning(cooperativeId, id);
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "terminerPlanning");
@@ -145,8 +154,9 @@ export async function terminerPlanning(req: Request, res: Response): Promise<voi
 
 export async function annulerPlanning(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    const planning = await planningService.annulerPlanning(id);
+    const planning = await planningService.annulerPlanning(cooperativeId, id);
     if (!planning) { res.status(404).json({ error: "Planning introuvable" }); return; }
     res.json(planning);
   } catch (err) {
@@ -157,8 +167,9 @@ export async function annulerPlanning(req: Request, res: Response): Promise<void
 
 export async function notifierMembres(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    const result = await planningService.notifierMembresZone(id);
+    const result = await planningService.notifierMembresZone(cooperativeId, id);
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "notifierMembres");
@@ -168,8 +179,9 @@ export async function notifierMembres(req: Request, res: Response): Promise<void
 
 export async function getRapportPlanning(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    const rapport = await planningService.getRapportPlanning(id);
+    const rapport = await planningService.getRapportPlanning(cooperativeId, id);
     if (!rapport) { res.status(404).json({ error: "Planning introuvable" }); return; }
     res.json(rapport);
   } catch (err) {
@@ -180,7 +192,8 @@ export async function getRapportPlanning(req: Request, res: Response): Promise<v
 
 export async function getStatsPlannings(req: Request, res: Response): Promise<void> {
   try {
-    const stats = await planningService.getStatsPlannings();
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const stats = await planningService.getStatsPlannings(cooperativeId);
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "getStatsPlannings");
@@ -190,7 +203,8 @@ export async function getStatsPlannings(req: Request, res: Response): Promise<vo
 
 export async function getStatsZones(req: Request, res: Response): Promise<void> {
   try {
-    const stats = await planningService.getStatsZones();
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    const stats = await planningService.getStatsZones(cooperativeId);
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "getStatsZones");

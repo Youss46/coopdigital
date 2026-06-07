@@ -37,13 +37,14 @@ export async function postPreview(req: Request, res: Response): Promise<void> {
 
 export async function postImporter(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     if (!req.file) { res.status(400).json({ error: "Fichier requis" }); return; }
     const { banque, numero_compte, user_mapping } = req.body as {
       banque?: string; numero_compte?: string; user_mapping?: string;
     };
     const userMapping = user_mapping ? (JSON.parse(user_mapping) as Record<string, string>) : undefined;
 
-    const result = await svc.importerReleve({
+    const result = await svc.importerReleve(cooperativeId, {
       buffer:       req.file.buffer,
       mimetype:     req.file.mimetype,
       originalname: req.file.originalname,
@@ -63,7 +64,10 @@ export async function postImporter(req: Request, res: Response): Promise<void> {
 // ─── Liste des relevés ────────────────────────────────────────────────────────
 
 export async function getReleves(req: Request, res: Response): Promise<void> {
-  try { res.json(await svc.listReleves()); }
+  try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
+    res.json(await svc.listReleves(cooperativeId));
+  }
   catch (err) { req.log.error({ err }, "getReleves"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
@@ -71,8 +75,9 @@ export async function getReleves(req: Request, res: Response): Promise<void> {
 
 export async function getReleve(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id   = parseInt(String(req.params["id"]), 10);
-    const data = await svc.getReleve(id);
+    const data = await svc.getReleve(cooperativeId, id);
     if (!data) { res.status(404).json({ error: "Relevé introuvable" }); return; }
     res.json(data);
   } catch (err) { req.log.error({ err }, "getReleve"); res.status(500).json({ error: "Erreur serveur" }); }
@@ -82,8 +87,9 @@ export async function getReleve(req: Request, res: Response): Promise<void> {
 
 export async function postAuto(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id = parseInt(String(req.params["id"]), 10);
-    res.json(await svc.reconcilierAutomatiquement(id));
+    res.json(await svc.reconcilierAutomatiquement(cooperativeId, id));
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "postAuto reconciliation");
@@ -120,9 +126,10 @@ export async function putIgnorer(req: Request, res: Response): Promise<void> {
 
 export async function getEcritures(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const q       = String(req.query["q"] ?? "");
     const montant = req.query["montant"] ? parseInt(String(req.query["montant"]), 10) : undefined;
-    res.json(await svc.rechercherEcritures(q, montant));
+    res.json(await svc.rechercherEcritures(cooperativeId, q, montant));
   } catch (err) { req.log.error({ err }, "getEcritures reconciliation"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
@@ -130,8 +137,9 @@ export async function getEcritures(req: Request, res: Response): Promise<void> {
 
 export async function getRapportPdf(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId ?? 1;
     const id  = parseInt(String(req.params["id"]), 10);
-    const buf = await svc.genererRapportPdf(id);
+    const buf = await svc.genererRapportPdf(cooperativeId, id);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="reconciliation-${id}.pdf"`);
     res.send(buf);

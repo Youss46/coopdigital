@@ -6,8 +6,6 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, desc, ne, inArray } from "drizzle-orm";
 
-const COOP_ID = 1;
-
 export interface ResultatVerification {
   code: string;
   verification: string;
@@ -22,7 +20,7 @@ export interface ResultatVerifications {
   toutOk: boolean;
 }
 
-export async function verifierAvantCloture(campagneId: number): Promise<ResultatVerifications> {
+export async function verifierAvantCloture(cooperativeId: number, campagneId: number): Promise<ResultatVerifications> {
   const resultats: ResultatVerification[] = [];
 
   const ok = (code: string, verification: string): ResultatVerification =>
@@ -190,7 +188,7 @@ export async function verifierAvantCloture(campagneId: number): Promise<Resultat
       FROM ecritures_comptables
       WHERE exercice_id IN (
         SELECT id FROM exercices_comptables
-        WHERE cooperative_id = ${COOP_ID} AND statut = 'ouvert'
+        WHERE cooperative_id = ${cooperativeId} AND statut = 'ouvert'
         LIMIT 1
       )
     `);
@@ -228,7 +226,7 @@ export async function verifierAvantCloture(campagneId: number): Promise<Resultat
   };
 }
 
-export async function genererBilan(campagneId: number, userId?: number): Promise<BilanData> {
+export async function genererBilan(cooperativeId: number, campagneId: number, userId?: number): Promise<BilanData> {
   const campagne = await db.query.campagnesTable.findFirst({
     where: eq(campagnesTable.id, campagneId),
   });
@@ -313,7 +311,7 @@ export async function genererBilan(campagneId: number, userId?: number): Promise
 
   const prevBilan = await db.query.bilansCampagneTable.findFirst({
     where: and(
-      eq(bilansCampagneTable.cooperativeId, COOP_ID),
+      eq(bilansCampagneTable.cooperativeId, cooperativeId),
       ne(bilansCampagneTable.campagneId, campagneId)
     ),
     orderBy: [desc(bilansCampagneTable.dateGeneration)],
@@ -330,7 +328,7 @@ export async function genererBilan(campagneId: number, userId?: number): Promise
     : null;
 
   const bilanData = {
-    cooperativeId: COOP_ID,
+    cooperativeId,
     campagneId,
     tonnageTotalKg: String(tonnageTotal),
     tonnageMembresKg: String(Number(p.tonnage_membres ?? 0)),
@@ -377,26 +375,26 @@ export type BilanData = {
   bilan: typeof bilansCampagneTable.$inferSelect;
 };
 
-export async function cloturerCampagne(campagneId: number, userId: number): Promise<BilanData> {
-  const verif = await verifierAvantCloture(campagneId);
+export async function cloturerCampagne(cooperativeId: number, campagneId: number, userId: number): Promise<BilanData> {
+  const verif = await verifierAvantCloture(cooperativeId, campagneId);
   if (verif.bloquants.length > 0) {
     throw new Error(`Clôture impossible : ${verif.bloquants.length} point(s) bloquant(s) à résoudre`);
   }
 
-  const bilanData = await genererBilan(campagneId, userId);
+  const bilanData = await genererBilan(cooperativeId, campagneId, userId);
 
   const dateFermeture = new Date().toISOString().slice(0, 10);
   await db.update(campagnesTable)
     .set({ statut: "fermee", dateFermeture })
-    .where(and(eq(campagnesTable.id, campagneId), eq(campagnesTable.cooperativeId, COOP_ID)));
+    .where(and(eq(campagnesTable.id, campagneId), eq(campagnesTable.cooperativeId, cooperativeId)));
 
   return bilanData;
 }
 
-export async function getComparaisonCampagnes(ids: number[]) {
+export async function getComparaisonCampagnes(cooperativeId: number, ids: number[]) {
   if (ids.length === 0) {
     const campagnes = await db.query.campagnesTable.findMany({
-      where: eq(campagnesTable.cooperativeId, COOP_ID),
+      where: eq(campagnesTable.cooperativeId, cooperativeId),
       orderBy: [desc(campagnesTable.anneeDebut)],
       limit: 5,
     });

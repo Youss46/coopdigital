@@ -2,12 +2,10 @@ import { db, distributionsIntrantsTable, remboursementsIntrantsTable, intrantsTa
 import { eq, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
-const COOP_ID = 1;
-
 /**
  * Retourne le total des intrants non remboursés (solde dû) pour un membre.
  */
-export async function getEncoursMembre(membreId: number): Promise<number> {
+export async function getEncoursMembre(cooperativeId: number, membreId: number): Promise<number> {
   const rows = await db
     .select({
       solde: sql<string>`COALESCE(SUM(montant_membre_fcfa - montant_rembourse_fcfa), 0)`,
@@ -16,7 +14,7 @@ export async function getEncoursMembre(membreId: number): Promise<number> {
     .where(
       and(
         eq(distributionsIntrantsTable.membreId, membreId),
-        eq(distributionsIntrantsTable.cooperativeId, COOP_ID),
+        eq(distributionsIntrantsTable.cooperativeId, cooperativeId),
         sql`statut_remboursement != 'rembourse'`,
         sql`montant_membre_fcfa > montant_rembourse_fcfa`
       )
@@ -31,6 +29,7 @@ export async function getEncoursMembre(membreId: number): Promise<number> {
  */
 export async function enregistrerRemboursementParLivraison(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  cooperativeId: number,
   membreId: number,
   montantADeduire: number,
   dateRemboursement: string
@@ -43,7 +42,7 @@ export async function enregistrerRemboursementParLivraison(
     .where(
       and(
         eq(distributionsIntrantsTable.membreId, membreId),
-        eq(distributionsIntrantsTable.cooperativeId, COOP_ID),
+        eq(distributionsIntrantsTable.cooperativeId, cooperativeId),
         sql`statut_remboursement != 'rembourse'`,
         sql`montant_membre_fcfa > montant_rembourse_fcfa`
       )

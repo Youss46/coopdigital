@@ -10,19 +10,19 @@ import { eq, and, desc, asc, sql, gte, lte } from "drizzle-orm";
 import { sendBulkSMS } from "./smsService";
 import { logger } from "../lib/logger";
 
-const COOP_ID = 1;
+
 
 // ─── Config prix ──────────────────────────────────────────────────────────────
-export async function getConfig() {
+export async function getConfig(cooperativeId: number) {
   const rows = await db
     .select()
     .from(configPrixTable)
-    .where(eq(configPrixTable.cooperativeId, COOP_ID))
+    .where(eq(configPrixTable.cooperativeId, cooperativeId))
     .limit(1);
   return rows[0] ?? null;
 }
 
-export async function updateConfig(data: {
+export async function updateConfig(cooperativeId: number, data: {
   seuilMargeMinimumFcfa?: number;
   seuilVariationAlertePct?: number;
   diffusionAutoSms?: boolean;
@@ -30,7 +30,7 @@ export async function updateConfig(data: {
   const rows = await db
     .insert(configPrixTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: cooperativeId,
       seuilMargeMinimumFcfa:    data.seuilMargeMinimumFcfa    != null ? String(data.seuilMargeMinimumFcfa)    : undefined,
       seuilVariationAlertePct:  data.seuilVariationAlertePct  != null ? String(data.seuilVariationAlertePct)  : undefined,
       diffusionAutoSms:         data.diffusionAutoSms,
@@ -50,6 +50,7 @@ export async function updateConfig(data: {
 
 // ─── Détecter variation et créer alerte ───────────────────────────────────────
 export async function detecterVariation(
+  cooperativeId: number,
   nouveauPrix: number,
   ancienPrix: number,
   config: { seuilVariationAlertePct: string | null },
@@ -66,7 +67,7 @@ export async function detecterVariation(
   const rows = await db
     .insert(alertesPrixTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: cooperativeId,
       type,
       seuilConfigure: String(seuil),
       valeurDeclenchante: String(Math.abs(variation).toFixed(2)),
@@ -78,7 +79,7 @@ export async function detecterVariation(
 }
 
 // ─── Alerte marge faible ──────────────────────────────────────────────────────
-export async function creerAlerteMarge(marge: number, seuilMin: number) {
+export async function creerAlerteMarge(cooperativeId: number, marge: number, seuilMin: number) {
   const message = marge <= 0
     ? `Marge négative ! Marge brute : ${marge} FCFA/kg (seuil : ${seuilMin} FCFA/kg)`
     : `Marge faible : ${marge} FCFA/kg en dessous du seuil de ${seuilMin} FCFA/kg`;
@@ -86,7 +87,7 @@ export async function creerAlerteMarge(marge: number, seuilMin: number) {
   const rows = await db
     .insert(alertesPrixTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: cooperativeId,
       type: "marge_faible",
       seuilConfigure: String(seuilMin),
       valeurDeclenchante: String(marge),
@@ -98,7 +99,7 @@ export async function creerAlerteMarge(marge: number, seuilMin: number) {
 }
 
 // ─── Saisir nouveau prix ─────────────────────────────────────────────────────
-export async function saisirPrix(data: {
+export async function saisirPrix(cooperativeId: number, data: {
   campagneId?: number;
   datePrix: string;
   prixBordChampFcfa: number;
@@ -110,7 +111,7 @@ export async function saisirPrix(data: {
   const anciens = await db
     .select({ prix: historiquePrixTable.prixBordChampFcfa })
     .from(historiquePrixTable)
-    .where(eq(historiquePrixTable.cooperativeId, COOP_ID))
+    .where(eq(historiquePrixTable.cooperativeId, cooperativeId))
     .orderBy(desc(historiquePrixTable.datePrix))
     .limit(1);
   const ancienPrix = anciens[0] ? parseFloat(anciens[0].prix) : null;
@@ -119,7 +120,7 @@ export async function saisirPrix(data: {
   const rows = await db
     .insert(historiquePrixTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId: cooperativeId,
       campagneId: data.campagneId,
       datePrix: data.datePrix,
       prixBordChampFcfa: String(data.prixBordChampFcfa),
@@ -130,24 +131,24 @@ export async function saisirPrix(data: {
     .returning();
   const nouveau = rows[0];
 
-  const config = await getConfig();
+  const config = await getConfig(cooperativeId);
 
   // Détecter variation
   if (ancienPrix && config) {
-    await detecterVariation(data.prixBordChampFcfa, ancienPrix, config);
+    await detecterVariation(cooperativeId, data.prixBordChampFcfa, ancienPrix, config);
   }
 
   // Vérifier marge minimale
   const marge = data.prixVenteExportFcfa - data.prixBordChampFcfa;
   const seuilMin = parseFloat(config?.seuilMargeMinimumFcfa ?? "100");
   if (marge < seuilMin && config) {
-    await creerAlerteMarge(marge, seuilMin);
+    await creerAlerteMarge(cooperativeId, marge, seuilMin);
   }
 
   // Diffusion SMS automatique
   if (config?.diffusionAutoSms) {
     try {
-      await diffuserPrixSMS(data.prixBordChampFcfa, data.datePrix);
+      await diffuserPrixSMS(cooperativeId, data.prixBordChampFcfa, data.datePrix);
     } catch (err) {
       logger.warn({ err }, "Diffusion SMS prix échouée");
     }
@@ -157,12 +158,12 @@ export async function saisirPrix(data: {
 }
 
 // ─── Diffusion SMS ────────────────────────────────────────────────────────────
-export async function diffuserPrixSMS(prix: number, date: string) {
+export async function diffuserPrixSMS(cooperativeId: number, prix: number, date: string) {
   const dateStr = new Date(date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
   const message = `Prix bord champ au ${dateStr} : ${prix} FCFA/kg. Votre coopérative CoopDigital.`;
 
   const membres = await db.execute<{ telephone: string }>(
-    sql`SELECT m.telephone FROM membres m WHERE m.cooperative_id = ${COOP_ID} AND m.statut = 'actif' AND m.telephone IS NOT NULL`
+    sql`SELECT m.telephone FROM membres m WHERE m.cooperative_id = ${cooperativeId} AND m.statut = 'actif' AND m.telephone IS NOT NULL`
   );
   const phones = membres.rows.map((r) => r.telephone).filter(Boolean) as string[];
 
@@ -173,13 +174,13 @@ export async function diffuserPrixSMS(prix: number, date: string) {
 }
 
 // ─── Historique avec filtres ──────────────────────────────────────────────────
-export async function getHistorique(params: {
+export async function getHistorique(cooperativeId: number, params: {
   campagneId?: number;
   dateDebut?: string;
   dateFin?: string;
   limit?: number;
 }) {
-  const conditions = [eq(historiquePrixTable.cooperativeId, COOP_ID)];
+  const conditions = [eq(historiquePrixTable.cooperativeId, cooperativeId)];
   if (params.campagneId) conditions.push(eq(historiquePrixTable.campagneId, params.campagneId));
   if (params.dateDebut) conditions.push(gte(historiquePrixTable.datePrix, params.dateDebut));
   if (params.dateFin)   conditions.push(lte(historiquePrixTable.datePrix, params.dateFin));
@@ -193,7 +194,7 @@ export async function getHistorique(params: {
 }
 
 // ─── Tendance (moyenne mobile 4 semaines) ─────────────────────────────────────
-export async function getTendance() {
+export async function getTendance(cooperativeId: number) {
   // Derniers 90 jours
   const dateDebut = new Date();
   dateDebut.setDate(dateDebut.getDate() - 90);
@@ -202,7 +203,7 @@ export async function getTendance() {
     .select()
     .from(historiquePrixTable)
     .where(and(
-      eq(historiquePrixTable.cooperativeId, COOP_ID),
+      eq(historiquePrixTable.cooperativeId, cooperativeId),
       gte(historiquePrixTable.datePrix, dateDebut.toISOString().slice(0, 10)),
     ))
     .orderBy(asc(historiquePrixTable.datePrix));
@@ -270,7 +271,7 @@ export async function analyserMarge(params: { campagneId?: number }) {
       v.campagne_id
     FROM ventes_exportateurs v
     LEFT JOIN exportateurs e ON e.id = v.exportateur_id
-    WHERE v.cooperative_id = ${COOP_ID}
+    WHERE v.cooperative_id = ${cooperativeId}
     ${params.campagneId ? sql`AND v.campagne_id = ${params.campagneId}` : sql``}
     ORDER BY v.date_vente DESC
     LIMIT 100
@@ -292,7 +293,7 @@ export async function analyserMarge(params: { campagneId?: number }) {
   }> = [];
 
   // Config pour seuil marge
-  const config = await getConfig();
+  const config = await getConfig(cooperativeId);
   const seuilMin = parseFloat(config?.seuilMargeMinimumFcfa ?? "100");
 
   for (const v of ventes.rows) {
@@ -317,7 +318,7 @@ export async function analyserMarge(params: { campagneId?: number }) {
         .select({ prix: historiquePrixTable.prixBordChampFcfa })
         .from(historiquePrixTable)
         .where(and(
-          eq(historiquePrixTable.cooperativeId, COOP_ID),
+          eq(historiquePrixTable.cooperativeId, cooperativeId),
           lte(historiquePrixTable.datePrix, v.date_vente),
         ))
         .orderBy(desc(historiquePrixTable.datePrix))
@@ -359,7 +360,7 @@ export async function analyserMarge(params: { campagneId?: number }) {
 }
 
 // ─── Comparaison campagnes ────────────────────────────────────────────────────
-export async function getComparaison() {
+export async function getComparaison(cooperativeId: number) {
   const rows = await db.execute<{
     campagne_id: number;
     libelle: string;
@@ -378,8 +379,8 @@ export async function getComparaison() {
       SUM(v.poids_kg / 1000)::text AS tonnage_total,
       COUNT(v.id)::text AS nb_ventes
     FROM campagnes c
-    LEFT JOIN ventes_exportateurs v ON v.campagne_id = c.id AND v.cooperative_id = ${COOP_ID}
-    WHERE c.cooperative_id = ${COOP_ID}
+    LEFT JOIN ventes_exportateurs v ON v.campagne_id = c.id AND v.cooperative_id = ${cooperativeId}
+    WHERE c.cooperative_id = ${cooperativeId}
     GROUP BY c.id, c.libelle, c.annee_debut
     ORDER BY c.annee_debut DESC
     LIMIT 5
@@ -388,8 +389,8 @@ export async function getComparaison() {
 }
 
 // ─── Alertes prix ─────────────────────────────────────────────────────────────
-export async function getAlertes(seulementNonLues = false) {
-  const conditions = [eq(alertesPrixTable.cooperativeId, COOP_ID)];
+export async function getAlertes(cooperativeId: number, seulementNonLues = false) {
+  const conditions = [eq(alertesPrixTable.cooperativeId, cooperativeId)];
   if (seulementNonLues) conditions.push(eq(alertesPrixTable.lu, false));
 
   return db
@@ -400,22 +401,22 @@ export async function getAlertes(seulementNonLues = false) {
     .limit(50);
 }
 
-export async function marquerAlerteLue(id: number) {
+export async function marquerAlerteLue(cooperativeId: number, id: number) {
   const rows = await db
     .update(alertesPrixTable)
     .set({ lu: true })
-    .where(and(eq(alertesPrixTable.id, id), eq(alertesPrixTable.cooperativeId, COOP_ID)))
+    .where(and(eq(alertesPrixTable.id, id), eq(alertesPrixTable.cooperativeId, cooperativeId)))
     .returning();
   return rows[0];
 }
 
 // ─── Simulation ───────────────────────────────────────────────────────────────
-export async function simulerMarge(prixHypothetique: number) {
+export async function simulerMarge(cooperativeId: number, prixHypothetique: number) {
   // Utiliser le dernier prix vente export comme référence
   const dernier = await db
     .select()
     .from(historiquePrixTable)
-    .where(eq(historiquePrixTable.cooperativeId, COOP_ID))
+    .where(eq(historiquePrixTable.cooperativeId, cooperativeId))
     .orderBy(desc(historiquePrixTable.datePrix))
     .limit(1);
 
