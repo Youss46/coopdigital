@@ -6,15 +6,19 @@ import { CreateAvanceBody, RembourserAvanceBody } from "@workspace/api-zod";
 import { generateEcrituresAvance } from "../services/comptabiliteService";
 
 export async function listAvances(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const statut = req.query["statut"] as string | undefined;
     const membreId = req.query["membre_id"] ? parseInt(String(req.query["membre_id"])) : undefined;
 
-    const conditions = [];
+    const conditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
     if (statut) conditions.push(eq(avancesTable.statut, statut as "en_cours" | "rembourse" | "en_retard"));
     if (membreId) conditions.push(eq(avancesTable.membreId, membreId));
-
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const avances = await db
       .select({
@@ -34,7 +38,7 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
       })
       .from(avancesTable)
       .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
-      .where(where)
+      .where(and(...conditions))
       .orderBy(desc(avancesTable.createdAt));
 
     res.json({ avances, total: avances.length });
@@ -45,6 +49,12 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
 }
 
 export async function createAvance(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const parse = CreateAvanceBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
@@ -62,6 +72,10 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, membreId)).limit(1);
     if (!membre) {
       res.status(404).json({ erreur: "Membre introuvable" });
+      return;
+    }
+    if (membre.cooperativeId !== cooperativeId) {
+      res.status(403).json({ erreur: "Ce membre n'appartient pas à votre coopérative" });
       return;
     }
 
@@ -115,6 +129,12 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
 }
 
 export async function getAvancesEncours(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const avances = await db
       .select({
@@ -134,7 +154,7 @@ export async function getAvancesEncours(req: Request, res: Response): Promise<vo
       })
       .from(avancesTable)
       .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
-      .where(eq(avancesTable.statut, "en_cours"))
+      .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(avancesTable.statut, "en_cours")))
       .orderBy(desc(avancesTable.createdAt));
 
     const totaux = avances.reduce(
@@ -160,6 +180,12 @@ export async function getAvancesEncours(req: Request, res: Response): Promise<vo
 }
 
 export async function rembourserAvance(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const parse = RembourserAvanceBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides" });
@@ -170,11 +196,21 @@ export async function rembourserAvance(req: Request, res: Response): Promise<voi
   const id = parseInt(String(req.params["id"] ?? "0"));
 
   try {
-    const [avance] = await db.select().from(avancesTable).where(eq(avancesTable.id, id)).limit(1);
-    if (!avance) {
+    const [row] = await db
+      .select({ avance: avancesTable, membreCoopId: membresTable.cooperativeId })
+      .from(avancesTable)
+      .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+      .where(eq(avancesTable.id, id))
+      .limit(1);
+    if (!row) {
       res.status(404).json({ erreur: "Avance introuvable" });
       return;
     }
+    if (row.membreCoopId !== cooperativeId) {
+      res.status(403).json({ erreur: "Cette avance n'appartient pas à votre coopérative" });
+      return;
+    }
+    const avance = row.avance;
 
     const montantReel = Math.min(montantFcfa, avance.soldeRestantFcfa);
     const nouveauRembourse = avance.montantRembourse_fcfa + montantReel;

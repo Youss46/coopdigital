@@ -7,11 +7,18 @@ import { generateEcrituresLivraison } from "../services/comptabiliteService";
 import { getEncoursMembre, enregistrerRemboursementParLivraison } from "../services/intrantsService";
 
 export async function listLivraisons(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const membreId = req.query["membre_id"] ? parseInt(String(req.query["membre_id"])) : undefined;
     const limit = Math.min(100, parseInt(String(req.query["limit"] ?? "20")));
 
-    const where = membreId ? eq(livraisonsTable.membreId, membreId) : undefined;
+    const conditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
+    if (membreId) conditions.push(eq(livraisonsTable.membreId, membreId));
 
     const livraisons = await db
       .select({
@@ -31,7 +38,7 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
       })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-      .where(where)
+      .where(and(...conditions))
       .orderBy(desc(livraisonsTable.dateLivraison))
       .limit(limit);
 
@@ -43,6 +50,12 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
 }
 
 export async function createLivraison(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const parse = CreateLivraisonBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
@@ -58,6 +71,10 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       res.status(404).json({ erreur: "Membre introuvable" });
       return;
     }
+    if (membre.cooperativeId !== cooperativeId) {
+      res.status(403).json({ erreur: "Ce membre n'appartient pas à votre coopérative" });
+      return;
+    }
 
     // Auto-détecter la campagne active si non fournie
     let campagneIdResolu: number | null = campagneId ?? null;
@@ -65,7 +82,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       const [campagneActive] = await db
         .select({ id: campagnesTable.id })
         .from(campagnesTable)
-        .where(eq(campagnesTable.statut, "ouverte"))
+        .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
         .orderBy(desc(campagnesTable.dateOuverture))
         .limit(1);
       campagneIdResolu = campagneActive?.id ?? null;
@@ -200,9 +217,18 @@ export async function createLivraison(req: Request, res: Response): Promise<void
 }
 
 export async function getLivraisonsNonLotees(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const deja = await db.select({ livraisonId: lotLivraisonsTable.livraisonId }).from(lotLivraisonsTable);
     const dejaIds = deja.map((d) => d.livraisonId);
+
+    const coopCondition = eq(membresTable.cooperativeId, cooperativeId);
+    const nonLoteCondition = dejaIds.length > 0 ? notInArray(livraisonsTable.id, dejaIds) : undefined;
 
     const livraisons = await db
       .select({
@@ -222,7 +248,7 @@ export async function getLivraisonsNonLotees(req: Request, res: Response): Promi
       })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-      .where(dejaIds.length > 0 ? notInArray(livraisonsTable.id, dejaIds) : undefined)
+      .where(nonLoteCondition ? and(coopCondition, nonLoteCondition) : coopCondition)
       .orderBy(desc(livraisonsTable.dateLivraison))
       .limit(500);
 

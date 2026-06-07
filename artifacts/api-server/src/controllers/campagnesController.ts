@@ -11,12 +11,11 @@ import {
 import PDFDocument from "pdfkit";
 import { drawHeader, drawFooter } from "../services/pdfHeaderService";
 
-const COOP_ID = 1;
-
 export async function getCampagneActive(req: Request, res: Response) {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const campagne = await db.query.campagnesTable.findFirst({
     where: and(
-      eq(campagnesTable.cooperativeId, COOP_ID),
+      eq(campagnesTable.cooperativeId, cooperativeId),
       eq(campagnesTable.statut, "ouverte")
     ),
     orderBy: [desc(campagnesTable.anneeDebut)],
@@ -26,23 +25,26 @@ export async function getCampagneActive(req: Request, res: Response) {
 }
 
 export async function listCampagnes(req: Request, res: Response) {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const campagnes = await db.query.campagnesTable.findMany({
-    where: eq(campagnesTable.cooperativeId, COOP_ID),
+    where: eq(campagnesTable.cooperativeId, cooperativeId),
     orderBy: [desc(campagnesTable.anneeDebut)],
   });
   return res.json(campagnes);
 }
 
 export async function getCampagne(req: Request, res: Response) {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const id = parseInt(String(req.params["id"] ?? "0"));
   const campagne = await db.query.campagnesTable.findFirst({
-    where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, COOP_ID)),
+    where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)),
   });
   if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
   return res.json(campagne);
 }
 
 export async function createCampagne(req: Request, res: Response) {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const { libelle, anneeDebut, anneeFin, dateOuverture, dateFermeture } = req.body as {
     libelle: string;
     anneeDebut: number;
@@ -58,7 +60,7 @@ export async function createCampagne(req: Request, res: Response) {
   const [campagne] = await db
     .insert(campagnesTable)
     .values({
-      cooperativeId: COOP_ID,
+      cooperativeId,
       libelle,
       anneeDebut,
       anneeFin,
@@ -72,13 +74,14 @@ export async function createCampagne(req: Request, res: Response) {
 }
 
 export async function fermerCampagne(req: Request, res: Response) {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const id = parseInt(String(req.params["id"] ?? "0"));
   const { dateFermeture } = req.body as { dateFermeture?: string };
 
   const [campagne] = await db
     .update(campagnesTable)
     .set({ statut: "fermee", dateFermeture: dateFermeture ?? new Date().toISOString().slice(0, 10) })
-    .where(and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, COOP_ID)))
+    .where(and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)))
     .returning();
 
   if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
@@ -91,7 +94,7 @@ export async function fermerCampagne(req: Request, res: Response) {
       .where(eq(livraisonsTable.campagneId, id));
 
     const membresAvecLivraison = livraisons.map((l) => l.membreId).filter((mid): mid is number => mid !== null);
-    const baseWhere = and(eq(membresTable.cooperativeId, COOP_ID), eq(membresTable.statut, "actif"));
+    const baseWhere = and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"));
 
     if (membresAvecLivraison.length > 0) {
       await db.update(membresTable).set({ statut: "inactif" })
@@ -107,9 +110,10 @@ export async function fermerCampagne(req: Request, res: Response) {
 }
 
 export async function verifierCampagne(req: Request, res: Response) {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const id = parseInt(String(req.params["id"] ?? "0"));
   const campagne = await db.query.campagnesTable.findFirst({
-    where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, COOP_ID)),
+    where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)),
   });
   if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
 
@@ -118,11 +122,12 @@ export async function verifierCampagne(req: Request, res: Response) {
 }
 
 export async function cloturerCampagne(req: Request, res: Response) {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const id = parseInt(String(req.params["id"] ?? "0"));
   const userId = (req as Request & { user?: { id: number } }).user?.id ?? 0;
 
   const campagne = await db.query.campagnesTable.findFirst({
-    where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, COOP_ID)),
+    where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)),
   });
   if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
   if (campagne.statut === "fermee") return res.status(400).json({ erreur: "Campagne déjà clôturée" });
@@ -132,9 +137,10 @@ export async function cloturerCampagne(req: Request, res: Response) {
 }
 
 export async function getBilan(req: Request, res: Response) {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const id = parseInt(String(req.params["id"] ?? "0"));
   const campagne = await db.query.campagnesTable.findFirst({
-    where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, COOP_ID)),
+    where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)),
   });
   if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
 
@@ -151,9 +157,10 @@ export async function getBilan(req: Request, res: Response) {
 }
 
 export async function getBilanPdf(req: Request, res: Response) {
+  const cooperativeId = req.user?.cooperativeId ?? 1;
   const id = parseInt(String(req.params["id"] ?? "0"));
   const campagne = await db.query.campagnesTable.findFirst({
-    where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, COOP_ID)),
+    where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)),
   });
   if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
 
@@ -186,7 +193,7 @@ export async function getBilanPdf(req: Request, res: Response) {
   };
 
   const header = async (pageLabel: string) => {
-    await drawHeader(doc, COOP_ID, {
+    await drawHeader(doc, cooperativeId, {
       titre_document: "Bilan de Campagne",
       reference: `${campagne.libelle} · ${pageLabel}`,
     });
@@ -323,7 +330,7 @@ export async function getBilanPdf(req: Request, res: Response) {
   const bilanRange = doc.bufferedPageRange();
   for (let i = 0; i < bilanRange.count; i++) {
     doc.switchToPage(i);
-    await drawFooter(doc, COOP_ID, i + 1, bilanRange.count);
+    await drawFooter(doc, cooperativeId, i + 1, bilanRange.count);
   }
   doc.end();
   const bilanBuffer = await bilanEndPromise;

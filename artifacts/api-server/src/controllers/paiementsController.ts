@@ -1,12 +1,22 @@
 import { type Request, type Response } from "express";
 import { db, paiementsTable, membresTable, livraisonsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export async function listPaiements(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const statut = req.query["statut"] as string | undefined;
     const membreId = req.query["membre_id"] ? parseInt(String(req.query["membre_id"])) : undefined;
     const limit = Math.min(100, parseInt(String(req.query["limit"] ?? "50")));
+
+    const conditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
+    if (statut) conditions.push(eq(paiementsTable.statut, statut as "en_attente" | "confirme" | "echec"));
+    if (membreId) conditions.push(eq(paiementsTable.membreId, membreId));
 
     const paiements = await db
       .select({
@@ -26,15 +36,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
       .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
-      .where(
-        statut && membreId
-          ? eq(paiementsTable.statut, statut as "en_attente" | "confirme" | "echec") // simplified; real app would combine
-          : statut
-          ? eq(paiementsTable.statut, statut as "en_attente" | "confirme" | "echec")
-          : membreId
-          ? eq(paiementsTable.membreId, membreId)
-          : undefined,
-      )
+      .where(and(...conditions))
       .orderBy(desc(paiementsTable.createdAt))
       .limit(limit);
 
@@ -46,6 +48,12 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
 }
 
 export async function validerPaiement(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const id = parseInt(String(req.params["id"]));
   if (isNaN(id)) {
     res.status(400).json({ erreur: "ID invalide" });
@@ -55,16 +63,22 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
   const body = (req.body ?? {}) as { referenceTransaction?: string | null };
 
   try {
-    const [existing] = await db
-      .select()
+    const [row] = await db
+      .select({ paiement: paiementsTable, membreCoopId: membresTable.cooperativeId })
       .from(paiementsTable)
+      .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
       .where(eq(paiementsTable.id, id))
       .limit(1);
 
-    if (!existing) {
+    if (!row) {
       res.status(404).json({ erreur: "Paiement introuvable" });
       return;
     }
+    if (row.membreCoopId !== cooperativeId) {
+      res.status(403).json({ erreur: "Ce paiement n'appartient pas à votre coopérative" });
+      return;
+    }
+    const existing = row.paiement;
 
     const [updated] = await db
       .update(paiementsTable)
