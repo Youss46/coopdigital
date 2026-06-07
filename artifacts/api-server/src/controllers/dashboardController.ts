@@ -1,8 +1,14 @@
 import { type Request, type Response } from "express";
-import { db, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable } from "@workspace/db";
+import { db, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable } from "@workspace/db";
 import { eq, sql, desc, gte, and } from "drizzle-orm";
 
 export async function getDashboard(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const debutMois = new Date();
     debutMois.setDate(1);
@@ -19,23 +25,27 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
-        .where(eq(membresTable.statut, "actif")),
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"))),
       db
         .select({ total: sql<number>`coalesce(sum(solde_restant_fcfa),0)::int` })
         .from(avancesTable)
-        .where(eq(avancesTable.statut, "en_cours")),
+        .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(avancesTable.statut, "en_cours"))),
       db
         .select({ tonnage: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
         .from(livraisonsTable)
-        .where(gte(livraisonsTable.dateLivraison, debutMoisStr)),
+        .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), gte(livraisonsTable.dateLivraison, debutMoisStr))),
       db
         .select({ total: sql<number>`coalesce(sum(montant_fcfa),0)::int` })
         .from(paiementsTable)
-        .where(and(eq(paiementsTable.statut, "confirme"), gte(paiementsTable.createdAt, debutMois))),
+        .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(paiementsTable.statut, "confirme"), gte(paiementsTable.createdAt, debutMois))),
       db
         .select({ total: sql<number>`coalesce(sum(solde_du_fcfa),0)::int` })
         .from(ventesExportateursTable)
-        .where(sql`${ventesExportateursTable.statut} != 'regle'`),
+        .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
+        .where(and(eq(exportateursTable.cooperativeId, cooperativeId), sql`${ventesExportateursTable.statut} != 'regle'`)),
     ]);
 
     res.json({
@@ -52,6 +62,12 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
 }
 
 export async function getDashboardLivraisons(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const livraisons = await db
       .select({
@@ -70,6 +86,7 @@ export async function getDashboardLivraisons(req: Request, res: Response): Promi
       })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+      .where(eq(membresTable.cooperativeId, cooperativeId))
       .orderBy(desc(livraisonsTable.createdAt))
       .limit(5);
 
@@ -81,6 +98,12 @@ export async function getDashboardLivraisons(req: Request, res: Response): Promi
 }
 
 export async function getDashboardAvancesRetard(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   try {
     const aujourd_hui = new Date().toISOString().split("T")[0]!;
 
@@ -102,7 +125,7 @@ export async function getDashboardAvancesRetard(req: Request, res: Response): Pr
       })
       .from(avancesTable)
       .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
-      .where(eq(avancesTable.statut, "en_retard"))
+      .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(avancesTable.statut, "en_retard")))
       .orderBy(desc(avancesTable.dateEcheance));
 
     res.json(avances);

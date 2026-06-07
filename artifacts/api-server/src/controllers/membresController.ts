@@ -66,13 +66,19 @@ export async function getMembreById(req: Request, res: Response): Promise<void> 
 }
 
 export async function createMembre(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
   const parse = CreateMembreBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
     return;
   }
 
-  const data = parse.data;
+  const data = { ...parse.data, cooperativeId };
 
   if (!data.superficieHa || parseFloat(String(data.superficieHa)) <= 0) {
     res.status(400).json({ erreur: "La superficie doit être supérieure à 0" });
@@ -83,7 +89,7 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
     const [existing] = await db
       .select()
       .from(membresTable)
-      .where(and(eq(membresTable.cooperativeId, data.cooperativeId), eq(membresTable.telephone, data.telephone)))
+      .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.telephone, data.telephone)))
       .limit(1);
 
     if (existing) {
