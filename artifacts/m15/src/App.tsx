@@ -36,9 +36,8 @@ function AppRoutes() {
       <Route path="/revenus"><PrivateRoute component={Revenus} /></Route>
       <Route path="/plans"><PrivateRoute component={Plans} /></Route>
       <Route path="/support"><PrivateRoute component={Support} /></Route>
-      <Route>
-        {token ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
-      </Route>
+      <Route path="/"><Redirect to={token ? "/dashboard" : "/login"} /></Route>
+      <Route><Redirect to={token ? "/dashboard" : "/login"} /></Route>
     </Switch>
   );
 }

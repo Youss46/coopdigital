@@ -181,7 +181,18 @@ export default function CoopDetail() {
             <Loader2 size={24} className="animate-spin mr-3" /> Chargement…
           </div>
         )}
-        {error && <div className="text-destructive bg-destructive/10 rounded-lg p-4 text-sm mb-4">{error}</div>}
+        {error && (
+          <div className="text-destructive bg-destructive/10 rounded-lg p-4 text-sm mb-4 flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button onClick={() => void load()} className="shrink-0 text-xs underline hover:no-underline">Réessayer</button>
+          </div>
+        )}
+        {!loading && !data && !error && (
+          <div className="text-center py-20 text-muted-foreground">
+            <p className="mb-3">Coopérative introuvable ou connexion perdue.</p>
+            <button onClick={() => void load()} className="text-sm text-primary underline hover:no-underline">Réessayer</button>
+          </div>
+        )}
 
         {data && (
           <>
