@@ -12,6 +12,9 @@ function enrichMembre<T extends { id: number; dateAdhesion: string }>(m: T) {
 }
 
 export async function listMembres(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+
   try {
     const page = Math.max(1, parseInt(String(req.query["page"] ?? "1")));
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query["limit"] ?? "20"))));
@@ -19,10 +22,7 @@ export async function listMembres(req: Request, res: Response): Promise<void> {
     const statut = req.query["statut"] as string | undefined;
     const offset = (page - 1) * limit;
 
-    const cooperativeId = req.user?.cooperativeId;
-
-    const conditions = [];
-    if (cooperativeId) conditions.push(eq(membresTable.cooperativeId, cooperativeId));
+    const conditions = [eq(membresTable.cooperativeId, cooperativeId)];
     if (statut === "actif" || statut === "inactif") conditions.push(eq(membresTable.statut, statut));
     if (search) {
       const pattern = `%${search}%`;
@@ -51,9 +51,14 @@ export async function listMembres(req: Request, res: Response): Promise<void> {
 }
 
 export async function getMembreById(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+
   try {
     const id = parseInt(String(req.params["id"] ?? "0"));
-    const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, id)).limit(1);
+    const [membre] = await db.select().from(membresTable)
+      .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
+      .limit(1);
     if (!membre) {
       res.status(404).json({ erreur: "Membre introuvable" });
       return;
@@ -113,6 +118,9 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
 }
 
 export async function updateMembre(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+
   const parse = UpdateMembreBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides" });
@@ -124,7 +132,7 @@ export async function updateMembre(req: Request, res: Response): Promise<void> {
     const [membre] = await db
       .update(membresTable)
       .set({ ...parse.data, updatedAt: new Date() })
-      .where(eq(membresTable.id, id))
+      .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
       .returning();
 
     if (!membre) {
@@ -154,9 +162,15 @@ export async function getMembreByQr(req: Request, res: Response): Promise<void> 
 }
 
 export async function getMembreHistorique(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+
   try {
     const id = parseInt(String(req.params["id"] ?? "0"));
     const { avancesTable, livraisonsTable, paiementsTable } = await import("@workspace/db");
+    const [membreCheck] = await db.select({ id: membresTable.id }).from(membresTable)
+      .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId))).limit(1);
+    if (!membreCheck) { res.status(404).json({ erreur: "Membre introuvable" }); return; }
 
     const [livraisons, avances, paiements] = await Promise.all([
       db.select().from(livraisonsTable).where(eq(livraisonsTable.membreId, id)).orderBy(desc(livraisonsTable.dateLivraison)),
@@ -197,7 +211,7 @@ export async function exportMembresPdf(req: Request, res: Response): Promise<voi
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    const coopId = req.user?.cooperativeId ?? 1;
+    const coopId = cooperativeId;
     const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
     const pdfChunks: Buffer[] = [];
     const pdfEndPromise = new Promise<Buffer>((resolve, reject) => {
@@ -282,6 +296,9 @@ export async function exportMembresPdf(req: Request, res: Response): Promise<voi
 }
 
 export async function modifierStatutMembre(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+
   try {
     const id = parseInt(String(req.params["id"] ?? "0"));
     const { statut } = req.body as { statut: string };
@@ -292,7 +309,7 @@ export async function modifierStatutMembre(req: Request, res: Response): Promise
     const [membre] = await db
       .update(membresTable)
       .set({ statut })
-      .where(eq(membresTable.id, id))
+      .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
       .returning();
     if (!membre) {
       res.status(404).json({ erreur: "Membre introuvable" });
