@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 
-setBaseUrl(import.meta.env.VITE_API_URL ?? "");
+// Strip trailing /api if present — VITE_API_URL must point to the server root,
+// not /api, because Orval already prepends /api to every generated path.
+setBaseUrl((import.meta.env.VITE_API_URL ?? "").replace(/\/api\/?$/, ""));
 
 const TOKEN_KEY = "coop_token";
 const USER_KEY = "coop_user";
