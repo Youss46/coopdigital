@@ -7,9 +7,13 @@ import {
   useListRefus,
   useGetStatsRefus,
   useTraiterRefus,
+  getGetEntrepotsQueryKey,
+  getGetMouvementsStockQueryKey,
+  getGetStockAlertesQueryKey,
   ListRefusStatut,
   type TraiterRefusInput,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
 
@@ -54,6 +58,7 @@ interface TraiterModalProps {
 
 function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const traiterMut = useTraiterRefus();
   const [form, setForm] = useState<Partial<TraiterRefusInput>>({ decision: "retour_stock" });
 
@@ -66,6 +71,9 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
     if (!form.decision) return;
     try {
       await traiterMut.mutateAsync({ id: refusId, data: form as TraiterRefusInput });
+      void queryClient.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
+      void queryClient.invalidateQueries({ queryKey: getGetMouvementsStockQueryKey() });
+      void queryClient.invalidateQueries({ queryKey: getGetStockAlertesQueryKey() });
       toast({ title: "Lot refoulé traité avec succès" });
       onDone();
     } catch {

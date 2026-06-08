@@ -9,7 +9,7 @@ async function calcStockActuel(entrepotId: number): Promise<number> {
     .select({
       stock: sql<number>`
         coalesce(
-          sum(case when type = 'entree' then poids_kg else -poids_kg end),
+          sum(case when type in ('entree', 'retour_refus') then poids_kg else -poids_kg end),
           0
         )::float
       `,
@@ -38,7 +38,7 @@ export async function getEntrepots(req: Request, res: Response): Promise<void> {
         createdAt: entrepotsTable.createdAt,
         stockActuelKg: sql<number>`
           coalesce(
-            sum(case when ${mouvementsStockTable.type} = 'entree'
+            sum(case when ${mouvementsStockTable.type} in ('entree', 'retour_refus')
                 then ${mouvementsStockTable.poidsKg}::numeric
                 else -${mouvementsStockTable.poidsKg}::numeric end),
             0
@@ -303,7 +303,7 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
         createdAt: entrepotsTable.createdAt,
         stockActuelKg: sql<number>`
           coalesce(
-            sum(case when ${mouvementsStockTable.type} = 'entree'
+            sum(case when ${mouvementsStockTable.type} in ('entree', 'retour_refus')
                 then ${mouvementsStockTable.poidsKg}::numeric
                 else -${mouvementsStockTable.poidsKg}::numeric end),
             0

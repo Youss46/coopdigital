@@ -68,7 +68,7 @@ export async function getStatsRefus(req: Request, res: Response) {
 
 export async function traiterRefus(req: Request, res: Response) {
   const id = parseInt(String(req.params["id"] ?? "0"));
-  const userId = (req as unknown as { utilisateur?: { id?: number } }).utilisateur?.id;
+  const userId = req.user?.id;
 
   const {
     decision,
