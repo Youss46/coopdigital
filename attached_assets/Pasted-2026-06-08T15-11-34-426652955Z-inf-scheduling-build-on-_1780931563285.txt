@@ -1,0 +1,196 @@
+2026-06-08T15:11:34.426652955Z [inf]  scheduling build on Metal builder "builder-qidoml"
+2026-06-08T15:11:39.108324765Z [inf]  fetched snapshot sha256:ffc0c00699cf6ee750299f7f8faa7d3988dc848917ea1c5441d20333d89318b7 (58 MB bytes)
+2026-06-08T15:11:39.108422251Z [inf]  fetching snapshot
+2026-06-08T15:11:39.737327136Z [inf]  modified file: artifacts/api-server/src/controllers/pcaDashboardController.ts (25270b -> 29121b)
+2026-06-08T15:11:40.360548433Z [inf]  unpacking archive
+2026-06-08T15:11:40.386395303Z [inf]  uploading snapshot
+2026-06-08T15:11:40.724788366Z [inf]  using build driver nixpacks-v1.41.0
+2026-06-08T15:11:41.522416021Z [inf]  
+2026-06-08T15:11:41.522423743Z [inf]  ╔══════════════════════════════ Nixpacks v1.41.0 ══════════════════════════════╗
+2026-06-08T15:11:41.522426637Z [inf]  ║ setup      │ nodejs_18, pnpm-9_x, openssl                                    ║
+2026-06-08T15:11:41.522433338Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-08T15:11:41.522434569Z [inf]  ║ install    │ npm install -g pnpm@10 --quiet                                  ║
+2026-06-08T15:11:41.522435430Z [inf]  ║            │ pnpm install --no-frozen-lockfile                               ║
+2026-06-08T15:11:41.522436863Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-08T15:11:41.522437644Z [inf]  ║ build      │ pnpm run typecheck:libs && pnpm --filter @workspace/api-server  ║
+2026-06-08T15:11:41.522438365Z [inf]  ║            │ run build                                                       ║
+2026-06-08T15:11:41.522439787Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-06-08T15:11:41.522440528Z [inf]  ║ start      │ pnpm --filter @workspace/api-server run start                   ║
+2026-06-08T15:11:41.522443523Z [inf]  ╚══════════════════════════════════════════════════════════════════════════════╝
+2026-06-08T15:11:41.522444304Z [inf]  
+2026-06-08T15:11:41.522853748Z [inf]  
+2026-06-08T15:11:41.522859246Z [inf]  Saved output to:
+2026-06-08T15:11:41.522860148Z [inf]    snapshot-target-unpack
+2026-06-08T15:11:41.856457014Z [inf]  [internal] load build definition from Dockerfile
+2026-06-08T15:11:41.856707690Z [inf]  [internal] load build definition from Dockerfile
+2026-06-08T15:11:41.856974942Z [inf]  [internal] load build definition from Dockerfile
+2026-06-08T15:11:41.955037374Z [inf]  [internal] load build definition from Dockerfile
+2026-06-08T15:11:41.977547969Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-06-08T15:11:42.313656103Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-06-08T15:11:42.314201731Z [inf]  [internal] load .dockerignore
+2026-06-08T15:11:42.314215442Z [inf]  [internal] load .dockerignore
+2026-06-08T15:11:42.314297876Z [inf]  [internal] load .dockerignore
+2026-06-08T15:11:42.575661224Z [inf]  [internal] load .dockerignore
+2026-06-08T15:11:42.617751526Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "JWT_SECRET") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-08T15:11:42.618335943Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "JWT_SECRET") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-08T15:11:42.618689373Z [wrn]  UndefinedVar: Usage of undefined variable '$NIXPACKS_PATH' (line 18)(https://docs.docker.com/go/dockerfile/rule/undefined-var/)
+ details: Variables should be defined before their use
+
+2026-06-08T15:11:42.622789425Z [inf]  [stage-0 11/11] COPY . /app
+2026-06-08T15:11:42.622790816Z [inf]  [stage-0 10/11] RUN printf '\nPATH=/app/node_modules/.bin:$PATH' >> /root/.profile
+2026-06-08T15:11:42.622791417Z [inf]  [stage-0  9/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-node_modules/cache,target=/app/node_modules/.cache pnpm run typecheck:libs && pnpm --filter @workspace/api-server run build
+2026-06-08T15:11:42.622792018Z [inf]  [stage-0  8/11] COPY . /app/.
+2026-06-08T15:11:42.622792529Z [inf]  [stage-0  7/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm install --no-frozen-lockfile
+2026-06-08T15:11:42.622793120Z [inf]  [stage-0  6/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 npm install -g pnpm@10 --quiet
+2026-06-08T15:11:42.622793751Z [inf]  [stage-0  5/11] COPY . /app/.
+2026-06-08T15:11:42.622794262Z [inf]  [stage-0  4/11] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-06-08T15:11:42.622794802Z [inf]  [stage-0  3/11] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2026-06-08T15:11:42.622795293Z [inf]  [internal] load build context
+2026-06-08T15:11:42.622795804Z [inf]  [stage-0  2/11] WORKDIR /app/
+2026-06-08T15:11:42.622796295Z [inf]  [stage-0  1/11] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-08T15:11:42.623031548Z [inf]  [stage-0  1/11] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-08T15:11:42.623322705Z [inf]  [internal] load build context
+2026-06-08T15:11:42.623621202Z [inf]  [internal] load build context
+2026-06-08T15:11:42.645045077Z [inf]  [stage-0  1/11] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-08T15:11:43.145232444Z [inf]  [internal] load build context
+2026-06-08T15:11:43.168097271Z [inf]  [stage-0  2/11] WORKDIR /app/
+2026-06-08T15:11:43.168098983Z [inf]  [stage-0  3/11] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2026-06-08T15:11:43.168099214Z [inf]  [stage-0  4/11] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-06-08T15:11:43.402492346Z [inf]  [stage-0  4/11] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-06-08T15:11:43.402690753Z [inf]  [stage-0  5/11] COPY . /app/.
+2026-06-08T15:11:44.810944819Z [inf]  [stage-0  5/11] COPY . /app/.
+2026-06-08T15:11:44.836760172Z [inf]  [stage-0  6/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 npm install -g pnpm@10 --quiet
+2026-06-08T15:11:46.884412826Z [inf]  
+added 1 package in 1s
+
+1 package is looking for funding
+  run `npm fund` for details
+
+2026-06-08T15:11:46.88624836Z [inf]  npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.16.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.16.0
+npm notice To update run: npm install -g npm@11.16.0
+npm notice
+
+2026-06-08T15:11:47.093842784Z [inf]  [stage-0  6/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 npm install -g pnpm@10 --quiet
+2026-06-08T15:11:47.125275265Z [inf]  [stage-0  7/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm install --no-frozen-lockfile
+2026-06-08T15:11:47.827482301Z [inf]  Scope: all 13 workspace projects
+
+2026-06-08T15:11:48.114821924Z [inf]  
+   ╭──────────────────────────────────────────────────────────────────╮
+   │                                                                  │
+   │                Update available! 9.15.9 → 11.5.2.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v11.5.2   │
+   │                Run "pnpm add -g pnpm" to update.                 │
+   │                                                                  │
+   ╰──────────────────────────────────────────────────────────────────╯
+
+
+2026-06-08T15:11:48.122548227Z [inf]  Progress: resolved 0, reused 1, downloaded 0, added 0
+
+2026-06-08T15:11:48.19694476Z [inf]  artifacts/api-server                     |  WARN  deprecated @types/bcryptjs@3.0.0
+
+2026-06-08T15:11:48.210995402Z [inf]  artifacts/frontend                       |  WARN  deprecated @types/qrcode.react@3.0.0
+
+2026-06-08T15:11:48.307429361Z [inf]  artifacts/mockup-sandbox                 |  WARN  deprecated recharts@2.15.4
+
+2026-06-08T15:11:49.123963133Z [inf]  Progress: resolved 872, reused 867, downloaded 0, added 0
+
+2026-06-08T15:11:50.232426324Z [inf]   WARN  7 deprecated subdependencies found: @esbuild-kit/core-utils@3.3.2, @esbuild-kit/esm-loader@2.6.5, glob@11.1.0, node-domexception@1.0.0, source-map@0.8.0-beta.0, uuid@8.3.2, uuid@9.0.1
+
+2026-06-08T15:11:50.240049401Z [inf]  Progress: resolved 1091, reused 950, downloaded 0, added 0
+
+2026-06-08T15:11:50.245080129Z [inf]  Packages: +270
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+2026-06-08T15:11:51.175562198Z [inf]  Progress: resolved 1091, reused 950, downloaded 0, added 270, done
+
+2026-06-08T15:11:51.61371453Z [inf]   WARN  Failed to create bin at /app/artifacts/frontend/node_modules/.bin/tsx. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs'
+ WARN  Failed to create bin at /app/artifacts/frontend/node_modules/.bin/jiti. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/jiti@2.7.0/node_modules/jiti/lib/jiti-cli.mjs'
+
+2026-06-08T15:11:51.61384798Z [inf]   WARN  Failed to create bin at /app/artifacts/frontend/node_modules/.bin/terser. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/terser@5.48.0/node_modules/terser/bin/terser'
+
+2026-06-08T15:11:51.613985757Z [inf]   WARN  Failed to create bin at /app/artifacts/frontend/node_modules/.bin/yaml. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/yaml@2.8.4/node_modules/yaml/bin.mjs'
+
+2026-06-08T15:11:51.616183844Z [inf]   WARN  Failed to create bin at /app/artifacts/mockup-sandbox/node_modules/.bin/jiti. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/jiti@2.7.0/node_modules/jiti/lib/jiti-cli.mjs'
+
+2026-06-08T15:11:51.616376393Z [inf]   WARN  Failed to create bin at /app/artifacts/mockup-sandbox/node_modules/.bin/yaml. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/yaml@2.8.4/node_modules/yaml/bin.mjs'
+
+2026-06-08T15:11:51.616445978Z [inf]   WARN  Failed to create bin at /app/artifacts/mockup-sandbox/node_modules/.bin/tsx. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs'
+
+2026-06-08T15:11:51.616856023Z [inf]   WARN  Failed to create bin at /app/artifacts/mockup-sandbox/node_modules/.bin/terser. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/terser@5.48.0/node_modules/terser/bin/terser'
+
+2026-06-08T15:11:51.617058046Z [inf]   WARN  Failed to create bin at /app/artifacts/m15/node_modules/.bin/tsx. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs'
+
+2026-06-08T15:11:51.617292838Z [inf]   WARN  Failed to create bin at /app/artifacts/m15/node_modules/.bin/jiti. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/jiti@2.7.0/node_modules/jiti/lib/jiti-cli.mjs'
+
+2026-06-08T15:11:51.617408592Z [inf]   WARN  Failed to create bin at /app/artifacts/m15/node_modules/.bin/yaml. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/yaml@2.8.4/node_modules/yaml/bin.mjs'
+
+2026-06-08T15:11:51.617605618Z [inf]   WARN  Failed to create bin at /app/artifacts/m15/node_modules/.bin/terser. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/terser@5.48.0/node_modules/terser/bin/terser'
+
+2026-06-08T15:11:51.620434572Z [inf]   WARN  Failed to create bin at /app/artifacts/api-server/node_modules/.bin/vite. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_terser@5.48.0_tsx@4.21.0_yaml@2.8.4/node_modules/vite/bin/vite.js'
+
+2026-06-08T15:11:51.62046621Z [inf]   WARN  Failed to create bin at /app/artifacts/api-server/node_modules/.bin/tsx. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs'
+
+2026-06-08T15:11:51.62058632Z [inf]   WARN  Failed to create bin at /app/artifacts/api-server/node_modules/.bin/jiti. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/jiti@2.7.0/node_modules/jiti/lib/jiti-cli.mjs'
+
+2026-06-08T15:11:51.620590006Z [inf]   WARN  Failed to create bin at /app/artifacts/api-server/node_modules/.bin/yaml. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/yaml@2.8.4/node_modules/yaml/bin.mjs'
+
+2026-06-08T15:11:51.620671818Z [inf]   WARN  Failed to create bin at /app/artifacts/api-server/node_modules/.bin/terser. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/terser@5.48.0/node_modules/terser/bin/terser'
+
+2026-06-08T15:11:51.620711277Z [inf]   WARN  Failed to create bin at /app/artifacts/portail/node_modules/.bin/tsx. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs'
+
+2026-06-08T15:11:51.620897957Z [inf]   WARN  Failed to create bin at /app/artifacts/portail/node_modules/.bin/jiti. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/jiti@2.7.0/node_modules/jiti/lib/jiti-cli.mjs'
+
+2026-06-08T15:11:51.620970496Z [inf]   WARN  Failed to create bin at /app/artifacts/portail/node_modules/.bin/yaml. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/yaml@2.8.4/node_modules/yaml/bin.mjs'
+
+2026-06-08T15:11:51.621117056Z [inf]   WARN  Failed to create bin at /app/artifacts/portail/node_modules/.bin/terser. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/terser@5.48.0/node_modules/terser/bin/terser'
+
+2026-06-08T15:11:51.62142609Z [inf]   WARN  Failed to create bin at /app/artifacts/terrain/node_modules/.bin/tsx. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs'
+
+2026-06-08T15:11:51.621498729Z [inf]   WARN  Failed to create bin at /app/artifacts/terrain/node_modules/.bin/jiti. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/jiti@2.7.0/node_modules/jiti/lib/jiti-cli.mjs'
+
+2026-06-08T15:11:51.621517467Z [inf]   WARN  Failed to create bin at /app/artifacts/terrain/node_modules/.bin/yaml. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/yaml@2.8.4/node_modules/yaml/bin.mjs'
+
+2026-06-08T15:11:51.621577317Z [inf]   WARN  Failed to create bin at /app/artifacts/terrain/node_modules/.bin/terser. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/terser@5.48.0/node_modules/terser/bin/terser'
+
+2026-06-08T15:11:51.621792329Z [inf]   WARN  Failed to create bin at /app/lib/api-spec/node_modules/.bin/tsc. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/bin/tsc'
+ WARN  Failed to create bin at /app/lib/api-spec/node_modules/.bin/tsserver. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/bin/tsserver'
+
+2026-06-08T15:11:51.621842064Z [inf]   WARN  Failed to create bin at /app/lib/api-spec/node_modules/.bin/prettier. ENOENT: no such file or directory, open '/app/node_modules/.pnpm/prettier@3.8.3/node_modules/prettier/bin/prettier.cjs'
+
+2026-06-08T15:11:51.795735673Z [inf]  . preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac'
+
+2026-06-08T15:11:51.830122356Z [inf]  . preinstall: Done
+
+2026-06-08T15:11:51.850591147Z [inf]  
+devDependencies: skipped because NODE_ENV is set to production
+
+
+2026-06-08T15:11:51.853515085Z [inf]   WARN  Issues with peer dependencies found
+artifacts/api-server
+└─┬ esbuild-plugin-pino 2.3.3
+  └── ✕ unmet peer esbuild@">=0.25.0 <=0.25.8": found 0.27.3
+
+
+2026-06-08T15:11:51.974477536Z [inf]  Done in 4.6s using pnpm v9.15.9
+
+2026-06-08T15:11:52.323753147Z [inf]  [stage-0  7/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm install --no-frozen-lockfile
+2026-06-08T15:11:52.345643331Z [inf]  [stage-0  8/11] COPY . /app/.
+2026-06-08T15:11:53.065354901Z [inf]  [stage-0  8/11] COPY . /app/.
+2026-06-08T15:11:53.082986876Z [inf]  [stage-0  9/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-node_modules/cache,target=/app/node_modules/.cache pnpm run typecheck:libs && pnpm --filter @workspace/api-server run build
+2026-06-08T15:11:53.730577797Z [inf]  
+> workspace@0.0.0 typecheck:libs /app
+> tsc --build
+
+
+2026-06-08T15:11:53.735412501Z [inf]  sh: 1: tsc: not found
+
+2026-06-08T15:11:53.736897609Z [inf]   ELIFECYCLE  Command failed.
+
+2026-06-08T15:11:53.870765414Z [err]  [stage-0  9/11] RUN --mount=type=cache,id=s/348c5894-0f6c-44e0-833f-0c6a4c24b7f8-node_modules/cache,target=/app/node_modules/.cache pnpm run typecheck:libs && pnpm --filter @workspace/api-server run build
+2026-06-08T15:11:53.904368251Z [err]  Build Failed: build daemon returned an error < failed to solve: process "/bin/bash -ol pipefail -c pnpm run typecheck:libs && pnpm --filter @workspace/api-server run build" did not complete successfully: exit code: 1 >
