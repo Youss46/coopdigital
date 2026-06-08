@@ -360,7 +360,14 @@ function OngletEvolution() {
   const historique = (rawHistorique as HistoriquePrix[] | undefined) ?? [];
   const comparaison = (rawComparaison as ComparaisonCampagne[] | undefined) ?? [];
 
-  const chartData = [...historique]
+  const latestByDate = new Map<string, HistoriquePrix>();
+  for (const h of historique) {
+    const existing = latestByDate.get(h.datePrix);
+    if (!existing || (h.id ?? 0) > (existing.id ?? 0)) {
+      latestByDate.set(h.datePrix, h);
+    }
+  }
+  const chartData = [...latestByDate.values()]
     .sort((a, b) => a.datePrix.localeCompare(b.datePrix))
     .map((h) => ({
       date: new Date(h.datePrix).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
