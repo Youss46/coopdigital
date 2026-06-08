@@ -10,6 +10,7 @@ import {
   personnelTable, bulletinsPaieTable,
   distributionsIntrantsTable,
   ecrituresComptablesTable,
+  caissesTable,
 } from "@workspace/db";
 import { eq, desc, sql, and, lt, gte, lte, ne, gt, not } from "drizzle-orm";
 
@@ -186,12 +187,9 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
         .where(and(eq(empruntsTable.cooperativeId, cooperativeId), eq(empruntsTable.statut, "en_cours"))),
 
       db.select({
-          tresorerie: sql<number>`
-            coalesce(sum(case when compte_debit like '5%' then montant_fcfa else 0 end), 0) -
-            coalesce(sum(case when compte_credit like '5%' then montant_fcfa else 0 end), 0)
-          `,
-        }).from(ecrituresComptablesTable)
-        .where(eq(ecrituresComptablesTable.cooperativeId, cooperativeId)),
+          tresorerie: sql<number>`coalesce(sum(solde_actuel_fcfa::numeric),0)::bigint`,
+        }).from(caissesTable)
+        .where(and(eq(caissesTable.cooperativeId, cooperativeId), eq(caissesTable.actif, true))),
 
       db.select({ count: sql<number>`count(*)::int` })
         .from(ventesExportateursTable)
