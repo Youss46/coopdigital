@@ -4,7 +4,7 @@ import { Search, Users, Package, X } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
 
 type SearchResults = {
-  membres: { id: number; nom: string; prenoms: string; telephone: string; codeMembre: string | null; statut: string }[];
+  membres: { id: number; nom: string; prenoms: string; telephone: string; statut: string }[];
   lots: { id: number; qrCodeLot: string; statut: string; poidsTotalKg: string | null; dateCreation: string }[];
   livraisons: { id: number; poidsKg: string; dateLivraison: string; membreNom: string; membrePrenoms: string }[];
 };
@@ -140,7 +140,7 @@ export default function GlobalSearch() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{m.nom} {m.prenoms}</p>
-                        <p className="text-xs text-gray-500">{m.telephone}{m.codeMembre ? ` · ${m.codeMembre}` : ""}</p>
+                        <p className="text-xs text-gray-500">{m.telephone}</p>
                       </div>
                       <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${m.statut === "actif" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                         {m.statut}

@@ -24,7 +24,6 @@ export async function globalSearch(req: Request, res: Response): Promise<void> {
         nom: membresTable.nom,
         prenoms: membresTable.prenoms,
         telephone: membresTable.telephone,
-        codeMembre: membresTable.codeMembre,
         statut: membresTable.statut,
       })
       .from(membresTable)
