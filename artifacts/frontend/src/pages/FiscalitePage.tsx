@@ -215,9 +215,11 @@ function TableauBordFiscal() {
         fetch(`${BASE}/api/fiscalite/calendrier`, { headers: { Authorization: `Bearer ${tok()}` } }),
         fetch(`${BASE}/api/fiscalite/alertes`,    { headers: { Authorization: `Bearer ${tok()}` } }),
       ]);
+      if (!rCal.ok) throw new Error((await rCal.json().catch(() => ({}))).error ?? `Erreur ${rCal.status}`);
+      if (!rAl.ok)  throw new Error((await rAl.json().catch(() => ({}))).error  ?? `Erreur ${rAl.status}`);
       setCalendrier(await rCal.json());
       setAlertes(await rAl.json());
-    } catch { toast({ title: "Erreur chargement", variant: "destructive" }); }
+    } catch (e) { toast({ title: "Erreur chargement", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
     finally { setLoading(false); }
   }, [toast]);
 

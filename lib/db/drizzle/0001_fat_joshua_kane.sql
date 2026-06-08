@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "mot_de_passe_temporaire" boolean DEFAULT false NOT NULL;
