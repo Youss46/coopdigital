@@ -1,7 +1,12 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 
 setBaseUrl(import.meta.env.VITE_API_URL ?? "");
+
+const TOKEN_KEY = "coop_token";
+const USER_KEY = "coop_user";
+
+setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
 
 interface Utilisateur {
   id: number;
@@ -21,19 +26,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const TOKEN_KEY = "coop_token";
-const USER_KEY = "coop_user";
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [utilisateur, setUtilisateur] = useState<Utilisateur | null>(() => {
     const stored = localStorage.getItem(USER_KEY);
     return stored ? (JSON.parse(stored) as Utilisateur) : null;
   });
-
-  useEffect(() => {
-    setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
-  }, []);
 
   const login = (newToken: string, newUser: Utilisateur) => {
     localStorage.setItem(TOKEN_KEY, newToken);
@@ -47,7 +45,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(USER_KEY);
     setToken(null);
     setUtilisateur(null);
-    setAuthTokenGetter(null);
   };
 
   return (
