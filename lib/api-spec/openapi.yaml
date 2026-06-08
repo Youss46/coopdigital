@@ -800,6 +800,42 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /ventes/{id}/refus:
+    post:
+      operationId: signalerRefusVente
+      tags: [exportateurs]
+      summary: Signaler un lot refoulé sur une vente exportateur
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignalerRefusInput"
+      responses:
+        "201":
+          description: Refus enregistré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Refus"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Vente introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # ── M07 Communication ─────────────────────────────────────────
   /communication/sms-groupe:
     post:
@@ -8017,6 +8053,20 @@ components:
           type: integer
         nbTraites:
           type: integer
+
+    SignalerRefusInput:
+      type: object
+      required: [poidsRefuleKg, nombreSacsRefoules, dateRefus]
+      properties:
+        poidsRefuleKg:
+          type: number
+        nombreSacsRefoules:
+          type: integer
+        dateRefus:
+          type: string
+          format: date
+        motifRefus:
+          type: string
 
     TraiterRefusInput:
       type: object

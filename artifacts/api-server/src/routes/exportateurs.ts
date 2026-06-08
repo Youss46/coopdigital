@@ -9,6 +9,7 @@ import {
   createVente,
   encaisserVente,
   getCreances,
+  signalerRefus,
 } from "../controllers/exportateursController";
 
 const router: IRouter = Router();
@@ -23,5 +24,6 @@ router.get("/ventes/creances", checkPermission("creances", "lire"), getCreances)
 router.get("/ventes", checkPermission("exportateurs", "lire"), listVentes);
 router.post("/ventes", checkPermission("exportateurs", "creer"), createVente);
 router.put("/ventes/:id/encaissement", checkPermission("creances", "enregistrer_encaissement"), encaisserVente);
+router.post("/ventes/:id/refus", checkPermission("refus", "traiter"), signalerRefus);
 
 export default router;

@@ -273,6 +273,7 @@ import type {
   SaisirPrixInput,
   ScoreMembreDetail,
   SearchFournisseursParams,
+  SignalerRefusInput,
   Simulation,
   SimulationMarge,
   SimulerBody,
@@ -3071,6 +3072,78 @@ export const useEncaisserVente = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getEncaisserVenteMutationOptions(options));
+    }
+
+export const getSignalerRefusVenteUrl = (id: number,) => {
+
+
+
+
+  return `/api/ventes/${id}/refus`
+}
+
+/**
+ * @summary Signaler un lot refoulé sur une vente exportateur
+ */
+export const signalerRefusVente = async (id: number,
+    signalerRefusInput: SignalerRefusInput, options?: RequestInit): Promise<Refus> => {
+
+  return customFetch<Refus>(getSignalerRefusVenteUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      signalerRefusInput,)
+  }
+);}
+
+
+
+
+export const getSignalerRefusVenteMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof signalerRefusVente>>, TError,{id: number;data: BodyType<SignalerRefusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof signalerRefusVente>>, TError,{id: number;data: BodyType<SignalerRefusInput>}, TContext> => {
+
+const mutationKey = ['signalerRefusVente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof signalerRefusVente>>, {id: number;data: BodyType<SignalerRefusInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  signalerRefusVente(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SignalerRefusVenteMutationResult = NonNullable<Awaited<ReturnType<typeof signalerRefusVente>>>
+    export type SignalerRefusVenteMutationBody = BodyType<SignalerRefusInput>
+    export type SignalerRefusVenteMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Signaler un lot refoulé sur une vente exportateur
+ */
+export const useSignalerRefusVente = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof signalerRefusVente>>, TError,{id: number;data: BodyType<SignalerRefusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof signalerRefusVente>>,
+        TError,
+        {id: number;data: BodyType<SignalerRefusInput>},
+        TContext
+      > => {
+      return useMutation(getSignalerRefusVenteMutationOptions(options));
     }
 
 export const getSendSmsGroupeUrl = () => {

@@ -409,6 +409,7 @@ export * from './saisirPrixInput';
 export * from './scoreMembreDetail';
 export * from './searchFournisseursParams';
 export * from './semainesTresorerie';
+export * from './signalerRefusInput';
 export * from './simulation';
 export * from './simulationMarge';
 export * from './simulationMargeRentabilite';

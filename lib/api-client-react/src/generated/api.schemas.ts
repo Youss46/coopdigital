@@ -2006,6 +2006,13 @@ export interface RefusStats {
   nbTraites?: number;
 }
 
+export interface SignalerRefusInput {
+  poidsRefuleKg: number;
+  nombreSacsRefoules: number;
+  dateRefus: string;
+  motifRefus?: string;
+}
+
 export type TraiterRefusInputDecision = typeof TraiterRefusInputDecision[keyof typeof TraiterRefusInputDecision];
 
 

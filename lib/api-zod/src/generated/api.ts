@@ -886,6 +886,21 @@ export const EncaisserVenteResponse = zod.object({
 
 
 /**
+ * @summary Signaler un lot refoulé sur une vente exportateur
+ */
+export const SignalerRefusVenteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SignalerRefusVenteBody = zod.object({
+  "poidsRefuleKg": zod.number(),
+  "nombreSacsRefoules": zod.number(),
+  "dateRefus": zod.coerce.date(),
+  "motifRefus": zod.string().optional()
+})
+
+
+/**
  * @summary Envoyer un SMS groupé aux membres
  */
 export const SendSmsGroupeBody = zod.object({

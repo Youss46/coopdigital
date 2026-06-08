@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, exportateursTable, ventesExportateursTable } from "@workspace/db";
+import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable } from "@workspace/db";
 import { eq, sql, desc, and, lte } from "drizzle-orm";
 import { CreateExportateurBody, CreateVenteBody, EncaisserVenteBody } from "@workspace/api-zod";
 import { generateEcrituresVente, generateEcrituresEncaissement } from "../services/comptabiliteService";
@@ -332,6 +332,67 @@ export async function getCreances(req: Request, res: Response): Promise<void> {
     res.json({ totalDuFcfa, enRetardFcfa, aEchoirSemaineFcfa, ventes });
   } catch (err) {
     req.log.error({ err }, "Erreur getCreances");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// POST /ventes/:id/refus — Signaler un lot refoulé
+export async function signalerRefus(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  const venteId = parseInt(String(req.params["id"] ?? "0"));
+  if (isNaN(venteId) || venteId <= 0) {
+    res.status(400).json({ erreur: "ID de vente invalide" });
+    return;
+  }
+
+  const { poidsRefuleKg, nombreSacsRefoules, dateRefus, motifRefus } =
+    req.body as { poidsRefuleKg?: number; nombreSacsRefoules?: number; dateRefus?: string; motifRefus?: string };
+
+  if (!poidsRefuleKg || !nombreSacsRefoules || !dateRefus) {
+    res.status(400).json({ erreur: "poidsRefuleKg, nombreSacsRefoules et dateRefus sont requis" });
+    return;
+  }
+
+  try {
+    // Vérifier que la vente appartient bien à cette coopérative
+    const [vente] = await db
+      .select({ id: ventesExportateursTable.id })
+      .from(ventesExportateursTable)
+      .innerJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
+      .where(
+        and(
+          eq(ventesExportateursTable.id, venteId),
+          eq(exportateursTable.cooperativeId, cooperativeId),
+        )
+      )
+      .limit(1);
+
+    if (!vente) {
+      res.status(404).json({ erreur: "Vente introuvable" });
+      return;
+    }
+
+    const [refus] = await db
+      .insert(traitementsRefusTable)
+      .values({
+        cooperativeId,
+        venteExportateurId: venteId,
+        poidsRefuleKg: String(poidsRefuleKg),
+        nombreSacsRefoules,
+        dateRefus,
+        motifRefus: motifRefus ?? null,
+        statut: "en_attente",
+      })
+      .returning();
+
+    res.status(201).json({ refus, vente: null });
+  } catch (err) {
+    req.log.error({ err }, "Erreur signalerRefus");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
