@@ -189,7 +189,7 @@ export async function getHistorique(cooperativeId: number, params: {
     .select()
     .from(historiquePrixTable)
     .where(and(...conditions))
-    .orderBy(desc(historiquePrixTable.datePrix))
+    .orderBy(desc(historiquePrixTable.datePrix), desc(historiquePrixTable.id))
     .limit(params.limit ?? 200);
 }
 
