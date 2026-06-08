@@ -69,10 +69,27 @@ function ClassementTab({ campagneId }: { campagneId: number }) {
   const top3 = liste.slice(0, 3);
   const podiumOrder = [top3[1], top3[0], top3[2]]; // argent - or - bronze
 
+  const [recalcMsg, setRecalcMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   function handleRecalc() {
+    setRecalcMsg(null);
     recalc.mutate(
       { data: { campagneId } },
-      { onSuccess: () => qc.invalidateQueries({ queryKey: getGetScoringClassementQueryKey(campagneId) }) },
+      {
+        onSuccess: (data) => {
+          const d = data as { calculés?: number };
+          qc.invalidateQueries({ queryKey: getGetScoringClassementQueryKey(campagneId) });
+          if ((d.calculés ?? 0) === 0) {
+            setRecalcMsg({ ok: false, text: "0 membre calculé — vérifiez que des livraisons existent pour cette campagne." });
+          } else {
+            setRecalcMsg({ ok: true, text: `✓ ${d.calculés} membre(s) recalculé(s) avec succès.` });
+          }
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "Erreur inconnue";
+          setRecalcMsg({ ok: false, text: `Erreur : ${msg}` });
+        },
+      },
     );
   }
 
@@ -134,13 +151,20 @@ function ClassementTab({ campagneId }: { campagneId: number }) {
             <option value="non_classe">Non classé</option>
           </select>
         </div>
-        <button
-          onClick={handleRecalc}
-          disabled={recalc.isPending}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-lg disabled:opacity-50"
-        >
-          {recalc.isPending ? "Recalcul…" : "↻ Recalculer maintenant"}
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          <button
+            onClick={handleRecalc}
+            disabled={recalc.isPending || campagneId === 0}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-lg disabled:opacity-50"
+          >
+            {recalc.isPending ? "Recalcul en cours…" : "↻ Recalculer maintenant"}
+          </button>
+          {recalcMsg && (
+            <p className={`text-xs px-3 py-1 rounded-lg ${recalcMsg.ok ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+              {recalcMsg.text}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Tableau */}

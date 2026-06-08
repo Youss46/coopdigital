@@ -62,9 +62,26 @@ export async function updateConfig(cooperativeId: number, data: Partial<{
   return rows[0];
 }
 
+// ─── Config par défaut ────────────────────────────────────────────────────────
+const DEFAULT_CONFIG = {
+  poidsVolumePct: "30", poidsQualitePct: "25", poidsRegularitePct: "20",
+  poidsRemboursementPct: "15", poidsFidelitePct: "5", poidsCotisationPct: "5",
+  seuilBronze: "40", seuilArgent: "60", seuilOr: "75", seuilPlatine: "90",
+  avantagesBronze: "", avantagesArgent: "", avantagesOr: "", avantagesPlatine: "",
+};
+
+async function getOrCreateConfig(cooperativeId: number) {
+  const existing = await getConfig(cooperativeId);
+  if (existing) return existing;
+  const rows = await db.insert(configScoringTable)
+    .values({ cooperativeId, ...DEFAULT_CONFIG })
+    .returning();
+  return rows[0];
+}
+
 // ─── Calculer score individuel ────────────────────────────────────────────────
 export async function calculerScore(cooperativeId: number, membreId: number, campagneId: number) {
-  const cfg = await getConfig(cooperativeId);
+  const cfg = await getOrCreateConfig(cooperativeId);
   if (!cfg) throw new Error("config_scoring introuvable");
 
   const seuils = {
