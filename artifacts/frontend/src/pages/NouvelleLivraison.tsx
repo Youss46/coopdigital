@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   useCreateLivraison,
@@ -8,6 +8,7 @@ import {
   useGetEncoursIntrantsMembre,
   useGetBalances,
   useGetConfigPesee,
+  useGetPrixActuel,
   getGetMembresQueryKey,
   getGetAvancesQueryKey,
   getGetEncoursIntrantsMembreQueryKey,
@@ -33,7 +34,7 @@ export default function NouvelleLivraison() {
   const [nombreSacs, setNombreSacs] = useState("");
   const [retenueKg, setRetenueKg] = useState("");
   const [sectionLivraison, setSectionLivraison] = useState("");
-  const [prixUnitaire, setPrixUnitaire] = useState("900");
+  const [prixUnitaire, setPrixUnitaire] = useState("");
   const [modePaiement, setModePaiement] = useState<"orange_money" | "mtn_momo" | "especes">("especes");
   const [dateLivraison, setDateLivraison] = useState(new Date().toISOString().split("T")[0]!);
   const [showOptions, setShowOptions] = useState(false);
@@ -42,6 +43,13 @@ export default function NouvelleLivraison() {
   const { data: campagneActive } = useGetCampagneActive();
   const { data: balancesData } = useGetBalances();
   const { data: configPesee } = useGetConfigPesee();
+  const { data: prixActuelData } = useGetPrixActuel();
+
+  useEffect(() => {
+    if (prixActuelData?.prixBordChampFcfa) {
+      setPrixUnitaire(String(prixActuelData.prixBordChampFcfa));
+    }
+  }, [prixActuelData?.prixBordChampFcfa]);
 
   const seuilDouble = Number(configPesee?.seuil_double_pesee_kg ?? 500);
   const ecartMaxPct = Number(configPesee?.ecart_max_autorise_pct ?? 2);
