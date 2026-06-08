@@ -57,16 +57,22 @@ function pct(num: number, den: number): number {
 
 export async function getSynthesePca(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) {
+      res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+      return;
+    }
+
     const today = todayStr();
     const weekStart = weekStartStr();
     const thirtyDaysAgo = nDaysAgoStr(30);
     const thirtyDaysLater = nDaysLaterStr(30);
 
-    // 1. Campagne active
+    // 1. Campagne active (filtrée par coopérative)
     const [campagne] = await db
       .select()
       .from(campagnesTable)
-      .where(eq(campagnesTable.statut, "ouverte"))
+      .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
       .orderBy(desc(campagnesTable.dateOuverture))
       .limit(1);
 
@@ -81,7 +87,6 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
       const joursRestants = fermeture
         ? Math.max(0, Math.floor((fermeture.getTime() - maintenant.getTime()) / 86_400_000))
         : null;
-      // Durée totale : soit la fermeture réelle, soit 365 jours par défaut (durée standard d'une campagne cacaoyère)
       const totalJours = fermeture
         ? Math.floor((fermeture.getTime() - ouverture.getTime()) / 86_400_000)
         : 365;
@@ -105,14 +110,20 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
       hypotheseRows,
     ] = await Promise.all([
       db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
-        .from(livraisonsTable).where(eq(livraisonsTable.dateLivraison, today)),
+        .from(livraisonsTable)
+        .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(livraisonsTable.dateLivraison, today))),
 
       db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
-        .from(livraisonsTable).where(gte(livraisonsTable.dateLivraison, weekStart)),
+        .from(livraisonsTable)
+        .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), gte(livraisonsTable.dateLivraison, weekStart))),
 
       campagneId
         ? db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
-            .from(livraisonsTable).where(eq(livraisonsTable.campagneId, campagneId))
+            .from(livraisonsTable)
+            .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+            .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(livraisonsTable.campagneId, campagneId)))
         : Promise.resolve([{ t: 0 }]),
 
       db.select({
@@ -120,7 +131,8 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
           tonnage: sql<number>`coalesce(sum(poids_kg::numeric),0)::float`,
         })
         .from(livraisonsTable)
-        .where(gte(livraisonsTable.dateLivraison, thirtyDaysAgo))
+        .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), gte(livraisonsTable.dateLivraison, thirtyDaysAgo)))
         .groupBy(livraisonsTable.dateLivraison)
         .orderBy(livraisonsTable.dateLivraison),
 
@@ -128,7 +140,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
         ? db.select({ tonnagePrev: hypothesesBudgetTable.tonnagePrevisionnelKg })
             .from(hypothesesBudgetTable)
             .innerJoin(budgetsCampagneTable, eq(hypothesesBudgetTable.budgetId, budgetsCampagneTable.id))
-            .where(eq(budgetsCampagneTable.campagneId, campagneId))
+            .where(and(eq(budgetsCampagneTable.campagneId, campagneId), eq(budgetsCampagneTable.cooperativeId, cooperativeId)))
             .limit(1)
         : Promise.resolve([]),
     ]);
@@ -148,7 +160,9 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
     ] = await Promise.all([
       campagneId
         ? db.select({ ca: sql<number>`coalesce(sum(montant_total_fcfa),0)::bigint` })
-            .from(ventesExportateursTable).where(eq(ventesExportateursTable.campagneId, campagneId))
+            .from(ventesExportateursTable)
+            .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
+            .where(and(eq(exportateursTable.cooperativeId, cooperativeId), eq(ventesExportateursTable.campagneId, campagneId)))
         : Promise.resolve([{ ca: 0 }]),
 
       campagneId
@@ -159,24 +173,30 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
 
       db.select({ total: sql<number>`coalesce(sum(solde_du_fcfa),0)::bigint` })
         .from(ventesExportateursTable)
-        .where(ne(ventesExportateursTable.statut, "regle")),
+        .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
+        .where(and(eq(exportateursTable.cooperativeId, cooperativeId), ne(ventesExportateursTable.statut, "regle"))),
 
       db.select({ total: sql<number>`coalesce(sum(solde_restant_fcfa),0)::bigint` })
-        .from(avancesTable).where(eq(avancesTable.statut, "en_cours")),
+        .from(avancesTable)
+        .innerJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(avancesTable.statut, "en_cours"))),
 
       db.select({ total: sql<number>`coalesce(sum(solde_restant_fcfa),0)::bigint` })
-        .from(empruntsTable).where(eq(empruntsTable.statut, "en_cours")),
+        .from(empruntsTable)
+        .where(and(eq(empruntsTable.cooperativeId, cooperativeId), eq(empruntsTable.statut, "en_cours"))),
 
       db.select({
           tresorerie: sql<number>`
             coalesce(sum(case when compte_debit like '5%' then montant_fcfa else 0 end), 0) -
             coalesce(sum(case when compte_credit like '5%' then montant_fcfa else 0 end), 0)
           `,
-        }).from(ecrituresComptablesTable),
+        }).from(ecrituresComptablesTable)
+        .where(eq(ecrituresComptablesTable.cooperativeId, cooperativeId)),
 
       db.select({ count: sql<number>`count(*)::int` })
         .from(ventesExportateursTable)
-        .where(eq(ventesExportateursTable.statut, "en_retard")),
+        .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
+        .where(and(eq(exportateursTable.cooperativeId, cooperativeId), eq(ventesExportateursTable.statut, "en_retard"))),
     ]);
 
     const caCampagne = Number(caRow?.ca ?? 0);
@@ -195,6 +215,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
             .from(lignesBudgetTable)
             .innerJoin(budgetsCampagneTable, eq(lignesBudgetTable.budgetId, budgetsCampagneTable.id))
             .where(and(
+              eq(budgetsCampagneTable.cooperativeId, cooperativeId),
               eq(budgetsCampagneTable.campagneId, campagneId),
               eq(budgetsCampagneTable.statut, "valide"),
             ))
@@ -210,6 +231,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
             .from(lignesBudgetTable)
             .innerJoin(budgetsCampagneTable, eq(lignesBudgetTable.budgetId, budgetsCampagneTable.id))
             .where(and(
+              eq(budgetsCampagneTable.cooperativeId, cooperativeId),
               eq(budgetsCampagneTable.campagneId, campagneId),
               gt(lignesBudgetTable.montantRealiseFcfa, lignesBudgetTable.montantPrevisionnelFcfa),
               sql`${lignesBudgetTable.montantPrevisionnelFcfa} > 0`,
@@ -233,7 +255,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
         })
         .from(ventesExportateursTable)
         .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
-        .where(eq(ventesExportateursTable.statut, "en_retard"))
+        .where(and(eq(exportateursTable.cooperativeId, cooperativeId), eq(ventesExportateursTable.statut, "en_retard")))
         .orderBy(desc(ventesExportateursTable.soldeDuFcfa))
         .limit(5),
 
@@ -249,6 +271,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
         .innerJoin(empruntsTable, eq(echeancierEmpruntsTable.empruntId, empruntsTable.id))
         .leftJoin(preteursTable, eq(empruntsTable.preteurId, preteursTable.id))
         .where(and(
+          eq(empruntsTable.cooperativeId, cooperativeId),
           eq(echeancierEmpruntsTable.statut, "a_payer"),
           gte(echeancierEmpruntsTable.dateEcheance, today),
           lte(echeancierEmpruntsTable.dateEcheance, thirtyDaysLater),
@@ -257,7 +280,9 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
         .limit(5),
 
       db.select({ count: sql<number>`count(*)::int` })
-        .from(avancesTable).where(eq(avancesTable.statut, "en_retard")),
+        .from(avancesTable)
+        .innerJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(avancesTable.statut, "en_retard"))),
     ]);
 
     const alertesCritiques = [
@@ -314,23 +339,29 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
       [intrantsTotalRow],
     ] = await Promise.all([
       db.select({ count: sql<number>`count(*)::int` })
-        .from(membresTable).where(eq(membresTable.statut, "actif")),
+        .from(membresTable)
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"))),
 
       campagne
         ? db.select({ count: sql<number>`count(*)::int` })
             .from(membresTable)
-            .where(gte(membresTable.dateAdhesion, campagne.dateOuverture))
+            .where(and(eq(membresTable.cooperativeId, cooperativeId), gte(membresTable.dateAdhesion, campagne.dateOuverture)))
         : Promise.resolve([{ count: 0 }]),
 
       db.select({
           octroyees: sql<number>`coalesce(sum(montant_octroye_fcfa),0)::bigint`,
           remboursees: sql<number>`coalesce(sum(montant_rembourse_fcfa),0)::bigint`,
-        }).from(avancesTable),
+        })
+        .from(avancesTable)
+        .innerJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .where(eq(membresTable.cooperativeId, cooperativeId)),
 
       db.select({
           distribues: sql<number>`coalesce(sum(montant_fcfa::numeric),0)::bigint`,
           recouvres: sql<number>`coalesce(sum(montant_rembourse_fcfa::numeric),0)::bigint`,
-        }).from(distributionsIntrantsTable),
+        })
+        .from(distributionsIntrantsTable)
+        .where(eq(distributionsIntrantsTable.cooperativeId, cooperativeId)),
     ]);
 
     // 7. Personnel
@@ -341,10 +372,13 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
       db.select({
           count: sql<number>`count(*)::int`,
           masse: sql<number>`coalesce(sum(salaire_base_fcfa + sursalaire_fcfa),0)::bigint`,
-        }).from(personnelTable).where(eq(personnelTable.statut, "actif")),
+        })
+        .from(personnelTable)
+        .where(and(eq(personnelTable.cooperativeId, cooperativeId), eq(personnelTable.statut, "actif"))),
 
       db.select({ count: sql<number>`count(*)::int` })
-        .from(bulletinsPaieTable).where(eq(bulletinsPaieTable.statut, "brouillon")),
+        .from(bulletinsPaieTable)
+        .where(and(eq(bulletinsPaieTable.cooperativeId, cooperativeId), eq(bulletinsPaieTable.statut, "brouillon"))),
     ]);
 
     // 8. CA mensuel (pour graphique)
@@ -354,7 +388,8 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
             ca: sql<number>`coalesce(sum(montant_total_fcfa),0)::bigint`,
           })
           .from(ventesExportateursTable)
-          .where(eq(ventesExportateursTable.campagneId, campagneId))
+          .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
+          .where(and(eq(exportateursTable.cooperativeId, cooperativeId), eq(ventesExportateursTable.campagneId, campagneId)))
           .groupBy(sql`to_char(date_vente, 'YYYY-MM')`)
           .orderBy(sql`to_char(date_vente, 'YYYY-MM')`)
       : [];
@@ -422,6 +457,12 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
 
 export async function getAlertesPrioritairesPca(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) {
+      res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+      return;
+    }
+
     const today = todayStr();
     const fourteenDaysLater = nDaysLaterStr(14);
 
@@ -435,7 +476,7 @@ export async function getAlertesPrioritairesPca(req: Request, res: Response): Pr
         })
         .from(ventesExportateursTable)
         .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
-        .where(eq(ventesExportateursTable.statut, "en_retard"))
+        .where(and(eq(exportateursTable.cooperativeId, cooperativeId), eq(ventesExportateursTable.statut, "en_retard")))
         .orderBy(desc(ventesExportateursTable.soldeDuFcfa)),
 
       db.select({
@@ -449,6 +490,7 @@ export async function getAlertesPrioritairesPca(req: Request, res: Response): Pr
         .innerJoin(empruntsTable, eq(echeancierEmpruntsTable.empruntId, empruntsTable.id))
         .leftJoin(preteursTable, eq(empruntsTable.preteurId, preteursTable.id))
         .where(and(
+          eq(empruntsTable.cooperativeId, cooperativeId),
           eq(echeancierEmpruntsTable.statut, "a_payer"),
           gte(echeancierEmpruntsTable.dateEcheance, today),
           lte(echeancierEmpruntsTable.dateEcheance, fourteenDaysLater),
@@ -462,7 +504,8 @@ export async function getAlertesPrioritairesPca(req: Request, res: Response): Pr
           dateEcheance: avancesTable.dateEcheance,
         })
         .from(avancesTable)
-        .where(eq(avancesTable.statut, "en_retard"))
+        .innerJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(avancesTable.statut, "en_retard")))
         .orderBy(desc(avancesTable.soldeRestantFcfa))
         .limit(10),
 
@@ -476,6 +519,7 @@ export async function getAlertesPrioritairesPca(req: Request, res: Response): Pr
         .from(lignesBudgetTable)
         .innerJoin(budgetsCampagneTable, eq(lignesBudgetTable.budgetId, budgetsCampagneTable.id))
         .where(and(
+          eq(budgetsCampagneTable.cooperativeId, cooperativeId),
           eq(budgetsCampagneTable.statut, "valide"),
           gt(lignesBudgetTable.montantRealiseFcfa, lignesBudgetTable.montantPrevisionnelFcfa),
           sql`${lignesBudgetTable.montantPrevisionnelFcfa} > 0`,
@@ -543,9 +587,16 @@ export async function getAlertesPrioritairesPca(req: Request, res: Response): Pr
 
 export async function getComparaisonCampagnesPca(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) {
+      res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+      return;
+    }
+
     const campagnes = await db
       .select()
       .from(campagnesTable)
+      .where(eq(campagnesTable.cooperativeId, cooperativeId))
       .orderBy(desc(campagnesTable.dateOuverture))
       .limit(3);
 
@@ -581,15 +632,23 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
         // Fallback: compute from raw data
         const [[livraisonsRow], [avRow], [membresRow], [caRow]] = await Promise.all([
           db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
-            .from(livraisonsTable).where(eq(livraisonsTable.campagneId, c.id)),
+            .from(livraisonsTable)
+            .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+            .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(livraisonsTable.campagneId, c.id))),
           db.select({
               octroyees: sql<number>`coalesce(sum(montant_octroye_fcfa),0)::bigint`,
               remboursees: sql<number>`coalesce(sum(montant_rembourse_fcfa),0)::bigint`,
-            }).from(avancesTable),
+            })
+            .from(avancesTable)
+            .innerJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+            .where(eq(membresTable.cooperativeId, cooperativeId)),
           db.select({ count: sql<number>`count(*)::int` })
-            .from(membresTable).where(eq(membresTable.statut, "actif")),
+            .from(membresTable)
+            .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"))),
           db.select({ ca: sql<number>`coalesce(sum(montant_total_fcfa),0)::bigint` })
-            .from(ventesExportateursTable).where(eq(ventesExportateursTable.campagneId, c.id)),
+            .from(ventesExportateursTable)
+            .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
+            .where(and(eq(exportateursTable.cooperativeId, cooperativeId), eq(ventesExportateursTable.campagneId, c.id))),
         ]);
 
         const tonnageT = (livraisonsRow?.t ?? 0) / 1000;
