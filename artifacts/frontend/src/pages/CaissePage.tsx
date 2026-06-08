@@ -2,8 +2,8 @@ import { useState, useCallback } from "react";
 import { Wallet, Plus, RefreshCw, Lock, Unlock, Download, AlertTriangle, TrendingUp, TrendingDown, ChevronRight, X, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const tok = () => localStorage.getItem("authToken") ?? "";
+const BASE = import.meta.env.VITE_API_URL ?? "";
+const tok = () => localStorage.getItem("coop_token") ?? "";
 
 const FCFA = (n: number | string) =>
   new Intl.NumberFormat("fr-FR").format(typeof n === "string" ? parseFloat(n) || 0 : n) + " FCFA";
