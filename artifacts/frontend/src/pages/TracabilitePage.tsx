@@ -4,41 +4,359 @@ import {
   useCreateLot,
   useGetLivraisonsNonLotees,
   useUpdateLotStatut,
+  useGetLotTracabilite,
+  useGetEntrepots,
 } from "@workspace/api-client-react";
-import { getGetLotsQueryKey, getGetLivraisonsNonLoteesQueryKey } from "@workspace/api-client-react";
+import {
+  getGetLotsQueryKey,
+  getGetLivraisonsNonLoteesQueryKey,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { QrCode, Package, PlusCircle, ChevronDown, Check } from "lucide-react";
+import {
+  QrCode,
+  Package,
+  Check,
+  X,
+  ChevronRight,
+  Copy,
+  Truck,
+  ShoppingCart,
+  Warehouse,
+  Users,
+  Scale,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+} from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
+import { useAuth } from "@/contexts/AuthContext";
 
 function formaterDate(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(d).toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 function formaterPoids(kg: string | number) {
   const v = parseFloat(String(kg));
   return v >= 1000 ? `${(v / 1000).toFixed(2)} T` : `${v.toFixed(1)} kg`;
 }
+function formaterMontant(v: number) {
+  return new Intl.NumberFormat("fr-FR").format(v) + " FCFA";
+}
 
 const STATUT_COLORS: Record<string, string> = {
-  en_stock: "bg-green-100 text-green-700",
+  en_stock: "bg-emerald-100 text-emerald-700",
   vendu: "bg-blue-100 text-blue-700",
-  transit: "bg-yellow-100 text-yellow-700",
+  transit: "bg-amber-100 text-amber-700",
 };
 const STATUT_LABELS: Record<string, string> = {
   en_stock: "En stock",
   vendu: "Vendu",
   transit: "En transit",
 };
+const STATUT_ORDER = ["en_stock", "transit", "vendu"];
+
+type LotStatut = "en_stock" | "transit" | "vendu";
+
+function StatutTimeline({ statut }: { statut: LotStatut }) {
+  const idx = STATUT_ORDER.indexOf(statut);
+  return (
+    <div className="flex items-center gap-1">
+      {STATUT_ORDER.map((s, i) => {
+        const done = i <= idx;
+        const current = i === idx;
+        return (
+          <div key={s} className="flex items-center gap-1">
+            <div
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+                current
+                  ? "bg-[#1a4731] text-white"
+                  : done
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-gray-100 text-gray-400"
+              }`}
+            >
+              {done && !current ? (
+                <CheckCircle2 size={11} />
+              ) : current ? (
+                <Clock size={11} />
+              ) : null}
+              {STATUT_LABELS[s]}
+            </div>
+            {i < STATUT_ORDER.length - 1 && (
+              <ArrowRight size={12} className={done ? "text-emerald-400" : "text-gray-300"} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DetailModal({
+  lotId,
+  onClose,
+  onStatutChange,
+  peutModifier,
+}: {
+  lotId: number;
+  onClose: () => void;
+  onStatutChange: (id: number, statut: LotStatut) => void;
+  peutModifier: boolean;
+}) {
+  const { data, isLoading } = useGetLotTracabilite(lotId);
+  const [copied, setCopied] = useState(false);
+  const [confirmStatut, setConfirmStatut] = useState<LotStatut | null>(null);
+
+  const copyQr = () => {
+    if (!data?.lot.qrCodeLot) return;
+    navigator.clipboard.writeText(data.lot.qrCodeLot);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const prochainStatut = (s: LotStatut): LotStatut | null => {
+    const idx = STATUT_ORDER.indexOf(s);
+    return idx < STATUT_ORDER.length - 1 ? (STATUT_ORDER[idx + 1] as LotStatut) : null;
+  };
+
+  type ProdEntry = { nom: string; prenoms: string; poids: number; montant: number; nb: number };
+  const parProducteur = data?.livraisons.reduce<Record<number, ProdEntry>>(
+    (acc: Record<number, ProdEntry>, l: { membreId: number; membreNom: string | null | undefined; membrePrenoms: string | null | undefined; poidsKg: string; montantNetFcfa: number }) => {
+      const k = l.membreId;
+      if (!acc[k]) {
+        acc[k] = { nom: l.membreNom ?? "", prenoms: l.membrePrenoms ?? "", poids: 0, montant: 0, nb: 0 };
+      }
+      acc[k]!.poids += parseFloat(l.poidsKg);
+      acc[k]!.montant += l.montantNetFcfa;
+      acc[k]!.nb += 1;
+      return acc;
+    },
+    {},
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-8 px-4 pb-4 overflow-y-auto">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden my-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
+          <div className="flex items-center gap-3">
+            <QrCode size={20} className="text-[#1a4731]" />
+            <h2 className="font-bold text-gray-900">Détail du lot</h2>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-200">
+            <X size={18} />
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="p-12 text-center text-gray-400">Chargement…</div>
+        ) : !data ? (
+          <div className="p-12 text-center text-gray-400">Lot introuvable</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {/* Header lot */}
+            <div className="px-6 py-4 space-y-3">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                      {data.lot.qrCodeLot}
+                    </span>
+                    <button
+                      onClick={copyQr}
+                      title="Copier QR code"
+                      className="text-gray-400 hover:text-[#1a4731] transition-colors"
+                    >
+                      {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                  <StatutTimeline statut={data.lot.statut as LotStatut} />
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-gray-900">{formaterPoids(data.lot.poidsTotalKg)}</p>
+                  <p className="text-xs text-gray-500">Créé le {formaterDate(data.lot.dateCreation)}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="bg-gray-50 rounded-lg px-3 py-2">
+                  <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-1">
+                    <Warehouse size={11} /> Entrepôt
+                  </p>
+                  <p className="text-sm font-medium text-gray-800">{data.lot.entrepot ?? "—"}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg px-3 py-2">
+                  <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-1">
+                    <Users size={11} /> Producteurs
+                  </p>
+                  <p className="text-sm font-medium text-gray-800">{data.lot.nbProducteurs ?? 0}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg px-3 py-2">
+                  <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-1">
+                    <Package size={11} /> Livraisons
+                  </p>
+                  <p className="text-sm font-medium text-gray-800">{data.lot.nbLivraisons ?? data.livraisons.length}</p>
+                </div>
+              </div>
+
+              {peutModifier && prochainStatut(data.lot.statut as LotStatut) && (
+                <div>
+                  {confirmStatut ? (
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-sm text-amber-800 flex-1">
+                        Passer ce lot en <strong>{STATUT_LABELS[confirmStatut]}</strong> ?
+                      </p>
+                      <button
+                        onClick={() => { onStatutChange(data.lot.id, confirmStatut); setConfirmStatut(null); onClose(); }}
+                        className="px-3 py-1 bg-[#1a4731] text-white text-xs font-medium rounded-lg"
+                      >
+                        Confirmer
+                      </button>
+                      <button
+                        onClick={() => setConfirmStatut(null)}
+                        className="px-3 py-1 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg"
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmStatut(prochainStatut(data.lot.statut as LotStatut)!)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg"
+                      style={{ backgroundColor: "#1a4731" }}
+                    >
+                      {prochainStatut(data.lot.statut as LotStatut) === "transit" ? (
+                        <Truck size={14} />
+                      ) : (
+                        <ShoppingCart size={14} />
+                      )}
+                      Passer en {STATUT_LABELS[prochainStatut(data.lot.statut as LotStatut)!]}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Vente liée */}
+            {data.vente && (
+              <div className="px-6 py-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+                  <ShoppingCart size={14} /> Vente exportateur
+                </h3>
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-blue-500 mb-0.5">Exportateur</p>
+                    <p className="font-semibold text-blue-900">{data.vente.exportateurNom ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-blue-500 mb-0.5">Montant</p>
+                    <p className="font-semibold text-blue-900">{formaterMontant(data.vente.montantTotalFcfa)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-blue-500 mb-0.5">Reçu</p>
+                    <p className="font-semibold text-blue-900">{formaterMontant(data.vente.montantRecuFcfa)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-blue-500 mb-0.5">Date vente</p>
+                    <p className="font-semibold text-blue-900">{formaterDate(data.vente.dateVente)}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Producteurs */}
+            {parProducteur && Object.keys(parProducteur).length > 0 && (
+              <div className="px-6 py-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+                  <Users size={14} /> Producteurs ({Object.keys(parProducteur).length})
+                </h3>
+                <div className="space-y-2">
+                  {(Object.entries(parProducteur) as [string, ProdEntry][]).map(([id, p]) => (
+                    <div key={id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                          style={{ backgroundColor: "#1a4731" }}
+                        >
+                          {p.nom[0]?.toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{p.nom} {p.prenoms}</p>
+                          <p className="text-xs text-gray-500">{p.nb} livraison{p.nb > 1 ? "s" : ""}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-gray-800">{formaterPoids(p.poids)}</p>
+                        <p className="text-xs text-gray-500">{formaterMontant(p.montant)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Livraisons */}
+            {data.livraisons.length > 0 && (
+              <div className="px-6 py-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+                  <Scale size={14} /> Livraisons ({data.livraisons.length})
+                </h3>
+                <div className="overflow-x-auto rounded-lg border border-gray-100">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <th className="text-left px-3 py-2 font-medium text-gray-500">Membre</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-500">Poids</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-500 hidden sm:table-cell">Montant net</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-500 hidden sm:table-cell">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.livraisons.map((l) => (
+                        <tr key={l.id} className="border-b border-gray-50 last:border-0">
+                          <td className="px-3 py-2 font-medium text-gray-800">
+                            {l.membreNom} {l.membrePrenoms}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">{formaterPoids(l.poidsKg)}</td>
+                          <td className="px-3 py-2 text-gray-600 hidden sm:table-cell">
+                            {formaterMontant(l.montantNetFcfa)}
+                          </td>
+                          <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">
+                            {formaterDate(l.dateLivraison)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function TracabilitePage() {
   const queryClient = useQueryClient();
+  const { utilisateur } = useAuth();
   const peutCreerLot = usePermission("tracabilite", "creer_lot");
-  const [onglet, setOnglet] = useState<"lots" | "creer">("lots");
-  const [filtreStatut, setFiltreStatut] = useState("");
-  const [selection, setSelection] = useState<number[]>([]);
-  const [entrepot, setEntrepot] = useState("");
+  const peutModifier = usePermission("tracabilite", "modifier_lot");
 
-  const { data: lots = [], isLoading } = useGetLots({ statut: (filtreStatut as "en_stock" | "vendu" | "transit") || undefined });
+  const [onglet, setOnglet] = useState<"lots" | "creer">("lots");
+  const [filtreStatut, setFiltreStatut] = useState<LotStatut | "">("");
+  const [selection, setSelection] = useState<number[]>([]);
+  const [entrepotId, setEntrepotId] = useState<string>("");
+  const [lotDetail, setLotDetail] = useState<number | null>(null);
+
+  const { data: lots = [], isLoading } = useGetLots({
+    statut: (filtreStatut as LotStatut) || undefined,
+  });
   const { data: livraisonsDispos = [] } = useGetLivraisonsNonLotees();
+  const { data: entrepots = [] } = useGetEntrepots();
 
   const mutCreate = useCreateLot({
     mutation: {
@@ -47,7 +365,7 @@ export default function TracabilitePage() {
         queryClient.invalidateQueries({ queryKey: getGetLivraisonsNonLoteesQueryKey() });
         setOnglet("lots");
         setSelection([]);
-        setEntrepot("");
+        setEntrepotId("");
       },
     },
   });
@@ -61,25 +379,65 @@ export default function TracabilitePage() {
   const toggleSelection = (id: number) =>
     setSelection((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
+  const toutSelectionner = () => {
+    if (selection.length === livraisonsDispos.length) {
+      setSelection([]);
+    } else {
+      setSelection(livraisonsDispos.map((l) => l.id));
+    }
+  };
+
   const poidsSelectionne = livraisonsDispos
     .filter((l) => selection.includes(l.id))
     .reduce((s, l) => s + parseFloat(l.poidsKg), 0);
 
+  const entrepotNom = entrepots.find((e) => String(e.id) === entrepotId)?.nom ?? null;
+
   const handleCreerLot = () => {
-    if (selection.length === 0) return;
+    if (selection.length === 0 || !utilisateur?.cooperativeId) return;
     mutCreate.mutate({
-      data: { cooperativeId: 1, livraisonIds: selection, entrepot: entrepot || undefined },
+      data: {
+        cooperativeId: utilisateur.cooperativeId,
+        livraisonIds: selection,
+        entrepot: entrepotNom ?? undefined,
+      },
     });
+  };
+
+  const handleStatutChange = (id: number, statut: LotStatut) => {
+    mutStatut.mutate({ id, data: { statut } });
+  };
+
+  const statsLots = {
+    en_stock: lots.filter((l) => l.statut === "en_stock").length,
+    transit: lots.filter((l) => l.statut === "transit").length,
+    vendu: lots.filter((l) => l.statut === "vendu").length,
+    poidsTotal: lots.reduce((s, l) => s + parseFloat(l.poidsTotalKg ?? "0"), 0),
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Traçabilité QR</h1>
-          <p className="text-gray-500 text-sm mt-1">Gestion des lots de cacao et traçabilité</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Traçabilité QR</h1>
+        <p className="text-gray-500 text-sm mt-1">Gestion des lots de cacao et traçabilité</p>
       </div>
+
+      {/* Stats */}
+      {lots.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "En stock", value: statsLots.en_stock, color: "text-emerald-700", bg: "bg-emerald-50" },
+            { label: "En transit", value: statsLots.transit, color: "text-amber-700", bg: "bg-amber-50" },
+            { label: "Vendus", value: statsLots.vendu, color: "text-blue-700", bg: "bg-blue-50" },
+            { label: "Poids total", value: formaterPoids(statsLots.poidsTotal), color: "text-gray-700", bg: "bg-gray-50" },
+          ].map((s) => (
+            <div key={s.label} className={`${s.bg} rounded-xl px-4 py-3`}>
+              <p className="text-xs text-gray-500 mb-0.5">{s.label}</p>
+              <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Onglets */}
       <div className="flex gap-1 border-b border-gray-200">
@@ -95,7 +453,7 @@ export default function TracabilitePage() {
                   : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
-              {o === "lots" ? "Lots en stock" : "Créer un lot"}
+              {o === "lots" ? `Lots (${lots.length})` : "Créer un lot"}
             </button>
           ))}
       </div>
@@ -104,7 +462,7 @@ export default function TracabilitePage() {
       {onglet === "lots" && (
         <div className="space-y-4">
           <div className="flex gap-2 flex-wrap">
-            {["", "en_stock", "vendu", "transit"].map((s) => (
+            {(["", "en_stock", "transit", "vendu"] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setFiltreStatut(s)}
@@ -122,7 +480,7 @@ export default function TracabilitePage() {
           {isLoading ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 animate-pulse h-20" />
+                <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 animate-pulse h-16" />
               ))}
             </div>
           ) : lots.length === 0 ? (
@@ -150,16 +508,26 @@ export default function TracabilitePage() {
                     <tr className="border-b border-gray-100 bg-gray-50">
                       <th className="text-left px-4 py-3 font-medium text-gray-500">QR Code</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500">Poids</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">Producteurs</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">Entrepôt</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">Date</th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">
+                        Producteurs
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">
+                        Entrepôt
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">
+                        Date
+                      </th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500">Statut</th>
-                      <th className="px-4 py-3"></th>
+                      <th className="px-4 py-3 w-8"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {lots.map((lot) => (
-                      <tr key={lot.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                      <tr
+                        key={lot.id}
+                        onClick={() => setLotDetail(lot.id)}
+                        className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <QrCode size={14} className="text-gray-400 flex-shrink-0" />
@@ -172,7 +540,7 @@ export default function TracabilitePage() {
                           {formaterPoids(lot.poidsTotalKg)}
                         </td>
                         <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">
-                          {lot.nbProducteurs ?? 0} producteurs
+                          {lot.nbProducteurs ?? 0} producteur{(lot.nbProducteurs ?? 0) > 1 ? "s" : ""}
                         </td>
                         <td className="px-4 py-3 text-gray-500 hidden md:table-cell">
                           {lot.entrepot ?? "—"}
@@ -180,32 +548,17 @@ export default function TracabilitePage() {
                         <td className="px-4 py-3 text-gray-500 hidden md:table-cell">
                           {formaterDate(lot.dateCreation)}
                         </td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUT_COLORS[lot.statut] ?? ""}`}>
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              STATUT_COLORS[lot.statut] ?? ""
+                            }`}
+                          >
                             {STATUT_LABELS[lot.statut]}
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          {lot.statut === "en_stock" && (
-                            <button
-                              onClick={() =>
-                                mutStatut.mutate({ id: lot.id, data: { statut: "transit" } })
-                              }
-                              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                            >
-                              → Transit
-                            </button>
-                          )}
-                          {lot.statut === "transit" && (
-                            <button
-                              onClick={() =>
-                                mutStatut.mutate({ id: lot.id, data: { statut: "vendu" } })
-                              }
-                              className="text-xs text-green-600 hover:text-green-800 font-medium"
-                            >
-                              → Vendu
-                            </button>
-                          )}
+                          <ChevronRight size={14} className="text-gray-400" />
                         </td>
                       </tr>
                     ))}
@@ -222,31 +575,47 @@ export default function TracabilitePage() {
         <div className="space-y-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h3 className="font-semibold text-gray-900 mb-4">Paramètres du lot</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Entrepôt (optionnel)</label>
-                <input
-                  type="text"
-                  value={entrepot}
-                  onChange={(e) => setEntrepot(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
-                  placeholder="ex. Entrepôt Central Méagui"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Entrepôt de stockage (optionnel)
+              </label>
+              <select
+                value={entrepotId}
+                onChange={(e) => setEntrepotId(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 bg-white"
+              >
+                <option value="">— Sélectionner un entrepôt —</option>
+                {entrepots.map((e) => (
+                  <option key={e.id} value={String(e.id)}>
+                    {e.nom}
+                    {e.ville ? ` — ${e.ville}` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Sélection livraisons */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
               <h3 className="font-semibold text-gray-900">
                 Livraisons disponibles ({livraisonsDispos.length})
               </h3>
-              {selection.length > 0 && (
-                <span className="text-xs font-medium text-[#1a4731]">
-                  {selection.length} sélectionnée(s) — {formaterPoids(poidsSelectionne)}
-                </span>
-              )}
+              <div className="flex items-center gap-3">
+                {selection.length > 0 && (
+                  <span className="text-xs font-medium text-[#1a4731]">
+                    {selection.length} sélectionnée{selection.length > 1 ? "s" : ""} —{" "}
+                    {formaterPoids(poidsSelectionne)}
+                  </span>
+                )}
+                {livraisonsDispos.length > 0 && (
+                  <button
+                    onClick={toutSelectionner}
+                    className="text-xs font-medium text-gray-500 hover:text-[#1a4731] border border-gray-200 px-3 py-1 rounded-lg hover:border-[#1a4731] transition-colors"
+                  >
+                    {selection.length === livraisonsDispos.length ? "Tout désélectionner" : "Tout sélectionner"}
+                  </button>
+                )}
+              </div>
             </div>
 
             {livraisonsDispos.length === 0 ? (
@@ -261,7 +630,12 @@ export default function TracabilitePage() {
                       <th className="w-10 px-4 py-3"></th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500">Membre</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500">Poids</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">Date</th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">
+                        Montant net
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">
+                        Date
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -271,7 +645,9 @@ export default function TracabilitePage() {
                         <tr
                           key={l.id}
                           onClick={() => toggleSelection(l.id)}
-                          className={`border-b border-gray-50 cursor-pointer transition-colors ${sel ? "bg-green-50" : "hover:bg-gray-50"}`}
+                          className={`border-b border-gray-50 cursor-pointer transition-colors ${
+                            sel ? "bg-green-50" : "hover:bg-gray-50"
+                          }`}
                         >
                           <td className="px-4 py-3">
                             <div
@@ -286,6 +662,11 @@ export default function TracabilitePage() {
                             {l.membreNom} {l.membrePrenoms}
                           </td>
                           <td className="px-4 py-3 text-gray-700">{formaterPoids(l.poidsKg)}</td>
+                          <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">
+                            {l.montantNetFcfa != null
+                              ? formaterMontant(l.montantNetFcfa)
+                              : "—"}
+                          </td>
                           <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
                             {formaterDate(l.dateLivraison)}
                           </td>
@@ -301,12 +682,18 @@ export default function TracabilitePage() {
           {selection.length > 0 && (
             <div className="bg-[#1a4731] rounded-xl p-4 flex items-center justify-between gap-4">
               <div className="text-white">
-                <p className="text-sm font-semibold">{selection.length} livraisons sélectionnées</p>
-                <p className="text-green-200 text-xs">Poids total : {formaterPoids(poidsSelectionne)}</p>
+                <p className="text-sm font-semibold">
+                  {selection.length} livraison{selection.length > 1 ? "s" : ""} sélectionnée
+                  {selection.length > 1 ? "s" : ""}
+                </p>
+                <p className="text-green-200 text-xs">
+                  Poids total : {formaterPoids(poidsSelectionne)}
+                  {entrepotNom ? ` · Entrepôt : ${entrepotNom}` : ""}
+                </p>
               </div>
               <button
                 onClick={handleCreerLot}
-                disabled={mutCreate.isPending}
+                disabled={mutCreate.isPending || !utilisateur?.cooperativeId}
                 className="px-5 py-2 bg-white text-[#1a4731] text-sm font-bold rounded-lg hover:bg-green-50 disabled:opacity-50 flex items-center gap-2"
               >
                 <QrCode size={14} />
@@ -315,6 +702,16 @@ export default function TracabilitePage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Modal détail */}
+      {lotDetail !== null && (
+        <DetailModal
+          lotId={lotDetail}
+          onClose={() => setLotDetail(null)}
+          onStatutChange={handleStatutChange}
+          peutModifier={peutModifier}
+        />
       )}
     </div>
   );
