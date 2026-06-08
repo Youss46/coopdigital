@@ -8,6 +8,7 @@
 import type { LivraisonDetail } from './livraisonDetail';
 import type { LotDetail } from './lotDetail';
 import type { Membre } from './membre';
+import type { ParcelleEudr } from './parcelleEudr';
 import type { VenteDetail } from './venteDetail';
 
 export interface LotTracabilite {
@@ -15,4 +16,5 @@ export interface LotTracabilite {
   livraisons: LivraisonDetail[];
   membres: Membre[];
   vente?: VenteDetail;
+  parcelles?: ParcelleEudr[];
 }

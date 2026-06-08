@@ -936,6 +936,8 @@ export const LotDetailStatut = {
   en_stock: 'en_stock',
   vendu: 'vendu',
   transit: 'transit',
+  refoule: 'refoule',
+  fusionne: 'fusionne',
 } as const;
 
 export interface LotDetail {
@@ -943,6 +945,9 @@ export interface LotDetail {
   cooperativeId: number;
   qrCodeLot: string;
   statut: LotDetailStatut;
+  /** @nullable */
+  venteExportateurId?: number | null;
+  parentLotIds?: number[] | null;
   poidsTotalKg: string;
   dateCreation: string;
   /** @nullable */
@@ -965,10 +970,47 @@ export const LotStatutInputStatut = {
   en_stock: 'en_stock',
   vendu: 'vendu',
   transit: 'transit',
+  refoule: 'refoule',
+  fusionne: 'fusionne',
 } as const;
 
 export interface LotStatutInput {
   statut: LotStatutInputStatut;
+  /** @nullable */
+  venteExportateurId?: number | null;
+}
+
+export interface FusionLotsInput {
+  /** @minItems 2 */
+  lotIds: number[];
+  entrepot: string;
+}
+
+export interface ExpedierLotInput {
+  venteExportateurId: number;
+}
+
+/**
+ * @nullable
+ */
+export type ParcelleEudrCoordonneesPoint = { [key: string]: unknown } | null;
+
+export interface ParcelleEudr {
+  id?: number;
+  membreId?: number;
+  /** @nullable */
+  membreNom?: string | null;
+  /** @nullable */
+  membrePrenoms?: string | null;
+  /** @nullable */
+  coordonneesPoint?: ParcelleEudrCoordonneesPoint;
+  polygone?: unknown | null;
+  /** @nullable */
+  superficieDeclareeHa?: string | null;
+  /** @nullable */
+  eudrStatut?: string | null;
+  /** @nullable */
+  eudrRisqueDeforestation?: string | null;
 }
 
 export type VenteDetailStatut = typeof VenteDetailStatut[keyof typeof VenteDetailStatut];
@@ -1005,6 +1047,7 @@ export interface LotTracabilite {
   livraisons: LivraisonDetail[];
   membres: Membre[];
   vente?: VenteDetail;
+  parcelles?: ParcelleEudr[];
 }
 
 export interface EntrepotStock {
@@ -4115,6 +4158,8 @@ export const GetLotsStatut = {
   en_stock: 'en_stock',
   vendu: 'vendu',
   transit: 'transit',
+  refoule: 'refoule',
+  fusionne: 'fusionne',
 } as const;
 
 export type GetMouvementsStockParams = {

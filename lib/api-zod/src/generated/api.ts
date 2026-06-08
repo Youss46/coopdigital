@@ -501,14 +501,16 @@ export const GetDashboardAvancesRetardResponse = zod.array(GetDashboardAvancesRe
  * @summary Liste des lots
  */
 export const GetLotsQueryParams = zod.object({
-  "statut": zod.enum(['en_stock', 'vendu', 'transit']).optional()
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']).optional()
 })
 
 export const GetLotsResponseItem = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "qrCodeLot": zod.string(),
-  "statut": zod.enum(['en_stock', 'vendu', 'transit']),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "venteExportateurId": zod.number().nullish(),
+  "parentLotIds": zod.array(zod.number()).nullish(),
   "poidsTotalKg": zod.string(),
   "dateCreation": zod.string(),
   "entrepot": zod.string().nullish(),
@@ -540,7 +542,9 @@ export const GetLotByQrResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "qrCodeLot": zod.string(),
-  "statut": zod.enum(['en_stock', 'vendu', 'transit']),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "venteExportateurId": zod.number().nullish(),
+  "parentLotIds": zod.array(zod.number()).nullish(),
   "poidsTotalKg": zod.string(),
   "dateCreation": zod.string(),
   "entrepot": zod.string().nullish(),
@@ -558,14 +562,57 @@ export const UpdateLotStatutParams = zod.object({
 })
 
 export const UpdateLotStatutBody = zod.object({
-  "statut": zod.enum(['en_stock', 'vendu', 'transit'])
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "venteExportateurId": zod.number().nullish()
 })
 
 export const UpdateLotStatutResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "qrCodeLot": zod.string(),
-  "statut": zod.enum(['en_stock', 'vendu', 'transit']),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "venteExportateurId": zod.number().nullish(),
+  "parentLotIds": zod.array(zod.number()).nullish(),
+  "poidsTotalKg": zod.string(),
+  "dateCreation": zod.string(),
+  "entrepot": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "nbProducteurs": zod.number().optional(),
+  "nbLivraisons": zod.number().optional()
+})
+
+
+/**
+ * @summary Fusionner plusieurs lots en un seul
+ */
+export const fusionnerLotsBodyLotIdsMin = 2;
+
+
+
+export const FusionnerLotsBody = zod.object({
+  "lotIds": zod.array(zod.number()).min(fusionnerLotsBodyLotIdsMin),
+  "entrepot": zod.string()
+})
+
+
+/**
+ * @summary Expédier un lot vers une vente exportateur
+ */
+export const ExpedierLotParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ExpedierLotBody = zod.object({
+  "venteExportateurId": zod.number()
+})
+
+export const ExpedierLotResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "qrCodeLot": zod.string(),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "venteExportateurId": zod.number().nullish(),
+  "parentLotIds": zod.array(zod.number()).nullish(),
   "poidsTotalKg": zod.string(),
   "dateCreation": zod.string(),
   "entrepot": zod.string().nullish(),
@@ -587,7 +634,9 @@ export const GetLotTracabiliteResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "qrCodeLot": zod.string(),
-  "statut": zod.enum(['en_stock', 'vendu', 'transit']),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "venteExportateurId": zod.number().nullish(),
+  "parentLotIds": zod.array(zod.number()).nullish(),
   "poidsTotalKg": zod.string(),
   "dateCreation": zod.string(),
   "entrepot": zod.string().nullish(),
@@ -644,7 +693,20 @@ export const GetLotTracabiliteResponse = zod.object({
   "soldeDuFcfa": zod.number(),
   "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']),
   "createdAt": zod.string()
-}).optional()
+}).optional(),
+  "parcelles": zod.array(zod.object({
+  "id": zod.number().optional(),
+  "membreId": zod.number().optional(),
+  "membreNom": zod.string().nullish(),
+  "membrePrenoms": zod.string().nullish(),
+  "coordonneesPoint": zod.object({
+
+}).passthrough().nullish(),
+  "polygone": zod.unknown().nullish(),
+  "superficieDeclareeHa": zod.string().nullish(),
+  "eudrStatut": zod.string().nullish(),
+  "eudrRisqueDeforestation": zod.string().nullish()
+})).optional()
 })
 
 

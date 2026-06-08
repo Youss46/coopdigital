@@ -5,7 +5,7 @@ import { cooperativesTable } from "./cooperatives";
 import { livraisonsTable } from "./livraisons";
 import { campagnesTable } from "./campagnes";
 
-export const lotStatutEnum = pgEnum("lot_statut", ["en_stock", "vendu", "transit"]);
+export const lotStatutEnum = pgEnum("lot_statut", ["en_stock", "vendu", "transit", "refoule", "fusionne"]);
 
 export const lotsTable = pgTable("lots", {
   id: serial("id").primaryKey(),
@@ -17,6 +17,8 @@ export const lotsTable = pgTable("lots", {
   dateCreation: timestamp("date_creation", { withTimezone: true }).defaultNow().notNull(),
   entrepot: text("entrepot"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  parentLotIds: integer("parent_lot_ids").array(),
+  venteExportateurId: integer("vente_exportateur_id"),
 });
 
 export const lotLivraisonsTable = pgTable("lot_livraisons", {

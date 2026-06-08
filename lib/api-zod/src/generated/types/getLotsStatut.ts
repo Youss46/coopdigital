@@ -13,4 +13,6 @@ export const GetLotsStatut = {
   en_stock: 'en_stock',
   vendu: 'vendu',
   transit: 'transit',
+  refoule: 'refoule',
+  fusionne: 'fusionne',
 } as const;

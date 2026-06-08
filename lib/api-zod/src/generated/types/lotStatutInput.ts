@@ -9,4 +9,6 @@ import type { LotStatutInputStatut } from './lotStatutInputStatut';
 
 export interface LotStatutInput {
   statut: LotStatutInputStatut;
+  /** @nullable */
+  venteExportateurId?: number | null;
 }

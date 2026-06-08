@@ -12,6 +12,9 @@ export interface LotDetail {
   cooperativeId: number;
   qrCodeLot: string;
   statut: LotDetailStatut;
+  /** @nullable */
+  venteExportateurId?: number | null;
+  parentLotIds?: number[] | null;
   poidsTotalKg: string;
   dateCreation: string;
   /** @nullable */

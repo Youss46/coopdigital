@@ -124,6 +124,7 @@ import type {
   Equipement,
   ErrorResponse,
   EvolutionScore,
+  ExpedierLotInput,
   ExportateurDetail,
   ExportateurHistorique,
   ExportateurInput,
@@ -131,6 +132,7 @@ import type {
   FluxTresorerie,
   Fournisseur,
   FournisseurInput,
+  FusionLotsInput,
   GenerationResult,
   GenererBulletinsInput,
   GenererDotationsBody,
@@ -2086,6 +2088,149 @@ export const useUpdateLotStatut = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getUpdateLotStatutMutationOptions(options));
+    }
+
+export const getFusionnerLotsUrl = () => {
+
+
+
+
+  return `/api/lots/fusionner`
+}
+
+/**
+ * @summary Fusionner plusieurs lots en un seul
+ */
+export const fusionnerLots = async (fusionLotsInput: FusionLotsInput, options?: RequestInit): Promise<LotDetail> => {
+
+  return customFetch<LotDetail>(getFusionnerLotsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fusionLotsInput,)
+  }
+);}
+
+
+
+
+export const getFusionnerLotsMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fusionnerLots>>, TError,{data: BodyType<FusionLotsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof fusionnerLots>>, TError,{data: BodyType<FusionLotsInput>}, TContext> => {
+
+const mutationKey = ['fusionnerLots'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof fusionnerLots>>, {data: BodyType<FusionLotsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  fusionnerLots(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FusionnerLotsMutationResult = NonNullable<Awaited<ReturnType<typeof fusionnerLots>>>
+    export type FusionnerLotsMutationBody = BodyType<FusionLotsInput>
+    export type FusionnerLotsMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Fusionner plusieurs lots en un seul
+ */
+export const useFusionnerLots = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fusionnerLots>>, TError,{data: BodyType<FusionLotsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof fusionnerLots>>,
+        TError,
+        {data: BodyType<FusionLotsInput>},
+        TContext
+      > => {
+      return useMutation(getFusionnerLotsMutationOptions(options));
+    }
+
+export const getExpedierLotUrl = (id: number,) => {
+
+
+
+
+  return `/api/lots/${id}/expedier`
+}
+
+/**
+ * @summary Expédier un lot vers une vente exportateur
+ */
+export const expedierLot = async (id: number,
+    expedierLotInput: ExpedierLotInput, options?: RequestInit): Promise<LotDetail> => {
+
+  return customFetch<LotDetail>(getExpedierLotUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      expedierLotInput,)
+  }
+);}
+
+
+
+
+export const getExpedierLotMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof expedierLot>>, TError,{id: number;data: BodyType<ExpedierLotInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof expedierLot>>, TError,{id: number;data: BodyType<ExpedierLotInput>}, TContext> => {
+
+const mutationKey = ['expedierLot'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof expedierLot>>, {id: number;data: BodyType<ExpedierLotInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  expedierLot(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExpedierLotMutationResult = NonNullable<Awaited<ReturnType<typeof expedierLot>>>
+    export type ExpedierLotMutationBody = BodyType<ExpedierLotInput>
+    export type ExpedierLotMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Expédier un lot vers une vente exportateur
+ */
+export const useExpedierLot = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof expedierLot>>, TError,{id: number;data: BodyType<ExpedierLotInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof expedierLot>>,
+        TError,
+        {id: number;data: BodyType<ExpedierLotInput>},
+        TContext
+      > => {
+      return useMutation(getExpedierLotMutationOptions(options));
     }
 
 export const getGetLotTracabiliteUrl = (id: number,) => {

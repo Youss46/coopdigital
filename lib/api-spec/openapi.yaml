@@ -431,7 +431,7 @@ paths:
       parameters:
         - name: statut
           in: query
-          schema: { type: string, enum: [en_stock, vendu, transit] }
+          schema: { type: string, enum: [en_stock, vendu, transit, refoule, fusionne] }
       responses:
         "200":
           description: Liste des lots
@@ -508,6 +508,61 @@ paths:
       responses:
         "200":
           description: Statut mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LotDetail"
+        "404":
+          description: Non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /lots/fusionner:
+    post:
+      operationId: fusionnerLots
+      tags: [lots]
+      summary: Fusionner plusieurs lots en un seul
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FusionLotsInput"
+      responses:
+        "201":
+          description: Lot fusionné créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LotDetail"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /lots/{id}/expedier:
+    put:
+      operationId: expedierLot
+      tags: [lots]
+      summary: Expédier un lot vers une vente exportateur
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpedierLotInput"
+      responses:
+        "200":
+          description: Lot expédié
           content:
             application/json:
               schema:
@@ -6655,7 +6710,14 @@ components:
           type: string
         statut:
           type: string
-          enum: [en_stock, vendu, transit]
+          enum: [en_stock, vendu, transit, refoule, fusionne]
+        venteExportateurId:
+          type: ["integer", "null"]
+        parentLotIds:
+          type: array
+          items:
+            type: integer
+          nullable: true
         poidsTotalKg:
           type: string
         dateCreation:
@@ -6688,7 +6750,50 @@ components:
       properties:
         statut:
           type: string
-          enum: [en_stock, vendu, transit]
+          enum: [en_stock, vendu, transit, refoule, fusionne]
+        venteExportateurId:
+          type: ["integer", "null"]
+
+    FusionLotsInput:
+      type: object
+      required: [lotIds, entrepot]
+      properties:
+        lotIds:
+          type: array
+          items:
+            type: integer
+          minItems: 2
+        entrepot:
+          type: string
+
+    ExpedierLotInput:
+      type: object
+      required: [venteExportateurId]
+      properties:
+        venteExportateurId:
+          type: integer
+
+    ParcelleEudr:
+      type: object
+      properties:
+        id:
+          type: integer
+        membreId:
+          type: integer
+        membreNom:
+          type: ["string", "null"]
+        membrePrenoms:
+          type: ["string", "null"]
+        coordonneesPoint:
+          type: ["object", "null"]
+        polygone:
+          nullable: true
+        superficieDeclareeHa:
+          type: ["string", "null"]
+        eudrStatut:
+          type: ["string", "null"]
+        eudrRisqueDeforestation:
+          type: ["string", "null"]
 
     LotTracabilite:
       type: object
@@ -6706,6 +6811,10 @@ components:
             $ref: "#/components/schemas/Membre"
         vente:
           $ref: "#/components/schemas/VenteDetail"
+        parcelles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParcelleEudr"
 
     # ── M03 Stocks ──────────────────────────────────────────────
     EntrepotStock:

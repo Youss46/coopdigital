@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable, mouvementsStockTable } from "@workspace/db";
+import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable, mouvementsStockTable, lotsTable } from "@workspace/db";
 import { eq, sql, desc, and, lte } from "drizzle-orm";
 import { CreateExportateurBody, CreateVenteBody, EncaisserVenteBody } from "@workspace/api-zod";
 import { generateEcrituresVente, generateEcrituresEncaissement } from "../services/comptabiliteService";
@@ -423,7 +423,7 @@ export async function signalerRefus(req: Request, res: Response): Promise<void> 
       refus = r!;
 
       // 2. Mettre à jour le statut et le solde de la vente
-      await tx
+      const [venteUpdated] = await tx
         .update(ventesExportateursTable)
         .set({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -432,7 +432,16 @@ export async function signalerRefus(req: Request, res: Response): Promise<void> 
           nombreSacsRefoules: sql`COALESCE(nombre_sacs_refoules, 0) + ${nombreSacsRefoules}`,
           poidsRefuleKg: sql`COALESCE(poids_refoule_kg::numeric, 0) + ${poidsRefouleNum}`,
         })
-        .where(eq(ventesExportateursTable.id, venteId));
+        .where(eq(ventesExportateursTable.id, venteId))
+        .returning({ lotId: ventesExportateursTable.lotId });
+
+      // 2b. Propager le statut REFOULÉ au lot lié (si applicable)
+      if (venteUpdated?.lotId) {
+        await tx
+          .update(lotsTable)
+          .set({ statut: "refoule" })
+          .where(eq(lotsTable.id, venteUpdated.lotId));
+      }
 
       // 3. Reconstituer le stock automatiquement
       await tx.insert(mouvementsStockTable).values({
