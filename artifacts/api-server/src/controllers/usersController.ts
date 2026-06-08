@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and } from "drizzle-orm";
 import {
   CreateUserBody,
   UpdateUserBody,
@@ -12,10 +12,20 @@ import { canCreateUser, canDeleteUser } from "../middlewares/roleGuard";
 
 const ROLES_ALLOWED_TO_MANAGE = ["pca", "directeur"];
 
+function getCoopId(req: Request): number | null {
+  return req.user?.cooperativeId ?? null;
+}
+
 // GET /users
 export async function listUsers(req: Request, res: Response): Promise<void> {
   if (!ROLES_ALLOWED_TO_MANAGE.includes(req.user?.role ?? "")) {
     res.status(403).json({ erreur: "Accès réservé au PCA et au Directeur" });
+    return;
+  }
+
+  const cooperativeId = getCoopId(req);
+  if (!cooperativeId) {
+    res.status(401).json({ erreur: "Coopérative non associée au compte" });
     return;
   }
 
@@ -33,6 +43,7 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
         createdAt: usersTable.createdAt,
       })
       .from(usersTable)
+      .where(eq(usersTable.cooperativeId, cooperativeId))
       .orderBy(asc(usersTable.createdAt));
 
     res.json(users);
@@ -47,6 +58,12 @@ export async function createUser(req: Request, res: Response): Promise<void> {
   const requesterRole = req.user?.role ?? "";
   if (!ROLES_ALLOWED_TO_MANAGE.includes(requesterRole)) {
     res.status(403).json({ erreur: "Droits insuffisants pour créer un compte" });
+    return;
+  }
+
+  const cooperativeId = getCoopId(req);
+  if (!cooperativeId) {
+    res.status(401).json({ erreur: "Coopérative non associée au compte" });
     return;
   }
 
@@ -75,7 +92,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
         telephone: telephone ?? null,
         passwordHash,
         role,
-        cooperativeId: req.user?.cooperativeId ?? null,
+        cooperativeId,
         actif: true,
       })
       .returning({
@@ -111,6 +128,12 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
   const id = parseInt(String(req.params["id"] ?? "0"), 10);
   if (!id) { res.status(400).json({ erreur: "ID invalide" }); return; }
 
+  const cooperativeId = getCoopId(req);
+  if (!cooperativeId) {
+    res.status(401).json({ erreur: "Coopérative non associée au compte" });
+    return;
+  }
+
   const parse = UpdateUserBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
@@ -118,7 +141,11 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const [existing] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+    const [existing] = await db
+      .select()
+      .from(usersTable)
+      .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)))
+      .limit(1);
     if (!existing) { res.status(404).json({ erreur: "Compte introuvable" }); return; }
 
     const updateData: Partial<typeof usersTable.$inferInsert> = {};
@@ -130,7 +157,7 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
     const [updated] = await db
       .update(usersTable)
       .set(updateData)
-      .where(eq(usersTable.id, id))
+      .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)))
       .returning({
         id: usersTable.id,
         nom: usersTable.nom,
@@ -161,6 +188,12 @@ export async function resetUserPassword(req: Request, res: Response): Promise<vo
     return;
   }
 
+  const cooperativeId = getCoopId(req);
+  if (!cooperativeId) {
+    res.status(401).json({ erreur: "Coopérative non associée au compte" });
+    return;
+  }
+
   const parse = ResetUserPasswordBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
@@ -168,11 +201,18 @@ export async function resetUserPassword(req: Request, res: Response): Promise<vo
   }
 
   try {
-    const [existing] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+    const [existing] = await db
+      .select()
+      .from(usersTable)
+      .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)))
+      .limit(1);
     if (!existing) { res.status(404).json({ erreur: "Compte introuvable" }); return; }
 
     const passwordHash = await bcrypt.hash(parse.data.nouveauMotDePasse, 10);
-    await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, id));
+    await db
+      .update(usersTable)
+      .set({ passwordHash })
+      .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)));
 
     res.json({ message: "Mot de passe réinitialisé avec succès" });
   } catch (err) {
@@ -189,8 +229,18 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
   const requesterId = req.user?.id ?? 0;
   const requesterRole = req.user?.role ?? "";
 
+  const cooperativeId = getCoopId(req);
+  if (!cooperativeId) {
+    res.status(401).json({ erreur: "Coopérative non associée au compte" });
+    return;
+  }
+
   try {
-    const [target] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+    const [target] = await db
+      .select()
+      .from(usersTable)
+      .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)))
+      .limit(1);
     if (!target) { res.status(404).json({ erreur: "Compte introuvable" }); return; }
 
     const check = canDeleteUser(requesterRole, requesterId, id, target.role);
@@ -199,7 +249,9 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    await db.delete(usersTable).where(eq(usersTable.id, id));
+    await db
+      .delete(usersTable)
+      .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)));
     res.status(204).end();
   } catch (err) {
     req.log.error({ err }, "Erreur lors de la suppression du compte");
@@ -218,6 +270,12 @@ export async function toggleUserActif(req: Request, res: Response): Promise<void
     return;
   }
 
+  const cooperativeId = getCoopId(req);
+  if (!cooperativeId) {
+    res.status(401).json({ erreur: "Coopérative non associée au compte" });
+    return;
+  }
+
   const parse = ToggleUserActifBody.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
@@ -225,7 +283,11 @@ export async function toggleUserActif(req: Request, res: Response): Promise<void
   }
 
   try {
-    const [existing] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+    const [existing] = await db
+      .select()
+      .from(usersTable)
+      .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)))
+      .limit(1);
     if (!existing) { res.status(404).json({ erreur: "Compte introuvable" }); return; }
 
     if (existing.role === "pca" && !parse.data.actif) {
@@ -236,7 +298,7 @@ export async function toggleUserActif(req: Request, res: Response): Promise<void
     const [updated] = await db
       .update(usersTable)
       .set({ actif: parse.data.actif })
-      .where(eq(usersTable.id, id))
+      .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)))
       .returning({
         id: usersTable.id,
         nom: usersTable.nom,
