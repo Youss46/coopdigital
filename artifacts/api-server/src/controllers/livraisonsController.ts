@@ -63,7 +63,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
   }
 
   const { membreId, poidsKg, prixUnitaireFcfa, dateLivraison, modePaiement,
-          campagneId, nombreSacs, retenueKg, sectionLivraison } = parse.data;
+          campagneId, nombreSacs, retenueKg, sectionLivraison, entrepotId } = parse.data;
 
   try {
     const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, membreId)).limit(1);
@@ -186,11 +186,14 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         await enregistrerRemboursementParLivraison(tx, cooperativeId, membreId, intrantsDeduits, dateStr);
       }
 
-      // Créer un mouvement de stock "entrée" dans le premier entrepôt de la coopérative
+      // Créer un mouvement de stock "entrée" dans l'entrepôt choisi (ou le premier par défaut)
+      const entrepotCondition = entrepotId
+        ? and(eq(entrepotsTable.id, entrepotId), eq(entrepotsTable.cooperativeId, cooperativeId))
+        : eq(entrepotsTable.cooperativeId, cooperativeId);
       const [entrepot] = await tx
         .select({ id: entrepotsTable.id })
         .from(entrepotsTable)
-        .where(eq(entrepotsTable.cooperativeId, cooperativeId))
+        .where(entrepotCondition)
         .orderBy(entrepotsTable.id)
         .limit(1);
 

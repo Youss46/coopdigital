@@ -9,6 +9,7 @@ import {
   useGetBalances,
   useGetConfigPesee,
   useGetPrixActuel,
+  useGetEntrepots,
   getGetMembresQueryKey,
   getGetAvancesQueryKey,
   getGetEncoursIntrantsMembreQueryKey,
@@ -34,6 +35,7 @@ export default function NouvelleLivraison() {
   const [nombreSacs, setNombreSacs] = useState("");
   const [retenueKg, setRetenueKg] = useState("");
   const [sectionLivraison, setSectionLivraison] = useState("");
+  const [entrepotId, setEntrepotId] = useState("");
   const [prixUnitaire, setPrixUnitaire] = useState("");
   const [modePaiement, setModePaiement] = useState<"orange_money" | "mtn_momo" | "especes">("especes");
   const [dateLivraison, setDateLivraison] = useState(new Date().toISOString().split("T")[0]!);
@@ -44,6 +46,7 @@ export default function NouvelleLivraison() {
   const { data: balancesData } = useGetBalances();
   const { data: configPesee } = useGetConfigPesee();
   const { data: prixActuelData } = useGetPrixActuel();
+  const { data: entrepotsData } = useGetEntrepots();
 
   useEffect(() => {
     if (prixActuelData?.prixBordChampFcfa) {
@@ -134,6 +137,7 @@ export default function NouvelleLivraison() {
         nombreSacs: nombreSacs ? parseInt(nombreSacs) : null,
         retenueKg: retenueTotal > 0 ? retenueTotal : null,
         sectionLivraison: sectionLivraison || null,
+        entrepotId: entrepotId ? parseInt(entrepotId) : null,
       },
     });
   };
@@ -466,28 +470,45 @@ export default function NouvelleLivraison() {
             {showOptions ? "Masquer les options" : "Options supplémentaires"}
           </button>
           {showOptions && (
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Mode de paiement</label>
-                <select
-                  value={modePaiement}
-                  onChange={(e) => setModePaiement(e.target.value as "orange_money" | "mtn_momo" | "especes")}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
-                >
-                  <option value="especes">Espèces</option>
-                  <option value="orange_money">Orange Money</option>
-                  <option value="mtn_momo">MTN MoMo</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Section livraison</label>
-                <input
-                  type="text"
-                  value={sectionLivraison}
-                  onChange={(e) => setSectionLivraison(e.target.value)}
-                  placeholder="Ex: Nord-Ouest"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
-                />
+            <div className="space-y-3 pt-1">
+              {(entrepotsData?.entrepots ?? []).length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Entrepôt de réception</label>
+                  <select
+                    value={entrepotId}
+                    onChange={(e) => setEntrepotId(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+                  >
+                    <option value="">— Par défaut (premier créé) —</option>
+                    {(entrepotsData?.entrepots ?? []).map((e) => (
+                      <option key={e.id} value={e.id}>{e.nom} — {e.ville}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Mode de paiement</label>
+                  <select
+                    value={modePaiement}
+                    onChange={(e) => setModePaiement(e.target.value as "orange_money" | "mtn_momo" | "especes")}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+                  >
+                    <option value="especes">Espèces</option>
+                    <option value="orange_money">Orange Money</option>
+                    <option value="mtn_momo">MTN MoMo</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Section livraison</label>
+                  <input
+                    type="text"
+                    value={sectionLivraison}
+                    onChange={(e) => setSectionLivraison(e.target.value)}
+                    placeholder="Ex: Nord-Ouest"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+                  />
+                </div>
               </div>
             </div>
           )}
