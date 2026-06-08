@@ -6618,6 +6618,9 @@ components:
         datePaiementPrevue:
           type: string
           nullable: true
+        entrepotId:
+          type: integer
+          nullable: true
 
     ValiderPaiementInput:
       type: object

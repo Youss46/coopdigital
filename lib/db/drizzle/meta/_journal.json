@@ -15,6 +15,13 @@
       "when": 1780921767209,
       "tag": "0001_fat_joshua_kane",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780961719533,
+      "tag": "0002_add_livraisons_paiement_differe",
+      "breakpoints": true
     }
   ]
 }

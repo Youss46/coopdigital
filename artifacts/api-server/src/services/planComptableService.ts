@@ -154,14 +154,15 @@ export async function validerNumeroCompte(cooperativeId: number, numero: string)
 // ── Paramètres comptes modules ────────────────────────────────────────────────
 
 export async function listerParams(cooperativeId?: number, module?: string) {
-  const coopId = cooperativeId ?? cooperativeId;
+  const coopId = cooperativeId;
+  const conditions = [
+    ...(coopId != null ? [eq(parametresComptesModulesTable.cooperativeId, coopId)] : []),
+    ...(module ? [eq(parametresComptesModulesTable.module, module)] : []),
+  ];
   const rows = await db
     .select()
     .from(parametresComptesModulesTable)
-    .where(and(
-      eq(parametresComptesModulesTable.cooperativeId, coopId),
-      ...(module ? [eq(parametresComptesModulesTable.module, module)] : []),
-    ))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(parametresComptesModulesTable.module), asc(parametresComptesModulesTable.operation));
   return rows;
 }

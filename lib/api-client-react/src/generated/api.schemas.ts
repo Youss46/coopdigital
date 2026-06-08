@@ -870,6 +870,7 @@ export interface LivraisonInput {
   retenueKg?: number | null;
   sectionLivraison?: string | null;
   datePaiementPrevue?: string | null;
+  entrepotId?: number | null;
 }
 
 export interface ValiderPaiementInput {

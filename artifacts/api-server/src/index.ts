@@ -3,6 +3,8 @@ import { logger } from "./lib/logger";
 import cron from "node-cron";
 import { checkEcheancesEnRetard } from "./services/empruntService";
 import { runNotificationsCron } from "./jobs/notificationsCron";
+import { runMigrations } from "@workspace/db";
+import path from "path";
 
 const rawPort = process.env["PORT"];
 
@@ -18,8 +20,15 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-// Démarrage immédiat : le serveur écoute avant les migrations
-// pour que le healthcheck Railway réussisse dès le lancement.
+// ── Migrations DB (idempotentes) ─────────────────────────────────────────────
+// Le chemin est résolu depuis le répertoire de travail du serveur
+// (artifacts/api-server/) vers lib/db/drizzle/
+const migrationsFolder = path.resolve(process.cwd(), "../../lib/db/drizzle");
+
+runMigrations(migrationsFolder)
+  .then(() => logger.info("Migrations DB appliquées"))
+  .catch((err) => logger.error({ err }, "Erreur migrations DB — démarrage quand même"));
+
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");

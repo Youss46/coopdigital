@@ -418,7 +418,8 @@ export const CreateLivraisonBody = zod.object({
   "nombreSacs": zod.number().nullish(),
   "retenueKg": zod.number().nullish(),
   "sectionLivraison": zod.string().nullish(),
-  "datePaiementPrevue": zod.string().nullish()
+  "datePaiementPrevue": zod.string().nullish(),
+  "entrepotId": zod.number().nullish()
 })
 
 
