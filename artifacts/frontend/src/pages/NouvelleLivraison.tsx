@@ -471,7 +471,7 @@ export default function NouvelleLivraison() {
           </button>
           {showOptions && (
             <div className="space-y-3 pt-1">
-              {(entrepotsData?.entrepots ?? []).length > 0 && (
+              {(entrepotsData ?? []).length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Entrepôt de réception</label>
                   <select
@@ -480,7 +480,7 @@ export default function NouvelleLivraison() {
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
                   >
                     <option value="">— Par défaut (premier créé) —</option>
-                    {(entrepotsData?.entrepots ?? []).map((e) => (
+                    {(entrepotsData ?? []).map((e) => (
                       <option key={e.id} value={e.id}>{e.nom} — {e.ville}</option>
                     ))}
                   </select>
