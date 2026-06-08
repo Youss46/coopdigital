@@ -206,7 +206,7 @@ export async function getTendance(cooperativeId: number) {
       eq(historiquePrixTable.cooperativeId, cooperativeId),
       gte(historiquePrixTable.datePrix, dateDebut.toISOString().slice(0, 10)),
     ))
-    .orderBy(asc(historiquePrixTable.datePrix));
+    .orderBy(asc(historiquePrixTable.datePrix), asc(historiquePrixTable.id));
 
   if (rows.length === 0) return null;
 
