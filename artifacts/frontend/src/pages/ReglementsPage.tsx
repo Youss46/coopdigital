@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   CheckCircle2, Clock, Loader2, CreditCard, Search, CheckCheck, AlertCircle,
 } from "lucide-react";
@@ -49,6 +49,19 @@ export default function ReglementsPage() {
   });
 
   const validerMut = useValiderPaiement();
+
+  // Auto-ouvrir le modal si ?paiementId=X est passé dans l'URL (depuis "Payer maintenant")
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paiementId = urlParams.get("paiementId");
+    if (!paiementId || !paiements) return;
+    const found = paiements.find((p) => p.id === parseInt(paiementId));
+    if (found && !modal) {
+      setModal({ paiement: found, ref: "" });
+      // Nettoyer l'URL sans recharger la page
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [paiements]);
 
   const filtres = (paiements ?? []).filter((p) => {
     if (!recherche) return true;

@@ -63,7 +63,10 @@ export async function createLivraison(req: Request, res: Response): Promise<void
   }
 
   const { membreId, poidsKg, prixUnitaireFcfa, dateLivraison, modePaiement,
-          campagneId, nombreSacs, retenueKg, sectionLivraison, entrepotId } = parse.data;
+          campagneId, nombreSacs, retenueKg, sectionLivraison, entrepotId,
+          datePaiementPrevue } = parse.data;
+
+  const estDiffere = modePaiement === "differe";
 
   try {
     const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, membreId)).limit(1);
@@ -146,17 +149,24 @@ export async function createLivraison(req: Request, res: Response): Promise<void
           nombreSacs: nombreSacs ?? null,
           retenueKg: retenueKg != null ? String(retenueKg) : null,
           sectionLivraison: sectionLivraison ?? null,
+          ...(estDiffere && {
+            statutPaiement: "EN_ATTENTE",
+            montantRestant: String(montantNet),
+            datePaiementPrevue: datePaiementPrevue ?? null,
+          }),
         })
         .returning();
 
-      // Créer le paiement
+      // Créer le paiement (différé = mode especes par défaut, sera confirmé lors du règlement)
       const [paiement] = await tx
         .insert(paiementsTable)
         .values({
           livraisonId: livraison!.id,
           membreId,
           montantFcfa: montantNet,
-          modePaiement: (modePaiement as "orange_money" | "mtn_momo" | "especes") ?? "especes",
+          modePaiement: estDiffere
+            ? "especes"
+            : ((modePaiement as "orange_money" | "mtn_momo" | "especes") ?? "especes"),
           statut: "en_attente",
         })
         .returning();

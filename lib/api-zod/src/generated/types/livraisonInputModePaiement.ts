@@ -13,4 +13,5 @@ export const LivraisonInputModePaiement = {
   orange_money: 'orange_money',
   mtn_momo: 'mtn_momo',
   especes: 'especes',
+  differe: 'differe',
 } as const;

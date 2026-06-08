@@ -37,7 +37,8 @@ export default function NouvelleLivraison() {
   const [sectionLivraison, setSectionLivraison] = useState("");
   const [entrepotId, setEntrepotId] = useState("");
   const [prixUnitaire, setPrixUnitaire] = useState("");
-  const [modePaiement, setModePaiement] = useState<"orange_money" | "mtn_momo" | "especes">("especes");
+  const [modePaiement, setModePaiement] = useState<"orange_money" | "mtn_momo" | "especes" | "differe">("especes");
+  const [datePaiementPrevue, setDatePaiementPrevue] = useState("");
   const [dateLivraison, setDateLivraison] = useState(new Date().toISOString().split("T")[0]!);
   const [showOptions, setShowOptions] = useState(false);
   const [succes, setSucces] = useState<{ montantNet: number; avanceDeduite: number; intrantsDeduits: number } | null>(null);
@@ -138,6 +139,7 @@ export default function NouvelleLivraison() {
         retenueKg: retenueTotal > 0 ? retenueTotal : null,
         sectionLivraison: sectionLivraison || null,
         entrepotId: entrepotId ? parseInt(entrepotId) : null,
+        ...(modePaiement === "differe" && datePaiementPrevue ? { datePaiementPrevue } : {}),
       },
     });
   };
@@ -491,14 +493,26 @@ export default function NouvelleLivraison() {
                   <label className="block text-xs font-medium text-gray-600 mb-1">Mode de paiement</label>
                   <select
                     value={modePaiement}
-                    onChange={(e) => setModePaiement(e.target.value as "orange_money" | "mtn_momo" | "especes")}
+                    onChange={(e) => setModePaiement(e.target.value as "orange_money" | "mtn_momo" | "especes" | "differe")}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
                   >
                     <option value="especes">Espèces</option>
                     <option value="orange_money">Orange Money</option>
                     <option value="mtn_momo">MTN MoMo</option>
+                    <option value="differe">Paiement différé</option>
                   </select>
                 </div>
+                {modePaiement === "differe" && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Date de paiement prévue</label>
+                    <input
+                      type="date"
+                      value={datePaiementPrevue}
+                      onChange={(e) => setDatePaiementPrevue(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Section livraison</label>
                   <input
@@ -573,7 +587,7 @@ export default function NouvelleLivraison() {
           className="w-full py-3.5 rounded-xl text-white text-sm font-bold disabled:opacity-40 transition-opacity hover:opacity-90"
           style={{ backgroundColor: "#1a4731" }}
         >
-          {mutation.isPending ? "Enregistrement en cours…" : "Valider et payer"}
+          {mutation.isPending ? "Enregistrement en cours…" : modePaiement === "differe" ? "Enregistrer sans payer" : "Valider et payer"}
         </button>
       </form>
     </div>

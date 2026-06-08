@@ -17,4 +17,5 @@ export interface LivraisonInput {
   nombreSacs?: number | null;
   retenueKg?: number | null;
   sectionLivraison?: string | null;
+  datePaiementPrevue?: string | null;
 }

@@ -6502,7 +6502,7 @@ components:
           type: string
         modePaiement:
           type: string
-          enum: [orange_money, mtn_momo, especes]
+          enum: [orange_money, mtn_momo, especes, differe]
         campagneId:
           type: integer
           nullable: true
@@ -6513,6 +6513,9 @@ components:
           type: number
           nullable: true
         sectionLivraison:
+          type: string
+          nullable: true
+        datePaiementPrevue:
           type: string
           nullable: true
 

@@ -8,12 +8,16 @@ import {
   useEnregistrerLiberation,
   useGetScoringResume,
   useModifierStatutMembre,
+  useListPaiements,
   getGetMembreByIdQueryKey,
   getGetMembreHistoriqueQueryKey,
   getGetAvancesQueryKey,
   getGetPartsMembreQueryKey,
   getGetScoringResumeQueryKey,
+  getListPaiementsQueryKey,
   type LiberationInput,
+  type PaiementListItem,
+  ListPaiementsStatut,
 } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
@@ -251,7 +255,7 @@ function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const TABS = ["Avances", "Livraisons", "Parts sociales", "Score", "Dons reçus", "Formations"] as const;
+const TABS = ["Avances", "Livraisons", "Impayées", "Parts sociales", "Score", "Dons reçus", "Formations"] as const;
 type Tab = (typeof TABS)[number];
 
 const NIVEAUX_SCORE: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
@@ -290,6 +294,11 @@ export default function MembreFiche() {
   });
   const { data: scoreResume } = useGetScoringResume(id, {
     query: { queryKey: getGetScoringResumeQueryKey(id), enabled: !!id },
+  });
+
+  const impayeesParams = { statut: "en_attente" as ListPaiementsStatut, membre_id: id };
+  const { data: paiementsImpayees = [], isLoading: impayeesLoading } = useListPaiements(impayeesParams, {
+    query: { queryKey: getListPaiementsQueryKey(impayeesParams), enabled: !!id && activeTab === "Impayées" },
   });
 
   const liberationMut = useEnregistrerLiberation();
@@ -553,6 +562,48 @@ export default function MembreFiche() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Livraisons impayées */}
+        {activeTab === "Impayées" && (
+          <div className="overflow-x-auto">
+            {impayeesLoading ? (
+              <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-green-600" /></div>
+            ) : (paiementsImpayees as PaiementListItem[]).length === 0 ? (
+              <div className="text-center py-12 text-gray-400 text-sm">Aucune livraison impayée</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-50 bg-gray-50">
+                    <th className="text-left px-4 py-3 font-medium text-gray-500">Date livraison</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-500">Montant dû</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-500">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {(paiementsImpayees as PaiementListItem[]).map((p) => (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-gray-600">
+                        {p.dateLivraison ? formaterDate(p.dateLivraison) : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-amber-700">
+                        {formaterFCFA(p.montantFcfa)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => navigate(`/reglements?paiementId=${p.id}`)}
+                          className="text-xs font-medium text-white px-3 py-1.5 rounded-lg"
+                          style={{ backgroundColor: "#1a4731" }}
+                        >
+                          Payer maintenant
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
 

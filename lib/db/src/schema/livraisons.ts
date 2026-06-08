@@ -45,6 +45,11 @@ export const livraisonsTable = pgTable("livraisons", {
   doublePeseeRequise:    boolean("double_pesee_requise").default(false),
   doublePeseeEffectuee:  boolean("double_pesee_effectuee").default(false),
   litigePesee:           boolean("litige_pesee").default(false),
+
+  // Paiement différé
+  statutPaiement:       text("statut_paiement").default("PAYÉ"),
+  montantRestant:       numeric("montant_restant", { precision: 12, scale: 2 }).default("0"),
+  datePaiementPrevue:   date("date_paiement_prevue", { mode: "string" }),
 });
 
 export const insertLivraisonSchema = createInsertSchema(livraisonsTable).omit({
