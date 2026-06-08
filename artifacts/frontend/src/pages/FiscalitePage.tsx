@@ -3,7 +3,7 @@ import { Calculator, AlertTriangle, CheckCircle2, Clock, Download, Plus, Refresh
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
-const tok  = () => localStorage.getItem("authToken") ?? "";
+const tok  = () => localStorage.getItem("coop_token") ?? "";
 const FCFA = (n: number | string) =>
   new Intl.NumberFormat("fr-FR").format(typeof n === "string" ? parseFloat(n) || 0 : n) + " FCFA";
 

@@ -3,7 +3,7 @@ import { GitMerge, Upload, CheckCircle2, AlertTriangle, HelpCircle, X, Download,
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
-const tok  = () => localStorage.getItem("authToken") ?? "";
+const tok  = () => localStorage.getItem("coop_token") ?? "";
 const FCFA = (n: number | string) =>
   new Intl.NumberFormat("fr-FR").format(typeof n === "string" ? parseFloat(n) || 0 : n) + " FCFA";
 

@@ -13,7 +13,7 @@ import { usePermission } from "@/hooks/usePermission";
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
 function getToken() {
-  return localStorage.getItem("authToken") ?? "";
+  return localStorage.getItem("coop_token") ?? "";
 }
 
 async function apiFetch<T>(path: string): Promise<T> {
