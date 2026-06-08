@@ -1,3 +1,4 @@
+// search controller — v2
 import { type Request, type Response } from "express";
 import { db, membresTable, lotsTable, livraisonsTable } from "@workspace/db";
 import { eq, and, or, ilike, desc } from "drizzle-orm";
