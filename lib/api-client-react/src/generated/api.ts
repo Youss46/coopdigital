@@ -7699,7 +7699,7 @@ export const getCountRefusEnAttenteUrl = () => {
 
 
 
-  return `/api/api/refus/count`
+  return `/api/refus/count`
 }
 
 /**
@@ -7722,7 +7722,7 @@ export const countRefusEnAttente = async ( options?: RequestInit): Promise<Count
 
 export const getCountRefusEnAttenteQueryKey = () => {
     return [
-    `/api/api/refus/count`
+    `/api/refus/count`
     ] as const;
     }
 
@@ -7776,7 +7776,7 @@ export const getGetStatsRefusUrl = () => {
 
 
 
-  return `/api/api/refus/stats`
+  return `/api/refus/stats`
 }
 
 /**
@@ -7799,7 +7799,7 @@ export const getStatsRefus = async ( options?: RequestInit): Promise<RefusStats>
 
 export const getGetStatsRefusQueryKey = () => {
     return [
-    `/api/api/refus/stats`
+    `/api/refus/stats`
     ] as const;
     }
 
@@ -7860,7 +7860,7 @@ export const getListRefusUrl = (params?: ListRefusParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/api/refus?${stringifiedParams}` : `/api/api/refus`
+  return stringifiedParams.length > 0 ? `/api/refus?${stringifiedParams}` : `/api/refus`
 }
 
 /**
@@ -7883,7 +7883,7 @@ export const listRefus = async (params?: ListRefusParams, options?: RequestInit)
 
 export const getListRefusQueryKey = (params?: ListRefusParams,) => {
     return [
-    `/api/api/refus`, ...(params ? [params] : [])
+    `/api/refus`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -7937,7 +7937,7 @@ export const getTraiterRefusUrl = (id: number,) => {
 
 
 
-  return `/api/api/refus/${id}/traiter`
+  return `/api/refus/${id}/traiter`
 }
 
 /**
