@@ -1,7 +1,5 @@
-import path from "path";
 import app from "./app";
 import { logger } from "./lib/logger";
-import { runMigrations } from "@workspace/db/migrate";
 import cron from "node-cron";
 import { checkEcheancesEnRetard } from "./services/empruntService";
 import { runNotificationsCron } from "./jobs/notificationsCron";
@@ -30,19 +28,6 @@ app.listen(port, (err) => {
   logger.info({ port }, "Server listening");
 });
 
-// ─── Migrations automatiques (production uniquement) ─────────────────────────
-// En développement, le schéma est synchronisé via `drizzle-kit push`.
-// En production (Railway), les migrations SQL sont appliquées après le démarrage
-// pour ne pas bloquer le healthcheck.
-if (process.env.NODE_ENV === "production") {
-  const migrationsFolder = path.join(__dirname, "migrations");
-  runMigrations(migrationsFolder)
-    .then(() => logger.info("Migrations appliquées avec succès"))
-    .catch((err) => {
-      logger.error({ err }, "Erreur critique lors des migrations");
-      process.exit(1);
-    });
-}
 
 // CRON : vérification quotidienne des échéances en retard (chaque jour à 06h00)
 // CRON budget : sync réalisé toutes les nuits à 02h00
