@@ -13,4 +13,7 @@ export const PaiementListItemStatut = {
   en_attente: 'en_attente',
   confirme: 'confirme',
   echec: 'echec',
+  rejete: 'rejete',
+  en_cours: 'en_cours',
+  effectue: 'effectue',
 } as const;

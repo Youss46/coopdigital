@@ -229,6 +229,7 @@ import type {
   NotificationsCount,
   NotificationsResponse,
   PaiementListItem,
+  PaiementsStats,
   PartsMembre,
   PayerBulletinInput,
   Personnel,
@@ -259,6 +260,7 @@ import type {
   Refus,
   RefusStats,
   RejeterEcritureInput,
+  RejeterPaiementInput,
   RemboursementAvancePersonnelInput,
   RemboursementEmprunt,
   RemboursementEmpruntInput,
@@ -8684,6 +8686,83 @@ export const useCreateFournisseurDepuisMembre = <TError = ErrorType<unknown>,
       return useMutation(getCreateFournisseurDepuisMembreMutationOptions(options));
     }
 
+export const getGetPaiementsStatsUrl = () => {
+
+
+
+
+  return `/api/api/paiements/stats`
+}
+
+/**
+ * @summary Statistiques des paiements
+ */
+export const getPaiementsStats = async ( options?: RequestInit): Promise<PaiementsStats> => {
+
+  return customFetch<PaiementsStats>(getGetPaiementsStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPaiementsStatsQueryKey = () => {
+    return [
+    `/api/api/paiements/stats`
+    ] as const;
+    }
+
+
+export const getGetPaiementsStatsQueryOptions = <TData = Awaited<ReturnType<typeof getPaiementsStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaiementsStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPaiementsStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaiementsStats>>> = ({ signal }) => getPaiementsStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPaiementsStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPaiementsStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getPaiementsStats>>>
+export type GetPaiementsStatsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Statistiques des paiements
+ */
+
+export function useGetPaiementsStats<TData = Awaited<ReturnType<typeof getPaiementsStats>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaiementsStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPaiementsStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListPaiementsUrl = (params?: ListPaiementsParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -8777,7 +8856,7 @@ export const getValiderPaiementUrl = (id: number,) => {
 }
 
 /**
- * @summary Marquer un paiement comme confirmé
+ * @summary Valider un paiement producteur
  */
 export const validerPaiement = async (id: number,
     validerPaiementInput?: ValiderPaiementInput, options?: RequestInit): Promise<PaiementListItem> => {
@@ -8827,7 +8906,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ValiderPaiementMutationError = ErrorType<unknown>
 
     /**
- * @summary Marquer un paiement comme confirmé
+ * @summary Valider un paiement producteur
  */
 export const useValiderPaiement = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validerPaiement>>, TError,{id: number;data?: BodyType<ValiderPaiementInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -8838,6 +8917,78 @@ export const useValiderPaiement = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getValiderPaiementMutationOptions(options));
+    }
+
+export const getRejeterPaiementUrl = (id: number,) => {
+
+
+
+
+  return `/api/api/paiements/${id}/rejeter`
+}
+
+/**
+ * @summary Rejeter un paiement producteur
+ */
+export const rejeterPaiement = async (id: number,
+    rejeterPaiementInput: RejeterPaiementInput, options?: RequestInit): Promise<PaiementListItem> => {
+
+  return customFetch<PaiementListItem>(getRejeterPaiementUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      rejeterPaiementInput,)
+  }
+);}
+
+
+
+
+export const getRejeterPaiementMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejeterPaiement>>, TError,{id: number;data: BodyType<RejeterPaiementInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rejeterPaiement>>, TError,{id: number;data: BodyType<RejeterPaiementInput>}, TContext> => {
+
+const mutationKey = ['rejeterPaiement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejeterPaiement>>, {id: number;data: BodyType<RejeterPaiementInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  rejeterPaiement(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RejeterPaiementMutationResult = NonNullable<Awaited<ReturnType<typeof rejeterPaiement>>>
+    export type RejeterPaiementMutationBody = BodyType<RejeterPaiementInput>
+    export type RejeterPaiementMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Rejeter un paiement producteur
+ */
+export const useRejeterPaiement = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejeterPaiement>>, TError,{id: number;data: BodyType<RejeterPaiementInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rejeterPaiement>>,
+        TError,
+        {id: number;data: BodyType<RejeterPaiementInput>},
+        TContext
+      > => {
+      return useMutation(getRejeterPaiementMutationOptions(options));
     }
 
 export const getListCategoriesIntrantsUrl = () => {

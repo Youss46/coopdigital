@@ -5,10 +5,12 @@
  * CoopDigital — API de gestion des coopératives cacaoyères
  * OpenAPI spec version: 0.1.0
  */
+import type { ListPaiementsPeriode } from './listPaiementsPeriode';
 import type { ListPaiementsStatut } from './listPaiementsStatut';
 
 export type ListPaiementsParams = {
 statut?: ListPaiementsStatut;
 membre_id?: number;
+periode?: ListPaiementsPeriode;
 limit?: number;
 };

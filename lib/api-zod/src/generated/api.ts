@@ -2691,13 +2691,35 @@ export const CreateFournisseurDepuisMembreParams = zod.object({
 
 
 /**
+ * @summary Statistiques des paiements
+ */
+export const GetPaiementsStatsResponse = zod.object({
+  "en_attente": zod.object({
+  "count": zod.number(),
+  "montant_total": zod.number()
+}),
+  "valide_aujourd_hui": zod.object({
+  "count": zod.number(),
+  "montant_total": zod.number()
+}),
+  "rejete": zod.object({
+  "count": zod.number()
+}),
+  "effectue_ce_mois": zod.object({
+  "montant_total": zod.number()
+})
+})
+
+
+/**
  * @summary Liste des paiements producteurs
  */
-export const listPaiementsQueryLimitDefault = 50;
+export const listPaiementsQueryLimitDefault = 100;
 
 export const ListPaiementsQueryParams = zod.object({
-  "statut": zod.enum(['en_attente', 'confirme', 'echec']).optional(),
+  "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']).optional(),
   "membre_id": zod.coerce.number().optional(),
+  "periode": zod.enum(['today', 'week', 'month']).optional(),
   "limit": zod.coerce.number().default(listPaiementsQueryLimitDefault)
 })
 
@@ -2708,18 +2730,27 @@ export const ListPaiementsResponseItem = zod.object({
   "montantFcfa": zod.number(),
   "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes']),
   "referenceTransaction": zod.string().nullish(),
-  "statut": zod.enum(['en_attente', 'confirme', 'echec']),
+  "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']),
   "createdAt": zod.string(),
+  "motifRejet": zod.string().nullish(),
+  "dateValidation": zod.string().nullish(),
   "membreNom": zod.string().nullish(),
   "membrePrenoms": zod.string().nullish(),
   "telephone": zod.string().nullish(),
-  "dateLivraison": zod.string().nullish()
+  "dateLivraison": zod.string().nullish(),
+  "poidsNetKg": zod.string().nullish(),
+  "poidsKg": zod.string().nullish(),
+  "montantBrutFcfa": zod.number().nullish(),
+  "avanceDeduiteFcfa": zod.number().nullish(),
+  "intrantsDeduitsFcfa": zod.number().nullish(),
+  "montantNetFcfa": zod.number().nullish(),
+  "agentId": zod.number().nullish()
 })
 export const ListPaiementsResponse = zod.array(ListPaiementsResponseItem)
 
 
 /**
- * @summary Marquer un paiement comme confirmé
+ * @summary Valider un paiement producteur
  */
 export const ValiderPaiementParams = zod.object({
   "id": zod.coerce.number()
@@ -2727,7 +2758,8 @@ export const ValiderPaiementParams = zod.object({
 
 export const ValiderPaiementBody = zod.object({
   "referenceTransaction": zod.string().nullish(),
-  "dateReglement": zod.string().nullish()
+  "dateReglement": zod.string().nullish(),
+  "telephone": zod.string().nullish()
 })
 
 export const ValiderPaiementResponse = zod.object({
@@ -2737,12 +2769,60 @@ export const ValiderPaiementResponse = zod.object({
   "montantFcfa": zod.number(),
   "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes']),
   "referenceTransaction": zod.string().nullish(),
-  "statut": zod.enum(['en_attente', 'confirme', 'echec']),
+  "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']),
   "createdAt": zod.string(),
+  "motifRejet": zod.string().nullish(),
+  "dateValidation": zod.string().nullish(),
   "membreNom": zod.string().nullish(),
   "membrePrenoms": zod.string().nullish(),
   "telephone": zod.string().nullish(),
-  "dateLivraison": zod.string().nullish()
+  "dateLivraison": zod.string().nullish(),
+  "poidsNetKg": zod.string().nullish(),
+  "poidsKg": zod.string().nullish(),
+  "montantBrutFcfa": zod.number().nullish(),
+  "avanceDeduiteFcfa": zod.number().nullish(),
+  "intrantsDeduitsFcfa": zod.number().nullish(),
+  "montantNetFcfa": zod.number().nullish(),
+  "agentId": zod.number().nullish()
+})
+
+
+/**
+ * @summary Rejeter un paiement producteur
+ */
+export const RejeterPaiementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const RejeterPaiementBody = zod.object({
+  "motifRejet": zod.string().min(1)
+})
+
+export const RejeterPaiementResponse = zod.object({
+  "id": zod.number(),
+  "livraisonId": zod.number(),
+  "membreId": zod.number(),
+  "montantFcfa": zod.number(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes']),
+  "referenceTransaction": zod.string().nullish(),
+  "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']),
+  "createdAt": zod.string(),
+  "motifRejet": zod.string().nullish(),
+  "dateValidation": zod.string().nullish(),
+  "membreNom": zod.string().nullish(),
+  "membrePrenoms": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "dateLivraison": zod.string().nullish(),
+  "poidsNetKg": zod.string().nullish(),
+  "poidsKg": zod.string().nullish(),
+  "montantBrutFcfa": zod.number().nullish(),
+  "avanceDeduiteFcfa": zod.number().nullish(),
+  "intrantsDeduitsFcfa": zod.number().nullish(),
+  "montantNetFcfa": zod.number().nullish(),
+  "agentId": zod.number().nullish()
 })
 
 

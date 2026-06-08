@@ -19,6 +19,10 @@ export interface PaiementListItem {
   statut: PaiementListItemStatut;
   createdAt: string;
   /** @nullable */
+  motifRejet?: string | null;
+  /** @nullable */
+  dateValidation?: string | null;
+  /** @nullable */
   membreNom?: string | null;
   /** @nullable */
   membrePrenoms?: string | null;
@@ -26,4 +30,18 @@ export interface PaiementListItem {
   telephone?: string | null;
   /** @nullable */
   dateLivraison?: string | null;
+  /** @nullable */
+  poidsNetKg?: string | null;
+  /** @nullable */
+  poidsKg?: string | null;
+  /** @nullable */
+  montantBrutFcfa?: number | null;
+  /** @nullable */
+  avanceDeduiteFcfa?: number | null;
+  /** @nullable */
+  intrantsDeduitsFcfa?: number | null;
+  /** @nullable */
+  montantNetFcfa?: number | null;
+  /** @nullable */
+  agentId?: number | null;
 }

@@ -875,6 +875,7 @@ export interface LivraisonInput {
 export interface ValiderPaiementInput {
   referenceTransaction?: string | null;
   dateReglement?: string | null;
+  telephone?: string | null;
 }
 
 export type PaiementListItemModePaiement = typeof PaiementListItemModePaiement[keyof typeof PaiementListItemModePaiement];
@@ -893,6 +894,9 @@ export const PaiementListItemStatut = {
   en_attente: 'en_attente',
   confirme: 'confirme',
   echec: 'echec',
+  rejete: 'rejete',
+  en_cours: 'en_cours',
+  effectue: 'effectue',
 } as const;
 
 export interface PaiementListItem {
@@ -906,6 +910,10 @@ export interface PaiementListItem {
   statut: PaiementListItemStatut;
   createdAt: string;
   /** @nullable */
+  motifRejet?: string | null;
+  /** @nullable */
+  dateValidation?: string | null;
+  /** @nullable */
   membreNom?: string | null;
   /** @nullable */
   membrePrenoms?: string | null;
@@ -913,6 +921,50 @@ export interface PaiementListItem {
   telephone?: string | null;
   /** @nullable */
   dateLivraison?: string | null;
+  /** @nullable */
+  poidsNetKg?: string | null;
+  /** @nullable */
+  poidsKg?: string | null;
+  /** @nullable */
+  montantBrutFcfa?: number | null;
+  /** @nullable */
+  avanceDeduiteFcfa?: number | null;
+  /** @nullable */
+  intrantsDeduitsFcfa?: number | null;
+  /** @nullable */
+  montantNetFcfa?: number | null;
+  /** @nullable */
+  agentId?: number | null;
+}
+
+export type PaiementsStatsEnAttente = {
+  count: number;
+  montant_total: number;
+};
+
+export type PaiementsStatsValideAujourdHui = {
+  count: number;
+  montant_total: number;
+};
+
+export type PaiementsStatsRejete = {
+  count: number;
+};
+
+export type PaiementsStatsEffectueCeMois = {
+  montant_total: number;
+};
+
+export interface PaiementsStats {
+  en_attente: PaiementsStatsEnAttente;
+  valide_aujourd_hui: PaiementsStatsValideAujourdHui;
+  rejete: PaiementsStatsRejete;
+  effectue_ce_mois: PaiementsStatsEffectueCeMois;
+}
+
+export interface RejeterPaiementInput {
+  /** @minLength 1 */
+  motifRejet: string;
 }
 
 export interface LivraisonResult {
@@ -4347,6 +4399,7 @@ export const ListFournisseursType = {
 export type ListPaiementsParams = {
 statut?: ListPaiementsStatut;
 membre_id?: number;
+periode?: ListPaiementsPeriode;
 limit?: number;
 };
 
@@ -4357,6 +4410,18 @@ export const ListPaiementsStatut = {
   en_attente: 'en_attente',
   confirme: 'confirme',
   echec: 'echec',
+  rejete: 'rejete',
+  en_cours: 'en_cours',
+  effectue: 'effectue',
+} as const;
+
+export type ListPaiementsPeriode = typeof ListPaiementsPeriode[keyof typeof ListPaiementsPeriode];
+
+
+export const ListPaiementsPeriode = {
+  today: 'today',
+  week: 'week',
+  month: 'month',
 } as const;
 
 export type GetEncoursIntrantsMembre200 = {

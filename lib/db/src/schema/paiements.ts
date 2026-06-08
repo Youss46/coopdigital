@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { livraisonsTable } from "./livraisons";
 import { membresTable } from "./membres";
 import { campagnesTable } from "./campagnes";
+import { usersTable } from "./users";
 
 export const modePaiementEnum = pgEnum("mode_paiement", [
   "orange_money",
@@ -15,6 +16,9 @@ export const paiementStatutEnum = pgEnum("paiement_statut", [
   "en_attente",
   "confirme",
   "echec",
+  "rejete",
+  "en_cours",
+  "effectue",
 ]);
 
 export const paiementsTable = pgTable("paiements", {
@@ -42,6 +46,12 @@ export const paiementsTable = pgTable("paiements", {
   statut: paiementStatutEnum("statut").notNull().default("en_attente"),
   recuEnvoyeWhatsapp: boolean("recu_envoye_whatsapp").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+
+  // Validation / rejet
+  validePar: integer("valide_par").references(() => usersTable.id),
+  dateValidation: timestamp("date_validation", { withTimezone: true }),
+  motifRejet: text("motif_rejet"),
+  initialisePar: integer("initialise_par").references(() => usersTable.id),
 });
 
 export const insertPaiementSchema = createInsertSchema(paiementsTable).omit({

@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ValiderPaiementInput {
-  referenceTransaction?: string | null;
-  dateReglement?: string | null;
-  telephone?: string | null;
-}
+export type PaiementsStatsEnAttente = {
+  count: number;
+  montant_total: number;
+};

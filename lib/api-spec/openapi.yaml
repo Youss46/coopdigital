@@ -2449,6 +2449,20 @@ paths:
               schema:
                 $ref: "#/components/schemas/Fournisseur"
 
+  /api/paiements/stats:
+    get:
+      operationId: getPaiementsStats
+      tags: [paiements]
+      summary: Statistiques des paiements
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Stats paiements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaiementsStats"
+
   /api/paiements:
     get:
       operationId: listPaiements
@@ -2460,16 +2474,21 @@ paths:
           in: query
           schema:
             type: string
-            enum: [en_attente, confirme, echec]
+            enum: [en_attente, confirme, echec, rejete, en_cours, effectue]
         - name: membre_id
           in: query
           schema:
             type: integer
+        - name: periode
+          in: query
+          schema:
+            type: string
+            enum: [today, week, month]
         - name: limit
           in: query
           schema:
             type: integer
-            default: 50
+            default: 100
       responses:
         "200":
           description: Liste paiements
@@ -2484,7 +2503,7 @@ paths:
     patch:
       operationId: validerPaiement
       tags: [paiements]
-      summary: Marquer un paiement comme confirmé
+      summary: Valider un paiement producteur
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -2500,7 +2519,33 @@ paths:
               $ref: "#/components/schemas/ValiderPaiementInput"
       responses:
         "200":
-          description: Paiement confirmé
+          description: Paiement validé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaiementListItem"
+
+  /api/paiements/{id}/rejeter:
+    post:
+      operationId: rejeterPaiement
+      tags: [paiements]
+      summary: Rejeter un paiement producteur
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejeterPaiementInput"
+      responses:
+        "200":
+          description: Paiement rejeté
           content:
             application/json:
               schema:
@@ -6583,6 +6628,9 @@ components:
         dateReglement:
           type: string
           nullable: true
+        telephone:
+          type: string
+          nullable: true
 
     PaiementListItem:
       type: object
@@ -6603,9 +6651,13 @@ components:
           type: ["string", "null"]
         statut:
           type: string
-          enum: [en_attente, confirme, echec]
+          enum: [en_attente, confirme, echec, rejete, en_cours, effectue]
         createdAt:
           type: string
+        motifRejet:
+          type: ["string", "null"]
+        dateValidation:
+          type: ["string", "null"]
         membreNom:
           type: ["string", "null"]
         membrePrenoms:
@@ -6614,6 +6666,55 @@ components:
           type: ["string", "null"]
         dateLivraison:
           type: ["string", "null"]
+        poidsNetKg:
+          type: ["string", "null"]
+        poidsKg:
+          type: ["string", "null"]
+        montantBrutFcfa:
+          type: ["integer", "null"]
+        avanceDeduiteFcfa:
+          type: ["integer", "null"]
+        intrantsDeduitsFcfa:
+          type: ["integer", "null"]
+        montantNetFcfa:
+          type: ["integer", "null"]
+        agentId:
+          type: ["integer", "null"]
+
+    PaiementsStats:
+      type: object
+      required: [en_attente, valide_aujourd_hui, rejete, effectue_ce_mois]
+      properties:
+        en_attente:
+          type: object
+          required: [count, montant_total]
+          properties:
+            count: { type: integer }
+            montant_total: { type: integer }
+        valide_aujourd_hui:
+          type: object
+          required: [count, montant_total]
+          properties:
+            count: { type: integer }
+            montant_total: { type: integer }
+        rejete:
+          type: object
+          required: [count]
+          properties:
+            count: { type: integer }
+        effectue_ce_mois:
+          type: object
+          required: [montant_total]
+          properties:
+            montant_total: { type: integer }
+
+    RejeterPaiementInput:
+      type: object
+      required: [motifRejet]
+      properties:
+        motifRejet:
+          type: string
+          minLength: 1
 
     LivraisonDetail:
       type: object
