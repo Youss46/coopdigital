@@ -53,6 +53,7 @@ import reconciliationRouter from "./reconciliation";
 import investissementsRouter from "./investissements";
 import supportRouter from "./support";
 import setupRouter from "./setup";
+import searchRouter from "./search";
 
 const router: IRouter = Router();
 
@@ -114,5 +115,6 @@ router.use(fiscaliteRouter);
 router.use(reconciliationRouter);
 router.use(investissementsRouter);
 router.use(supportRouter);
+router.use(searchRouter);
 
 export default router;

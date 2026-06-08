@@ -49,6 +49,7 @@ import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetA
 import NotificationPanel from "./NotificationPanel";
 import HelpPanel from "./HelpPanel";
 import InstallButton from "./InstallButton";
+import GlobalSearch from "./GlobalSearch";
 
 const navItems = [
   // ── Dashboards ────────────────────────────────────────────────────────────
@@ -466,18 +467,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             <Menu size={22} />
           </button>
-          <div className="flex items-center gap-2 flex-1">
-            <img src="/logo-192.png" alt="CoopDigital" className="w-7 h-7 rounded-lg object-contain" />
-            <span className="font-bold text-gray-900 text-base">CoopDigital</span>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <img src="/logo-192.png" alt="CoopDigital" className="w-7 h-7 rounded-lg object-contain flex-shrink-0" />
+            <span className="font-bold text-gray-900 text-base truncate">CoopDigital</span>
           </div>
           <div className="flex items-center gap-1">
+            <GlobalSearch />
             <HelpPanel />
             <NotificationPanel />
           </div>
         </header>
 
         {/* Barre supérieure desktop — boutons à droite */}
-        <header className="hidden lg:flex items-center justify-end gap-2 px-6 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+        <header className="hidden lg:flex items-center gap-3 px-6 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+          <div className="flex-1">
+            <GlobalSearch />
+          </div>
           <InstallButton />
           <HelpPanel />
           <NotificationPanel />
