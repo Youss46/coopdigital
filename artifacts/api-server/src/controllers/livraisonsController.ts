@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable, campagnesTable } from "@workspace/db";
+import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable, campagnesTable, entrepotsTable, mouvementsStockTable } from "@workspace/db";
 import { eq, and, desc, notInArray } from "drizzle-orm";
 import { checkLivraison, creerAnomalies } from "../services/anomalieService";
 import { CreateLivraisonBody } from "@workspace/api-zod";
@@ -184,6 +184,26 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       // Remboursement automatique des intrants par déduction livraison
       if (intrantsDeduits > 0) {
         await enregistrerRemboursementParLivraison(tx, cooperativeId, membreId, intrantsDeduits, dateStr);
+      }
+
+      // Créer un mouvement de stock "entrée" dans le premier entrepôt de la coopérative
+      const [entrepot] = await tx
+        .select({ id: entrepotsTable.id })
+        .from(entrepotsTable)
+        .where(eq(entrepotsTable.cooperativeId, cooperativeId))
+        .orderBy(entrepotsTable.id)
+        .limit(1);
+
+      if (entrepot) {
+        const poidsNet = retenueKg != null ? poidsKg - retenueKg : poidsKg;
+        await tx.insert(mouvementsStockTable).values({
+          entrepotId: entrepot.id,
+          lotId: null,
+          type: "entree",
+          poidsKg: String(Math.max(0, poidsNet)),
+          motif: `Livraison #${livraison!.id}`,
+          agentId: req.user?.id ?? null,
+        });
       }
 
       return {
