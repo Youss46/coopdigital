@@ -14095,7 +14095,7 @@ export const getGetScoringConfigUrl = () => {
 
 
 
-  return `/api/api/scoring/config`
+  return `/api/scoring/config`
 }
 
 /**
@@ -14118,7 +14118,7 @@ export const getScoringConfig = async ( options?: RequestInit): Promise<ConfigSc
 
 export const getGetScoringConfigQueryKey = () => {
     return [
-    `/api/api/scoring/config`
+    `/api/scoring/config`
     ] as const;
     }
 
@@ -14172,7 +14172,7 @@ export const getUpdateScoringConfigUrl = () => {
 
 
 
-  return `/api/api/scoring/config`
+  return `/api/scoring/config`
 }
 
 /**
@@ -14243,7 +14243,7 @@ export const getGetScoringClassementUrl = (id: number,) => {
 
 
 
-  return `/api/api/scoring/campagne/${id}`
+  return `/api/scoring/campagne/${id}`
 }
 
 /**
@@ -14266,7 +14266,7 @@ export const getScoringClassement = async (id: number, options?: RequestInit): P
 
 export const getGetScoringClassementQueryKey = (id: number,) => {
     return [
-    `/api/api/scoring/campagne/${id}`
+    `/api/scoring/campagne/${id}`
     ] as const;
     }
 
@@ -14327,7 +14327,7 @@ export const getGetScoringTopUrl = (params?: GetScoringTopParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/api/scoring/top?${stringifiedParams}` : `/api/api/scoring/top`
+  return stringifiedParams.length > 0 ? `/api/scoring/top?${stringifiedParams}` : `/api/scoring/top`
 }
 
 /**
@@ -14350,7 +14350,7 @@ export const getScoringTop = async (params?: GetScoringTopParams, options?: Requ
 
 export const getGetScoringTopQueryKey = (params?: GetScoringTopParams,) => {
     return [
-    `/api/api/scoring/top`, ...(params ? [params] : [])
+    `/api/scoring/top`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -14411,7 +14411,7 @@ export const getGetScoringParNiveauUrl = (params?: GetScoringParNiveauParams,) =
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/api/scoring/par-niveau?${stringifiedParams}` : `/api/api/scoring/par-niveau`
+  return stringifiedParams.length > 0 ? `/api/scoring/par-niveau?${stringifiedParams}` : `/api/scoring/par-niveau`
 }
 
 /**
@@ -14434,7 +14434,7 @@ export const getScoringParNiveau = async (params?: GetScoringParNiveauParams, op
 
 export const getGetScoringParNiveauQueryKey = (params?: GetScoringParNiveauParams,) => {
     return [
-    `/api/api/scoring/par-niveau`, ...(params ? [params] : [])
+    `/api/scoring/par-niveau`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -14488,7 +14488,7 @@ export const getGetScoringEvolutionUrl = (membreId: number,) => {
 
 
 
-  return `/api/api/scoring/evolution/${membreId}`
+  return `/api/scoring/evolution/${membreId}`
 }
 
 /**
@@ -14511,7 +14511,7 @@ export const getScoringEvolution = async (membreId: number, options?: RequestIni
 
 export const getGetScoringEvolutionQueryKey = (membreId: number,) => {
     return [
-    `/api/api/scoring/evolution/${membreId}`
+    `/api/scoring/evolution/${membreId}`
     ] as const;
     }
 
@@ -14565,7 +14565,7 @@ export const getGetScoringResumeUrl = (membreId: number,) => {
 
 
 
-  return `/api/api/scoring/resume/${membreId}`
+  return `/api/scoring/resume/${membreId}`
 }
 
 /**
@@ -14588,7 +14588,7 @@ export const getScoringResume = async (membreId: number, options?: RequestInit):
 
 export const getGetScoringResumeQueryKey = (membreId: number,) => {
     return [
-    `/api/api/scoring/resume/${membreId}`
+    `/api/scoring/resume/${membreId}`
     ] as const;
     }
 
@@ -14642,7 +14642,7 @@ export const getGetScoringMembreUrl = (id: number,) => {
 
 
 
-  return `/api/api/scoring/membre/${id}`
+  return `/api/scoring/membre/${id}`
 }
 
 /**
@@ -14665,7 +14665,7 @@ export const getScoringMembre = async (id: number, options?: RequestInit): Promi
 
 export const getGetScoringMembreQueryKey = (id: number,) => {
     return [
-    `/api/api/scoring/membre/${id}`
+    `/api/scoring/membre/${id}`
     ] as const;
     }
 
@@ -14719,7 +14719,7 @@ export const getPostScoringRecalculerUrl = () => {
 
 
 
-  return `/api/api/scoring/recalculer`
+  return `/api/scoring/recalculer`
 }
 
 /**

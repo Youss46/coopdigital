@@ -3847,7 +3847,7 @@ paths:
           description: Remboursement enregistré
 
   # ─── Scoring paths ────────────────────────────────────────────────────────
-  /api/scoring/config:
+  /scoring/config:
     get:
       operationId: getScoringConfig
       summary: Récupérer la configuration du scoring
@@ -3880,7 +3880,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConfigScoring"
 
-  /api/scoring/campagne/{id}:
+  /scoring/campagne/{id}:
     get:
       operationId: getScoringClassement
       summary: Classement complet d'une campagne
@@ -3902,7 +3902,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/EntreeClassement"
 
-  /api/scoring/top:
+  /scoring/top:
     get:
       operationId: getScoringTop
       summary: Top N producteurs
@@ -3927,7 +3927,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/TopProducteur"
 
-  /api/scoring/par-niveau:
+  /scoring/par-niveau:
     get:
       operationId: getScoringParNiveau
       summary: Membres par niveau
@@ -3953,7 +3953,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/MembreNiveau"
 
-  /api/scoring/evolution/{membreId}:
+  /scoring/evolution/{membreId}:
     get:
       operationId: getScoringEvolution
       summary: Évolution du score d'un membre
@@ -3975,7 +3975,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/EvolutionScore"
 
-  /api/scoring/resume/{membreId}:
+  /scoring/resume/{membreId}:
     get:
       operationId: getScoringResume
       summary: Résumé du score d'un membre (dernière campagne)
@@ -3995,7 +3995,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ResumeMembre"
 
-  /api/scoring/membre/{id}:
+  /scoring/membre/{id}:
     get:
       operationId: getScoringMembre
       summary: Score détaillé d'un membre (toutes campagnes)
@@ -4017,7 +4017,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/ScoreMembreDetail"
 
-  /api/scoring/recalculer:
+  /scoring/recalculer:
     post:
       operationId: postScoringRecalculer
       summary: Recalculer tous les scores d'une campagne
