@@ -184,7 +184,7 @@ function TabFlotte() {
       marque: v.marque ?? "",
       modele: v.modele ?? "",
       type: v.type,
-      capacite_kg: v.capacite_kg ? String(v.capacite_kg) : "",
+      capacite_kg: v.capacite_kg ? String(Number(v.capacite_kg) / 1000) : "",
       annee_fabrication: v.annee_fabrication ? String(v.annee_fabrication) : "",
       proprietaire: v.proprietaire,
       nom_prestataire: v.nom_prestataire ?? "",
@@ -205,7 +205,7 @@ function TabFlotte() {
       marque:                       form.marque || undefined,
       modele:                       form.modele || undefined,
       type:                         form.type as "camion" | "camionnette" | "moto" | "tracteur",
-      capacite_kg:                  form.capacite_kg ? Number(form.capacite_kg) : undefined,
+      capacite_kg:                  form.capacite_kg ? Number(form.capacite_kg) * 1000 : undefined,
       annee_fabrication:            form.annee_fabrication ? Number(form.annee_fabrication) : undefined,
       proprietaire:                 form.proprietaire as "cooperative" | "location" | "prestataire",
       nom_prestataire:              form.nom_prestataire || undefined,
@@ -284,7 +284,7 @@ function TabFlotte() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Capacité</span>
-                    <span>{v.capacite_kg ? `${Number(v.capacite_kg).toLocaleString("fr-FR")} kg` : "—"}</span>
+                    <span>{v.capacite_kg ? `${(Number(v.capacite_kg) / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} T` : "—"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Kilométrage</span>
@@ -345,8 +345,8 @@ function TabFlotte() {
               </Select>
             </div>
             <div>
-              <Label>Capacité (kg)</Label>
-              <Input type="number" value={form.capacite_kg} onChange={e => setForm(f => ({ ...f, capacite_kg: e.target.value }))} />
+              <Label>Capacité (T)</Label>
+              <Input type="number" step="0.1" value={form.capacite_kg} onChange={e => setForm(f => ({ ...f, capacite_kg: e.target.value }))} />
             </div>
             <div>
               <Label>Propriétaire</Label>
