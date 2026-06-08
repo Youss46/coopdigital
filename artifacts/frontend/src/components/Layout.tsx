@@ -79,6 +79,8 @@ const navItems = [
     icon: Award,
     roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
   },
+
+  // ── Campagnes & Collecte ──────────────────────────────────────────────────
   {
     href: "/campagnes",
     label: "Campagnes",
@@ -86,11 +88,31 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "agent_terrain", "auditeur"],
   },
   {
+    href: "/planning",
+    label: "Planif. collectes",
+    icon: ClipboardList,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "agent_terrain"],
+  },
+  {
     href: "/livraisons/nouvelle",
     label: "Livraisons",
     icon: Package,
     roles: ["pca", "directeur", "agent_terrain", "responsable_tracabilite", "comptable", "auditeur"],
   },
+  {
+    href: "/pesee",
+    label: "Pesée",
+    icon: Scale,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "magasinier"],
+  },
+  {
+    href: "/transport",
+    label: "Transport",
+    icon: Truck,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "magasinier"],
+  },
+
+  // ── Traçabilité & Conformité ──────────────────────────────────────────────
   {
     href: "/tracabilite",
     label: "Traçabilité",
@@ -109,6 +131,8 @@ const navItems = [
     icon: Leaf,
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
+
+  // ── Stocks ────────────────────────────────────────────────────────────────
   {
     href: "/stocks",
     label: "Stocks",
@@ -194,18 +218,6 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
-    href: "/planning",
-    label: "Planif. collectes",
-    icon: ClipboardList,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "agent_terrain"],
-  },
-  {
-    href: "/formations",
-    label: "Formations",
-    icon: GraduationCap,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "agent_terrain"],
-  },
-  {
     href: "/caisse",
     label: "Caisse",
     icon: Wallet,
@@ -242,8 +254,26 @@ const navItems = [
     icon: Banknote,
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
+  {
+    href: "/formations",
+    label: "Formations",
+    icon: GraduationCap,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "agent_terrain"],
+  },
+  {
+    href: "/equipements",
+    label: "Équipements",
+    icon: Package,
+    roles: ["pca", "directeur", "comptable", "auditeur", "magasinier"],
+  },
 
   // ── Pilotage & Contrôle ───────────────────────────────────────────────────
+  {
+    href: "/previsions",
+    label: "Prévisions",
+    icon: TrendingUp,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
   {
     href: "/reporting",
     label: "Reporting",
@@ -282,30 +312,6 @@ const navItems = [
     label: "Administration",
     icon: ShieldCheck,
     roles: ["pca", "directeur"],
-  },
-  {
-    href: "/transport",
-    label: "Transport",
-    icon: Truck,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "magasinier"],
-  },
-  {
-    href: "/pesee",
-    label: "Pesée",
-    icon: Scale,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "magasinier"],
-  },
-  {
-    href: "/equipements",
-    label: "Équipements",
-    icon: Package,
-    roles: ["pca", "directeur", "comptable", "auditeur", "magasinier"],
-  },
-  {
-    href: "/previsions",
-    label: "Prévisions",
-    icon: TrendingUp,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
     href: "/parametres",
