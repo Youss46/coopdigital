@@ -100,13 +100,18 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
   if (!camp) throw new Error("Campagne introuvable");
 
   const dateFin = camp.dateFermeture ?? new Date().toISOString().slice(0, 10);
+  const dateDebut = camp.dateOuverture;
   const semaines = Math.max(
     1,
     Math.ceil(
-      (new Date(dateFin).getTime() - new Date(camp.dateOuverture).getTime()) /
+      (new Date(dateFin).getTime() - new Date(dateDebut).getTime()) /
       (7 * 86400 * 1000),
     ),
   );
+
+  // Condition d'appartenance d'une livraison à la campagne :
+  // soit campagne_id correspond, soit campagne_id est NULL et la date est dans la période
+  // (gère le cas de livraisons enregistrées avant la création de la campagne)
 
   // 2. Score Volume — tonnage membre vs moyenne coop
   const volRows = await db.execute<{ tonnage_membre: string; tonnage_moyen: string }>(sql`
@@ -116,12 +121,14 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
         (SELECT AVG(t.s) FROM (
           SELECT SUM(COALESCE(l2.poids_net_kg, l2.poids_kg)) AS s
           FROM livraisons l2
-          WHERE l2.campagne_id = ${campagneId}
+          WHERE (l2.campagne_id = ${campagneId}
+                 OR (l2.campagne_id IS NULL AND l2.date_livraison >= ${dateDebut}::date AND l2.date_livraison <= ${dateFin}::date))
           GROUP BY l2.membre_id
         ) t), 1
       ) AS tonnage_moyen
     FROM livraisons l
-    WHERE l.campagne_id = ${campagneId}
+    WHERE (l.campagne_id = ${campagneId}
+           OR (l.campagne_id IS NULL AND l.date_livraison >= ${dateDebut}::date AND l.date_livraison <= ${dateFin}::date))
   `);
   const vol = volRows.rows[0];
   const scoreVolume = Math.min(100,
@@ -136,7 +143,9 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
       COALESCE(SUM(COALESCE(l.poids_net_kg, l.poids_kg)), 0) AS poids_net,
       COALESCE(SUM(COALESCE(l.produit_brut_kg, l.poids_kg)), 0) AS poids_brut
     FROM livraisons l
-    WHERE l.membre_id = ${membreId} AND l.campagne_id = ${campagneId}
+    WHERE l.membre_id = ${membreId}
+      AND (l.campagne_id = ${campagneId}
+           OR (l.campagne_id IS NULL AND l.date_livraison >= ${dateDebut}::date AND l.date_livraison <= ${dateFin}::date))
   `);
   const qual = qualRows.rows[0];
   const scoreQualite = (Number(qual.poids_brut) > 0)
@@ -147,7 +156,9 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
   const regRows = await db.execute<{ semaines_actives: string }>(sql`
     SELECT COUNT(DISTINCT DATE_TRUNC('week', l.date_livraison::date)) AS semaines_actives
     FROM livraisons l
-    WHERE l.membre_id = ${membreId} AND l.campagne_id = ${campagneId}
+    WHERE l.membre_id = ${membreId}
+      AND (l.campagne_id = ${campagneId}
+           OR (l.campagne_id IS NULL AND l.date_livraison >= ${dateDebut}::date AND l.date_livraison <= ${dateFin}::date))
   `);
   const semainesActives = Number(regRows.rows[0]?.semaines_actives ?? 0);
   const scoreRegularite = Math.min(100, (semainesActives / semaines) * 100);
@@ -247,12 +258,25 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
 
 // ─── Recalculer tous les membres d'une campagne ───────────────────────────────
 export async function recalculerTous(cooperativeId: number, campagneId: number) {
+  // Récupérer les dates de la campagne pour le fallback date-range
+  const campRow = await db.select({
+    dateOuverture: campagnesTable.dateOuverture,
+    dateFermeture: campagnesTable.dateFermeture,
+  }).from(campagnesTable).where(eq(campagnesTable.id, campagneId)).limit(1);
+  const camp = campRow[0];
+  if (!camp) return { calculés: 0, campagneId };
+
+  const dateDebut = camp.dateOuverture;
+  const dateFin = camp.dateFermeture ?? new Date().toISOString().slice(0, 10);
+
   // Membres actifs ayant au moins 1 livraison dans la campagne
+  // Inclut les livraisons sans campagne_id dont la date tombe dans la période
   const membres = await db.execute<{ membre_id: number }>(sql`
     SELECT DISTINCT l.membre_id
     FROM livraisons l
     INNER JOIN membres m ON m.id = l.membre_id
-    WHERE l.campagne_id = ${campagneId}
+    WHERE (l.campagne_id = ${campagneId}
+           OR (l.campagne_id IS NULL AND l.date_livraison >= ${dateDebut}::date AND l.date_livraison <= ${dateFin}::date))
       AND m.cooperative_id = ${cooperativeId}
       AND m.statut = 'actif'
   `);
