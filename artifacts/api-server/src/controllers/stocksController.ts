@@ -246,6 +246,44 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function createEntrepot(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  const { nom, ville, capaciteKg, seuilAlerteKg } = req.body as {
+    nom: string;
+    ville: string;
+    capaciteKg: number;
+    seuilAlerteKg?: number;
+  };
+
+  if (!nom || !ville || !capaciteKg) {
+    res.status(400).json({ erreur: "nom, ville et capaciteKg sont requis" });
+    return;
+  }
+
+  try {
+    const [entrepot] = await db
+      .insert(entrepotsTable)
+      .values({
+        cooperativeId,
+        nom: nom.trim(),
+        ville: ville.trim(),
+        capaciteKg: String(capaciteKg),
+        seuilAlerteKg: seuilAlerteKg != null ? String(seuilAlerteKg) : null,
+      })
+      .returning();
+
+    res.status(201).json(entrepot);
+  } catch (err) {
+    req.log.error({ err }, "Erreur createEntrepot");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 export async function getAlertes(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) {

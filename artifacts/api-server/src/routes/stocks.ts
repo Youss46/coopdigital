@@ -8,6 +8,7 @@ import {
   entreeStock,
   sortieStock,
   getAlertes,
+  createEntrepot,
 } from "../controllers/stocksController";
 
 const router: IRouter = Router();
@@ -15,6 +16,7 @@ const router: IRouter = Router();
 router.use(authMiddleware);
 
 router.get("/stocks/entrepots", checkPermission("stocks", "lire"), getEntrepots);
+router.post("/stocks/entrepots", checkPermission("stocks", "entree"), auditMiddleware("stocks", "CREATE", { entiteType: "entrepot" }), createEntrepot);
 router.get("/stocks/mouvements", checkPermission("stocks", "lire"), getMouvements);
 router.post("/stocks/entree", checkPermission("stocks", "entree"), auditMiddleware("stocks", "CREATE", { entiteType: "stock_entree" }), entreeStock);
 router.post("/stocks/sortie", checkPermission("stocks", "sortie"), auditMiddleware("stocks", "CREATE", { entiteType: "stock_sortie" }), sortieStock);

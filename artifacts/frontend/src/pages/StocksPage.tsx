@@ -11,9 +11,17 @@ import {
   getGetMouvementsStockQueryKey,
   getGetStockAlertesQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
+
+const tok = () => localStorage.getItem("coop_token") ?? "";
+const hdr = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
+async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const r = await fetch(path, { method: "POST", headers: hdr(), body: JSON.stringify(body) });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erreur ?? r.statusText);
+  return r.json();
+}
 
 function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", {
@@ -36,6 +44,25 @@ export default function StocksPage() {
   const [onglet, setOnglet] = useState<"entrepots" | "journal">("entrepots");
   const [modalMouvement, setModalMouvement] = useState<"entree" | "sortie" | null>(null);
   const [form, setForm] = useState({ entrepotId: "", poidsKg: "", motif: "" });
+  const [modalEntrepot, setModalEntrepot] = useState(false);
+  const [formEntrepot, setFormEntrepot] = useState({ nom: "", ville: "", capaciteKg: "", seuilAlerteKg: "" });
+  const [errEntrepot, setErrEntrepot] = useState("");
+
+  const mutCreerEntrepot = useMutation({
+    mutationFn: () => apiPost("/api/stocks/entrepots", {
+      nom: formEntrepot.nom,
+      ville: formEntrepot.ville,
+      capaciteKg: parseFloat(formEntrepot.capaciteKg),
+      seuilAlerteKg: formEntrepot.seuilAlerteKg ? parseFloat(formEntrepot.seuilAlerteKg) : undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
+      setModalEntrepot(false);
+      setFormEntrepot({ nom: "", ville: "", capaciteKg: "", seuilAlerteKg: "" });
+      setErrEntrepot("");
+    },
+    onError: (e: Error) => setErrEntrepot(e.message),
+  });
 
   const { data: entrepots = [], isLoading } = useGetEntrepots();
   const { data: mouvements = [] } = useGetMouvementsStock();
@@ -98,6 +125,15 @@ export default function StocksPage() {
           <p className="text-gray-500 text-sm mt-1">Suivi des entrepôts et mouvements de cacao</p>
         </div>
         <div className="flex gap-2">
+          {peutEntree && (
+            <button
+              onClick={() => setModalEntrepot(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
+            >
+              <PlusCircle size={15} />
+              Entrepôt
+            </button>
+          )}
           {peutEntree && (
             <button
               onClick={() => setModalMouvement("entree")}
@@ -334,6 +370,63 @@ export default function StocksPage() {
                 style={{ backgroundColor: modalMouvement === "entree" ? "#1a4731" : "#2563eb" }}
               >
                 {mutEntree.isPending || mutSortie.isPending ? "Enregistrement…" : "Confirmer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal créer entrepôt */}
+      {modalEntrepot && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">Créer un entrepôt</h3>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
+                <input type="text" value={formEntrepot.nom}
+                  onChange={(e) => setFormEntrepot((f) => ({ ...f, nom: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                  placeholder="ex. Entrepôt Central Méagui" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Ville *</label>
+                <input type="text" value={formEntrepot.ville}
+                  onChange={(e) => setFormEntrepot((f) => ({ ...f, ville: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                  placeholder="ex. Méagui" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Capacité (kg) *</label>
+                  <input type="number" value={formEntrepot.capaciteKg}
+                    onChange={(e) => setFormEntrepot((f) => ({ ...f, capaciteKg: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                    placeholder="ex. 50000" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Seuil alerte (kg)</label>
+                  <input type="number" value={formEntrepot.seuilAlerteKg}
+                    onChange={(e) => setFormEntrepot((f) => ({ ...f, seuilAlerteKg: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                    placeholder="ex. 5000" />
+                </div>
+              </div>
+              {errEntrepot && <p className="text-xs text-red-600">{errEntrepot}</p>}
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button onClick={() => { setModalEntrepot(false); setErrEntrepot(""); }}
+                className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Annuler
+              </button>
+              <button
+                onClick={() => mutCreerEntrepot.mutate()}
+                disabled={mutCreerEntrepot.isPending || !formEntrepot.nom || !formEntrepot.ville || !formEntrepot.capaciteKg}
+                className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50"
+                style={{ backgroundColor: "#1a4731" }}>
+                {mutCreerEntrepot.isPending ? "Enregistrement…" : "Créer"}
               </button>
             </div>
           </div>
