@@ -15,10 +15,11 @@ import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 
+const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const hdr = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(path, { method: "POST", headers: hdr(), body: JSON.stringify(body) });
+  const r = await fetch(`${BASE}${path}`, { method: "POST", headers: hdr(), body: JSON.stringify(body) });
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erreur ?? r.statusText);
   return r.json();
 }
