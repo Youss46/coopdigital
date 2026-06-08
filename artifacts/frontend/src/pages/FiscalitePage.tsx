@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Calculator, AlertTriangle, CheckCircle2, Clock, Download, Plus, RefreshCw, X, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok  = () => localStorage.getItem("authToken") ?? "";
 const FCFA = (n: number | string) =>
   new Intl.NumberFormat("fr-FR").format(typeof n === "string" ? parseFloat(n) || 0 : n) + " FCFA";

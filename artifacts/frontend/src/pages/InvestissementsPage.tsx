@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = import.meta.env.VITE_API_URL ?? "";
 
 function fmtF(n: number) {
   return n.toLocaleString("fr-CI") + " FCFA";

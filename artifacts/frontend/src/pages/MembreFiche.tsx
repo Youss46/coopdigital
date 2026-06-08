@@ -27,7 +27,7 @@ import { usePermission } from "@/hooks/usePermission";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const tokFn = () => localStorage.getItem("coop_token") ?? "";
-const BASE_FICHE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE_FICHE = import.meta.env.VITE_API_URL ?? "";
 
 // ── Composant formations d'un membre ─────────────────────────────────────────
 interface FormationMembre {
