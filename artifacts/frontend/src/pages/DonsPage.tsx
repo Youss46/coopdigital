@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Layout from "@/components/Layout";
 import {
   Gift, ArrowUpCircle, ArrowDownCircle, TrendingUp, Plus, Loader2,
   RefreshCw, CheckCircle2, XCircle, Clock, FileText, X, Trash2,
@@ -544,8 +543,8 @@ export default function DonsPage() {
   const inputCls = "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background";
 
   return (
-    <Layout>
-      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+    <>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
@@ -852,6 +851,6 @@ export default function DonsPage() {
           </div>
         </div>
       )}
-    </Layout>
+    </>
   );
 }
