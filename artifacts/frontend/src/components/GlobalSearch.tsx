@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Search, Users, Package, X } from "lucide-react";
-
-const BASE = import.meta.env.VITE_API_URL ?? "";
-const tok = () => localStorage.getItem("coop_token") ?? "";
+import { customFetch } from "@workspace/api-client-react";
 
 type SearchResults = {
   membres: { id: number; nom: string; prenoms: string; telephone: string; codeMembre: string | null; statut: string }[];
@@ -26,19 +24,18 @@ export default function GlobalSearch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debouncedQ = useDebounce(query, 300);
 
   useEffect(() => {
-    if (debouncedQ.length < 2) { setResults(null); return; }
+    if (debouncedQ.length < 2) { setResults(null); setError(""); return; }
     setLoading(true);
-    fetch(`${BASE}/api/search?q=${encodeURIComponent(debouncedQ)}`, {
-      headers: { Authorization: `Bearer ${tok()}` },
-    })
-      .then((r) => r.json())
+    setError("");
+    customFetch<SearchResults>(`/api/search?q=${encodeURIComponent(debouncedQ)}`)
       .then((data) => setResults(data))
-      .catch(() => setResults(null))
+      .catch((e) => { setResults(null); setError(e?.message ?? "Erreur réseau"); })
       .finally(() => setLoading(false));
   }, [debouncedQ]);
 
@@ -46,6 +43,7 @@ export default function GlobalSearch() {
     setOpen(false);
     setQuery("");
     setResults(null);
+    setError("");
   }, []);
 
   useEffect(() => {
@@ -70,7 +68,7 @@ export default function GlobalSearch() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open, close]);
 
-  const total = (results?.membres.length ?? 0) + (results?.lots.length ?? 0) + (results?.livraisons.length ?? 0);
+  const total = (results?.membres?.length ?? 0) + (results?.lots?.length ?? 0) + (results?.livraisons?.length ?? 0);
 
   return (
     <>
@@ -111,15 +109,19 @@ export default function GlobalSearch() {
                 <div className="px-4 py-6 text-center text-sm text-gray-400">Recherche…</div>
               )}
 
-              {!loading && query.length >= 2 && results && total === 0 && (
+              {!loading && error && (
+                <div className="px-4 py-4 text-center text-sm text-red-500">{error}</div>
+              )}
+
+              {!loading && !error && query.length >= 2 && results !== null && total === 0 && (
                 <div className="px-4 py-6 text-center text-sm text-gray-400">Aucun résultat pour « {query} »</div>
               )}
 
-              {!loading && query.length < 2 && (
+              {!loading && !error && query.length < 2 && (
                 <div className="px-4 py-6 text-center text-sm text-gray-400">Tapez au moins 2 caractères pour rechercher</div>
               )}
 
-              {results && results.membres.length > 0 && (
+              {results && (results.membres?.length ?? 0) > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
                     <Users size={11} /> Membres
@@ -140,7 +142,7 @@ export default function GlobalSearch() {
                         <p className="text-sm font-medium text-gray-900 truncate">{m.nom} {m.prenoms}</p>
                         <p className="text-xs text-gray-500">{m.telephone}{m.codeMembre ? ` · ${m.codeMembre}` : ""}</p>
                       </div>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${m.statut === "actif" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${m.statut === "actif" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                         {m.statut}
                       </span>
                     </button>
@@ -148,15 +150,15 @@ export default function GlobalSearch() {
                 </div>
               )}
 
-              {results && results.livraisons.length > 0 && (
+              {results && (results.livraisons?.length ?? 0) > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
-                    <Package size={11} /> Livraisons
+                    <Package size={11} /> Livraisons récentes
                   </div>
                   {results.livraisons.map((l) => (
                     <button
                       key={l.id}
-                      onClick={() => { navigate(`/membres`); close(); }}
+                      onClick={() => { navigate("/membres"); close(); }}
                       className="w-full text-left px-4 py-3 hover:bg-green-50 flex items-center gap-3 border-b border-gray-50 transition-colors"
                     >
                       <div className="w-8 h-8 rounded-full flex-shrink-0 bg-amber-100 flex items-center justify-center">
@@ -170,13 +172,13 @@ export default function GlobalSearch() {
                           {parseFloat(l.poidsKg).toLocaleString("fr-FR")} kg · {new Date(l.dateLivraison + "T00:00:00").toLocaleDateString("fr-FR")}
                         </p>
                       </div>
-                      <span className="text-xs text-gray-400">Livraison #{l.id}</span>
+                      <span className="text-xs text-gray-400 flex-shrink-0">#{l.id}</span>
                     </button>
                   ))}
                 </div>
               )}
 
-              {results && results.lots.length > 0 && (
+              {results && (results.lots?.length ?? 0) > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
                     <Package size={11} /> Lots
@@ -197,7 +199,7 @@ export default function GlobalSearch() {
                           {new Date(l.dateCreation + "T00:00:00").toLocaleDateString("fr-FR")}
                         </p>
                       </div>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                         l.statut === "en_stock" ? "bg-blue-100 text-blue-700" :
                         l.statut === "vendu" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
                       }`}>
