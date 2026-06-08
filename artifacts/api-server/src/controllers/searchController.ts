@@ -83,4 +83,3 @@ export async function globalSearch(req: Request, res: Response): Promise<void> {
 
   res.json({ membres, lots, livraisons });
 }
-# v2
