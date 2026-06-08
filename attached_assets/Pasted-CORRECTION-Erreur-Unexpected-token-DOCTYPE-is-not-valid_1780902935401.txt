@@ -1,0 +1,76 @@
+CORRECTION — Erreur "Unexpected token '<', <!DOCTYPE is not valid JSON" sur la page Caisse
+
+PROBLÈME CONSTATÉ :
+Quand on accède à la page /caisse, une erreur
+toast rouge apparaît :
+"Unexpected token '<', '<!DOCTYPE'... is not valid JSON"
+
+EXPLICATION DU PROBLÈME :
+Le frontend appelle une route API qui n'existe pas
+ou qui plante côté backend. Au lieu de retourner
+du JSON, le serveur retourne une page HTML
+(page d'erreur 404 ou 500). Le frontend essaie
+de parser ce HTML comme du JSON → erreur.
+
+ÉTAPES DE DIAGNOSTIC :
+
+1. Ouvre la console du navigateur (F12 → Network)
+   et trouve la requête qui échoue sur /caisse.
+   Note l'URL exacte appelée et le status HTTP.
+
+2. Dans le backend, vérifie que ces routes existent :
+
+   GET /api/caisse          → liste des caisses
+   GET /api/caisse/soldes   → soldes actuels
+   GET /api/caisse/alertes  → alertes fond minimum
+
+3. Vérifie que le router caisse est bien enregistré
+   dans le fichier principal du serveur (app.ts
+   ou server.ts ou index.ts) :
+
+   import caisseRouter from './routes/caisse'
+   app.use('/api/caisse', caisseRouter)
+
+   Si cette ligne est absente → AJOUTE-LA.
+
+4. Vérifie que le controller caisse existe et
+   que la fonction getCaisses() retourne bien
+   du JSON et non une erreur non gérée.
+
+5. Si la route existe mais plante → vérifie
+   que la table "caisses" existe dans la base
+   de données PostgreSQL :
+
+   SELECT * FROM caisses LIMIT 1;
+
+   Si la table n'existe pas → lance la migration :
+   /backend/db/migrations/039_caisse.sql
+
+CORRECTION GÉNÉRALE pour toutes les routes :
+Ajoute un try/catch global dans chaque controller
+pour éviter que les erreurs retournent du HTML :
+
+  export async function getCaisses(req, res) {
+    try {
+      const cooperative_id = req.user.cooperative_id
+      const caisses = await db.query(
+        'SELECT * FROM caisses WHERE cooperative_id = $1',
+        [cooperative_id]
+      )
+      res.json(caisses.rows)
+    } catch (err) {
+      console.error('getCaisses error:', err)
+      res.status(500).json({
+        erreur: 'Erreur serveur',
+        message: err.message
+      })
+    }
+  }
+
+VÉRIFICATION FINALE :
+Après correction, la page /caisse doit :
+✅ Charger sans erreur toast
+✅ Afficher "Aucune caisse enregistrée" proprement
+   si la table est vide
+✅ Le bouton "+ Nouvelle caisse" doit fonctionner
+✅ Aucun HTML dans les réponses API
