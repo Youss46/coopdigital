@@ -141,6 +141,7 @@ export default function ExportateursPage() {
   // Vue fiche exportateur
   if (vueFiche !== null && fiche) {
     return (
+      <>
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <button
@@ -213,6 +214,87 @@ export default function ExportateursPage() {
           )}
         </div>
       </div>
+
+      {/* Modal signaler un refus — fiche view */}
+      {modalRefus !== null && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-2">
+              <AlertTriangle size={18} className="text-orange-500" />
+              <h3 className="font-bold text-gray-900">Signaler un lot refoulé</h3>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Poids refoulé (kg) *</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={formRefus.poidsRefuleKg}
+                    onChange={(e) => setFormRefus((f) => ({ ...f, poidsRefuleKg: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    placeholder="500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Nombre de sacs *</label>
+                  <input
+                    type="number"
+                    value={formRefus.nombreSacsRefoules}
+                    onChange={(e) => setFormRefus((f) => ({ ...f, nombreSacsRefoules: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    placeholder="10"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Date du refus *</label>
+                <input
+                  type="date"
+                  value={formRefus.dateRefus}
+                  onChange={(e) => setFormRefus((f) => ({ ...f, dateRefus: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Motif du refus</label>
+                <input
+                  type="text"
+                  value={formRefus.motifRefus}
+                  onChange={(e) => setFormRefus((f) => ({ ...f, motifRefus: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  placeholder="Humidité excessive, qualité insuffisante…"
+                />
+              </div>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => { setModalRefus(null); setFormRefus(REFUS_INIT); }}
+                className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => mutRefus.mutate({
+                  id: modalRefus,
+                  data: {
+                    poidsRefuleKg: parseFloat(formRefus.poidsRefuleKg),
+                    nombreSacsRefoules: parseInt(formRefus.nombreSacsRefoules),
+                    dateRefus: formRefus.dateRefus,
+                    ...(formRefus.motifRefus ? { motifRefus: formRefus.motifRefus } : {}),
+                  },
+                })}
+                disabled={!formRefus.poidsRefuleKg || !formRefus.nombreSacsRefoules || !formRefus.dateRefus || mutRefus.isPending}
+                className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ backgroundColor: "#c2410c" }}
+              >
+                {mutRefus.isPending ? <><Loader2 size={14} className="animate-spin" /> Enregistrement…</> : "Confirmer le refus"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 
