@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable, mouvementsStockTable, lotsTable } from "@workspace/db";
+import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable, lotsTable } from "@workspace/db";
 import { eq, sql, desc, and, lte } from "drizzle-orm";
 import { CreateExportateurBody, CreateVenteBody, EncaisserVenteBody } from "@workspace/api-zod";
 import { generateEcrituresVente, generateEcrituresEncaissement } from "../services/comptabiliteService";
@@ -443,13 +443,10 @@ export async function signalerRefus(req: Request, res: Response): Promise<void> 
           .where(eq(lotsTable.id, venteUpdated.lotId));
       }
 
-      // 3. Reconstituer le stock automatiquement
-      await tx.insert(mouvementsStockTable).values({
-        entrepotId: entrepotRetourId,
-        type: "retour_refus",
-        poidsKg: String(poidsRefouleNum),
-        motif: `Lot refoulé — vente #${venteId}${motifRefus ? ` (${motifRefus})` : ""}`,
-      });
+      // NOTE : le stock entrepôt N'est PAS touché ici.
+      // L'entrepotRetourId est stocké dans traitements_refus pour pré-remplir
+      // le modal de traitement. Le mouvement de stock sera créé uniquement
+      // dans traiterRefus() si la décision est 'retour_stock'.
     });
 
     res.status(201).json({ refus, vente: null });
