@@ -1,15 +1,18 @@
 import { useState } from "react";
 import {
   PackageX, Loader2, AlertTriangle, CheckCircle2, RotateCcw,
-  TrendingDown, ShoppingCart,
+  TrendingDown, ShoppingCart, UserPlus,
 } from "lucide-react";
 import {
   useListRefus,
   useGetStatsRefus,
   useTraiterRefus,
+  useGetExportateurs,
   getGetEntrepotsQueryKey,
   getGetMouvementsStockQueryKey,
   getGetStockAlertesQueryKey,
+  getListRefusQueryKey,
+  getGetStatsRefusQueryKey,
   ListRefusStatut,
   type TraiterRefusInput,
 } from "@workspace/api-client-react";
@@ -49,6 +52,10 @@ function fmt(v: number | string | undefined | null, suffix = " kg") {
   return n.toLocaleString("fr-FR") + suffix;
 }
 
+function fmtFcfa(n: number) {
+  return n.toLocaleString("fr-FR") + " FCFA";
+}
+
 interface TraiterModalProps {
   refusId: number;
   poidsKg: string;
@@ -60,20 +67,62 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const traiterMut = useTraiterRefus();
-  const [form, setForm] = useState<Partial<TraiterRefusInput>>({ decision: "retour_stock" });
+  const { data: exportateurs = [] } = useGetExportateurs();
+
+  const [form, setForm] = useState<Partial<TraiterRefusInput>>({
+    decision: "retour_stock",
+    modeReglement: "immediat",
+    dateVenteRefus: new Date().toISOString().slice(0, 10),
+  });
+  const [nouvelAcheteur, setNouvelAcheteur] = useState(false);
 
   function field<K extends keyof TraiterRefusInput>(k: K, v: TraiterRefusInput[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
+  const poids = parseFloat(poidsKg) || 0;
+  const prix = form.prixUnitaireNouveauFcfa ?? 0;
+  const montantTotal = Math.round(poids * prix);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.decision) return;
+
+    if (form.decision === "autre_acheteur") {
+      if (!prix) {
+        toast({ title: "Prix unitaire requis", variant: "destructive" });
+        return;
+      }
+      if (!nouvelAcheteur && !form.acheteurId) {
+        toast({ title: "Sélectionnez un acheteur", variant: "destructive" });
+        return;
+      }
+      if (nouvelAcheteur && !form.nomNouvelAcheteur?.trim()) {
+        toast({ title: "Nom de l'acheteur requis", variant: "destructive" });
+        return;
+      }
+      if (form.modeReglement === "credit" && !form.dateEcheanceRefus) {
+        toast({ title: "Date d'échéance requise pour vente à crédit", variant: "destructive" });
+        return;
+      }
+    }
+
     try {
-      await traiterMut.mutateAsync({ id: refusId, data: form as TraiterRefusInput });
+      const payload: TraiterRefusInput = {
+        ...(form as TraiterRefusInput),
+        ...(form.decision === "autre_acheteur" && nouvelAcheteur
+          ? { acheteurId: undefined }
+          : {}),
+        ...(form.decision === "autre_acheteur" && !nouvelAcheteur
+          ? { nomNouvelAcheteur: undefined, telNouvelAcheteur: undefined }
+          : {}),
+      };
+      await traiterMut.mutateAsync({ id: refusId, data: payload });
       void queryClient.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
       void queryClient.invalidateQueries({ queryKey: getGetMouvementsStockQueryKey() });
       void queryClient.invalidateQueries({ queryKey: getGetStockAlertesQueryKey() });
+      void queryClient.invalidateQueries({ queryKey: getListRefusQueryKey() });
+      void queryClient.invalidateQueries({ queryKey: getGetStatsRefusQueryKey() });
       toast({ title: "Lot refoulé traité avec succès" });
       onDone();
     } catch {
@@ -83,11 +132,12 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h2 className="font-bold text-gray-900 text-lg">Traiter le refus</h2>
         <p className="text-sm text-gray-500">Poids refoulé : <strong>{fmt(poidsKg)}</strong></p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Décision */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Décision *</label>
             <div className="grid grid-cols-2 gap-2">
@@ -112,19 +162,21 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
             </div>
           </div>
 
-          {form.decision === "autre_acheteur" && (
+          {/* ── Retour stock ── */}
+          {form.decision === "retour_stock" && (
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Prix unitaire (FCFA/kg) *</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Entrepôt de destination</label>
               <input
                 type="number"
                 className={INPUT_CLS}
-                placeholder="Ex: 850"
-                value={form.prixUnitaireNouveauFcfa ?? ""}
-                onChange={(e) => field("prixUnitaireNouveauFcfa", parseInt(e.target.value))}
+                placeholder="ID entrepôt"
+                value={form.entrepotRetourId ?? ""}
+                onChange={(e) => field("entrepotRetourId", parseInt(e.target.value))}
               />
             </div>
           )}
 
+          {/* ── Déclassement ── */}
           {form.decision === "declassement" && (
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -138,6 +190,115 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
             </div>
           )}
 
+          {/* ── Autre acheteur ── */}
+          {form.decision === "autre_acheteur" && (
+            <div className="space-y-3">
+              {/* Prix unitaire */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Prix unitaire (FCFA/kg) *</label>
+                <input
+                  type="number"
+                  className={INPUT_CLS}
+                  placeholder="Ex: 850"
+                  value={form.prixUnitaireNouveauFcfa ?? ""}
+                  onChange={(e) => field("prixUnitaireNouveauFcfa", parseInt(e.target.value))}
+                />
+                {prix > 0 && (
+                  <p className="text-xs text-green-700 font-medium mt-1">
+                    Montant total : {fmt(poids, "")} kg × {prix.toLocaleString("fr-FR")} = <strong>{fmtFcfa(montantTotal)}</strong>
+                  </p>
+                )}
+              </div>
+
+              {/* Acheteur */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-gray-600">Acheteur *</label>
+                  <button
+                    type="button"
+                    onClick={() => { setNouvelAcheteur(!nouvelAcheteur); field("acheteurId", undefined); field("nomNouvelAcheteur", undefined); }}
+                    className="flex items-center gap-1 text-xs text-green-700 hover:text-green-800 font-medium"
+                  >
+                    <UserPlus className="w-3 h-3" />
+                    {nouvelAcheteur ? "Acheteur existant" : "Nouvel acheteur"}
+                  </button>
+                </div>
+                {!nouvelAcheteur ? (
+                  <select
+                    className={INPUT_CLS}
+                    value={form.acheteurId ?? ""}
+                    onChange={(e) => field("acheteurId", parseInt(e.target.value) || undefined)}
+                  >
+                    <option value="">— Sélectionner —</option>
+                    {exportateurs.map((exp) => (
+                      <option key={exp.id} value={exp.id}>{exp.nom}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      className={INPUT_CLS}
+                      placeholder="Nom de l'acheteur *"
+                      value={form.nomNouvelAcheteur ?? ""}
+                      onChange={(e) => field("nomNouvelAcheteur", e.target.value)}
+                    />
+                    <input
+                      className={INPUT_CLS}
+                      placeholder="Téléphone (optionnel)"
+                      value={form.telNouvelAcheteur ?? ""}
+                      onChange={(e) => field("telNouvelAcheteur", e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Date de vente */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Date de vente *</label>
+                <input
+                  type="date"
+                  className={INPUT_CLS}
+                  value={form.dateVenteRefus ?? ""}
+                  onChange={(e) => field("dateVenteRefus", e.target.value)}
+                />
+              </div>
+
+              {/* Mode règlement */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Mode règlement *</label>
+                <div className="flex gap-3">
+                  {(["immediat", "credit"] as const).map((m) => (
+                    <label key={m} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="modeReglement"
+                        value={m}
+                        checked={form.modeReglement === m}
+                        onChange={() => field("modeReglement", m)}
+                        className="text-green-600"
+                      />
+                      <span className="text-sm text-gray-700">{m === "immediat" ? "Immédiat" : "À crédit"}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Date d'échéance si à crédit */}
+              {form.modeReglement === "credit" && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Date d'échéance *</label>
+                  <input
+                    type="date"
+                    className={INPUT_CLS}
+                    value={form.dateEcheanceRefus ?? ""}
+                    onChange={(e) => field("dateEcheanceRefus", e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Perte ── */}
           {form.decision === "perte" && (
             <>
               <div>
@@ -151,6 +312,7 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
             </>
           )}
 
+          {/* PV de constat */}
           <div className="flex items-center gap-2">
             <input
               type="checkbox"

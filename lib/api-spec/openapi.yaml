@@ -8306,6 +8306,25 @@ components:
           type: boolean
         tauxHumidite:
           type: number
+        acheteurId:
+          type: integer
+          nullable: true
+        nomNouvelAcheteur:
+          type: string
+          nullable: true
+        telNouvelAcheteur:
+          type: string
+          nullable: true
+        dateVenteRefus:
+          type: string
+          nullable: true
+        modeReglement:
+          type: string
+          enum: [immediat, credit]
+          nullable: true
+        dateEcheanceRefus:
+          type: string
+          nullable: true
 
     Fournisseur:
       type: object

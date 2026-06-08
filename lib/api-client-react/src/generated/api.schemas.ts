@@ -2121,6 +2121,14 @@ export const TraiterRefusInputDecision = {
   perte: 'perte',
 } as const;
 
+export type TraiterRefusInputModeReglement = typeof TraiterRefusInputModeReglement[keyof typeof TraiterRefusInputModeReglement] | null;
+
+
+export const TraiterRefusInputModeReglement = {
+  immediat: 'immediat',
+  credit: 'credit',
+} as const;
+
 export interface TraiterRefusInput {
   decision: TraiterRefusInputDecision;
   entrepotRetourId?: number;
@@ -2131,6 +2139,12 @@ export interface TraiterRefusInput {
   motifPerte?: string;
   pvConstat?: boolean;
   tauxHumidite?: number;
+  acheteurId?: number | null;
+  nomNouvelAcheteur?: string | null;
+  telNouvelAcheteur?: string | null;
+  dateVenteRefus?: string | null;
+  modeReglement?: TraiterRefusInputModeReglement;
+  dateEcheanceRefus?: string | null;
 }
 
 export type FournisseurTypeFournisseur = typeof FournisseurTypeFournisseur[keyof typeof FournisseurTypeFournisseur];

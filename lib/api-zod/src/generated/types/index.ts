@@ -459,6 +459,7 @@ export * from './traiterAnomalieInput';
 export * from './traiterAnomalieInputStatut';
 export * from './traiterRefusInput';
 export * from './traiterRefusInputDecision';
+export * from './traiterRefusInputModeReglement';
 export * from './trancheInput';
 export * from './trancheSubvention';
 export * from './trancheSubventionStatut';

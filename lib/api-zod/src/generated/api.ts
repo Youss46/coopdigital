@@ -2498,7 +2498,13 @@ export const TraiterRefusBody = zod.object({
   "prixUnitaireNouveauFcfa": zod.number().optional(),
   "motifPerte": zod.string().optional(),
   "pvConstat": zod.boolean().optional(),
-  "tauxHumidite": zod.number().optional()
+  "tauxHumidite": zod.number().optional(),
+  "acheteurId": zod.number().nullish(),
+  "nomNouvelAcheteur": zod.string().nullish(),
+  "telNouvelAcheteur": zod.string().nullish(),
+  "dateVenteRefus": zod.string().nullish(),
+  "modeReglement": zod.enum(['immediat', 'credit']).nullish(),
+  "dateEcheanceRefus": zod.string().nullish()
 })
 
 export const TraiterRefusResponse = zod.object({

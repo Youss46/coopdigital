@@ -4,6 +4,7 @@ import {
   traitementsRefusTable,
   ventesExportateursTable,
   mouvementsStockTable,
+  exportateursTable,
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -75,36 +76,91 @@ export async function traiterRefus(req: Request, res: Response) {
     entrepotRetourId,
     ancienGrade,
     nouveauGrade,
-    nouvelExportateurId,
     prixUnitaireNouveauFcfa,
     motifPerte,
     pvConstat,
     tauxHumidite,
+    // Autre acheteur
+    acheteurId,
+    nomNouvelAcheteur,
+    telNouvelAcheteur,
+    dateVenteRefus,
+    modeReglement,
+    dateEcheanceRefus,
   } = req.body as {
     decision: "retour_stock" | "declassement" | "autre_acheteur" | "perte";
     entrepotRetourId?: number;
     ancienGrade?: string;
     nouveauGrade?: string;
-    nouvelExportateurId?: number;
     prixUnitaireNouveauFcfa?: number;
     motifPerte?: string;
     pvConstat?: boolean;
     tauxHumidite?: number;
+    acheteurId?: number;
+    nomNouvelAcheteur?: string;
+    telNouvelAcheteur?: string;
+    dateVenteRefus?: string;
+    modeReglement?: "immediat" | "credit";
+    dateEcheanceRefus?: string;
   };
 
   if (!decision) return res.status(400).json({ erreur: "Décision requise" });
 
+  const cooperativeId = coopId(req);
+
   const refus = await db.query.traitementsRefusTable.findFirst({
     where: and(
       eq(traitementsRefusTable.id, id),
-      eq(traitementsRefusTable.cooperativeId, coopId(req))
+      eq(traitementsRefusTable.cooperativeId, cooperativeId)
     ),
   });
 
   if (!refus) return res.status(404).json({ erreur: "Refus introuvable" });
   if (refus.statut === "traite") return res.status(400).json({ erreur: "Déjà traité" });
 
+  let exportateurIdFinal: number | undefined;
+
   await db.transaction(async (tx) => {
+    // ── Autre acheteur : résoudre ou créer l'exportateur ─────────────────────
+    if (decision === "autre_acheteur") {
+      if (!prixUnitaireNouveauFcfa) throw new Error("Prix unitaire requis");
+
+      if (acheteurId) {
+        exportateurIdFinal = acheteurId;
+      } else if (nomNouvelAcheteur) {
+        const [newExp] = await tx
+          .insert(exportateursTable)
+          .values({
+            cooperativeId,
+            nom: nomNouvelAcheteur.trim(),
+            contact: telNouvelAcheteur?.trim() ?? null,
+          })
+          .returning({ id: exportateursTable.id });
+        exportateurIdFinal = newExp!.id;
+      } else {
+        throw new Error("Acheteur requis pour la décision 'autre acheteur'");
+      }
+
+      const poidsNum = Number(refus.poidsRefuleKg);
+      const montantTotal = Math.round(poidsNum * prixUnitaireNouveauFcfa);
+      const estImmediat = modeReglement === "immediat";
+      const dateVente = dateVenteRefus ?? new Date().toISOString().slice(0, 10);
+
+      await tx.insert(ventesExportateursTable).values({
+        exportateurId: exportateurIdFinal,
+        poidsKg: String(poidsNum),
+        prixUnitaireFcfa: prixUnitaireNouveauFcfa,
+        montantTotalFcfa: montantTotal,
+        dateVente,
+        dateEcheanceReglement: estImmediat ? null : (dateEcheanceRefus ?? null),
+        montantRecuFcfa: estImmediat ? montantTotal : 0,
+        soldeDuFcfa: estImmediat ? 0 : montantTotal,
+        statut: estImmediat ? "regle" : "en_attente",
+        produit: "cacao",
+      });
+    }
+
+    // ── Mise à jour du refus ──────────────────────────────────────────────────
     await tx
       .update(traitementsRefusTable)
       .set({
@@ -112,7 +168,7 @@ export async function traiterRefus(req: Request, res: Response) {
         entrepotRetourId: entrepotRetourId ?? null,
         ancienGrade: ancienGrade ?? null,
         nouveauGrade: nouveauGrade ?? null,
-        nouvelExportateurId: nouvelExportateurId ?? null,
+        nouvelExportateurId: exportateurIdFinal ?? null,
         prixUnitaireNouveauFcfa: prixUnitaireNouveauFcfa?.toString() ?? null,
         motifPerte: motifPerte ?? null,
         pvConstat: pvConstat ?? false,
@@ -123,6 +179,7 @@ export async function traiterRefus(req: Request, res: Response) {
       })
       .where(eq(traitementsRefusTable.id, id));
 
+    // ── Mouvement de stock selon décision ────────────────────────────────────
     if (decision === "retour_stock" && entrepotRetourId) {
       await tx.insert(mouvementsStockTable).values({
         entrepotId: entrepotRetourId,
@@ -142,11 +199,12 @@ export async function traiterRefus(req: Request, res: Response) {
     }
   });
 
-  const montantEstime = Math.round(Number(refus.poidsRefuleKg) * 900);
+  // ── Écritures comptables (hors transaction) ───────────────────────────────
   const dateOp = new Date().toISOString().slice(0, 10);
 
   if (decision === "retour_stock") {
-    void proposerEcriture(coopId(req), {
+    const montantEstime = Math.round(Number(refus.poidsRefuleKg) * 900);
+    void proposerEcriture(cooperativeId, {
       source: "stock",
       sourceId: refus.id,
       libelle: `Retour stock lot refoulé #${refus.venteExportateurId}`,
@@ -156,7 +214,8 @@ export async function traiterRefus(req: Request, res: Response) {
       date: dateOp,
     });
   } else if (decision === "perte") {
-    void proposerEcriture(coopId(req), {
+    const montantEstime = Math.round(Number(refus.poidsRefuleKg) * 900);
+    void proposerEcriture(cooperativeId, {
       source: "stock",
       sourceId: refus.id,
       libelle: `Perte lot refoulé #${refus.venteExportateurId}`,
@@ -167,11 +226,13 @@ export async function traiterRefus(req: Request, res: Response) {
     });
   } else if (decision === "autre_acheteur" && prixUnitaireNouveauFcfa) {
     const montant = Math.round(Number(refus.poidsRefuleKg) * prixUnitaireNouveauFcfa);
-    void proposerEcriture(coopId(req), {
+    const estImmediat = modeReglement === "immediat";
+    // Immédiat : Caisse/Ventes — À crédit : Créances/Ventes
+    void proposerEcriture(cooperativeId, {
       source: "vente",
       sourceId: refus.id,
-      libelle: `Vente lot refoulé nouvel acheteur #${refus.venteExportateurId}`,
-      compteDebit: "4111",
+      libelle: `Vente lot refoulé — acheteur #${exportateurIdFinal}`,
+      compteDebit: estImmediat ? "571" : "413",
       compteCredit: "701",
       montantFcfa: montant,
       date: dateOp,

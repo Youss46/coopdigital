@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { TraiterRefusInputDecision } from './traiterRefusInputDecision';
+import type { TraiterRefusInputModeReglement } from './traiterRefusInputModeReglement';
 
 export interface TraiterRefusInput {
   decision: TraiterRefusInputDecision;
@@ -17,4 +18,10 @@ export interface TraiterRefusInput {
   motifPerte?: string;
   pvConstat?: boolean;
   tauxHumidite?: number;
+  acheteurId?: number | null;
+  nomNouvelAcheteur?: string | null;
+  telNouvelAcheteur?: string | null;
+  dateVenteRefus?: string | null;
+  modeReglement?: TraiterRefusInputModeReglement;
+  dateEcheanceRefus?: string | null;
 }
