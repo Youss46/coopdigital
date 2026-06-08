@@ -69,7 +69,7 @@ function makePdfDoc(opts: PDFKit.PDFDocumentOptions = {}): {
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Fiche membre
 // ─────────────────────────────────────────────────────────────────────────────
-export async function generateFicheMembre(membreId: number, cooperativeId = 1): Promise<Buffer> {
+export async function generateFicheMembre(membreId: number, cooperativeId: number): Promise<Buffer> {
   const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, membreId));
   if (!membre) throw new Error("Membre introuvable");
 
@@ -501,9 +501,9 @@ type VoteRow = {
 
 export async function generatePvAg(params: {
   ag: AgRow; points: PointRow[]; presences: PresenceRow[]; votes: VoteRow[];
-  cooperativeId?: number;
+  cooperativeId: number;
 }): Promise<Buffer> {
-  const { ag, points, presences, votes, cooperativeId = 1 } = params;
+  const { ag, points, presences, votes, cooperativeId } = params;
   const typeFr: Record<string, string> = {
     ordinaire: "Ordinaire", extraordinaire: "Extraordinaire", constitutive: "Constitutive",
   };

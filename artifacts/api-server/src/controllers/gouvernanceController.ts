@@ -359,7 +359,7 @@ export async function getPvPdf(req: Request, res: Response): Promise<void> {
     db.select().from(votesAgTable).where(eq(votesAgTable.agId, id)),
   ]);
 
-  const pdfBuffer = await generatePvAg({ ag, points, presences, votes });
+  const pdfBuffer = await generatePvAg({ ag, points, presences, votes, cooperativeId: coopId(req) });
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="PV_AG_${ag.dateAg}_${id}.pdf"`);

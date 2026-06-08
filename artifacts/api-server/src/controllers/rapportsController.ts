@@ -3,13 +3,18 @@ import { generateFicheMembre, generateRapportMensuel, generateBilanCampagne } fr
 
 export async function getMemberPdf(req: Request, res: Response): Promise<void> {
   const membreId = parseInt(String(req.params["id"] ?? "0"));
+  const cooperativeId = req.user?.cooperativeId;
   if (!membreId) {
     res.status(400).json({ erreur: "ID membre invalide" });
     return;
   }
+  if (!cooperativeId) {
+    res.status(401).json({ erreur: "Coopérative non associée au compte" });
+    return;
+  }
 
   try {
-    const buffer = await generateFicheMembre(membreId);
+    const buffer = await generateFicheMembre(membreId, cooperativeId);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="fiche_membre_${membreId}.pdf"`);
     res.setHeader("Content-Length", String(buffer.length));
