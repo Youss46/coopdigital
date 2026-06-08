@@ -896,7 +896,8 @@ export const SignalerRefusVenteBody = zod.object({
   "poidsRefuleKg": zod.number(),
   "nombreSacsRefoules": zod.number(),
   "dateRefus": zod.coerce.date(),
-  "motifRefus": zod.string().optional()
+  "motifRefus": zod.string().optional(),
+  "entrepotRetourId": zod.number()
 })
 
 

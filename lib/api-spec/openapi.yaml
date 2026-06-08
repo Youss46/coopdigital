@@ -8056,7 +8056,7 @@ components:
 
     SignalerRefusInput:
       type: object
-      required: [poidsRefuleKg, nombreSacsRefoules, dateRefus]
+      required: [poidsRefuleKg, nombreSacsRefoules, dateRefus, entrepotRetourId]
       properties:
         poidsRefuleKg:
           type: number
@@ -8067,6 +8067,8 @@ components:
           format: date
         motifRefus:
           type: string
+        entrepotRetourId:
+          type: integer
 
     TraiterRefusInput:
       type: object

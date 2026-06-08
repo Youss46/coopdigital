@@ -15,7 +15,7 @@ export const exportateursTable = pgTable("exportateurs", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const venteStatutEnum = pgEnum("vente_statut", ["en_attente", "partiel", "regle", "en_retard"]);
+export const venteStatutEnum = pgEnum("vente_statut", ["en_attente", "partiel", "regle", "en_retard", "refoule", "partiellement_refoule"]);
 
 export const ventesExportateursTable = pgTable("ventes_exportateurs", {
   id: serial("id").primaryKey(),

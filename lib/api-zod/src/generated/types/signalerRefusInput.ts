@@ -11,4 +11,5 @@ export interface SignalerRefusInput {
   nombreSacsRefoules: number;
   dateRefus: Date;
   motifRefus?: string;
+  entrepotRetourId: number;
 }

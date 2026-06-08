@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable } from "@workspace/db";
+import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable, mouvementsStockTable } from "@workspace/db";
 import { eq, sql, desc, and, lte } from "drizzle-orm";
 import { CreateExportateurBody, CreateVenteBody, EncaisserVenteBody } from "@workspace/api-zod";
 import { generateEcrituresVente, generateEcrituresEncaissement } from "../services/comptabiliteService";
@@ -350,18 +350,30 @@ export async function signalerRefus(req: Request, res: Response): Promise<void> 
     return;
   }
 
-  const { poidsRefuleKg, nombreSacsRefoules, dateRefus, motifRefus } =
-    req.body as { poidsRefuleKg?: number; nombreSacsRefoules?: number; dateRefus?: string; motifRefus?: string };
+  const { poidsRefuleKg, nombreSacsRefoules, dateRefus, motifRefus, entrepotRetourId } =
+    req.body as {
+      poidsRefuleKg?: number;
+      nombreSacsRefoules?: number;
+      dateRefus?: string;
+      motifRefus?: string;
+      entrepotRetourId?: number;
+    };
 
-  if (!poidsRefuleKg || !nombreSacsRefoules || !dateRefus) {
-    res.status(400).json({ erreur: "poidsRefuleKg, nombreSacsRefoules et dateRefus sont requis" });
+  if (!poidsRefuleKg || !nombreSacsRefoules || !dateRefus || !entrepotRetourId) {
+    res.status(400).json({ erreur: "poidsRefuleKg, nombreSacsRefoules, dateRefus et entrepotRetourId sont requis" });
     return;
   }
 
   try {
-    // Vérifier que la vente appartient bien à cette coopérative
+    // Récupérer la vente avec ses détails (et vérifier qu'elle appartient à la coop)
     const [vente] = await db
-      .select({ id: ventesExportateursTable.id })
+      .select({
+        id: ventesExportateursTable.id,
+        poidsKg: ventesExportateursTable.poidsKg,
+        prixUnitaireFcfa: ventesExportateursTable.prixUnitaireFcfa,
+        soldeDuFcfa: ventesExportateursTable.soldeDuFcfa,
+        statut: ventesExportateursTable.statut,
+      })
       .from(ventesExportateursTable)
       .innerJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
       .where(
@@ -377,18 +389,59 @@ export async function signalerRefus(req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const [refus] = await db
-      .insert(traitementsRefusTable)
-      .values({
-        cooperativeId,
-        venteExportateurId: venteId,
-        poidsRefuleKg: String(poidsRefuleKg),
-        nombreSacsRefoules,
-        dateRefus,
-        motifRefus: motifRefus ?? null,
-        statut: "en_attente",
-      })
-      .returning();
+    if (vente.statut === "regle") {
+      res.status(400).json({ erreur: "Impossible de signaler un refus sur une vente réglée" });
+      return;
+    }
+
+    // Calcul : refus total ou partiel ?
+    const poidsVenteKg = parseFloat(String(vente.poidsKg));
+    const poidsRefouleNum = parseFloat(String(poidsRefuleKg));
+    const estRefusTotal = poidsRefouleNum >= poidsVenteKg;
+
+    const montantAnnuleFcfa = Math.round(poidsRefouleNum * vente.prixUnitaireFcfa);
+    const nouveauSoldeDuFcfa = estRefusTotal ? 0 : Math.max(0, vente.soldeDuFcfa - montantAnnuleFcfa);
+    const nouveauStatut = estRefusTotal ? "refoule" : "partiellement_refoule";
+
+    let refus!: typeof traitementsRefusTable.$inferSelect;
+
+    await db.transaction(async (tx) => {
+      // 1. Créer le refus
+      const [r] = await tx
+        .insert(traitementsRefusTable)
+        .values({
+          cooperativeId,
+          venteExportateurId: venteId,
+          poidsRefuleKg: String(poidsRefouleNum),
+          nombreSacsRefoules,
+          dateRefus,
+          motifRefus: motifRefus ?? null,
+          entrepotRetourId,
+          statut: "en_attente",
+        })
+        .returning();
+      refus = r!;
+
+      // 2. Mettre à jour le statut et le solde de la vente
+      await tx
+        .update(ventesExportateursTable)
+        .set({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          statut: nouveauStatut as any,
+          soldeDuFcfa: nouveauSoldeDuFcfa,
+          nombreSacsRefoules: sql`COALESCE(nombre_sacs_refoules, 0) + ${nombreSacsRefoules}`,
+          poidsRefuleKg: sql`COALESCE(poids_refoule_kg::numeric, 0) + ${poidsRefouleNum}`,
+        })
+        .where(eq(ventesExportateursTable.id, venteId));
+
+      // 3. Reconstituer le stock automatiquement
+      await tx.insert(mouvementsStockTable).values({
+        entrepotId: entrepotRetourId,
+        type: "retour_refus",
+        poidsKg: String(poidsRefouleNum),
+        motif: `Lot refoulé — vente #${venteId}${motifRefus ? ` (${motifRefus})` : ""}`,
+      });
+    });
 
     res.status(201).json({ refus, vente: null });
   } catch (err) {

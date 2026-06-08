@@ -9,13 +9,16 @@ import {
   useGetDevisesTaux,
   usePostDevisesConvertir,
   useSignalerRefusVente,
+  useGetEntrepots,
   type TauxChange,
+  type EntrepotStock,
 } from "@workspace/api-client-react";
 import {
   getGetExportateursQueryKey,
   getGetVentesQueryKey,
   getGetExportateurByIdQueryKey,
   getGetDevisesTauxQueryKey,
+  getGetEntrepotsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Building2, PlusCircle, ChevronRight, ArrowLeft, AlertTriangle, Loader2 } from "lucide-react";
@@ -34,15 +37,19 @@ const STATUT_COLORS: Record<string, string> = {
   partiel: "bg-blue-100 text-blue-700",
   regle: "bg-green-100 text-green-700",
   en_retard: "bg-red-100 text-red-700",
+  refoule: "bg-orange-100 text-orange-700",
+  partiellement_refoule: "bg-orange-50 text-orange-600",
 };
 const STATUT_LABELS: Record<string, string> = {
   en_attente: "En attente",
   partiel: "Partiel",
   regle: "Réglé",
   en_retard: "En retard",
+  refoule: "Refoulé",
+  partiellement_refoule: "Part. refoulé",
 };
 
-const REFUS_INIT = { poidsRefuleKg: "", nombreSacsRefoules: "", dateRefus: new Date().toISOString().split("T")[0]!, motifRefus: "" };
+const REFUS_INIT = { poidsRefuleKg: "", nombreSacsRefoules: "", dateRefus: new Date().toISOString().split("T")[0]!, motifRefus: "", entrepotRetourId: "" };
 
 export default function ExportateursPage() {
   const queryClient = useQueryClient();
@@ -109,6 +116,7 @@ export default function ExportateursPage() {
     },
   });
 
+  const { data: entrepots = [] } = useGetEntrepots({ query: { queryKey: getGetEntrepotsQueryKey() } });
   const { data: tauxActuels = [] } = useGetDevisesTaux({ query: { queryKey: getGetDevisesTauxQueryKey() } });
   const mutConvertir = usePostDevisesConvertir();
 
@@ -257,6 +265,19 @@ export default function ExportateursPage() {
                 />
               </div>
               <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Entrepôt de retour *</label>
+                <select
+                  value={formRefus.entrepotRetourId}
+                  onChange={(e) => setFormRefus((f) => ({ ...f, entrepotRetourId: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                >
+                  <option value="">— Sélectionner —</option>
+                  {(entrepots as EntrepotStock[]).map((e) => (
+                    <option key={e.id} value={e.id}>{e.nom}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Motif du refus</label>
                 <input
                   type="text"
@@ -276,15 +297,16 @@ export default function ExportateursPage() {
               </button>
               <button
                 onClick={() => mutRefus.mutate({
-                  id: modalRefus,
+                  id: modalRefus!,
                   data: {
                     poidsRefuleKg: parseFloat(formRefus.poidsRefuleKg),
                     nombreSacsRefoules: parseInt(formRefus.nombreSacsRefoules),
                     dateRefus: formRefus.dateRefus,
+                    entrepotRetourId: parseInt(formRefus.entrepotRetourId),
                     ...(formRefus.motifRefus ? { motifRefus: formRefus.motifRefus } : {}),
                   },
                 })}
-                disabled={!formRefus.poidsRefuleKg || !formRefus.nombreSacsRefoules || !formRefus.dateRefus || mutRefus.isPending}
+                disabled={!formRefus.poidsRefuleKg || !formRefus.nombreSacsRefoules || !formRefus.dateRefus || !formRefus.entrepotRetourId || mutRefus.isPending}
                 className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "#c2410c" }}
               >
@@ -481,6 +503,19 @@ export default function ExportateursPage() {
                 />
               </div>
               <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Entrepôt de retour *</label>
+                <select
+                  value={formRefus.entrepotRetourId}
+                  onChange={(e) => setFormRefus((f) => ({ ...f, entrepotRetourId: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                >
+                  <option value="">— Sélectionner —</option>
+                  {(entrepots as EntrepotStock[]).map((e) => (
+                    <option key={e.id} value={e.id}>{e.nom}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Motif du refus</label>
                 <input
                   type="text"
@@ -500,15 +535,16 @@ export default function ExportateursPage() {
               </button>
               <button
                 onClick={() => mutRefus.mutate({
-                  id: modalRefus,
+                  id: modalRefus!,
                   data: {
                     poidsRefuleKg: parseFloat(formRefus.poidsRefuleKg),
                     nombreSacsRefoules: parseInt(formRefus.nombreSacsRefoules),
                     dateRefus: formRefus.dateRefus,
+                    entrepotRetourId: parseInt(formRefus.entrepotRetourId),
                     ...(formRefus.motifRefus ? { motifRefus: formRefus.motifRefus } : {}),
                   },
                 })}
-                disabled={!formRefus.poidsRefuleKg || !formRefus.nombreSacsRefoules || !formRefus.dateRefus || mutRefus.isPending}
+                disabled={!formRefus.poidsRefuleKg || !formRefus.nombreSacsRefoules || !formRefus.dateRefus || !formRefus.entrepotRetourId || mutRefus.isPending}
                 className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "#c2410c" }}
               >

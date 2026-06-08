@@ -2011,6 +2011,7 @@ export interface SignalerRefusInput {
   nombreSacsRefoules: number;
   dateRefus: string;
   motifRefus?: string;
+  entrepotRetourId: number;
 }
 
 export type TraiterRefusInputDecision = typeof TraiterRefusInputDecision[keyof typeof TraiterRefusInputDecision];
