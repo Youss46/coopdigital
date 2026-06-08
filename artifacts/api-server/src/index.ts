@@ -6,21 +6,6 @@ import cron from "node-cron";
 import { checkEcheancesEnRetard } from "./services/empruntService";
 import { runNotificationsCron } from "./jobs/notificationsCron";
 
-// ─── Migrations automatiques (production uniquement) ─────────────────────────
-// En développement, le schéma est synchronisé via `drizzle-kit push`.
-// En production (Railway), les migrations SQL sont appliquées au démarrage :
-// toutes les tables manquantes sont créées, sans jamais supprimer de données.
-if (process.env.NODE_ENV === "production") {
-  try {
-    const migrationsFolder = path.join(__dirname, "migrations");
-    await runMigrations(migrationsFolder);
-    logger.info("Migrations appliquées avec succès");
-  } catch (err) {
-    logger.error({ err }, "Erreur critique lors des migrations — démarrage annulé");
-    process.exit(1);
-  }
-}
-
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
@@ -35,14 +20,29 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+// Démarrage immédiat : le serveur écoute avant les migrations
+// pour que le healthcheck Railway réussisse dès le lancement.
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
-
   logger.info({ port }, "Server listening");
 });
+
+// ─── Migrations automatiques (production uniquement) ─────────────────────────
+// En développement, le schéma est synchronisé via `drizzle-kit push`.
+// En production (Railway), les migrations SQL sont appliquées après le démarrage
+// pour ne pas bloquer le healthcheck.
+if (process.env.NODE_ENV === "production") {
+  const migrationsFolder = path.join(__dirname, "migrations");
+  runMigrations(migrationsFolder)
+    .then(() => logger.info("Migrations appliquées avec succès"))
+    .catch((err) => {
+      logger.error({ err }, "Erreur critique lors des migrations");
+      process.exit(1);
+    });
+}
 
 // CRON : vérification quotidienne des échéances en retard (chaque jour à 06h00)
 // CRON budget : sync réalisé toutes les nuits à 02h00
