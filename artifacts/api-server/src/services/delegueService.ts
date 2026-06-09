@@ -189,7 +189,7 @@ export async function listDelegues(cooperativeId: number) {
     .from(usersTable)
     .where(and(
       eq(usersTable.cooperativeId, cooperativeId),
-      eq(usersTable.role, "agent_terrain"),
+      eq(usersTable.role, "delegue"),
     ))
     .orderBy(usersTable.nom);
 

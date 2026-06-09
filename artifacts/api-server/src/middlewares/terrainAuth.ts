@@ -3,9 +3,11 @@ import jwt from "jsonwebtoken";
 
 export interface TerrainJwtPayload {
   id: number;
-  role: "agent_terrain";
+  role: "delegue";
   cooperativeId: number | null;
   section: string | null;
+  zoneType: string | null;
+  zoneNom: string | null;
 }
 
 declare global {
@@ -33,8 +35,8 @@ export function terrainAuthMiddleware(req: Request, res: Response, next: NextFun
 
   try {
     const payload = jwt.verify(token, secret) as TerrainJwtPayload;
-    if (payload.role !== "agent_terrain") {
-      res.status(403).json({ erreur: "Accès réservé aux agents terrain" });
+    if (payload.role !== "delegue") {
+      res.status(403).json({ erreur: "Accès réservé aux délégués de localité" });
       return;
     }
     req.agent = payload;

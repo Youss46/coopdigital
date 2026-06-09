@@ -21,7 +21,7 @@ const router = Router();
 router.post("/terrain/auth/login", loginTerrainHandler);
 router.post("/terrain/auth/change-password", terrainAuthMiddleware, changePasswordHandler);
 
-// Routes protégées (agent_terrain uniquement)
+// Routes protégées (délégué uniquement)
 router.get("/terrain/profil", terrainAuthMiddleware, getProfilHandler);
 router.get("/terrain/prix", terrainAuthMiddleware, getPrixHandler);
 router.get("/terrain/fournisseurs", terrainAuthMiddleware, getFournisseursHandler);

@@ -7,6 +7,8 @@ export interface AgentUser {
   role: string;
   cooperativeId: number | null;
   section: string | null;
+  zoneType: string | null;
+  zoneNom: string | null;
   motDePasseTemporaire?: boolean;
 }
 

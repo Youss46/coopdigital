@@ -34,7 +34,9 @@ export default function Accueil() {
       <header className="t-header">
         <div style={{ flex: 1 }}>
           <div className="t-header__title">Bonjour, {user?.nom} 👋</div>
-          <div className="t-header__sub">{today}</div>
+          <div className="t-header__sub">
+            {user?.zoneNom ? `Zone : ${user.zoneNom}` : (user?.section ?? "Délégué de localité")}
+          </div>
         </div>
         {caisse && caisse.paiementsDifferesCount > 0 && (
           <Link href="/paiements-differes">

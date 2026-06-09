@@ -9,7 +9,7 @@ export const USER_ROLES = [
   "comptable",
   "magasinier",
   "responsable_tracabilite",
-  "agent_terrain",
+  "delegue",
   "auditeur",
 ] as const;
 
@@ -23,8 +23,11 @@ export const usersTable = pgTable("users", {
   email: text("email").unique().notNull(),
   telephone: varchar("telephone", { length: 20 }),
   passwordHash: text("password_hash").notNull(),
-  role: varchar("role", { length: 30 }).$type<UserRole>().notNull().default("agent_terrain"),
+  role: varchar("role", { length: 30 }).$type<UserRole>().notNull().default("delegue"),
   section: text("section"),
+  zoneType: varchar("zone_type", { length: 20 }),
+  zoneNom: text("zone_nom"),
+  zoneVillages: text("zone_villages"),
   actif: boolean("actif").notNull().default(true),
   motDePasseTemporaire: boolean("mot_de_passe_temporaire").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

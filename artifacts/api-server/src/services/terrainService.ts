@@ -29,7 +29,7 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
     .where(and(eq(usersTable.telephone, telephone), eq(usersTable.actif, true)))
     .limit(1);
 
-  if (!user || user.role !== "agent_terrain") return null;
+  if (!user || user.role !== "delegue") return null;
 
   const ok = await bcrypt.compare(motDePasse, user.passwordHash);
   if (!ok) return null;
@@ -39,6 +39,8 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
     role: user.role,
     cooperativeId: user.cooperativeId ?? null,
     section: user.section ?? null,
+    zoneType: user.zoneType ?? null,
+    zoneNom: user.zoneNom ?? null,
   };
   const token = jwt.sign(payload, secret, { expiresIn: "24h" });
 
@@ -53,6 +55,8 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
       role: user.role,
       cooperativeId: user.cooperativeId ?? null,
       section: user.section ?? null,
+      zoneType: user.zoneType ?? null,
+      zoneNom: user.zoneNom ?? null,
       motDePasseTemporaire: user.motDePasseTemporaire,
     },
   };

@@ -72,13 +72,13 @@ const navItems = [
     href: "/membres",
     label: "Membres",
     icon: Users,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "agent_terrain", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
   },
   {
     href: "/scoring",
     label: "Scoring Producteurs",
     icon: Award,
-    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "delegue", "auditeur"],
   },
 
   // ── Campagnes & Collecte ──────────────────────────────────────────────────
@@ -86,19 +86,19 @@ const navItems = [
     href: "/campagnes",
     label: "Campagnes",
     icon: CalendarDays,
-    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "agent_terrain", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "delegue", "auditeur"],
   },
   {
     href: "/planning",
     label: "Planif. collectes",
     icon: ClipboardList,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "agent_terrain"],
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "delegue"],
   },
   {
     href: "/livraisons/nouvelle",
     label: "Livraisons",
     icon: Package,
-    roles: ["pca", "directeur", "agent_terrain", "responsable_tracabilite", "comptable", "auditeur"],
+    roles: ["pca", "directeur", "delegue", "responsable_tracabilite", "comptable", "auditeur"],
   },
   {
     href: "/pesee",
@@ -152,19 +152,19 @@ const navItems = [
     href: "/avances",
     label: "Avances",
     icon: CreditCard,
-    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "delegue", "auditeur"],
   },
   {
     href: "/intrants",
     label: "Intrants",
     icon: Leaf,
-    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur", "magasinier"],
+    roles: ["pca", "directeur", "comptable", "delegue", "auditeur", "magasinier"],
   },
   {
     href: "/reglements",
     label: "Règlements",
     icon: CheckCircle2,
-    roles: ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "delegue", "auditeur"],
   },
 
   // ── Commerce & Partenaires ────────────────────────────────────────────────
@@ -172,7 +172,7 @@ const navItems = [
     href: "/fournisseurs",
     label: "Fournisseurs",
     icon: UserCheck,
-    roles: ["pca", "directeur", "comptable", "agent_terrain", "responsable_tracabilite", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "delegue", "responsable_tracabilite", "auditeur"],
   },
   {
     href: "/exportateurs",
@@ -222,7 +222,7 @@ const navItems = [
     href: "/caisse",
     label: "Caisse",
     icon: Wallet,
-    roles: ["pca", "directeur", "comptable", "auditeur", "agent_terrain"],
+    roles: ["pca", "directeur", "comptable", "auditeur", "delegue"],
   },
   {
     href: "/fiscalite",
@@ -259,7 +259,7 @@ const navItems = [
     href: "/formations",
     label: "Formations",
     icon: GraduationCap,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "agent_terrain"],
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "delegue"],
   },
   {
     href: "/equipements",

@@ -13,9 +13,9 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   membres: {
-    lire:     ["pca", "directeur", "comptable", "responsable_tracabilite", "agent_terrain", "auditeur"],
-    creer:    ["pca", "directeur", "agent_terrain"],
-    modifier: ["pca", "directeur", "agent_terrain"],
+    lire:     ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
+    creer:    ["pca", "directeur", "delegue"],
+    modifier: ["pca", "directeur", "delegue"],
     supprimer:["pca", "directeur"],
     exporter: ["pca", "directeur", "comptable", "auditeur"],
   },
@@ -25,7 +25,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     creer_lot:        ["pca", "directeur", "responsable_tracabilite"],
     modifier_lot:     ["pca", "directeur", "responsable_tracabilite"],
     supprimer_lot:    ["pca", "directeur"],
-    scanner_qr:       ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
+    scanner_qr:       ["pca", "directeur", "responsable_tracabilite", "delegue"],
     exporter_eudr:    ["pca", "directeur", "responsable_tracabilite", "auditeur"],
   },
 
@@ -40,22 +40,22 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   avances: {
-    lire:      ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
-    octroyer:  ["pca", "directeur", "agent_terrain"],
-    rembourser:["pca", "directeur", "agent_terrain"],
+    lire:      ["pca", "directeur", "comptable", "delegue", "auditeur"],
+    octroyer:  ["pca", "directeur", "delegue"],
+    rembourser:["pca", "directeur", "delegue"],
     supprimer: ["pca", "directeur"],
   },
 
   livraisons: {
-    lire:      ["pca", "directeur", "comptable", "responsable_tracabilite", "agent_terrain", "auditeur"],
-    creer:     ["pca", "directeur", "agent_terrain"],
+    lire:      ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
+    creer:     ["pca", "directeur", "delegue"],
     modifier:  ["pca", "directeur"],
     supprimer: ["pca", "directeur"],
   },
 
   paiements: {
-    lire:     ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
-    confirmer:["pca", "directeur", "agent_terrain"],
+    lire:     ["pca", "directeur", "comptable", "delegue", "auditeur"],
+    confirmer:["pca", "directeur", "delegue"],
     valider:  ["pca", "directeur", "comptable"],
     rejeter:  ["pca", "directeur", "comptable"],
     annuler:  ["pca", "directeur"],
@@ -96,7 +96,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_dashboard:             ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
     generer_rapport_mensuel:    ["pca", "directeur", "comptable"],
     generer_bilan_campagne:     ["pca", "directeur", "comptable"],
-    generer_fiche_membre:       ["pca", "directeur", "agent_terrain"],
+    generer_fiche_membre:       ["pca", "directeur", "delegue"],
     exporter_donnees_bailleurs: ["pca", "directeur", "auditeur"],
   },
 
@@ -170,13 +170,13 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   fournisseurs: {
-    lire:     ["pca", "directeur", "comptable", "agent_terrain", "responsable_tracabilite", "auditeur"],
-    creer:    ["pca", "directeur", "agent_terrain"],
-    modifier: ["pca", "directeur", "agent_terrain"],
+    lire:     ["pca", "directeur", "comptable", "delegue", "responsable_tracabilite", "auditeur"],
+    creer:    ["pca", "directeur", "delegue"],
+    modifier: ["pca", "directeur", "delegue"],
   },
 
   campagnes: {
-    lire:       ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "agent_terrain", "auditeur"],
+    lire:       ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "delegue", "auditeur"],
     creer:      ["pca", "directeur"],
     fermer:     ["pca", "directeur"],
     verifier:   ["pca", "directeur", "comptable"],

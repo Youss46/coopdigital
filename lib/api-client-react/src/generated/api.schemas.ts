@@ -1484,7 +1484,7 @@ export const UtilisateurCompteRole = {
   comptable: 'comptable',
   magasinier: 'magasinier',
   responsable_tracabilite: 'responsable_tracabilite',
-  agent_terrain: 'agent_terrain',
+  delegue: 'delegue',
   auditeur: 'auditeur',
 } as const;
 
@@ -1509,7 +1509,7 @@ export const CreateUserInputRole = {
   comptable: 'comptable',
   magasinier: 'magasinier',
   responsable_tracabilite: 'responsable_tracabilite',
-  agent_terrain: 'agent_terrain',
+  delegue: 'delegue',
   auditeur: 'auditeur',
 } as const;
 
@@ -1521,6 +1521,10 @@ export interface CreateUserInput {
   role: CreateUserInputRole;
   /** @minLength 8 */
   motDePasse: string;
+  section?: string;
+  zoneType?: 'section' | 'groupement' | 'village';
+  zoneNom?: string;
+  zoneVillages?: string;
 }
 
 export interface UpdateUserInput {

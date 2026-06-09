@@ -1386,7 +1386,7 @@ export const GetUsersResponseItem = zod.object({
   "prenoms": zod.string(),
   "email": zod.string(),
   "telephone": zod.string().nullish(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'delegue', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
   "createdAt": zod.coerce.date()
@@ -1406,9 +1406,12 @@ export const CreateUserBody = zod.object({
   "prenoms": zod.string(),
   "email": zod.string().email(),
   "telephone": zod.string().optional(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'delegue', 'auditeur']),
   "motDePasse": zod.string().min(createUserBodyMotDePasseMin),
   "section": zod.string().optional(),
+  "zoneType": zod.enum(['section', 'groupement', 'village']).optional(),
+  "zoneNom": zod.string().optional(),
+  "zoneVillages": zod.string().optional(),
 })
 
 
@@ -1432,7 +1435,7 @@ export const UpdateUserResponse = zod.object({
   "prenoms": zod.string(),
   "email": zod.string(),
   "telephone": zod.string().nullish(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'delegue', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
   "createdAt": zod.coerce.date()
@@ -1484,7 +1487,7 @@ export const ToggleUserActifResponse = zod.object({
   "prenoms": zod.string(),
   "email": zod.string(),
   "telephone": zod.string().nullish(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'delegue', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
   "createdAt": zod.coerce.date()

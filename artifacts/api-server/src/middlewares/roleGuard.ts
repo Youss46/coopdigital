@@ -4,7 +4,7 @@ export type UserRole =
   | "comptable"
   | "magasinier"
   | "responsable_tracabilite"
-  | "agent_terrain"
+  | "delegue"
   | "auditeur";
 
 /**

@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 import * as delegueService from "../services/delegueService.js";
 
-// ─── Routes terrain (agent_terrain) ────────────────────────────────────────
+// ─── Routes terrain (delegue) ────────────────────────────────────────────
 
 export async function getCaisseHandler(req: Request, res: Response): Promise<void> {
   const agent = req.agent!;

@@ -15,9 +15,9 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE M01 — MEMBRES
   membres: {
-    lire:     ["pca", "directeur", "comptable", "responsable_tracabilite", "agent_terrain", "auditeur"],
-    creer:    ["pca", "directeur", "agent_terrain"],
-    modifier: ["pca", "directeur", "agent_terrain"],
+    lire:     ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
+    creer:    ["pca", "directeur", "delegue"],
+    modifier: ["pca", "directeur", "delegue"],
     supprimer:["pca", "directeur"],
     exporter: ["pca", "directeur", "comptable", "auditeur"],
   },
@@ -28,7 +28,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     creer_lot:        ["pca", "directeur", "responsable_tracabilite"],
     modifier_lot:     ["pca", "directeur", "responsable_tracabilite"],
     supprimer_lot:    ["pca", "directeur"],
-    scanner_qr:       ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
+    scanner_qr:       ["pca", "directeur", "responsable_tracabilite", "delegue"],
     exporter_eudr:    ["pca", "directeur", "responsable_tracabilite", "auditeur"],
   },
 
@@ -45,22 +45,22 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE M04 — AVANCES & PAIEMENTS
   avances: {
-    lire:      ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
-    octroyer:  ["pca", "directeur", "agent_terrain"],
-    rembourser:["pca", "directeur", "agent_terrain"],
+    lire:      ["pca", "directeur", "comptable", "delegue", "auditeur"],
+    octroyer:  ["pca", "directeur", "delegue"],
+    rembourser:["pca", "directeur", "delegue"],
     supprimer: ["pca", "directeur"],
   },
 
   livraisons: {
-    lire:      ["pca", "directeur", "comptable", "responsable_tracabilite", "agent_terrain", "auditeur"],
-    creer:     ["pca", "directeur", "agent_terrain"],
+    lire:      ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
+    creer:     ["pca", "directeur", "delegue"],
     modifier:  ["pca", "directeur"],
     supprimer: ["pca", "directeur"],
   },
 
   paiements: {
-    lire:     ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
-    confirmer:["pca", "directeur", "agent_terrain"],
+    lire:     ["pca", "directeur", "comptable", "delegue", "auditeur"],
+    confirmer:["pca", "directeur", "delegue"],
     valider:  ["pca", "directeur", "comptable"],
     rejeter:  ["pca", "directeur", "comptable"],
     annuler:  ["pca", "directeur"],
@@ -116,8 +116,8 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_dashboard:               ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
     generer_rapport_mensuel:      ["pca", "directeur", "comptable"],
     generer_bilan_campagne:       ["pca", "directeur", "comptable"],
-    generer_fiche_membre:         ["pca", "directeur", "agent_terrain"],
-    generer_recu:                 ["pca", "directeur", "comptable", "agent_terrain", "magasinier"],
+    generer_fiche_membre:         ["pca", "directeur", "delegue"],
+    generer_recu:                 ["pca", "directeur", "comptable", "delegue", "magasinier"],
     exporter_donnees_bailleurs:   ["pca", "directeur", "auditeur"],
   },
 
@@ -136,7 +136,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE CAMPAGNES
   campagnes: {
-    lire:       ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "agent_terrain", "auditeur"],
+    lire:       ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "delegue", "auditeur"],
     creer:      ["pca", "directeur"],
     fermer:     ["pca", "directeur"],
     verifier:   ["pca", "directeur", "comptable"],
@@ -146,8 +146,8 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE PARTS SOCIALES
   parts_sociales: {
-    lire:               ["pca", "directeur", "comptable", "agent_terrain", "auditeur"],
-    enregistrer_versement: ["pca", "directeur", "comptable", "agent_terrain"],
+    lire:               ["pca", "directeur", "comptable", "delegue", "auditeur"],
+    enregistrer_versement: ["pca", "directeur", "comptable", "delegue"],
     configurer:         ["pca", "directeur"],
   },
 
@@ -159,9 +159,9 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE FOURNISSEURS
   fournisseurs: {
-    lire:     ["pca", "directeur", "comptable", "agent_terrain", "responsable_tracabilite", "auditeur"],
-    creer:    ["pca", "directeur", "agent_terrain"],
-    modifier: ["pca", "directeur", "agent_terrain"],
+    lire:     ["pca", "directeur", "comptable", "delegue", "responsable_tracabilite", "auditeur"],
+    creer:    ["pca", "directeur", "delegue"],
+    modifier: ["pca", "directeur", "delegue"],
   },
 
   // MODULE M07 — COMMUNICATION
@@ -226,10 +226,10 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE M28 — INTRANTS
   intrants: {
-    voir:          ["pca", "directeur", "comptable", "agent_terrain", "auditeur", "magasinier"],
-    distribuer:    ["pca", "directeur", "agent_terrain"],
+    voir:          ["pca", "directeur", "comptable", "delegue", "auditeur", "magasinier"],
+    distribuer:    ["pca", "directeur", "delegue"],
     approvisionner:["pca", "directeur", "magasinier"],
-    rembourser:    ["pca", "directeur", "agent_terrain", "comptable"],
+    rembourser:    ["pca", "directeur", "delegue", "comptable"],
     rapport:       ["pca", "directeur", "comptable", "auditeur"],
     creer:         ["pca", "directeur", "magasinier"],
     modifier:      ["pca", "directeur", "magasinier"],
@@ -237,9 +237,9 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE PARCELLES & EUDR
   parcelles: {
-    voir_carte:       ["pca", "directeur", "comptable", "responsable_tracabilite", "agent_terrain", "auditeur"],
-    creer_parcelle:   ["pca", "directeur", "agent_terrain", "responsable_tracabilite"],
-    modifier_parcelle:["pca", "directeur", "agent_terrain", "responsable_tracabilite"],
+    voir_carte:       ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
+    creer_parcelle:   ["pca", "directeur", "delegue", "responsable_tracabilite"],
+    modifier_parcelle:["pca", "directeur", "delegue", "responsable_tracabilite"],
     verifier_eudr:    ["pca", "directeur", "responsable_tracabilite", "auditeur"],
     exporter_geojson: ["pca", "directeur", "responsable_tracabilite", "auditeur"],
     importer_zones:   ["pca", "directeur"],
@@ -278,7 +278,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   caisse: {
     voir:             ["pca", "directeur", "comptable", "auditeur"],
     ouvrir_session:   ["pca", "directeur", "comptable"],
-    enregistrer_mvt:  ["pca", "directeur", "comptable", "agent_terrain"],
+    enregistrer_mvt:  ["pca", "directeur", "comptable", "delegue"],
     fermer_session:   ["pca", "directeur", "comptable"],
     creer_caisse:     ["pca", "directeur"],
     voir_alertes:     ["pca", "directeur", "comptable"],
@@ -300,8 +300,8 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE — SUPPORT
   support: {
-    creer_ticket:  ["pca", "directeur", "comptable", "agent_terrain", "responsable_tracabilite"],
-    voir_tickets:  ["pca", "directeur", "comptable", "agent_terrain", "responsable_tracabilite"],
+    creer_ticket:  ["pca", "directeur", "comptable", "delegue", "responsable_tracabilite"],
+    voir_tickets:  ["pca", "directeur", "comptable", "delegue", "responsable_tracabilite"],
   },
 
   // MODULE — FISCALITÉ
@@ -317,7 +317,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir:                  ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
     planifier:             ["pca", "directeur", "responsable_tracabilite"],
     inscrire:              ["pca", "directeur", "responsable_tracabilite"],
-    gerer_presences:       ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
+    gerer_presences:       ["pca", "directeur", "responsable_tracabilite", "delegue"],
     generer_attestation:   ["pca", "directeur", "responsable_tracabilite"],
     voir_stats:            ["pca", "directeur", "comptable", "auditeur"],
   },
@@ -327,7 +327,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir:        ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
     planifier:   ["pca", "directeur", "responsable_tracabilite"],
     notifier_sms:["pca", "directeur"],
-    terminer:    ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
+    terminer:    ["pca", "directeur", "responsable_tracabilite", "delegue"],
     gerer_zones: ["pca", "directeur"],
   },
 

@@ -13,7 +13,7 @@ import {
 
 const router = Router();
 
-// Routes terrain (JWT agent_terrain)
+// Routes terrain (JWT delegue)
 router.get("/terrain/caisse", terrainAuthMiddleware, getCaisseHandler);
 router.get("/terrain/paiements-differes", terrainAuthMiddleware, getPaiementsDifferesHandler);
 router.post("/terrain/regulariser/:livraisonId", terrainAuthMiddleware, regulariserPaiementHandler);

@@ -36,7 +36,7 @@ type UserRole =
   | "comptable"
   | "magasinier"
   | "responsable_tracabilite"
-  | "agent_terrain"
+  | "delegue"
   | "auditeur";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -45,7 +45,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   comptable: "Comptable",
   magasinier: "Magasinier",
   responsable_tracabilite: "Resp. Traçabilité",
-  agent_terrain: "Agent terrain",
+  delegue: "Délégué de localité",
   auditeur: "Auditeur",
 };
 
@@ -55,7 +55,7 @@ const ROLE_BADGE_STYLE: Record<UserRole, { bg: string; text: string }> = {
   comptable: { bg: "#1d4ed8", text: "#ffffff" },
   magasinier: { bg: "#c2410c", text: "#ffffff" },
   responsable_tracabilite: { bg: "#0f766e", text: "#ffffff" },
-  agent_terrain: { bg: "#6b7280", text: "#ffffff" },
+  delegue: { bg: "#15803d", text: "#ffffff" },
   auditeur: { bg: "#a16207", text: "#ffffff" },
 };
 
@@ -67,7 +67,7 @@ function getRolesCreables(requesterRole: string): UserRole[] {
     "comptable",
     "magasinier",
     "responsable_tracabilite",
-    "agent_terrain",
+    "delegue",
     "auditeur",
   ];
   if (requesterRole === "pca") return all;
@@ -120,6 +120,9 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
     telephone: "",
     role: "" as UserRole | "",
     section: "",
+    zoneType: "" as "section" | "groupement" | "village" | "",
+    zoneNom: "",
+    zoneVillages: "",
   });
 
   const rolesDisponibles = getRolesCreables(requesterRole);
@@ -165,6 +168,9 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
           role: form.role as UserRole,
           motDePasse,
           section: form.section || undefined,
+          zoneType: (form.zoneType || undefined) as "section" | "groupement" | "village" | undefined,
+          zoneNom: form.zoneNom || undefined,
+          zoneVillages: form.zoneVillages || undefined,
         },
       },
       {
@@ -196,7 +202,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
               </div>
               <h3 className="font-bold text-gray-900 text-lg">Compte créé !</h3>
               <p className="text-sm text-gray-500 mt-1">
-                {form.prenoms} {form.nom} · <RoleBadge role={form.role || "agent_terrain"} />
+                {form.prenoms} {form.nom} · <RoleBadge role={form.role || "delegue"} />
               </p>
             </div>
 
@@ -314,7 +320,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
                 <select
                   required
                   value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value as UserRole, section: "" })}
+                  onChange={(e) => setForm({ ...form, role: e.target.value as UserRole, section: "", zoneType: "", zoneNom: "", zoneVillages: "" })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 >
                   <option value="">Sélectionner un rôle…</option>
@@ -324,19 +330,53 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
                 </select>
               </div>
 
-              {form.role === "agent_terrain" && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Section / Zone <span className="text-gray-400">(optionnel)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.section}
-                    onChange={(e) => setForm({ ...form, section: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder="ex. Zone Nord, Section Yamoussoukro…"
-                  />
-                </div>
+              {form.role === "delegue" && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Type de zone <span className="text-gray-400">(optionnel)</span>
+                    </label>
+                    <div className="flex gap-4">
+                      {(["section", "groupement", "village"] as const).map((t) => (
+                        <label key={t} className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="zoneType"
+                            value={t}
+                            checked={form.zoneType === t}
+                            onChange={() => setForm({ ...form, zoneType: t })}
+                            className="accent-green-600"
+                          />
+                          <span className="text-sm capitalize">{t.charAt(0).toUpperCase() + t.slice(1)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Nom de la zone <span className="text-gray-400">(optionnel)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={form.zoneNom}
+                      onChange={(e) => setForm({ ...form, zoneNom: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      placeholder="ex. Village Broukro, Groupement Sud…"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Villages couverts <span className="text-gray-400">(optionnel, séparés par des virgules)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={form.zoneVillages}
+                      onChange={(e) => setForm({ ...form, zoneVillages: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      placeholder="ex. Broukro, Kpata, Amoriakro"
+                    />
+                  </div>
+                </>
               )}
 
               {/* Mot de passe auto-généré */}

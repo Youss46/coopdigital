@@ -162,7 +162,7 @@ export async function notifAnomalieCritique(cooperativeId: number, description: 
 }
 
 export async function notifPrixChange(cooperativeId: number, prixKg: number): Promise<void> {
-  await notifierParRole(cooperativeId, ["pca", "directeur", "agent_terrain"], {
+  await notifierParRole(cooperativeId, ["pca", "directeur", "delegue"], {
     type:         "prix_change",
     gravite:      "info",
     titre:        "Prix bord champ mis à jour",

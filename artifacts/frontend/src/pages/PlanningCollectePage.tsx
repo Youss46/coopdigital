@@ -476,7 +476,7 @@ function OngletCalendrier({ zones, agents, role }: OngletCalendrierProps) {
   const semaineParam = toIso(monday);
 
   const canPlanifier = ["pca", "directeur", "responsable_tracabilite"].includes(role);
-  const canTerminer  = ["pca", "directeur", "responsable_tracabilite", "agent_terrain"].includes(role);
+  const canTerminer  = ["pca", "directeur", "responsable_tracabilite", "delegue"].includes(role);
   const canNotifier  = ["pca", "directeur"].includes(role);
 
   const { data: plannings = [], refetch } = useQuery<Planning[]>({
@@ -604,7 +604,7 @@ function OngletCalendrier({ zones, agents, role }: OngletCalendrierProps) {
 function OngletSuivi({ role }: { role: string }) {
   const { toast } = useToast();
   const today = toIso(new Date());
-  const canTerminer = ["pca", "directeur", "responsable_tracabilite", "agent_terrain"].includes(role);
+  const canTerminer = ["pca", "directeur", "responsable_tracabilite", "delegue"].includes(role);
   const [loadingId, setLoadingId] = useState<number | null>(null);
 
   const { data: plannings = [], refetch, isFetching } = useQuery<Planning[]>({
@@ -869,7 +869,7 @@ function OngletZones({ zones, agents, refetchZones, role }: OngletZonesProps) {
 
 export default function PlanningCollectePage() {
   const { utilisateur } = useAuth();
-  const role = utilisateur?.role ?? "agent_terrain";
+  const role = utilisateur?.role ?? "delegue";
   const [tab, setTab] = useState<"calendrier" | "suivi" | "zones">("calendrier");
 
   const { data: zones = [], refetch: refetchZones } = useQuery<Zone[]>({
