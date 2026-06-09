@@ -1,4 +1,5 @@
 import { type Request, type Response } from "express";
+import PDFDocument from "pdfkit";
 import { UpdateConfigBody, CreateDocumentOfficielBody } from "@workspace/api-zod";
 import {
   getConfig,
@@ -8,7 +9,7 @@ import {
   createDocumentOfficiel,
   deleteDocumentOfficiel,
 } from "../services/configService";
-import { invalidateLogoCache } from "../services/pdfHeaderService";
+import { invalidateLogoCache, drawHeader, drawFooter } from "../services/pdfHeaderService";
 import type { ConfigCooperative } from "@workspace/db";
 
 function toDateStr(d: Date | null | undefined): string | null | undefined {
@@ -242,5 +243,144 @@ export async function handleDeleteDocument(req: Request, res: Response): Promise
   } catch (err) {
     req.log.error({ err }, "Erreur deleteDocument");
     res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+const MOIS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+
+function fmtDate(d: string | null | undefined): string | null {
+  if (!d) return null;
+  try { return new Date(d + "T12:00:00").toLocaleDateString("fr-FR"); } catch { return d; }
+}
+
+function fmtNumber(v: string | number | null | undefined): string | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  if (isNaN(n)) return String(v);
+  return n.toLocaleString("fr-FR");
+}
+
+export async function handleExportConfigPdf(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) {
+      res.status(400).json({ erreur: "Coopérative introuvable" });
+      return;
+    }
+
+    const cfg = await getConfig(cooperativeId);
+    if (!cfg) {
+      res.status(404).json({ erreur: "Aucune configuration trouvée" });
+      return;
+    }
+
+    const doc = new PDFDocument({ margin: 40, size: "A4", bufferPages: true });
+    const MARGIN = 40;
+    const W   = doc.page.width;
+    const CW  = W - MARGIN * 2;
+    const LBL = 180;
+    const VAL = CW - LBL - 10;
+    const couleur = cfg.couleurPrimaire || "#1a4731";
+
+    const safeName = (cfg.nomComplet ?? "parametres").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="parametres_${safeName}.pdf"`);
+    doc.pipe(res);
+
+    await drawHeader(doc, cooperativeId, { titre_document: "FICHE DE PARAMÈTRES" });
+
+    let y = 106;
+
+    function checkPage(): void {
+      if (y > doc.page.height - 70) {
+        doc.addPage();
+        y = 40;
+      }
+    }
+
+    function sectionTitle(title: string): void {
+      checkPage();
+      doc.rect(MARGIN, y, CW, 18).fill(couleur);
+      doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#ffffff")
+        .text(title, MARGIN + 8, y + 5, { width: CW - 16, lineBreak: false });
+      y += 24;
+    }
+
+    function row(label: string, value: string | number | null | undefined): void {
+      if (value == null || value === "") return;
+      checkPage();
+      doc.font("Helvetica-Bold").fontSize(8).fillColor("#666666")
+        .text(label, MARGIN, y, { width: LBL, lineBreak: false });
+      doc.font("Helvetica").fontSize(8).fillColor("#111111")
+        .text(String(value), MARGIN + LBL, y, { width: VAL });
+      y += doc.currentLineHeight(true) + 4;
+      if (y < MARGIN + LBL + 18) y = MARGIN + LBL + 18;
+    }
+
+    function gap(n = 8): void { y += n; }
+
+    sectionTitle("Identité");
+    row("Nom complet",  cfg.nomComplet);
+    row("Nom abrégé",   cfg.nomAbrege);
+    row("Slogan",       cfg.slogan);
+    gap();
+
+    sectionTitle("Coordonnées");
+    row("Adresse",              cfg.adresse);
+    row("Ville",                cfg.ville);
+    row("Région",               cfg.region);
+    row("Pays",                 cfg.pays);
+    row("Téléphone principal",  cfg.telephone);
+    row("Téléphone secondaire", cfg.telephone2);
+    row("Email",                cfg.email);
+    row("Site web",             cfg.siteWeb);
+    row("Boîte postale",        cfg.boitePostale);
+    gap();
+
+    sectionTitle("Informations juridiques");
+    row("Forme juridique",      cfg.formeJuridique);
+    row("Numéro d'agrément",    cfg.numeroAgrement);
+    row("Date d'agrément",      fmtDate(cfg.dateAgrement));
+    row("Autorité d'agrément",  cfg.autoriteAgrement);
+    row("Date de création",     fmtDate(cfg.dateCreation));
+    row("Numéro RCCM",          cfg.numeroRccm);
+    row("Numéro contribuable",  cfg.numeroContribuable);
+    gap();
+
+    sectionTitle("Informations bancaires");
+    row("Banque principale",    cfg.banquePrincipale);
+    row("Numéro de compte",     cfg.numeroCompteBancaire);
+    row("IBAN",                 cfg.iban);
+    row("SWIFT / BIC",          cfg.swift);
+    row("Devise",               cfg.devise);
+    if (cfg.exerciceFiscalDebutMois != null) {
+      row("Début exercice fiscal", MOIS_FR[(cfg.exerciceFiscalDebutMois - 1)] ?? String(cfg.exerciceFiscalDebutMois));
+    }
+    gap();
+
+    sectionTitle("Informations opérationnelles");
+    row("Produit principal",     cfg.produitPrincipal);
+    row("Zone de collecte",      cfg.zoneCollecte);
+    row("Superficie totale (ha)", fmtNumber(cfg.superficieTotaleHa));
+    gap();
+
+    sectionTitle("Parts sociales & Cotisations");
+    row("Valeur nominale d'une part (FCFA)", fmtNumber(cfg.valeurNominalePartFcfa));
+    row("Nombre de parts minimum",           cfg.nbrePartsMin);
+    row("Cotisation annuelle (FCFA)",        fmtNumber(cfg.cotisationAnnuelleFcfa));
+    row("Quorum AG requis (%)",              fmtNumber(cfg.quorumAgPct));
+    gap();
+
+    doc.flushPages();
+    const totalPages = doc.bufferedPageRange().count;
+    for (let i = 0; i < totalPages; i++) {
+      doc.switchToPage(i);
+      await drawFooter(doc, cooperativeId, i + 1, totalPages);
+    }
+
+    doc.end();
+  } catch (err) {
+    req.log.error({ err }, "Erreur exportConfigPdf");
+    if (!res.headersSent) res.status(500).json({ erreur: "Erreur interne" });
   }
 }

@@ -57,6 +57,7 @@ import {
   ExternalLink,
   Image as ImageIcon,
   Loader2,
+  FileDown,
 } from "lucide-react";
 
 const MONTHS = [
@@ -105,6 +106,28 @@ export default function ParametresPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
+  async function handleDownloadPdf() {
+    setIsDownloadingPdf(true);
+    try {
+      const r = await fetch("/api/config/export-pdf", { credentials: "include" });
+      if (!r.ok) throw new Error("Erreur serveur");
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "parametres_coop.pdf";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Erreur lors du téléchargement PDF", variant: "destructive" });
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  }
 
   const { data: config, isLoading: configLoading } = useGetConfig({
     query: { queryKey: getGetConfigQueryKey() },
@@ -316,16 +339,26 @@ export default function ParametresPage() {
           <h1 className="text-2xl font-bold text-gray-900">Paramètres</h1>
           <p className="text-gray-500 text-sm mt-1">Configuration de la coopérative</p>
         </div>
-        {canEdit && (
+        <div className="flex items-center gap-2">
           <Button
-            onClick={handleSave}
-            disabled={updateConfig.isPending}
-            className="bg-green-700 hover:bg-green-800 text-white"
+            variant="outline"
+            onClick={() => void handleDownloadPdf()}
+            disabled={isDownloadingPdf || !config}
           >
-            {updateConfig.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-            Enregistrer
+            {isDownloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
+            Exporter PDF
           </Button>
-        )}
+          {canEdit && (
+            <Button
+              onClick={handleSave}
+              disabled={updateConfig.isPending}
+              className="bg-green-700 hover:bg-green-800 text-white"
+            >
+              {updateConfig.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Enregistrer
+            </Button>
+          )}
+        </div>
       </div>
 
       <Tabs defaultValue="identite">
