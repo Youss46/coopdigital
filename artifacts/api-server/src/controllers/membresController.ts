@@ -1,10 +1,49 @@
 import { type Request, type Response } from "express";
 
-import { db, membresTable, livraisonsTable, campagnesTable } from "@workspace/db";
+import { db, membresTable, livraisonsTable, campagnesTable, fournisseursTable } from "@workspace/db";
 import { eq, and, or, ilike, sql, desc, notInArray, asc } from "drizzle-orm";
 import { CreateMembreBody, UpdateMembreBody } from "@workspace/api-zod";
 import { computeCodeMembre } from "../services/portailService";
 import { generateListeMembres } from "../services/pdfService";
+
+function genCodeFournisseur(seq: number, annee: number) {
+  return `MBR-${annee}-${String(seq).padStart(4, "0")}`;
+}
+
+async function autoCreateFournisseurMembre(
+  cooperativeId: number,
+  membre: { id: number; nom: string; prenoms: string | null; telephone: string; section?: string | null; nationalite?: string | null; dateAdhesion: string; lieuNaissance?: string | null },
+) {
+  try {
+    const existing = await db.query.fournisseursTable.findFirst({
+      where: and(eq(fournisseursTable.membreId, membre.id), eq(fournisseursTable.cooperativeId, cooperativeId)),
+    });
+    if (existing) return;
+
+    const [countRow] = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(fournisseursTable)
+      .where(and(eq(fournisseursTable.cooperativeId, cooperativeId), eq(fournisseursTable.typeFournisseur, "membre")));
+    const seq = Number(countRow?.count ?? 0) + 1;
+    const code = genCodeFournisseur(seq, new Date().getFullYear());
+
+    await db.insert(fournisseursTable).values({
+      cooperativeId,
+      typeFournisseur: "membre",
+      membreId: membre.id,
+      code,
+      nom: membre.nom,
+      prenoms: membre.prenoms,
+      telephone: membre.telephone,
+      section: membre.section ?? undefined,
+      nationalite: membre.nationalite ?? "Ivoirienne",
+      dateAdhesion: membre.dateAdhesion,
+      lieuNaissance: membre.lieuNaissance ?? undefined,
+    });
+  } catch {
+    // Non bloquant — la création du membre est déjà confirmée
+  }
+}
 
 function enrichMembre<T extends { id: number; dateAdhesion: string }>(m: T) {
   return { ...m, codeMembre: computeCodeMembre(m.id, m.dateAdhesion) };
@@ -108,6 +147,8 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
         dateAdhesion: data.dateAdhesion ?? new Date().toISOString().split("T")[0]!,
       })
       .returning();
+
+    void autoCreateFournisseurMembre(cooperativeId, membre);
 
     res.status(201).json(enrichMembre(membre));
   } catch (err) {

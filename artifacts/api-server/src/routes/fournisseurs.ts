@@ -7,6 +7,7 @@ import {
   createFournisseur,
   createFournisseurDepuisMembre,
   updateFournisseur,
+  updateAgrement,
   getRapportTypeFournisseur,
 } from "../controllers/fournisseursController";
 
@@ -18,6 +19,7 @@ router.get("/fournisseurs", checkPermission("fournisseurs", "lire"), listFournis
 router.get("/fournisseurs/:id", checkPermission("fournisseurs", "lire"), getFournisseurById);
 router.post("/fournisseurs/depuis-membre/:id", checkPermission("fournisseurs", "creer"), createFournisseurDepuisMembre);
 router.post("/fournisseurs", checkPermission("fournisseurs", "creer"), createFournisseur);
+router.put("/fournisseurs/:id/agrement", checkPermission("fournisseurs", "modifier"), updateAgrement);
 router.put("/fournisseurs/:id", checkPermission("fournisseurs", "modifier"), updateFournisseur);
 
 export default router;

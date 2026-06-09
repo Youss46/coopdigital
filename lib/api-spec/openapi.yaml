@@ -2476,6 +2476,8 @@ paths:
                       type: string
                     count:
                       type: integer
+                    tonnageTotal:
+                      type: number
 
   /fournisseurs:
     get:
@@ -2564,6 +2566,43 @@ paths:
       responses:
         "200":
           description: Fournisseur mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fournisseur"
+
+  /fournisseurs/{id}/agrement:
+    put:
+      operationId: updateAgrement
+      tags: [fournisseurs]
+      summary: Mettre à jour l'agrément d'un pisteur
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [statutAgrement]
+              properties:
+                statutAgrement:
+                  type: string
+                  enum: [agree, suspendu, expire]
+                dateAgrement:
+                  type: string
+                  format: date
+                dateExpirationAgrement:
+                  type: string
+                  format: date
+      responses:
+        "200":
+          description: Agrément mis à jour
           content:
             application/json:
               schema:
@@ -8518,6 +8557,21 @@ components:
           format: date
         lieuNaissance:
           type: ["string", "null"]
+        statutAgrement:
+          type: ["string", "null"]
+          enum: [agree, suspendu, expire, null]
+        dateAgrement:
+          type: ["string", "null"]
+          format: date
+        dateExpirationAgrement:
+          type: ["string", "null"]
+          format: date
+        nbLivraisons:
+          type: integer
+        tonnageTotal:
+          type: number
+        derniereLivraison:
+          type: ["string", "null"]
         actif:
           type: boolean
         createdAt:
@@ -8552,6 +8606,12 @@ components:
           format: date
         lieuNaissance:
           type: string
+        dateAgrement:
+          type: string
+          format: date
+        dateExpirationAgrement:
+          type: string
+          format: date
     Bailleur:
       type: object
       required: [id, cooperative_id, nom, type, created_at]

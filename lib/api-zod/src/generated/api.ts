@@ -2620,6 +2620,12 @@ export const SearchFournisseursResponseItem = zod.object({
   "origine": zod.string().nullish(),
   "dateAdhesion": zod.coerce.date().nullish(),
   "lieuNaissance": zod.string().nullish(),
+  "statutAgrement": zod.union([zod.literal('agree'),zod.literal('suspendu'),zod.literal('expire'),zod.literal(null)]).nullish(),
+  "dateAgrement": zod.coerce.date().nullish(),
+  "dateExpirationAgrement": zod.coerce.date().nullish(),
+  "nbLivraisons": zod.number().optional(),
+  "tonnageTotal": zod.number().optional(),
+  "derniereLivraison": zod.string().nullish(),
   "actif": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
@@ -2631,7 +2637,8 @@ export const SearchFournisseursResponse = zod.array(SearchFournisseursResponseIt
  */
 export const GetRapportTypeFournisseurResponseItem = zod.object({
   "typeFournisseur": zod.string(),
-  "count": zod.number()
+  "count": zod.number(),
+  "tonnageTotal": zod.number().optional()
 })
 export const GetRapportTypeFournisseurResponse = zod.array(GetRapportTypeFournisseurResponseItem)
 
@@ -2661,6 +2668,12 @@ export const ListFournisseursResponseItem = zod.object({
   "origine": zod.string().nullish(),
   "dateAdhesion": zod.coerce.date().nullish(),
   "lieuNaissance": zod.string().nullish(),
+  "statutAgrement": zod.union([zod.literal('agree'),zod.literal('suspendu'),zod.literal('expire'),zod.literal(null)]).nullish(),
+  "dateAgrement": zod.coerce.date().nullish(),
+  "dateExpirationAgrement": zod.coerce.date().nullish(),
+  "nbLivraisons": zod.number().optional(),
+  "tonnageTotal": zod.number().optional(),
+  "derniereLivraison": zod.string().nullish(),
   "actif": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
@@ -2681,7 +2694,9 @@ export const CreateFournisseurBody = zod.object({
   "numeroCni": zod.string().optional(),
   "origine": zod.string().optional(),
   "dateAdhesion": zod.coerce.date().optional(),
-  "lieuNaissance": zod.string().optional()
+  "lieuNaissance": zod.string().optional(),
+  "dateAgrement": zod.coerce.date().optional(),
+  "dateExpirationAgrement": zod.coerce.date().optional()
 })
 
 
@@ -2708,6 +2723,12 @@ export const GetFournisseurByIdResponse = zod.object({
   "origine": zod.string().nullish(),
   "dateAdhesion": zod.coerce.date().nullish(),
   "lieuNaissance": zod.string().nullish(),
+  "statutAgrement": zod.union([zod.literal('agree'),zod.literal('suspendu'),zod.literal('expire'),zod.literal(null)]).nullish(),
+  "dateAgrement": zod.coerce.date().nullish(),
+  "dateExpirationAgrement": zod.coerce.date().nullish(),
+  "nbLivraisons": zod.number().optional(),
+  "tonnageTotal": zod.number().optional(),
+  "derniereLivraison": zod.string().nullish(),
   "actif": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
@@ -2731,7 +2752,9 @@ export const UpdateFournisseurBody = zod.object({
   "numeroCni": zod.string().optional(),
   "origine": zod.string().optional(),
   "dateAdhesion": zod.coerce.date().optional(),
-  "lieuNaissance": zod.string().optional()
+  "lieuNaissance": zod.string().optional(),
+  "dateAgrement": zod.coerce.date().optional(),
+  "dateExpirationAgrement": zod.coerce.date().optional()
 })
 
 export const UpdateFournisseurResponse = zod.object({
@@ -2750,6 +2773,52 @@ export const UpdateFournisseurResponse = zod.object({
   "origine": zod.string().nullish(),
   "dateAdhesion": zod.coerce.date().nullish(),
   "lieuNaissance": zod.string().nullish(),
+  "statutAgrement": zod.union([zod.literal('agree'),zod.literal('suspendu'),zod.literal('expire'),zod.literal(null)]).nullish(),
+  "dateAgrement": zod.coerce.date().nullish(),
+  "dateExpirationAgrement": zod.coerce.date().nullish(),
+  "nbLivraisons": zod.number().optional(),
+  "tonnageTotal": zod.number().optional(),
+  "derniereLivraison": zod.string().nullish(),
+  "actif": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Mettre à jour l'agrément d'un pisteur
+ */
+export const UpdateAgrementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateAgrementBody = zod.object({
+  "statutAgrement": zod.enum(['agree', 'suspendu', 'expire']),
+  "dateAgrement": zod.coerce.date().optional(),
+  "dateExpirationAgrement": zod.coerce.date().optional()
+})
+
+export const UpdateAgrementResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "typeFournisseur": zod.enum(['membre', 'pisteur', 'externe']),
+  "membreId": zod.number().nullish(),
+  "code": zod.string(),
+  "nom": zod.string(),
+  "prenoms": zod.string().nullish(),
+  "sexe": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "nationalite": zod.string().nullish(),
+  "numeroCni": zod.string().nullish(),
+  "origine": zod.string().nullish(),
+  "dateAdhesion": zod.coerce.date().nullish(),
+  "lieuNaissance": zod.string().nullish(),
+  "statutAgrement": zod.union([zod.literal('agree'),zod.literal('suspendu'),zod.literal('expire'),zod.literal(null)]).nullish(),
+  "dateAgrement": zod.coerce.date().nullish(),
+  "dateExpirationAgrement": zod.coerce.date().nullish(),
+  "nbLivraisons": zod.number().optional(),
+  "tonnageTotal": zod.number().optional(),
+  "derniereLivraison": zod.string().nullish(),
   "actif": zod.boolean(),
   "createdAt": zod.coerce.date()
 })

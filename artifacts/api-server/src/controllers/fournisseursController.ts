@@ -1,8 +1,7 @@
 import { type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { fournisseursTable, membresTable } from "@workspace/db";
-import { eq, and, or, ilike, desc } from "drizzle-orm";
-import { sql } from "drizzle-orm";
+import { fournisseursTable, membresTable, livraisonsTable } from "@workspace/db";
+import { eq, and, or, ilike, desc, sql } from "drizzle-orm";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -28,25 +27,64 @@ export async function listFournisseurs(req: Request, res: Response) {
     q?: string;
   };
 
-  const fournisseurs = await db.query.fournisseursTable.findMany({
-    where: and(
-      eq(fournisseursTable.cooperativeId, coopId(req)),
-      eq(fournisseursTable.actif, true),
-      type ? eq(fournisseursTable.typeFournisseur, type as "membre" | "pisteur" | "externe") : undefined,
-      section ? eq(fournisseursTable.section, section) : undefined,
-      q
-        ? or(
-            ilike(fournisseursTable.nom, `%${q}%`),
-            ilike(fournisseursTable.prenoms, `%${q}%`),
-            ilike(fournisseursTable.code, `%${q}%`),
-            ilike(fournisseursTable.telephone, `%${q}%`)
-          )
-        : undefined
-    ),
-    orderBy: [desc(fournisseursTable.createdAt)],
-  });
+  const cid = coopId(req);
 
-  return res.json(fournisseurs);
+  const rows = await db
+    .select({
+      id:                    fournisseursTable.id,
+      cooperativeId:         fournisseursTable.cooperativeId,
+      typeFournisseur:       fournisseursTable.typeFournisseur,
+      membreId:              fournisseursTable.membreId,
+      code:                  fournisseursTable.code,
+      nom:                   fournisseursTable.nom,
+      prenoms:               fournisseursTable.prenoms,
+      sexe:                  fournisseursTable.sexe,
+      telephone:             fournisseursTable.telephone,
+      section:               fournisseursTable.section,
+      nationalite:           fournisseursTable.nationalite,
+      numeroCni:             fournisseursTable.numeroCni,
+      origine:               fournisseursTable.origine,
+      dateAdhesion:          fournisseursTable.dateAdhesion,
+      lieuNaissance:         fournisseursTable.lieuNaissance,
+      photoUrl:              fournisseursTable.photoUrl,
+      statutAgrement:        fournisseursTable.statutAgrement,
+      dateAgrement:          fournisseursTable.dateAgrement,
+      dateExpirationAgrement: fournisseursTable.dateExpirationAgrement,
+      actif:                 fournisseursTable.actif,
+      createdAt:             fournisseursTable.createdAt,
+      updatedAt:             fournisseursTable.updatedAt,
+      nbLivraisons:  sql<number>`count(${livraisonsTable.id})::int`,
+      tonnageTotal:  sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float`,
+      derniereLivraison: sql<string | null>`max(${livraisonsTable.dateLivraison})`,
+    })
+    .from(fournisseursTable)
+    .leftJoin(
+      livraisonsTable,
+      and(
+        eq(livraisonsTable.membreId, fournisseursTable.membreId!),
+        sql`${fournisseursTable.membreId} is not null`
+      )
+    )
+    .where(
+      and(
+        eq(fournisseursTable.cooperativeId, cid),
+        eq(fournisseursTable.actif, true),
+        type ? eq(fournisseursTable.typeFournisseur, type as "membre" | "pisteur" | "externe") : undefined,
+        section ? eq(fournisseursTable.section, section) : undefined,
+        q
+          ? or(
+              ilike(fournisseursTable.nom, `%${q}%`),
+              ilike(fournisseursTable.prenoms, `%${q}%`),
+              ilike(fournisseursTable.code, `%${q}%`),
+              ilike(fournisseursTable.telephone, `%${q}%`)
+            )
+          : undefined
+      )
+    )
+    .groupBy(fournisseursTable.id)
+    .orderBy(desc(fournisseursTable.createdAt));
+
+  return res.json(rows);
 }
 
 export async function searchFournisseurs(req: Request, res: Response) {
@@ -81,7 +119,16 @@ export async function getFournisseurById(req: Request, res: Response) {
   });
 
   if (!fournisseur) return res.status(404).json({ erreur: "Fournisseur introuvable" });
-  return res.json(fournisseur);
+
+  const livraisons = fournisseur.membreId
+    ? await db.query.livraisonsTable.findMany({
+        where: eq(livraisonsTable.membreId, fournisseur.membreId),
+        orderBy: [desc(livraisonsTable.dateLivraison)],
+        limit: 20,
+      })
+    : [];
+
+  return res.json({ ...fournisseur, livraisons });
 }
 
 export async function createFournisseur(req: Request, res: Response) {
@@ -97,6 +144,8 @@ export async function createFournisseur(req: Request, res: Response) {
     origine?: string;
     dateAdhesion?: string;
     lieuNaissance?: string;
+    dateAgrement?: string;
+    dateExpirationAgrement?: string;
   };
 
   if (!body.typeFournisseur || !body.nom) {
@@ -136,6 +185,9 @@ export async function createFournisseur(req: Request, res: Response) {
       origine: body.origine,
       dateAdhesion: body.dateAdhesion,
       lieuNaissance: body.lieuNaissance,
+      statutAgrement: type === "pisteur" ? "agree" : undefined,
+      dateAgrement: body.dateAgrement,
+      dateExpirationAgrement: body.dateExpirationAgrement,
     })
     .returning();
 
@@ -234,16 +286,59 @@ export async function updateFournisseur(req: Request, res: Response) {
   return res.json(updated);
 }
 
+export async function updateAgrement(req: Request, res: Response) {
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  const body = req.body as {
+    statutAgrement: "agree" | "suspendu" | "expire";
+    dateAgrement?: string;
+    dateExpirationAgrement?: string;
+  };
+
+  if (!["agree", "suspendu", "expire"].includes(body.statutAgrement)) {
+    return res.status(400).json({ erreur: "Statut agrément invalide" });
+  }
+
+  const [updated] = await db
+    .update(fournisseursTable)
+    .set({
+      statutAgrement: body.statutAgrement,
+      ...(body.dateAgrement !== undefined ? { dateAgrement: body.dateAgrement } : {}),
+      ...(body.dateExpirationAgrement !== undefined ? { dateExpirationAgrement: body.dateExpirationAgrement } : {}),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(fournisseursTable.id, id),
+        eq(fournisseursTable.cooperativeId, coopId(req)),
+        eq(fournisseursTable.typeFournisseur, "pisteur")
+      )
+    )
+    .returning();
+
+  if (!updated) return res.status(404).json({ erreur: "Pisteur introuvable" });
+  return res.json(updated);
+}
+
 export async function getRapportTypeFournisseur(req: Request, res: Response) {
+  const cid = coopId(req);
+
   const result = await db
     .select({
       typeFournisseur: fournisseursTable.typeFournisseur,
-      count: sql<number>`COUNT(*)`,
+      count: sql<number>`COUNT(${fournisseursTable.id})::int`,
+      tonnageTotal: sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float`,
     })
     .from(fournisseursTable)
+    .leftJoin(
+      livraisonsTable,
+      and(
+        eq(livraisonsTable.membreId, fournisseursTable.membreId!),
+        sql`${fournisseursTable.membreId} is not null`
+      )
+    )
     .where(
       and(
-        eq(fournisseursTable.cooperativeId, coopId(req)),
+        eq(fournisseursTable.cooperativeId, cid),
         eq(fournisseursTable.actif, true)
       )
     )

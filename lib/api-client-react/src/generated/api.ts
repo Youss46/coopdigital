@@ -302,6 +302,7 @@ import type {
   TraiterRefusInput,
   TrancheInput,
   Tresorerie,
+  UpdateAgrementBody,
   UpdateBalance200,
   UpdateBalanceBody,
   UpdateChauffeurBody,
@@ -9154,6 +9155,78 @@ export const useUpdateFournisseur = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateFournisseurMutationOptions(options));
+    }
+
+export const getUpdateAgrementUrl = (id: number,) => {
+
+
+
+
+  return `/api/fournisseurs/${id}/agrement`
+}
+
+/**
+ * @summary Mettre à jour l'agrément d'un pisteur
+ */
+export const updateAgrement = async (id: number,
+    updateAgrementBody: UpdateAgrementBody, options?: RequestInit): Promise<Fournisseur> => {
+
+  return customFetch<Fournisseur>(getUpdateAgrementUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateAgrementBody,)
+  }
+);}
+
+
+
+
+export const getUpdateAgrementMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgrement>>, TError,{id: number;data: BodyType<UpdateAgrementBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAgrement>>, TError,{id: number;data: BodyType<UpdateAgrementBody>}, TContext> => {
+
+const mutationKey = ['updateAgrement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAgrement>>, {id: number;data: BodyType<UpdateAgrementBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateAgrement(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAgrementMutationResult = NonNullable<Awaited<ReturnType<typeof updateAgrement>>>
+    export type UpdateAgrementMutationBody = BodyType<UpdateAgrementBody>
+    export type UpdateAgrementMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mettre à jour l'agrément d'un pisteur
+ */
+export const useUpdateAgrement = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgrement>>, TError,{id: number;data: BodyType<UpdateAgrementBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAgrement>>,
+        TError,
+        {id: number;data: BodyType<UpdateAgrementBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateAgrementMutationOptions(options));
     }
 
 export const getCreateFournisseurDepuisMembreUrl = (id: number,) => {

@@ -2190,6 +2190,18 @@ export const FournisseurTypeFournisseur = {
   externe: 'externe',
 } as const;
 
+/**
+ * @nullable
+ */
+export type FournisseurStatutAgrement = typeof FournisseurStatutAgrement[keyof typeof FournisseurStatutAgrement] | null;
+
+
+export const FournisseurStatutAgrement = {
+  agree: 'agree',
+  suspendu: 'suspendu',
+  expire: 'expire',
+} as const;
+
 export interface Fournisseur {
   id: number;
   cooperativeId: number;
@@ -2216,6 +2228,16 @@ export interface Fournisseur {
   dateAdhesion?: string | null;
   /** @nullable */
   lieuNaissance?: string | null;
+  /** @nullable */
+  statutAgrement?: FournisseurStatutAgrement;
+  /** @nullable */
+  dateAgrement?: string | null;
+  /** @nullable */
+  dateExpirationAgrement?: string | null;
+  nbLivraisons?: number;
+  tonnageTotal?: number;
+  /** @nullable */
+  derniereLivraison?: string | null;
   actif: boolean;
   createdAt: string;
 }
@@ -2240,6 +2262,8 @@ export interface FournisseurInput {
   origine?: string;
   dateAdhesion?: string;
   lieuNaissance?: string;
+  dateAgrement?: string;
+  dateExpirationAgrement?: string;
 }
 
 export type BailleurType = typeof BailleurType[keyof typeof BailleurType];
@@ -4432,6 +4456,7 @@ q: string;
 export type GetRapportTypeFournisseur200Item = {
   typeFournisseur: string;
   count: number;
+  tonnageTotal?: number;
 };
 
 export type ListFournisseursParams = {
@@ -4448,6 +4473,21 @@ export const ListFournisseursType = {
   pisteur: 'pisteur',
   externe: 'externe',
 } as const;
+
+export type UpdateAgrementBodyStatutAgrement = typeof UpdateAgrementBodyStatutAgrement[keyof typeof UpdateAgrementBodyStatutAgrement];
+
+
+export const UpdateAgrementBodyStatutAgrement = {
+  agree: 'agree',
+  suspendu: 'suspendu',
+  expire: 'expire',
+} as const;
+
+export type UpdateAgrementBody = {
+  statutAgrement: UpdateAgrementBodyStatutAgrement;
+  dateAgrement?: string;
+  dateExpirationAgrement?: string;
+};
 
 export type ListPaiementsParams = {
 statut?: ListPaiementsStatut;
