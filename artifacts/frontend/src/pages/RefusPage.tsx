@@ -8,6 +8,7 @@ import {
   useGetStatsRefus,
   useTraiterRefus,
   useGetExportateurs,
+  useGetEntrepots,
   getGetEntrepotsQueryKey,
   getGetMouvementsStockQueryKey,
   getGetStockAlertesQueryKey,
@@ -68,6 +69,7 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
   const queryClient = useQueryClient();
   const traiterMut = useTraiterRefus();
   const { data: exportateurs = [] } = useGetExportateurs();
+  const { data: entrepots = [] } = useGetEntrepots();
 
   const [form, setForm] = useState<Partial<TraiterRefusInput>>({
     decision: "retour_stock",
@@ -87,6 +89,11 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.decision) return;
+
+    if (form.decision === "retour_stock" && !form.entrepotRetourId) {
+      toast({ title: "Entrepôt obligatoire pour un retour stock", variant: "destructive" });
+      return;
+    }
 
     if (form.decision === "autre_acheteur") {
       if (!prix) {
@@ -165,14 +172,19 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
           {/* ── Retour stock ── */}
           {form.decision === "retour_stock" && (
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Entrepôt de destination</label>
-              <input
-                type="number"
+              <label className="block text-xs font-medium text-gray-600 mb-1">Entrepôt de destination *</label>
+              <select
                 className={INPUT_CLS}
-                placeholder="ID entrepôt"
                 value={form.entrepotRetourId ?? ""}
-                onChange={(e) => field("entrepotRetourId", parseInt(e.target.value))}
-              />
+                onChange={(e) => field("entrepotRetourId", parseInt(e.target.value) || undefined)}
+              >
+                <option value="">— Choisir un entrepôt —</option>
+                {entrepots.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nom}{e.ville ? ` — ${e.ville}` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
