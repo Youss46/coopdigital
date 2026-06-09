@@ -877,10 +877,11 @@ export default function PlanningCollectePage() {
     queryFn: () => apiFetch("/planning-collecte/zones"),
   });
 
-  const { data: agents = [] } = useQuery<Agent[]>({
+  const { data: allUsers = [] } = useQuery<Agent[]>({
     queryKey: ["users-all"],
     queryFn: () => apiFetch("/users"),
   });
+  const agents = allUsers.filter((u) => u.role === "terrain");
 
   const { data: stats } = useQuery<Stats>({
     queryKey: ["planning-stats"],
