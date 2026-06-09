@@ -9,10 +9,55 @@ import {
   deleteDocumentOfficiel,
 } from "../services/configService";
 import { invalidateLogoCache } from "../services/pdfHeaderService";
+import type { ConfigCooperative } from "@workspace/db";
 
 function toDateStr(d: Date | null | undefined): string | null | undefined {
   if (d == null) return d;
   return d instanceof Date ? d.toISOString().split("T")[0] : String(d);
+}
+
+function toApiConfig(row: ConfigCooperative) {
+  return {
+    id:                         row.id,
+    cooperative_id:             row.cooperativeId,
+    nom_complet:                row.nomComplet,
+    nom_abrege:                 row.nomAbrege,
+    logo_url:                   row.logoUrl,
+    slogan:                     row.slogan,
+    adresse:                    row.adresse,
+    ville:                      row.ville,
+    region:                     row.region,
+    pays:                       row.pays,
+    telephone:                  row.telephone,
+    telephone2:                 row.telephone2,
+    email:                      row.email,
+    site_web:                   row.siteWeb,
+    boite_postale:              row.boitePostale,
+    numero_agrement:            row.numeroAgrement,
+    date_agrement:              row.dateAgrement,
+    autorite_agrement:          row.autoriteAgrement,
+    forme_juridique:            row.formeJuridique,
+    numero_rccm:                row.numeroRccm,
+    numero_contribuable:        row.numeroContribuable,
+    date_creation:              row.dateCreation,
+    banque_principale:          row.banquePrincipale,
+    numero_compte_bancaire:     row.numeroCompteBancaire,
+    iban:                       row.iban,
+    swift:                      row.swift,
+    devise:                     row.devise,
+    exercice_fiscal_debut_mois: row.exerciceFiscalDebutMois,
+    produit_principal:          row.produitPrincipal,
+    zone_collecte:              row.zoneCollecte,
+    superficie_totale_ha:       row.superficieTotaleHa,
+    valeur_nominale_part_fcfa:  row.valeurNominalePartFcfa,
+    nbre_parts_min:             row.nbrePartsMin,
+    cotisation_annuelle_fcfa:   row.cotisationAnnuelleFcfa,
+    quorum_ag_pct:              row.quorumAgPct,
+    couleur_primaire:           row.couleurPrimaire,
+    couleur_secondaire:         row.couleurSecondaire,
+    pied_de_page_pdf:           row.piedDePagePdf,
+    updated_at:                 row.updatedAt,
+  };
 }
 
 export async function handleGetConfig(req: Request, res: Response): Promise<void> {
@@ -23,7 +68,7 @@ export async function handleGetConfig(req: Request, res: Response): Promise<void
       return;
     }
     const config = await getConfig(cooperativeId);
-    res.json(config ?? {});
+    res.json(config ? toApiConfig(config) : {});
   } catch (err) {
     req.log.error({ err }, "Erreur getConfig");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -84,7 +129,7 @@ export async function handleUpdateConfig(req: Request, res: Response): Promise<v
       piedDePagePdf:            d.pied_de_page_pdf         ?? undefined,
     });
 
-    res.json(updated);
+    res.json(updated ? toApiConfig(updated) : {});
   } catch (err) {
     req.log.error({ err }, "Erreur updateConfig");
     res.status(500).json({ erreur: "Erreur interne" });
