@@ -181,7 +181,7 @@ const navItems = [
     href: "/fournisseurs",
     label: "Fournisseurs",
     icon: UserCheck,
-    roles: ["pca", "directeur", "comptable", "delegue", "responsable_tracabilite", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "delegue", "auditeur"],
   },
   {
     href: "/exportateurs",
@@ -199,7 +199,7 @@ const navItems = [
     href: "/prix",
     label: "Suivi des Prix",
     icon: TrendingUp,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
 
   // ── Finance Coopérative ───────────────────────────────────────────────────
@@ -268,7 +268,7 @@ const navItems = [
     href: "/formations",
     label: "Formations",
     icon: GraduationCap,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "delegue"],
+    roles: ["pca", "directeur", "comptable", "auditeur", "delegue"],
   },
   {
     href: "/equipements",
@@ -288,7 +288,7 @@ const navItems = [
     href: "/reporting",
     label: "Reporting",
     icon: BarChart3,
-    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "magasinier", "auditeur"],
   },
   {
     href: "/anomalies",
