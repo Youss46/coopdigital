@@ -78,7 +78,7 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: `${base}index.html`,
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/(m15|portail|terrain)(\/|$)/],
         globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],
         globIgnores: ["**/hero/**"],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
