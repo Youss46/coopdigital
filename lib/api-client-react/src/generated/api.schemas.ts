@@ -684,6 +684,16 @@ export interface Membre {
   parcelleLng?: string | null;
   createdAt: string;
   updatedAt: string;
+  /** @nullable */
+  delegueId?: number | null;
+  /** @nullable */
+  rattachementType?: string | null;
+  /** @nullable */
+  zoneType?: string | null;
+  /** @nullable */
+  zoneNom?: string | null;
+  creeParDelegue?: boolean | null;
+  delegueInfo?: { nom: string; prenoms: string; telephone: string | null; zoneNom: string | null } | null;
 }
 
 export type MembreInputStatut = typeof MembreInputStatut[keyof typeof MembreInputStatut];
@@ -717,6 +727,8 @@ export interface MembreInput {
   sexe?: MembreInputSexe;
   parcelleLat?: string;
   parcelleLng?: string;
+  delegueId?: number;
+  rattachementType?: 'delegue' | 'base_centrale';
 }
 
 export type MembreUpdateStatut = typeof MembreUpdateStatut[keyof typeof MembreUpdateStatut];
@@ -4252,6 +4264,8 @@ page?: number;
 limit?: number;
 search?: string;
 statut?: GetMembresStatut;
+delegueId?: number;
+rattachementType?: 'delegue' | 'base_centrale';
 };
 
 export type GetMembresStatut = typeof GetMembresStatut[keyof typeof GetMembresStatut];

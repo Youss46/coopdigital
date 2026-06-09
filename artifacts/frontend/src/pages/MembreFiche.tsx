@@ -24,10 +24,11 @@ import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowLeft, MapPin, Phone, Users, Leaf, Calendar, TrendingDown,
   Coins, Plus, Loader2, ChevronDown, ChevronUp, UserCheck, UserX, Gift,
-  GraduationCap, Award, Download,
+  GraduationCap, Award, Download, Building2, User, Edit3, AlertTriangle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const tokFn = () => localStorage.getItem("coop_token") ?? "";
@@ -339,6 +340,52 @@ export default function MembreFiche() {
   });
   const peutModifier = usePermission("membres", "modifier");
   const avanceEnCours = avancesData?.avances?.find((a) => a.statut === "en_cours");
+  const { utilisateur } = useAuth();
+  const peutTransferer = utilisateur?.role === "pca" || utilisateur?.role === "directeur";
+
+  // Modal transfert rattachement
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferPending, setTransferPending] = useState(false);
+  const [transferForm, setTransferForm] = useState<{ rattachementType: "delegue" | "base_centrale"; delegueId?: number }>({
+    rattachementType: "delegue",
+  });
+
+  // Liste des délégués
+  const { data: deleguesList = [] } = useQuery<Array<{ id: number; nom: string; prenoms: string; zoneNom: string | null; telephone: string | null }>>({
+    queryKey: ["delegues-pour-fiche"],
+    queryFn: async () => {
+      const r = await fetch("/api/membres/delegues-list", { headers: { Authorization: `Bearer ${tokFn()}` } });
+      if (!r.ok) return [];
+      return r.json();
+    },
+    enabled: !!id,
+  });
+
+  async function handleTransfert(e: React.FormEvent) {
+    e.preventDefault();
+    if (!membre) return;
+    if (transferForm.rattachementType === "delegue" && !transferForm.delegueId) return;
+    setTransferPending(true);
+    try {
+      const res = await fetch(`/api/membres/${id}/rattachement`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokFn()}` },
+        body: JSON.stringify(transferForm),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: (err as { erreur?: string }).erreur ?? "Erreur lors du transfert", variant: "destructive" });
+        return;
+      }
+      toast({ title: "Rattachement modifié avec succès" });
+      setShowTransferModal(false);
+      void qc.invalidateQueries({ queryKey: getGetMembreByIdQueryKey(id) });
+    } catch {
+      toast({ title: "Erreur réseau", variant: "destructive" });
+    } finally {
+      setTransferPending(false);
+    }
+  }
 
   function handleToggleStatut() {
     if (!membre) return;
@@ -476,6 +523,72 @@ export default function MembreFiche() {
             );
           })()}
         </div>
+      </div>
+
+      {/* Rattachement */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-gray-900 text-sm">Rattachement</h2>
+          {peutTransferer && (
+            <button
+              onClick={() => {
+                setTransferForm({
+                  rattachementType: (membre.rattachementType as "delegue" | "base_centrale") ?? "delegue",
+                  delegueId: membre.delegueId ?? undefined,
+                });
+                setShowTransferModal(true);
+              }}
+              className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium"
+            >
+              <Edit3 size={12} />
+              Modifier
+            </button>
+          )}
+        </div>
+
+        {membre.rattachementType === "base_centrale" ? (
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+              <Building2 size={16} className="text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900">Base centrale</p>
+              <p className="text-xs text-gray-500">Géré directement par la direction</p>
+            </div>
+          </div>
+        ) : membre.delegueId ? (
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+              <User size={16} className="text-green-700" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900">
+                {membre.delegueInfo
+                  ? `${membre.delegueInfo.nom} ${membre.delegueInfo.prenoms}`
+                  : `Délégué #${membre.delegueId}`}
+              </p>
+              {(membre.zoneNom ?? membre.delegueInfo?.zoneNom) && (
+                <p className="text-xs text-gray-500">Zone : {membre.zoneNom ?? membre.delegueInfo?.zoneNom}</p>
+              )}
+              {membre.delegueInfo?.telephone && (
+                <p className="text-xs text-gray-400">{membre.delegueInfo.telephone}</p>
+              )}
+              {membre.creeParDelegue && (
+                <span className="inline-block mt-1 text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded">Créé par ce délégué</span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle size={16} className="text-orange-500" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700">Non assigné</p>
+              <p className="text-xs text-gray-500">Ce membre n'a pas encore de rattachement</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* QR Code */}
@@ -892,6 +1005,95 @@ export default function MembreFiche() {
           </div>
         )}
       </div>
+
+      {/* Modal transfert rattachement */}
+      {showTransferModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Modifier le rattachement</h3>
+              <button onClick={() => setShowTransferModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            </div>
+            <form onSubmit={handleTransfert} className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Type de rattachement</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio" name="tr_type" value="delegue"
+                      checked={transferForm.rattachementType === "delegue"}
+                      onChange={() => setTransferForm({ rattachementType: "delegue", delegueId: undefined })}
+                      className="accent-green-700"
+                    />
+                    <span className="text-sm text-gray-700">Délégué de localité</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio" name="tr_type" value="base_centrale"
+                      checked={transferForm.rattachementType === "base_centrale"}
+                      onChange={() => setTransferForm({ rattachementType: "base_centrale", delegueId: undefined })}
+                      className="accent-green-700"
+                    />
+                    <span className="text-sm text-gray-700">Base centrale</span>
+                  </label>
+                </div>
+              </div>
+
+              {transferForm.rattachementType === "delegue" && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Délégué responsable *</label>
+                  <select
+                    value={transferForm.delegueId ?? ""}
+                    onChange={(e) => setTransferForm({ ...transferForm, delegueId: e.target.value ? parseInt(e.target.value) : undefined })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                  >
+                    <option value="">Sélectionner un délégué…</option>
+                    {deleguesList.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.nom} {d.prenoms}{d.zoneNom ? ` — ${d.zoneNom}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {transferForm.delegueId && (() => {
+                    const d = deleguesList.find((d) => d.id === transferForm.delegueId);
+                    return d ? (
+                      <div className="mt-2 bg-green-50 rounded-lg px-3 py-2 text-xs text-gray-600">
+                        <span className="font-medium text-gray-800">{d.nom} {d.prenoms}</span>
+                        {d.zoneNom && <span className="ml-2 text-gray-500">Zone : {d.zoneNom}</span>}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              )}
+
+              {transferForm.rattachementType === "base_centrale" && (
+                <div className="bg-purple-50 rounded-lg px-3 py-2.5 text-xs text-purple-700">
+                  <Building2 size={12} className="inline mr-1" />
+                  Ce membre sera transféré vers la direction. Un SMS sera envoyé à l'ancien délégué.
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTransferModal(false)}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={transferPending || (transferForm.rattachementType === "delegue" && !transferForm.delegueId)}
+                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
+                  style={{ backgroundColor: "#1a4731" }}
+                >
+                  {transferPending ? "Transfert en cours…" : "Confirmer le transfert"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

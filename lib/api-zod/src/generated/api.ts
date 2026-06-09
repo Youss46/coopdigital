@@ -47,7 +47,9 @@ export const GetMembresQueryParams = zod.object({
   "page": zod.coerce.number().default(getMembresQueryPageDefault),
   "limit": zod.coerce.number().default(getMembresQueryLimitDefault),
   "search": zod.coerce.string().optional(),
-  "statut": zod.enum(['actif', 'inactif']).optional()
+  "statut": zod.enum(['actif', 'inactif']).optional(),
+  "delegueId": zod.coerce.number().optional(),
+  "rattachementType": zod.enum(['delegue', 'base_centrale']).optional()
 })
 
 export const GetMembresResponse = zod.object({
@@ -95,7 +97,9 @@ export const CreateMembreBody = zod.object({
   "photoUrl": zod.string().optional(),
   "sexe": zod.enum(['M', 'F']).optional(),
   "parcelleLat": zod.string().optional(),
-  "parcelleLng": zod.string().optional()
+  "parcelleLng": zod.string().optional(),
+  "delegueId": zod.number().optional(),
+  "rattachementType": zod.enum(['delegue', 'base_centrale']).optional()
 })
 
 

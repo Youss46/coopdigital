@@ -1,6 +1,6 @@
 import {
   pgTable, serial, text, integer, numeric,
-  timestamp, date, uuid, pgEnum,
+  timestamp, date, uuid, pgEnum, varchar, boolean,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -41,6 +41,13 @@ export const membresTable = pgTable("membres", {
   totalSouscritFcfa: integer("total_souscrit_fcfa").notNull().default(0),
   totalLibereFcfa: integer("total_libere_fcfa").notNull().default(0),
   resteALibererFcfa: integer("reste_a_liberer_fcfa").notNull().default(0),
+
+  // Rattachement délégué de localité
+  delegueId: integer("delegue_id"),
+  rattachementType: varchar("rattachement_type", { length: 20 }).default("delegue"),
+  zoneType: varchar("zone_type", { length: 20 }),
+  zoneNom: text("zone_nom"),
+  creeParDelegue: boolean("cree_par_delegue").default(false),
 
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

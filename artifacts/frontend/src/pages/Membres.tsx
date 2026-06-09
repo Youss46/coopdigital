@@ -5,36 +5,114 @@ import {
   useCreateMembre,
   type MembreInput,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGetMembresQueryKey } from "@workspace/api-client-react";
-import { UserPlus, Search, Eye, FileDown, Loader2 } from "lucide-react";
+import { UserPlus, Search, Eye, FileDown, Loader2, Building2, User, AlertTriangle } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
+import { useAuth } from "@/contexts/AuthContext";
 
-function formaterDate(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface DelegueInfo {
+  id: number;
+  nom: string;
+  prenoms: string;
+  telephone: string | null;
+  zoneType: string | null;
+  zoneNom: string | null;
+  section: string | null;
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 const COOP_ID_PAR_DEFAUT = 1;
+
+const tok = () => localStorage.getItem("coop_token") ?? "";
+
+// ── Composant principal ───────────────────────────────────────────────────────
 
 export default function Membres() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { utilisateur } = useAuth();
 
   const peutCreer = usePermission("membres", "creer");
   const peutExporter = usePermission("membres", "exporter");
   const [exportPending, setExportPending] = useState(false);
 
+  const estDelegue = utilisateur?.role === "delegue";
+  const estDirection = utilisateur?.role === "pca" || utilisateur?.role === "directeur";
+
+  // Filtres
   const [recherche, setRecherche] = useState("");
   const [statut, setStatut] = useState<"" | "actif" | "inactif">("");
+  const [filtreDelegueId, setFiltreDelegueId] = useState<number | undefined>(undefined);
+  const [filtreRattachement, setFiltreRattachement] = useState<"" | "delegue" | "base_centrale">("");
+
   const [modalOuvert, setModalOuvert] = useState(false);
+
+  // Formulaire création
+  const [form, setForm] = useState<Partial<MembreInput> & { rattachementType: "delegue" | "base_centrale"; delegueId?: number }>({
+    cooperativeId: COOP_ID_PAR_DEFAUT,
+    statut: "actif",
+    dateAdhesion: new Date().toISOString().split("T")[0],
+    rattachementType: "delegue",
+    delegueId: undefined,
+  });
+
+  // Données
+  const { data, isLoading } = useGetMembres({
+    search: recherche || undefined,
+    statut: statut || undefined,
+    limit: 50,
+    delegueId: filtreDelegueId,
+    rattachementType: filtreRattachement || undefined,
+  });
+
+  const membres = data?.membres ?? [];
+
+  // Liste des délégués pour le dropdown
+  const { data: delegues = [] } = useQuery<DelegueInfo[]>({
+    queryKey: ["delegues-pour-membres"],
+    queryFn: async () => {
+      const r = await fetch("/api/membres/delegues-list", {
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (!r.ok) return [];
+      return r.json() as Promise<DelegueInfo[]>;
+    },
+    enabled: !!utilisateur,
+  });
+
+  // Délégué courant (si l'utilisateur est lui-même délégué)
+  const delegueCourant = estDelegue ? delegues.find((d) => d.id === utilisateur?.id) : null;
+
+  // Mutation création
+  const mutation = useCreateMembre({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetMembresQueryKey() });
+        setModalOuvert(false);
+        resetForm();
+      },
+    },
+  });
+
+  const resetForm = () =>
+    setForm({
+      cooperativeId: COOP_ID_PAR_DEFAUT,
+      statut: "actif",
+      dateAdhesion: new Date().toISOString().split("T")[0],
+      rattachementType: "delegue",
+      delegueId: undefined,
+    });
 
   async function handleExportPdf() {
     setExportPending(true);
     try {
       const params = statut ? `?statut=${statut}` : "";
-      const token = localStorage.getItem("coop_token") ?? "";
       const res = await fetch(`/api/membres/export-pdf${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${tok()}` },
       });
       if (!res.ok) throw new Error("Erreur export");
       const blob = await res.blob();
@@ -54,36 +132,13 @@ export default function Membres() {
     }
   }
 
-  const { data, isLoading } = useGetMembres({
-    search: recherche || undefined,
-    statut: statut || undefined,
-    limit: 50,
-  });
-
-  const membres = data?.membres ?? [];
-
-  const mutation = useCreateMembre({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetMembresQueryKey() });
-        setModalOuvert(false);
-        resetForm();
-      },
-    },
-  });
-
-  const [form, setForm] = useState<Partial<MembreInput>>({
-    cooperativeId: COOP_ID_PAR_DEFAUT,
-    statut: "actif",
-    dateAdhesion: new Date().toISOString().split("T")[0],
-  });
-
-  const resetForm = () =>
-    setForm({ cooperativeId: COOP_ID_PAR_DEFAUT, statut: "actif", dateAdhesion: new Date().toISOString().split("T")[0] });
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nom || !form.prenoms || !form.telephone || !form.superficieHa) return;
+
+    const delegueIdFinal = estDelegue ? utilisateur?.id : form.delegueId;
+    const rattachementTypeFinal = estDelegue ? "delegue" : form.rattachementType;
+
     mutation.mutate({
       data: {
         cooperativeId: COOP_ID_PAR_DEFAUT,
@@ -96,21 +151,53 @@ export default function Membres() {
         village: form.village,
         groupement: form.groupement,
         numeroCni: form.numeroCni,
-        sexe: form.sexe,
+        sexe: form.sexe as "M" | "F" | undefined,
+        delegueId: delegueIdFinal,
+        rattachementType: rattachementTypeFinal,
       },
     });
   };
+
+  // ── Bloc rattachement dans la liste ──────────────────────────────────────────
+  function badgeRattachement(m: (typeof membres)[number]) {
+    if (m.rattachementType === "base_centrale") {
+      return (
+        <span className="inline-flex items-center gap-1 text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">
+          <Building2 size={10} />Base centrale
+        </span>
+      );
+    }
+    if (m.delegueId) {
+      const d = delegues.find((d) => d.id === m.delegueId);
+      const label = d ? `${d.nom} ${d.prenoms?.split(" ")[0] ?? ""}` : `Délégué #${m.delegueId}`;
+      return (
+        <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+          <User size={10} />{label}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full">
+        <AlertTriangle size={10} />Non assigné
+      </span>
+    );
+  }
+
+  // Membres sans rattachement (pour l'alerte)
+  const sanRattachement = !estDelegue ? membres.filter((m) => !m.delegueId && m.rattachementType !== "base_centrale").length : 0;
 
   return (
     <div className="space-y-5">
       {/* En-tête */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Membres</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{data?.total ?? 0} membres enregistrés</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {estDelegue ? `Mes membres${delegueCourant?.zoneNom ? ` — ${delegueCourant.zoneNom}` : ""}` : "Membres"}
+          </h1>
+          <p className="text-gray-500 text-sm mt-0.5">{data?.total ?? 0} membres{estDelegue ? " dans votre zone" : " enregistrés"}</p>
         </div>
         <div className="flex items-center gap-2">
-          {peutExporter && (
+          {peutExporter && !estDelegue && (
             <button
               onClick={handleExportPdf}
               disabled={exportPending}
@@ -133,6 +220,16 @@ export default function Membres() {
         </div>
       </div>
 
+      {/* Alerte membres sans rattachement */}
+      {sanRattachement > 0 && estDirection && (
+        <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+          <AlertTriangle size={16} className="text-orange-500 flex-shrink-0" />
+          <p className="text-sm text-orange-800">
+            <span className="font-semibold">{sanRattachement} membre{sanRattachement > 1 ? "s" : ""}</span> n'ont pas encore de rattachement assigné.
+          </p>
+        </div>
+      )}
+
       {/* Filtres */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-0" style={{ minWidth: "160px" }}>
@@ -150,21 +247,53 @@ export default function Membres() {
           onChange={(e) => setStatut(e.target.value as "" | "actif" | "inactif")}
           className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
         >
-          <option value="">Tous</option>
+          <option value="">Tous statuts</option>
           <option value="actif">Actif</option>
           <option value="inactif">Inactif</option>
         </select>
+
+        {/* Filtres direction uniquement */}
+        {!estDelegue && (
+          <>
+            <select
+              value={filtreDelegueId ?? ""}
+              onChange={(e) => setFiltreDelegueId(e.target.value ? parseInt(e.target.value) : undefined)}
+              className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+            >
+              <option value="">Tous les délégués</option>
+              {delegues.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nom} {d.prenoms} {d.zoneNom ? `— ${d.zoneNom}` : ""}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filtreRattachement}
+              onChange={(e) => {
+                setFiltreRattachement(e.target.value as "" | "delegue" | "base_centrale");
+                setFiltreDelegueId(undefined);
+              }}
+              className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+            >
+              <option value="">Tous rattachements</option>
+              <option value="delegue">Délégué de localité</option>
+              <option value="base_centrale">🏢 Base centrale</option>
+            </select>
+          </>
+        )}
       </div>
 
       {/* Tableau */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm min-w-[480px]">
+        <table className="w-full text-sm min-w-[520px]">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               <th className="text-left px-4 py-3 font-medium text-gray-600">Nom & Prénoms</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Téléphone</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Village</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Groupement</th>
+              {!estDelegue && (
+                <th className="text-left px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Rattachement</th>
+              )}
               <th className="text-right px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Superficie</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">Statut</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">Actions</th>
@@ -193,25 +322,25 @@ export default function Membres() {
                       {m.sexe === "M" ? "M." : m.sexe === "F" ? "Mme" : ""}
                     </span>
                     {m.nom} {m.prenoms}
-                    {m.sexe && (
-                      <span className="ml-1 text-xs" title={m.sexe === "M" ? "Homme" : "Femme"}>
-                        {m.sexe === "M" ? "♂" : "♀"}
-                      </span>
-                    )}
                     <div className="text-xs text-green-700 font-mono font-semibold mt-0.5">
                       {m.codeMembre}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{m.telephone}</td>
                   <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{m.village ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{m.groupement ?? "—"}</td>
+                  {!estDelegue && (
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      {badgeRattachement(m)}
+                      {m.zoneNom && (
+                        <div className="text-xs text-gray-400 mt-0.5">{m.zoneNom}</div>
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-right text-gray-600 hidden md:table-cell">{parseFloat(m.superficieHa).toFixed(2)} ha</td>
                   <td className="px-4 py-3 text-center">
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        m.statut === "actif"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-500"
+                        m.statut === "actif" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
                       }`}
                     >
                       {m.statut === "actif" ? "Actif" : "Inactif"}
@@ -242,15 +371,15 @@ export default function Membres() {
               <button onClick={() => setModalOuvert(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+
+              {/* Civilité */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Civilité / Genre</label>
                 <div className="flex gap-3">
                   {(["M", "F"] as const).map((v) => (
                     <label key={v} className="flex items-center gap-1.5 cursor-pointer">
                       <input
-                        type="radio"
-                        name="civilite"
-                        value={v}
+                        type="radio" name="civilite" value={v}
                         checked={form.sexe === v}
                         onChange={() => setForm({ ...form, sexe: v })}
                         className="accent-green-700"
@@ -260,90 +389,145 @@ export default function Membres() {
                   ))}
                 </div>
               </div>
+
+              {/* Nom + Prénoms */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
-                  <input
-                    required
-                    value={form.nom ?? ""}
-                    onChange={(e) => setForm({ ...form, nom: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1"
-                    placeholder="KOUASSI"
-                  />
+                  <input required value={form.nom ?? ""} onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="KOUASSI" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Prénoms *</label>
-                  <input
-                    required
-                    value={form.prenoms ?? ""}
-                    onChange={(e) => setForm({ ...form, prenoms: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1"
-                    placeholder="Koffi Jean"
-                  />
+                  <input required value={form.prenoms ?? ""} onChange={(e) => setForm({ ...form, prenoms: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="Koffi Jean" />
                 </div>
               </div>
+
+              {/* Téléphone + CNI */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone *</label>
-                  <input
-                    required
-                    value={form.telephone ?? ""}
-                    onChange={(e) => setForm({ ...form, telephone: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1"
-                    placeholder="07 XX XX XX XX"
-                  />
+                  <input required value={form.telephone ?? ""} onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="07 XX XX XX XX" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">N° CNI</label>
-                  <input
-                    value={form.numeroCni ?? ""}
-                    onChange={(e) => setForm({ ...form, numeroCni: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1"
-                  />
+                  <input value={form.numeroCni ?? ""} onChange={(e) => setForm({ ...form, numeroCni: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
                 </div>
               </div>
+
+              {/* Village + Groupement */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Village</label>
-                  <input
-                    value={form.village ?? ""}
-                    onChange={(e) => setForm({ ...form, village: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1"
-                  />
+                  <input value={form.village ?? ""} onChange={(e) => setForm({ ...form, village: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Groupement</label>
-                  <input
-                    value={form.groupement ?? ""}
-                    onChange={(e) => setForm({ ...form, groupement: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1"
-                  />
+                  <input value={form.groupement ?? ""} onChange={(e) => setForm({ ...form, groupement: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
                 </div>
               </div>
+
+              {/* Superficie + Date adhésion */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Superficie (ha) *</label>
-                  <input
-                    required
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={form.superficieHa ?? ""}
+                  <input required type="number" min="0.01" step="0.01" value={form.superficieHa ?? ""}
                     onChange={(e) => setForm({ ...form, superficieHa: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1"
-                  />
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Date adhésion *</label>
-                  <input
-                    required
-                    type="date"
-                    value={form.dateAdhesion ?? ""}
+                  <input required type="date" value={form.dateAdhesion ?? ""}
                     onChange={(e) => setForm({ ...form, dateAdhesion: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1"
-                  />
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
                 </div>
               </div>
+
+              {/* ── RATTACHEMENT ─────────────────────────────────────────────── */}
+              <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Rattachement</p>
+
+                {estDelegue ? (
+                  /* Délégué : rattachement verrouillé sur lui-même */
+                  <div className="bg-green-50 rounded-lg px-3 py-2.5">
+                    <p className="text-xs text-gray-500 mb-0.5">Rattachement automatique</p>
+                    <p className="text-sm font-medium text-gray-800">
+                      <User size={12} className="inline mr-1 text-green-600" />
+                      {utilisateur?.nom} {utilisateur?.prenoms}
+                    </p>
+                    {delegueCourant?.zoneNom && (
+                      <p className="text-xs text-gray-500 mt-0.5">Zone : {delegueCourant.zoneNom}</p>
+                    )}
+                    <p className="text-xs text-green-600 mt-1">Délégué de localité — créé dans votre zone</p>
+                  </div>
+                ) : (
+                  /* Direction : choix du type */
+                  <>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio" name="rattachementType" value="delegue"
+                          checked={form.rattachementType === "delegue"}
+                          onChange={() => setForm({ ...form, rattachementType: "delegue", delegueId: undefined })}
+                          className="accent-green-700"
+                        />
+                        <span className="text-sm text-gray-700">Délégué de localité</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio" name="rattachementType" value="base_centrale"
+                          checked={form.rattachementType === "base_centrale"}
+                          onChange={() => setForm({ ...form, rattachementType: "base_centrale", delegueId: undefined })}
+                          className="accent-green-700"
+                        />
+                        <span className="text-sm text-gray-700">Base centrale</span>
+                      </label>
+                    </div>
+
+                    {form.rattachementType === "delegue" && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Délégué responsable *</label>
+                        <select
+                          value={form.delegueId ?? ""}
+                          onChange={(e) => setForm({ ...form, delegueId: e.target.value ? parseInt(e.target.value) : undefined })}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                        >
+                          <option value="">Sélectionner un délégué…</option>
+                          {delegues.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.nom} {d.prenoms}{d.zoneNom ? ` — ${d.zoneNom}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                        {form.delegueId && (() => {
+                          const d = delegues.find((d) => d.id === form.delegueId);
+                          return d ? (
+                            <div className="mt-2 bg-green-50 rounded-lg px-3 py-2 text-xs text-gray-600">
+                              <span className="font-medium text-gray-800">{d.nom} {d.prenoms}</span>
+                              {d.zoneNom && <span className="ml-2 text-gray-500">Zone : {d.zoneNom}</span>}
+                              {d.telephone && <span className="ml-2 text-gray-400">{d.telephone}</span>}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    )}
+
+                    {form.rattachementType === "base_centrale" && (
+                      <div className="bg-purple-50 rounded-lg px-3 py-2.5 text-xs text-purple-700">
+                        <Building2 size={12} className="inline mr-1" />
+                        Ce membre sera géré directement par la direction.
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Statut */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Statut</label>
                 <select
@@ -355,6 +539,7 @@ export default function Membres() {
                   <option value="inactif">Inactif</option>
                 </select>
               </div>
+
               {mutation.isError && (
                 <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
                   Erreur lors de la création du membre
