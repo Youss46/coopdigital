@@ -66,7 +66,7 @@ export default defineConfig({
           },
           {
             name: "Livraisons",
-            url: `${base}livraisons`,
+            url: `${base}livraisons/nouvelle`,
             icons: [{ src: `${base}logo-192.png`, sizes: "192x192" }],
           },
           {
