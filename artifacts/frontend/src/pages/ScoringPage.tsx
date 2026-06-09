@@ -20,13 +20,13 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { customFetch } from "@workspace/api-client-react";
 
-const tok = () => localStorage.getItem("coop_token") ?? "";
-const hdr = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
 async function apiFetch<T>(path: string): Promise<T> {
-  const r = await fetch(path, { headers: hdr() });
-  if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
-  return r.json() as Promise<T>;
+  return customFetch<T>(path);
+}
+async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  return customFetch<T>(path, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
 }
 
 // ─── Panneau diagnostic ───────────────────────────────────────────────────────
@@ -45,32 +45,22 @@ function DiagnosticPanel({ campagneId, onRattachéEtRecalculé }: {
   const [rattachMsg, setRattachMsg] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery<DiagInfo>({
+  const { data, isLoading, isError, refetch } = useQuery<DiagInfo>({
     queryKey: ["scoring-diagnostic", campagneId],
     queryFn: () => apiFetch<DiagInfo>(`/api/scoring/diagnostic/${campagneId}`),
     enabled: campagneId > 0,
+    retry: 1,
   });
 
   async function handleRattacher() {
     setIsPending(true);
     setRattachMsg(null);
     try {
-      const r = await fetch(`/api/campagnes/${campagneId}/rattacher-livraisons`, {
-        method: "POST",
-        headers: hdr(),
-      });
-      const json = await r.json() as { rattachées?: number; erreur?: string };
-      if (!r.ok) throw new Error(json.erreur ?? r.statusText);
+      const json = await apiPost<{ rattachées?: number }>(`/api/campagnes/${campagneId}/rattacher-livraisons`, {});
       setRattachMsg(`✓ ${json.rattachées ?? 0} livraison(s) rattachée(s). Lancement du recalcul…`);
       await refetch();
       qc.invalidateQueries({ queryKey: ["scoring-diagnostic", campagneId] });
-      // Lancer le recalcul automatiquement
-      const r2 = await fetch("/api/scoring/recalculer", {
-        method: "POST",
-        headers: hdr(),
-        body: JSON.stringify({ campagneId }),
-      });
-      const j2 = await r2.json() as { calculés?: number };
+      const j2 = await apiPost<{ calculés?: number }>("/api/scoring/recalculer", { campagneId });
       setRattachMsg(`✓ Rattachement + recalcul terminés — ${j2.calculés ?? 0} membre(s) calculé(s).`);
       onRattachéEtRecalculé();
     } catch (e) {
@@ -80,8 +70,15 @@ function DiagnosticPanel({ campagneId, onRattachéEtRecalculé }: {
     }
   }
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return <div className="text-center py-8 text-gray-400 text-sm">Analyse en cours…</div>;
+  }
+  if (isError || !data) {
+    return (
+      <div className="text-center py-8 text-red-500 text-sm">
+        Impossible de charger le diagnostic. Vérifiez votre connexion et rafraîchissez la page.
+      </div>
+    );
   }
 
   const { nbMembresActifs, nbLivraisonsCampagne, nbLivraisonsNull, nbLivraisonsAutres } = data;
