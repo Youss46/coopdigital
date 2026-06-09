@@ -5,7 +5,8 @@ export type UserRole =
   | "magasinier"
   | "responsable_tracabilite"
   | "delegue"
-  | "auditeur";
+  | "auditeur"
+  | "agent_terrain";
 
 /**
  * Vérifie si l'utilisateur `requesterRole` a le droit de créer un compte

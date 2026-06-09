@@ -37,7 +37,8 @@ type UserRole =
   | "magasinier"
   | "responsable_tracabilite"
   | "delegue"
-  | "auditeur";
+  | "auditeur"
+  | "agent_terrain";
 
 const ROLE_LABELS: Record<UserRole, string> = {
   pca: "PCA",
@@ -47,6 +48,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   responsable_tracabilite: "Resp. Traçabilité",
   delegue: "Délégué de localité",
   auditeur: "Auditeur",
+  agent_terrain: "Agent terrain",
 };
 
 const ROLE_BADGE_STYLE: Record<UserRole, { bg: string; text: string }> = {
@@ -57,6 +59,7 @@ const ROLE_BADGE_STYLE: Record<UserRole, { bg: string; text: string }> = {
   responsable_tracabilite: { bg: "#0f766e", text: "#ffffff" },
   delegue: { bg: "#15803d", text: "#ffffff" },
   auditeur: { bg: "#a16207", text: "#ffffff" },
+  agent_terrain: { bg: "#065f46", text: "#ffffff" },
 };
 
 // Rôles créables selon le rôle du demandeur
@@ -68,6 +71,7 @@ function getRolesCreables(requesterRole: string): UserRole[] {
     "magasinier",
     "responsable_tracabilite",
     "delegue",
+    "agent_terrain",
     "auditeur",
   ];
   if (requesterRole === "pca") return all;
@@ -329,6 +333,21 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
                   ))}
                 </select>
               </div>
+
+              {form.role === "agent_terrain" && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Zone d'intervention <span className="text-gray-400">(optionnel)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.section}
+                    onChange={(e) => setForm({ ...form, section: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="ex. Zone Nord, Secteur Broukro…"
+                  />
+                </div>
+              )}
 
               {form.role === "delegue" && (
                 <>
