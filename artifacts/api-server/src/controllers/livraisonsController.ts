@@ -79,7 +79,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       return;
     }
 
-    // Auto-détecter la campagne active si non fournie
+    // Résoudre la campagne : obligatoire (règle métier : 1 livraison = 1 campagne active)
     let campagneIdResolu: number | null = campagneId ?? null;
     if (!campagneIdResolu) {
       const [campagneActive] = await db
@@ -89,6 +89,10 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         .orderBy(desc(campagnesTable.dateOuverture))
         .limit(1);
       campagneIdResolu = campagneActive?.id ?? null;
+    }
+    if (!campagneIdResolu) {
+      res.status(400).json({ erreur: "Aucune campagne active. Ouvrez une campagne avant d'enregistrer des livraisons." });
+      return;
     }
 
     // ── Détection anomalies AVANT la transaction ──────────────────────────

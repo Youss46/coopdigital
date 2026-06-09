@@ -11,6 +11,7 @@ import {
   getBilan,
   getBilanPdf,
   getComparaison,
+  rattacherLivraisons,
 } from "../controllers/campagnesController";
 import { desactiverMembresSansCampagne } from "../controllers/membresController";
 
@@ -23,6 +24,7 @@ router.post("/campagnes",                  checkPermission("campagnes", "creer")
 router.get("/campagnes/:id",               checkPermission("campagnes", "lire"),      getCampagne);
 router.put("/campagnes/:id/fermer",               checkPermission("campagnes", "fermer"),    fermerCampagne);
 router.post("/campagnes/:id/desactiver-inactifs", checkPermission("campagnes", "fermer"),    desactiverMembresSansCampagne);
+router.post("/campagnes/:id/rattacher-livraisons", checkPermission("campagnes", "fermer"),   rattacherLivraisons);
 router.get("/campagnes/:id/verifier",      checkPermission("campagnes", "verifier"),  verifierCampagne);
 router.post("/campagnes/:id/cloture",      checkPermission("campagnes", "cloturer"),  cloturerCampagne);
 router.get("/campagnes/:id/bilan",         checkPermission("campagnes", "voir_bilan"), getBilan);

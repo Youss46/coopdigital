@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { campagnesTable, bilansCampagneTable, membresTable, livraisonsTable } from "@workspace/db";
-import { eq, and, desc, notInArray } from "drizzle-orm";
+import { eq, and, desc, notInArray, sql } from "drizzle-orm";
 import {
   verifierAvantCloture,
   genererBilan,
@@ -357,4 +357,35 @@ export async function getComparaison(req: Request, res: Response) {
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const result = await getComparaisonCampagnes(cooperativeId, ids);
   return res.json(result);
+}
+
+// POST /api/campagnes/:id/rattacher-livraisons
+// Rattache toutes les livraisons sans campagne_id (membres de cette coopérative) à cette campagne.
+// Permet de corriger les données historiques saisies avant l'application de la règle.
+export async function rattacherLivraisons(req: Request, res: Response) {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+
+  const campagneId = parseInt(String(req.params["id"]));
+  if (isNaN(campagneId)) { res.status(400).json({ erreur: "id invalide" }); return; }
+
+  // Vérifier que la campagne appartient à la coopérative
+  const [campagne] = await db.select({ id: campagnesTable.id })
+    .from(campagnesTable)
+    .where(and(eq(campagnesTable.id, campagneId), eq(campagnesTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!campagne) { res.status(404).json({ erreur: "Campagne introuvable" }); return; }
+
+  // Mettre à jour les livraisons NULL dont le membre appartient à la coopérative
+  const result = await db.execute(
+    sql`UPDATE livraisons l
+        SET campagne_id = ${campagneId}
+        FROM membres m
+        WHERE l.membre_id = m.id
+          AND m.cooperative_id = ${cooperativeId}
+          AND l.campagne_id IS NULL`
+  );
+
+  const count = (result as { rowCount?: number }).rowCount ?? 0;
+  return res.json({ rattachées: count, campagneId });
 }

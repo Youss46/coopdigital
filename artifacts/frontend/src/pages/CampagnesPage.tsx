@@ -158,6 +158,9 @@ export default function CampagnesPage() {
       query: { enabled: tab === "bilans", queryKey: getGetComparaisonCampagnesQueryKey() },
     });
 
+  const [rattachPending, setRattachPending] = useState(false);
+  const [rattachMsg, setRattachMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   const createMut = useCreateCampagne();
   const cloturerMut = useCloturerCampagne();
 
@@ -180,6 +183,28 @@ export default function CampagnesPage() {
       });
     } catch {
       toast({ title: "Erreur lors de la création", variant: "destructive" });
+    }
+  }
+
+  async function handleRattacher() {
+    if (!activeId) return;
+    setRattachPending(true);
+    setRattachMsg(null);
+    try {
+      const BASE = import.meta.env.VITE_API_URL ?? "";
+      const tok = localStorage.getItem("coop_token") ?? "";
+      const r = await fetch(`${BASE}/api/campagnes/${activeId}/rattacher-livraisons`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+      });
+      const data = await r.json() as { rattachées?: number };
+      if (!r.ok) throw new Error((data as { erreur?: string }).erreur ?? r.statusText);
+      const n = data.rattachées ?? 0;
+      setRattachMsg({ ok: true, text: n > 0 ? `✓ ${n} livraison(s) rattachée(s) à cette campagne.` : "Aucune livraison orpheline trouvée." });
+    } catch (err) {
+      setRattachMsg({ ok: false, text: err instanceof Error ? err.message : "Erreur inconnue" });
+    } finally {
+      setRattachPending(false);
     }
   }
 
@@ -302,13 +327,32 @@ export default function CampagnesPage() {
 
           {/* Bannière campagne active */}
           {active && (
-            <div className="bg-green-600 rounded-xl p-5 text-white flex items-center justify-between">
-              <div>
-                <div className="text-xs font-medium opacity-80 mb-1">Campagne en cours</div>
-                <div className="text-lg font-bold">{active.libelle}</div>
-                <div className="text-sm opacity-90">{active.anneeDebut}–{active.anneeFin}</div>
+            <div className="bg-green-600 rounded-xl p-5 text-white space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-medium opacity-80 mb-1">Campagne en cours</div>
+                  <div className="text-lg font-bold">{active.libelle}</div>
+                  <div className="text-sm opacity-90">{active.anneeDebut}–{active.anneeFin}</div>
+                </div>
+                <CheckCircle2 className="w-8 h-8 opacity-40" />
               </div>
-              <CheckCircle2 className="w-8 h-8 opacity-40" />
+              {peutCloturer && (
+                <div className="border-t border-white/20 pt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={handleRattacher}
+                    disabled={rattachPending}
+                    className="inline-flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {rattachPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    Rattacher livraisons orphelines
+                  </button>
+                  {rattachMsg && (
+                    <span className={`text-xs px-2 py-1 rounded-md ${rattachMsg.ok ? "bg-white/20 text-white" : "bg-red-200/30 text-red-100"}`}>
+                      {rattachMsg.text}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

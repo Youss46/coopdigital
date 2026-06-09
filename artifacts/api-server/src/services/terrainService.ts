@@ -94,6 +94,7 @@ export async function getPrixActuel(cooperativeId: number) {
     .limit(1);
 
   const campagneId = campagneActive?.id ?? null;
+  if (!campagneId) throw new Error("Aucune campagne active. Impossible d'enregistrer une collecte.");
 
   const baseWhere = campagneId
     ? and(
