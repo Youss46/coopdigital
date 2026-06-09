@@ -310,7 +310,7 @@ const navItems = [
   },
   {
     href: "/delegues",
-    label: "Délégués terrain",
+    label: "Délégués Localité",
     icon: Users2,
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },

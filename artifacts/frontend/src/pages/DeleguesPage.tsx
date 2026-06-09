@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import Layout from "@/components/Layout";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 
@@ -82,10 +81,9 @@ export default function DeleguesPage() {
   const totalDu = delegues.reduce((s, d) => s + d.paiementsDifferes.montantTotal, 0);
 
   return (
-    <Layout>
-      <div style={{ padding: "24px 32px", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#111", marginBottom: 4 }}>Délégués terrain</h1>
+    <div style={{ padding: "24px 32px", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#111", marginBottom: 4 }}>Délégués Localité</h1>
           <p style={{ color: "#6b7280", fontSize: ".9rem" }}>Gestion des caisses et suivi des paiements différés</p>
         </div>
 
@@ -305,6 +303,6 @@ export default function DeleguesPage() {
           </div>
         </div>
       )}
-    </Layout>
+    </div>
   );
 }
