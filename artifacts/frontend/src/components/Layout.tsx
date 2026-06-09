@@ -101,7 +101,7 @@ const navItems = [
     href: "/planning",
     label: "Planif. collectes",
     icon: ClipboardList,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "delegue"],
+    roles: ["pca", "directeur", "comptable", "auditeur", "delegue"],
   },
   {
     href: "/livraisons/nouvelle",
