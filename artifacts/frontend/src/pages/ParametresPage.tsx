@@ -279,24 +279,46 @@ export default function ParametresPage() {
   const [deleteDocId, setDeleteDocId] = useState<number | null>(null);
 
   async function handleDocFileSelect(file: File) {
+    const MAX_SIZE = 8 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      toast({ title: "Fichier trop volumineux (max 8 Mo)", variant: "destructive" });
+      return;
+    }
     setDocFileUploading(true);
     try {
-      const res = await fetch("/api/storage/uploads/request-url", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
       });
-      const { uploadURL, objectPath } = await res.json() as { uploadURL: string; objectPath: string };
-      await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-      setDocForm((p) => ({ ...p, fichier_url: `/api/storage${objectPath}`, libelle: p.libelle || file.name }));
-      toast({ title: "Fichier uploadé" });
+      setDocForm((p) => ({ ...p, fichier_url: dataUrl, libelle: p.libelle || file.name }));
+      toast({ title: "Fichier sélectionné" });
     } catch {
-      toast({ title: "Erreur upload fichier", variant: "destructive" });
+      toast({ title: "Erreur lecture fichier", variant: "destructive" });
     } finally {
       setDocFileUploading(false);
+    }
+  }
+
+  function openDocument(fichierUrl: string, libelle: string) {
+    if (fichierUrl.startsWith("data:")) {
+      const [header, b64] = fichierUrl.split(",");
+      const mime = header.match(/:(.*?);/)?.[1] ?? "application/octet-stream";
+      const binary = atob(b64 ?? "");
+      const arr = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+      const blob = new Blob([arr], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = libelle;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } else {
+      window.open(fichierUrl, "_blank", "noopener,noreferrer");
     }
   }
 
@@ -785,14 +807,13 @@ export default function ParametresPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <a
-                                href={doc.fichier_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
+                                onClick={() => openDocument(doc.fichier_url, doc.libelle)}
                                 className="p-1 text-gray-500 hover:text-green-700 transition-colors"
+                                title="Ouvrir / Télécharger"
                               >
                                 <ExternalLink className="w-4 h-4" />
-                              </a>
+                              </button>
                               {canEdit && (
                                 <button
                                   onClick={() => setDeleteDocId(doc.id)}

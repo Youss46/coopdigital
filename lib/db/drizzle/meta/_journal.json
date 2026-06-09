@@ -36,6 +36,13 @@
       "when": 1749456600000,
       "tag": "0004_logo_url_text",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1749543000000,
+      "tag": "0005_documents_fichier_text",
+      "breakpoints": true
     }
   ]
 }

@@ -68,7 +68,7 @@ export const documentsOfficielsTable = pgTable("documents_officiels", {
   cooperativeId:  integer("cooperative_id").notNull().references(() => cooperativesTable.id, { onDelete: "cascade" }),
   type:           varchar("type", { length: 50 }).notNull(),
   libelle:        varchar("libelle", { length: 255 }).notNull(),
-  fichierUrl:     varchar("fichier_url", { length: 500 }).notNull(),
+  fichierUrl:     text("fichier_url").notNull(),
   dateDocument:   date("date_document"),
   dateExpiration: date("date_expiration"),
   createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow(),
