@@ -23,6 +23,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
+import { computeCodeMembre } from "./portailService";
 
 const VERT = "#1a4731";
 const OR   = "#c4962a";
@@ -1258,6 +1259,97 @@ export async function generateEtatPartsSociales(membreId: number, cooperativeId:
     doc.fontSize(10).fillColor("white").font("Helvetica-Bold")
       .text("TOTAL LIBÉRÉ", MARGIN + 8, y + 7, { width: 310, lineBreak: false });
     doc.text(formaterFCFA(totalLibereFcfa), MARGIN + 320, y + 7, { width: 170, align: "right", lineBreak: false });
+  }
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 11. Liste des membres (export tableau)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateListeMembres(
+  membres: Array<{
+    id: number;
+    nom: string;
+    prenoms: string;
+    telephone: string | null;
+    village: string | null;
+    superficieHa: string;
+    statut: string;
+    dateAdhesion: string;
+  }>,
+  statutFilter: string | undefined,
+  cooperativeId: number,
+): Promise<Buffer> {
+  const { doc, endPromise } = makePdfDoc({ margin: 50 });
+
+  const label =
+    statutFilter === "actif"   ? "Membres actifs"   :
+    statutFilter === "inactif" ? "Membres inactifs" :
+    "Tous les membres";
+
+  await drawHeader(doc, cooperativeId, {
+    titre_document: "Liste des membres",
+    reference: `${label} · ${new Date().toLocaleDateString("fr-FR")}`,
+  });
+
+  const VERT_L = "#1a4731";
+  const GRIS_L = "#6b7280";
+  const NOIR_L = "#111827";
+
+  const nbActifs   = membres.filter((m) => m.statut === "actif").length;
+  const nbInactifs = membres.filter((m) => m.statut === "inactif").length;
+  doc.fontSize(10).font("Helvetica").fillColor(GRIS_L)
+    .text(
+      `Total : ${membres.length} membres   |   Actifs : ${nbActifs}   |   Inactifs : ${nbInactifs}`,
+      50, doc.y,
+    );
+  doc.moveDown(0.8);
+
+  const cols = { nom: 50, code: 200, tel: 285, village: 370, superficie: 450, statut: 510 };
+  const rowH = 20;
+
+  const drawTableHeader = () => {
+    const headerY = doc.y;
+    doc.rect(50, headerY, doc.page.width - 100, rowH).fill("#f0fdf4");
+    const ty = headerY + 6;
+    doc.fillColor(VERT_L).fontSize(8).font("Helvetica-Bold");
+    doc.text("NOM & PRÉNOMS", cols.nom,        ty, { width: 145, lineBreak: false });
+    doc.text("CODE",          cols.code,       ty, { width: 80,  lineBreak: false });
+    doc.text("TÉLÉPHONE",     cols.tel,        ty, { width: 80,  lineBreak: false });
+    doc.text("VILLAGE",       cols.village,    ty, { width: 75,  lineBreak: false });
+    doc.text("HA",            cols.superficie, ty, { width: 55,  lineBreak: false, align: "right" });
+    doc.text("STATUT",        cols.statut,     ty, { width: 55,  lineBreak: false });
+    doc.fillColor(NOIR_L);
+    doc.y = headerY + rowH;
+    doc.moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke("#e5e7eb");
+  };
+
+  drawTableHeader();
+
+  for (const [i, m] of membres.entries()) {
+    if (doc.y > doc.page.height - 80) {
+      doc.addPage();
+      drawTableHeader();
+    }
+    const rowY = doc.y;
+    if (i % 2 === 0) doc.rect(50, rowY, doc.page.width - 100, rowH).fill("#f9fafb");
+    const ty   = rowY + 5;
+    const code = computeCodeMembre(m.id, m.dateAdhesion);
+    doc.fillColor(NOIR_L).fontSize(8).font("Helvetica");
+    doc.text(`${m.nom} ${m.prenoms}`,              cols.nom,        ty, { width: 145, lineBreak: false });
+    doc.fillColor(VERT_L).font("Helvetica-Bold");
+    doc.text(code,                                  cols.code,       ty, { width: 80,  lineBreak: false });
+    doc.fillColor(NOIR_L).font("Helvetica");
+    doc.text(m.telephone    ?? "—",                 cols.tel,        ty, { width: 80,  lineBreak: false });
+    doc.text(m.village      ?? "—",                 cols.village,    ty, { width: 75,  lineBreak: false });
+    doc.text(parseFloat(m.superficieHa).toFixed(2), cols.superficie, ty, { width: 55,  lineBreak: false, align: "right" });
+    doc.fillColor(m.statut === "actif" ? "#16a34a" : "#6b7280").font("Helvetica-Bold");
+    doc.text(m.statut === "actif" ? "Actif" : "Inactif", cols.statut, ty, { width: 55, lineBreak: false });
+    doc.fillColor(NOIR_L);
+    doc.y = rowY + rowH;
   }
 
   await addFooters(doc, cooperativeId);
