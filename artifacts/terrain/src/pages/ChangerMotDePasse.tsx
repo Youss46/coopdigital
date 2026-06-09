@@ -4,6 +4,71 @@ import { changerMotDePasse } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { saveAuth } from "../lib/auth";
 
+function EyeIcon({ open }: { open: boolean }) {
+  return open ? (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  ) : (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  );
+}
+
+function PasswordInput({
+  id, value, onChange, placeholder, autoComplete, required,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  autoComplete?: string;
+  required?: boolean;
+}) {
+  const [voir, setVoir] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        id={id}
+        type={voir ? "text" : "password"}
+        className="t-input t-input--lg"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        autoComplete={autoComplete}
+        required={required}
+        style={{ paddingRight: "2.8rem" }}
+      />
+      <button
+        type="button"
+        onClick={() => setVoir((v) => !v)}
+        aria-label={voir ? "Masquer" : "Afficher"}
+        style={{
+          position: "absolute",
+          right: "0.75rem",
+          top: "50%",
+          transform: "translateY(-50%)",
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          color: "rgba(255,255,255,0.65)",
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <EyeIcon open={voir} />
+      </button>
+    </div>
+  );
+}
+
 export default function ChangerMotDePasse() {
   const { user, token } = useAuth();
   const [, setLocation] = useLocation();
@@ -72,13 +137,11 @@ export default function ChangerMotDePasse() {
 
           <div className="t-field">
             <label className="t-label" htmlFor="actuel">Mot de passe temporaire</label>
-            <input
+            <PasswordInput
               id="actuel"
-              type="password"
-              className="t-input t-input--lg"
-              placeholder="••••••••"
               value={actuel}
-              onChange={(e) => setActuel(e.target.value)}
+              onChange={setActuel}
+              placeholder="••••••••"
               autoComplete="current-password"
               required
             />
@@ -86,13 +149,11 @@ export default function ChangerMotDePasse() {
 
           <div className="t-field">
             <label className="t-label" htmlFor="nouveau">Nouveau mot de passe</label>
-            <input
+            <PasswordInput
               id="nouveau"
-              type="password"
-              className="t-input t-input--lg"
-              placeholder="Minimum 6 caractères"
               value={nouveau}
-              onChange={(e) => setNouveau(e.target.value)}
+              onChange={setNouveau}
+              placeholder="Minimum 6 caractères"
               autoComplete="new-password"
               required
             />
@@ -100,13 +161,11 @@ export default function ChangerMotDePasse() {
 
           <div className="t-field">
             <label className="t-label" htmlFor="confirmer">Confirmer le mot de passe</label>
-            <input
+            <PasswordInput
               id="confirmer"
-              type="password"
-              className="t-input t-input--lg"
-              placeholder="Répétez le nouveau mot de passe"
               value={confirmer}
-              onChange={(e) => setConfirmer(e.target.value)}
+              onChange={setConfirmer}
+              placeholder="Répétez le nouveau mot de passe"
               autoComplete="new-password"
               required
             />
