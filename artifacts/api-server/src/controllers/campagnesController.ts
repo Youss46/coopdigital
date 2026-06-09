@@ -370,20 +370,36 @@ export async function rattacherLivraisons(req: Request, res: Response) {
   if (isNaN(campagneId)) { res.status(400).json({ erreur: "id invalide" }); return; }
 
   // Vérifier que la campagne appartient à la coopérative
-  const [campagne] = await db.select({ id: campagnesTable.id })
+  const [campagne] = await db.select({
+    id:         campagnesTable.id,
+    anneeDebut: campagnesTable.anneeDebut,
+    anneeFin:   campagnesTable.anneeFin,
+  })
     .from(campagnesTable)
     .where(and(eq(campagnesTable.id, campagneId), eq(campagnesTable.cooperativeId, cooperativeId)))
     .limit(1);
   if (!campagne) { res.status(404).json({ erreur: "Campagne introuvable" }); return; }
 
-  // Mettre à jour les livraisons NULL dont le membre appartient à la coopérative
+  const dateDebut = `${campagne.anneeDebut}-01-01`;
+  const dateFin   = `${campagne.anneeFin}-12-31`;
+
+  // Rattacher :
+  //   1. les livraisons sans campagne_id (NULL)
+  //   2. les livraisons avec un campagne_id différent mais dont la date tombe dans l'année de la campagne
   const result = await db.execute(
     sql`UPDATE livraisons l
         SET campagne_id = ${campagneId}
         FROM membres m
         WHERE l.membre_id = m.id
           AND m.cooperative_id = ${cooperativeId}
-          AND l.campagne_id IS NULL`
+          AND (
+            l.campagne_id IS NULL
+            OR (
+              l.campagne_id != ${campagneId}
+              AND l.date_livraison >= ${dateDebut}::date
+              AND l.date_livraison <= ${dateFin}::date
+            )
+          )`
   );
 
   const count = (result as { rowCount?: number }).rowCount ?? 0;

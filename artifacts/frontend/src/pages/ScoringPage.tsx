@@ -37,18 +37,56 @@ interface DiagInfo {
   nbLivraisonsAutres: number;
 }
 
-function DiagnosticPanel({ campagneId }: { campagneId: number }) {
-  const { data, isLoading } = useQuery<DiagInfo>({
+function DiagnosticPanel({ campagneId, onRattachéEtRecalculé }: {
+  campagneId: number;
+  onRattachéEtRecalculé: () => void;
+}) {
+  const qc = useQueryClient();
+  const [rattachMsg, setRattachMsg] = useState<string | null>(null);
+  const [isPending, setIsPending] = useState(false);
+
+  const { data, isLoading, refetch } = useQuery<DiagInfo>({
     queryKey: ["scoring-diagnostic", campagneId],
     queryFn: () => apiFetch<DiagInfo>(`/api/scoring/diagnostic/${campagneId}`),
     enabled: campagneId > 0,
   });
+
+  async function handleRattacher() {
+    setIsPending(true);
+    setRattachMsg(null);
+    try {
+      const r = await fetch(`/api/campagnes/${campagneId}/rattacher-livraisons`, {
+        method: "POST",
+        headers: hdr(),
+      });
+      const json = await r.json() as { rattachées?: number; erreur?: string };
+      if (!r.ok) throw new Error(json.erreur ?? r.statusText);
+      setRattachMsg(`✓ ${json.rattachées ?? 0} livraison(s) rattachée(s). Lancement du recalcul…`);
+      await refetch();
+      qc.invalidateQueries({ queryKey: ["scoring-diagnostic", campagneId] });
+      // Lancer le recalcul automatiquement
+      const r2 = await fetch("/api/scoring/recalculer", {
+        method: "POST",
+        headers: hdr(),
+        body: JSON.stringify({ campagneId }),
+      });
+      const j2 = await r2.json() as { calculés?: number };
+      setRattachMsg(`✓ Rattachement + recalcul terminés — ${j2.calculés ?? 0} membre(s) calculé(s).`);
+      onRattachéEtRecalculé();
+    } catch (e) {
+      setRattachMsg(`Erreur : ${e instanceof Error ? e.message : "inconnue"}`);
+    } finally {
+      setIsPending(false);
+    }
+  }
 
   if (isLoading || !data) {
     return <div className="text-center py-8 text-gray-400 text-sm">Analyse en cours…</div>;
   }
 
   const { nbMembresActifs, nbLivraisonsCampagne, nbLivraisonsNull, nbLivraisonsAutres } = data;
+  const nbACorrection = nbLivraisonsNull + nbLivraisonsAutres;
+  const peutRattacher = nbLivraisonsCampagne === 0 && nbACorrection > 0;
 
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 space-y-4">
@@ -56,33 +94,49 @@ function DiagnosticPanel({ campagneId }: { campagneId: number }) {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Membres actifs", value: nbMembresActifs, ok: nbMembresActifs > 0 },
-          { label: "Livraisons (cette campagne)", value: nbLivraisonsCampagne, ok: nbLivraisonsCampagne > 0 },
-          { label: "Livraisons sans campagne", value: nbLivraisonsNull, ok: true },
-          { label: "Livraisons autre campagne", value: nbLivraisonsAutres, ok: true },
-        ].map(({ label, value, ok }) => (
-          <div key={label} className={`rounded-lg p-3 text-center border ${ok && value > 0 ? "bg-white border-gray-200" : value === 0 && label !== "Livraisons sans campagne" && label !== "Livraisons autre campagne" ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`}>
+          { label: "Membres actifs",              value: nbMembresActifs,      alert: nbMembresActifs === 0 },
+          { label: "Livraisons — cette campagne", value: nbLivraisonsCampagne, alert: false },
+          { label: "Livraisons sans campagne",    value: nbLivraisonsNull,     alert: false },
+          { label: "Livraisons autre campagne",   value: nbLivraisonsAutres,   alert: false },
+        ].map(({ label, value, alert }) => (
+          <div key={label} className={`rounded-lg p-3 text-center border ${alert ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`}>
             <div className="text-2xl font-bold text-gray-800">{value}</div>
             <div className="text-xs text-gray-500 mt-0.5">{label}</div>
           </div>
         ))}
       </div>
 
-      <div className="text-sm text-amber-800 space-y-1.5 pt-1">
+      <div className="text-sm text-amber-800 space-y-2 pt-1">
         {nbMembresActifs === 0 && (
-          <p>⚠️ <strong>Aucun membre actif.</strong> Vérifiez que les membres ont le statut "actif" dans la liste des membres.</p>
+          <p>⚠️ <strong>Aucun membre actif.</strong> Vérifiez que les membres ont le statut "actif".</p>
         )}
         {nbMembresActifs > 0 && nbLivraisonsCampagne === 0 && nbLivraisonsNull === 0 && nbLivraisonsAutres === 0 && (
-          <p>⚠️ <strong>Aucune livraison enregistrée.</strong> Le scoring se base sur les livraisons. Enregistrez des livraisons via l'application Terrain ou le portail avant de recalculer.</p>
+          <p>⚠️ <strong>Aucune livraison enregistrée.</strong> Le scoring se base sur les livraisons saisies via l'application Terrain ou le portail.</p>
         )}
-        {nbLivraisonsCampagne === 0 && nbLivraisonsAutres > 0 && (
-          <p>⚠️ <strong>{nbLivraisonsAutres} livraison(s) sont liées à une autre campagne.</strong> Utilisez le bouton "Rattacher livraisons orphelines" dans la page Campagnes pour les réassigner à cette campagne.</p>
+        {peutRattacher && (
+          <div className="bg-white border border-amber-300 rounded-lg p-3 space-y-2">
+            <p>
+              ⚠️ <strong>{nbACorrection} livraison(s) trouvées mais pas liées à cette campagne.</strong>{" "}
+              {nbLivraisonsAutres > 0 && `${nbLivraisonsAutres} pointent vers une autre campagne. `}
+              {nbLivraisonsNull > 0 && `${nbLivraisonsNull} n'ont pas de campagne. `}
+              Cliquez ci-dessous pour les rattacher automatiquement et relancer le scoring.
+            </p>
+            <button
+              onClick={handleRattacher}
+              disabled={isPending}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-lg disabled:opacity-50"
+            >
+              {isPending ? "Rattachement en cours…" : `🔗 Rattacher ${nbACorrection} livraison(s) et recalculer`}
+            </button>
+          </div>
         )}
-        {nbLivraisonsCampagne === 0 && nbLivraisonsNull > 0 && (
-          <p>⚠️ <strong>{nbLivraisonsNull} livraison(s) sans campagne.</strong> Utilisez le bouton "Rattacher livraisons orphelines" dans la page Campagnes pour les associer à cette campagne.</p>
+        {rattachMsg && (
+          <p className={`text-xs px-3 py-2 rounded-lg ${rattachMsg.startsWith("✓") ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+            {rattachMsg}
+          </p>
         )}
         {nbLivraisonsCampagne > 0 && (
-          <p>✅ {nbLivraisonsCampagne} livraison(s) trouvées pour cette campagne. Cliquez sur <strong>↻ Recalculer maintenant</strong> pour lancer le calcul.</p>
+          <p>✅ {nbLivraisonsCampagne} livraison(s) trouvées pour cette campagne. Cliquez sur <strong>↻ Recalculer maintenant</strong>.</p>
         )}
       </div>
     </div>
@@ -242,7 +296,9 @@ function ClassementTab({ campagneId }: { campagneId: number }) {
         <div className="text-center py-12 text-gray-400">Chargement…</div>
       ) : filtré.length === 0 ? (
         liste.length === 0
-          ? <DiagnosticPanel campagneId={campagneId} />
+          ? <DiagnosticPanel campagneId={campagneId} onRattachéEtRecalculé={() => {
+              qc.invalidateQueries({ queryKey: getGetScoringClassementQueryKey(campagneId) });
+            }} />
           : <div className="text-center py-12 text-gray-400">Aucun résultat pour ces filtres.</div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200">
