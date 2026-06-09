@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable, lotsTable } from "@workspace/db";
+import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable, lotsTable, campagnesTable } from "@workspace/db";
 import { eq, sql, desc, and, lte } from "drizzle-orm";
 import { CreateExportateurBody, CreateVenteBody, EncaisserVenteBody } from "@workspace/api-zod";
 import { generateEcrituresVente, generateEcrituresEncaissement } from "../services/comptabiliteService";
@@ -187,11 +187,20 @@ export async function createVente(req: Request, res: Response): Promise<void> {
     if (!exp) { res.status(403).json({ erreur: "Exportateur introuvable ou non autorisé" }); return; }
     const montantTotalFcfa = Math.round(poidsKg * prixUnitaireFcfa);
 
+    // Rattacher à la campagne active de la coopérative
+    const [campagneActive] = await db
+      .select({ id: campagnesTable.id })
+      .from(campagnesTable)
+      .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
+      .orderBy(desc(campagnesTable.dateOuverture))
+      .limit(1);
+
     const [vente] = await db
       .insert(ventesExportateursTable)
       .values({
         exportateurId,
         lotId: lotId ?? null,
+        campagneId: campagneActive?.id ?? null,
         poidsKg: String(poidsKg),
         prixUnitaireFcfa,
         montantTotalFcfa,

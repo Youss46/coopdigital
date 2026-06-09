@@ -12,7 +12,7 @@ import {
   ecrituresComptablesTable,
   caissesTable,
 } from "@workspace/db";
-import { eq, desc, sql, and, lt, gte, lte, ne, gt, not } from "drizzle-orm";
+import { eq, desc, sql, and, lt, gte, lte, ne, gt, not, or, isNull } from "drizzle-orm";
 
 // ─── Middleware rôle PCA ───────────────────────────────────────────────────────
 
@@ -159,11 +159,21 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
       [tresorerieRow],
       creancesEnRetardRows,
     ] = await Promise.all([
-      campagneId
+      campagneId && campagne
         ? db.select({ ca: sql<number>`coalesce(sum(montant_total_fcfa),0)::bigint` })
             .from(ventesExportateursTable)
             .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
-            .where(and(eq(exportateursTable.cooperativeId, cooperativeId), eq(ventesExportateursTable.campagneId, campagneId)))
+            .where(and(
+              eq(exportateursTable.cooperativeId, cooperativeId),
+              or(
+                eq(ventesExportateursTable.campagneId, campagneId),
+                and(
+                  isNull(ventesExportateursTable.campagneId),
+                  gte(ventesExportateursTable.dateVente, `${campagne.anneeDebut}-01-01`),
+                  lte(ventesExportateursTable.dateVente, `${campagne.anneeFin}-12-31`),
+                ),
+              ),
+            ))
         : Promise.resolve([{ ca: 0 }]),
 
       campagneId
@@ -380,14 +390,24 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
     ]);
 
     // 8. CA mensuel (pour graphique)
-    const caMensuelRows = campagneId
+    const caMensuelRows = campagneId && campagne
       ? await db.select({
             mois: sql<string>`to_char(date_vente, 'YYYY-MM')`,
             ca: sql<number>`coalesce(sum(montant_total_fcfa),0)::bigint`,
           })
           .from(ventesExportateursTable)
           .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
-          .where(and(eq(exportateursTable.cooperativeId, cooperativeId), eq(ventesExportateursTable.campagneId, campagneId)))
+          .where(and(
+            eq(exportateursTable.cooperativeId, cooperativeId),
+            or(
+              eq(ventesExportateursTable.campagneId, campagneId),
+              and(
+                isNull(ventesExportateursTable.campagneId),
+                gte(ventesExportateursTable.dateVente, `${campagne.anneeDebut}-01-01`),
+                lte(ventesExportateursTable.dateVente, `${campagne.anneeFin}-12-31`),
+              ),
+            ),
+          ))
           .groupBy(sql`to_char(date_vente, 'YYYY-MM')`)
           .orderBy(sql`to_char(date_vente, 'YYYY-MM')`)
       : [];
@@ -646,7 +666,17 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
           db.select({ ca: sql<number>`coalesce(sum(montant_total_fcfa),0)::bigint` })
             .from(ventesExportateursTable)
             .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
-            .where(and(eq(exportateursTable.cooperativeId, cooperativeId), eq(ventesExportateursTable.campagneId, c.id))),
+            .where(and(
+              eq(exportateursTable.cooperativeId, cooperativeId),
+              or(
+                eq(ventesExportateursTable.campagneId, c.id),
+                and(
+                  isNull(ventesExportateursTable.campagneId),
+                  gte(ventesExportateursTable.dateVente, `${c.anneeDebut}-01-01`),
+                  lte(ventesExportateursTable.dateVente, `${c.anneeFin}-12-31`),
+                ),
+              ),
+            )),
         ]);
 
         const tonnageT = (livraisonsRow?.t ?? 0) / 1000;
