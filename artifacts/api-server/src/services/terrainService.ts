@@ -112,22 +112,28 @@ export async function getPrixActuel(cooperativeId: number) {
   const campagneId = campagneActive?.id ?? null;
   if (!campagneId) throw new Error("Aucune campagne active. Impossible d'enregistrer une collecte.");
 
-  const baseWhere = campagneId
-    ? and(
-        eq(historiquePrixTable.cooperativeId, cooperativeId),
-        eq(historiquePrixTable.campagneId, campagneId),
-      )
-    : eq(historiquePrixTable.cooperativeId, cooperativeId);
-
-  const [prixRow] = await db
+  // Cherche d'abord un prix lié à la campagne active, sinon prend le plus récent de la coopérative
+  const [prixCampagne] = await db
     .select({ prixBordChampFcfa: historiquePrixTable.prixBordChampFcfa })
     .from(historiquePrixTable)
-    .where(baseWhere)
+    .where(and(
+      eq(historiquePrixTable.cooperativeId, cooperativeId),
+      eq(historiquePrixTable.campagneId, campagneId),
+    ))
     .orderBy(desc(historiquePrixTable.createdAt))
     .limit(1);
 
+  const [prixRecent] = prixCampagne
+    ? [prixCampagne]
+    : await db
+        .select({ prixBordChampFcfa: historiquePrixTable.prixBordChampFcfa })
+        .from(historiquePrixTable)
+        .where(eq(historiquePrixTable.cooperativeId, cooperativeId))
+        .orderBy(desc(historiquePrixTable.createdAt))
+        .limit(1);
+
   return {
-    prixBordChampFcfa: prixRow ? toNum(prixRow.prixBordChampFcfa) : 1000,
+    prixBordChampFcfa: prixRecent ? toNum(prixRecent.prixBordChampFcfa) : 1000,
     campagneId,
   };
 }
