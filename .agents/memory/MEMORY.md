@@ -2,7 +2,7 @@
 - [React Query v5 queryKey obligatoire](orval-query-key-required.md) — UseQueryOptions exige queryKey; utiliser getGet*QueryKey() avec options `enabled`.
 - [API route prefix convention](route-prefix.md) — routes/*.ts must NOT include `/api/` prefix; app.use("/api", router) already strips it.
 - [Orval YAML path prefix rule](orval-yaml-path-prefix.md) — paths in openapi.yaml must NOT include the server baseUrl prefix; `servers: - url: /api` handles it automatically.
-- [api-zod barrel export conflict](api-zod-export-star.md) — `lib/api-zod/src/index.ts` must use only `export * from "./generated/api"` (not `export type * from "./generated/types"`) to avoid TS2308 ambiguity when Zod query-param schemas share names with TypeScript types.
+- [api-zod barrel export + schemas config](api-zod-export-star.md) — orval.config.ts must NOT have `schemas: { path: "generated/types", type: "typescript" }` in the zod output; it generates TS types with same names as Zod consts → TS2308. After removing, fix index.ts to single `export * from "./generated/api"` (orval regenerates index.ts on each run pointing to the removed types dir).
 - [Express 5 params string cast](express5-params-typing.md) — `req.params[dynamicKey]` may type as `string | string[]`; use `String(req.params[key])` for dynamic access.
 - [Router ordering for public portail routes](router-ordering.md) — portailRouter must be registered before any sub-router that calls router.use(authMiddleware) without a path (dashboard, lots, communication, etc.) or all requests without a token are blocked with 401.
 - [Orval format:date coerce](orval-date-coerce.md) — OpenAPI `format: date` fields generate `zod.coerce.date()` → TS `Date`; Drizzle date columns expect `string`; use a `toDateStr(d)` helper to convert.

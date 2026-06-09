@@ -7473,7 +7473,7 @@ export const getGetConfigPartsUrl = () => {
 
 
 
-  return `/api/api/parts-sociales/config`
+  return `/api/parts-sociales/config`
 }
 
 /**
@@ -7496,7 +7496,7 @@ export const getConfigParts = async ( options?: RequestInit): Promise<ConfigPart
 
 export const getGetConfigPartsQueryKey = () => {
     return [
-    `/api/api/parts-sociales/config`
+    `/api/parts-sociales/config`
     ] as const;
     }
 
@@ -7550,7 +7550,7 @@ export const getUpdateConfigPartsUrl = () => {
 
 
 
-  return `/api/api/parts-sociales/config`
+  return `/api/parts-sociales/config`
 }
 
 /**
@@ -7621,7 +7621,7 @@ export const getGetRapportPartsUrl = () => {
 
 
 
-  return `/api/api/parts-sociales/rapport`
+  return `/api/parts-sociales/rapport`
 }
 
 /**
@@ -7644,7 +7644,7 @@ export const getRapportParts = async ( options?: RequestInit): Promise<RapportPa
 
 export const getGetRapportPartsQueryKey = () => {
     return [
-    `/api/api/parts-sociales/rapport`
+    `/api/parts-sociales/rapport`
     ] as const;
     }
 
@@ -7698,7 +7698,7 @@ export const getGetPartsMembreUrl = (id: number,) => {
 
 
 
-  return `/api/api/parts-sociales/membre/${id}`
+  return `/api/parts-sociales/membre/${id}`
 }
 
 /**
@@ -7721,7 +7721,7 @@ export const getPartsMembre = async (id: number, options?: RequestInit): Promise
 
 export const getGetPartsMembreQueryKey = (id: number,) => {
     return [
-    `/api/api/parts-sociales/membre/${id}`
+    `/api/parts-sociales/membre/${id}`
     ] as const;
     }
 
@@ -7775,7 +7775,7 @@ export const getEnregistrerLiberationUrl = () => {
 
 
 
-  return `/api/api/parts-sociales/liberation`
+  return `/api/parts-sociales/liberation`
 }
 
 /**
@@ -8691,7 +8691,7 @@ export const getGetPaiementsStatsUrl = () => {
 
 
 
-  return `/api/api/paiements/stats`
+  return `/api/paiements/stats`
 }
 
 /**
@@ -8714,7 +8714,7 @@ export const getPaiementsStats = async ( options?: RequestInit): Promise<Paiemen
 
 export const getGetPaiementsStatsQueryKey = () => {
     return [
-    `/api/api/paiements/stats`
+    `/api/paiements/stats`
     ] as const;
     }
 
@@ -8775,7 +8775,7 @@ export const getListPaiementsUrl = (params?: ListPaiementsParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/api/paiements?${stringifiedParams}` : `/api/api/paiements`
+  return stringifiedParams.length > 0 ? `/api/paiements?${stringifiedParams}` : `/api/paiements`
 }
 
 /**
@@ -8798,7 +8798,7 @@ export const listPaiements = async (params?: ListPaiementsParams, options?: Requ
 
 export const getListPaiementsQueryKey = (params?: ListPaiementsParams,) => {
     return [
-    `/api/api/paiements`, ...(params ? [params] : [])
+    `/api/paiements`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -8852,7 +8852,7 @@ export const getValiderPaiementUrl = (id: number,) => {
 
 
 
-  return `/api/api/paiements/${id}/valider`
+  return `/api/paiements/${id}/valider`
 }
 
 /**
@@ -8924,7 +8924,7 @@ export const getRejeterPaiementUrl = (id: number,) => {
 
 
 
-  return `/api/api/paiements/${id}/rejeter`
+  return `/api/paiements/${id}/rejeter`
 }
 
 /**
@@ -15166,7 +15166,7 @@ export const getGetAnomaliesUrl = (params?: GetAnomaliesParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/api/anomalies?${stringifiedParams}` : `/api/api/anomalies`
+  return stringifiedParams.length > 0 ? `/api/anomalies?${stringifiedParams}` : `/api/anomalies`
 }
 
 /**
@@ -15189,7 +15189,7 @@ export const getAnomalies = async (params?: GetAnomaliesParams, options?: Reques
 
 export const getGetAnomaliesQueryKey = (params?: GetAnomaliesParams,) => {
     return [
-    `/api/api/anomalies`, ...(params ? [params] : [])
+    `/api/anomalies`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -15243,7 +15243,7 @@ export const getGetAnomaliesStatsUrl = () => {
 
 
 
-  return `/api/api/anomalies/stats`
+  return `/api/anomalies/stats`
 }
 
 /**
@@ -15266,7 +15266,7 @@ export const getAnomaliesStats = async ( options?: RequestInit): Promise<Anomali
 
 export const getGetAnomaliesStatsQueryKey = () => {
     return [
-    `/api/api/anomalies/stats`
+    `/api/anomalies/stats`
     ] as const;
     }
 
@@ -15320,7 +15320,7 @@ export const getGetAnomaliesConfigUrl = () => {
 
 
 
-  return `/api/api/anomalies/config`
+  return `/api/anomalies/config`
 }
 
 /**
@@ -15343,7 +15343,7 @@ export const getAnomaliesConfig = async ( options?: RequestInit): Promise<Config
 
 export const getGetAnomaliesConfigQueryKey = () => {
     return [
-    `/api/api/anomalies/config`
+    `/api/anomalies/config`
     ] as const;
     }
 
@@ -15397,7 +15397,7 @@ export const getPutAnomaliesConfigUrl = () => {
 
 
 
-  return `/api/api/anomalies/config`
+  return `/api/anomalies/config`
 }
 
 /**
@@ -15468,7 +15468,7 @@ export const getTraiterAnomalieUrl = (id: number,) => {
 
 
 
-  return `/api/api/anomalies/${id}/traiter`
+  return `/api/anomalies/${id}/traiter`
 }
 
 /**

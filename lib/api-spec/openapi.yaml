@@ -2123,7 +2123,7 @@ paths:
                 type: string
                 format: binary
 
-  /api/parts-sociales/config:
+  /parts-sociales/config:
     get:
       operationId: getConfigParts
       tags: [parts-sociales]
@@ -2155,7 +2155,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConfigPartsSociales"
 
-  /api/parts-sociales/rapport:
+  /parts-sociales/rapport:
     get:
       operationId: getRapportParts
       tags: [parts-sociales]
@@ -2169,7 +2169,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/RapportParts"
 
-  /api/parts-sociales/membre/{id}:
+  /parts-sociales/membre/{id}:
     get:
       operationId: getPartsMembre
       tags: [parts-sociales]
@@ -2189,7 +2189,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PartsMembre"
 
-  /api/parts-sociales/liberation:
+  /parts-sociales/liberation:
     post:
       operationId: enregistrerLiberation
       tags: [parts-sociales]
@@ -2449,7 +2449,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Fournisseur"
 
-  /api/paiements/stats:
+  /paiements/stats:
     get:
       operationId: getPaiementsStats
       tags: [paiements]
@@ -2463,7 +2463,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PaiementsStats"
 
-  /api/paiements:
+  /paiements:
     get:
       operationId: listPaiements
       tags: [paiements]
@@ -2499,7 +2499,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/PaiementListItem"
 
-  /api/paiements/{id}/valider:
+  /paiements/{id}/valider:
     patch:
       operationId: validerPaiement
       tags: [paiements]
@@ -2525,7 +2525,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PaiementListItem"
 
-  /api/paiements/{id}/rejeter:
+  /paiements/{id}/rejeter:
     post:
       operationId: rejeterPaiement
       tags: [paiements]
@@ -4173,7 +4173,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/RecalculerResult"
 
-  /api/anomalies:
+  /anomalies:
     get:
       operationId: getAnomalies
       summary: Liste des anomalies détectées
@@ -4197,7 +4197,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AnomaliesListResponse"
 
-  /api/anomalies/stats:
+  /anomalies/stats:
     get:
       operationId: getAnomaliesStats
       summary: Statistiques des anomalies
@@ -4211,7 +4211,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AnomaliesStats"
 
-  /api/anomalies/config:
+  /anomalies/config:
     get:
       operationId: getAnomaliesConfig
       summary: Configuration des seuils d'anomalies
@@ -4243,7 +4243,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConfigAnomalies"
 
-  /api/anomalies/{id}/traiter:
+  /anomalies/{id}/traiter:
     put:
       operationId: traiterAnomalie
       summary: Traiter une anomalie (résoudre, ignorer, faux positif)
