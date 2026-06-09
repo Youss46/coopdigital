@@ -10,7 +10,7 @@ import {
 
 // ─── Helpers API ─────────────────────────────────────────────────────────────
 
-const BASE = import.meta.env.VITE_API_URL ?? "";
+const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`;
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem("coop_token");
