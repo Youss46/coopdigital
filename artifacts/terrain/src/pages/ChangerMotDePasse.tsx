@@ -70,7 +70,7 @@ function PasswordInput({
 }
 
 export default function ChangerMotDePasse() {
-  const { user, token } = useAuth();
+  const { user, token, login } = useAuth();
   const [, setLocation] = useLocation();
   const [nouveau, setNouveau] = useState("");
   const [confirmer, setConfirmer] = useState("");
@@ -92,7 +92,7 @@ export default function ChangerMotDePasse() {
     try {
       await changerMotDePasse(nouveau);
       if (user && token) {
-        saveAuth(token, { ...user, motDePasseTemporaire: false });
+        login(token, { ...user, motDePasseTemporaire: false });
       }
       setLocation("/");
     } catch (err) {
