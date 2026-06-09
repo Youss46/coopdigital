@@ -780,29 +780,8 @@ export async function creerCooperativeM15(data: {
     if (!plan) throw new Error("Plan introuvable");
   }
 
-  const [coop] = await db
-    .insert(cooperativesTable)
-    .values({ nom: data.nom, ville: data.ville, region: data.region })
-    .returning();
-
-  if (!coop) throw new Error("Erreur création coopérative");
-
   const motDePasse = genererMotDePasseTemp();
   const hash = await bcrypt.hash(motDePasse, 10);
-  const pcaEmail = data.pcaEmail ?? `pca.${coop.id}@${data.nom.toLowerCase().replace(/[^a-z0-9]/g, "")}.ci`;
-
-  await db.insert(usersTable).values({
-    cooperativeId: coop.id,
-    nom: data.pcaNom,
-    prenoms: data.pcaPrenoms,
-    email: pcaEmail,
-    telephone: data.pcaTelephone,
-    passwordHash: hash,
-    role: "pca",
-    actif: true,
-    motDePasseTemporaire: true,
-  });
-
   const cleLicence = await genererCleLicence();
 
   const today = new Date();
@@ -824,44 +803,79 @@ export async function creerCooperativeM15(data: {
     dateExpiration = exp.toISOString().slice(0, 10);
   }
 
-  const [licence] = await db.insert(licencesTable).values({
-    cooperativeId: coop.id,
-    planId: data.planId ?? null,
-    cleLicence,
-    dureeAns: data.dureeAns ?? 1,
-    statut,
-    dateActivation: dateActivation ?? null,
-    dateExpiration: dateExpiration ?? null,
-    trialActif: data.trialActif ?? false,
-    dureeTrialJours: data.dureeTrialJours ?? 30,
-    dateFinTrial: dateFinTrial ?? null,
-    renouvellementAuto: data.renouvellementAuto ?? false,
-    montantPayeFcfa: data.montantPaye ? String(data.montantPaye) : null,
-    modePaiement: data.modePaiement ?? null,
-    referencePaiement: data.referencePaiement ?? null,
-    notesInternes: data.notesInternes ?? null,
-    creePar: m15UserId,
-  }).returning();
+  const result = await db.transaction(async (tx) => {
+    const [coop] = await tx
+      .insert(cooperativesTable)
+      .values({ nom: data.nom, ville: data.ville, region: data.region })
+      .returning();
 
-  if (!licence) throw new Error("Erreur création licence");
+    if (!coop) throw new Error("Erreur création coopérative");
 
-  await db.insert(historiqueLicencesTable).values({
-    licenceId: licence.id,
-    cooperativeId: coop.id,
-    action: statut === "active" ? "activation" : "creation",
-    ancienStatut: null,
-    nouveauStatut: statut,
-    details: { planNom: plan?.nom ?? "Trial", dureeAns: data.dureeAns, cleLicence },
-    effectuePar: m15UserId,
+    const pcaEmail = data.pcaEmail ?? `pca.${coop.id}@${data.nom.toLowerCase().replace(/[^a-z0-9]/g, "")}.ci`;
+
+    const existingUser = await tx
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, pcaEmail))
+      .limit(1);
+
+    if (existingUser.length > 0) {
+      throw new Error(`L'adresse email "${pcaEmail}" est déjà utilisée par un autre compte. Veuillez utiliser une adresse différente.`);
+    }
+
+    await tx.insert(usersTable).values({
+      cooperativeId: coop.id,
+      nom: data.pcaNom,
+      prenoms: data.pcaPrenoms,
+      email: pcaEmail,
+      telephone: data.pcaTelephone,
+      passwordHash: hash,
+      role: "pca",
+      actif: true,
+      motDePasseTemporaire: true,
+    });
+
+    const [licence] = await tx.insert(licencesTable).values({
+      cooperativeId: coop.id,
+      planId: data.planId ?? null,
+      cleLicence,
+      dureeAns: data.dureeAns ?? 1,
+      statut,
+      dateActivation: dateActivation ?? null,
+      dateExpiration: dateExpiration ?? null,
+      trialActif: data.trialActif ?? false,
+      dureeTrialJours: data.dureeTrialJours ?? 30,
+      dateFinTrial: dateFinTrial ?? null,
+      renouvellementAuto: data.renouvellementAuto ?? false,
+      montantPayeFcfa: data.montantPaye ? String(data.montantPaye) : null,
+      modePaiement: data.modePaiement ?? null,
+      referencePaiement: data.referencePaiement ?? null,
+      notesInternes: data.notesInternes ?? null,
+      creePar: m15UserId,
+    }).returning();
+
+    if (!licence) throw new Error("Erreur création licence");
+
+    await tx.insert(historiqueLicencesTable).values({
+      licenceId: licence.id,
+      cooperativeId: coop.id,
+      action: statut === "active" ? "activation" : "creation",
+      ancienStatut: null,
+      nouveauStatut: statut,
+      details: { planNom: plan?.nom ?? "Trial", dureeAns: data.dureeAns, cleLicence },
+      effectuePar: m15UserId,
+    });
+
+    return { coop, licence, pcaEmail };
   });
 
   return {
-    cooperative: coop,
-    licence,
+    cooperative: result.coop,
+    licence: result.licence,
     cleLicence,
     dateExpiration: dateExpiration ?? null,
     motdepasse_clair: motDePasse,
-    pcaEmail,
+    pcaEmail: result.pcaEmail,
     pcaTelephone: data.pcaTelephone,
   };
 }
