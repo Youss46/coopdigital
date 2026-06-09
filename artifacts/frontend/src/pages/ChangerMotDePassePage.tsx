@@ -46,7 +46,7 @@ export default function ChangerMotDePassePage() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ""}/api/auth/changer-mot-de-passe`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ""}/auth/changer-mot-de-passe`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

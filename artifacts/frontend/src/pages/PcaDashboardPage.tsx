@@ -54,7 +54,7 @@ interface ComparaisonRow {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const TOKEN_KEY = "coop_token";
-const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`;
+const BASE = import.meta.env.VITE_API_URL ?? "";
 
 async function apiFetch<T>(path: string): Promise<T> {
   const token = localStorage.getItem(TOKEN_KEY);

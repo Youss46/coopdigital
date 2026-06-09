@@ -86,7 +86,7 @@ function NouveauTicketForm({ defaultModule, onSuccess }: {
     e.preventDefault();
     setLoading(true);
     try {
-      const r = await fetch(`${BASE}/api/support/tickets`, {
+      const r = await fetch(`${BASE}/support/tickets`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(form),
@@ -175,7 +175,7 @@ function FaqView() {
   const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${BASE}/api/support/faq`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${BASE}/support/faq`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then(setFaq)
       .catch(() => null);
@@ -219,7 +219,7 @@ function MesTickets() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${BASE}/api/support/tickets`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${BASE}/support/tickets`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then(setTickets)
       .catch(() => null)
