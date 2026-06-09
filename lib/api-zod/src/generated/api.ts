@@ -1407,7 +1407,8 @@ export const CreateUserBody = zod.object({
   "email": zod.string().email(),
   "telephone": zod.string().optional(),
   "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
-  "motDePasse": zod.string().min(createUserBodyMotDePasseMin)
+  "motDePasse": zod.string().min(createUserBodyMotDePasseMin),
+  "section": zod.string().optional(),
 })
 
 

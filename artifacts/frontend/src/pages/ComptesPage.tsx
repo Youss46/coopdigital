@@ -119,6 +119,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
     email: "",
     telephone: "",
     role: "" as UserRole | "",
+    section: "",
   });
 
   const rolesDisponibles = getRolesCreables(requesterRole);
@@ -163,6 +164,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
           telephone: form.telephone || undefined,
           role: form.role as UserRole,
           motDePasse,
+          section: form.section || undefined,
         },
       },
       {
@@ -312,7 +314,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
                 <select
                   required
                   value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
+                  onChange={(e) => setForm({ ...form, role: e.target.value as UserRole, section: "" })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 >
                   <option value="">Sélectionner un rôle…</option>
@@ -321,6 +323,21 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
                   ))}
                 </select>
               </div>
+
+              {form.role === "agent_terrain" && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Section / Zone <span className="text-gray-400">(optionnel)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.section}
+                    onChange={(e) => setForm({ ...form, section: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="ex. Zone Nord, Section Yamoussoukro…"
+                  />
+                </div>
+              )}
 
               {/* Mot de passe auto-généré */}
               <div>

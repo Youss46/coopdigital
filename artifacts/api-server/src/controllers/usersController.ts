@@ -73,7 +73,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { nom, prenoms, email, telephone, role, motDePasse } = parse.data;
+  const { nom, prenoms, email, telephone, role, motDePasse, section } = parse.data;
 
   if (!canCreateUser(requesterRole, role)) {
     res.status(403).json({ erreur: "Vous ne pouvez pas créer un compte avec ce rôle" });
@@ -95,6 +95,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
         cooperativeId,
         actif: true,
         motDePasseTemporaire: role === "agent_terrain",
+        section: section ?? null,
       })
       .returning({
         id: usersTable.id,

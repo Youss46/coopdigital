@@ -44,6 +44,7 @@ import {
   GitMerge,
   TrendingUp as TrendingUpInvest,
   FolderKanban,
+  Users2,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -306,6 +307,12 @@ const navItems = [
     label: "Communication",
     icon: MessageSquare,
     roles: ["pca", "directeur"],
+  },
+  {
+    href: "/delegues",
+    label: "Délégués terrain",
+    icon: Users2,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
     href: "/administration/comptes",
