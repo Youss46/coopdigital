@@ -90,7 +90,7 @@ export default function ChangerMotDePasse() {
     }
     setLoading(true);
     try {
-      await changerMotDePasse(null, nouveau);
+      await changerMotDePasse(nouveau);
       if (user && token) {
         saveAuth(token, { ...user, motDePasseTemporaire: false });
       }
