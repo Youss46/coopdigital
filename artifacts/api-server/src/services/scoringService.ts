@@ -293,13 +293,18 @@ export async function recalculerTous(cooperativeId: number, campagneId: number) 
       AND m.statut = 'actif'
   `);
 
+  const nbTrouvés = membres.rows.length;
   let calculés = 0;
+  const erreurs: { membre_id: number; erreur: string }[] = [];
+
   for (const row of membres.rows) {
     try {
       await calculerScore(cooperativeId, row.membre_id, campagneId);
       calculés++;
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       logger.warn({ err, membre_id: row.membre_id }, "Erreur calcul score membre");
+      erreurs.push({ membre_id: row.membre_id, erreur: msg });
     }
   }
 
@@ -315,7 +320,7 @@ export async function recalculerTous(cooperativeId: number, campagneId: number) 
     WHERE sm.id = r.id
   `);
 
-  return { calculés, campagneId };
+  return { calculés, campagneId, nbTrouvés, erreurs: erreurs.slice(0, 3) };
 }
 
 // ─── Classement complet d'une campagne ───────────────────────────────────────

@@ -198,10 +198,18 @@ function ClassementTab({ campagneId }: { campagneId: number }) {
       { data: { campagneId } },
       {
         onSuccess: (data) => {
-          const d = data as { calculés?: number };
+          const d = data as { calculés?: number; nbTrouvés?: number; erreurs?: { membre_id: number; erreur: string }[] };
           qc.invalidateQueries({ queryKey: getGetScoringClassementQueryKey(campagneId) });
           if ((d.calculés ?? 0) === 0) {
-            setRecalcMsg({ ok: false, text: "0 membre calculé — vérifiez que des livraisons existent pour cette campagne." });
+            const found = d.nbTrouvés ?? 0;
+            const firstErr = d.erreurs?.[0]?.erreur;
+            if (found === 0) {
+              setRecalcMsg({ ok: false, text: "0 membre trouvé avec des livraisons actives pour cette campagne." });
+            } else if (firstErr) {
+              setRecalcMsg({ ok: false, text: `${found} membre(s) trouvé(s) mais erreur de calcul : ${firstErr}` });
+            } else {
+              setRecalcMsg({ ok: false, text: "0 membre calculé — vérifiez que des livraisons existent pour cette campagne." });
+            }
           } else {
             setRecalcMsg({ ok: true, text: `✓ ${d.calculés} membre(s) recalculé(s) avec succès.` });
           }
