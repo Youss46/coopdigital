@@ -117,6 +117,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     generer_rapport_mensuel:      ["pca", "directeur", "comptable"],
     generer_bilan_campagne:       ["pca", "directeur", "comptable"],
     generer_fiche_membre:         ["pca", "directeur", "agent_terrain"],
+    generer_recu:                 ["pca", "directeur", "comptable", "agent_terrain", "magasinier"],
     exporter_donnees_bailleurs:   ["pca", "directeur", "auditeur"],
   },
 

@@ -11,7 +11,7 @@ import {
   getGetScoringResumeQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { PlusCircle, TrendingDown, Banknote, Clock } from "lucide-react";
+import { PlusCircle, TrendingDown, Banknote, Clock, FileDown } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 
 function formaterFCFA(n: number) {
@@ -19,6 +19,17 @@ function formaterFCFA(n: number) {
 }
 function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+}
+async function downloadPdf(url: string, filename: string) {
+  const token = localStorage.getItem("coop_token") ?? "";
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 export default function Avances() {
@@ -210,14 +221,23 @@ export default function Avances() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    {peutRembourser && a.statut !== "rembourse" && a.soldeRestantFcfa > 0 && (
+                    <div className="flex items-center justify-center gap-2">
+                      {peutRembourser && a.statut !== "rembourse" && a.soldeRestantFcfa > 0 && (
+                        <button
+                          onClick={() => ouvrirRemboursement(a.id, a.soldeRestantFcfa, `${a.membreNom} ${a.membrePrenoms}`)}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Rembourser
+                        </button>
+                      )}
                       <button
-                        onClick={() => ouvrirRemboursement(a.id, a.soldeRestantFcfa, `${a.membreNom} ${a.membrePrenoms}`)}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        title="Télécharger le reçu"
+                        onClick={() => void downloadPdf(`/api/rapports/recu/avance/${a.id}`, `recu_avance_${a.id}.pdf`)}
+                        className="p-1 text-gray-400 hover:text-green-700 transition-colors"
                       >
-                        Rembourser
+                        <FileDown size={15} />
                       </button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))

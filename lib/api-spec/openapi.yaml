@@ -1891,6 +1891,146 @@ paths:
                 items:
                   $ref: "#/components/schemas/HistoriqueMasse"
 
+  /rapports/recu/livraison/{id}:
+    get:
+      operationId: getRecuLivraison
+      tags: [rapports]
+      summary: Reçu de livraison (PDF)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: PDF reçu de livraison
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: Livraison introuvable
+
+  /rapports/recu/paiement/{id}:
+    get:
+      operationId: getRecuPaiement
+      tags: [rapports]
+      summary: Reçu de paiement (PDF)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: PDF reçu de paiement
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: Paiement introuvable
+
+  /rapports/recu/bulletin/{id}:
+    get:
+      operationId: getRecuBulletinPaie
+      tags: [rapports]
+      summary: Bulletin de paie (PDF)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: PDF bulletin de paie
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: Bulletin introuvable
+
+  /rapports/recu/pesee/{id}:
+    get:
+      operationId: getBordereauPesee
+      tags: [rapports]
+      summary: Bordereau de pesée (PDF)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: PDF bordereau de pesée
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: Livraison introuvable
+
+  /rapports/recu/avance/{id}:
+    get:
+      operationId: getRecuAvance
+      tags: [rapports]
+      summary: Reçu d'avance (PDF)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: PDF reçu d'avance
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: Avance introuvable
+
+  /rapports/recu/intrant/{id}:
+    get:
+      operationId: getRecuIntrant
+      tags: [rapports]
+      summary: Reçu d'intrant distribué (PDF)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: PDF reçu d'intrant
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: Distribution introuvable
+
+  /rapports/recu/parts/{id}:
+    get:
+      operationId: getEtatPartsSociales
+      tags: [rapports]
+      summary: État des parts sociales d'un membre (PDF)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: PDF état des parts sociales
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: Membre introuvable
+
   /campagnes/active:
     get:
       operationId: getCampagneActive

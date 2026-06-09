@@ -66,7 +66,15 @@ async function getLogoBuffer(
 
   if (config?.logoUrl) {
     try {
-      const buffer = await fetchFromStorage(config.logoUrl);
+      let buffer: Buffer;
+      if (config.logoUrl.startsWith("data:")) {
+        // Logo stocké en base64 data URL (nouveau format)
+        const base64Data = config.logoUrl.split(",")[1] ?? "";
+        buffer = Buffer.from(base64Data, "base64");
+      } else {
+        // Ancien format : Object Storage path
+        buffer = await fetchFromStorage(config.logoUrl);
+      }
       result = { buffer, source: "cooperative" };
     } catch (err) {
       if (!(err instanceof ObjectNotFoundError)) {

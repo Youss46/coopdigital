@@ -3,8 +3,9 @@ import {
   Users, FileText, BarChart2, CreditCard,
   Plus, RefreshCw, CheckCircle, Banknote,
   Loader2, ChevronDown, TrendingUp, Building2,
-  UserCheck, AlertCircle,
+  UserCheck, AlertCircle, FileDown,
 } from "lucide-react";
+
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -32,6 +33,18 @@ import {
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
+
+async function downloadPdfBulletin(bulletinId: number) {
+  const token = localStorage.getItem("coop_token") ?? "";
+  const res = await fetch(`/api/rapports/recu/bulletin/${bulletinId}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `bulletin_paie_${bulletinId}.pdf`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -630,6 +643,13 @@ function TabPaie() {
                             {toDate(bulletin.datePaiement)?.toLocaleDateString("fr-CI") ?? "—"}
                           </span>
                         )}
+                        <button
+                          title="Télécharger le bulletin PDF"
+                          onClick={() => void downloadPdfBulletin(bulletin.id)}
+                          className="p-1 text-gray-400 hover:text-green-700 transition-colors"
+                        >
+                          <FileDown size={14} />
+                        </button>
                       </div>
                     </td>
                   </tr>

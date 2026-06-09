@@ -33,6 +33,18 @@ import { usePermission } from "@/hooks/usePermission";
 const tokFn = () => localStorage.getItem("coop_token") ?? "";
 const BASE_FICHE = import.meta.env.VITE_API_URL ?? "";
 
+async function downloadPdf(path: string, filename: string) {
+  const token = tokFn();
+  const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 // ── Composant formations d'un membre ─────────────────────────────────────────
 interface FormationMembre {
   session_id: number; titre: string; thematique: string | null;
@@ -505,21 +517,30 @@ export default function MembreFiche() {
                       {a.motif ? ` · ${a.motif}` : ""}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                        a.statut === "rembourse"
-                          ? "bg-green-100 text-green-700"
-                          : a.statut === "en_retard"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-amber-100 text-amber-700"
-                      }`}
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                          a.statut === "rembourse"
+                            ? "bg-green-100 text-green-700"
+                            : a.statut === "en_retard"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {a.statut === "en_cours" ? "En cours" : a.statut === "rembourse" ? "Remboursé" : "En retard"}
+                      </span>
+                      {a.statut !== "rembourse" && (
+                        <p className="text-xs text-gray-500 mt-0.5">Solde : {formaterFCFA(a.soldeRestantFcfa)}</p>
+                      )}
+                    </div>
+                    <button
+                      title="Reçu d'avance"
+                      onClick={() => void downloadPdf(`/api/rapports/recu/avance/${a.id}`, `recu_avance_${a.id}.pdf`)}
+                      className="p-1 text-gray-400 hover:text-green-700 transition-colors"
                     >
-                      {a.statut === "en_cours" ? "En cours" : a.statut === "rembourse" ? "Remboursé" : "En retard"}
-                    </span>
-                    {a.statut !== "rembourse" && (
-                      <p className="text-xs text-gray-500 mt-0.5">Solde : {formaterFCFA(a.soldeRestantFcfa)}</p>
-                    )}
+                      <Download size={14} />
+                    </button>
                   </div>
                 </div>
               ))
@@ -539,12 +560,13 @@ export default function MembreFiche() {
                   <th className="text-right px-4 py-3 font-medium text-gray-500">Montant brut</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-500">Avance déduite</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-500">Net payé</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {!historique?.livraisons || historique.livraisons.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center text-gray-400 py-8">Aucune livraison</td>
+                    <td colSpan={7} className="text-center text-gray-400 py-8">Aucune livraison</td>
                   </tr>
                 ) : (
                   historique.livraisons.map((l) => (
@@ -557,6 +579,15 @@ export default function MembreFiche() {
                         {l.avanceDeduiteFcfa > 0 ? `-${formaterFCFA(l.avanceDeduiteFcfa)}` : "—"}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-green-700">{formaterFCFA(l.montantNetFcfa)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          title="Reçu livraison"
+                          onClick={() => void downloadPdf(`/api/rapports/recu/livraison/${l.id}`, `recu_livraison_${l.id}.pdf`)}
+                          className="p-1 text-gray-400 hover:text-green-700 transition-colors"
+                        >
+                          <Download size={14} />
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -616,6 +647,16 @@ export default function MembreFiche() {
               </div>
             ) : partsData ? (
               <>
+                {/* Bouton état PDF */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => void downloadPdf(`/api/rapports/recu/parts/${id}`, `parts_sociales_${id}.pdf`)}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors"
+                  >
+                    <Download size={13} />
+                    Télécharger l'état des parts
+                  </button>
+                </div>
                 {/* Résumé */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
