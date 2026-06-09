@@ -96,6 +96,7 @@ export default function Membres() {
         village: form.village,
         groupement: form.groupement,
         numeroCni: form.numeroCni,
+        sexe: form.sexe,
       },
     });
   };
@@ -188,7 +189,15 @@ export default function Membres() {
               membres.map((m) => (
                 <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-900">
+                    <span className="text-gray-500 font-normal text-xs mr-1">
+                      {m.sexe === "M" ? "M." : m.sexe === "F" ? "Mme" : ""}
+                    </span>
                     {m.nom} {m.prenoms}
+                    {m.sexe && (
+                      <span className="ml-1 text-xs" title={m.sexe === "M" ? "Homme" : "Femme"}>
+                        {m.sexe === "M" ? "♂" : "♀"}
+                      </span>
+                    )}
                     <div className="text-xs text-green-700 font-mono font-semibold mt-0.5">
                       {m.codeMembre}
                     </div>
@@ -233,6 +242,24 @@ export default function Membres() {
               <button onClick={() => setModalOuvert(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Civilité / Genre</label>
+                <div className="flex gap-3">
+                  {(["M", "F"] as const).map((v) => (
+                    <label key={v} className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="civilite"
+                        value={v}
+                        checked={form.sexe === v}
+                        onChange={() => setForm({ ...form, sexe: v })}
+                        className="accent-green-700"
+                      />
+                      <span className="text-sm text-gray-700">{v === "M" ? "Monsieur (Homme)" : "Madame (Femme)"}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>

@@ -645,6 +645,17 @@ export const MembreStatut = {
   inactif: 'inactif',
 } as const;
 
+/**
+ * @nullable
+ */
+export type MembreSexe = typeof MembreSexe[keyof typeof MembreSexe] | null;
+
+
+export const MembreSexe = {
+  M: 'M',
+  F: 'F',
+} as const;
+
 export interface Membre {
   id: number;
   cooperativeId: number;
@@ -666,6 +677,8 @@ export interface Membre {
   /** @nullable */
   photoUrl?: string | null;
   /** @nullable */
+  sexe?: MembreSexe;
+  /** @nullable */
   parcelleLat?: string | null;
   /** @nullable */
   parcelleLng?: string | null;
@@ -681,6 +694,14 @@ export const MembreInputStatut = {
   inactif: 'inactif',
 } as const;
 
+export type MembreInputSexe = typeof MembreInputSexe[keyof typeof MembreInputSexe];
+
+
+export const MembreInputSexe = {
+  M: 'M',
+  F: 'F',
+} as const;
+
 export interface MembreInput {
   cooperativeId: number;
   nom: string;
@@ -693,6 +714,7 @@ export interface MembreInput {
   statut?: MembreInputStatut;
   dateAdhesion: string;
   photoUrl?: string;
+  sexe?: MembreInputSexe;
   parcelleLat?: string;
   parcelleLng?: string;
 }
@@ -705,6 +727,14 @@ export const MembreUpdateStatut = {
   inactif: 'inactif',
 } as const;
 
+export type MembreUpdateSexe = typeof MembreUpdateSexe[keyof typeof MembreUpdateSexe];
+
+
+export const MembreUpdateSexe = {
+  M: 'M',
+  F: 'F',
+} as const;
+
 export interface MembreUpdate {
   nom?: string;
   prenoms?: string;
@@ -714,6 +744,7 @@ export interface MembreUpdate {
   groupement?: string;
   superficieHa?: string;
   statut?: MembreUpdateStatut;
+  sexe?: MembreUpdateSexe;
   photoUrl?: string;
   parcelleLat?: string;
   parcelleLng?: string;
@@ -976,6 +1007,8 @@ export interface LivraisonResult {
 
 export interface DashboardKpi {
   membresActifs: number;
+  membresHommes?: number;
+  membresFemmes?: number;
   avancesEnCoursMontant: number;
   tonnageMois: number;
   paiementsMois: number;

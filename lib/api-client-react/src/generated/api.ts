@@ -6640,6 +6640,545 @@ export function useGetHistoriqueMasse<TData = Awaited<ReturnType<typeof getHisto
 
 
 
+export const getGetRecuLivraisonUrl = (id: number,) => {
+
+
+
+
+  return `/api/rapports/recu/livraison/${id}`
+}
+
+/**
+ * @summary Reçu de livraison (PDF)
+ */
+export const getRecuLivraison = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetRecuLivraisonUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRecuLivraisonQueryKey = (id: number,) => {
+    return [
+    `/api/rapports/recu/livraison/${id}`
+    ] as const;
+    }
+
+
+export const getGetRecuLivraisonQueryOptions = <TData = Awaited<ReturnType<typeof getRecuLivraison>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecuLivraison>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRecuLivraisonQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRecuLivraison>>> = ({ signal }) => getRecuLivraison(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecuLivraison>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRecuLivraisonQueryResult = NonNullable<Awaited<ReturnType<typeof getRecuLivraison>>>
+export type GetRecuLivraisonQueryError = ErrorType<void>
+
+
+/**
+ * @summary Reçu de livraison (PDF)
+ */
+
+export function useGetRecuLivraison<TData = Awaited<ReturnType<typeof getRecuLivraison>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecuLivraison>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRecuLivraisonQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRecuPaiementUrl = (id: number,) => {
+
+
+
+
+  return `/api/rapports/recu/paiement/${id}`
+}
+
+/**
+ * @summary Reçu de paiement (PDF)
+ */
+export const getRecuPaiement = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetRecuPaiementUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRecuPaiementQueryKey = (id: number,) => {
+    return [
+    `/api/rapports/recu/paiement/${id}`
+    ] as const;
+    }
+
+
+export const getGetRecuPaiementQueryOptions = <TData = Awaited<ReturnType<typeof getRecuPaiement>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecuPaiement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRecuPaiementQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRecuPaiement>>> = ({ signal }) => getRecuPaiement(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecuPaiement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRecuPaiementQueryResult = NonNullable<Awaited<ReturnType<typeof getRecuPaiement>>>
+export type GetRecuPaiementQueryError = ErrorType<void>
+
+
+/**
+ * @summary Reçu de paiement (PDF)
+ */
+
+export function useGetRecuPaiement<TData = Awaited<ReturnType<typeof getRecuPaiement>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecuPaiement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRecuPaiementQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRecuBulletinPaieUrl = (id: number,) => {
+
+
+
+
+  return `/api/rapports/recu/bulletin/${id}`
+}
+
+/**
+ * @summary Bulletin de paie (PDF)
+ */
+export const getRecuBulletinPaie = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetRecuBulletinPaieUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRecuBulletinPaieQueryKey = (id: number,) => {
+    return [
+    `/api/rapports/recu/bulletin/${id}`
+    ] as const;
+    }
+
+
+export const getGetRecuBulletinPaieQueryOptions = <TData = Awaited<ReturnType<typeof getRecuBulletinPaie>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecuBulletinPaie>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRecuBulletinPaieQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRecuBulletinPaie>>> = ({ signal }) => getRecuBulletinPaie(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecuBulletinPaie>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRecuBulletinPaieQueryResult = NonNullable<Awaited<ReturnType<typeof getRecuBulletinPaie>>>
+export type GetRecuBulletinPaieQueryError = ErrorType<void>
+
+
+/**
+ * @summary Bulletin de paie (PDF)
+ */
+
+export function useGetRecuBulletinPaie<TData = Awaited<ReturnType<typeof getRecuBulletinPaie>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecuBulletinPaie>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRecuBulletinPaieQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetBordereauPeseeUrl = (id: number,) => {
+
+
+
+
+  return `/api/rapports/recu/pesee/${id}`
+}
+
+/**
+ * @summary Bordereau de pesée (PDF)
+ */
+export const getBordereauPesee = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetBordereauPeseeUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBordereauPeseeQueryKey = (id: number,) => {
+    return [
+    `/api/rapports/recu/pesee/${id}`
+    ] as const;
+    }
+
+
+export const getGetBordereauPeseeQueryOptions = <TData = Awaited<ReturnType<typeof getBordereauPesee>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBordereauPesee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBordereauPeseeQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBordereauPesee>>> = ({ signal }) => getBordereauPesee(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBordereauPesee>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBordereauPeseeQueryResult = NonNullable<Awaited<ReturnType<typeof getBordereauPesee>>>
+export type GetBordereauPeseeQueryError = ErrorType<void>
+
+
+/**
+ * @summary Bordereau de pesée (PDF)
+ */
+
+export function useGetBordereauPesee<TData = Awaited<ReturnType<typeof getBordereauPesee>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBordereauPesee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBordereauPeseeQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRecuAvanceUrl = (id: number,) => {
+
+
+
+
+  return `/api/rapports/recu/avance/${id}`
+}
+
+/**
+ * @summary Reçu d'avance (PDF)
+ */
+export const getRecuAvance = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetRecuAvanceUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRecuAvanceQueryKey = (id: number,) => {
+    return [
+    `/api/rapports/recu/avance/${id}`
+    ] as const;
+    }
+
+
+export const getGetRecuAvanceQueryOptions = <TData = Awaited<ReturnType<typeof getRecuAvance>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecuAvance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRecuAvanceQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRecuAvance>>> = ({ signal }) => getRecuAvance(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecuAvance>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRecuAvanceQueryResult = NonNullable<Awaited<ReturnType<typeof getRecuAvance>>>
+export type GetRecuAvanceQueryError = ErrorType<void>
+
+
+/**
+ * @summary Reçu d'avance (PDF)
+ */
+
+export function useGetRecuAvance<TData = Awaited<ReturnType<typeof getRecuAvance>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecuAvance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRecuAvanceQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRecuIntrantUrl = (id: number,) => {
+
+
+
+
+  return `/api/rapports/recu/intrant/${id}`
+}
+
+/**
+ * @summary Reçu d'intrant distribué (PDF)
+ */
+export const getRecuIntrant = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetRecuIntrantUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRecuIntrantQueryKey = (id: number,) => {
+    return [
+    `/api/rapports/recu/intrant/${id}`
+    ] as const;
+    }
+
+
+export const getGetRecuIntrantQueryOptions = <TData = Awaited<ReturnType<typeof getRecuIntrant>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecuIntrant>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRecuIntrantQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRecuIntrant>>> = ({ signal }) => getRecuIntrant(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecuIntrant>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRecuIntrantQueryResult = NonNullable<Awaited<ReturnType<typeof getRecuIntrant>>>
+export type GetRecuIntrantQueryError = ErrorType<void>
+
+
+/**
+ * @summary Reçu d'intrant distribué (PDF)
+ */
+
+export function useGetRecuIntrant<TData = Awaited<ReturnType<typeof getRecuIntrant>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecuIntrant>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRecuIntrantQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEtatPartsSocialesUrl = (id: number,) => {
+
+
+
+
+  return `/api/rapports/recu/parts/${id}`
+}
+
+/**
+ * @summary État des parts sociales d'un membre (PDF)
+ */
+export const getEtatPartsSociales = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetEtatPartsSocialesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEtatPartsSocialesQueryKey = (id: number,) => {
+    return [
+    `/api/rapports/recu/parts/${id}`
+    ] as const;
+    }
+
+
+export const getGetEtatPartsSocialesQueryOptions = <TData = Awaited<ReturnType<typeof getEtatPartsSociales>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEtatPartsSociales>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEtatPartsSocialesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEtatPartsSociales>>> = ({ signal }) => getEtatPartsSociales(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEtatPartsSociales>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEtatPartsSocialesQueryResult = NonNullable<Awaited<ReturnType<typeof getEtatPartsSociales>>>
+export type GetEtatPartsSocialesQueryError = ErrorType<void>
+
+
+/**
+ * @summary État des parts sociales d'un membre (PDF)
+ */
+
+export function useGetEtatPartsSociales<TData = Awaited<ReturnType<typeof getEtatPartsSociales>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEtatPartsSociales>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEtatPartsSocialesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetCampagneActiveUrl = () => {
 
 

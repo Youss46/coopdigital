@@ -66,6 +66,7 @@ export const GetMembresResponse = zod.object({
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
   "photoUrl": zod.string().nullish(),
+  "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
   "parcelleLng": zod.string().nullish(),
   "createdAt": zod.string(),
@@ -92,6 +93,7 @@ export const CreateMembreBody = zod.object({
   "statut": zod.enum(['actif', 'inactif']).optional(),
   "dateAdhesion": zod.string(),
   "photoUrl": zod.string().optional(),
+  "sexe": zod.enum(['M', 'F']).optional(),
   "parcelleLat": zod.string().optional(),
   "parcelleLng": zod.string().optional()
 })
@@ -119,6 +121,7 @@ export const GetMembreByQrResponse = zod.object({
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
   "photoUrl": zod.string().nullish(),
+  "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
   "parcelleLng": zod.string().nullish(),
   "createdAt": zod.string(),
@@ -148,6 +151,7 @@ export const GetMembreByIdResponse = zod.object({
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
   "photoUrl": zod.string().nullish(),
+  "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
   "parcelleLng": zod.string().nullish(),
   "createdAt": zod.string(),
@@ -171,6 +175,7 @@ export const UpdateMembreBody = zod.object({
   "groupement": zod.string().optional(),
   "superficieHa": zod.string().optional(),
   "statut": zod.enum(['actif', 'inactif']).optional(),
+  "sexe": zod.enum(['M', 'F']).optional(),
   "photoUrl": zod.string().optional(),
   "parcelleLat": zod.string().optional(),
   "parcelleLng": zod.string().optional()
@@ -191,6 +196,7 @@ export const UpdateMembreResponse = zod.object({
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
   "photoUrl": zod.string().nullish(),
+  "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
   "parcelleLng": zod.string().nullish(),
   "createdAt": zod.string(),
@@ -224,6 +230,7 @@ export const ModifierStatutMembreResponse = zod.object({
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
   "photoUrl": zod.string().nullish(),
+  "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
   "parcelleLng": zod.string().nullish(),
   "createdAt": zod.string(),
@@ -449,6 +456,8 @@ export const GetLivraisonsNonLoteesResponse = zod.array(GetLivraisonsNonLoteesRe
  */
 export const GetDashboardResponse = zod.object({
   "membresActifs": zod.number(),
+  "membresHommes": zod.number().optional(),
+  "membresFemmes": zod.number().optional(),
   "avancesEnCoursMontant": zod.number(),
   "tonnageMois": zod.number(),
   "paiementsMois": zod.number(),
@@ -675,6 +684,7 @@ export const GetLotTracabiliteResponse = zod.object({
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
   "photoUrl": zod.string().nullish(),
+  "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
   "parcelleLng": zod.string().nullish(),
   "createdAt": zod.string(),
@@ -2031,6 +2041,62 @@ export const GetHistoriqueMasseResponseItem = zod.object({
   "nbBulletins": zod.number()
 })
 export const GetHistoriqueMasseResponse = zod.array(GetHistoriqueMasseResponseItem)
+
+
+/**
+ * @summary Reçu de livraison (PDF)
+ */
+export const GetRecuLivraisonParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Reçu de paiement (PDF)
+ */
+export const GetRecuPaiementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Bulletin de paie (PDF)
+ */
+export const GetRecuBulletinPaieParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Bordereau de pesée (PDF)
+ */
+export const GetBordereauPeseeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Reçu d'avance (PDF)
+ */
+export const GetRecuAvanceParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Reçu d'intrant distribué (PDF)
+ */
+export const GetRecuIntrantParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary État des parts sociales d'un membre (PDF)
+ */
+export const GetEtatPartsSocialesParams = zod.object({
+  "id": zod.coerce.number()
+})
 
 
 /**

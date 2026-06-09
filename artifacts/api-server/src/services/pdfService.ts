@@ -1274,6 +1274,7 @@ export async function generateListeMembres(
     id: number;
     nom: string;
     prenoms: string;
+    sexe?: string | null;
     telephone: string | null;
     village: string | null;
     superficieHa: string;
@@ -1301,9 +1302,11 @@ export async function generateListeMembres(
 
   const nbActifs   = membres.filter((m) => m.statut === "actif").length;
   const nbInactifs = membres.filter((m) => m.statut === "inactif").length;
+  const nbHommes   = membres.filter((m) => m.sexe === "M").length;
+  const nbFemmes   = membres.filter((m) => m.sexe === "F").length;
   doc.fontSize(10).font("Helvetica").fillColor(GRIS_L)
     .text(
-      `Total : ${membres.length} membres   |   Actifs : ${nbActifs}   |   Inactifs : ${nbInactifs}`,
+      `Total : ${membres.length} membres   |   Actifs : ${nbActifs}   |   Inactifs : ${nbInactifs}   |   Hommes : ${nbHommes}   |   Femmes : ${nbFemmes}`,
       50, doc.y,
     );
   doc.moveDown(0.8);
@@ -1338,8 +1341,9 @@ export async function generateListeMembres(
     if (i % 2 === 0) doc.rect(50, rowY, doc.page.width - 100, rowH).fill("#f9fafb");
     const ty   = rowY + 5;
     const code = computeCodeMembre(m.id, m.dateAdhesion);
+    const civilite = m.sexe === "M" ? "M." : m.sexe === "F" ? "Mme" : "";
     doc.fillColor(NOIR_L).fontSize(8).font("Helvetica");
-    doc.text(`${m.nom} ${m.prenoms}`,              cols.nom,        ty, { width: 145, lineBreak: false });
+    doc.text(`${civilite ? civilite + " " : ""}${m.nom} ${m.prenoms}`, cols.nom, ty, { width: 145, lineBreak: false });
     doc.fillColor(VERT_L).font("Helvetica-Bold");
     doc.text(code,                                  cols.code,       ty, { width: 80,  lineBreak: false });
     doc.fillColor(NOIR_L).font("Helvetica");

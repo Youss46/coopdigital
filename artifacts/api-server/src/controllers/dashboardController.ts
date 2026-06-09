@@ -17,6 +17,8 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
 
     const [
       [membresActifsRow],
+      [membresHommesRow],
+      [membresFemmesRow],
       [avancesRow],
       [tonnageRow],
       [paiementsRow],
@@ -26,6 +28,14 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
         .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"))),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(membresTable)
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"), eq(membresTable.sexe, "M"))),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(membresTable)
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"), eq(membresTable.sexe, "F"))),
       db
         .select({ total: sql<number>`coalesce(sum(solde_restant_fcfa),0)::int` })
         .from(avancesTable)
@@ -50,6 +60,8 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
 
     res.json({
       membresActifs: membresActifsRow?.count ?? 0,
+      membresHommes: membresHommesRow?.count ?? 0,
+      membresFemmes: membresFemmesRow?.count ?? 0,
       avancesEnCoursMontant: avancesRow?.total ?? 0,
       tonnageMois: tonnageRow?.tonnage ?? 0,
       paiementsMois: paiementsRow?.total ?? 0,

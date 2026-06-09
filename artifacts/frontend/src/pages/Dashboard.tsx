@@ -61,7 +61,11 @@ export default function Dashboard() {
               valeur={String(kpi?.membresActifs ?? 0)}
               icone={Users}
               couleur="#1a4731"
-              sousTitre="Membres enregistrés"
+              sousTitre={
+                kpi?.membresHommes != null
+                  ? `Hommes : ${kpi.membresHommes} · Femmes : ${kpi.membresFemmes ?? 0}`
+                  : "Membres enregistrés"
+              }
             />
             <CarteKpi
               titre="Avances en cours"
