@@ -231,11 +231,9 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
 
   const niveau = attribuerNiveau(scoreGlobal, seuils);
 
-  // Upsert dans scores_membres
-  const rows = await db.insert(scoresMembreTable).values({
-    cooperativeId:      cooperativeId,
-    membreId,
-    campagneId,
+  // Upsert manuel (SELECT → UPDATE ou INSERT)
+  // Évite ON CONFLICT qui exige une contrainte unique préexistante en prod.
+  const upsertData = {
     scoreVolume:        String(Math.round(scoreVolume * 100) / 100),
     scoreQualite:       String(Math.round(scoreQualite * 100) / 100),
     scoreRegularite:    String(Math.round(scoreRegularite * 100) / 100),
@@ -245,20 +243,31 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
     scoreGlobal:        String(scoreGlobal),
     niveau,
     dateCalcul:         new Date(),
-  }).onConflictDoUpdate({
-    target: [scoresMembreTable.cooperativeId, scoresMembreTable.membreId, scoresMembreTable.campagneId],
-    set: {
-      scoreVolume:        String(Math.round(scoreVolume * 100) / 100),
-      scoreQualite:       String(Math.round(scoreQualite * 100) / 100),
-      scoreRegularite:    String(Math.round(scoreRegularite * 100) / 100),
-      scoreRemboursement: String(Math.round(scoreRemboursement * 100) / 100),
-      scoreFidelite:      String(scoreFidelite),
-      scoreCotisation:    String(scoreCotisation),
-      scoreGlobal:        String(scoreGlobal),
-      niveau,
-      dateCalcul:         sql`now()`,
-    },
-  }).returning();
+  };
+
+  const existing = await db
+    .select({ id: scoresMembreTable.id })
+    .from(scoresMembreTable)
+    .where(and(
+      eq(scoresMembreTable.cooperativeId, cooperativeId),
+      eq(scoresMembreTable.membreId, membreId),
+      eq(scoresMembreTable.campagneId, campagneId),
+    ))
+    .limit(1);
+
+  let rows;
+  if (existing[0]) {
+    rows = await db
+      .update(scoresMembreTable)
+      .set(upsertData)
+      .where(eq(scoresMembreTable.id, existing[0].id))
+      .returning();
+  } else {
+    rows = await db
+      .insert(scoresMembreTable)
+      .values({ cooperativeId, membreId, campagneId, ...upsertData })
+      .returning();
+  }
 
   return rows[0];
 }
