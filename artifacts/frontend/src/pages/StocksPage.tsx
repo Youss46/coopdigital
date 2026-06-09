@@ -11,8 +11,9 @@ import {
   getGetMouvementsStockQueryKey,
   getGetStockAlertesQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle } from "lucide-react";
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle, PackageCheck, Clock, ArrowRight } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -38,8 +39,15 @@ function formaterPoids(kg: string | number) {
   return v >= 1000 ? `${(v / 1000).toFixed(2)} T` : `${v.toFixed(1)} kg`;
 }
 
+interface LotissementStats {
+  poidsTotal: number;
+  poidsLoti: number;
+  poidsNonLoti: number;
+}
+
 export default function StocksPage() {
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const peutEntree = usePermission("stocks", "entree");
   const peutSortie = usePermission("stocks", "sortie");
   const [onglet, setOnglet] = useState<"entrepots" | "journal">("entrepots");
@@ -68,6 +76,14 @@ export default function StocksPage() {
   const { data: entrepots = [], isLoading } = useGetEntrepots();
   const { data: mouvements = [] } = useGetMouvementsStock();
   const { data: alertes = [] } = useGetStockAlertes();
+  const { data: lotStats } = useQuery<LotissementStats>({
+    queryKey: ["stocks-lotissement-stats"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/stocks/lotissement-stats`, { headers: { Authorization: `Bearer ${tok()}` } });
+      if (!r.ok) throw new Error("Erreur stats lotissement");
+      return r.json();
+    },
+  });
 
   const mutEntree = useEntreeStock({
     mutation: {
@@ -190,6 +206,64 @@ export default function StocksPage() {
           </div>
         ))}
       </div>
+
+      {/* Lotissement des stocks */}
+      {(() => {
+        const total = lotStats?.poidsTotal ?? 0;
+        const loti = lotStats?.poidsLoti ?? 0;
+        const nonLoti = lotStats?.poidsNonLoti ?? 0;
+        const pct = total > 0 ? Math.round((loti / total) * 100) : 0;
+        const alerte = pct < 20;
+        const barColor = alerte ? "#f59e0b" : pct >= 80 ? "#22c55e" : "#1a4731";
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-700">Lotissement des livraisons</p>
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: barColor + "20", color: barColor }}>
+                {pct}% loti
+              </span>
+            </div>
+            {/* Barre de progression */}
+            <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="h-2.5 rounded-full transition-all duration-500"
+                style={{ width: `${pct}%`, backgroundColor: barColor }}
+              />
+            </div>
+            {alerte && total > 0 && (
+              <p className="text-xs text-amber-600 flex items-center gap-1">
+                <AlertTriangle size={12} />
+                Pensez à regrouper vos livraisons en lots
+              </p>
+            )}
+            {/* Détails */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2.5 bg-green-50 rounded-lg p-3">
+                <PackageCheck size={16} className="text-green-600 shrink-0" />
+                <div>
+                  <p className="text-xs text-gray-500">En lots tracés</p>
+                  <p className="text-sm font-semibold text-gray-900">{formaterPoids(loti)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 bg-amber-50 rounded-lg p-3">
+                <Clock size={16} className="text-amber-500 shrink-0" />
+                <div>
+                  <p className="text-xs text-gray-500">En attente de lot</p>
+                  <p className="text-sm font-semibold text-gray-900">{formaterPoids(nonLoti)}</p>
+                </div>
+              </div>
+            </div>
+            {/* Bouton */}
+            <button
+              onClick={() => setLocation("/tracabilite")}
+              className="flex items-center gap-1.5 text-xs font-medium text-[#1a4731] hover:underline"
+            >
+              Créer des lots
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Onglets */}
       <div className="flex gap-1 border-b border-gray-200">

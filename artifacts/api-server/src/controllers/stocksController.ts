@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { checkStock, creerAnomalies } from "../services/anomalieService";
-import { db, entrepotsTable, mouvementsStockTable, usersTable } from "@workspace/db";
+import { db, entrepotsTable, mouvementsStockTable, usersTable, livraisonsTable, lotLivraisonsTable, membresTable } from "@workspace/db";
 import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
 import { EntreeStockBody, SortieStockBody } from "@workspace/api-zod";
 
@@ -326,6 +326,39 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
     res.json(alertes);
   } catch (err) {
     req.log.error({ err }, "Erreur getAlertes");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function getLotissementStats(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  try {
+    const rows = await db.execute(sql`
+      SELECT
+        coalesce(sum(coalesce(l.poids_net_kg, l.poids_kg)::numeric), 0)::float  AS "poidsTotal",
+        coalesce(sum(CASE WHEN ll.livraison_id IS NOT NULL
+          THEN coalesce(l.poids_net_kg, l.poids_kg)::numeric ELSE 0 END), 0)::float AS "poidsLoti",
+        coalesce(sum(CASE WHEN ll.livraison_id IS NULL
+          THEN coalesce(l.poids_net_kg, l.poids_kg)::numeric ELSE 0 END), 0)::float AS "poidsNonLoti"
+      FROM livraisons l
+      JOIN membres m ON m.id = l.membre_id
+      LEFT JOIN lot_livraisons ll ON ll.livraison_id = l.id
+      WHERE m.cooperative_id = ${cooperativeId}
+    `);
+
+    const row = rows.rows[0] as { poidsTotal: number; poidsLoti: number; poidsNonLoti: number } | undefined;
+    res.json({
+      poidsTotal:   row?.poidsTotal   ?? 0,
+      poidsLoti:    row?.poidsLoti    ?? 0,
+      poidsNonLoti: row?.poidsNonLoti ?? 0,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Erreur getLotissementStats");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
