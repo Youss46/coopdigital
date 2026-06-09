@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useGetScoringClassement,
   useGetScoringConfig,
@@ -8,10 +8,12 @@ import {
   useGetScoringEvolution,
   usePostScoringRecalculer,
   useGetCampagneActive,
+  useListCampagnes,
   getGetScoringClassementQueryKey,
   getGetScoringMembreQueryKey,
   type EntreeClassement,
   type ScoreMembreDetail,
+  type Campagne,
 } from "@workspace/api-client-react";
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -574,8 +576,28 @@ const TABS = [
 
 export default function ScoringPage() {
   const [tab, setTab] = useState("classement");
-  const { data: campagne } = useGetCampagneActive();
-  const campagneId = (campagne as { id?: number } | undefined)?.id ?? 0;
+  const [selectedCampagneId, setSelectedCampagneId] = useState<number>(0);
+
+  const { data: campagneActive } = useGetCampagneActive();
+  const { data: campagnesRaw } = useListCampagnes();
+  const campagnes = (campagnesRaw ?? []) as Campagne[];
+
+  // Initialiser avec la campagne active dès qu'elle est disponible
+  useEffect(() => {
+    if (selectedCampagneId === 0 && campagneActive?.id) {
+      setSelectedCampagneId(campagneActive.id);
+    }
+  }, [campagneActive, selectedCampagneId]);
+
+  // Si toujours 0 après chargement, prendre la première campagne de la liste
+  useEffect(() => {
+    if (selectedCampagneId === 0 && campagnes.length > 0 && campagnes[0]?.id) {
+      setSelectedCampagneId(campagnes[0].id);
+    }
+  }, [campagnes, selectedCampagneId]);
+
+  const campagneChoisie = campagnes.find(c => c.id === selectedCampagneId);
+  const estActive = campagneActive?.id === selectedCampagneId;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -585,19 +607,49 @@ export default function ScoringPage() {
           <h1 className="text-2xl font-bold text-gray-900">Scoring Producteurs</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Classement et analyse de performance des membres
-            {campagne && (
-              <span className="ml-2 text-indigo-600 font-medium">
-                — Campagne {(campagne as { anneeDebut?: number; anneeFin?: number }).anneeDebut}/{(campagne as { anneeDebut?: number; anneeFin?: number }).anneeFin}
-              </span>
-            )}
           </p>
         </div>
-        {campagneId === 0 && (
-          <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-            ⚠️ Aucune campagne active
-          </div>
-        )}
+
+        {/* Sélecteur de campagne */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {campagnes.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Campagne :</label>
+              <select
+                value={selectedCampagneId}
+                onChange={e => setSelectedCampagneId(Number(e.target.value))}
+                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              >
+                {campagnes.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.libelle} {c.statut === "ouverte" ? "✓" : ""}
+                  </option>
+                ))}
+              </select>
+              {estActive && (
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                  Active
+                </span>
+              )}
+              {!estActive && campagneChoisie && (
+                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                  Clôturée
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+              ⚠️ Aucune campagne enregistrée
+            </div>
+          )}
+        </div>
       </div>
+
+      {selectedCampagneId === 0 && (
+        <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          ⚠️ Sélectionnez une campagne pour afficher les scores.
+        </div>
+      )}
 
       {/* Onglets */}
       <div className="border-b border-gray-200">
@@ -619,9 +671,9 @@ export default function ScoringPage() {
       </div>
 
       {/* Contenu */}
-      {tab === "classement" && <ClassementTab campagneId={campagneId} />}
-      {tab === "fiche"      && <FicheScoreTab campagneId={campagneId} />}
-      {tab === "config"     && <ConfigTab     campagneId={campagneId} />}
+      {tab === "classement" && <ClassementTab campagneId={selectedCampagneId} />}
+      {tab === "fiche"      && <FicheScoreTab campagneId={selectedCampagneId} />}
+      {tab === "config"     && <ConfigTab     campagneId={selectedCampagneId} />}
     </div>
   );
 }
