@@ -107,6 +107,17 @@ export async function saisirPrix(cooperativeId: number, data: {
   source?: string;
   saisiPar?: number;
 }) {
+  // Auto-rattacher la campagne active si non fournie
+  let campagneId = data.campagneId;
+  if (!campagneId) {
+    const [campagneActive] = await db
+      .select({ id: campagnesTable.id })
+      .from(campagnesTable)
+      .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
+      .limit(1);
+    campagneId = campagneActive?.id;
+  }
+
   // Récupérer prix précédent pour détecter variation
   const anciens = await db
     .select({ prix: historiquePrixTable.prixBordChampFcfa })
@@ -121,7 +132,7 @@ export async function saisirPrix(cooperativeId: number, data: {
     .insert(historiquePrixTable)
     .values({
       cooperativeId: cooperativeId,
-      campagneId: data.campagneId,
+      campagneId: campagneId,
       datePrix: data.datePrix,
       prixBordChampFcfa: String(data.prixBordChampFcfa),
       prixVenteExportFcfa: String(data.prixVenteExportFcfa),
@@ -185,12 +196,27 @@ export async function getHistorique(cooperativeId: number, params: {
   if (params.dateDebut) conditions.push(gte(historiquePrixTable.datePrix, params.dateDebut));
   if (params.dateFin)   conditions.push(lte(historiquePrixTable.datePrix, params.dateFin));
 
-  return db
-    .select()
+  const rows = await db
+    .select({
+      id: historiquePrixTable.id,
+      cooperativeId: historiquePrixTable.cooperativeId,
+      campagneId: historiquePrixTable.campagneId,
+      campagneNom: campagnesTable.libelle,
+      datePrix: historiquePrixTable.datePrix,
+      prixBordChampFcfa: historiquePrixTable.prixBordChampFcfa,
+      prixVenteExportFcfa: historiquePrixTable.prixVenteExportFcfa,
+      margeBruteKgFcfa: historiquePrixTable.margeBruteKgFcfa,
+      source: historiquePrixTable.source,
+      saisiPar: historiquePrixTable.saisiPar,
+      createdAt: historiquePrixTable.createdAt,
+    })
     .from(historiquePrixTable)
+    .leftJoin(campagnesTable, eq(campagnesTable.id, historiquePrixTable.campagneId))
     .where(and(...conditions))
     .orderBy(desc(historiquePrixTable.datePrix), desc(historiquePrixTable.id))
     .limit(params.limit ?? 200);
+
+  return rows;
 }
 
 // ─── Tendance (moyenne mobile 4 semaines) ─────────────────────────────────────

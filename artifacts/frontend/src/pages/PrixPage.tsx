@@ -12,6 +12,7 @@ import {
   usePutPrixAlertesIdLu,
   usePostPrixDiffuserSms,
   useGetPrixSimulation,
+  useListCampagnes,
   getGetPrixActuelQueryKey,
   getGetPrixHistoriqueQueryKey,
   getGetPrixTendanceQueryKey,
@@ -25,6 +26,7 @@ import {
   type ComparaisonCampagne,
   type TendancePrix,
   type AnalyseMarge,
+  type Campagne,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePermission } from "@/hooks/usePermission";
@@ -75,6 +77,10 @@ function ModalSaisirPrix({ onClose }: { onClose: () => void }) {
     source: "manuel",
   });
 
+  const { data: rawCampagnes } = useListCampagnes();
+  const campagnes = (rawCampagnes as Campagne[] | undefined) ?? [];
+  const campagneActive = campagnes.find((c) => c.statut === "ouverte") ?? null;
+
   const mut = usePostPrix({
     mutation: {
       onSuccess: () => {
@@ -101,6 +107,14 @@ function ModalSaisirPrix({ onClose }: { onClose: () => void }) {
           <button onClick={onClose}><X size={16} className="text-gray-400" /></button>
         </div>
         <div className="px-6 py-5 space-y-4">
+          {/* Campagne active */}
+          <div className={`rounded-lg px-3 py-2.5 text-sm flex items-center gap-2 ${campagneActive ? "bg-green-50 border border-green-100" : "bg-amber-50 border border-amber-100"}`}>
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${campagneActive ? "bg-green-500" : "bg-amber-400"}`} />
+            {campagneActive
+              ? <span className="text-green-800">Campagne <strong>{campagneActive.libelle}</strong> — ce prix y sera rattaché automatiquement.</span>
+              : <span className="text-amber-800">Aucune campagne ouverte — le prix sera enregistré sans campagne.</span>
+            }
+          </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
             <input type="date" value={form.datePrix}

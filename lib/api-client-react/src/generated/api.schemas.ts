@@ -2708,6 +2708,7 @@ export interface HistoriquePrix {
   id: number;
   cooperativeId: number;
   campagneId?: number | null;
+  campagneNom?: string | null;
   datePrix: string;
   prixBordChampFcfa: string;
   prixVenteExportFcfa: string;

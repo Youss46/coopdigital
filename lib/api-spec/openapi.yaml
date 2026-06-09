@@ -9253,6 +9253,9 @@ components:
         campagneId:
           type: integer
           nullable: true
+        campagneNom:
+          type: string
+          nullable: true
         datePrix:
           type: string
           format: date
