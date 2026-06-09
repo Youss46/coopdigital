@@ -2,7 +2,7 @@ import { type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { eq, and, desc, sql, asc } from "drizzle-orm";
 import { missionsTerrainTable, missionsMembresTable, usersTable, membresTable } from "@workspace/db";
-import { sendSMS } from "../services/smsService.js";
+import { creerNotification, notifierParRole } from "../services/notificationService.js";
 import { computeCompletude } from "./membresController";
 
 // ── Liste des missions ────────────────────────────────────────────────────────
@@ -153,17 +153,16 @@ export async function createMission(req: Request, res: Response): Promise<void> 
 
     // SMS à l'agent assigné
     if (agentId) {
-      try {
-        const [agent] = await db
-          .select({ telephone: usersTable.telephone, nom: usersTable.nom, prenoms: usersTable.prenoms })
-          .from(usersTable)
-          .where(eq(usersTable.id, agentId))
-          .limit(1);
-        if (agent?.telephone) {
-          const msg = `Nouvelle mission assignée : ${titre} — ${zoneNom}. Date : ${datePrevue}. ${membreIds?.length ?? 0} parcelles. [Voir dans CoopDigital Terrain]`;
-          void sendSMS(agent.telephone, msg);
-        }
-      } catch { /* non bloquant */ }
+      void creerNotification(cooperativeId, [agentId], {
+        type:         "mission_assignee",
+        titre:        `Mission assignée : ${titre}`,
+        message:      `Zone : ${zoneNom}. Date prévue : ${datePrevue}. ${membreIds?.length ?? 0} parcelle(s) à collecter.`,
+        lien:         `/missions/${mission.id}`,
+        lienLibelle:  "Voir la mission",
+        gravite:      "info",
+        sourceModule: "missions",
+        sourceId:     mission.id,
+      });
     }
 
     res.status(201).json(mission);
@@ -302,14 +301,16 @@ export async function soumettreMission(req: Request, res: Response): Promise<voi
         .from(usersTable)
         .where(eq(usersTable.id, userId))
         .limit(1);
-      const rtUsers = await db
-        .select({ telephone: usersTable.telephone })
-        .from(usersTable)
-        .where(and(eq(usersTable.cooperativeId, cooperativeId), eq(usersTable.role, "responsable_tracabilite")));
-      const msg = `Mission "${mission.titre}" soumise par ${agent?.prenoms ?? ""} ${agent?.nom ?? ""}. ${updated.parcellesCollectees ?? 0} parcelles collectées. [Valider dans CoopDigital]`;
-      for (const rt of rtUsers) {
-        if (rt.telephone) void sendSMS(rt.telephone, msg);
-      }
+      void notifierParRole(cooperativeId, ["responsable_tracabilite", "pca", "directeur"], {
+        type:         "mission_soumise",
+        titre:        `Mission soumise : ${mission.titre}`,
+        message:      `Soumise par ${agent?.prenoms ?? ""} ${agent?.nom ?? ""}. ${updated.parcellesCollectees ?? 0} parcelle(s) collectée(s) à valider.`,
+        lien:         `/missions/${mission.id}`,
+        lienLibelle:  "Valider les parcelles",
+        gravite:      "attention",
+        sourceModule: "missions",
+        sourceId:     mission.id,
+      });
     } catch { /* non bloquant */ }
 
     res.json(updated);
@@ -443,20 +444,21 @@ export async function rejeterParcelleMission(req: Request, res: Response): Promi
     // Notifier l'agent
     if (mission.agentId) {
       try {
-        const [agent] = await db
-          .select({ telephone: usersTable.telephone })
-          .from(usersTable)
-          .where(eq(usersTable.id, mission.agentId))
-          .limit(1);
         const [membre] = await db
           .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
           .from(membresTable)
           .where(eq(membresTable.id, membreId))
           .limit(1);
-        if (agent?.telephone) {
-          const msg = `Parcelle rejetée dans la mission "${mission.titre}" — Membre : ${membre?.prenoms ?? ""} ${membre?.nom ?? ""}. Motif : ${motif}. [Voir les corrections dans CoopDigital Terrain]`;
-          void sendSMS(agent.telephone, msg);
-        }
+        void creerNotification(cooperativeId, [mission.agentId], {
+          type:         "mission_parcelle_rejetee",
+          titre:        `Parcelle rejetée — ${mission.titre}`,
+          message:      `Membre : ${membre?.prenoms ?? ""} ${membre?.nom ?? ""}. Motif : ${motif}.`,
+          lien:         `/missions/${mission.id}`,
+          lienLibelle:  "Voir les corrections",
+          gravite:      "attention",
+          sourceModule: "missions",
+          sourceId:     mission.id,
+        });
       } catch { /* non bloquant */ }
     }
 

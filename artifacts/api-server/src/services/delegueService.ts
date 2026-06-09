@@ -13,7 +13,7 @@ import {
 } from "@workspace/db";
 import { and, eq, sql, desc } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
-import { sendSMS } from "./smsService.js";
+import { creerNotification, notifierParRole } from "./notificationService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -395,20 +395,16 @@ export async function alimenterDepuisCaissePrincipale(
     dateEnvoi: new Date(),
   });
 
-  // 7. SMS au délégué
-  if (agent.telephone) {
-    try {
-      const coopNomResult = await db.execute<{ nom: string }>(
-        sql`SELECT nom FROM cooperatives WHERE id = ${coopId} LIMIT 1`
-      );
-      const coopNom = coopNomResult.rows[0]?.nom ?? "CoopDigital";
-      const dateStr = new Date().toLocaleDateString("fr-FR");
-      const message = `Bonjour ${agent.nom}, votre caisse CoopDigital a ete alimentee de ${montantFcfa.toLocaleString("fr-FR")} FCFA. Solde : ${nouveauSolde.toLocaleString("fr-FR")} FCFA. Zone : ${agent.section ?? "—"}. Coop ${coopNom} — ${dateStr}`;
-      await sendSMS(agent.telephone, message);
-    } catch (smsErr) {
-      logger.warn({ smsErr }, "SMS alimentation caisse délégué non envoyé");
-    }
-  }
+  // 7. Notification délégué (alimentation caisse)
+  void creerNotification(coopId, [agentId], {
+    type:         "caisse_delegue",
+    titre:        "Caisse alimentée",
+    message:      `Votre caisse a été alimentée de ${montantFcfa.toLocaleString("fr-FR")} FCFA. Nouveau solde : ${nouveauSolde.toLocaleString("fr-FR")} FCFA.`,
+    lien:         "/caisse",
+    lienLibelle:  "Voir ma caisse",
+    gravite:      "info",
+    sourceModule: "delegues",
+  });
 
   logger.info({ agentId, montantFcfa, caisseSourceId, nouveauSolde }, "Caisse déléguée alimentée");
   return { solde: nouveauSolde, soldeSource: nouveauSoldeSource };
@@ -455,27 +451,18 @@ export async function cloturerJournee(
   const soldeTheorique = toNum(caisse.solde);
   const ecart = soldeReel - soldeTheorique;
 
-  // SMS directeur si écart significatif (> 500 FCFA)
+  // Notification direction si écart significatif (> 500 FCFA)
   if (Math.abs(ecart) > 500) {
-    try {
-      const dirResult = await db.execute<{ telephone: string }>(sql`
-        SELECT telephone FROM users
-        WHERE cooperative_id = ${coopId}
-          AND role IN ('directeur', 'pca')
-          AND actif = true
-          AND telephone IS NOT NULL
-        ORDER BY CASE role WHEN 'directeur' THEN 1 ELSE 2 END
-        LIMIT 1
-      `);
-      const dirTel = dirResult.rows[0]?.telephone;
-      if (dirTel) {
-        const dateStr = new Date().toLocaleDateString("fr-FR");
-        const msg = `Rapport delegue ${agent?.nom ?? ""} — ${dateStr}: Recu: ${montantRecu.toLocaleString("fr-FR")} FCFA. Paye: ${montantPaye.toLocaleString("fr-FR")} FCFA. Solde theorique: ${soldeTheorique.toLocaleString("fr-FR")} FCFA. Reel: ${soldeReel.toLocaleString("fr-FR")} FCFA. Ecart: ${ecart > 0 ? "+" : ""}${ecart.toLocaleString("fr-FR")} FCFA. Zone: ${agent?.section ?? "—"}`;
-        await sendSMS(dirTel, msg);
-      }
-    } catch (smsErr) {
-      logger.warn({ smsErr }, "SMS clôture journée délégué non envoyé");
-    }
+    const dateStr = new Date().toLocaleDateString("fr-FR");
+    void notifierParRole(coopId, ["directeur", "pca"], {
+      type:         "caisse_delegue",
+      titre:        `Écart de caisse — ${agent?.nom ?? ""} (${dateStr})`,
+      message:      `Reçu : ${montantRecu.toLocaleString("fr-FR")} FCFA. Payé : ${montantPaye.toLocaleString("fr-FR")} FCFA. Solde théorique : ${soldeTheorique.toLocaleString("fr-FR")} FCFA. Réel : ${soldeReel.toLocaleString("fr-FR")} FCFA. Écart : ${ecart > 0 ? "+" : ""}${ecart.toLocaleString("fr-FR")} FCFA. Zone : ${agent?.section ?? "—"}`,
+      lien:         "/delegues/alertes",
+      lienLibelle:  "Voir les alertes",
+      gravite:      Math.abs(ecart) > 5000 ? "critique" : "attention",
+      sourceModule: "delegues",
+    });
   }
 
   logger.info({ agentId, soldeTheorique, soldeReel, ecart }, "Clôture journée délégué");

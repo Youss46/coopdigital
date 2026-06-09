@@ -5,7 +5,7 @@ import { eq, and, or, ilike, sql, desc, notInArray, asc } from "drizzle-orm";
 import { CreateMembreBody, UpdateMembreBody } from "@workspace/api-zod";
 import { computeCodeMembre } from "../services/portailService";
 import { generateListeMembres } from "../services/pdfService";
-import { sendSMS } from "../services/smsService.js";
+import { creerNotification, notifierParRole } from "../services/notificationService.js";
 
 function genCodeFournisseur(seq: number, annee: number) {
   return `MBR-${annee}-${String(seq).padStart(4, "0")}`;
@@ -393,14 +393,16 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
           .from(usersTable)
           .where(eq(usersTable.id, userId))
           .limit(1);
-        const rtUsers = await db
-          .select({ telephone: usersTable.telephone })
-          .from(usersTable)
-          .where(and(eq(usersTable.cooperativeId, cooperativeId), eq(usersTable.role, "responsable_tracabilite")));
-        const msg = `Nouvelle demande de ${delegueInfo?.prenoms ?? ""} ${delegueInfo?.nom ?? ""} — Zone ${delegueInfo?.zoneNom ?? ""}. Membre: ${membre.prenoms} ${membre.nom}. [Voir dans CoopDigital]`;
-        for (const rt of rtUsers) {
-          if (rt.telephone) void sendSMS(rt.telephone, msg);
-        }
+        void notifierParRole(cooperativeId, ["responsable_tracabilite", "pca", "directeur"], {
+          type:         "demande_membre",
+          titre:        "Nouvelle demande de membre",
+          message:      `${delegueInfo?.prenoms ?? ""} ${delegueInfo?.nom ?? ""} (Zone ${delegueInfo?.zoneNom ?? "—"}) a soumis une demande pour ${membre.prenoms} ${membre.nom}.`,
+          lien:         "/membres?statut_membre=en_attente",
+          lienLibelle:  "Valider la demande",
+          gravite:      "attention",
+          sourceModule: "membres",
+          sourceId:     membre.id,
+        });
       } catch { /* non bloquant */ }
     }
 
@@ -527,34 +529,38 @@ export async function transfererRattachement(req: Request, res: Response): Promi
       .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
       .returning();
 
-    // ── Notifications SMS ─────────────────────────────────────────────────
+    // ── Notifications ─────────────────────────────────────────────────────
     const membreNom = `${ancien.nom} ${ancien.prenoms}`;
 
     // Notifier l'ancien délégué s'il change
     if (ancien.delegueId && ancien.delegueId !== newDelegueId) {
-      const [ancienDelegue] = await db
-        .select({ telephone: usersTable.telephone })
-        .from(usersTable)
-        .where(eq(usersTable.id, ancien.delegueId))
-        .limit(1);
-      if (ancienDelegue?.telephone) {
-        const msg = rattachementType === "base_centrale"
-          ? `Le membre ${membreNom} a été transféré vers la base centrale.`
-          : `Le membre ${membreNom} a été transféré vers un autre délégué.`;
-        void sendSMS(ancienDelegue.telephone, msg).catch(() => {});
-      }
+      const msg = rattachementType === "base_centrale"
+        ? `Le membre ${membreNom} a été transféré vers la base centrale.`
+        : `Le membre ${membreNom} a été transféré vers un autre délégué.`;
+      void creerNotification(cooperativeId, [ancien.delegueId], {
+        type:         "rattachement_change",
+        titre:        "Membre transféré",
+        message:      msg,
+        lien:         "/membres",
+        lienLibelle:  "Voir mes membres",
+        gravite:      "info",
+        sourceModule: "membres",
+        sourceId:     id,
+      });
     }
 
     // Notifier le nouveau délégué
     if (newDelegueId && newDelegueId !== ancien.delegueId) {
-      const [nouveauDelegue] = await db
-        .select({ telephone: usersTable.telephone })
-        .from(usersTable)
-        .where(eq(usersTable.id, newDelegueId))
-        .limit(1);
-      if (nouveauDelegue?.telephone) {
-        void sendSMS(nouveauDelegue.telephone, `Le membre ${membreNom} vous a été rattaché. M15 Tech`).catch(() => {});
-      }
+      void creerNotification(cooperativeId, [newDelegueId], {
+        type:         "rattachement_change",
+        titre:        "Nouveau membre rattaché",
+        message:      `Le membre ${membreNom} vous a été rattaché.`,
+        lien:         `/membres/${id}`,
+        lienLibelle:  "Voir la fiche",
+        gravite:      "info",
+        sourceModule: "membres",
+        sourceId:     id,
+      });
     }
 
     req.log.info({ membreId: id, rattachementType, newDelegueId, motif }, "Rattachement membre modifié");
@@ -759,18 +765,17 @@ export async function validerMembre(req: Request, res: Response): Promise<void> 
 
     void autoCreateFournisseurMembre(cooperativeId, membre);
 
-    // SMS au délégué
     if (existing.demandeParDelegueId) {
-      try {
-        const [delegue] = await db
-          .select({ telephone: usersTable.telephone })
-          .from(usersTable)
-          .where(eq(usersTable.id, existing.demandeParDelegueId))
-          .limit(1);
-        if (delegue?.telephone) {
-          void sendSMS(delegue.telephone, `Le membre ${membre.prenoms} ${membre.nom} a été validé et est maintenant actif dans CoopDigital.`);
-        }
-      } catch { /* non bloquant */ }
+      void creerNotification(cooperativeId, [existing.demandeParDelegueId], {
+        type:         "membre_valide",
+        titre:        "Demande de membre validée ✓",
+        message:      `${membre.prenoms} ${membre.nom} est maintenant actif dans CoopDigital.`,
+        lien:         `/membres/${membre.id}`,
+        lienLibelle:  "Voir la fiche",
+        gravite:      "info",
+        sourceModule: "membres",
+        sourceId:     membre.id,
+      });
     }
 
     res.json(enrichMembre(membre));
@@ -808,18 +813,17 @@ export async function rejeterMembre(req: Request, res: Response): Promise<void> 
       .where(eq(membresTable.id, id))
       .returning();
 
-    // SMS au délégué avec motif
     if (existing.demandeParDelegueId) {
-      try {
-        const [delegue] = await db
-          .select({ telephone: usersTable.telephone })
-          .from(usersTable)
-          .where(eq(usersTable.id, existing.demandeParDelegueId))
-          .limit(1);
-        if (delegue?.telephone) {
-          void sendSMS(delegue.telephone, `La demande pour ${membre.prenoms} ${membre.nom} a été rejetée. Motif : ${motif}. Veuillez corriger et renvoyer la demande.`);
-        }
-      } catch { /* non bloquant */ }
+      void creerNotification(cooperativeId, [existing.demandeParDelegueId], {
+        type:         "membre_rejete",
+        titre:        "Demande de membre rejetée",
+        message:      `La demande pour ${membre.prenoms} ${membre.nom} a été rejetée. Motif : ${motif}.`,
+        lien:         `/membres/${membre.id}`,
+        lienLibelle:  "Corriger la fiche",
+        gravite:      "attention",
+        sourceModule: "membres",
+        sourceId:     membre.id,
+      });
     }
 
     res.json(enrichMembre(membre));

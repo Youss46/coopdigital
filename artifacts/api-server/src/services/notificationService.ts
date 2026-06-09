@@ -27,7 +27,18 @@ export type NotifType =
   | "message_recu"
   | "livraison_anomalie"
   | "budget_depasse"
-  | "prix_change";
+  | "prix_change"
+  // ── Workflow membres ──────────────────────────────────
+  | "demande_membre"
+  | "membre_valide"
+  | "membre_rejete"
+  | "rattachement_change"
+  // ── Missions terrain ──────────────────────────────────
+  | "mission_assignee"
+  | "mission_soumise"
+  | "mission_parcelle_rejetee"
+  // ── Délégués ──────────────────────────────────────────
+  | "caisse_delegue";
 
 export type NotifGravite = "info" | "attention" | "critique";
 
@@ -59,6 +70,17 @@ const PREF_COL: Record<NotifType, keyof typeof preferencesNotificationsTable.$in
   livraison_anomalie:       "notifAnomalieCritique",
   budget_depasse:           "notifBudgetDepasse",
   prix_change:              "notifPrixChange",
+  // Workflow membres
+  demande_membre:           "notifAnomalieCritique",
+  membre_valide:            "notifMessageRecu",
+  membre_rejete:            "notifMessageRecu",
+  rattachement_change:      "notifMessageRecu",
+  // Missions terrain
+  mission_assignee:         "notifMessageRecu",
+  mission_soumise:          "notifAnomalieCritique",
+  mission_parcelle_rejetee: "notifMessageRecu",
+  // Délégués
+  caisse_delegue:           "notifMessageRecu",
 };
 
 // ─── Créer des notifications pour une liste de users ──────────────────────────
