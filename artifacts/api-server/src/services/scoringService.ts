@@ -95,6 +95,8 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
   const campRow = await db.select({
     dateOuverture: campagnesTable.dateOuverture,
     dateFermeture: campagnesTable.dateFermeture,
+    anneeDebut:    campagnesTable.anneeDebut,
+    anneeFin:      campagnesTable.anneeFin,
   }).from(campagnesTable).where(eq(campagnesTable.id, campagneId)).limit(1);
   const camp = campRow[0];
   if (!camp) throw new Error("Campagne introuvable");
@@ -109,9 +111,14 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
     ),
   );
 
+  // Bornes larges pour les livraisons sans campagne_id :
+  // on utilise toute l'année civile couverte par la campagne (annee_debut à annee_fin)
+  // afin d'inclure les livraisons saisies avant la date_ouverture officielle.
+  const nullDateDebut = `${camp.anneeDebut}-01-01`;
+  const nullDateFin   = `${camp.anneeFin}-12-31`;
+
   // Condition d'appartenance d'une livraison à la campagne :
-  // soit campagne_id correspond, soit campagne_id est NULL et la date est dans la période
-  // (gère le cas de livraisons enregistrées avant la création de la campagne)
+  // soit campagne_id correspond, soit campagne_id est NULL et l'année tombe dans la campagne
 
   // 2. Score Volume — tonnage membre vs moyenne coop
   const volRows = await db.execute<{ tonnage_membre: string; tonnage_moyen: string }>(sql`
@@ -122,13 +129,13 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
           SELECT SUM(COALESCE(l2.poids_net_kg, l2.poids_kg)) AS s
           FROM livraisons l2
           WHERE (l2.campagne_id = ${campagneId}
-                 OR (l2.campagne_id IS NULL AND l2.date_livraison >= ${dateDebut}::date AND l2.date_livraison <= ${dateFin}::date))
+                 OR (l2.campagne_id IS NULL AND l2.date_livraison >= ${nullDateDebut}::date AND l2.date_livraison <= ${nullDateFin}::date))
           GROUP BY l2.membre_id
         ) t), 1
       ) AS tonnage_moyen
     FROM livraisons l
     WHERE (l.campagne_id = ${campagneId}
-           OR (l.campagne_id IS NULL AND l.date_livraison >= ${dateDebut}::date AND l.date_livraison <= ${dateFin}::date))
+           OR (l.campagne_id IS NULL AND l.date_livraison >= ${nullDateDebut}::date AND l.date_livraison <= ${nullDateFin}::date))
   `);
   const vol = volRows.rows[0];
   const scoreVolume = Math.min(100,
@@ -145,7 +152,7 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
     FROM livraisons l
     WHERE l.membre_id = ${membreId}
       AND (l.campagne_id = ${campagneId}
-           OR (l.campagne_id IS NULL AND l.date_livraison >= ${dateDebut}::date AND l.date_livraison <= ${dateFin}::date))
+           OR (l.campagne_id IS NULL AND l.date_livraison >= ${nullDateDebut}::date AND l.date_livraison <= ${nullDateFin}::date))
   `);
   const qual = qualRows.rows[0];
   const scoreQualite = (Number(qual.poids_brut) > 0)
@@ -158,7 +165,7 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
     FROM livraisons l
     WHERE l.membre_id = ${membreId}
       AND (l.campagne_id = ${campagneId}
-           OR (l.campagne_id IS NULL AND l.date_livraison >= ${dateDebut}::date AND l.date_livraison <= ${dateFin}::date))
+           OR (l.campagne_id IS NULL AND l.date_livraison >= ${nullDateDebut}::date AND l.date_livraison <= ${nullDateFin}::date))
   `);
   const semainesActives = Number(regRows.rows[0]?.semaines_actives ?? 0);
   const scoreRegularite = Math.min(100, (semainesActives / semaines) * 100);
@@ -262,21 +269,26 @@ export async function recalculerTous(cooperativeId: number, campagneId: number) 
   const campRow = await db.select({
     dateOuverture: campagnesTable.dateOuverture,
     dateFermeture: campagnesTable.dateFermeture,
+    anneeDebut:    campagnesTable.anneeDebut,
+    anneeFin:      campagnesTable.anneeFin,
   }).from(campagnesTable).where(eq(campagnesTable.id, campagneId)).limit(1);
   const camp = campRow[0];
   if (!camp) return { calculés: 0, campagneId };
 
-  const dateDebut = camp.dateOuverture;
-  const dateFin = camp.dateFermeture ?? new Date().toISOString().slice(0, 10);
+  // Bornes larges pour les livraisons sans campagne_id :
+  // toute l'année civile couverte par la campagne (inclut les livraisons
+  // saisies avant la date_ouverture officielle)
+  const nullDateDebut = `${camp.anneeDebut}-01-01`;
+  const nullDateFin   = `${camp.anneeFin}-12-31`;
 
   // Membres actifs ayant au moins 1 livraison dans la campagne
-  // Inclut les livraisons sans campagne_id dont la date tombe dans la période
+  // Inclut les livraisons sans campagne_id dont l'année tombe dans la campagne
   const membres = await db.execute<{ membre_id: number }>(sql`
     SELECT DISTINCT l.membre_id
     FROM livraisons l
     INNER JOIN membres m ON m.id = l.membre_id
     WHERE (l.campagne_id = ${campagneId}
-           OR (l.campagne_id IS NULL AND l.date_livraison >= ${dateDebut}::date AND l.date_livraison <= ${dateFin}::date))
+           OR (l.campagne_id IS NULL AND l.date_livraison >= ${nullDateDebut}::date AND l.date_livraison <= ${nullDateFin}::date))
       AND m.cooperative_id = ${cooperativeId}
       AND m.statut = 'actif'
   `);
@@ -308,6 +320,12 @@ export async function recalculerTous(cooperativeId: number, campagneId: number) 
 
 // ─── Classement complet d'une campagne ───────────────────────────────────────
 export async function getClassementCampagne(cooperativeId: number, campagneId: number) {
+  const campRow = await db.select({ anneeDebut: campagnesTable.anneeDebut, anneeFin: campagnesTable.anneeFin })
+    .from(campagnesTable).where(eq(campagnesTable.id, campagneId)).limit(1);
+  const camp = campRow[0];
+  const nullDateDebut = camp ? `${camp.anneeDebut}-01-01` : "1900-01-01";
+  const nullDateFin   = camp ? `${camp.anneeFin}-12-31`   : "2100-12-31";
+
   const rows = await db.execute<{
     id: number; membre_id: number; score_global: string; niveau: string; rang: number;
     score_volume: string; score_qualite: string; score_regularite: string;
@@ -326,7 +344,9 @@ export async function getClassementCampagne(cooperativeId: number, campagneId: n
       COALESCE(SUM(l.poids_net_kg), 0) AS tonnage
     FROM scores_membres sm
     INNER JOIN membres m ON m.id = sm.membre_id
-    LEFT JOIN livraisons l ON l.membre_id = sm.membre_id AND l.campagne_id = ${campagneId}
+    LEFT JOIN livraisons l ON l.membre_id = sm.membre_id
+      AND (l.campagne_id = ${campagneId}
+           OR (l.campagne_id IS NULL AND l.date_livraison >= ${nullDateDebut}::date AND l.date_livraison <= ${nullDateFin}::date))
     WHERE sm.campagne_id = ${campagneId} AND sm.cooperative_id = ${cooperativeId}
     GROUP BY sm.id, m.id
     ORDER BY sm.rang ASC NULLS LAST, sm.score_global DESC
@@ -376,6 +396,12 @@ export async function getEvolution(cooperativeId: number, membreId: number) {
 
 // ─── Top N producteurs ────────────────────────────────────────────────────────
 export async function getTopN(cooperativeId: number, campagneId: number, n: number) {
+  const campRow2 = await db.select({ anneeDebut: campagnesTable.anneeDebut, anneeFin: campagnesTable.anneeFin })
+    .from(campagnesTable).where(eq(campagnesTable.id, campagneId)).limit(1);
+  const camp2 = campRow2[0];
+  const nullDateDebut2 = camp2 ? `${camp2.anneeDebut}-01-01` : "1900-01-01";
+  const nullDateFin2   = camp2 ? `${camp2.anneeFin}-12-31`   : "2100-12-31";
+
   const rows = await db.execute<{
     rang: number; membre_id: number; nom: string; prenoms: string;
     village: string | null; score_global: string; niveau: string;
@@ -387,7 +413,9 @@ export async function getTopN(cooperativeId: number, campagneId: number, n: numb
       COALESCE(SUM(l.poids_net_kg), 0) AS tonnage
     FROM scores_membres sm
     INNER JOIN membres m ON m.id = sm.membre_id
-    LEFT JOIN livraisons l ON l.membre_id = sm.membre_id AND l.campagne_id = ${campagneId}
+    LEFT JOIN livraisons l ON l.membre_id = sm.membre_id
+      AND (l.campagne_id = ${campagneId}
+           OR (l.campagne_id IS NULL AND l.date_livraison >= ${nullDateDebut2}::date AND l.date_livraison <= ${nullDateFin2}::date))
     WHERE sm.campagne_id = ${campagneId} AND sm.cooperative_id = ${cooperativeId}
       AND sm.rang IS NOT NULL
     GROUP BY sm.id, m.id
