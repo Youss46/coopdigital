@@ -52,8 +52,24 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
       role: user.role,
       cooperativeId: user.cooperativeId ?? null,
       section: user.section ?? null,
+      motDePasseTemporaire: user.motDePasseTemporaire,
     },
   };
+}
+
+export async function changerMotDePasse(agentId: number, motDePasseActuel: string, nouveauMotDePasse: string) {
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, agentId)).limit(1);
+  if (!user) throw new Error("Agent introuvable");
+
+  const ok = await bcrypt.compare(motDePasseActuel, user.passwordHash);
+  if (!ok) throw new Error("Mot de passe actuel incorrect");
+
+  if (nouveauMotDePasse.length < 6) throw new Error("Le nouveau mot de passe doit contenir au moins 6 caractères");
+
+  const hash = await bcrypt.hash(nouveauMotDePasse, 12);
+  await db.update(usersTable)
+    .set({ passwordHash: hash, motDePasseTemporaire: false })
+    .where(eq(usersTable.id, agentId));
 }
 
 // ─── Profil + stats ────────────────────────────────────────────────────────

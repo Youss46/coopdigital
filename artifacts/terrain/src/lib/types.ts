@@ -7,6 +7,7 @@ export interface AgentUser {
   role: string;
   cooperativeId: number | null;
   section: string | null;
+  motDePasseTemporaire?: boolean;
 }
 
 export interface Fournisseur {

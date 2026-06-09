@@ -9,12 +9,17 @@ import PaiementFlow from "./pages/PaiementFlow";
 import AvanceFlow from "./pages/AvanceFlow";
 import Bilan from "./pages/Bilan";
 import SyncHistorique from "./pages/SyncHistorique";
+import ChangerMotDePasse from "./pages/ChangerMotDePasse";
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   if (!isAuthenticated) {
     return <Login />;
+  }
+
+  if (user?.motDePasseTemporaire) {
+    return <ChangerMotDePasse />;
   }
 
   return (

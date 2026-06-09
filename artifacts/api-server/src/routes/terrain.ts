@@ -12,12 +12,14 @@ import {
   getBilanJourHandler,
   postSyncHandler,
   postRapportHandler,
+  changePasswordHandler,
 } from "../controllers/terrainController.js";
 
 const router = Router();
 
 // Auth terrain (public)
 router.post("/terrain/auth/login", loginTerrainHandler);
+router.post("/terrain/auth/change-password", terrainAuthMiddleware, changePasswordHandler);
 
 // Routes protégées (agent_terrain uniquement)
 router.get("/terrain/profil", terrainAuthMiddleware, getProfilHandler);

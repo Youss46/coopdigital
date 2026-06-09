@@ -182,6 +182,20 @@ export async function postSyncHandler(req: Request, res: Response): Promise<void
   }
 }
 
+export async function changePasswordHandler(req: Request, res: Response): Promise<void> {
+  const { id } = getAgent(req);
+  const { motDePasseActuel, nouveauMotDePasse } = req.body as { motDePasseActuel?: string; nouveauMotDePasse?: string };
+  if (!motDePasseActuel || !nouveauMotDePasse) {
+    res.status(400).json({ erreur: "Données manquantes" }); return;
+  }
+  try {
+    await terrainService.changerMotDePasse(id, motDePasseActuel, nouveauMotDePasse);
+    res.json({ message: "Mot de passe mis à jour" });
+  } catch (err) {
+    res.status(400).json({ erreur: (err as Error).message });
+  }
+}
+
 export async function postRapportHandler(req: Request, res: Response): Promise<void> {
   const { id, cooperativeId } = getAgent(req);
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }

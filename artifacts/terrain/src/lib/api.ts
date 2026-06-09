@@ -113,3 +113,7 @@ export async function syncOps(operations: import("./types").PendingOp[]) {
 export async function envoyerRapport() {
   return apiPost<{ message: string }>("/rapport-journalier", {});
 }
+
+export async function changerMotDePasse(motDePasseActuel: string, nouveauMotDePasse: string) {
+  return apiPost<{ message: string }>("/auth/change-password", { motDePasseActuel, nouveauMotDePasse });
+}
