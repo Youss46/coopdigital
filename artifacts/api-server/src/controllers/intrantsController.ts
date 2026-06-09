@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express";
-import { db, intrantsTable, categoriesIntrantsTable, distributionsIntrantsTable, approvisionnmentsIntrantsTable, remboursementsIntrantsTable, membresTable } from "@workspace/db";
+import { db, intrantsTable, categoriesIntrantsTable, distributionsIntrantsTable, approvisionnmentsIntrantsTable, remboursementsIntrantsTable, membresTable, campagnesTable } from "@workspace/db";
 import { eq, and, sql, lt, desc, asc, gte } from "drizzle-orm";
+import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
 import { getEncoursMembre } from "../services/intrantsService";
 
 class TenantError extends Error {
@@ -199,6 +200,14 @@ export async function createAppro(req: Request, res: Response): Promise<void> {
     const pu = parseFloat(String(prixUnitaireFcfa));
     const montantTotal = qte * pu;
 
+    if (campagneId) {
+      const [cs] = await db.select({ statut: campagnesTable.statut })
+        .from(campagnesTable)
+        .where(and(eq(campagnesTable.id, Number(campagneId)), eq(campagnesTable.cooperativeId, coopId(req))))
+        .limit(1);
+      if (cs?.statut === "fermee") throw new CampagneFermeeError();
+    }
+
     const result = await db.transaction(async (tx) => {
       const [appro] = await tx
         .insert(approvisionnmentsIntrantsTable)
@@ -227,6 +236,7 @@ export async function createAppro(req: Request, res: Response): Promise<void> {
     res.status(201).json(result);
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    if (err instanceof CampagneFermeeError) { res.status(err.status).json({ erreur: err.erreur }); return; }
     req.log.error({ err }, "Erreur createAppro");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
@@ -255,6 +265,14 @@ export async function createDistribution(req: Request, res: Response): Promise<v
     let montantMembre = montantTotal;
     if (modeVal === "gratuit") montantMembre = 0;
     else if (modeVal === "subventionne") montantMembre = montantTotal * (1 - taux / 100);
+
+    if (campagneId) {
+      const [cs] = await db.select({ statut: campagnesTable.statut })
+        .from(campagnesTable)
+        .where(and(eq(campagnesTable.id, Number(campagneId)), eq(campagnesTable.cooperativeId, coopId(req))))
+        .limit(1);
+      if (cs?.statut === "fermee") throw new CampagneFermeeError();
+    }
 
     const result = await db.transaction(async (tx) => {
       // Vérifier stock disponible
@@ -297,6 +315,7 @@ export async function createDistribution(req: Request, res: Response): Promise<v
 
     res.status(201).json(result);
   } catch (err: unknown) {
+    if (err instanceof CampagneFermeeError) { res.status(err.status).json({ erreur: err.erreur }); return; }
     if (err instanceof Error && err.message === "Stock insuffisant") {
       res.status(409).json({ erreur: "Stock insuffisant pour cette distribution" });
       return;

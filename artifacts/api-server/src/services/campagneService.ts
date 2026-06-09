@@ -5,6 +5,8 @@ import {
   verificationsClotureCampagneTable,
 } from "@workspace/db";
 import { eq, and, sql, desc, ne, inArray } from "drizzle-orm";
+import { logger } from "../lib/logger";
+import { recalculerTous } from "./scoringService";
 
 export interface ResultatVerification {
   code: string;
@@ -387,6 +389,11 @@ export async function cloturerCampagne(cooperativeId: number, campagneId: number
   await db.update(campagnesTable)
     .set({ statut: "fermee", dateFermeture })
     .where(and(eq(campagnesTable.id, campagneId), eq(campagnesTable.cooperativeId, cooperativeId)));
+
+  // Scoring final de tous les membres — fire-and-forget (non bloquant)
+  recalculerTous(cooperativeId, campagneId).catch((err) =>
+    logger.warn({ err, campagneId }, "Erreur scoring post-clôture (non bloquant)"),
+  );
 
   return bilanData;
 }

@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express";
 import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable, campagnesTable, entrepotsTable, mouvementsStockTable } from "@workspace/db";
 import { eq, and, desc, notInArray } from "drizzle-orm";
+import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
 import { checkLivraison, creerAnomalies } from "../services/anomalieService";
 import { CreateLivraisonBody } from "@workspace/api-zod";
 import { generateEcrituresLivraison } from "../services/comptabiliteService";
@@ -93,6 +94,19 @@ export async function createLivraison(req: Request, res: Response): Promise<void
     if (!campagneIdResolu) {
       res.status(400).json({ erreur: "Aucune campagne active. Ouvrez une campagne avant d'enregistrer des livraisons." });
       return;
+    }
+
+    // Si campagneId fourni explicitement, vérifier qu'elle n'est pas clôturée
+    if (campagneId != null) {
+      try {
+        await assertCampagneOuverte(cooperativeId, campagneIdResolu);
+      } catch (err) {
+        if (err instanceof CampagneFermeeError) {
+          res.status(err.status).json({ erreur: err.erreur });
+          return;
+        }
+        throw err;
+      }
     }
 
     // ── Détection anomalies AVANT la transaction ──────────────────────────

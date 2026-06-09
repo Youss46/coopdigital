@@ -5,6 +5,7 @@ import {
 } from "@workspace/db";
 import { eq, and, asc, sql } from "drizzle-orm";
 import { syncRealise, getAlertesDepassement } from "../services/budgetService";
+import { CampagneFermeeError } from "../lib/campagneGuard";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -45,6 +46,11 @@ export async function creerOuGetBudget(req: Request, res: Response): Promise<voi
 
     if (!campagne) {
       res.status(404).json({ erreur: "Campagne introuvable" });
+      return;
+    }
+
+    if (campagne.statut === "fermee") {
+      res.status(409).json({ erreur: "Cette campagne est clôturée. Impossible de créer ou modifier son budget." });
       return;
     }
 
@@ -153,6 +159,24 @@ export async function modifierLigne(req: Request, res: Response): Promise<void> 
 
     if (!ligneId) {
       res.status(400).json({ erreur: "ligneId requis" });
+      return;
+    }
+
+    // Vérifier que la campagne associée au budget n'est pas clôturée
+    const [budgetRow] = await db
+      .select({ campagneId: budgetsCampagneTable.campagneId })
+      .from(budgetsCampagneTable)
+      .where(and(eq(budgetsCampagneTable.id, budgetId), eq(budgetsCampagneTable.cooperativeId, coopId(req))))
+      .limit(1);
+    if (!budgetRow) { res.status(404).json({ erreur: "Budget introuvable" }); return; }
+
+    const [campRow] = await db
+      .select({ statut: campagnesTable.statut })
+      .from(campagnesTable)
+      .where(eq(campagnesTable.id, budgetRow.campagneId))
+      .limit(1);
+    if (campRow?.statut === "fermee") {
+      res.status(409).json({ erreur: "Cette campagne est clôturée. Le budget ne peut plus être modifié." });
       return;
     }
 

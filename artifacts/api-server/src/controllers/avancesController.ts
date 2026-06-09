@@ -1,7 +1,8 @@
 import { type Request, type Response } from "express";
 import { checkAvance, creerAnomalies } from "../services/anomalieService";
-import { db, avancesTable, membresTable } from "@workspace/db";
+import { db, avancesTable, membresTable, campagnesTable } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
+import { CampagneFermeeError, assertCampagneActiveExiste } from "../lib/campagneGuard";
 import { CreateAvanceBody, RembourserAvanceBody } from "@workspace/api-zod";
 import { generateEcrituresAvance } from "../services/comptabiliteService";
 
@@ -77,6 +78,17 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     if (membre.cooperativeId !== cooperativeId) {
       res.status(403).json({ erreur: "Ce membre n'appartient pas à votre coopérative" });
       return;
+    }
+
+    // Les avances ne peuvent être octroyées qu'en cours de campagne active
+    try {
+      await assertCampagneActiveExiste(cooperativeId);
+    } catch (err) {
+      if (err instanceof CampagneFermeeError) {
+        res.status(err.status).json({ erreur: err.erreur });
+        return;
+      }
+      throw err;
     }
 
     // ── Détection anomalies ──────────────────────────────────────────────
