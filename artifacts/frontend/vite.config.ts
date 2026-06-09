@@ -85,6 +85,11 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
+            // PDF exports et rapports — jamais mis en cache (binaire, dynamique)
+            urlPattern: /^\/api\/(membres\/export-pdf|rapports\/)/,
+            handler: "NetworkOnly",
+          },
+          {
             urlPattern: /^\/api\//,
             handler: "NetworkFirst",
             options: {
@@ -93,7 +98,7 @@ export default defineConfig({
                 maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24,
               },
-              networkTimeoutSeconds: 5,
+              networkTimeoutSeconds: 10,
             },
           },
           {
