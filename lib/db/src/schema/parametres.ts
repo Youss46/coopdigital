@@ -10,7 +10,7 @@ export const configCooperativeTable = pgTable("config_cooperative", {
 
   nomComplet:               varchar("nom_complet", { length: 255 }),
   nomAbrege:                varchar("nom_abrege", { length: 100 }),
-  logoUrl:                  varchar("logo_url", { length: 500 }),
+  logoUrl:                  text("logo_url"),
   slogan:                   varchar("slogan", { length: 255 }),
 
   adresse:                  varchar("adresse", { length: 255 }),
