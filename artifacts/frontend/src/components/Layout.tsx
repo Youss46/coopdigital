@@ -38,6 +38,7 @@ import {
   MapPinned,
   Gift,
   ClipboardList,
+  Navigation,
   GraduationCap,
   Wallet,
   Calculator,
@@ -65,6 +66,14 @@ const navItems = [
     label: "Tableau de bord",
     icon: LayoutDashboard,
     roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
+  },
+
+  // ── Agent terrain ─────────────────────────────────────────────────────────
+  {
+    href: "/missions",
+    label: "Mes missions",
+    icon: Navigation,
+    roles: ["agent_terrain"],
   },
 
   // ── Membres & Terrain ─────────────────────────────────────────────────────

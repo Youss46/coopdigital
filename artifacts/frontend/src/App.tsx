@@ -74,13 +74,14 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 }
 
 function AppRoutes() {
-  const { estConnecte } = useAuth();
+  const { estConnecte, utilisateur } = useAuth();
+  const accueil = utilisateur?.role === "agent_terrain" ? "/missions" : "/dashboard";
   return (
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/changer-mot-de-passe" component={ChangerMotDePassePage} />
       <Route path="/">
-        {estConnecte ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
+        {estConnecte ? <Redirect to={accueil} /> : <Redirect to="/login" />}
       </Route>
       <Route path="/dashboard">
         <ProtectedRoute component={Dashboard} />

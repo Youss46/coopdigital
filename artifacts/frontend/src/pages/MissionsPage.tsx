@@ -166,15 +166,22 @@ export default function MissionsPage() {
       {/* ── En-tête ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/membres")}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-            <ChevronLeft size={16} />Membres
-          </button>
+          {!estAgent && (
+            <button onClick={() => navigate("/membres")}
+              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+              <ChevronLeft size={16} />Membres
+            </button>
+          )}
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <MapPin size={22} className="text-green-700" />Missions terrain
+              <MapPin size={22} className="text-green-700" />
+              {estAgent ? "Mes missions" : "Missions terrain"}
             </h1>
-            <p className="text-gray-500 text-sm mt-0.5">{missions.length} mission{missions.length !== 1 ? "s" : ""}</p>
+            <p className="text-gray-500 text-sm mt-0.5">
+              {estAgent
+                ? `${missions.filter(m => ["planifiee","en_cours"].includes(m.statut)).length} mission${missions.filter(m => ["planifiee","en_cours"].includes(m.statut)).length !== 1 ? "s" : ""} en cours`
+                : `${missions.length} mission${missions.length !== 1 ? "s" : ""}`}
+            </p>
           </div>
         </div>
         {peutCreer && (
