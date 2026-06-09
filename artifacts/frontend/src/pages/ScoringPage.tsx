@@ -19,7 +19,75 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+
+const tok = () => localStorage.getItem("coop_token") ?? "";
+const hdr = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
+async function apiFetch<T>(path: string): Promise<T> {
+  const r = await fetch(path, { headers: hdr() });
+  if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
+  return r.json() as Promise<T>;
+}
+
+// ─── Panneau diagnostic ───────────────────────────────────────────────────────
+interface DiagInfo {
+  nbMembresActifs: number;
+  nbLivraisonsCampagne: number;
+  nbLivraisonsNull: number;
+  nbLivraisonsAutres: number;
+}
+
+function DiagnosticPanel({ campagneId }: { campagneId: number }) {
+  const { data, isLoading } = useQuery<DiagInfo>({
+    queryKey: ["scoring-diagnostic", campagneId],
+    queryFn: () => apiFetch<DiagInfo>(`/api/scoring/diagnostic/${campagneId}`),
+    enabled: campagneId > 0,
+  });
+
+  if (isLoading || !data) {
+    return <div className="text-center py-8 text-gray-400 text-sm">Analyse en cours…</div>;
+  }
+
+  const { nbMembresActifs, nbLivraisonsCampagne, nbLivraisonsNull, nbLivraisonsAutres } = data;
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 space-y-4">
+      <h3 className="font-semibold text-amber-900 text-sm">🔍 Diagnostic — Pourquoi 0 membre calculé ?</h3>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Membres actifs", value: nbMembresActifs, ok: nbMembresActifs > 0 },
+          { label: "Livraisons (cette campagne)", value: nbLivraisonsCampagne, ok: nbLivraisonsCampagne > 0 },
+          { label: "Livraisons sans campagne", value: nbLivraisonsNull, ok: true },
+          { label: "Livraisons autre campagne", value: nbLivraisonsAutres, ok: true },
+        ].map(({ label, value, ok }) => (
+          <div key={label} className={`rounded-lg p-3 text-center border ${ok && value > 0 ? "bg-white border-gray-200" : value === 0 && label !== "Livraisons sans campagne" && label !== "Livraisons autre campagne" ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`}>
+            <div className="text-2xl font-bold text-gray-800">{value}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="text-sm text-amber-800 space-y-1.5 pt-1">
+        {nbMembresActifs === 0 && (
+          <p>⚠️ <strong>Aucun membre actif.</strong> Vérifiez que les membres ont le statut "actif" dans la liste des membres.</p>
+        )}
+        {nbMembresActifs > 0 && nbLivraisonsCampagne === 0 && nbLivraisonsNull === 0 && nbLivraisonsAutres === 0 && (
+          <p>⚠️ <strong>Aucune livraison enregistrée.</strong> Le scoring se base sur les livraisons. Enregistrez des livraisons via l'application Terrain ou le portail avant de recalculer.</p>
+        )}
+        {nbLivraisonsCampagne === 0 && nbLivraisonsAutres > 0 && (
+          <p>⚠️ <strong>{nbLivraisonsAutres} livraison(s) sont liées à une autre campagne.</strong> Utilisez le bouton "Rattacher livraisons orphelines" dans la page Campagnes pour les réassigner à cette campagne.</p>
+        )}
+        {nbLivraisonsCampagne === 0 && nbLivraisonsNull > 0 && (
+          <p>⚠️ <strong>{nbLivraisonsNull} livraison(s) sans campagne.</strong> Utilisez le bouton "Rattacher livraisons orphelines" dans la page Campagnes pour les associer à cette campagne.</p>
+        )}
+        {nbLivraisonsCampagne > 0 && (
+          <p>✅ {nbLivraisonsCampagne} livraison(s) trouvées pour cette campagne. Cliquez sur <strong>↻ Recalculer maintenant</strong> pour lancer le calcul.</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── Badge niveau ─────────────────────────────────────────────────────────────
 const NIVEAUX: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
@@ -173,11 +241,9 @@ function ClassementTab({ campagneId }: { campagneId: number }) {
       {isLoading ? (
         <div className="text-center py-12 text-gray-400">Chargement…</div>
       ) : filtré.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
-          {liste.length === 0
-            ? "Aucun score calculé pour cette campagne. Cliquez sur « Recalculer »."
-            : "Aucun résultat pour ces filtres."}
-        </div>
+        liste.length === 0
+          ? <DiagnosticPanel campagneId={campagneId} />
+          : <div className="text-center py-12 text-gray-400">Aucun résultat pour ces filtres.</div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200">
           <table className="w-full text-sm">

@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
 import * as scoringService from "../services/scoringService";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
 const pid = (v: string | string[]) => parseInt(Array.isArray(v) ? v[0] : v, 10);
 
@@ -87,6 +89,38 @@ export async function getEvolution(req: Request, res: Response): Promise<void> {
   if (isNaN(membreId)) { res.status(400).json({ erreur: "membreId invalide" }); return; }
   const data = await scoringService.getEvolution(cooperativeId, membreId);
   res.json(data);
+}
+
+// GET /api/scoring/diagnostic/:campagneId
+export async function getDiagnostic(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+  const campagneId = pid(req.params.campagneId);
+  if (isNaN(campagneId)) { res.status(400).json({ erreur: "campagneId invalide" }); return; }
+
+  const rows = await db.execute<{
+    nb_membres_actifs: string;
+    nb_livraisons_campagne: string;
+    nb_livraisons_null: string;
+    nb_livraisons_autres: string;
+  }>(sql`
+    SELECT
+      (SELECT COUNT(*) FROM membres WHERE cooperative_id = ${cooperativeId} AND statut = 'actif') AS nb_membres_actifs,
+      (SELECT COUNT(*) FROM livraisons l JOIN membres m ON m.id = l.membre_id
+        WHERE l.campagne_id = ${campagneId} AND m.cooperative_id = ${cooperativeId}) AS nb_livraisons_campagne,
+      (SELECT COUNT(*) FROM livraisons l JOIN membres m ON m.id = l.membre_id
+        WHERE l.campagne_id IS NULL AND m.cooperative_id = ${cooperativeId}) AS nb_livraisons_null,
+      (SELECT COUNT(*) FROM livraisons l JOIN membres m ON m.id = l.membre_id
+        WHERE l.campagne_id IS NOT NULL AND l.campagne_id != ${campagneId} AND m.cooperative_id = ${cooperativeId}) AS nb_livraisons_autres
+  `);
+
+  const r = rows.rows[0] ?? { nb_membres_actifs: "0", nb_livraisons_campagne: "0", nb_livraisons_null: "0", nb_livraisons_autres: "0" };
+  res.json({
+    nbMembresActifs:      Number(r.nb_membres_actifs),
+    nbLivraisonsCampagne: Number(r.nb_livraisons_campagne),
+    nbLivraisonsNull:     Number(r.nb_livraisons_null),
+    nbLivraisonsAutres:   Number(r.nb_livraisons_autres),
+  });
 }
 
 // GET /api/scoring/resume/:membreId  (pour fiche membre + formulaire avance)

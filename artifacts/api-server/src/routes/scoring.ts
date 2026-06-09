@@ -13,5 +13,6 @@ router.get("/scoring/evolution/:membreId",     authMiddleware, ctrl.getEvolution
 router.get("/scoring/resume/:membreId",        authMiddleware, ctrl.getResumeMembre);
 router.get("/scoring/membre/:id",              authMiddleware, ctrl.getScoreMembre);
 router.post("/scoring/recalculer",             authMiddleware, ctrl.recalculerScores);
+router.get("/scoring/diagnostic/:campagneId",  authMiddleware, ctrl.getDiagnostic);
 
 export default router;
