@@ -95,7 +95,7 @@ export default function Login() {
                   border: "none",
                   padding: 0,
                   cursor: "pointer",
-                  color: "rgba(255,255,255,0.65)",
+                  color: "#9ca3af",
                   display: "flex",
                   alignItems: "center",
                 }}

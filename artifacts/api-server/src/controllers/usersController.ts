@@ -94,6 +94,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
         role,
         cooperativeId,
         actif: true,
+        motDePasseTemporaire: role === "agent_terrain",
       })
       .returning({
         id: usersTable.id,
