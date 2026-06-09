@@ -257,7 +257,6 @@ export default function DeleguesPage() {
             )}
           </div>
         )}
-      </div>
 
       {/* Modal approvisionnement */}
       {showAppro !== null && (
