@@ -2,6 +2,7 @@ import { db } from "@workspace/db";
 import {
   usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable,
   distributionsIntrantsTable, historiquePrixTable, campagnesTable,
+  caissesDeleguesTable, mouvementsCaisseDelegueTable,
 } from "@workspace/db";
 import { and, eq, sql, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -294,6 +295,17 @@ export async function enregistrerCollecte(
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // Vérifier la caisse du délégué
+  const [caisse] = await db
+    .select()
+    .from(caissesDeleguesTable)
+    .where(eq(caissesDeleguesTable.userId, agentId))
+    .limit(1);
+
+  const soldeCaisse = caisse ? Number(caisse.solde) : 0;
+  const paiementImmediat = soldeCaisse >= montantNet;
+  const statutPaiement = paiementImmediat ? "PAYÉ" : "DIFFÉRÉ";
+
   const [livraison] = await db.insert(livraisonsTable).values({
     membreId: data.membreId,
     campagneId: prix.campagneId ?? undefined,
@@ -309,6 +321,8 @@ export async function enregistrerCollecte(
     montantNetFcfa: montantNet,
     dateLivraison: today,
     agentId,
+    statutPaiement,
+    montantRestant: paiementImmediat ? "0" : String(montantNet),
   }).returning();
 
   if (!livraison) throw new Error("Erreur lors de l'enregistrement de la collecte");
@@ -326,15 +340,32 @@ export async function enregistrerCollecte(
       .where(eq(avancesTable.id, avance.id));
   }
 
-  // Créer le paiement
+  // Créer le paiement (en_attente si différé)
   await db.insert(paiementsTable).values({
     livraisonId: livraison.id,
     membreId: data.membreId,
     campagneId: prix.campagneId ?? undefined,
     montantFcfa: montantNet,
     modePaiement: data.modePaiement as "orange_money" | "mtn_momo" | "especes",
-    statut: "confirme",
+    statut: paiementImmediat ? "confirme" : "en_attente",
   });
+
+  // Débiter la caisse si paiement immédiat
+  if (paiementImmediat && caisse) {
+    const nouveauSolde = soldeCaisse - montantNet;
+    await db.update(caissesDeleguesTable)
+      .set({ solde: String(nouveauSolde), updatedAt: new Date() })
+      .where(eq(caissesDeleguesTable.id, caisse.id));
+    await db.insert(mouvementsCaisseDelegueTable).values({
+      caisseDelegueId: caisse.id,
+      type: "paiement_collecte",
+      montantFcfa: String(-montantNet),
+      soldeApresFcfa: String(nouveauSolde),
+      livraisonId: livraison.id,
+      note: `Paiement collecte LIV-${livraison.id}`,
+      createdById: agentId,
+    });
+  }
 
   const [membre] = await db
     .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
@@ -352,6 +383,8 @@ export async function enregistrerCollecte(
     montantNetFcfa: montantNet,
     modePaiement: data.modePaiement,
     prixUnitaireFcfa: prixUnitaire,
+    statutPaiement,
+    soldeCaisseApres: paiementImmediat ? (soldeCaisse - montantNet) : soldeCaisse,
   };
 }
 

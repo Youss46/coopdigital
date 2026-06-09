@@ -326,13 +326,28 @@ export default function CollecteFlow() {
         {/* STEP 4 : Succès */}
         {step === 4 && (
           <div className="t-success-screen">
-            <div className="t-success-screen__icon">{isOnline ? "✅" : "📴"}</div>
+            <div className="t-success-screen__icon">
+              {!isOnline ? "📴" : result?.statutPaiement === "DIFFÉRÉ" ? "⏳" : "✅"}
+            </div>
             <div className="t-success-screen__title">
-              {isOnline ? "Collecte enregistrée !" : "Enregistré hors ligne"}
+              {!isOnline ? "Enregistré hors ligne" : result?.statutPaiement === "DIFFÉRÉ" ? "Collecte enregistrée — paiement différé" : "Collecte enregistrée !"}
             </div>
             <div className="t-success-screen__sub">
-              {isOnline ? "La collecte a été enregistrée avec succès." : "Sera synchronisé dès le retour du réseau."}
+              {!isOnline
+                ? "Sera synchronisé dès le retour du réseau."
+                : result?.statutPaiement === "DIFFÉRÉ"
+                  ? "Fonds insuffisants — le planteur sera payé dès que la caisse sera approvisionnée."
+                  : "La collecte a été enregistrée et le paiement effectué."}
             </div>
+
+            {result?.statutPaiement === "DIFFÉRÉ" && (
+              <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 12, padding: "12px 16px", margin: "0 24px", width: "100%", maxWidth: 320, boxSizing: "border-box" }}>
+                <div style={{ fontWeight: 700, color: "#dc2626", fontSize: ".9rem", marginBottom: 4 }}>⚠️ Paiement différé</div>
+                <div style={{ fontSize: ".85rem", color: "#b91c1c" }}>
+                  {result.montantNetFcfa.toLocaleString("fr-FR")} FCFA à payer à {result.membreNom} lors du prochain approvisionnement.
+                </div>
+              </div>
+            )}
 
             {result && (
               <div className="t-success-screen__card t-gap">
@@ -355,9 +370,19 @@ export default function CollecteFlow() {
                   </div>
                 )}
                 <div className="t-recap-row t-recap-row--total">
-                  <span className="t-recap-row__label">Net payé</span>
+                  <span className="t-recap-row__label">{result.statutPaiement === "DIFFÉRÉ" ? "Net à payer" : "Net payé"}</span>
                   <span className="t-recap-row__value">{result.montantNetFcfa.toLocaleString("fr-FR")} FCFA</span>
                 </div>
+                {result.statutPaiement && (
+                  <div className="t-recap-row">
+                    <span className="t-recap-row__label">Statut</span>
+                    <span className="t-recap-row__value">
+                      <span className={result.statutPaiement === "DIFFÉRÉ" ? "t-badge t-badge--warning" : "t-badge t-badge--success"}>
+                        {result.statutPaiement}
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

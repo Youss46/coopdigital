@@ -117,3 +117,15 @@ export async function envoyerRapport() {
 export async function changerMotDePasse(nouveauMotDePasse: string) {
   return apiPost<{ message: string }>("/auth/change-password", { nouveauMotDePasse });
 }
+
+export async function getCaisse() {
+  return apiGet<import("./types").CaisseDelegue>("/caisse");
+}
+
+export async function getPaiementsDifferes() {
+  return apiGet<import("./types").PaiementDiffere[]>("/paiements-differes");
+}
+
+export async function regulariserPaiement(livraisonId: number, modePaiement: string) {
+  return apiPost<{ solde: number; montantPayeFcfa: number }>(`/regulariser/${livraisonId}`, { modePaiement });
+}

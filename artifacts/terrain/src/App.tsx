@@ -10,6 +10,7 @@ import AvanceFlow from "./pages/AvanceFlow";
 import Bilan from "./pages/Bilan";
 import SyncHistorique from "./pages/SyncHistorique";
 import ChangerMotDePasse from "./pages/ChangerMotDePasse";
+import PaiementsDifferes from "./pages/PaiementsDifferes";
 
 function AppRoutes() {
   const { isAuthenticated, user } = useAuth();
@@ -30,6 +31,7 @@ function AppRoutes() {
       <Route path="/avance" component={AvanceFlow} />
       <Route path="/bilan" component={Bilan} />
       <Route path="/historique" component={SyncHistorique} />
+      <Route path="/paiements-differes" component={PaiementsDifferes} />
       <Route>
         <Redirect to="/" />
       </Route>

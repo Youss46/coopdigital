@@ -42,6 +42,7 @@ import peseeRouter from "./pesee";
 import equipementsRouter from "./equipements";
 import previsionsRouter from "./previsions";
 import terrainRouter from "./terrain";
+import deleguesRouter from "./delegues";
 import parcellesRouter from "./parcelles";
 import rseRouter from "./rse";
 import donsRouter from "./dons";
@@ -63,6 +64,7 @@ router.use(setupRouter);
 router.use(authRouter);
 router.use(portailRouter);
 router.use(terrainRouter);
+router.use(deleguesRouter);
 router.use(m15Router);
 router.use(saasRouter);
 

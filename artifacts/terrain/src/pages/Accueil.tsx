@@ -1,26 +1,26 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { getProfil } from "../lib/api";
+import { getProfil, getCaisse } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useOffline } from "../contexts/OfflineContext";
 import OfflineBanner from "../components/OfflineBanner";
-import type { BilanJour, PrixActuel } from "../lib/types";
+import type { BilanJour, PrixActuel, CaisseDelegue } from "../lib/types";
 
 export default function Accueil() {
   const { user, logout } = useAuth();
   const { isOnline, pendingCount } = useOffline();
   const [bilan, setBilan] = useState<BilanJour | null>(null);
   const [prix, setPrix] = useState<PrixActuel | null>(null);
+  const [caisse, setCaisse] = useState<CaisseDelegue | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
 
   useEffect(() => {
     if (!isOnline) { setLoading(false); return; }
-    getProfil()
-      .then((p) => {
-        setBilan(p.statsJour);
-        setPrix(p.prixActuel);
-      })
+    Promise.all([
+      getProfil().then((p) => { setBilan(p.statsJour); setPrix(p.prixActuel); }),
+      getCaisse().then(setCaisse).catch(() => {}),
+    ])
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [isOnline]);
@@ -36,6 +36,13 @@ export default function Accueil() {
           <div className="t-header__title">Bonjour, {user?.nom} 👋</div>
           <div className="t-header__sub">{today}</div>
         </div>
+        {caisse && caisse.paiementsDifferesCount > 0 && (
+          <Link href="/paiements-differes">
+            <span className="t-header__badge" style={{ background: "#ef4444", cursor: "pointer" }}>
+              ⏳ {caisse.paiementsDifferesCount}
+            </span>
+          </Link>
+        )}
         {pendingCount > 0 && (
           <span className="t-header__badge">📴 {pendingCount}</span>
         )}
@@ -54,6 +61,26 @@ export default function Accueil() {
           <div style={{ background: "var(--t-primary)", color: "#fff", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: ".85rem", opacity: .8 }}>Prix bord champ</span>
             <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>{prix.prixBordChampFcfa.toLocaleString("fr-FR")} FCFA/kg</span>
+          </div>
+        )}
+
+        {/* Caisse */}
+        {caisse !== null && (
+          <div style={{ display: "flex", gap: 0, borderBottom: "1px solid rgba(255,255,255,.15)" }}>
+            <div style={{ flex: 1, padding: "10px 16px", background: "rgba(0,0,0,.15)" }}>
+              <div style={{ fontSize: ".72rem", color: "rgba(255,255,255,.7)", marginBottom: 2 }}>Solde caisse</div>
+              <div style={{ fontWeight: 800, fontSize: ".95rem", color: caisse.solde > 0 ? "#4ade80" : "#f87171" }}>
+                {caisse.solde.toLocaleString("fr-FR")} FCFA
+              </div>
+            </div>
+            {caisse.paiementsDifferesCount > 0 && (
+              <Link href="/paiements-differes" style={{ flex: 1, padding: "10px 16px", background: "rgba(239,68,68,.2)", textDecoration: "none", display: "block" }}>
+                <div style={{ fontSize: ".72rem", color: "rgba(255,255,255,.7)", marginBottom: 2 }}>Paiements différés</div>
+                <div style={{ fontWeight: 800, fontSize: ".95rem", color: "#fca5a5" }}>
+                  {caisse.paiementsDifferesCount} · {caisse.montantDuFcfa.toLocaleString("fr-FR")} FCFA
+                </div>
+              </Link>
+            )}
           </div>
         )}
 
@@ -98,6 +125,15 @@ export default function Accueil() {
           <Link href="/bilan" className="t-action t-action--bilan">
             <span className="t-action__icon">📊</span>
             <span className="t-action__label">Bilan du jour</span>
+          </Link>
+          <Link href="/paiements-differes" className="t-action" style={{ background: caisse && caisse.paiementsDifferesCount > 0 ? "#fef2f2" : undefined, position: "relative" }}>
+            <span className="t-action__icon">⏳</span>
+            <span className="t-action__label">Différés</span>
+            {caisse && caisse.paiementsDifferesCount > 0 && (
+              <span style={{ position: "absolute", top: 6, right: 6, background: "#ef4444", color: "#fff", borderRadius: "50%", width: 18, height: 18, fontSize: ".65rem", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {caisse.paiementsDifferesCount}
+              </span>
+            )}
           </Link>
         </div>
 

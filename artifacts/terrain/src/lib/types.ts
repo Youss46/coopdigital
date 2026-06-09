@@ -60,6 +60,26 @@ export interface CollecteResult {
   montantNetFcfa: number;
   modePaiement: string;
   prixUnitaireFcfa: number;
+  statutPaiement?: "PAYÉ" | "DIFFÉRÉ";
+  soldeCaisseApres?: number;
+}
+
+export interface CaisseDelegue {
+  id: number;
+  solde: number;
+  plafond: number | null;
+  paiementsDifferesCount: number;
+  montantDuFcfa: number;
+}
+
+export interface PaiementDiffere {
+  livraisonId: number;
+  membreId: number;
+  membreNom: string;
+  dateLivraison: string;
+  poidsKg: number;
+  montantNetFcfa: number;
+  montantRestant: number;
 }
 
 export interface PaiementInput {

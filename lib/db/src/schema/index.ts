@@ -38,6 +38,7 @@ export * from "./dons";
 export * from "./planning";
 export * from "./formations";
 export * from "./caisse";
+export * from "./caisses_delegues";
 export * from "./fiscalite";
 export * from "./reconciliation";
 export * from "./investissements";

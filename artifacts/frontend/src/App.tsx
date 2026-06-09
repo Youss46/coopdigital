@@ -48,6 +48,7 @@ import CaissePage from "@/pages/CaissePage";
 import FiscalitePage from "@/pages/FiscalitePage";
 import ReconciliationPage from "@/pages/ReconciliationPage";
 import InvestissementsPage from "@/pages/InvestissementsPage";
+import DeleguesPage from "@/pages/DeleguesPage";
 import ChangerMotDePassePage from "@/pages/ChangerMotDePassePage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
@@ -210,6 +211,9 @@ function AppRoutes() {
       </Route>
       <Route path="/investissements">
         <ProtectedRoute component={InvestissementsPage} />
+      </Route>
+      <Route path="/delegues">
+        <ProtectedRoute component={DeleguesPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>
