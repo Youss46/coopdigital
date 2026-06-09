@@ -355,7 +355,7 @@ export async function getClassementCampagne(cooperativeId: number, campagneId: n
       sm.score_remboursement, sm.score_fidelite, sm.score_cotisation,
       sm.date_calcul,
       m.nom, m.prenoms, m.village, m.groupement, m.section, m.photo_url,
-      COALESCE(SUM(l.poids_net_kg), 0) AS tonnage
+      COALESCE(SUM(COALESCE(l.poids_net_kg, l.poids_kg)), 0) AS tonnage
     FROM scores_membres sm
     INNER JOIN membres m ON m.id = sm.membre_id
     LEFT JOIN livraisons l ON l.membre_id = sm.membre_id
@@ -424,7 +424,7 @@ export async function getTopN(cooperativeId: number, campagneId: number, n: numb
     SELECT
       sm.rang, sm.membre_id, m.nom, m.prenoms, m.village,
       sm.score_global, sm.niveau, sm.score_volume, sm.score_qualite,
-      COALESCE(SUM(l.poids_net_kg), 0) AS tonnage
+      COALESCE(SUM(COALESCE(l.poids_net_kg, l.poids_kg)), 0) AS tonnage
     FROM scores_membres sm
     INNER JOIN membres m ON m.id = sm.membre_id
     LEFT JOIN livraisons l ON l.membre_id = sm.membre_id
