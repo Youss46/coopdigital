@@ -44,10 +44,10 @@ export default function FournisseurSearch({ onSelect, title = "Choisir un membre
     ? items.filter((f) => {
         const s = search.toLowerCase();
         return (
-          (f.nom ?? "").toLowerCase().includes(s) ||
-          (f.prenoms ?? "").toLowerCase().includes(s) ||
-          (f.code ?? "").toLowerCase().includes(s) ||
-          (f.telephone ?? "").includes(s)
+          f.nom.toLowerCase().includes(s) ||
+          f.prenoms.toLowerCase().includes(s) ||
+          f.code.toLowerCase().includes(s) ||
+          f.telephone.includes(s)
         );
       })
     : items.slice(0, 30);
