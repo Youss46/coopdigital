@@ -72,7 +72,6 @@ function PasswordInput({
 export default function ChangerMotDePasse() {
   const { user, token } = useAuth();
   const [, setLocation] = useLocation();
-  const [actuel, setActuel] = useState("");
   const [nouveau, setNouveau] = useState("");
   const [confirmer, setConfirmer] = useState("");
   const [erreur, setErreur] = useState("");
@@ -82,16 +81,16 @@ export default function ChangerMotDePasse() {
     e.preventDefault();
     setErreur("");
     if (nouveau !== confirmer) {
-      setErreur("Les deux nouveaux mots de passe ne correspondent pas");
+      setErreur("Les deux mots de passe ne correspondent pas");
       return;
     }
     if (nouveau.length < 6) {
-      setErreur("Le nouveau mot de passe doit contenir au moins 6 caractères");
+      setErreur("Le mot de passe doit contenir au moins 6 caractères");
       return;
     }
     setLoading(true);
     try {
-      await changerMotDePasse(actuel, nouveau);
+      await changerMotDePasse(null, nouveau);
       if (user && token) {
         saveAuth(token, { ...user, motDePasseTemporaire: false });
       }
@@ -136,18 +135,6 @@ export default function ChangerMotDePasse() {
           {erreur && <div className="t-login__error">⚠️ {erreur}</div>}
 
           <div className="t-field">
-            <label className="t-label" htmlFor="actuel">Mot de passe temporaire</label>
-            <PasswordInput
-              id="actuel"
-              value={actuel}
-              onChange={setActuel}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              required
-            />
-          </div>
-
-          <div className="t-field">
             <label className="t-label" htmlFor="nouveau">Nouveau mot de passe</label>
             <PasswordInput
               id="nouveau"
@@ -165,7 +152,7 @@ export default function ChangerMotDePasse() {
               id="confirmer"
               value={confirmer}
               onChange={setConfirmer}
-              placeholder="Répétez le nouveau mot de passe"
+              placeholder="Répétez le mot de passe"
               autoComplete="new-password"
               required
             />
@@ -174,7 +161,7 @@ export default function ChangerMotDePasse() {
           <button
             type="submit"
             className="t-btn t-btn--primary"
-            disabled={loading || !actuel || !nouveau || !confirmer}
+            disabled={loading || !nouveau || !confirmer}
           >
             {loading ? "Enregistrement…" : "Valider mon mot de passe"}
           </button>

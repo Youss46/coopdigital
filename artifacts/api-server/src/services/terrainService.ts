@@ -57,12 +57,16 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
   };
 }
 
-export async function changerMotDePasse(agentId: number, motDePasseActuel: string, nouveauMotDePasse: string) {
+export async function changerMotDePasse(agentId: number, motDePasseActuel: string | null, nouveauMotDePasse: string) {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, agentId)).limit(1);
   if (!user) throw new Error("Agent introuvable");
 
-  const ok = await bcrypt.compare(motDePasseActuel, user.passwordHash);
-  if (!ok) throw new Error("Mot de passe actuel incorrect");
+  // Si le compte n'est PAS temporaire, on exige la vérification du mot de passe actuel
+  if (!user.motDePasseTemporaire) {
+    if (!motDePasseActuel) throw new Error("Mot de passe actuel requis");
+    const ok = await bcrypt.compare(motDePasseActuel, user.passwordHash);
+    if (!ok) throw new Error("Mot de passe actuel incorrect");
+  }
 
   if (nouveauMotDePasse.length < 6) throw new Error("Le nouveau mot de passe doit contenir au moins 6 caractères");
 

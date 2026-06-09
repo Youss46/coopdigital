@@ -184,12 +184,12 @@ export async function postSyncHandler(req: Request, res: Response): Promise<void
 
 export async function changePasswordHandler(req: Request, res: Response): Promise<void> {
   const { id } = getAgent(req);
-  const { motDePasseActuel, nouveauMotDePasse } = req.body as { motDePasseActuel?: string; nouveauMotDePasse?: string };
-  if (!motDePasseActuel || !nouveauMotDePasse) {
-    res.status(400).json({ erreur: "Données manquantes" }); return;
+  const { motDePasseActuel, nouveauMotDePasse } = req.body as { motDePasseActuel?: string | null; nouveauMotDePasse?: string };
+  if (!nouveauMotDePasse) {
+    res.status(400).json({ erreur: "Nouveau mot de passe requis" }); return;
   }
   try {
-    await terrainService.changerMotDePasse(id, motDePasseActuel, nouveauMotDePasse);
+    await terrainService.changerMotDePasse(id, motDePasseActuel ?? null, nouveauMotDePasse);
     res.json({ message: "Mot de passe mis à jour" });
   } catch (err) {
     res.status(400).json({ erreur: (err as Error).message });

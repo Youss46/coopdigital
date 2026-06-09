@@ -114,6 +114,6 @@ export async function envoyerRapport() {
   return apiPost<{ message: string }>("/rapport-journalier", {});
 }
 
-export async function changerMotDePasse(motDePasseActuel: string, nouveauMotDePasse: string) {
+export async function changerMotDePasse(motDePasseActuel: string | null, nouveauMotDePasse: string) {
   return apiPost<{ message: string }>("/auth/change-password", { motDePasseActuel, nouveauMotDePasse });
 }
