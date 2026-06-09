@@ -3224,6 +3224,11 @@ export interface UpdatePreferencesNotificationsBody {
   recevoir_email?: boolean;
 }
 
+export interface UploadLogoDataUrl {
+  data_url: string;
+  content_type: string;
+}
+
 export interface UploadUrlRequest {
   name: string;
   size: number;

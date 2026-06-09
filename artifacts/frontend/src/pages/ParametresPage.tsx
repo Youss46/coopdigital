@@ -231,25 +231,19 @@ export default function ParametresPage() {
   async function handleLogoFile(file: File) {
     setIsUploadingLogo(true);
     try {
-      const result = await new Promise<{ uploadURL: string; logo_url: string }>((resolve, reject) => {
-        uploadLogoMut.mutate(
-          { data: { name: file.name, size: file.size, contentType: file.type } },
-          {
-            onSuccess: (data) => resolve(data as { uploadURL: string; logo_url: string }),
-            onError: reject,
-          },
-        );
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
       });
-      await fetch(result.uploadURL, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      qc.invalidateQueries({ queryKey: getGetConfigQueryKey() });
-      toast({ title: "Logo uploadé avec succès" });
+
+      uploadLogoMut.mutate(
+        { data: { data_url: dataUrl, content_type: file.type } },
+        { onSettled: () => setIsUploadingLogo(false) },
+      );
     } catch {
-      toast({ title: "Erreur upload logo", variant: "destructive" });
-    } finally {
+      toast({ title: "Erreur lors de la lecture du fichier", variant: "destructive" });
       setIsUploadingLogo(false);
     }
   }

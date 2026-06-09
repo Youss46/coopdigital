@@ -9,9 +9,6 @@ import {
   deleteDocumentOfficiel,
 } from "../services/configService";
 import { invalidateLogoCache } from "../services/pdfHeaderService";
-import { ObjectStorageService } from "../lib/objectStorage";
-
-const objectStorageService = new ObjectStorageService();
 
 function toDateStr(d: Date | null | undefined): string | null | undefined {
   if (d == null) return d;
@@ -103,20 +100,28 @@ export async function handleUploadLogo(req: Request, res: Response): Promise<voi
       return;
     }
 
-    const { name, size, contentType } = req.body as { name: string; size: number; contentType: string };
-    if (!name || !size || !contentType) {
+    const { data_url, content_type } = req.body as { data_url: string; content_type: string };
+    if (!data_url || !content_type) {
       res.status(400).json({ erreur: "Données manquantes pour l'upload" });
       return;
     }
 
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-    const logoUrl = `/api/storage${objectPath}`;
+    if (!data_url.startsWith("data:image/")) {
+      res.status(400).json({ erreur: "Format invalide — seules les images sont acceptées." });
+      return;
+    }
 
-    await updateLogoUrl(cooperativeId, userId, logoUrl);
+    // Limite 2 Mo — base64 ≈ 1.37× la taille originale
+    const base64Part = data_url.split(",")[1] ?? "";
+    if (Math.ceil(base64Part.length * 0.75) > 2 * 1024 * 1024) {
+      res.status(400).json({ erreur: "Logo trop volumineux (max 2 Mo)" });
+      return;
+    }
+
+    await updateLogoUrl(cooperativeId, userId, data_url);
     invalidateLogoCache(cooperativeId);
 
-    res.json({ uploadURL, objectPath, logo_url: logoUrl });
+    res.json({ logo_url: data_url });
   } catch (err) {
     req.log.error({ err }, "Erreur uploadLogo");
     res.status(500).json({ erreur: "Erreur interne" });

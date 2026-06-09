@@ -5454,9 +5454,8 @@ export const UpdateConfigResponse = zod.object({
  * @summary Uploader le logo de la coopérative
  */
 export const UploadLogoBody = zod.object({
-  "name": zod.string(),
-  "size": zod.number(),
-  "contentType": zod.string()
+  "data_url": zod.string(),
+  "content_type": zod.string()
 })
 
 export const UploadLogoResponse = zod.object({

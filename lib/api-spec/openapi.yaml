@@ -4587,7 +4587,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/UploadUrlRequest" }
+            schema: { $ref: "#/components/schemas/UploadLogoDataUrl" }
       responses:
         "200":
           description: URL logo mise à jour
@@ -9719,6 +9719,13 @@ components:
         notif_prix_change:              { type: boolean }
         recevoir_sms:                   { type: boolean }
         recevoir_email:                 { type: boolean }
+
+    UploadLogoDataUrl:
+      type: object
+      required: [data_url, content_type]
+      properties:
+        data_url:     { type: string }
+        content_type: { type: string }
 
     UploadUrlRequest:
       type: object
