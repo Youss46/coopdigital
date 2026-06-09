@@ -13,6 +13,8 @@ import {
   exportMembresPdf,
   listDeleguesPourMembres,
   transfererRattachement,
+  validerMembre,
+  rejeterMembre,
 } from "../controllers/membresController";
 
 const router: IRouter = Router();
@@ -26,8 +28,10 @@ router.post("/membres", checkPermission("membres", "creer"), auditMiddleware("me
 router.get("/membres/qr/:token", checkPermission("membres", "lire"), getMembreByQr);
 router.get("/membres/:id/historique", checkPermission("membres", "lire"), getMembreHistorique);
 router.get("/membres/:id", checkPermission("membres", "lire"), getMembreById);
-router.patch("/membres/:id/statut", checkPermission("membres", "modifier"), auditMiddleware("membres", "UPDATE", { entiteIdParam: "id", entiteType: "membre" }), modifierStatutMembre);
+router.post("/membres/:id/valider",     checkPermission("membres", "valider"),  auditMiddleware("membres", "UPDATE", { entiteIdParam: "id", entiteType: "membre" }), validerMembre);
+router.post("/membres/:id/rejeter",     checkPermission("membres", "rejeter"),  auditMiddleware("membres", "UPDATE", { entiteIdParam: "id", entiteType: "membre" }), rejeterMembre);
+router.patch("/membres/:id/statut",     checkPermission("membres", "modifier"), auditMiddleware("membres", "UPDATE", { entiteIdParam: "id", entiteType: "membre" }), modifierStatutMembre);
 router.patch("/membres/:id/rattachement", checkPermission("membres", "modifier"), auditMiddleware("membres", "UPDATE", { entiteIdParam: "id", entiteType: "membre" }), transfererRattachement);
-router.put("/membres/:id", checkPermission("membres", "modifier"), auditMiddleware("membres", "UPDATE", { entiteIdParam: "id", entiteType: "membre" }), updateMembre);
+router.put("/membres/:id",              checkPermission("membres", "modifier"), auditMiddleware("membres", "UPDATE", { entiteIdParam: "id", entiteType: "membre" }), updateMembre);
 
 export default router;

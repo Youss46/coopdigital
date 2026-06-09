@@ -1,6 +1,6 @@
 import {
   pgTable, serial, text, integer, numeric,
-  timestamp, date, uuid, pgEnum, varchar, boolean,
+  timestamp, date, uuid, pgEnum, varchar, boolean, jsonb,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -27,7 +27,7 @@ export const membresTable = pgTable("membres", {
   parcelleLat: numeric("parcelle_lat", { precision: 10, scale: 7 }),
   parcelleLng: numeric("parcelle_lng", { precision: 10, scale: 7 }),
 
-  // Données démographiques (RSE)
+  // Données démographiques
   sexe:           text("sexe"),
   dateNaissance:  date("date_naissance", { mode: "string" }),
 
@@ -48,6 +48,37 @@ export const membresTable = pgTable("membres", {
   zoneType: varchar("zone_type", { length: 20 }),
   zoneNom: text("zone_nom"),
   creeParDelegue: boolean("cree_par_delegue").default(false),
+
+  // ── Workflow de validation ──────────────────────────────────────────────────
+  statutMembre: varchar("statut_membre", { length: 20 }).default("en_attente"),
+  // 'en_attente' | 'actif' | 'rejete' | 'suspendu' | 'archive'
+  creePar: varchar("cree_par", { length: 30 }),
+  // 'delegue' | 'directeur' | 'pca' | 'responsable_tracabilite' | 'migration'
+  demandeParDelegueId: integer("demande_par_delegue_id"),
+  motifRejet: text("motif_rejet"),
+  validePar: integer("valide_par"),
+  dateValidation: timestamp("date_validation", { withTimezone: true }),
+
+  // ── Contact enrichi ─────────────────────────────────────────────────────────
+  telephoneSecondaire: varchar("telephone_secondaire", { length: 20 }),
+
+  // ── Parcelles enrichies ─────────────────────────────────────────────────────
+  nombreParcelles: integer("nombre_parcelles"),
+  superficieTotale: numeric("superficie_totale", { precision: 10, scale: 2 }),
+  gpsParcelles: jsonb("gps_parcelles"),
+  // [{ parcelle: 1, lat: x, lng: y, superficie: z, polygone: [...], photos: [...] }]
+  culturePrincipale: varchar("culture_principale", { length: 50 }),
+  polygoneGps: jsonb("polygone_gps"),
+
+  // ── EUDR / Traçabilité ──────────────────────────────────────────────────────
+  certification: varchar("certification", { length: 50 }),
+  documentsJoints: jsonb("documents_joints"),
+
+  // ── Complétion & terrain ────────────────────────────────────────────────────
+  completudeFiche: integer("completude_fiche").default(0),
+  gpsCollectePar: integer("gps_collecte_par"),
+  gpsValidePar: integer("gps_valide_par"),
+  dateCollecteGps: timestamp("date_collecte_gps", { withTimezone: true }),
 
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

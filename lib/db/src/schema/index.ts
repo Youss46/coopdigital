@@ -43,3 +43,4 @@ export * from "./fiscalite";
 export * from "./reconciliation";
 export * from "./investissements";
 export * from "./support";
+export * from "./missions";

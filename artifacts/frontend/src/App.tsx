@@ -6,6 +6,8 @@ import SplashScreen from "@/components/SplashScreen";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Membres from "@/pages/Membres";
+import MissionsPage from "@/pages/MissionsPage";
+import MissionDetailPage from "@/pages/MissionDetailPage";
 import MembreFiche from "@/pages/MembreFiche";
 import Avances from "@/pages/Avances";
 import NouvelleLivraison from "@/pages/NouvelleLivraison";
@@ -88,6 +90,12 @@ function AppRoutes() {
       </Route>
       <Route path="/membres">
         <ProtectedRoute component={Membres} />
+      </Route>
+      <Route path="/missions/:id">
+        <ProtectedRoute component={MissionDetailPage} />
+      </Route>
+      <Route path="/missions">
+        <ProtectedRoute component={MissionsPage} />
       </Route>
       <Route path="/avances">
         <ProtectedRoute component={Avances} />

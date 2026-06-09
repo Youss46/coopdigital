@@ -6,20 +6,33 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE COMPTES & ADMINISTRATION
   users: {
-    lire:      ["pca", "directeur"],
-    creer:     ["pca", "directeur"],
-    modifier:  ["pca", "directeur"],
-    supprimer: ["pca", "directeur"],
-    activer:   ["pca", "directeur"],
+    lire:               ["pca", "directeur", "responsable_tracabilite"],
+    creer:              ["pca", "directeur", "responsable_tracabilite"],
+    modifier:           ["pca", "directeur", "responsable_tracabilite"],
+    supprimer:          ["pca", "directeur"],
+    activer:            ["pca", "directeur"],
+    creer_agent_terrain:["pca", "directeur", "responsable_tracabilite"],
   },
 
   // MODULE M01 — MEMBRES
   membres: {
-    lire:     ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
-    creer:    ["pca", "directeur", "delegue"],
-    modifier: ["pca", "directeur", "delegue"],
+    lire:     ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur", "agent_terrain"],
+    creer:    ["pca", "directeur", "delegue", "responsable_tracabilite"],
+    modifier: ["pca", "directeur", "delegue", "responsable_tracabilite"],
     supprimer:["pca", "directeur"],
     exporter: ["pca", "directeur", "comptable", "auditeur"],
+    valider:  ["pca", "directeur", "responsable_tracabilite"],
+    rejeter:  ["pca", "directeur", "responsable_tracabilite"],
+    suspendre:["pca", "directeur"],
+  },
+
+  // MODULE MISSIONS TERRAIN
+  missions: {
+    lire:     ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
+    creer:    ["pca", "directeur", "responsable_tracabilite"],
+    modifier: ["pca", "directeur", "responsable_tracabilite"],
+    valider:  ["pca", "directeur", "responsable_tracabilite"],
+    executer: ["agent_terrain"],
   },
 
   // MODULE M02 — TRAÇABILITÉ

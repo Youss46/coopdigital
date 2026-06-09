@@ -80,6 +80,27 @@ export async function listDeleguesPourMembres(req: Request, res: Response): Prom
 
 // ── Liste membres ─────────────────────────────────────────────────────────────
 
+export function computeCompletude(m: Record<string, unknown>): number {
+  const champs = [
+    !!m["nom"] && String(m["nom"]).trim() !== "",
+    !!m["prenoms"] && String(m["prenoms"]).trim() !== "",
+    !!m["telephone"] && String(m["telephone"]).trim() !== "",
+    !!m["village"] && String(m["village"]).trim() !== "",
+    !!m["date_naissance"] || !!m["dateNaissance"],
+    !!m["sexe"] && String(m["sexe"]).trim() !== "",
+    !!m["numero_cni"] || !!m["numeroCni"],
+    !!m["gps_parcelles"] || !!m["gpsParcelles"],
+    !!m["superficie_totale"] || !!m["superficieTotale"],
+    !!m["nombre_parcelles"] || !!m["nombreParcelles"],
+    !!m["date_adhesion"] || !!m["dateAdhesion"],
+    !!m["type_fournisseur"] || !!m["typeFournisseur"],
+    (m["nbre_parts_souscrites"] !== undefined
+      ? Number(m["nbre_parts_souscrites"]) > 0
+      : Number(m["nbrePartsSouscrites"] ?? 0) > 0),
+  ];
+  return Math.round((champs.filter(Boolean).length / 13) * 100);
+}
+
 export async function listMembres(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
@@ -89,8 +110,11 @@ export async function listMembres(req: Request, res: Response): Promise<void> {
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query["limit"] ?? "20"))));
     const search = String(req.query["search"] ?? "").trim();
     const statut = req.query["statut"] as string | undefined;
+    const statutMembre = req.query["statut_membre"] as string | undefined;
     const delegueId = req.query["delegueId"] ? parseInt(String(req.query["delegueId"])) : undefined;
     const rattachementType = req.query["rattachementType"] as string | undefined;
+    const vue = req.query["vue"] as string | undefined;
+    const sansGps = req.query["sans_gps"] === "1";
     const offset = (page - 1) * limit;
 
     const userRole = req.user?.role;
@@ -98,14 +122,37 @@ export async function listMembres(req: Request, res: Response): Promise<void> {
 
     const conditions = [eq(membresTable.cooperativeId, cooperativeId)];
 
-    // RÈGLE 3 — Visibilité : délégué ne voit que ses membres
     if (userRole === "delegue" && userId) {
-      conditions.push(eq(membresTable.delegueId, userId));
+      if (vue === "demandes") {
+        // Onglet "Mes demandes" : demandes soumises par ce délégué (en_attente + rejetés)
+        conditions.push(eq(membresTable.demandeParDelegueId, userId));
+        conditions.push(sql`${membresTable.statutMembre} IN ('en_attente', 'rejete')`);
+      } else {
+        // Onglet "Mes membres" : actifs rattachés à ce délégué seulement
+        conditions.push(eq(membresTable.delegueId, userId));
+        conditions.push(eq(membresTable.statutMembre, "actif"));
+      }
+    } else if (userRole === "agent_terrain" && userId) {
+      // Agent terrain : seulement les membres de ses missions
+      conditions.push(
+        sql`${membresTable.id} IN (
+          SELECT mm.membre_id FROM missions_membres mm
+          JOIN missions_terrain mt ON mt.id = mm.mission_id
+          WHERE mt.agent_id = ${userId}
+        )`
+      );
     } else {
-      // Direction : filtres optionnels
+      // Direction / RT / comptable / auditeur : filtres libres
       if (delegueId) conditions.push(eq(membresTable.delegueId, delegueId));
       if (rattachementType === "delegue" || rattachementType === "base_centrale") {
         conditions.push(eq(membresTable.rattachementType, rattachementType));
+      }
+      const validStatutsMembre = ["en_attente", "actif", "rejete", "suspendu", "archive"];
+      if (statutMembre && validStatutsMembre.includes(statutMembre)) {
+        conditions.push(eq(membresTable.statutMembre, statutMembre));
+      }
+      if (sansGps) {
+        conditions.push(sql`${membresTable.gpsParcelles} IS NULL`);
       }
     }
 
@@ -269,6 +316,26 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    // ── RÈGLE 2/3 — Workflow selon rôle ────────────────────────────────────────
+    const directRoles = ["pca", "directeur", "responsable_tracabilite"];
+    let statutMembreFinal: string;
+    let validePar: number | null = null;
+    let dateValidationFinal: Date | null = null;
+    let demandeParDelegueId: number | null = null;
+
+    if (userRole === "delegue" && userId) {
+      statutMembreFinal = "en_attente";
+      demandeParDelegueId = userId;
+    } else if (userRole && directRoles.includes(userRole)) {
+      statutMembreFinal = "actif";
+      validePar = userId ?? null;
+      dateValidationFinal = new Date();
+    } else {
+      statutMembreFinal = "actif";
+    }
+
+    const body = req.body as Record<string, unknown>;
+
     const [membre] = await db
       .insert(membresTable)
       .values({
@@ -282,19 +349,60 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
         village: data.village ?? null,
         groupement: data.groupement ?? null,
         numeroCni: data.numeroCni ?? null,
-        sexe: data.sexe ?? null,
+        sexe: (data.sexe ?? body["sexe"] ?? null) as string | null,
+        dateNaissance: (data.dateNaissance ?? body["dateNaissance"] ?? null) as string | null,
         photoUrl: data.photoUrl ?? null,
         parcelleLat: data.parcelleLat ?? null,
         parcelleLng: data.parcelleLng ?? null,
+        typeFournisseur: (data.typeFournisseur ?? body["typeFournisseur"] ?? null) as string | null,
+        section: (data.section ?? body["section"] ?? null) as string | null,
+        nbrePartsSouscrites: (data.nbrePartsSouscrites ?? Number(body["nbrePartsSouscrites"] ?? 0)) as number,
+        valeurNominalePartFcfa: (data.valeurNominalePartFcfa ?? Number(body["valeurNominalePartFcfa"] ?? 0)) as number,
         delegueId: delegueIdFinal,
         rattachementType: rattachementTypeFinal,
         zoneType: zoneTypeFinal,
         zoneNom: zoneNomFinal,
         creeParDelegue,
+        // Workflow
+        statutMembre: statutMembreFinal,
+        creePar: userRole ?? "system",
+        demandeParDelegueId,
+        validePar,
+        dateValidation: dateValidationFinal,
+        // Parcelles enrichies
+        telephoneSecondaire: (body["telephoneSecondaire"] ?? null) as string | null,
+        nombreParcelles: body["nombreParcelles"] ? Number(body["nombreParcelles"]) : null,
+        superficieTotale: (body["superficieTotale"] ?? null) as string | null,
+        gpsParcelles: (body["gpsParcelles"] ?? null) as unknown,
+        culturePrincipale: (body["culturePrincipale"] ?? null) as string | null,
+        certification: (body["certification"] ?? null) as string | null,
+        documentsJoints: (body["documentsJoints"] ?? null) as unknown,
       })
       .returning();
 
-    void autoCreateFournisseurMembre(cooperativeId, membre);
+    // Auto-création fournisseur uniquement pour membres actifs directs
+    if (statutMembreFinal === "actif") {
+      void autoCreateFournisseurMembre(cooperativeId, membre);
+    }
+
+    // Notification RT si demande délégué
+    if (statutMembreFinal === "en_attente" && userId) {
+      try {
+        const [delegueInfo] = await db
+          .select({ nom: usersTable.nom, prenoms: usersTable.prenoms, zoneNom: usersTable.zoneNom })
+          .from(usersTable)
+          .where(eq(usersTable.id, userId))
+          .limit(1);
+        const rtUsers = await db
+          .select({ telephone: usersTable.telephone })
+          .from(usersTable)
+          .where(and(eq(usersTable.cooperativeId, cooperativeId), eq(usersTable.role, "responsable_tracabilite")));
+        const msg = `Nouvelle demande de ${delegueInfo?.prenoms ?? ""} ${delegueInfo?.nom ?? ""} — Zone ${delegueInfo?.zoneNom ?? ""}. Membre: ${membre.prenoms} ${membre.nom}. [Voir dans CoopDigital]`;
+        for (const rt of rtUsers) {
+          if (rt.telephone) void sendSMS(rt.telephone, msg);
+        }
+      } catch { /* non bloquant */ }
+    }
 
     res.status(201).json(enrichMembre(membre));
   } catch (err) {
@@ -605,6 +713,118 @@ export async function desactiverMembresSansCampagne(req: Request, res: Response)
     res.json({ desactivesCount, campagneId });
   } catch (err) {
     req.log.error({ err }, "Erreur desactiverMembresSansCampagne");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ── Validation workflow membre ─────────────────────────────────────────────────
+
+export async function validerMembre(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const userId = req.user?.id;
+  if (!cooperativeId || !userId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const id = parseInt(String(req.params["id"] ?? "0"));
+
+  try {
+    const [existing] = await db
+      .select()
+      .from(membresTable)
+      .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!existing) { res.status(404).json({ erreur: "Membre introuvable" }); return; }
+    if (existing.statutMembre !== "en_attente") {
+      res.status(400).json({ erreur: "Ce membre n'est pas en attente de validation" });
+      return;
+    }
+
+    const completude = computeCompletude(existing as unknown as Record<string, unknown>);
+    if (completude < 100) {
+      res.status(400).json({ erreur: `Fiche incomplète (${completude}%). Complétez les 13 champs obligatoires.`, completude });
+      return;
+    }
+
+    const [membre] = await db
+      .update(membresTable)
+      .set({
+        statutMembre: "actif",
+        validePar: userId,
+        dateValidation: new Date(),
+        completudeFiche: completude,
+        updatedAt: new Date(),
+      })
+      .where(eq(membresTable.id, id))
+      .returning();
+
+    void autoCreateFournisseurMembre(cooperativeId, membre);
+
+    // SMS au délégué
+    if (existing.demandeParDelegueId) {
+      try {
+        const [delegue] = await db
+          .select({ telephone: usersTable.telephone })
+          .from(usersTable)
+          .where(eq(usersTable.id, existing.demandeParDelegueId))
+          .limit(1);
+        if (delegue?.telephone) {
+          void sendSMS(delegue.telephone, `Le membre ${membre.prenoms} ${membre.nom} a été validé et est maintenant actif dans CoopDigital.`);
+        }
+      } catch { /* non bloquant */ }
+    }
+
+    res.json(enrichMembre(membre));
+  } catch (err) {
+    req.log.error({ err }, "Erreur validerMembre");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function rejeterMembre(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const userId = req.user?.id;
+  if (!cooperativeId || !userId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  const { motif } = req.body as { motif?: string };
+
+  if (!motif || motif.trim() === "") {
+    res.status(400).json({ erreur: "Le motif de rejet est obligatoire" });
+    return;
+  }
+
+  try {
+    const [existing] = await db
+      .select()
+      .from(membresTable)
+      .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!existing) { res.status(404).json({ erreur: "Membre introuvable" }); return; }
+
+    const [membre] = await db
+      .update(membresTable)
+      .set({ statutMembre: "rejete", motifRejet: motif, updatedAt: new Date() })
+      .where(eq(membresTable.id, id))
+      .returning();
+
+    // SMS au délégué avec motif
+    if (existing.demandeParDelegueId) {
+      try {
+        const [delegue] = await db
+          .select({ telephone: usersTable.telephone })
+          .from(usersTable)
+          .where(eq(usersTable.id, existing.demandeParDelegueId))
+          .limit(1);
+        if (delegue?.telephone) {
+          void sendSMS(delegue.telephone, `La demande pour ${membre.prenoms} ${membre.nom} a été rejetée. Motif : ${motif}. Veuillez corriger et renvoyer la demande.`);
+        }
+      } catch { /* non bloquant */ }
+    }
+
+    res.json(enrichMembre(membre));
+  } catch (err) {
+    req.log.error({ err }, "Erreur rejeterMembre");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
