@@ -417,7 +417,11 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       total: sql<string>`COALESCE(SUM(${paiementsTable.montantFcfa}), 0)`,
     })
     .from(paiementsTable)
-    .where(sql`DATE(${paiementsTable.createdAt}) = ${todayStr}::date`);
+    .innerJoin(membresTable, eq(membresTable.id, paiementsTable.membreId))
+    .where(and(
+      eq(membresTable.cooperativeId, cooperativeId),
+      sql`DATE(${paiementsTable.createdAt}) = ${todayStr}::date`,
+    ));
 
   const [avancesStats] = await db
     .select({
@@ -425,7 +429,11 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       total: sql<string>`COALESCE(SUM(${avancesTable.montantOctroyeFcfa}), 0)`,
     })
     .from(avancesTable)
-    .where(sql`DATE(${avancesTable.createdAt}) = ${todayStr}::date`);
+    .innerJoin(membresTable, eq(membresTable.id, avancesTable.membreId))
+    .where(and(
+      eq(membresTable.cooperativeId, cooperativeId),
+      sql`DATE(${avancesTable.createdAt}) = ${todayStr}::date`,
+    ));
 
   const recentesLivraisons = await db
     .select({
@@ -450,7 +458,11 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       createdAt: paiementsTable.createdAt,
     })
     .from(paiementsTable)
-    .where(sql`DATE(${paiementsTable.createdAt}) = ${todayStr}::date`)
+    .innerJoin(membresTable, eq(membresTable.id, paiementsTable.membreId))
+    .where(and(
+      eq(membresTable.cooperativeId, cooperativeId),
+      sql`DATE(${paiementsTable.createdAt}) = ${todayStr}::date`,
+    ))
     .orderBy(desc(paiementsTable.createdAt))
     .limit(3);
 
