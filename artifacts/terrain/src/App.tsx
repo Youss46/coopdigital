@@ -1,6 +1,7 @@
 import { Switch, Route, Redirect, Router as WouterRouter } from "wouter";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
+import OfflineBanner from "./components/OfflineBanner";
 import Login from "./pages/Login";
 import Accueil from "./pages/Accueil";
 import CollecteFlow from "./pages/CollecteFlow";
@@ -36,6 +37,7 @@ export default function App() {
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <AuthProvider>
         <OfflineProvider>
+          <OfflineBanner />
           <AppRoutes />
         </OfflineProvider>
       </AuthProvider>

@@ -1,6 +1,7 @@
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { OfflineBanner, OnlineToast } from "@/components/OfflineIndicator";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Cooperatives from "@/pages/Cooperatives";
@@ -47,6 +48,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <OfflineBanner />
+          <OnlineToast />
           <AppRoutes />
         </WouterRouter>
       </AuthProvider>

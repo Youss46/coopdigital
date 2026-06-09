@@ -52,6 +52,7 @@ import ChangerMotDePassePage from "@/pages/ChangerMotDePassePage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
+import { OfflineBanner, OnlineToast } from "@/components/OfflineIndicator";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -224,6 +225,8 @@ function App() {
       {!splashTermine && <SplashScreen onTermine={handleSplashTermine} />}
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
         <AuthProvider>
+          <OfflineBanner />
+          <OnlineToast />
           <AppRoutes />
           <Toaster />
         </AuthProvider>
