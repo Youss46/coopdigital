@@ -20,3 +20,4 @@
 - [cooperatives.nom not libelle](cooperatives-nom.md) — cooperatives table uses `nom` column (not `libelle`); columns are: id, nom, ville, region, created_at.
 - [TS project references — rebuild after schema/codegen changes](ts-project-refs-rebuild.md) — after modifying lib/db schema or running Orval codegen, must run `tsc --build` on the affected lib package to refresh dist/*.d.ts; stale dist causes TS errors in consumers even though exports point to src/.
 - [Drizzle migrations — schéma drizzle et pre-population](drizzle-migration-schema.md) — Drizzle stocke migrations dans schéma SQL "drizzle" (pas "public"); logique LIMIT 1 DESC pour skip; pré-peupler via script node avant de lancer migrate().
+- [Caisse déléguée — alertes route ordering](caisse-delegue-route-order.md) — GET /delegues/alertes doit être déclaré AVANT GET /delegues/:agentId/caisse dans delegues.ts; sinon Express interprète "alertes" comme un agentId.

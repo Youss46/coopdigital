@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNav from "../components/BottomNav";
 import { useOffline } from "../contexts/OfflineContext";
-import { getFournisseurRecap, enregistrerPaiement } from "../lib/api";
-import type { Fournisseur, FournisseurRecap } from "../lib/types";
+import { getFournisseurRecap, enregistrerPaiement, getCaisse } from "../lib/api";
+import type { Fournisseur, FournisseurRecap, CaisseDelegue } from "../lib/types";
 
 type Step = 1 | 2 | 3;
 type ModePaiement = "especes" | "orange_money" | "mtn_momo";
@@ -16,6 +16,7 @@ export default function PaiementFlow() {
   const [step, setStep] = useState<Step>(1);
   const [fournisseur, setFournisseur] = useState<Fournisseur | null>(null);
   const [recap, setRecap] = useState<FournisseurRecap | null>(null);
+  const [caisse, setCaisse] = useState<CaisseDelegue | null>(null);
   const [livraisonId, setLivraisonId] = useState("");
   const [montant, setMontant] = useState("");
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
@@ -23,6 +24,17 @@ export default function PaiementFlow() {
   const [erreur, setErreur] = useState("");
   const [success, setSuccess] = useState(false);
   const [ref, setRef] = useState("");
+
+  useEffect(() => {
+    if (step === 2 && isOnline) {
+      getCaisse().then(setCaisse).catch(() => {});
+    }
+  }, [step, isOnline]);
+
+  const montantNum = parseInt(montant) || 0;
+  const soldeCaisse = caisse?.solde ?? null;
+  const soldeInsuffisant = soldeCaisse !== null && montantNum > 0 && montantNum > soldeCaisse;
+  const soldeRestant = soldeCaisse !== null && montantNum > 0 ? soldeCaisse - montantNum : null;
 
   async function handleSelectFournisseur(f: Fournisseur) {
     setFournisseur(f);
@@ -64,6 +76,7 @@ export default function PaiementFlow() {
     setStep(1);
     setFournisseur(null);
     setRecap(null);
+    setCaisse(null);
     setLivraisonId("");
     setMontant("");
     setModePaiement("especes");
@@ -123,6 +136,23 @@ export default function PaiementFlow() {
               )}
             </div>
 
+            {/* Solde caisse */}
+            {soldeCaisse !== null && (
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                background: soldeCaisse === 0 ? "var(--t-danger-bg)" : "rgba(74,222,128,.1)",
+                border: `1.5px solid ${soldeCaisse === 0 ? "var(--t-danger)" : "var(--t-success)"}`,
+                borderRadius: "var(--t-radius)", padding: "10px 14px",
+              }}>
+                <div style={{ fontSize: ".82rem", color: soldeCaisse === 0 ? "var(--t-danger)" : "var(--t-success)", fontWeight: 600 }}>
+                  {soldeCaisse === 0 ? "⚠️ Caisse vide" : "💰 Solde caisse"}
+                </div>
+                <div style={{ fontWeight: 800, fontSize: ".95rem", color: soldeCaisse === 0 ? "var(--t-danger)" : "var(--t-success)" }}>
+                  {soldeCaisse.toLocaleString("fr-FR")} FCFA
+                </div>
+              </div>
+            )}
+
             <div className="t-field">
               <label className="t-label">ID Livraison (optionnel)</label>
               <input
@@ -147,6 +177,20 @@ export default function PaiementFlow() {
                 placeholder="Ex: 75 000"
               />
             </div>
+
+            {/* Vérification solde */}
+            {montantNum > 0 && soldeCaisse !== null && (
+              <div style={{
+                background: soldeInsuffisant ? "var(--t-danger-bg)" : "rgba(74,222,128,.08)",
+                border: `1px solid ${soldeInsuffisant ? "var(--t-danger)" : "var(--t-success)"}`,
+                borderRadius: "var(--t-radius)", padding: "10px 14px", fontSize: ".88rem",
+                color: soldeInsuffisant ? "var(--t-danger)" : "var(--t-success)", fontWeight: 600,
+              }}>
+                {soldeInsuffisant
+                  ? `❌ Solde insuffisant — disponible : ${soldeCaisse.toLocaleString("fr-FR")} FCFA`
+                  : `✅ Solde restant après paiement : ${(soldeRestant ?? 0).toLocaleString("fr-FR")} FCFA`}
+              </div>
+            )}
 
             <div className="t-field">
               <label className="t-label">Mode de paiement</label>
@@ -175,7 +219,7 @@ export default function PaiementFlow() {
 
             <button
               className="t-btn t-btn--success"
-              disabled={submitting || (!montant && !livraisonId)}
+              disabled={submitting || (!montant && !livraisonId) || (soldeInsuffisant && isOnline)}
               onClick={handleConfirmer}
             >
               {submitting ? "Enregistrement…" : "✅ Confirmer le paiement"}
@@ -209,6 +253,14 @@ export default function PaiementFlow() {
                     {modePaiement === "especes" ? "💵 Espèces" : modePaiement === "orange_money" ? "🟠 Orange Money" : "🟡 MTN MoMo"}
                   </span>
                 </div>
+                {soldeCaisse !== null && montantNum > 0 && (
+                  <div className="t-recap-row">
+                    <span className="t-recap-row__label">Solde caisse restant</span>
+                    <span className="t-recap-row__value" style={{ color: "var(--t-success)", fontWeight: 700 }}>
+                      {(soldeCaisse - montantNum).toLocaleString("fr-FR")} FCFA
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

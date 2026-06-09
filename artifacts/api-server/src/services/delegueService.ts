@@ -6,9 +6,14 @@ import {
   paiementsTable,
   caissesDeleguesTable,
   mouvementsCaisseDelegueTable,
+  caissesTable,
+  mouvementsCaisseTable,
+  alimentationsCaisseDelegueTable,
   campagnesTable,
 } from "@workspace/db";
 import { and, eq, sql, desc } from "drizzle-orm";
+import { logger } from "../lib/logger.js";
+import { sendSMS } from "./smsService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -298,4 +303,195 @@ export async function getPaiementsDifferesCooperative(cooperativeId: number) {
     agentNom: r.agentNom ? `${r.agentNom} ${r.agentPrenoms}` : "—",
     agentSection: r.agentSection ?? "—",
   }));
+}
+
+// ─── Alimentation depuis caisse principale ────────────────────────────────────
+
+export async function alimenterDepuisCaissePrincipale(
+  agentId: number,
+  coopId: number,
+  montantFcfa: number,
+  caisseSourceId: number,
+  motif: string,
+  adminId: number,
+): Promise<{ solde: number; soldeSource: number }> {
+  if (montantFcfa <= 0) throw new Error("Le montant doit être positif");
+
+  // 1. Vérifier solde de la caisse source
+  const [source] = await db.select()
+    .from(caissesTable)
+    .where(and(eq(caissesTable.id, caisseSourceId), eq(caissesTable.cooperativeId, coopId)))
+    .limit(1);
+  if (!source) throw new Error("Caisse source introuvable");
+
+  const soldeSource = toNum(source.soldeActuelFcfa);
+  if (soldeSource < montantFcfa) {
+    throw new Error(`Solde insuffisant en caisse principale. Disponible : ${soldeSource.toLocaleString("fr-FR")} FCFA`);
+  }
+
+  // 2. Informations du délégué
+  const [agent] = await db
+    .select({ nom: usersTable.nom, prenoms: usersTable.prenoms, telephone: usersTable.telephone, section: usersTable.section })
+    .from(usersTable).where(eq(usersTable.id, agentId)).limit(1);
+  if (!agent) throw new Error("Délégué introuvable");
+  const nomDelegue = `${agent.nom} ${agent.prenoms ?? ""}`.trim();
+
+  // 3. Caisse du délégué
+  const caisse = await getOrCreateCaisse(agentId, coopId);
+  const ancienSolde = toNum(caisse.solde);
+  const nouveauSolde = ancienSolde + montantFcfa;
+  const nouveauSoldeSource = soldeSource - montantFcfa;
+
+  // 4. Débiter la caisse principale
+  await db.update(caissesTable)
+    .set({ soldeActuelFcfa: String(nouveauSoldeSource) })
+    .where(eq(caissesTable.id, caisseSourceId));
+
+  // Enregistrer mouvement sur caisse principale si session ouverte
+  const sessionResult = await db.execute<{ id: number }>(sql`
+    SELECT id FROM sessions_caisse
+    WHERE caisse_id = ${caisseSourceId} AND date_session = CURRENT_DATE AND statut = 'ouverte'
+    LIMIT 1
+  `);
+  const sessionId = sessionResult.rows[0]?.id;
+
+  if (sessionId) {
+    await db.insert(mouvementsCaisseTable).values({
+      caisseId: caisseSourceId,
+      sessionId,
+      cooperativeId: coopId,
+      type: "sortie",
+      motif: "alimentation_delegue",
+      montantFcfa: String(montantFcfa),
+      libelle: `Alimentation caisse délégué ${nomDelegue}`,
+      soldeApresFcfa: String(nouveauSoldeSource),
+      enregistrePar: adminId,
+    });
+  }
+
+  // 5. Créditer la caisse déléguée
+  await db.update(caissesDeleguesTable)
+    .set({ solde: String(nouveauSolde), updatedAt: new Date() })
+    .where(eq(caissesDeleguesTable.id, caisse.id));
+
+  await db.insert(mouvementsCaisseDelegueTable).values({
+    caisseDelegueId: caisse.id,
+    type: "approvisionnement",
+    montantFcfa: String(montantFcfa),
+    soldeApresFcfa: String(nouveauSolde),
+    note: motif || `Alimentation depuis caisse principale`,
+    createdById: adminId,
+  });
+
+  // 6. Enregistrer l'alimentation
+  await db.insert(alimentationsCaisseDelegueTable).values({
+    cooperativeId: coopId,
+    caisseDelegueId: caisse.id,
+    caisseSourceId,
+    montantFcfa: String(montantFcfa),
+    motif,
+    statut: "confirme",
+    envoyePar: adminId,
+    dateEnvoi: new Date(),
+  });
+
+  // 7. SMS au délégué
+  if (agent.telephone) {
+    try {
+      const coopNomResult = await db.execute<{ nom: string }>(
+        sql`SELECT nom FROM cooperatives WHERE id = ${coopId} LIMIT 1`
+      );
+      const coopNom = coopNomResult.rows[0]?.nom ?? "CoopDigital";
+      const dateStr = new Date().toLocaleDateString("fr-FR");
+      const message = `Bonjour ${agent.nom}, votre caisse CoopDigital a ete alimentee de ${montantFcfa.toLocaleString("fr-FR")} FCFA. Solde : ${nouveauSolde.toLocaleString("fr-FR")} FCFA. Zone : ${agent.section ?? "—"}. Coop ${coopNom} — ${dateStr}`;
+      await sendSMS(agent.telephone, message);
+    } catch (smsErr) {
+      logger.warn({ smsErr }, "SMS alimentation caisse délégué non envoyé");
+    }
+  }
+
+  logger.info({ agentId, montantFcfa, caisseSourceId, nouveauSolde }, "Caisse déléguée alimentée");
+  return { solde: nouveauSolde, soldeSource: nouveauSoldeSource };
+}
+
+// ─── Clôture journée ──────────────────────────────────────────────────────────
+
+export async function cloturerJournee(
+  agentId: number,
+  coopId: number,
+  soldeReel: number,
+  adminId: number,
+  observations?: string,
+): Promise<{
+  soldeTheorique: number;
+  soldeReel: number;
+  ecart: number;
+  montantRecu: number;
+  montantPaye: number;
+}> {
+  const caisse = await getOrCreateCaisse(agentId, coopId);
+  const [agent] = await db
+    .select({ nom: usersTable.nom, prenoms: usersTable.prenoms, telephone: usersTable.telephone, section: usersTable.section })
+    .from(usersTable).where(eq(usersTable.id, agentId)).limit(1);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Calculer totaux du jour depuis mouvements caisse déléguée
+  const statsResult = await db.execute<{ type: string; total: string }>(sql`
+    SELECT type, SUM(ABS(montant_fcfa)) as total
+    FROM mouvements_caisse_delegue
+    WHERE caisse_delegue_id = ${caisse.id}
+      AND DATE(created_at AT TIME ZONE 'UTC') = ${today}
+    GROUP BY type
+  `);
+
+  let montantRecu = 0;
+  let montantPaye = 0;
+  for (const r of statsResult.rows) {
+    if (r.type === "approvisionnement") montantRecu += toNum(r.total);
+    else montantPaye += toNum(r.total);
+  }
+
+  const soldeTheorique = toNum(caisse.solde);
+  const ecart = soldeReel - soldeTheorique;
+
+  // SMS directeur si écart significatif (> 500 FCFA)
+  if (Math.abs(ecart) > 500) {
+    try {
+      const dirResult = await db.execute<{ telephone: string }>(sql`
+        SELECT telephone FROM users
+        WHERE cooperative_id = ${coopId}
+          AND role IN ('directeur', 'pca')
+          AND actif = true
+          AND telephone IS NOT NULL
+        ORDER BY CASE role WHEN 'directeur' THEN 1 ELSE 2 END
+        LIMIT 1
+      `);
+      const dirTel = dirResult.rows[0]?.telephone;
+      if (dirTel) {
+        const dateStr = new Date().toLocaleDateString("fr-FR");
+        const msg = `Rapport delegue ${agent?.nom ?? ""} — ${dateStr}: Recu: ${montantRecu.toLocaleString("fr-FR")} FCFA. Paye: ${montantPaye.toLocaleString("fr-FR")} FCFA. Solde theorique: ${soldeTheorique.toLocaleString("fr-FR")} FCFA. Reel: ${soldeReel.toLocaleString("fr-FR")} FCFA. Ecart: ${ecart > 0 ? "+" : ""}${ecart.toLocaleString("fr-FR")} FCFA. Zone: ${agent?.section ?? "—"}`;
+        await sendSMS(dirTel, msg);
+      }
+    } catch (smsErr) {
+      logger.warn({ smsErr }, "SMS clôture journée délégué non envoyé");
+    }
+  }
+
+  logger.info({ agentId, soldeTheorique, soldeReel, ecart }, "Clôture journée délégué");
+
+  return {
+    soldeTheorique,
+    soldeReel,
+    ecart,
+    montantRecu,
+    montantPaye,
+  };
+}
+
+// ─── Alertes caisses déléguées ────────────────────────────────────────────────
+
+export async function getAlertesCaissesDelegues(coopId: number) {
+  const agents = await listDelegues(coopId);
+  return agents.filter((a) => a.caisse.solde === 0 || a.paiementsDifferes.nb > 0);
 }

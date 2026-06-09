@@ -86,6 +86,16 @@ export default function Accueil() {
           </div>
         )}
 
+        {/* Alerte caisse vide */}
+        {caisse !== null && caisse.solde === 0 && (
+          <div style={{ margin: "12px 16px 0", background: "#fef2f2", border: "1.5px solid #fca5a5", borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ fontWeight: 800, color: "#dc2626", fontSize: ".95rem", marginBottom: 4 }}>⚠️ CAISSE VIDE</div>
+            <div style={{ color: "#b91c1c", fontSize: ".83rem", lineHeight: 1.4 }}>
+              Votre caisse est vide. Contactez l'administration pour alimenter votre caisse avant de procéder aux paiements.
+            </div>
+          </div>
+        )}
+
         {/* Stats du jour */}
         {!loading && bilan && (
           <div className="t-stats">
