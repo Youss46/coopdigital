@@ -38,11 +38,15 @@ async function downloadPdf(path: string, filename: string) {
   const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) return;
   const blob = await res.blob();
+  if (blob.size === 0) return;
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 200);
 }
 
 // ── Composant formations d'un membre ─────────────────────────────────────────

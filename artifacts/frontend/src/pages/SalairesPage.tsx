@@ -39,11 +39,15 @@ async function downloadPdfBulletin(bulletinId: number) {
   const res = await fetch(`/api/rapports/recu/bulletin/${bulletinId}`, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) return;
   const blob = await res.blob();
+  if (blob.size === 0) return;
+  const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  a.href = blobUrl;
   a.download = `bulletin_paie_${bulletinId}.pdf`;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 200);
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────

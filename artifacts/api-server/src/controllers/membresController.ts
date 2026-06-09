@@ -207,10 +207,6 @@ export async function exportMembresPdf(req: Request, res: Response): Promise<voi
       statutFilter === "inactif" ? "Membres inactifs" :
       "Tous les membres";
 
-    const filename = `membres-${statutFilter ?? "tous"}-${new Date().toISOString().slice(0, 10)}.pdf`;
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
     const coopId = cooperativeId;
     const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
     const pdfChunks: Buffer[] = [];
@@ -239,47 +235,51 @@ export async function exportMembresPdf(req: Request, res: Response): Promise<voi
 
     // En-têtes tableau
     const cols = { nom: 50, code: 200, tel: 285, village: 370, superficie: 450, statut: 510 };
-    const rowH = 22;
+    const rowH = 20;
 
     const drawTableHeader = () => {
-      doc.rect(50, doc.y, doc.page.width - 100, rowH).fill("#f0fdf4");
-      const y = doc.y + 6;
+      const headerY = doc.y;
+      doc.rect(50, headerY, doc.page.width - 100, rowH).fill("#f0fdf4");
+      const ty = headerY + 6;
       doc.fillColor(VERT).fontSize(8).font("Helvetica-Bold");
-      doc.text("NOM & PRÉNOMS", cols.nom, y, { width: 145 });
-      doc.text("CODE", cols.code, y, { width: 80 });
-      doc.text("TÉLÉPHONE", cols.tel, y, { width: 80 });
-      doc.text("VILLAGE", cols.village, y, { width: 75 });
-      doc.text("HA", cols.superficie, y, { width: 55, align: "right" });
-      doc.text("STATUT", cols.statut, y, { width: 55 });
+      doc.text("NOM & PRÉNOMS", cols.nom, ty, { width: 145, lineBreak: false });
+      doc.text("CODE",          cols.code,      ty, { width: 80,  lineBreak: false });
+      doc.text("TÉLÉPHONE",     cols.tel,        ty, { width: 80,  lineBreak: false });
+      doc.text("VILLAGE",       cols.village,    ty, { width: 75,  lineBreak: false });
+      doc.text("HA",            cols.superficie, ty, { width: 55,  lineBreak: false, align: "right" });
+      doc.text("STATUT",        cols.statut,     ty, { width: 55,  lineBreak: false });
       doc.fillColor(NOIR);
-      doc.y += rowH;
+      doc.y = headerY + rowH;
       doc.moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke("#e5e7eb");
     };
 
     drawTableHeader();
 
-    membres.forEach((m, i) => {
+    for (const [i, m] of membres.entries()) {
       if (doc.y > doc.page.height - 80) {
         doc.addPage();
         drawTableHeader();
       }
-      const y = doc.y + 5;
+      const rowY = doc.y;
       if (i % 2 === 0) {
-        doc.rect(50, doc.y, doc.page.width - 100, rowH).fill("#f9fafb");
+        doc.rect(50, rowY, doc.page.width - 100, rowH).fill("#f9fafb");
       }
+      const ty = rowY + 5;
       const code = computeCodeMembre(m.id, m.dateAdhesion);
       doc.fillColor(NOIR).fontSize(8).font("Helvetica");
-      doc.text(`${m.nom} ${m.prenoms}`, cols.nom, y, { width: 145 });
-      doc.fillColor(VERT).font("Helvetica-Bold").text(code, cols.code, y, { width: 80 });
-      doc.fillColor(NOIR).font("Helvetica").text(m.telephone, cols.tel, y, { width: 80 });
-      doc.text(m.village ?? "—", cols.village, y, { width: 75 });
-      doc.text(parseFloat(m.superficieHa).toFixed(2), cols.superficie, y, { width: 55, align: "right" });
+      doc.text(`${m.nom} ${m.prenoms}`,            cols.nom,      ty, { width: 145, lineBreak: false });
+      doc.fillColor(VERT).font("Helvetica-Bold");
+      doc.text(code,                                cols.code,     ty, { width: 80,  lineBreak: false });
+      doc.fillColor(NOIR).font("Helvetica");
+      doc.text(m.telephone ?? "—",                  cols.tel,       ty, { width: 80,  lineBreak: false });
+      doc.text(m.village   ?? "—",                  cols.village,   ty, { width: 75,  lineBreak: false });
+      doc.text(parseFloat(m.superficieHa).toFixed(2), cols.superficie, ty, { width: 55, lineBreak: false, align: "right" });
       const statutColor = m.statut === "actif" ? "#16a34a" : "#6b7280";
-      doc.fillColor(statutColor).font("Helvetica-Bold")
-        .text(m.statut === "actif" ? "Actif" : "Inactif", cols.statut, y, { width: 55 });
+      doc.fillColor(statutColor).font("Helvetica-Bold");
+      doc.text(m.statut === "actif" ? "Actif" : "Inactif", cols.statut, ty, { width: 55, lineBreak: false });
       doc.fillColor(NOIR);
-      doc.y += rowH;
-    });
+      doc.y = rowY + rowH;
+    }
 
     const membresRange = doc.bufferedPageRange();
     for (let i = 0; i < membresRange.count; i++) {
@@ -288,7 +288,12 @@ export async function exportMembresPdf(req: Request, res: Response): Promise<voi
     }
     doc.end();
     const pdfBuf = await pdfEndPromise;
-    res.send(pdfBuf);
+
+    const filename = `membres-${statutFilter ?? "tous"}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", String(pdfBuf.length));
+    res.end(pdfBuf);
   } catch (err) {
     req.log.error({ err }, "Erreur exportMembresPdf");
     if (!res.headersSent) res.status(500).json({ erreur: "Erreur interne du serveur" });

@@ -25,11 +25,15 @@ async function downloadPdf(url: string, filename: string) {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) return;
   const blob = await res.blob();
+  if (blob.size === 0) return;
+  const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  a.href = blobUrl;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 200);
 }
 
 export default function Avances() {

@@ -38,12 +38,15 @@ export default function Membres() {
       });
       if (!res.ok) throw new Error("Erreur export");
       const blob = await res.blob();
+      if (blob.size === 0) throw new Error("PDF vide");
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `membres-${statut || "tous"}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 200);
     } catch {
       alert("Impossible de générer le PDF");
     } finally {
