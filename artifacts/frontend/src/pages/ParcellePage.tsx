@@ -1010,6 +1010,12 @@ function StatCouverture({ label, value, sub, color, icon: Icon }: {
   );
 }
 
+interface CoopConfig {
+  nom_complet: string | null;
+  nom_abrege: string | null;
+  region: string | null;
+}
+
 function OngletCarteGlobale() {
   const qc = useQueryClient();
   const [filterEudr, setFilterEudr] = useState("all");
@@ -1024,6 +1030,15 @@ function OngletCarteGlobale() {
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingXlsx, setIsExportingXlsx] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
+
+  const configQ = useQuery({
+    queryKey: ["coop-config"],
+    queryFn: () => apiFetch<CoopConfig>("/api/config"),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const coopNom = configQ.data?.nom_complet ?? configQ.data?.nom_abrege ?? "CoopDigital";
+  const coopRegion = configQ.data?.region;
 
   const zonesQ = useQuery({
     queryKey: ["parcelles-zones-filtres"],
@@ -1539,12 +1554,18 @@ function OngletCarteGlobale() {
           : filterVillage ? `Village : ${filterVillage}` : null;
         return (
           <div className="print-only">
-            <div style={{ marginBottom: 16 }}>
-              <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Rapport EUDR — Couverture GPS parcelles</h1>
+            <div style={{ marginBottom: 16, borderBottom: "2px solid #15803d", paddingBottom: 10 }}>
+              <p style={{ fontSize: 10, color: "#6b7280", margin: "0 0 2px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {coopNom}{coopRegion ? ` · ${coopRegion}` : ""}
+              </p>
+              <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "#111" }}>Rapport EUDR — Couverture GPS parcelles</h1>
               <p style={{ fontSize: 11, color: "#555", margin: "4px 0 0" }}>
-                Généré le {dateStr} · CoopDigital
+                Généré le {dateStr}
                 {filtreLabel && <span style={{ marginLeft: 8, background: "#dcfce7", color: "#15803d", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>Filtre : {filtreLabel}</span>}
               </p>
+            </div>
+            <div className="print-page-footer">
+              {coopNom}{coopRegion ? ` · ${coopRegion}` : ""} &nbsp;·&nbsp; Rapport EUDR généré le {dateStr}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
