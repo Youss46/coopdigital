@@ -180,10 +180,14 @@ export async function getDashboardTracabilite(req: Request, res: Response): Prom
           eq(membresTable.cooperativeId, cooperativeId),
           sql`${membresTable.statutMembre} = 'en_attente'`,
         )),
-      db.select({ eudrStatut: parcellesTable.eudrStatut, count: sql<number>`count(*)::int` })
-        .from(parcellesTable)
-        .where(and(eq(parcellesTable.cooperativeId, cooperativeId), eq(parcellesTable.actif, true)))
-        .groupBy(parcellesTable.eudrStatut),
+      db.select({ eudrStatut: membresTable.statutEudr, count: sql<number>`count(*)::int` })
+        .from(membresTable)
+        .where(and(
+          eq(membresTable.cooperativeId, cooperativeId),
+          sql`${membresTable.statutMembre} = 'actif'`,
+          sql`${membresTable.gpsParcelles} IS NOT NULL`,
+        ))
+        .groupBy(membresTable.statutEudr),
       db.select({ count: sql<number>`count(*)::int` })
         .from(missionsTerrainTable)
         .where(and(

@@ -520,14 +520,23 @@ export async function validerParcelleMission(req: Request, res: Response): Promi
       .limit(1);
 
     if (membreActuel) {
+      // Calculer superficie depuis le polygone GPS
+      const gpsPoints = mm.gpsCollecte as GpsPointRaw[] | null;
+      const poly: [number, number][] = (gpsPoints ?? [])
+        .filter(p => typeof p.lat === "number" && typeof p.lon === "number")
+        .map(p => [p.lat, p.lon] as [number, number]);
+      const sfHa = calculerSuperficie(poly);
+
       const updatedMembre = await db
         .update(membresTable)
         .set({
-          gpsParcelles: mm.gpsCollecte,
-          gpsCollectePar: mission.agentId,
-          gpsValidePar: userId,
+          gpsParcelles:    mm.gpsCollecte,
+          gpsCollectePar:  mission.agentId,
+          gpsValidePar:    userId,
           dateCollecteGps: mm.dateCollecte ?? new Date(),
-          updatedAt: new Date(),
+          superficieTotale: String(sfHa > 0 ? sfHa : parseFloat(String(membreActuel.superficieHa ?? "0"))),
+          nombreParcelles:  membreActuel.nombreParcelles ?? 1,
+          updatedAt:        new Date(),
         })
         .where(eq(membresTable.id, membreId))
         .returning();
@@ -545,7 +554,7 @@ export async function validerParcelleMission(req: Request, res: Response): Promi
       }
 
       // Auto-créer ou mettre à jour la parcelle dans parcellesTable
-      void autoCreerParcelleMission({
+      await autoCreerParcelleMission({
         cooperativeId,
         membreId,
         gpsCollecte: mm.gpsCollecte,
@@ -799,6 +808,13 @@ export async function validerToutCollectes(req: Request, res: Response): Promise
 
     // Pour chaque membre : intégrer les données GPS + recalculer complétude
     for (const row of toValider) {
+      // Calculer superficie depuis le polygone GPS collecté
+      const gpsPoints = row.gpsCollecte as GpsPointRaw[] | null;
+      const poly: [number, number][] = (gpsPoints ?? [])
+        .filter(p => typeof p.lat === "number" && typeof p.lon === "number")
+        .map(p => [p.lat, p.lon] as [number, number]);
+      const sfHa = calculerSuperficie(poly);
+
       const [updatedMembre] = await db
         .update(membresTable)
         .set({
@@ -806,6 +822,8 @@ export async function validerToutCollectes(req: Request, res: Response): Promise
           gpsCollectePar:   mission.agentId,
           gpsValidePar:     userId,
           dateCollecteGps:  row.dateCollecte ?? new Date(),
+          superficieTotale: sfHa > 0 ? String(sfHa) : sql`COALESCE(${membresTable.superficieTotale}, ${membresTable.superficieHa}::numeric)`,
+          nombreParcelles:  sql`COALESCE(${membresTable.nombreParcelles}, 1)`,
           updatedAt:        new Date(),
         })
         .where(eq(membresTable.id, row.membreId))
@@ -822,7 +840,7 @@ export async function validerToutCollectes(req: Request, res: Response): Promise
           .where(eq(membresTable.id, row.membreId));
 
         // Auto-créer ou mettre à jour la parcelle dans parcellesTable
-        void autoCreerParcelleMission({
+        await autoCreerParcelleMission({
           cooperativeId,
           membreId: row.membreId,
           gpsCollecte: row.gpsCollecte,
