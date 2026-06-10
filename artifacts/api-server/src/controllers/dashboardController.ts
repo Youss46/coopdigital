@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
-import { db, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable } from "@workspace/db";
-import { eq, sql, desc, gte, and } from "drizzle-orm";
+import { db, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable } from "@workspace/db";
+import { eq, sql, desc, gte, and, isNull } from "drizzle-orm";
 
 export async function getDashboard(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -143,6 +143,76 @@ export async function getDashboardAvancesRetard(req: Request, res: Response): Pr
     res.json(avances);
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboardAvancesRetard");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function getDashboardTracabilite(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+  try {
+    const [
+      [membresRow],
+      [sansGpsRow],
+      [demandesRow],
+      parcellesRows,
+      [missionsRow],
+    ] = await Promise.all([
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(membresTable)
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"))),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(membresTable)
+        .where(and(
+          eq(membresTable.cooperativeId, cooperativeId),
+          eq(membresTable.statut, "actif"),
+          isNull(membresTable.polygoneGps),
+          isNull(membresTable.gpsParcelles),
+        )),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(membresTable)
+        .where(and(
+          eq(membresTable.cooperativeId, cooperativeId),
+          sql`${membresTable.statutMembre} = 'en_attente'`,
+        )),
+      db.select({ eudrStatut: parcellesTable.eudrStatut, count: sql<number>`count(*)::int` })
+        .from(parcellesTable)
+        .where(and(eq(parcellesTable.cooperativeId, cooperativeId), eq(parcellesTable.actif, true)))
+        .groupBy(parcellesTable.eudrStatut),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(missionsTerrainTable)
+        .where(and(
+          eq(missionsTerrainTable.cooperativeId, cooperativeId),
+          sql`${missionsTerrainTable.statut} = 'soumise'`,
+        )),
+    ]);
+
+    const membresTotal = membresRow?.count ?? 0;
+    const membresSansGps = sansGpsRow?.count ?? 0;
+    const demandesEnAttente = demandesRow?.count ?? 0;
+    const missionsSoumises = missionsRow?.count ?? 0;
+
+    let parcellesTotal = 0, parcellesConformes = 0, parcellesNonConformes = 0, parcellesNonVerifiees = 0;
+    for (const r of parcellesRows) {
+      parcellesTotal += r.count;
+      if (r.eudrStatut === "conforme")       parcellesConformes += r.count;
+      else if (r.eudrStatut === "non_conforme") parcellesNonConformes += r.count;
+      else                                    parcellesNonVerifiees += r.count;
+    }
+
+    const tauxEudrConforme   = parcellesTotal > 0 ? Math.round((parcellesConformes / parcellesTotal) * 100) : 0;
+    const tauxCompletionGps  = membresTotal   > 0 ? Math.round(((membresTotal - membresSansGps) / membresTotal) * 100) : 0;
+
+    res.json({
+      membresTotal, membresSansGps, demandesEnAttente, missionsSoumises,
+      parcellesTotal, parcellesConformes, parcellesNonConformes, parcellesNonVerifiees,
+      tauxEudrConforme, tauxCompletionGps,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Erreur getDashboardTracabilite");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

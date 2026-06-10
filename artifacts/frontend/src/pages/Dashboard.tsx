@@ -1,5 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
 import { useGetDashboard, useGetDashboardLivraisons, useGetDashboardAvancesRetard } from "@workspace/api-client-react";
-import { Users, TrendingUp, Package, Banknote, AlertTriangle, Clock } from "lucide-react";
+import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLocation } from "wouter";
+
+const tok = () => localStorage.getItem("coop_token") ?? "";
+const apiFetch = (url: string) => fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
 
 function formaterFCFA(montant: number) {
   return new Intl.NumberFormat("fr-FR").format(montant) + " FCFA";
@@ -36,10 +42,220 @@ function CarteKpi({
   );
 }
 
+interface StatsRT {
+  membresTotal: number;
+  membresSansGps: number;
+  demandesEnAttente: number;
+  missionsSoumises: number;
+  parcellesTotal: number;
+  parcellesConformes: number;
+  parcellesNonConformes: number;
+  parcellesNonVerifiees: number;
+  tauxEudrConforme: number;
+  tauxCompletionGps: number;
+}
+
+function JaugeCirculaire({ pct, couleur, taille = 80 }: { pct: number; couleur: string; taille?: number }) {
+  const r = (taille - 12) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = (pct / 100) * circ;
+  return (
+    <svg width={taille} height={taille} viewBox={`0 0 ${taille} ${taille}`}>
+      <circle cx={taille / 2} cy={taille / 2} r={r} fill="none" stroke="#f3f4f6" strokeWidth={10} />
+      <circle
+        cx={taille / 2} cy={taille / 2} r={r} fill="none"
+        stroke={couleur} strokeWidth={10}
+        strokeDasharray={`${dash} ${circ - dash}`}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${taille / 2} ${taille / 2})`}
+      />
+      <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" fontSize={taille * 0.22} fontWeight="bold" fill="#111827">
+        {pct}%
+      </text>
+    </svg>
+  );
+}
+
+function DashboardRT() {
+  const [, navigate] = useLocation();
+
+  const { data: stats, isLoading } = useQuery<StatsRT>({
+    queryKey: ["dashboard-tracabilite"],
+    queryFn: async () => {
+      const r = await apiFetch("/api/dashboard/tracabilite");
+      if (!r.ok) throw new Error("Erreur chargement");
+      return r.json() as Promise<StatsRT>;
+    },
+  });
+
+  const { data: conformite } = useQuery<{
+    nb_parcelles_total: number;
+    nb_conformes: number;
+    nb_non_conformes: number;
+    nb_non_verifiees: number;
+    par_section: { section: string; total: number; conformes: number; pct: number }[];
+  }>({
+    queryKey: ["parcelles-conformite"],
+    queryFn: async () => {
+      const r = await apiFetch("/api/parcelles/conformite");
+      if (!r.ok) return null;
+      return r.json();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse h-24" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const s = stats ?? {
+    membresTotal: 0, membresSansGps: 0, demandesEnAttente: 0, missionsSoumises: 0,
+    parcellesTotal: 0, parcellesConformes: 0, parcellesNonConformes: 0, parcellesNonVerifiees: 0,
+    tauxEudrConforme: 0, tauxCompletionGps: 0,
+  };
+
+  const parSections = (conformite?.par_section ?? []).slice(0, 6);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Tableau de bord Traçabilité</h1>
+        <p className="text-gray-500 text-sm mt-1">EUDR · Parcelles · Missions terrain</p>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <CarteKpi
+          titre="Conformité EUDR"
+          valeur={`${s.tauxEudrConforme} %`}
+          icone={CheckCircle2}
+          couleur={s.tauxEudrConforme >= 80 ? "#16a34a" : s.tauxEudrConforme >= 50 ? "#c4962a" : "#dc2626"}
+          sousTitre={`${s.parcellesConformes} / ${s.parcellesTotal} parcelles`}
+        />
+        <CarteKpi
+          titre="Couverture GPS"
+          valeur={`${s.tauxCompletionGps} %`}
+          icone={MapPin}
+          couleur="#2563eb"
+          sousTitre={`${s.membresSansGps} membre${s.membresSansGps !== 1 ? "s" : ""} sans GPS`}
+        />
+        <CarteKpi
+          titre="Demandes en attente"
+          valeur={String(s.demandesEnAttente)}
+          icone={Users}
+          couleur="#c4962a"
+          sousTitre="À valider ou rejeter"
+        />
+        <CarteKpi
+          titre="Missions à valider"
+          valeur={String(s.missionsSoumises)}
+          icone={Navigation}
+          couleur={s.missionsSoumises > 0 ? "#7c3aed" : "#6b7280"}
+          sousTitre="Données GPS soumises"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="font-semibold text-gray-900 text-sm mb-4 flex items-center gap-2">
+            <MapPinned size={15} className="text-gray-400" />Conformité EUDR — Vue globale
+          </h2>
+          <div className="flex items-center gap-6">
+            <JaugeCirculaire pct={s.tauxEudrConforme} couleur={s.tauxEudrConforme >= 80 ? "#16a34a" : s.tauxEudrConforme >= 50 ? "#c4962a" : "#dc2626"} taille={96} />
+            <div className="space-y-2 flex-1">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />Conformes</span>
+                <span className="font-semibold">{s.parcellesConformes}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />Non conformes</span>
+                <span className="font-semibold">{s.parcellesNonConformes}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-gray-300 inline-block" />Non vérifiées</span>
+                <span className="font-semibold">{s.parcellesNonVerifiees}</span>
+              </div>
+              <div className="pt-1 border-t border-gray-100 flex items-center justify-between text-sm font-medium">
+                <span>Total</span>
+                <span>{s.parcellesTotal}</span>
+              </div>
+            </div>
+          </div>
+          <button onClick={() => navigate("/parcelles")}
+            className="mt-4 w-full text-center text-xs text-green-700 hover:underline">
+            Voir toutes les parcelles →
+          </button>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="font-semibold text-gray-900 text-sm mb-4 flex items-center gap-2">
+            <MapPinned size={15} className="text-gray-400" />Conformité par section
+          </h2>
+          {parSections.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">Aucune donnée de section disponible</p>
+          ) : (
+            <div className="space-y-2">
+              {parSections.map((sec) => (
+                <div key={sec.section}>
+                  <div className="flex items-center justify-between text-xs text-gray-600 mb-0.5">
+                    <span className="truncate max-w-[60%]">{sec.section}</span>
+                    <span className="font-medium">{sec.pct}% ({sec.conformes}/{sec.total})</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${sec.pct >= 80 ? "bg-green-500" : sec.pct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
+                      style={{ width: `${sec.pct}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {s.demandesEnAttente > 0 && (
+          <button onClick={() => navigate("/membres?statut=en_attente")}
+            className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left hover:bg-amber-100 transition-colors">
+            <p className="text-amber-800 font-semibold text-sm">{s.demandesEnAttente} demande{s.demandesEnAttente > 1 ? "s" : ""} à traiter</p>
+            <p className="text-amber-600 text-xs mt-0.5">Valider ou rejeter les nouveaux membres →</p>
+          </button>
+        )}
+        {s.missionsSoumises > 0 && (
+          <button onClick={() => navigate("/missions")}
+            className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-left hover:bg-purple-100 transition-colors">
+            <p className="text-purple-800 font-semibold text-sm">{s.missionsSoumises} mission{s.missionsSoumises > 1 ? "s" : ""} à valider</p>
+            <p className="text-purple-600 text-xs mt-0.5">Données GPS soumises par les agents →</p>
+          </button>
+        )}
+        {s.membresSansGps > 0 && (
+          <button onClick={() => navigate("/missions")}
+            className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left hover:bg-blue-100 transition-colors">
+            <p className="text-blue-800 font-semibold text-sm">{s.membresSansGps} membre{s.membresSansGps > 1 ? "s" : ""} sans GPS</p>
+            <p className="text-blue-600 text-xs mt-0.5">Créer des missions terrain pour les cartographier →</p>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
+  const { utilisateur } = useAuth();
   const { data: kpi, isLoading: kpiChargement } = useGetDashboard();
   const { data: livraisons } = useGetDashboardLivraisons();
   const { data: avancesRetard } = useGetDashboardAvancesRetard();
+
+  if (utilisateur?.role === "responsable_tracabilite") {
+    return <DashboardRT />;
+  }
 
   return (
     <div className="space-y-6">

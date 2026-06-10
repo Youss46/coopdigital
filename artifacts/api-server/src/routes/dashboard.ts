@@ -4,6 +4,7 @@ import {
   getDashboard,
   getDashboardLivraisons,
   getDashboardAvancesRetard,
+  getDashboardTracabilite,
 } from "../controllers/dashboardController";
 import {
   requirePca,
@@ -19,6 +20,7 @@ router.use(authMiddleware);
 router.get("/dashboard", getDashboard);
 router.get("/dashboard/livraisons", getDashboardLivraisons);
 router.get("/dashboard/avances-retard", getDashboardAvancesRetard);
+router.get("/dashboard/tracabilite", getDashboardTracabilite);
 
 router.get("/dashboard/pca/synthese", requirePca, getSynthesePca);
 router.get("/dashboard/pca/alertes-prioritaires", requirePca, getAlertesPrioritairesPca);

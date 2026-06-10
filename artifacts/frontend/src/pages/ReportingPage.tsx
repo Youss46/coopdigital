@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -13,6 +14,7 @@ import {
   useGetMargeCampagnes,
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
+import { useAuth } from "@/contexts/AuthContext";
 function getAuthToken(): string | null {
   return localStorage.getItem("coop_token");
 }
@@ -517,6 +519,238 @@ function FicheMembre() {
   );
 }
 
+// ─── Reporting EUDR (pour responsable_tracabilite) ────────────────────────────
+const tok = () => localStorage.getItem("coop_token") ?? "";
+const apiFetch = (url: string) => fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
+
+interface StatsRT {
+  membresTotal: number;
+  membresSansGps: number;
+  demandesEnAttente: number;
+  missionsSoumises: number;
+  parcellesTotal: number;
+  parcellesConformes: number;
+  parcellesNonConformes: number;
+  parcellesNonVerifiees: number;
+  tauxEudrConforme: number;
+  tauxCompletionGps: number;
+}
+
+interface ConformiteData {
+  nb_parcelles_total: number;
+  nb_conformes: number;
+  nb_non_conformes: number;
+  nb_non_verifiees: number;
+  par_section: { section: string; total: number; conformes: number; pct: number }[];
+}
+
+function JaugePct({ pct, couleur }: { pct: number; couleur: string }) {
+  return (
+    <div className="w-full">
+      <div className="flex justify-between text-xs text-gray-500 mb-1">
+        <span>0%</span>
+        <span className="font-semibold" style={{ color: couleur }}>{pct}%</span>
+        <span>100%</span>
+      </div>
+      <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: couleur }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CarteStatRT({
+  titre, valeur, sousTitre, couleur,
+}: { titre: string; valeur: string; sousTitre?: string; couleur?: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <p className="text-sm text-gray-500">{titre}</p>
+      <p className="text-2xl font-bold mt-1" style={{ color: couleur ?? "#111827" }}>{valeur}</p>
+      {sousTitre && <p className="text-xs text-gray-400 mt-0.5">{sousTitre}</p>}
+    </div>
+  );
+}
+
+function ReportingEudr() {
+  const { data: stats, isLoading: sl } = useQuery<StatsRT>({
+    queryKey: ["dashboard-tracabilite"],
+    queryFn: async () => {
+      const r = await apiFetch("/api/dashboard/tracabilite");
+      if (!r.ok) throw new Error("Erreur");
+      return r.json() as Promise<StatsRT>;
+    },
+  });
+
+  const { data: conformite, isLoading: cl } = useQuery<ConformiteData>({
+    queryKey: ["parcelles-conformite"],
+    queryFn: async () => {
+      const r = await apiFetch("/api/parcelles/conformite");
+      if (!r.ok) return null;
+      return r.json();
+    },
+  });
+
+  const isLoading = sl || cl;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="bg-white rounded-xl border border-gray-200 h-20 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  const s: StatsRT = stats ?? {
+    membresTotal: 0, membresSansGps: 0, demandesEnAttente: 0, missionsSoumises: 0,
+    parcellesTotal: 0, parcellesConformes: 0, parcellesNonConformes: 0, parcellesNonVerifiees: 0,
+    tauxEudrConforme: 0, tauxCompletionGps: 0,
+  };
+
+  const eudrCouleur = s.tauxEudrConforme >= 80 ? "#16a34a" : s.tauxEudrConforme >= 50 ? "#c4962a" : "#dc2626";
+  const gpsCouleur  = s.tauxCompletionGps  >= 80 ? "#16a34a" : s.tauxCompletionGps  >= 50 ? "#c4962a" : "#dc2626";
+
+  const pieData = [
+    { name: "Conformes",      value: s.parcellesConformes,    fill: "#16a34a" },
+    { name: "Non conformes",  value: s.parcellesNonConformes, fill: "#dc2626" },
+    { name: "Non vérifiées",  value: s.parcellesNonVerifiees, fill: "#d1d5db" },
+  ].filter((d) => d.value > 0);
+
+  const parSections = (conformite?.par_section ?? []);
+  const barData = parSections.map((s) => ({ section: s.section, "% Conforme": s.pct }));
+
+  return (
+    <div className="space-y-8">
+      {/* Taux de complétion */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <h2 className="font-semibold text-gray-900 mb-4">Taux de complétion des fiches membres</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <p className="text-sm text-gray-600 mb-2">Couverture GPS</p>
+            <JaugePct pct={s.tauxCompletionGps} couleur={gpsCouleur} />
+            <p className="text-xs text-gray-400 mt-1">
+              {s.membresTotal - s.membresSansGps} membres géolocalisés sur {s.membresTotal}
+              {s.membresSansGps > 0 && ` · ${s.membresSansGps} sans GPS`}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 mb-2">Conformité EUDR parcelles</p>
+            <JaugePct pct={s.tauxEudrConforme} couleur={eudrCouleur} />
+            <p className="text-xs text-gray-400 mt-1">
+              {s.parcellesConformes} conformes sur {s.parcellesTotal} parcelles actives
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* KPIs résumé */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <CarteStatRT titre="Membres actifs" valeur={String(s.membresTotal)} />
+        <CarteStatRT titre="Sans GPS" valeur={String(s.membresSansGps)} couleur={s.membresSansGps > 0 ? "#c4962a" : "#16a34a"} sousTitre="à cartographier" />
+        <CarteStatRT titre="Demandes en attente" valeur={String(s.demandesEnAttente)} couleur={s.demandesEnAttente > 0 ? "#c4962a" : "#16a34a"} />
+        <CarteStatRT titre="Missions à valider" valeur={String(s.missionsSoumises)} couleur={s.missionsSoumises > 0 ? "#7c3aed" : "#16a34a"} sousTitre="données GPS soumises" />
+      </div>
+
+      {/* Parcelles EUDR — répartition */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="font-semibold text-gray-900 text-sm mb-4">Répartition EUDR — {s.parcellesTotal} parcelles</h2>
+          {pieData.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">Aucune parcelle active</p>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80}>
+                    {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => [`${v} parcelles`]} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {[
+                  { label: "Conformes",     val: s.parcellesConformes,    col: "text-green-700",  bg: "bg-green-50 border-green-200" },
+                  { label: "Non conformes", val: s.parcellesNonConformes, col: "text-red-700",    bg: "bg-red-50 border-red-200" },
+                  { label: "Non vérifiées", val: s.parcellesNonVerifiees, col: "text-gray-700",   bg: "bg-gray-50 border-gray-200" },
+                ].map((item) => (
+                  <div key={item.label} className={`rounded-lg border text-center py-2 ${item.bg}`}>
+                    <p className={`text-lg font-bold ${item.col}`}>{item.val}</p>
+                    <p className="text-xs text-gray-500">{item.label}</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Par section */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="font-semibold text-gray-900 text-sm mb-4">Conformité EUDR par section</h2>
+          {barData.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">Aucune donnée de section</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={barData} layout="vertical" margin={{ left: 0, right: 20 }}>
+                <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="section" width={90} tick={{ fontSize: 11 }} />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <Tooltip formatter={(v: number) => [`${v}%`, "Conformité"]} />
+                <Bar dataKey="% Conforme" fill="#16a34a" radius={[0, 4, 4, 0]}>
+                  {barData.map((entry, i) => (
+                    <Cell key={i} fill={entry["% Conforme"] >= 80 ? "#16a34a" : entry["% Conforme"] >= 50 ? "#c4962a" : "#dc2626"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* Tableau détaillé par section */}
+      {parSections.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="font-semibold text-gray-900 text-sm">Détail par section — Rapport EUDR</h2>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs">
+              <tr>
+                <th className="text-left px-5 py-3">Section</th>
+                <th className="text-right px-5 py-3">Total</th>
+                <th className="text-right px-5 py-3">Conformes</th>
+                <th className="text-right px-5 py-3">Non conformes</th>
+                <th className="text-right px-5 py-3">Taux</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {parSections.map((sec) => (
+                <tr key={sec.section} className="hover:bg-gray-50">
+                  <td className="px-5 py-3 font-medium text-gray-900">{sec.section}</td>
+                  <td className="px-5 py-3 text-right text-gray-700">{sec.total}</td>
+                  <td className="px-5 py-3 text-right text-green-700">{sec.conformes}</td>
+                  <td className="px-5 py-3 text-right text-red-600">{sec.total - sec.conformes}</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      sec.pct >= 80 ? "bg-green-100 text-green-800" :
+                      sec.pct >= 50 ? "bg-amber-100 text-amber-800" :
+                      "bg-red-100 text-red-800"
+                    }`}>{sec.pct}%</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Page principale ─────────────────────────────────────────────────────────
 type Onglet = "dashboard" | "etats" | "rapports";
 
@@ -527,7 +761,22 @@ const ONGLETS: { id: Onglet; label: string }[] = [
 ];
 
 export default function ReportingPage() {
+  const { utilisateur } = useAuth();
   const [onglet, setOnglet] = useState<Onglet>("dashboard");
+
+  if (utilisateur?.role === "responsable_tracabilite") {
+    return (
+      <div className="p-4 md:p-6 max-w-6xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Rapports EUDR</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Conformité parcelles, couverture GPS et taux de complétion des fiches membres
+          </p>
+        </div>
+        <ReportingEudr />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
