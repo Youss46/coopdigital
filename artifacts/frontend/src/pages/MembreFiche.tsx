@@ -376,7 +376,7 @@ export default function MembreFiche() {
   const peutModifier = usePermission("membres", "modifier");
   const avanceEnCours = avancesData?.avances?.find((a) => a.statut === "en_cours");
   const { utilisateur } = useAuth();
-  const peutTransferer = utilisateur?.role === "pca" || utilisateur?.role === "directeur";
+  const peutTransferer = utilisateur?.role === "pca" || utilisateur?.role === "directeur" || utilisateur?.role === "responsable_tracabilite";
 
   // Modal édition infos membre
   const [showEditModal, setShowEditModal] = useState(false);
@@ -719,10 +719,22 @@ export default function MembreFiche() {
             <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
               <AlertTriangle size={16} className="text-orange-500" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-medium text-gray-700">Non assigné</p>
               <p className="text-xs text-gray-500">Ce membre n'a pas encore de rattachement</p>
             </div>
+            {peutTransferer && (
+              <button
+                onClick={() => {
+                  setTransferForm({ rattachementType: "delegue", delegueId: undefined });
+                  setShowTransferModal(true);
+                }}
+                className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 rounded-lg px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100"
+              >
+                <Edit3 size={12} />
+                Assigner
+              </button>
+            )}
           </div>
         )}
       </div>

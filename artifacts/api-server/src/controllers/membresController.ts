@@ -548,9 +548,9 @@ export async function transfererRattachement(req: Request, res: Response): Promi
 
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
 
-  // RÈGLE 4 — Seuls pca et directeur peuvent transférer
-  if (userRole !== "pca" && userRole !== "directeur") {
-    res.status(403).json({ erreur: "Seuls le PCA et le Directeur peuvent modifier le rattachement" });
+  // RÈGLE 4 — Seuls pca, directeur et responsable_tracabilite peuvent transférer
+  if (userRole !== "pca" && userRole !== "directeur" && userRole !== "responsable_tracabilite") {
+    res.status(403).json({ erreur: "Vous n'avez pas la permission de modifier le rattachement" });
     return;
   }
 
