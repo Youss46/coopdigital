@@ -15,6 +15,7 @@ import {
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/contexts/AuthContext";
+import { Download } from "lucide-react";
 function getAuthToken(): string | null {
   return localStorage.getItem("coop_token");
 }
@@ -623,6 +624,55 @@ function ReportingEudr() {
   const parSections = (conformite?.par_section ?? []);
   const barData = parSections.map((s) => ({ section: s.section, "% Conforme": s.pct }));
 
+  async function handleExportTerrainGeoJSON() {
+    const r = await apiFetch("/api/parcelles/gps-terrain");
+    if (!r.ok) return;
+    const data = await r.json() as {
+      polygones: {
+        membreId: number; membreNom: string; membrePrenoms: string;
+        village: string | null; section: string | null;
+        missionId: number; missionTitre: string; statut: string;
+        dateCollecte: string | null; superficieHa: string | null;
+        polygone: [number, number][];
+      }[];
+    };
+    const features = data.polygones.map(p => {
+      const coords = p.polygone.map(([lat, lng]) => [lng, lat]);
+      const ring = coords.length > 0 ? [...coords, coords[0]] : coords;
+      return {
+        type: "Feature" as const,
+        geometry: { type: "Polygon" as const, coordinates: [ring] },
+        properties: {
+          membre_id:    p.membreId,
+          nom_membre:   `${p.membreNom} ${p.membrePrenoms}`.trim(),
+          village:      p.village ?? "",
+          section:      p.section ?? "",
+          superficie_ha: p.superficieHa ? parseFloat(String(p.superficieHa)) : 0,
+          date_collecte: p.dateCollecte ? p.dateCollecte.slice(0, 10) : null,
+          statut:       p.statut,
+          mission_id:   p.missionId,
+          mission_titre: p.missionTitre,
+        },
+      };
+    });
+    const geojson = {
+      type: "FeatureCollection",
+      features,
+      metadata: {
+        generated_at: new Date().toISOString(),
+        total_parcelles: features.length,
+        regulation: "EUDR (EU) 2023/1115",
+      },
+    };
+    const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/geo+json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gps_terrain_complet_${new Date().toISOString().slice(0, 10)}.geojson`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-8">
       {/* Taux de complétion */}
@@ -747,6 +797,26 @@ function ReportingEudr() {
           </table>
         </div>
       )}
+
+      {/* Export GPS Terrain */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="font-semibold text-gray-900 text-sm">Export GPS Terrain — GeoJSON EUDR</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Télécharger tous les polygones GPS collectés par les agents terrain au format GeoJSON
+              compatible avec QGIS et les outils de conformité EUDR (Règlement UE 2023/1115).
+            </p>
+          </div>
+          <button
+            onClick={handleExportTerrainGeoJSON}
+            className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-800 transition-colors"
+          >
+            <Download size={14} />
+            Télécharger GeoJSON
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

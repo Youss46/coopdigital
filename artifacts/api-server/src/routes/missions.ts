@@ -12,6 +12,7 @@ import {
   rejeterParcelleMission,
   membresSansGps,
   listAgentsTerrain,
+  exportMissionGeoJSON,
 } from "../controllers/missionsController";
 
 const router: IRouter = Router();
@@ -22,6 +23,7 @@ router.get("/missions/agents-terrain",  checkPermission("missions", "creer"),   
 router.get("/missions/sans-gps",        checkPermission("missions", "lire"),    membresSansGps);
 router.get("/missions",                 checkPermission("missions", "lire"),    listMissions);
 router.post("/missions",                checkPermission("missions", "creer"),   createMission);
+router.get("/missions/:id/export-geojson", checkPermission("missions", "lire"),  exportMissionGeoJSON);
 router.get("/missions/:id",             checkPermission("missions", "lire"),    getMissionById);
 router.post("/missions/:id/demarrer",   checkPermission("missions", "executer"), demarrerMission);
 router.post("/missions/:id/soumettre",  checkPermission("missions", "executer"), soumettreMission);

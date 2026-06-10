@@ -4,6 +4,7 @@ import { eq, and, desc, sql, asc } from "drizzle-orm";
 import { missionsTerrainTable, missionsMembresTable, usersTable, membresTable } from "@workspace/db";
 import { creerNotification, notifierParRole } from "../services/notificationService.js";
 import { computeCompletude } from "./membresController";
+import { calculerSuperficie } from "../services/parcelleService.js";
 
 // ── Liste des missions ────────────────────────────────────────────────────────
 
@@ -101,6 +102,100 @@ export async function getMissionById(req: Request, res: Response): Promise<void>
     res.json({ ...mission, membres });
   } catch (err) {
     req.log.error({ err }, "Erreur getMissionById");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ── Export GeoJSON d'une mission ─────────────────────────────────────────────
+
+interface GpsPointExport { lat: number; lon: number; accuracy?: number; ts: number; }
+
+export async function exportMissionGeoJSON(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const missionId = parseInt(String(req.params["id"] ?? "0"));
+
+  try {
+    const [mission] = await db
+      .select()
+      .from(missionsTerrainTable)
+      .where(and(eq(missionsTerrainTable.id, missionId), eq(missionsTerrainTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!mission) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
+
+    const rows = await db
+      .select({
+        membreId:     missionsMembresTable.membreId,
+        statut:       missionsMembresTable.statut,
+        gpsCollecte:  missionsMembresTable.gpsCollecte,
+        dateCollecte: missionsMembresTable.dateCollecte,
+        nom:          membresTable.nom,
+        prenoms:      membresTable.prenoms,
+        village:      membresTable.village,
+        section:      membresTable.section,
+        superficieHa: membresTable.superficieHa,
+      })
+      .from(missionsMembresTable)
+      .innerJoin(membresTable, eq(membresTable.id, missionsMembresTable.membreId))
+      .where(
+        and(
+          eq(missionsMembresTable.missionId, missionId),
+          sql`${missionsMembresTable.gpsCollecte} IS NOT NULL`,
+          sql`${missionsMembresTable.statut} IN ('collecte', 'valide')`,
+        ),
+      )
+      .orderBy(asc(membresTable.nom));
+
+    const features = rows
+      .map(row => {
+        const pts = row.gpsCollecte as GpsPointExport[] | null;
+        if (!pts || pts.length < 3) return null;
+        const validPts = pts.filter(p => typeof p.lat === "number" && typeof p.lon === "number");
+        if (validPts.length < 3) return null;
+        const coords = validPts.map(p => [p.lon, p.lat]);
+        const ring = [...coords, coords[0]];
+        const latLngPoly: [number, number][] = validPts.map(p => [p.lat, p.lon]);
+        const superficieCalculee = calculerSuperficie(latLngPoly);
+        return {
+          type: "Feature" as const,
+          geometry: { type: "Polygon" as const, coordinates: [ring] },
+          properties: {
+            membre_id:     row.membreId,
+            nom_membre:    `${row.nom} ${row.prenoms}`.trim(),
+            village:       row.village ?? "",
+            section:       row.section ?? "",
+            superficie_ha: superficieCalculee > 0 ? superficieCalculee : parseFloat(String(row.superficieHa ?? 0)),
+            date_collecte: row.dateCollecte ? new Date(row.dateCollecte as Date).toISOString().slice(0, 10) : null,
+            statut:        row.statut,
+            mission_id:    missionId,
+            mission_titre: mission.titre,
+            zone:          mission.zoneNom,
+          },
+        };
+      })
+      .filter(Boolean);
+
+    const geojson = {
+      type: "FeatureCollection",
+      features,
+      metadata: {
+        mission_id:     missionId,
+        mission_titre:  mission.titre,
+        zone:           mission.zoneNom,
+        generated_at:   new Date().toISOString(),
+        total_parcelles: features.length,
+        regulation:     "EUDR (EU) 2023/1115",
+      },
+    };
+
+    const filename = `gps_terrain_mission_${missionId}_${new Date().toISOString().slice(0, 10)}.geojson`;
+    res.setHeader("Content-Type", "application/geo+json");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.json(geojson);
+  } catch (err) {
+    req.log.error({ err }, "Erreur exportMissionGeoJSON");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

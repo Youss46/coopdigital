@@ -3,7 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft, MapPin, Users, Calendar, CheckCircle,
-  XCircle, Clock, Target, Loader2, AlertTriangle, Eye, Map, List,
+  XCircle, Clock, Target, Loader2, AlertTriangle, Eye, Map, List, Download,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
@@ -142,6 +142,20 @@ export default function MissionDetailPage() {
     onError: (e: Error) => alert(e.message),
   });
 
+  // ── Export GeoJSON ────────────────────────────────────────────────────────
+
+  async function handleExportGeoJSON() {
+    const r = await apiFetch(`/api/missions/${missionId}/export-geojson`);
+    if (!r.ok) return;
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gps_terrain_mission_${missionId}_${new Date().toISOString().slice(0, 10)}.geojson`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // ── Stats rapides ─────────────────────────────────────────────────────────
 
   const stats = mission ? {
@@ -208,6 +222,16 @@ export default function MissionDetailPage() {
               <Map size={14} />Carte GPS
             </button>
           </div>
+          {stats && (stats.collectes + stats.valides) > 0 && (
+            <button
+              onClick={handleExportGeoJSON}
+              title="Télécharger les polygones GPS de cette mission en GeoJSON EUDR"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-green-600 text-green-700 text-sm rounded-lg hover:bg-green-50 transition-colors"
+            >
+              <Download size={14} />
+              GeoJSON
+            </button>
+          )}
           {estAgent && mission.statut === "planifiee" && (
             <button onClick={() => demarrer.mutate()} disabled={demarrer.isPending}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
