@@ -1136,12 +1136,9 @@ function OngletCarteGlobale() {
   }
 
   async function handleExportPDF() {
-    const el = exportRef.current;
-    if (!el) return;
     setIsExporting(true);
     try {
-      const [{ default: html2canvas }, { jsPDF }, autoTableModule, configData] = await Promise.all([
-        import("html2canvas"),
+      const [{ jsPDF }, autoTableModule, configData] = await Promise.all([
         import("jspdf"),
         import("jspdf-autotable"),
         apiFetch<{ nom_complet?: string | null; nom_abrege?: string | null }>("/api/config").catch(() => ({})),
@@ -1151,30 +1148,44 @@ function OngletCarteGlobale() {
         ?? (configData as { nom_complet?: string | null; nom_abrege?: string | null }).nom_abrege
         ?? "CoopDigital";
 
-      const canvas = await html2canvas(el, {
-        useCORS: true,
-        scale: 1.5,
-        logging: false,
-        allowTaint: false,
-      });
-      const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const margin = 14;
       const dateStr = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
 
+      // ── Page 1 : résumé global ─────────────────────────────────────────────
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(14);
-      pdf.text("Rapport EUDR — Couverture GPS parcelles", margin, 13);
+      pdf.text("Rapport EUDR — Couverture GPS parcelles", margin, 14);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(9);
-      pdf.text(`Généré le ${dateStr} · ${nomCoop}`, margin, 20);
+      pdf.text(`Généré le ${dateStr} · ${nomCoop}`, margin, 21);
 
-      const imgW = pageW - margin * 2;
-      const imgH = Math.min((canvas.height * imgW) / canvas.width, pageH - 28);
-      pdf.addImage(imgData, "PNG", margin, 25, imgW, imgH);
+      if (stats) {
+        const pctTotal = stats.nb_parcelles_total > 0 ? Math.round((stats.nb_conformes / stats.nb_parcelles_total) * 100) : 0;
+        const resume = [
+          ["Parcelles totales",      String(stats.nb_parcelles_total)],
+          ["Parcelles conformes",    String(stats.nb_conformes)],
+          ["Non conformes",          String(stats.nb_non_conformes)],
+          ["En cours de vérif.",     String(stats.nb_en_cours)],
+          ["Taux de conformité",     `${pctTotal} %`],
+          ["Superficie totale (ha)", stats.superficie_totale_ha?.toFixed(2) ?? "—"],
+          ["Superficie conforme",    `${stats.superficie_conforme_ha?.toFixed(2) ?? "—"} ha (${stats.pct_superficie_conforme ?? 0} %)`],
+        ];
+        autoTable(pdf, {
+          startY: 28,
+          head: [["Indicateur", "Valeur"]],
+          body: resume,
+          margin: { left: margin, right: margin },
+          tableWidth: 90,
+          styles: { fontSize: 11, cellPadding: 5 },
+          headStyles: { fillColor: [22, 163, 74], textColor: 255, fontStyle: "bold" },
+          columnStyles: { 1: { halign: "right", fontStyle: "bold" } },
+        });
+      }
 
+      // ── Page 2 : synthèse par section ─────────────────────────────────────
       if (stats && stats.par_section.length > 0) {
         pdf.addPage();
 
@@ -1196,11 +1207,11 @@ function OngletCarteGlobale() {
           (acc, s) => ({ conformes: acc.conformes + s.conformes, total: acc.total + s.total, superficie_ha: acc.superficie_ha + s.superficie_ha }),
           { conformes: 0, total: 0, superficie_ha: 0 },
         );
-        const pctTotal = totaux.total > 0 ? Math.round((totaux.conformes / totaux.total) * 100) : 0;
+        const pctTotalSection = totaux.total > 0 ? Math.round((totaux.conformes / totaux.total) * 100) : 0;
         tableData.push([
           "TOTAL",
           `${totaux.conformes} / ${totaux.total}`,
-          `${pctTotal} %`,
+          `${pctTotalSection} %`,
           totaux.superficie_ha.toFixed(2),
         ]);
 
@@ -1226,10 +1237,38 @@ function OngletCarteGlobale() {
         });
       }
 
+      // ── Page 3 (optionnelle) : capture de la carte ─────────────────────────
+      // Les tuiles OSM sont cross-origin → on essaie, mais on ne bloque pas le PDF si ça échoue
+      const mapEl = exportRef.current;
+      if (mapEl) {
+        try {
+          const { default: html2canvas } = await import("html2canvas");
+          const canvas = await html2canvas(mapEl, {
+            useCORS: true,
+            allowTaint: true,
+            scale: 1.2,
+            logging: false,
+          });
+          const imgData = canvas.toDataURL("image/png");
+          pdf.addPage();
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(12);
+          pdf.text("Vue cartographique — Parcelles EUDR", margin, 14);
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(9);
+          pdf.text(`Généré le ${dateStr} · ${nomCoop}`, margin, 21);
+          const imgW = pageW - margin * 2;
+          const imgH = Math.min((canvas.height * imgW) / canvas.width, pageH - 28);
+          pdf.addImage(imgData, "PNG", margin, 25, imgW, imgH);
+        } catch {
+          // Capture carte échouée (CORS tuiles) — on génère le PDF sans la carte
+        }
+      }
+
       pdf.save(`eudr_rapport_${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch (e) {
       console.error(e);
-      alert("Erreur lors de la génération du PDF. Vérifiez que la carte est bien chargée.");
+      alert("Erreur lors de la génération du PDF.");
     } finally {
       setIsExporting(false);
     }
