@@ -121,7 +121,7 @@ interface ConformiteStats {
   pct_superficie_conforme: number;
   membres_avec_parcelle: number;
   membres_sans_parcelle: number;
-  par_section: { section: string; total: number; conformes: number; pct: number }[];
+  par_section: { section: string; total: number; conformes: number; pct: number; superficie_ha: number }[];
 }
 
 interface NouvelleParcelleForm {
@@ -1116,10 +1116,13 @@ function OngletCarteGlobale() {
     if (!el) return;
     setIsExporting(true);
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      const [{ default: html2canvas }, { jsPDF }, autoTableModule] = await Promise.all([
         import("html2canvas"),
         import("jspdf"),
+        import("jspdf-autotable"),
       ]);
+      const autoTable = (autoTableModule as { default: typeof autoTableModule.default }).default ?? autoTableModule;
+
       const canvas = await html2canvas(el, {
         useCORS: true,
         scale: 1.5,
@@ -1131,21 +1134,70 @@ function OngletCarteGlobale() {
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const margin = 14;
+      const dateStr = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
 
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(14);
       pdf.text("Rapport EUDR — Couverture GPS parcelles", margin, 13);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(9);
-      pdf.text(
-        `Généré le ${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })} · CoopDigital`,
-        margin,
-        20,
-      );
+      pdf.text(`Généré le ${dateStr} · CoopDigital`, margin, 20);
 
       const imgW = pageW - margin * 2;
       const imgH = Math.min((canvas.height * imgW) / canvas.width, pageH - 28);
       pdf.addImage(imgData, "PNG", margin, 25, imgW, imgH);
+
+      if (stats && stats.par_section.length > 0) {
+        pdf.addPage();
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(13);
+        pdf.text("Synthèse par section", margin, 14);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.text(`Généré le ${dateStr} · CoopDigital`, margin, 21);
+
+        const tableData = stats.par_section.map(s => [
+          s.section,
+          `${s.conformes} / ${s.total}`,
+          `${s.pct} %`,
+          s.superficie_ha.toFixed(2),
+        ]);
+
+        const totaux = stats.par_section.reduce(
+          (acc, s) => ({ conformes: acc.conformes + s.conformes, total: acc.total + s.total, superficie_ha: acc.superficie_ha + s.superficie_ha }),
+          { conformes: 0, total: 0, superficie_ha: 0 },
+        );
+        const pctTotal = totaux.total > 0 ? Math.round((totaux.conformes / totaux.total) * 100) : 0;
+        tableData.push([
+          "TOTAL",
+          `${totaux.conformes} / ${totaux.total}`,
+          `${pctTotal} %`,
+          totaux.superficie_ha.toFixed(2),
+        ]);
+
+        autoTable(pdf, {
+          startY: 27,
+          head: [["Section", "Membres conformes / Total", "% Conformité", "Superficie totale (ha)"]],
+          body: tableData,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 10, cellPadding: 4 },
+          headStyles: { fillColor: [22, 163, 74], textColor: 255, fontStyle: "bold" },
+          columnStyles: {
+            0: { cellWidth: "auto" },
+            1: { halign: "center" },
+            2: { halign: "center" },
+            3: { halign: "right" },
+          },
+          didParseCell: (data) => {
+            if (data.row.index === tableData.length - 1) {
+              data.cell.styles.fontStyle = "bold";
+              data.cell.styles.fillColor = [240, 240, 240];
+            }
+          },
+        });
+      }
+
       pdf.save(`eudr_rapport_${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch (e) {
       console.error(e);

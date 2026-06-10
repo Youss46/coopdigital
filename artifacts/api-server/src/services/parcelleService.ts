@@ -216,7 +216,7 @@ export interface ConformiteStats {
   pct_superficie_conforme: number;
   membres_avec_parcelle: number;
   membres_sans_parcelle: number;
-  par_section: { section: string; total: number; conformes: number; pct: number }[];
+  par_section: { section: string; total: number; conformes: number; pct: number; superficie_ha: number }[];
 }
 
 export async function calculerConformiteGlobale(cooperativeId: number): Promise<ConformiteStats> {
@@ -248,11 +248,12 @@ export async function calculerConformiteGlobale(cooperativeId: number): Promise<
     .from(membresTable)
     .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif")));
 
-  const sectionMap = new Map<string, { total: number; conformes: number }>();
+  const sectionMap = new Map<string, { total: number; conformes: number; superficie_ha: number }>();
   for (const r of rows) {
     const sec = r.section ?? "Non définie";
-    const s = sectionMap.get(sec) ?? { total: 0, conformes: 0 };
+    const s = sectionMap.get(sec) ?? { total: 0, conformes: 0, superficie_ha: 0 };
     s.total++;
+    s.superficie_ha += ha(r);
     if (r.eudrStatut === "conforme") s.conformes++;
     sectionMap.set(sec, s);
   }
@@ -263,6 +264,7 @@ export async function calculerConformiteGlobale(cooperativeId: number): Promise<
       total: s.total,
       conformes: s.conformes,
       pct: s.total > 0 ? Math.round((s.conformes / s.total) * 100) : 0,
+      superficie_ha: Math.round(s.superficie_ha * 100) / 100,
     }))
     .sort((a, b) => b.total - a.total);
 
