@@ -1331,6 +1331,34 @@ function OngletCarteGlobale() {
 
   return (
     <div ref={exportRef} className="space-y-4">
+
+      {/* Barre d'actions export — toujours visible */}
+      <div className="no-print flex flex-wrap items-center justify-end gap-2">
+        <button
+          onClick={handleExportExcel}
+          disabled={isExportingXlsx || isLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 border border-green-300 rounded-lg text-sm text-green-700 hover:bg-green-50 disabled:opacity-50 transition-colors bg-white shadow-sm"
+        >
+          {isExportingXlsx ? <RefreshCw size={13} className="animate-spin" /> : <FileDown size={13} />}
+          {isExportingXlsx ? "Génération…" : "Exporter Excel"}
+        </button>
+        <button
+          onClick={handleExportPDF}
+          disabled={isExporting || isLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors bg-white shadow-sm"
+        >
+          {isExporting ? <RefreshCw size={13} className="animate-spin" /> : <FileDown size={13} />}
+          {isExporting ? "Génération…" : "Exporter PDF"}
+        </button>
+        <button
+          onClick={handlePrint}
+          className="flex items-center gap-1.5 px-3 py-1.5 border border-blue-300 rounded-lg text-sm text-blue-700 hover:bg-blue-50 transition-colors bg-white shadow-sm"
+        >
+          <Printer size={13} />
+          Imprimer
+        </button>
+      </div>
+
       {/* Statistiques de couverture */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCouverture
@@ -1461,36 +1489,6 @@ function OngletCarteGlobale() {
         <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
           {(isLoading || isVerifying) && <RefreshCw size={13} className="animate-spin" />}
           <span>{parcelles.length} parcelle{parcelles.length > 1 ? "s" : ""} affichée{parcelles.length > 1 ? "s" : ""}</span>
-          <button
-            onClick={handleExportExcel}
-            disabled={isExportingXlsx || isLoading}
-            title="Exporter les données EUDR en tableau Excel (.xlsx)"
-            className="flex items-center gap-1 px-2.5 py-1 border border-green-300 rounded-lg text-xs text-green-700 hover:bg-green-50 disabled:opacity-50 transition-colors"
-          >
-            {isExportingXlsx
-              ? <RefreshCw size={11} className="animate-spin" />
-              : <FileDown size={11} />}
-            {isExportingXlsx ? "Génération…" : "Exporter Excel"}
-          </button>
-          <button
-            onClick={handleExportPDF}
-            disabled={isExporting || isLoading}
-            title="Exporter la carte et les statistiques en PDF"
-            className="flex items-center gap-1 px-2.5 py-1 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-          >
-            {isExporting
-              ? <RefreshCw size={11} className="animate-spin" />
-              : <FileDown size={11} />}
-            {isExporting ? "Génération…" : "Exporter PDF"}
-          </button>
-          <button
-            onClick={handlePrint}
-            title="Imprimer le rapport EUDR directement"
-            className="flex items-center gap-1 px-2.5 py-1 border border-blue-300 rounded-lg text-xs text-blue-700 hover:bg-blue-50 transition-colors"
-          >
-            <Printer size={11} />
-            Imprimer
-          </button>
         </div>
       </div>
 
