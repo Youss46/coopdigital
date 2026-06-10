@@ -1,6 +1,7 @@
 import "leaflet/dist/leaflet.css";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Polyline, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import {
@@ -1697,6 +1698,7 @@ export default function ParcellePage() {
   const [tab, setTab] = useState<Tab>("carte_globale");
   const [isVerifying, setIsVerifying] = useState(false);
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const carteQ = useQuery({
     queryKey: ["parcelles-carte"],
@@ -1733,12 +1735,23 @@ export default function ParcellePage() {
     setIsVerifying(false);
   }
 
-  function handleExportGeoJSON() {
+  async function handleExportGeoJSON() {
     const token = localStorage.getItem(TOKEN_KEY);
-    const a = document.createElement("a");
-    a.href = `${BASE}/api/parcelles/export-geojson?_token=${encodeURIComponent(token ?? "")}`;
-    a.download = `eudr_export_${new Date().toISOString().slice(0, 10)}.geojson`;
-    a.click();
+    try {
+      const res = await fetch(`${BASE}/api/parcelles/export-geojson`, {
+        headers: { Authorization: `Bearer ${token ?? ""}` },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `eudr_export_${new Date().toISOString().slice(0, 10)}.geojson`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Erreur export GeoJSON", description: "Impossible de télécharger le fichier.", variant: "destructive" });
+    }
   }
 
   const tabs: { id: Tab; label: string; icon: typeof Map }[] = [
