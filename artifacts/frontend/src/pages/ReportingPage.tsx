@@ -16,6 +16,7 @@ import {
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/contexts/AuthContext";
 import { Download } from "lucide-react";
+const BASE = import.meta.env.VITE_API_URL ?? "";
 function getAuthToken(): string | null {
   return localStorage.getItem("coop_token");
 }
@@ -476,7 +477,7 @@ function FicheMembre() {
     setLoading(true);
     try {
       const token = getAuthToken();
-      const resp = await fetch(`/api/rapports/membre/${id}`, {
+      const resp = await fetch(`${BASE}/api/rapports/membre/${id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!resp.ok) {

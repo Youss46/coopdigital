@@ -55,6 +55,8 @@ import HelpPanel from "./HelpPanel";
 import InstallButton from "./InstallButton";
 import GlobalSearch from "./GlobalSearch";
 
+const BASE = import.meta.env.VITE_API_URL ?? "";
+
 const navItems = [
   // ── Dashboards ────────────────────────────────────────────────────────────
   {
@@ -367,7 +369,7 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
     queryKey: ["parcelles-conformite"],
     queryFn: async () => {
       const token = localStorage.getItem("coop_token") ?? "";
-      const r = await fetch("/api/parcelles/conformite", { headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetch(`${BASE}/api/parcelles/conformite`, { headers: { Authorization: `Bearer ${token}` } });
       if (!r.ok) return null;
       return r.json() as Promise<{ par_section: { pct: number }[] }>;
     },

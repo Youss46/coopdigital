@@ -8,6 +8,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
 // ── Token auth ──────────────────────────────────────────────────────────────
+const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const headers = () => ({
   Authorization: `Bearer ${tok()}`,
@@ -515,7 +516,7 @@ export default function DonsPage() {
   }
 
   async function handleRapportPDF() {
-    const r = await fetch("/api/dons/rapport-pdf", { headers: { Authorization: `Bearer ${tok()}` } });
+    const r = await fetch(`${BASE}/api/dons/rapport-pdf`, { headers: { Authorization: `Bearer ${tok()}` } });
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

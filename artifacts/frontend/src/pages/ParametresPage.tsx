@@ -111,7 +111,9 @@ export default function ParametresPage() {
   async function handleDownloadPdf() {
     setIsDownloadingPdf(true);
     try {
-      const r = await fetch("/api/config/export-pdf", { credentials: "include" });
+      const BASE = import.meta.env.VITE_API_URL ?? "";
+      const token = localStorage.getItem("coop_token") ?? "";
+      const r = await fetch(`${BASE}/api/config/export-pdf`, { headers: { Authorization: `Bearer ${token}` } });
       if (!r.ok) throw new Error("Erreur serveur");
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
