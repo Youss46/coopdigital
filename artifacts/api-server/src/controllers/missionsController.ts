@@ -1,4 +1,5 @@
 import { type Request, type Response } from "express";
+import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { eq, and, desc, sql, asc } from "drizzle-orm";
 import { missionsTerrainTable, missionsMembresTable, messagesMissionTable, usersTable, membresTable } from "@workspace/db";
@@ -1028,6 +1029,7 @@ export async function listAgentsTerrain(req: Request, res: Response): Promise<vo
         id: usersTable.id,
         nom: usersTable.nom,
         prenoms: usersTable.prenoms,
+        email: usersTable.email,
         telephone: usersTable.telephone,
         zoneNom: usersTable.zoneNom,
         actif: usersTable.actif,
@@ -1039,6 +1041,63 @@ export async function listAgentsTerrain(req: Request, res: Response): Promise<vo
     res.json(agents);
   } catch (err) {
     req.log.error({ err }, "Erreur listAgentsTerrain");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ── Créer un agent terrain (accessible au RT) ─────────────────────────────────
+
+export async function createAgentTerrain(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const { nom, prenoms, email, telephone, zone, motDePasse } = req.body as {
+    nom?: string; prenoms?: string; email?: string;
+    telephone?: string; zone?: string; motDePasse?: string;
+  };
+
+  if (!nom || !prenoms || !email || !motDePasse) {
+    res.status(400).json({ erreur: "Nom, prénoms, email et mot de passe sont requis" });
+    return;
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(motDePasse, 10);
+    const [created] = await db
+      .insert(usersTable)
+      .values({
+        nom,
+        prenoms,
+        email,
+        telephone: telephone ?? null,
+        passwordHash,
+        role: "agent_terrain",
+        cooperativeId,
+        actif: true,
+        motDePasseTemporaire: true,
+        section: zone ?? null,
+        zoneType: null,
+        zoneNom: zone ?? null,
+        zoneVillages: null,
+      })
+      .returning({
+        id: usersTable.id,
+        nom: usersTable.nom,
+        prenoms: usersTable.prenoms,
+        email: usersTable.email,
+        telephone: usersTable.telephone,
+        role: usersTable.role,
+        actif: usersTable.actif,
+      });
+
+    res.status(201).json(created);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("unique") || msg.includes("duplicate")) {
+      res.status(409).json({ erreur: "Un compte avec cet email existe déjà" });
+      return;
+    }
+    req.log.error({ err }, "Erreur createAgentTerrain");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

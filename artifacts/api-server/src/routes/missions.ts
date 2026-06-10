@@ -12,6 +12,7 @@ import {
   rejeterParcelleMission,
   membresSansGps,
   listAgentsTerrain,
+  createAgentTerrain,
   exportMissionGeoJSON,
   getMessagesMission,
   sendMessageMission,
@@ -25,7 +26,8 @@ const router: IRouter = Router();
 
 router.use(authMiddleware);
 
-router.get("/missions/agents-terrain",  checkPermission("missions", "creer"),   listAgentsTerrain);
+router.get("/missions/agents-terrain",  checkPermission("missions", "creer"),              listAgentsTerrain);
+router.post("/missions/agents-terrain", checkPermission("missions", "creer_agent_terrain"), createAgentTerrain);
 router.get("/missions/sans-gps",        checkPermission("missions", "lire"),    membresSansGps);
 router.get("/missions",                 checkPermission("missions", "lire"),    listMissions);
 router.post("/missions",                checkPermission("missions", "creer"),   createMission);
