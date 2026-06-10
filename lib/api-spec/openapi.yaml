@@ -6664,6 +6664,12 @@ components:
           enum: [membre, pisteur, externe]
         nbrePartsSouscrites:
           type: number
+        superficieTotale:
+          type: string
+          description: Superficie totale GPS (ha)
+        nombreParcelles:
+          type: integer
+          description: Nombre de parcelles enregistrées
 
     ModifierStatutMembreBody:
       type: object

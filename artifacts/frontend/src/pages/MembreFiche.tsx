@@ -385,7 +385,8 @@ export default function MembreFiche() {
     nom: string; prenoms: string; telephone: string; village: string;
     groupement: string; superficieHa: string; sexe: string; numeroCni: string;
     dateNaissance: string; dateAdhesion: string; typeFournisseur: string; nbrePartsSouscrites: string;
-  }>({ nom: "", prenoms: "", telephone: "", village: "", groupement: "", superficieHa: "", sexe: "", numeroCni: "", dateNaissance: "", dateAdhesion: "", typeFournisseur: "", nbrePartsSouscrites: "" });
+    superficieTotale: string; nombreParcelles: string;
+  }>({ nom: "", prenoms: "", telephone: "", village: "", groupement: "", superficieHa: "", sexe: "", numeroCni: "", dateNaissance: "", dateAdhesion: "", typeFournisseur: "", nbrePartsSouscrites: "", superficieTotale: "", nombreParcelles: "" });
 
   function openEditModal() {
     if (!membre) return;
@@ -402,6 +403,8 @@ export default function MembreFiche() {
       dateAdhesion: (membre.dateAdhesion as string | null) ?? "",
       typeFournisseur: (membre.typeFournisseur as string | null) ?? "",
       nbrePartsSouscrites: membre.nbrePartsSouscrites != null ? String(membre.nbrePartsSouscrites) : "",
+      superficieTotale: (membre.superficieTotale as string | null) ?? "",
+      nombreParcelles: (membre.nombreParcelles as number | null) != null ? String(membre.nombreParcelles) : "",
     });
     setShowEditModal(true);
   }
@@ -423,6 +426,8 @@ export default function MembreFiche() {
       if (editForm.dateAdhesion.trim())     body["dateAdhesion"]      = editForm.dateAdhesion.trim();
       if (editForm.typeFournisseur)         body["typeFournisseur"]   = editForm.typeFournisseur;
       if (editForm.nbrePartsSouscrites.trim()) body["nbrePartsSouscrites"] = parseFloat(editForm.nbrePartsSouscrites);
+      if (editForm.superficieTotale.trim()) body["superficieTotale"] = editForm.superficieTotale.trim();
+      if (editForm.nombreParcelles.trim())  body["nombreParcelles"]  = parseInt(editForm.nombreParcelles);
       const res = await fetch(`${BASE_FICHE}/api/membres/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokFn()}` },
@@ -1585,6 +1590,37 @@ export default function MembreFiche() {
                   />
                 </div>
               </div>
+
+              {/* Groupe B — EUDR / GPS */}
+              <div className="border border-amber-200 rounded-xl p-3 bg-amber-50 space-y-3">
+                <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Groupe B — EUDR / GPS</p>
+                <p className="text-xs text-amber-700">Les polygones GPS sont collectés par les agents terrain. Superficie totale et nombre de parcelles peuvent être saisis manuellement.</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Superficie totale (ha)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editForm.superficieTotale}
+                      onChange={e => setEditForm(f => ({ ...f, superficieTotale: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Nombre de parcelles</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={editForm.nombreParcelles}
+                      onChange={e => setEditForm(f => ({ ...f, nombreParcelles: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-2 pb-1">
                 <button
                   type="button"

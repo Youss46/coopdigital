@@ -186,7 +186,9 @@ export const UpdateMembreBody = zod.object({
   "dateNaissance": zod.string().optional(),
   "dateAdhesion": zod.string().optional(),
   "typeFournisseur": zod.enum(['membre', 'pisteur', 'externe']).optional(),
-  "nbrePartsSouscrites": zod.number().optional()
+  "nbrePartsSouscrites": zod.number().optional(),
+  "superficieTotale": zod.string().optional(),
+  "nombreParcelles": zod.number().optional()
 })
 
 export const UpdateMembreResponse = zod.object({
