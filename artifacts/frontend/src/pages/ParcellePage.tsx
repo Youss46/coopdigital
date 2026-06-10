@@ -109,6 +109,8 @@ interface ParcelleListItem extends ParcelleCarte {
   eudrRisqueDeforestation: string | null;
   eudrDansZoneProtegee: boolean | null;
   createdAt: string;
+  codeMembre: string | null;
+  membreSuperficieHa: string | null;
 }
 
 interface ConformiteStats {
@@ -821,7 +823,12 @@ function OngletListe({
               <tbody className="divide-y divide-gray-100">
                 {(data?.parcelles ?? []).map(p => (
                   <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{p.codeParcelle ?? "—"}</td>
+                    <td className="px-4 py-2.5">
+                      <p className="font-mono text-xs font-semibold text-gray-800">{p.codeMembre ?? p.codeParcelle ?? "—"}</p>
+                      {p.codeParcelle && p.codeMembre && (
+                        <p className="font-mono text-xs text-gray-400">{p.codeParcelle}</p>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5">
                       <p className="font-medium text-gray-800">{p.membre_nom}</p>
                       <p className="text-xs text-gray-500">{p.telephone}</p>
@@ -829,7 +836,7 @@ function OngletListe({
                     <td className="px-4 py-2.5 text-gray-600">{p.village ?? "—"}</td>
                     <td className="px-4 py-2.5 capitalize text-gray-600">{p.culturePrincipale ?? "—"}</td>
                     <td className="px-4 py-2.5 text-right text-gray-600">
-                      {parseFloat(String(p.superficieCalculeeHa ?? p.superficieDeclareeHa ?? 0)) || "—"} ha
+                      {parseFloat(String(p.superficieCalculeeHa ?? p.superficieDeclareeHa ?? p.membreSuperficieHa ?? 0)) || "—"} ha
                     </td>
                     <td className="px-4 py-2.5 text-center"><BadgeEudr statut={p.eudrStatut} /></td>
                     <td className="px-4 py-2.5 text-center">

@@ -9,6 +9,7 @@ import {
   calculerConformiteGlobale,
 } from "../services/parcelleService";
 import { getConfig } from "../services/configService";
+import { computeCodeMembre } from "../services/portailService";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -52,10 +53,13 @@ export async function listParcelles(req: Request, res: Response): Promise<void> 
 
     const [parcelles, [{ count }]] = await Promise.all([
       db.select({
-        parcelle:    parcellesTable,
-        membreNom:   membresTable.nom,
-        membrePrenoms: membresTable.prenoms,
-        telephone:   membresTable.telephone,
+        parcelle:           parcellesTable,
+        membreNom:          membresTable.nom,
+        membrePrenoms:      membresTable.prenoms,
+        telephone:          membresTable.telephone,
+        membreDbId:         membresTable.id,
+        dateAdhesion:       membresTable.dateAdhesion,
+        membreSuperficieHa: membresTable.superficieHa,
       })
         .from(parcellesTable)
         .innerJoin(membresTable, eq(parcellesTable.membreId, membresTable.id))
@@ -76,8 +80,10 @@ export async function listParcelles(req: Request, res: Response): Promise<void> 
     res.json({
       parcelles: parcelles.map(r => ({
         ...r.parcelle,
-        membre_nom: `${r.membreNom} ${r.membrePrenoms}`,
-        telephone: r.telephone,
+        membre_nom:         `${r.membreNom} ${r.membrePrenoms}`,
+        telephone:          r.telephone,
+        codeMembre:         computeCodeMembre(r.membreDbId, r.dateAdhesion ?? "2025-01-01"),
+        membreSuperficieHa: r.membreSuperficieHa,
       })),
       total: count,
       page,

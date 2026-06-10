@@ -38,7 +38,7 @@ async function autoCreerParcelleMission(opts: {
   if (existing) {
     await db
       .update(parcellesTable)
-      .set({ polygone, superficieCalculeeHa, updatedAt: new Date() })
+      .set({ polygone, superficieCalculeeHa, eudrStatut: "conforme", updatedAt: new Date() })
       .where(eq(parcellesTable.id, existing.id));
   } else {
     const codeParcelle = await genererCodeParcelle(opts.membreId);
@@ -52,7 +52,7 @@ async function autoCreerParcelleMission(opts: {
       village:             opts.membre.village ?? null,
       section:             opts.membre.section ?? null,
       culturePrincipale:   opts.membre.culturePrincipale ?? "cacao",
-      eudrStatut:          "non_verifie",
+      eudrStatut:          "conforme",
       eudrRisqueDeforestation: "inconnu",
       actif:               true,
       enregistrePar:       opts.enregistrePar,
