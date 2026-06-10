@@ -29,7 +29,7 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
     .where(and(eq(usersTable.telephone, telephone), eq(usersTable.actif, true)))
     .limit(1);
 
-  if (!user || user.role !== "delegue") return null;
+  if (!user || (user.role !== "delegue" && user.role !== "agent_terrain")) return null;
 
   const ok = await bcrypt.compare(motDePasse, user.passwordHash);
   if (!ok) return null;
@@ -577,7 +577,7 @@ export async function syncOperations(
   cooperativeId: number,
   operations: Array<{
     localId: string;
-    type: "collecte" | "paiement" | "avance";
+    type: "collecte" | "paiement" | "avance" | "gps_collecte";
     data: Record<string, unknown>;
     timestamp: number;
   }>
@@ -594,6 +594,16 @@ export async function syncOperations(
         await enregistrerPaiement(agentId, cooperativeId, op.data as Parameters<typeof enregistrerPaiement>[2]);
       } else if (op.type === "avance") {
         await octroierAvance(agentId, cooperativeId, op.data as Parameters<typeof octroierAvance>[2]);
+      } else if (op.type === "gps_collecte") {
+        const { collecterParcelleAgent } = await import("./missionsAgentService.js");
+        const d = op.data as { missionId: number; membreId: number; polygoneGps: object; photos: string[]; notes?: string; superficieCalculeeHa?: number; probleme?: { type: string; description: string } };
+        await collecterParcelleAgent(d.missionId, d.membreId, agentId, {
+          polygoneGps: d.polygoneGps,
+          photos: d.photos,
+          notes: d.notes,
+          superficieCalculeeHa: d.superficieCalculeeHa,
+          probleme: d.probleme,
+        });
       }
       succes.push(op.localId);
     } catch (err) {

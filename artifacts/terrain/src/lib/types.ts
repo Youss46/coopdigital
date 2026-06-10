@@ -110,10 +110,88 @@ export interface BilanJour {
   }>;
 }
 
+export interface GpsPoint {
+  lat: number;
+  lon: number;
+  accuracy?: number;
+  ts: number;
+}
+
+export interface GpsCollecteInput {
+  missionId: number;
+  membreId: number;
+  polygoneGps: GpsPoint[];
+  photos: string[];
+  notes?: string;
+  superficieCalculeeHa?: number;
+  probleme?: { type: string; description: string };
+  localId?: string;
+}
+
+export interface MissionTerrain {
+  id: number;
+  cooperativeId: number;
+  titre: string;
+  zoneType: string;
+  zoneNom: string;
+  datePrevue: string;
+  agentId: number | null;
+  statut: "planifiee" | "en_cours" | "soumise" | "validee" | "rejetee";
+  objectifParcelles: number | null;
+  parcellesCollectees: number | null;
+  motifRejet: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  membresTotal: number;
+  membresCollectes: number;
+  membresRejetes: number;
+}
+
+export interface MissionMembre {
+  id: number;
+  membreId: number;
+  statut: "a_faire" | "collecte" | "valide" | "rejete";
+  gpsCollecte: unknown;
+  photosCollectees: unknown;
+  notesAgent: string | null;
+  dateCollecte: string | null;
+  motifRejet: string | null;
+  membreNom: string | null;
+  membrePrenoms: string | null;
+  membreVillage: string | null;
+  membreSection: string | null;
+  superficieHa: string | null;
+}
+
+export interface MessageMission {
+  id: number;
+  message: string;
+  type: string | null;
+  lu: boolean | null;
+  createdAt: string;
+  auteurId: number | null;
+  auteurNom: string | null;
+  auteurPrenoms: string | null;
+  auteurRole: string | null;
+}
+
+export interface MissionDetail extends MissionTerrain {
+  membres: MissionMembre[];
+  messages: MessageMission[];
+}
+
+export interface StatsAgent {
+  parcellesMappees: number;
+  missionsTerminees: number;
+  missionsTotal: number;
+  tauxValidation: number;
+}
+
 export interface PendingOp {
   localId: string;
-  type: "collecte" | "paiement" | "avance";
-  data: CollecteInput | PaiementInput | AvanceInput;
+  type: "collecte" | "paiement" | "avance" | "gps_collecte";
+  data: CollecteInput | PaiementInput | AvanceInput | GpsCollecteInput;
   timestamp: number;
   status: "pending" | "synced" | "error";
   errorMsg?: string;

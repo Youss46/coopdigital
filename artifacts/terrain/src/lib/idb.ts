@@ -1,6 +1,6 @@
-import type { PendingOp, CollecteInput, PaiementInput, AvanceInput, PrixActuel, Fournisseur } from "./types";
+import type { PendingOp, CollecteInput, PaiementInput, AvanceInput, GpsCollecteInput, PrixActuel, Fournisseur } from "./types";
 
-export type PendingOpType = "collecte" | "paiement" | "avance";
+export type PendingOpType = "collecte" | "paiement" | "avance" | "gps_collecte";
 
 const DB_NAME = "coopdigital-terrain";
 const DB_VERSION = 1;
@@ -40,7 +40,7 @@ function tx(storeName: string, mode: IDBTransactionMode, db: IDBDatabase) {
 
 export async function queueOp(op: {
   type: PendingOpType;
-  data: CollecteInput | PaiementInput | AvanceInput;
+  data: CollecteInput | PaiementInput | AvanceInput | GpsCollecteInput;
   localId: string;
 }): Promise<void> {
   const db = await openDb();

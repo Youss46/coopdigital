@@ -50,6 +50,13 @@
       "when": 1749629400000,
       "tag": "0006_fournisseurs_agrement",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1749715800000,
+      "tag": "0007_messages_mission",
+      "breakpoints": true
     }
   ]
 }

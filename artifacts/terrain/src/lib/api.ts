@@ -1,49 +1,34 @@
 import { getToken } from "./auth";
 import { queueOp, type PendingOpType } from "./idb";
-import type { CollecteInput, PaiementInput, AvanceInput } from "./types";
+import type {
+  CollecteInput, PaiementInput, AvanceInput,
+  MissionTerrain, MissionDetail, StatsAgent, GpsCollecteInput, MessageMission,
+} from "./types";
 
 const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api/terrain`;
 
-async function apiFetch<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string> || {}),
   };
-
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers,
-  });
-
+  const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
   }
-
   return res.json() as Promise<T>;
 }
 
-export function apiGet<T>(path: string): Promise<T> {
-  return apiFetch<T>(path);
-}
-
+export function apiGet<T>(path: string): Promise<T> { return apiFetch<T>(path); }
 export function apiPost<T>(path: string, data: unknown): Promise<T> {
-  return apiFetch<T>(path, {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  return apiFetch<T>(path, { method: "POST", body: JSON.stringify(data) });
 }
 
 export async function loginTerrain(telephone: string, motDePasse: string) {
-  return apiPost<{ token: string; agent: import("./types").AgentUser }>(
-    "/auth/login",
-    { telephone, motDePasse }
-  );
+  return apiPost<{ token: string; agent: import("./types").AgentUser }>("/auth/login", { telephone, motDePasse });
 }
 
 export async function getProfil() {
@@ -66,10 +51,7 @@ export async function getPrix() {
   return apiGet<import("./types").PrixActuel>("/prix");
 }
 
-export async function enregistrerCollecte(
-  data: CollecteInput,
-  online: boolean
-) {
+export async function enregistrerCollecte(data: CollecteInput, online: boolean) {
   if (!online) {
     await queueOp({ type: "collecte" as PendingOpType, data, localId: data.localId ?? crypto.randomUUID() });
     return null;
@@ -77,10 +59,7 @@ export async function enregistrerCollecte(
   return apiPost<import("./types").CollecteResult>("/collecte", data);
 }
 
-export async function enregistrerPaiement(
-  data: PaiementInput,
-  online: boolean
-) {
+export async function enregistrerPaiement(data: PaiementInput, online: boolean) {
   if (!online) {
     await queueOp({ type: "paiement" as PendingOpType, data, localId: data.localId ?? crypto.randomUUID() });
     return null;
@@ -88,10 +67,7 @@ export async function enregistrerPaiement(
   return apiPost<{ paiementId: number; ref: string }>("/paiement", data);
 }
 
-export async function octroierAvance(
-  data: AvanceInput,
-  online: boolean
-) {
+export async function octroierAvance(data: AvanceInput, online: boolean) {
   if (!online) {
     await queueOp({ type: "avance" as PendingOpType, data, localId: data.localId ?? crypto.randomUUID() });
     return null;
@@ -99,28 +75,22 @@ export async function octroierAvance(
   return apiPost<{ avanceId: number }>("/avance", data);
 }
 
-export async function getBilan() {
-  return apiGet<import("./types").BilanJour>("/bilan-jour");
-}
+export async function getBilan() { return apiGet<import("./types").BilanJour>("/bilan-jour"); }
 
 export async function syncOps(operations: import("./types").PendingOp[]) {
   return apiPost<{ succes: string[]; echecs: Array<{ localId: string; erreur: string }> }>(
     "/sync",
-    { operations }
+    { operations },
   );
 }
 
-export async function envoyerRapport() {
-  return apiPost<{ message: string }>("/rapport-journalier", {});
-}
+export async function envoyerRapport() { return apiPost<{ message: string }>("/rapport-journalier", {}); }
 
 export async function changerMotDePasse(nouveauMotDePasse: string) {
   return apiPost<{ message: string }>("/auth/change-password", { nouveauMotDePasse });
 }
 
-export async function getCaisse() {
-  return apiGet<import("./types").CaisseDelegue>("/caisse");
-}
+export async function getCaisse() { return apiGet<import("./types").CaisseDelegue>("/caisse"); }
 
 export async function getPaiementsDifferes() {
   return apiGet<import("./types").PaiementDiffere[]>("/paiements-differes");
@@ -128,4 +98,49 @@ export async function getPaiementsDifferes() {
 
 export async function regulariserPaiement(livraisonId: number, modePaiement: string) {
   return apiPost<{ solde: number; montantPayeFcfa: number }>(`/regulariser/${livraisonId}`, { modePaiement });
+}
+
+// ── Agent terrain ────────────────────────────────────────────────────────────
+
+export async function getMissions(): Promise<MissionTerrain[]> {
+  return apiGet<MissionTerrain[]>("/missions");
+}
+
+export async function getMissionDetail(id: number): Promise<MissionDetail> {
+  return apiGet<MissionDetail>(`/missions/${id}`);
+}
+
+export async function soumettresMission(id: number): Promise<{ ok: boolean }> {
+  return apiPost<{ ok: boolean }>(`/missions/${id}/soumettre`, {});
+}
+
+export async function collecterParcelle(
+  missionId: number,
+  membreId: number,
+  data: Omit<GpsCollecteInput, "missionId" | "membreId" | "localId">,
+  online: boolean,
+): Promise<{ ok: boolean } | null> {
+  if (!online) {
+    const localId = crypto.randomUUID();
+    const fullData: GpsCollecteInput = { ...data, missionId, membreId, localId };
+    await queueOp({ type: "gps_collecte" as PendingOpType, data: fullData, localId });
+    return null;
+  }
+  return apiPost<{ ok: boolean }>(`/missions/${missionId}/parcelle/${membreId}`, data);
+}
+
+export async function getMessages(missionId: number): Promise<MessageMission[]> {
+  return apiGet<MessageMission[]>(`/messages/${missionId}`);
+}
+
+export async function sendMessage(missionId: number, message: string, type = "commentaire"): Promise<MessageMission> {
+  return apiPost<MessageMission>(`/messages/${missionId}`, { message, type });
+}
+
+export async function getStatsAgent(): Promise<StatsAgent> {
+  return apiGet<StatsAgent>("/agent/stats");
+}
+
+export async function getHistoriqueAgent(): Promise<MissionTerrain[]> {
+  return apiGet<MissionTerrain[]>("/agent/historique");
 }
