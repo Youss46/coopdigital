@@ -82,9 +82,9 @@ export default function HistoriqueAgent() {
         ) : (
           displayed.map((m) => {
             const s = STATUT_LABEL[m.statut] ?? { label: m.statut, color: "#94a3b8", icon: "❓" };
-            const pct = m.membresTotal > 0
-              ? Math.round((m.membresCollectes / m.membresTotal) * 100)
-              : 0;
+            const tauxValid = m.tauxValidation ?? (m.membresCollectes > 0 && m.membresValides !== undefined
+              ? Math.round((m.membresValides / m.membresCollectes) * 100)
+              : 0);
             return (
               <div key={m.id} style={{ background: "#1e2d45", borderRadius: 12, padding: "14px 16px", marginBottom: 10, borderLeft: `3px solid ${s.color}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -102,12 +102,12 @@ export default function HistoriqueAgent() {
                     <div style={{ fontSize: ".65rem", color: "#64748b" }}>Collectées</div>
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#3b82f6" }}>{m.membresTotal}</div>
-                    <div style={{ fontSize: ".65rem", color: "#64748b" }}>Total</div>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#3b82f6" }}>{m.membresValides ?? "—"}</div>
+                    <div style={{ fontSize: ".65rem", color: "#64748b" }}>Validées</div>
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#f59e0b" }}>{pct}%</div>
-                    <div style={{ fontSize: ".65rem", color: "#64748b" }}>Taux</div>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#f59e0b" }}>{tauxValid}%</div>
+                    <div style={{ fontSize: ".65rem", color: "#64748b" }}>Taux valid.</div>
                   </div>
                 </div>
                 {m.statut === "rejetee" && m.motifRejet && (

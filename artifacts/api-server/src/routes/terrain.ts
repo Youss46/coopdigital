@@ -54,5 +54,6 @@ router.get("/terrain/messages/:missionId", terrainAuthMiddleware, getMessagesHan
 router.post("/terrain/messages/:missionId", terrainAuthMiddleware, sendMessageHandler);
 router.get("/terrain/agent/stats", terrainAuthMiddleware, getStatsAgentHandler);
 router.get("/terrain/agent/historique", terrainAuthMiddleware, getHistoriqueAgentHandler);
+router.get("/terrain/historique", terrainAuthMiddleware, getHistoriqueAgentHandler);
 
 export default router;

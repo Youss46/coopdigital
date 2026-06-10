@@ -146,6 +146,8 @@ export interface MissionTerrain {
   membresTotal: number;
   membresCollectes: number;
   membresRejetes: number;
+  membresValides?: number;
+  tauxValidation?: number;
 }
 
 export interface MissionMembre {

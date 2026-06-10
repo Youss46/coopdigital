@@ -24,7 +24,7 @@ const STATUT_MISSION: Record<string, { label: string; color: string }> = {
 function MembreRow({ m, missionId, missionStatut }: { m: MissionMembre; missionId: number; missionStatut: string }) {
   const [, navigate] = useLocation();
   const s = STATUT_M[m.statut] ?? { label: m.statut, color: "#94a3b8" };
-  const canCollect = (m.statut === "a_faire" || m.statut === "rejete") && (missionStatut === "planifiee" || missionStatut === "en_cours");
+  const canCollect = (m.statut === "a_faire" || m.statut === "rejete") && (missionStatut === "planifiee" || missionStatut === "en_cours" || missionStatut === "rejetee");
   return (
     <div style={{ background: "#1a2035", borderRadius: 10, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -192,7 +192,7 @@ export default function MissionDetailPage() {
 
   const statut = STATUT_MISSION[mission.statut] ?? { label: mission.statut, color: "#94a3b8" };
   const pct = mission.membresTotal > 0 ? Math.round((mission.membresCollectes / mission.membresTotal) * 100) : 0;
-  const canSoumettre = (mission.statut === "en_cours") && mission.membresCollectes >= mission.membresTotal && mission.membresTotal > 0;
+  const canSoumettre = (mission.statut === "en_cours" || mission.statut === "rejetee") && mission.membresCollectes >= mission.membresTotal && mission.membresTotal > 0;
 
   return (
     <div className="t-app">

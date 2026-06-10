@@ -141,7 +141,7 @@ export async function collecterParcelleAgent(
     .from(missionsMembresTable)
     .where(eq(missionsMembresTable.missionId, missionId));
 
-  if (mission.statut === "planifiee") {
+  if (mission.statut === "planifiee" || mission.statut === "rejetee") {
     await db
       .update(missionsTerrainTable)
       .set({ parcellesCollectees: counts?.collectes ?? 0, statut: "en_cours", updatedAt: new Date() })
