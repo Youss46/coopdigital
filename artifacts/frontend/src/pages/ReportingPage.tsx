@@ -523,7 +523,7 @@ function FicheMembre() {
 
 // ─── Reporting EUDR (pour responsable_tracabilite) ────────────────────────────
 const tok = () => localStorage.getItem("coop_token") ?? "";
-const apiFetch = (url: string) => fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
+const apiFetch = (url: string) => fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } });
 
 interface StatsRT {
   membresTotal: number;
