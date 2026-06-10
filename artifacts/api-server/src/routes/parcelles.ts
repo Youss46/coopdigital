@@ -13,10 +13,12 @@ import {
   importZonesRisque,
   verifierEUDRController,
   verifierTout,
+  getGpsTerrain,
 } from "../controllers/parcellesController";
 
 const router: IRouter = Router();
 
+router.get(  "/parcelles/gps-terrain",          checkPermission("parcelles", "voir_carte"),        getGpsTerrain);
 router.get(  "/parcelles/carte",               checkPermission("parcelles", "voir_carte"),        getParcellesCarte);
 router.get(  "/parcelles/export-geojson",       checkPermission("parcelles", "exporter_geojson"),  exportGeoJSONController);
 router.get(  "/parcelles/conformite",           checkPermission("parcelles", "voir_carte"),        getConformite);

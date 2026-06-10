@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Polyline, useMap
 import L from "leaflet";
 import {
   Map, List, ShieldCheck, Download, Plus, RefreshCw, X, CheckCircle2,
-  AlertTriangle, XCircle, Clock, HelpCircle, ChevronRight, Leaf,
+  AlertTriangle, XCircle, Clock, HelpCircle, ChevronRight, Leaf, Navigation,
 } from "lucide-react";
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)["_getIconUrl"];
@@ -48,6 +48,20 @@ interface ParcelleCarte {
   membreNom: string;
   membrePrenoms: string;
   membreId: number;
+}
+
+interface GpsTerrainPolygon {
+  membreId: number;
+  membreNom: string;
+  membrePrenoms: string;
+  village: string | null;
+  section: string | null;
+  missionId: number;
+  missionTitre: string;
+  statut: string;
+  dateCollecte: string | null;
+  superficieHa: string | null;
+  polygone: [number, number][];
 }
 
 interface ZoneRisque {
@@ -171,6 +185,8 @@ function LeafletMap({
   drawVertices,
   onAddVertex,
   showZones,
+  gpsTerrainPolygons,
+  showGpsTerrain,
 }: {
   parcelles: ParcelleCarte[];
   zones: ZoneRisque[];
@@ -180,6 +196,8 @@ function LeafletMap({
   drawVertices: [number, number][];
   onAddVertex: (pt: [number, number]) => void;
   showZones: boolean;
+  gpsTerrainPolygons: GpsTerrainPolygon[];
+  showGpsTerrain: boolean;
 }) {
   const COOP_CENTER: [number, number] = [7.0, -6.5];
 
@@ -260,6 +278,38 @@ function LeafletMap({
 
         return null;
       })}
+
+      {showGpsTerrain && gpsTerrainPolygons.map((tp, idx) => (
+        <Polygon
+          key={`terrain-${tp.missionId}-${tp.membreId}-${idx}`}
+          positions={tp.polygone}
+          pathOptions={{ color: "#f59e0b", fillColor: "#f59e0b", fillOpacity: 0.18, weight: 2.5, dashArray: "6 3" }}
+        >
+          <Popup>
+            <div className="text-sm min-w-40">
+              <p className="font-semibold text-amber-700 flex items-center gap-1">
+                GPS Terrain
+              </p>
+              <p className="text-gray-800 font-medium mt-0.5">{tp.membreNom} {tp.membrePrenoms}</p>
+              {tp.village && (
+                <p className="text-gray-500 text-xs">{tp.village}{tp.section ? ` — ${tp.section}` : ""}</p>
+              )}
+              <p className="text-gray-500 text-xs mt-1 italic">{tp.missionTitre}</p>
+              {tp.dateCollecte && (
+                <p className="text-gray-400 text-xs">{new Date(tp.dateCollecte).toLocaleDateString("fr-FR")}</p>
+              )}
+              {tp.superficieHa && (
+                <p className="text-gray-600 text-xs">{parseFloat(String(tp.superficieHa))} ha</p>
+              )}
+              <span className={`inline-block mt-1.5 text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                tp.statut === "valide" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+              }`}>
+                {tp.statut === "valide" ? "Validé" : "Collecté"}
+              </span>
+            </div>
+          </Popup>
+        </Polygon>
+      ))}
 
       <DrawingLayer active={drawingMode} vertices={drawVertices} onAddVertex={onAddVertex} />
     </MapContainer>
@@ -450,12 +500,14 @@ function NouvelleParcelleDrawer({
 function OngletCarte({
   parcelles,
   zones,
+  gpsTerrainPolygons,
   isLoading,
   onRefresh,
   onVerifier,
 }: {
   parcelles: ParcelleCarte[];
   zones: ZoneRisque[];
+  gpsTerrainPolygons: GpsTerrainPolygon[];
   isLoading: boolean;
   onRefresh: () => void;
   onVerifier: (id: number) => Promise<void>;
@@ -464,6 +516,7 @@ function OngletCarte({
   const [drawingMode, setDrawingMode] = useState(false);
   const [drawVertices, setDrawVertices] = useState<[number, number][]>([]);
   const [showZones, setShowZones] = useState(true);
+  const [showGpsTerrain, setShowGpsTerrain] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [drawnPolygon, setDrawnPolygon] = useState<[number, number][] | null>(null);
   const [filterEudr, setFilterEudr] = useState("all");
@@ -510,6 +563,16 @@ function OngletCarte({
           <input type="checkbox" checked={showZones} onChange={e => setShowZones(e.target.checked)} className="rounded" />
           Zones protégées
         </label>
+        <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+          <input type="checkbox" checked={showGpsTerrain} onChange={e => setShowGpsTerrain(e.target.checked)} className="rounded" />
+          <Navigation size={12} className="text-amber-500" />
+          GPS Terrain
+          {gpsTerrainPolygons.length > 0 && (
+            <span className="ml-0.5 text-xs bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 font-medium">
+              {gpsTerrainPolygons.length}
+            </span>
+          )}
+        </label>
         <div className="ml-auto flex items-center gap-2">
           {drawingMode ? (
             <>
@@ -551,6 +614,12 @@ function OngletCarte({
             Zone protégée
           </span>
         )}
+        {showGpsTerrain && gpsTerrainPolygons.length > 0 && (
+          <span className="flex items-center gap-1.5 text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-sm border-2 border-amber-500" style={{ borderStyle: "dashed" }} />
+            GPS Terrain
+          </span>
+        )}
       </div>
 
       {/* Carte + panneau */}
@@ -564,6 +633,8 @@ function OngletCarte({
           drawVertices={drawVertices}
           onAddVertex={addVertex}
           showZones={showZones}
+          gpsTerrainPolygons={gpsTerrainPolygons}
+          showGpsTerrain={showGpsTerrain}
         />
         {selectedParcelle && (
           <SidePanel
@@ -863,6 +934,12 @@ export default function ParcellePage() {
     queryFn: () => apiFetch<{ parcelles: ParcelleCarte[]; zones: ZoneRisque[] }>("/api/parcelles/carte"),
   });
 
+  const gpsTerrainQ = useQuery({
+    queryKey: ["parcelles-gps-terrain"],
+    queryFn: () => apiFetch<{ polygones: GpsTerrainPolygon[] }>("/api/parcelles/gps-terrain"),
+    enabled: tab === "carte",
+  });
+
   const conformiteQ = useQuery({
     queryKey: ["parcelles-conformite"],
     queryFn: () => apiFetch<ConformiteStats>("/api/parcelles/conformite"),
@@ -947,6 +1024,7 @@ export default function ParcellePage() {
         <OngletCarte
           parcelles={carteQ.data?.parcelles ?? []}
           zones={carteQ.data?.zones ?? []}
+          gpsTerrainPolygons={gpsTerrainQ.data?.polygones ?? []}
           isLoading={carteQ.isFetching}
           onRefresh={() => carteQ.refetch()}
           onVerifier={handleVerifier}

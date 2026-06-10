@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, parcellesTable, membresTable, historiqueRendementsTable, zonesRisqueEudrTable, campagnesTable } from "@workspace/db";
+import { db, parcellesTable, membresTable, historiqueRendementsTable, zonesRisqueEudrTable, campagnesTable, missionsMembresTable, missionsTerrainTable } from "@workspace/db";
 import { eq, and, sql, desc, ilike, or } from "drizzle-orm";
 import {
   calculerSuperficie,
@@ -403,6 +403,72 @@ export async function verifierEUDRController(req: Request, res: Response): Promi
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur verifierEUDR");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ── GPS Terrain collecte ──────────────────────────────────────────────────────
+
+interface GpsPoint { lat: number; lon: number; accuracy?: number; ts: number; }
+
+export async function getGpsTerrain(req: Request, res: Response): Promise<void> {
+  try {
+    const coopId = COOP_ID(req);
+
+    const rows = await db
+      .select({
+        membreId:      membresTable.id,
+        membreNom:     membresTable.nom,
+        membrePrenoms: membresTable.prenoms,
+        village:       membresTable.village,
+        section:       membresTable.section,
+        missionId:     missionsTerrainTable.id,
+        missionTitre:  missionsTerrainTable.titre,
+        statut:        missionsMembresTable.statut,
+        dateCollecte:  missionsMembresTable.dateCollecte,
+        superficieHa:  membresTable.superficieHa,
+        gpsCollecte:   missionsMembresTable.gpsCollecte,
+      })
+      .from(missionsMembresTable)
+      .innerJoin(membresTable, eq(membresTable.id, missionsMembresTable.membreId))
+      .innerJoin(missionsTerrainTable, eq(missionsTerrainTable.id, missionsMembresTable.missionId))
+      .where(
+        and(
+          eq(missionsTerrainTable.cooperativeId, coopId),
+          sql`${missionsMembresTable.gpsCollecte} IS NOT NULL`,
+          sql`${missionsMembresTable.statut} IN ('collecte', 'valide')`,
+        ),
+      )
+      .orderBy(desc(missionsMembresTable.dateCollecte));
+
+    const result = rows
+      .map(row => {
+        const pts = row.gpsCollecte as GpsPoint[] | null;
+        if (!pts || pts.length < 3) return null;
+        const polygone: [number, number][] = pts
+          .filter(p => typeof p.lat === "number" && typeof p.lon === "number")
+          .map(p => [p.lat, p.lon] as [number, number]);
+        if (polygone.length < 3) return null;
+        return {
+          membreId:      row.membreId,
+          membreNom:     row.membreNom,
+          membrePrenoms: row.membrePrenoms,
+          village:       row.village,
+          section:       row.section,
+          missionId:     row.missionId,
+          missionTitre:  row.missionTitre,
+          statut:        row.statut,
+          dateCollecte:  row.dateCollecte ? new Date(row.dateCollecte as Date).toISOString() : null,
+          superficieHa:  row.superficieHa,
+          polygone,
+        };
+      })
+      .filter(Boolean);
+
+    res.json({ polygones: result });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur getGpsTerrain");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
