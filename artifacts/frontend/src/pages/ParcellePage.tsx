@@ -1139,12 +1139,16 @@ function OngletCarteGlobale() {
     if (!el) return;
     setIsExporting(true);
     try {
-      const [{ default: html2canvas }, { jsPDF }, autoTableModule] = await Promise.all([
+      const [{ default: html2canvas }, { jsPDF }, autoTableModule, configData] = await Promise.all([
         import("html2canvas"),
         import("jspdf"),
         import("jspdf-autotable"),
+        apiFetch<{ nom_complet?: string | null; nom_abrege?: string | null }>("/api/config").catch(() => ({})),
       ]);
       const autoTable = (autoTableModule as { default: typeof autoTableModule.default }).default ?? autoTableModule;
+      const nomCoop = (configData as { nom_complet?: string | null; nom_abrege?: string | null }).nom_complet
+        ?? (configData as { nom_complet?: string | null; nom_abrege?: string | null }).nom_abrege
+        ?? "CoopDigital";
 
       const canvas = await html2canvas(el, {
         useCORS: true,
@@ -1164,7 +1168,7 @@ function OngletCarteGlobale() {
       pdf.text("Rapport EUDR — Couverture GPS parcelles", margin, 13);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(9);
-      pdf.text(`Généré le ${dateStr} · CoopDigital`, margin, 20);
+      pdf.text(`Généré le ${dateStr} · ${nomCoop}`, margin, 20);
 
       const imgW = pageW - margin * 2;
       const imgH = Math.min((canvas.height * imgW) / canvas.width, pageH - 28);
@@ -1178,7 +1182,7 @@ function OngletCarteGlobale() {
         pdf.text("Synthèse par section", margin, 14);
         pdf.setFont("helvetica", "normal");
         pdf.setFontSize(9);
-        pdf.text(`Généré le ${dateStr} · CoopDigital`, margin, 21);
+        pdf.text(`Généré le ${dateStr} · ${nomCoop}`, margin, 21);
 
         const tableData = stats.par_section.map(s => [
           s.section,
@@ -1239,7 +1243,7 @@ function OngletCarteGlobale() {
       if (filterSection) params.set("section", filterSection);
       const qs = params.toString();
 
-      const data = await apiFetch<{ parcelles: EudrExportRow[] }>(
+      const data = await apiFetch<{ parcelles: EudrExportRow[]; nomCooperative: string | null }>(
         `/api/parcelles/export-eudr${qs ? `?${qs}` : ""}`,
       );
 
@@ -1261,7 +1265,11 @@ function OngletCarteGlobale() {
       }));
 
       const { utils, writeFile } = await import("xlsx");
-      const ws = utils.json_to_sheet(rows);
+      const ws = utils.json_to_sheet(rows, { origin: 2 });
+      utils.sheet_add_aoa(ws, [
+        [data.nomCooperative ?? "Export EUDR"],
+        [`Export EUDR — Parcelles · ${new Date().toLocaleDateString("fr-FR")}`],
+      ], { origin: "A1" });
       ws["!cols"] = [
         { wch: 28 }, { wch: 16 }, { wch: 16 },
         { wch: 16 }, { wch: 16 }, { wch: 6 }, { wch: 18 },

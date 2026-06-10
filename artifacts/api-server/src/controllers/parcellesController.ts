@@ -8,6 +8,7 @@ import {
   exportGeoJSON,
   calculerConformiteGlobale,
 } from "../services/parcelleService";
+import { getConfig } from "../services/configService";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -631,7 +632,10 @@ export async function exportEudrData(req: Request, res: Response): Promise<void>
       .where(and(...conditions))
       .orderBy(parcellesTable.section, parcellesTable.village, membresTable.nom);
 
-    res.json({ parcelles: rows });
+    const config = await getConfig(coopId);
+    const nomCooperative = config?.nomComplet ?? config?.nomAbrege ?? null;
+
+    res.json({ parcelles: rows, nomCooperative });
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur exportEudrData");
