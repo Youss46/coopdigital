@@ -54,3 +54,6 @@ channel = "stable-25_05"
 
 [userenv.shared]
 JWT_SECRET = "3725d6b3e6ef6997d65e176c974d7ea6417a35a3a2f9198d7e149f37d0b4308be26cbd627b15b0159005493428face50"
+VAPID_PUBLIC_KEY = "BPCY50bh4yvZAqlbJ2ai6f9IVn-x0Wpn1sQB3cyfsqCBh_XapoV17ZPrlKHlQUlqUT-8WgJMBiQPZRrotBxmG6Q"
+VAPID_SUBJECT = "mailto:admin@coopdigital.ci"
+VAPID_PRIVATE_KEY = "PruMt7aBsVzm75Wj1_ABdclo82mvje3KyNojt4tI3-8"

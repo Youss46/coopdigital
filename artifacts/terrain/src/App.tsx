@@ -1,6 +1,7 @@
 import { Switch, Route, Redirect, Router as WouterRouter } from "wouter";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
+import { usePushSubscription } from "./hooks/usePushSubscription";
 import OfflineBanner from "./components/OfflineBanner";
 import Login from "./pages/Login";
 import Accueil from "./pages/Accueil";
@@ -47,6 +48,7 @@ function DelegueRoutes() {
 
 function AppRoutes() {
   const { isAuthenticated, user } = useAuth();
+  usePushSubscription(isAuthenticated);
 
   if (!isAuthenticated) {
     return <Login />;

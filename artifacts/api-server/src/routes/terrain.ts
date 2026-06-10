@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { terrainAuthMiddleware, delegueOnly } from "../middlewares/terrainAuth.js";
+import { getVapidPublicKey, subscribePush, unsubscribePush } from "../controllers/pushController.js";
 import {
   loginTerrainHandler,
   getProfilHandler,
@@ -55,5 +56,10 @@ router.post("/terrain/messages/:missionId", terrainAuthMiddleware, sendMessageHa
 router.get("/terrain/agent/stats", terrainAuthMiddleware, getStatsAgentHandler);
 router.get("/terrain/agent/historique", terrainAuthMiddleware, getHistoriqueAgentHandler);
 router.get("/terrain/historique", terrainAuthMiddleware, getHistoriqueAgentHandler);
+
+// Push notifications
+router.get("/terrain/push/vapid-key", getVapidPublicKey);
+router.post("/terrain/push/subscribe", terrainAuthMiddleware, subscribePush);
+router.delete("/terrain/push/subscribe", terrainAuthMiddleware, unsubscribePush);
 
 export default router;

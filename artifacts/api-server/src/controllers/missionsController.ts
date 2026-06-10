@@ -6,6 +6,7 @@ import { missionsTerrainTable, missionsMembresTable, messagesMissionTable, users
 import { creerNotification, notifierParRole } from "../services/notificationService.js";
 import { computeCompletude, computeCompletudEudr } from "./membresController";
 import { calculerSuperficie, genererCodeParcelle } from "../services/parcelleService.js";
+import { envoyerPushNotification } from "../services/pushService.js";
 
 // ── Helper : auto-création / mise à jour parcelle depuis mission GPS ──────────
 
@@ -307,17 +308,23 @@ export async function createMission(req: Request, res: Response): Promise<void> 
       );
     }
 
-    // SMS à l'agent assigné
+    // Notification in-app + push à l'agent assigné
     if (agentId) {
+      const msgNotif = `Zone : ${zoneNom}. Date prévue : ${datePrevue}. ${membreIds?.length ?? 0} parcelle(s) à collecter.`;
       void creerNotification(cooperativeId, [agentId], {
         type:         "mission_assignee",
         titre:        `Mission assignée : ${titre}`,
-        message:      `Zone : ${zoneNom}. Date prévue : ${datePrevue}. ${membreIds?.length ?? 0} parcelle(s) à collecter.`,
+        message:      msgNotif,
         lien:         `/missions/${mission.id}`,
         lienLibelle:  "Voir la mission",
         gravite:      "info",
         sourceModule: "missions",
         sourceId:     mission.id,
+      });
+      void envoyerPushNotification(agentId, {
+        title: `📍 Nouvelle mission : ${titre}`,
+        body:  msgNotif,
+        url:   `/missions/${mission.id}`,
       });
     }
 

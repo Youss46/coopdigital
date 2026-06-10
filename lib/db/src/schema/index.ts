@@ -45,3 +45,4 @@ export * from "./investissements";
 export * from "./support";
 export * from "./missions";
 export * from "./messages_mission";
+export * from "./pushSubscriptions";
