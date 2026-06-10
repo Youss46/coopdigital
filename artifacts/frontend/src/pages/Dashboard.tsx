@@ -5,8 +5,9 @@ import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, Chec
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 
+const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
-const apiFetch = (url: string) => fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
+const apiFetch = (url: string) => fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } });
 
 function formaterFCFA(montant: number) {
   return new Intl.NumberFormat("fr-FR").format(montant) + " FCFA";
