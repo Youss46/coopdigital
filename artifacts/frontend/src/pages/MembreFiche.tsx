@@ -370,6 +370,8 @@ export default function MembreFiche() {
       },
       onSettled: (_data, _err, { id: membreId }) => {
         void qc.invalidateQueries({ queryKey: getGetMembreByIdQueryKey(membreId) });
+        void qc.invalidateQueries({ queryKey: ["membres-list"] });
+        void qc.invalidateQueries({ queryKey: ["membres-demandes"] });
       },
     },
   });
