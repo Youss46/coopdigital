@@ -94,7 +94,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
         role,
         cooperativeId,
         actif: true,
-        motDePasseTemporaire: role === "delegue",
+        motDePasseTemporaire: ["delegue", "directeur", "comptable", "responsable_tracabilite", "auditeur", "magasinier"].includes(role),
         section: section ?? null,
         zoneType: zoneType ?? null,
         zoneNom: zoneNom ?? null,
