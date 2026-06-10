@@ -13,6 +13,10 @@ import {
   membresSansGps,
   listAgentsTerrain,
   exportMissionGeoJSON,
+  getMessagesMission,
+  sendMessageMission,
+  validerMissionComplete,
+  rejeterMissionComplete,
 } from "../controllers/missionsController";
 
 const router: IRouter = Router();
@@ -27,6 +31,10 @@ router.get("/missions/:id/export-geojson", checkPermission("missions", "lire"), 
 router.get("/missions/:id",             checkPermission("missions", "lire"),    getMissionById);
 router.post("/missions/:id/demarrer",   checkPermission("missions", "executer"), demarrerMission);
 router.post("/missions/:id/soumettre",  checkPermission("missions", "executer"), soumettreMission);
+router.get("/missions/:id/messages",    checkPermission("missions", "lire"),    getMessagesMission);
+router.post("/missions/:id/messages",   checkPermission("missions", "lire"),    sendMessageMission);
+router.post("/missions/:id/valider",    checkPermission("missions", "valider"), validerMissionComplete);
+router.post("/missions/:id/rejeter",    checkPermission("missions", "valider"), rejeterMissionComplete);
 router.patch("/missions/:id/membres/:membreId/collecte",
                                         checkPermission("missions", "executer"), collecterGpsMembre);
 router.post("/missions/:id/membres/:membreId/valider",

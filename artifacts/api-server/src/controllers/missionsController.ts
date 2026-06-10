@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { eq, and, desc, sql, asc } from "drizzle-orm";
-import { missionsTerrainTable, missionsMembresTable, usersTable, membresTable } from "@workspace/db";
+import { missionsTerrainTable, missionsMembresTable, messagesMissionTable, usersTable, membresTable } from "@workspace/db";
 import { creerNotification, notifierParRole } from "../services/notificationService.js";
 import { computeCompletude } from "./membresController";
 import { calculerSuperficie } from "../services/parcelleService.js";
@@ -567,6 +567,217 @@ export async function rejeterParcelleMission(req: Request, res: Response): Promi
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Erreur rejeterParcelleMission");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ── Messages de mission (RT) ──────────────────────────────────────────────────
+
+export async function getMessagesMission(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const missionId = parseInt(String(req.params["id"] ?? "0"));
+
+  try {
+    const [mission] = await db
+      .select({ id: missionsTerrainTable.id, agentId: missionsTerrainTable.agentId })
+      .from(missionsTerrainTable)
+      .where(and(eq(missionsTerrainTable.id, missionId), eq(missionsTerrainTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!mission) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
+
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+    if (userRole === "agent_terrain" && mission.agentId !== userId) {
+      res.status(403).json({ erreur: "Mission non assignée à cet agent" });
+      return;
+    }
+
+    const messages = await db
+      .select({
+        id: messagesMissionTable.id,
+        message: messagesMissionTable.message,
+        type: messagesMissionTable.type,
+        lu: messagesMissionTable.lu,
+        createdAt: messagesMissionTable.createdAt,
+        auteurId: messagesMissionTable.auteurId,
+        auteurNom: usersTable.nom,
+        auteurPrenoms: usersTable.prenoms,
+        auteurRole: usersTable.role,
+      })
+      .from(messagesMissionTable)
+      .leftJoin(usersTable, eq(usersTable.id, messagesMissionTable.auteurId))
+      .where(eq(messagesMissionTable.missionId, missionId))
+      .orderBy(messagesMissionTable.createdAt);
+
+    // Marquer les messages non lus comme lus pour cet utilisateur
+    await db
+      .update(messagesMissionTable)
+      .set({ lu: true })
+      .where(and(eq(messagesMissionTable.missionId, missionId), eq(messagesMissionTable.lu, false)));
+
+    res.json(messages);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getMessagesMission");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function sendMessageMission(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const userId = req.user?.id;
+  if (!cooperativeId || !userId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const missionId = parseInt(String(req.params["id"] ?? "0"));
+  const { message, type } = req.body as { message?: string; type?: string };
+
+  if (!message?.trim()) {
+    res.status(400).json({ erreur: "Le message est requis" });
+    return;
+  }
+
+  try {
+    const [mission] = await db
+      .select({ id: missionsTerrainTable.id, agentId: missionsTerrainTable.agentId })
+      .from(missionsTerrainTable)
+      .where(and(eq(missionsTerrainTable.id, missionId), eq(missionsTerrainTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!mission) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
+
+    if (req.user?.role === "agent_terrain" && mission.agentId !== userId) {
+      res.status(403).json({ erreur: "Mission non assignée à cet agent" });
+      return;
+    }
+
+    const [msg] = await db
+      .insert(messagesMissionTable)
+      .values({
+        missionId,
+        auteurId: userId,
+        message: message.trim(),
+        type: (type ?? "commentaire") as "commentaire" | "probleme" | "reponse",
+      })
+      .returning();
+
+    res.status(201).json(msg);
+  } catch (err) {
+    req.log.error({ err }, "Erreur sendMessageMission");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ── Valider / Rejeter la mission entière (RT) ─────────────────────────────────
+
+export async function validerMissionComplete(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const userId = req.user?.id;
+  if (!cooperativeId || !userId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const missionId = parseInt(String(req.params["id"] ?? "0"));
+
+  try {
+    const [mission] = await db
+      .select()
+      .from(missionsTerrainTable)
+      .where(and(eq(missionsTerrainTable.id, missionId), eq(missionsTerrainTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!mission) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
+    if (mission.statut !== "soumise") {
+      res.status(400).json({ erreur: "Seules les missions soumises peuvent être validées" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(missionsTerrainTable)
+      .set({ statut: "validee", updatedAt: new Date() })
+      .where(eq(missionsTerrainTable.id, missionId))
+      .returning();
+
+    // Notification à l'agent
+    if (mission.agentId) {
+      try {
+        void creerNotification(cooperativeId, [mission.agentId], {
+          type:         "mission_validee",
+          titre:        `Mission validée ✓ : ${mission.titre}`,
+          message:      `Votre mission a été validée. ${updated.parcellesCollectees ?? 0} parcelle(s) intégrée(s).`,
+          lien:         `/missions/${mission.id}`,
+          lienLibelle:  "Voir la mission",
+          gravite:      "info",
+          sourceModule: "missions",
+          sourceId:     mission.id,
+        });
+      } catch { /* non bloquant */ }
+    }
+
+    res.json({ ok: true, mission: updated });
+  } catch (err) {
+    req.log.error({ err }, "Erreur validerMissionComplete");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function rejeterMissionComplete(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const userId = req.user?.id;
+  if (!cooperativeId || !userId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const missionId = parseInt(String(req.params["id"] ?? "0"));
+  const { motif } = req.body as { motif?: string };
+
+  if (!motif?.trim()) {
+    res.status(400).json({ erreur: "Le motif de rejet est obligatoire" });
+    return;
+  }
+
+  try {
+    const [mission] = await db
+      .select()
+      .from(missionsTerrainTable)
+      .where(and(eq(missionsTerrainTable.id, missionId), eq(missionsTerrainTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!mission) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
+    if (mission.statut !== "soumise") {
+      res.status(400).json({ erreur: "Seules les missions soumises peuvent être rejetées" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(missionsTerrainTable)
+      .set({ statut: "rejetee", motifRejet: motif.trim(), updatedAt: new Date() })
+      .where(eq(missionsTerrainTable.id, missionId))
+      .returning();
+
+    // Ajouter un message système + notifier l'agent
+    try {
+      await db.insert(messagesMissionTable).values({
+        missionId,
+        auteurId: userId,
+        message: `[MISSION REJETÉE] ${motif.trim()}`,
+        type: "probleme",
+      });
+
+      if (mission.agentId) {
+        void creerNotification(cooperativeId, [mission.agentId], {
+          type:         "mission_rejetee",
+          titre:        `Mission rejetée : ${mission.titre}`,
+          message:      `Motif : ${motif.trim()}. Veuillez corriger et resoumettre.`,
+          lien:         `/missions/${mission.id}`,
+          lienLibelle:  "Voir les corrections",
+          gravite:      "alerte",
+          sourceModule: "missions",
+          sourceId:     mission.id,
+        });
+      }
+    } catch { /* non bloquant */ }
+
+    res.json({ ok: true, mission: updated });
+  } catch (err) {
+    req.log.error({ err }, "Erreur rejeterMissionComplete");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
