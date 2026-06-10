@@ -836,13 +836,19 @@ export default function MembreFiche() {
       })()}
 
       {/* QR Code */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col items-center gap-3 max-w-xs">
-        <h2 className="font-semibold text-gray-900 text-sm w-full">QR Code membre</h2>
-        <div className="p-3 bg-white border border-gray-100 rounded-lg">
-          <QRCodeSVG value={membre.qrCodeToken} size={140} />
-        </div>
-        <p className="text-xs text-gray-400 font-mono text-center break-all">{membre.qrCodeToken}</p>
-      </div>
+      {(() => {
+        const portailUrl = `${window.location.origin}/portail/connexion?code=${encodeURIComponent(membre.codeMembre ?? "")}`;
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col items-center gap-3 max-w-xs">
+            <h2 className="font-semibold text-gray-900 text-sm w-full">QR Code membre</h2>
+            <div className="p-3 bg-white border border-gray-100 rounded-lg">
+              <QRCodeSVG value={portailUrl} size={140} />
+            </div>
+            <p className="text-xs text-gray-600 font-mono text-center font-semibold">{membre.codeMembre}</p>
+            <p className="text-[10px] text-gray-400 text-center">Scanner pour ouvrir l'espace membre</p>
+          </div>
+        );
+      })()}
 
       {/* Onglets */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

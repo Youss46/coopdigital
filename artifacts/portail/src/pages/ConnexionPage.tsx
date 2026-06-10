@@ -7,7 +7,8 @@ import { Loader2, AlertCircle } from "lucide-react";
 export default function ConnexionPage() {
   const [, setLoc] = useLocation();
   const { login } = useAuth();
-  const [code, setCode] = useState("");
+  const urlCode = new URLSearchParams(window.location.search).get("code") ?? "";
+  const [code, setCode] = useState(urlCode);
   const [tel, setTel] = useState("");
   const [loading, setLoading] = useState(false);
   const [erreur, setErreur] = useState("");
