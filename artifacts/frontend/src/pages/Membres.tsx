@@ -244,6 +244,9 @@ export default function Membres() {
         village: form.village, groupement: form.groupement,
         numeroCni: form.numeroCni, sexe: form.sexe as "M" | "F" | undefined,
         delegueId: delegueIdFinal, rattachementType: rattachementTypeFinal,
+        dateNaissance: (form as Record<string, unknown>)["dateNaissance"] as string | undefined,
+        typeFournisseur: (form as Record<string, unknown>)["typeFournisseur"] as "membre" | "pisteur" | "externe" | undefined,
+        nbrePartsSouscrites: (form as Record<string, unknown>)["nbrePartsSouscrites"] ? Number((form as Record<string, unknown>)["nbrePartsSouscrites"]) : undefined,
       },
     });
   };
@@ -622,6 +625,35 @@ export default function Membres() {
                     onChange={(e) => setForm({ ...form, dateAdhesion: e.target.value })}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
                 </div>
+              </div>
+
+              {/* Date de naissance + N° CNI */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Date de naissance</label>
+                  <input type="date" value={((form as Record<string, unknown>)["dateNaissance"] as string) ?? ""}
+                    onChange={(e) => setForm({ ...form, ...{ dateNaissance: e.target.value } } as typeof form)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Parts souscrites</label>
+                  <input type="number" min="0" step="1" value={((form as Record<string, unknown>)["nbrePartsSouscrites"] as string) ?? ""}
+                    onChange={(e) => setForm({ ...form, ...{ nbrePartsSouscrites: e.target.value } } as typeof form)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
+                </div>
+              </div>
+
+              {/* Type fournisseur */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Type fournisseur</label>
+                <select value={((form as Record<string, unknown>)["typeFournisseur"] as string) ?? ""}
+                  onChange={(e) => setForm({ ...form, ...{ typeFournisseur: e.target.value || undefined } } as typeof form)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1">
+                  <option value="">— Non renseigné —</option>
+                  <option value="membre">Membre</option>
+                  <option value="pisteur">Pisteur</option>
+                  <option value="externe">Externe</option>
+                </select>
               </div>
 
               {/* Rattachement */}

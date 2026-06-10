@@ -6653,6 +6653,17 @@ components:
           type: string
         parcelleLng:
           type: string
+        dateNaissance:
+          type: string
+          format: date
+        dateAdhesion:
+          type: string
+          format: date
+        typeFournisseur:
+          type: string
+          enum: [membre, pisteur, externe]
+        nbrePartsSouscrites:
+          type: number
 
     ModifierStatutMembreBody:
       type: object

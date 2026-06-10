@@ -384,7 +384,8 @@ export default function MembreFiche() {
   const [editForm, setEditForm] = useState<{
     nom: string; prenoms: string; telephone: string; village: string;
     groupement: string; superficieHa: string; sexe: string; numeroCni: string;
-  }>({ nom: "", prenoms: "", telephone: "", village: "", groupement: "", superficieHa: "", sexe: "", numeroCni: "" });
+    dateNaissance: string; dateAdhesion: string; typeFournisseur: string; nbrePartsSouscrites: string;
+  }>({ nom: "", prenoms: "", telephone: "", village: "", groupement: "", superficieHa: "", sexe: "", numeroCni: "", dateNaissance: "", dateAdhesion: "", typeFournisseur: "", nbrePartsSouscrites: "" });
 
   function openEditModal() {
     if (!membre) return;
@@ -397,6 +398,10 @@ export default function MembreFiche() {
       superficieHa: membre.superficieHa ?? "",
       sexe: (membre.sexe as string | null) ?? "",
       numeroCni: (membre.numeroCni as string | null) ?? "",
+      dateNaissance: (membre.dateNaissance as string | null) ?? "",
+      dateAdhesion: (membre.dateAdhesion as string | null) ?? "",
+      typeFournisseur: (membre.typeFournisseur as string | null) ?? "",
+      nbrePartsSouscrites: membre.nbrePartsSouscrites != null ? String(membre.nbrePartsSouscrites) : "",
     });
     setShowEditModal(true);
   }
@@ -405,15 +410,19 @@ export default function MembreFiche() {
     e.preventDefault();
     setEditPending(true);
     try {
-      const body: Record<string, string> = {};
-      if (editForm.nom.trim())         body["nom"]          = editForm.nom.trim();
-      if (editForm.prenoms.trim())     body["prenoms"]      = editForm.prenoms.trim();
-      if (editForm.telephone.trim())   body["telephone"]    = editForm.telephone.trim();
-      if (editForm.village.trim())     body["village"]      = editForm.village.trim();
-      if (editForm.groupement.trim())  body["groupement"]   = editForm.groupement.trim();
-      if (editForm.superficieHa.trim()) body["superficieHa"] = editForm.superficieHa.trim();
-      if (editForm.sexe)               body["sexe"]         = editForm.sexe;
-      if (editForm.numeroCni.trim())   body["numeroCni"]    = editForm.numeroCni.trim();
+      const body: Record<string, string | number> = {};
+      if (editForm.nom.trim())              body["nom"]               = editForm.nom.trim();
+      if (editForm.prenoms.trim())          body["prenoms"]           = editForm.prenoms.trim();
+      if (editForm.telephone.trim())        body["telephone"]         = editForm.telephone.trim();
+      if (editForm.village.trim())          body["village"]           = editForm.village.trim();
+      if (editForm.groupement.trim())       body["groupement"]        = editForm.groupement.trim();
+      if (editForm.superficieHa.trim())     body["superficieHa"]      = editForm.superficieHa.trim();
+      if (editForm.sexe)                    body["sexe"]              = editForm.sexe;
+      if (editForm.numeroCni.trim())        body["numeroCni"]         = editForm.numeroCni.trim();
+      if (editForm.dateNaissance.trim())    body["dateNaissance"]     = editForm.dateNaissance.trim();
+      if (editForm.dateAdhesion.trim())     body["dateAdhesion"]      = editForm.dateAdhesion.trim();
+      if (editForm.typeFournisseur)         body["typeFournisseur"]   = editForm.typeFournisseur;
+      if (editForm.nbrePartsSouscrites.trim()) body["nbrePartsSouscrites"] = parseFloat(editForm.nbrePartsSouscrites);
       const res = await fetch(`${BASE_FICHE}/api/membres/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokFn()}` },
@@ -1526,6 +1535,52 @@ export default function MembreFiche() {
                   <input
                     value={editForm.numeroCni}
                     onChange={e => setEditForm(f => ({ ...f, numeroCni: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Date de naissance</label>
+                  <input
+                    type="date"
+                    value={editForm.dateNaissance}
+                    onChange={e => setEditForm(f => ({ ...f, dateNaissance: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Date d'adhésion</label>
+                  <input
+                    type="date"
+                    value={editForm.dateAdhesion}
+                    onChange={e => setEditForm(f => ({ ...f, dateAdhesion: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Type fournisseur</label>
+                  <select
+                    value={editForm.typeFournisseur}
+                    onChange={e => setEditForm(f => ({ ...f, typeFournisseur: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  >
+                    <option value="">— Non renseigné —</option>
+                    <option value="membre">Membre</option>
+                    <option value="pisteur">Pisteur</option>
+                    <option value="externe">Externe</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Parts souscrites</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={editForm.nbrePartsSouscrites}
+                    onChange={e => setEditForm(f => ({ ...f, nbrePartsSouscrites: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
                   />
                 </div>

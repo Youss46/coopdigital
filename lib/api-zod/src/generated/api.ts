@@ -182,7 +182,11 @@ export const UpdateMembreBody = zod.object({
   "sexe": zod.enum(['M', 'F']).optional(),
   "photoUrl": zod.string().optional(),
   "parcelleLat": zod.string().optional(),
-  "parcelleLng": zod.string().optional()
+  "parcelleLng": zod.string().optional(),
+  "dateNaissance": zod.string().optional(),
+  "dateAdhesion": zod.string().optional(),
+  "typeFournisseur": zod.enum(['membre', 'pisteur', 'externe']).optional(),
+  "nbrePartsSouscrites": zod.number().optional()
 })
 
 export const UpdateMembreResponse = zod.object({
