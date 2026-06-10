@@ -487,9 +487,20 @@ export async function updateMembre(req: Request, res: Response): Promise<void> {
       }
     }
 
+    const body = req.body as Record<string, unknown>;
+
+    // Champs supplémentaires lus directement depuis req.body (non couverts par les anciennes versions du schéma Zod)
+    const extraFields: Record<string, unknown> = {};
+    if (body["dateNaissance"] !== undefined)    extraFields["dateNaissance"]     = body["dateNaissance"] as string | null;
+    if (body["dateAdhesion"] !== undefined)     extraFields["dateAdhesion"]      = body["dateAdhesion"] as string | null;
+    if (body["typeFournisseur"] !== undefined)  extraFields["typeFournisseur"]   = body["typeFournisseur"] as string | null;
+    if (body["nbrePartsSouscrites"] !== undefined) extraFields["nbrePartsSouscrites"] = Number(body["nbrePartsSouscrites"]);
+    if (body["superficieTotale"] !== undefined) extraFields["superficieTotale"]  = String(body["superficieTotale"]);
+    if (body["nombreParcelles"] !== undefined)  extraFields["nombreParcelles"]   = Number(body["nombreParcelles"]);
+
     const [membre] = await db
       .update(membresTable)
-      .set({ ...parse.data, updatedAt: new Date() })
+      .set({ ...parse.data, ...extraFields, updatedAt: new Date() })
       .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
       .returning();
 
