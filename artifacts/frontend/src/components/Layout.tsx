@@ -375,8 +375,12 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
   });
+  const storedWarning = (() => {
+    try { return (JSON.parse(localStorage.getItem("coop_gps_seuils") ?? "null") as { warning?: number } | null)?.warning ?? 50; }
+    catch { return 50; }
+  })();
   const nbSectionsAlerte = showEudrAlerteBadge
-    ? (conformiteNav?.par_section ?? []).filter(s => s.pct < 50).length
+    ? (conformiteNav?.par_section ?? []).filter(s => s.pct < storedWarning).length
     : 0;
 
   return (

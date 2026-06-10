@@ -252,52 +252,54 @@ function DashboardRT() {
       </div>
 
       {/* ── Alertes couverture GPS par section ───────────────────────────────── */}
-      {hasAlertes && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
-              <AlertTriangle size={15} className="text-amber-500" />
-              Alertes couverture GPS — sections sous objectif
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+            <AlertTriangle size={15} className={hasAlertes ? "text-amber-500" : "text-gray-400"} />
+            Alertes couverture GPS
+            {hasAlertes && (
               <span className="text-xs font-normal text-gray-500">
                 ({sectionsEnDanger.length} critique{sectionsEnDanger.length !== 1 ? "s" : ""}, {sectionsEnAvertissement.length} avertissement{sectionsEnAvertissement.length !== 1 ? "s" : ""})
               </span>
-            </h2>
+            )}
+          </h2>
+          <button
+            onClick={editingSeuils ? () => setEditingSeuils(false) : openEditSeuils}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <Settings size={12} />
+            {editingSeuils ? "Fermer" : `Seuils : ${seuils.warning}% / ${seuils.objectif}%`}
+          </button>
+        </div>
+
+        {editingSeuils && (
+          <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              <span className="text-red-700 font-medium text-xs">⚠ Seuil danger (%)</span>
+              <input
+                type="number" min="0" max="100" value={seuilWarningDraft}
+                onChange={e => setSeuilWarningDraft(e.target.value)}
+                className="w-16 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-red-400"
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              <span className="text-amber-700 font-medium text-xs">◎ Objectif (%)</span>
+              <input
+                type="number" min="0" max="100" value={seuilObjectifDraft}
+                onChange={e => setSeuilObjectifDraft(e.target.value)}
+                className="w-16 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400"
+              />
+            </label>
             <button
-              onClick={editingSeuils ? () => setEditingSeuils(false) : openEditSeuils}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              onClick={saveSeuils}
+              className="px-3 py-1 bg-green-700 text-white rounded-lg text-xs hover:bg-green-800 transition-colors"
             >
-              <Settings size={12} />
-              {editingSeuils ? "Fermer" : `Seuils : ${seuils.warning}% / ${seuils.objectif}%`}
+              Enregistrer
             </button>
           </div>
+        )}
 
-          {editingSeuils && (
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-4 text-sm">
-              <label className="flex items-center gap-2">
-                <span className="text-red-700 font-medium text-xs">⚠ Seuil danger (%)</span>
-                <input
-                  type="number" min="0" max="100" value={seuilWarningDraft}
-                  onChange={e => setSeuilWarningDraft(e.target.value)}
-                  className="w-16 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-red-400"
-                />
-              </label>
-              <label className="flex items-center gap-2">
-                <span className="text-amber-700 font-medium text-xs">◎ Objectif (%)</span>
-                <input
-                  type="number" min="0" max="100" value={seuilObjectifDraft}
-                  onChange={e => setSeuilObjectifDraft(e.target.value)}
-                  className="w-16 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400"
-                />
-              </label>
-              <button
-                onClick={saveSeuils}
-                className="px-3 py-1 bg-green-700 text-white rounded-lg text-xs hover:bg-green-800 transition-colors"
-              >
-                Enregistrer
-              </button>
-            </div>
-          )}
-
+        {hasAlertes ? (
           <div className="divide-y divide-gray-100">
             {[...sectionsEnDanger, ...sectionsEnAvertissement].map(sec => {
               const isDanger = sec.pct < seuils.warning;
@@ -320,7 +322,7 @@ function DashboardRT() {
                     </span>
                   </div>
                   <button
-                    onClick={() => navigate(`/parcelles`)}
+                    onClick={() => navigate("/parcelles")}
                     className="text-xs text-blue-600 hover:underline shrink-0"
                   >
                     Voir →
@@ -329,8 +331,14 @@ function DashboardRT() {
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="px-5 py-8 text-center">
+            <CheckCircle2 size={22} className="mx-auto mb-2 text-green-500" />
+            <p className="text-sm font-medium text-green-700">Toutes les sections sont au-dessus de l'objectif</p>
+            <p className="text-xs text-gray-400 mt-1">Seuil danger : {seuils.warning}% · Objectif : {seuils.objectif}%</p>
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {s.demandesEnAttente > 0 && (
