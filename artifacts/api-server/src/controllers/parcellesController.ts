@@ -440,6 +440,54 @@ export async function verifierEUDRController(req: Request, res: Response): Promi
   }
 }
 
+// ── Membres sans GPS ─────────────────────────────────────────────────────────
+
+export async function getMembresSansGps(req: Request, res: Response): Promise<void> {
+  try {
+    const coopId = COOP_ID(req);
+    const villageQ = req.query["village"] as string | undefined;
+    const sectionQ = req.query["section"] as string | undefined;
+
+    const conditions: ReturnType<typeof eq>[] = [
+      eq(membresTable.cooperativeId, coopId),
+      eq(membresTable.statutMembre, "actif"),
+      sql`${parcellesTable.id} IS NULL`,
+    ];
+    if (villageQ) conditions.push(eq(membresTable.village, villageQ));
+    if (sectionQ) conditions.push(eq(membresTable.section, sectionQ));
+
+    const rows = await db
+      .select({
+        id:          membresTable.id,
+        nom:         membresTable.nom,
+        prenoms:     membresTable.prenoms,
+        telephone:   membresTable.telephone,
+        village:     membresTable.village,
+        section:     membresTable.section,
+        parcelleLat: membresTable.parcelleLat,
+        parcelleLng: membresTable.parcelleLng,
+      })
+      .from(membresTable)
+      .leftJoin(
+        parcellesTable,
+        and(
+          eq(parcellesTable.membreId, membresTable.id),
+          eq(parcellesTable.cooperativeId, coopId),
+          eq(parcellesTable.actif, true),
+          sql`(${parcellesTable.polygone} IS NOT NULL OR ${parcellesTable.coordonneesPoint} IS NOT NULL)`,
+        ),
+      )
+      .where(and(...conditions))
+      .orderBy(membresTable.village, membresTable.nom);
+
+    res.json({ membres: rows });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur getMembresSansGps");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 // ── GPS Terrain collecte ──────────────────────────────────────────────────────
 
 interface GpsPoint { lat: number; lon: number; accuracy?: number; ts: number; }

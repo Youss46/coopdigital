@@ -16,10 +16,12 @@ import {
   verifierTout,
   getGpsTerrain,
   getZonesFiltres,
+  getMembresSansGps,
 } from "../controllers/parcellesController";
 
 const router: IRouter = Router();
 
+router.get(  "/parcelles/membres-sans-gps",      checkPermission("parcelles", "voir_carte"),        getMembresSansGps);
 router.get(  "/parcelles/gps-terrain",          checkPermission("parcelles", "voir_carte"),        getGpsTerrain);
 router.get(  "/parcelles/zones-filtres",         checkPermission("parcelles", "voir_carte"),        getZonesFiltres);
 router.get(  "/parcelles/carte",               checkPermission("parcelles", "voir_carte"),        getParcellesCarte);

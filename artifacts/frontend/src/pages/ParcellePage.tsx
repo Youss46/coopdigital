@@ -73,6 +73,17 @@ interface ZoneRisque {
   source: string | null;
 }
 
+interface MembreSansGps {
+  id: number;
+  nom: string;
+  prenoms: string;
+  telephone: string | null;
+  village: string | null;
+  section: string | null;
+  parcelleLat: string | null;
+  parcelleLng: string | null;
+}
+
 interface ParcelleListItem extends ParcelleCarte {
   membre_nom: string;
   telephone: string;
@@ -188,6 +199,8 @@ function LeafletMap({
   showZones,
   gpsTerrainPolygons,
   showGpsTerrain,
+  membresSansGps,
+  showMembresSansGps,
 }: {
   parcelles: ParcelleCarte[];
   zones: ZoneRisque[];
@@ -199,6 +212,8 @@ function LeafletMap({
   showZones: boolean;
   gpsTerrainPolygons: GpsTerrainPolygon[];
   showGpsTerrain: boolean;
+  membresSansGps: MembreSansGps[];
+  showMembresSansGps: boolean;
 }) {
   const COOP_CENTER: [number, number] = [7.0, -6.5];
 
@@ -311,6 +326,35 @@ function LeafletMap({
           </Popup>
         </Polygon>
       ))}
+
+      {showMembresSansGps && membresSansGps.map(m => {
+        const lat = m.parcelleLat ? parseFloat(m.parcelleLat) : null;
+        const lng = m.parcelleLng ? parseFloat(m.parcelleLng) : null;
+        if (!lat || !lng || isNaN(lat) || isNaN(lng)) return null;
+        return (
+          <CircleMarker
+            key={`sans-gps-${m.id}`}
+            center={[lat, lng]}
+            radius={8}
+            pathOptions={{ color: "#dc2626", fillColor: "#dc2626", fillOpacity: 0.75, weight: 2 }}
+          >
+            <Popup>
+              <div className="text-sm min-w-36">
+                <p className="font-semibold text-red-700 flex items-center gap-1 mb-1">
+                  Sans GPS
+                </p>
+                <p className="text-gray-800 font-medium">{m.nom} {m.prenoms}</p>
+                {m.telephone && (
+                  <p className="text-gray-500 text-xs mt-0.5">{m.telephone}</p>
+                )}
+                {m.village && (
+                  <p className="text-gray-500 text-xs">{m.village}{m.section ? ` — ${m.section}` : ""}</p>
+                )}
+              </div>
+            </Popup>
+          </CircleMarker>
+        );
+      })}
 
       <DrawingLayer active={drawingMode} vertices={drawVertices} onAddVertex={onAddVertex} />
     </MapContainer>
@@ -636,6 +680,8 @@ function OngletCarte({
           showZones={showZones}
           gpsTerrainPolygons={gpsTerrainPolygons}
           showGpsTerrain={showGpsTerrain}
+          membresSansGps={[]}
+          showMembresSansGps={false}
         />
         {selectedParcelle && (
           <SidePanel
@@ -958,6 +1004,7 @@ function OngletCarteGlobale() {
   const [filterZoneType, setFilterZoneType] = useState("");
   const [showZones, setShowZones] = useState(true);
   const [showGpsTerrain, setShowGpsTerrain] = useState(true);
+  const [showMembresSansGps, setShowMembresSansGps] = useState(true);
   const [selected, setSelected] = useState<number | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -992,9 +1039,24 @@ function OngletCarteGlobale() {
     queryFn: () => apiFetch<ConformiteStats>("/api/parcelles/conformite"),
   });
 
+  const membresSansGpsQ = useQuery({
+    queryKey: ["parcelles-membres-sans-gps"],
+    queryFn: () => apiFetch<{ membres: MembreSansGps[] }>("/api/parcelles/membres-sans-gps"),
+  });
+
   const parcelles = carteQ.data?.parcelles ?? [];
   const allZones = carteQ.data?.zones ?? [];
   const stats = conformiteQ.data;
+
+  const allMembresSansGps = membresSansGpsQ.data?.membres ?? [];
+  const membresSansGps = allMembresSansGps.filter(m => {
+    if (filterVillage && m.village !== filterVillage) return false;
+    if (filterSection && m.section !== filterSection) return false;
+    return true;
+  });
+  const membresSansGpsAvecCoords = membresSansGps.filter(
+    m => m.parcelleLat && m.parcelleLng && parseFloat(m.parcelleLat) !== 0 && parseFloat(m.parcelleLng) !== 0,
+  );
 
   // Fix 2: filter GPS terrain polygons by village/section consistently with parcel filter
   const allGpsPolygones = gpsTerrainQ.data?.polygones ?? [];
@@ -1193,6 +1255,20 @@ function OngletCarteGlobale() {
           )}
         </label>
 
+        <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+          <input type="checkbox" checked={showMembresSansGps} onChange={e => setShowMembresSansGps(e.target.checked)} className="rounded" />
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-600 shrink-0" />
+          Membres sans GPS
+          <span className={`ml-0.5 text-xs rounded-full px-1.5 py-0.5 font-medium ${
+            membresSansGps.length > 0 ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"
+          }`}>
+            {membresSansGps.length}
+          </span>
+          {membresSansGpsAvecCoords.length < membresSansGps.length && membresSansGps.length > 0 && (
+            <span className="text-xs text-gray-400">({membresSansGpsAvecCoords.length} localisés)</span>
+          )}
+        </label>
+
         <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
           {(isLoading || isVerifying) && <RefreshCw size={13} className="animate-spin" />}
           <span>{parcelles.length} parcelle{parcelles.length > 1 ? "s" : ""} affichée{parcelles.length > 1 ? "s" : ""}</span>
@@ -1230,6 +1306,12 @@ function OngletCarteGlobale() {
             GPS Terrain{(filterVillage || filterSection) ? " (filtré)" : ""}
           </span>
         )}
+        {showMembresSansGps && membresSansGpsAvecCoords.length > 0 && (
+          <span className="flex items-center gap-1.5 text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-full bg-red-600" />
+            Membre sans GPS
+          </span>
+        )}
       </div>
 
       {/* Carte */}
@@ -1245,6 +1327,8 @@ function OngletCarteGlobale() {
           showZones={showZones}
           gpsTerrainPolygons={gpsPolygones}
           showGpsTerrain={showGpsTerrain}
+          membresSansGps={membresSansGps}
+          showMembresSansGps={showMembresSansGps}
         />
         {selectedParcelle && (
           <SidePanel
