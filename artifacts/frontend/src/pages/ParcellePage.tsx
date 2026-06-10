@@ -1,12 +1,12 @@
 import "leaflet/dist/leaflet.css";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Polyline, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import {
   Map, List, ShieldCheck, Download, Plus, RefreshCw, X, CheckCircle2,
   AlertTriangle, XCircle, Clock, HelpCircle, ChevronRight, Leaf, Navigation,
-  Globe, Users, Layers, Filter,
+  Globe, Users, Layers, Filter, FileDown,
 } from "lucide-react";
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)["_getIconUrl"];
@@ -960,6 +960,8 @@ function OngletCarteGlobale() {
   const [showGpsTerrain, setShowGpsTerrain] = useState(true);
   const [selected, setSelected] = useState<number | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
 
   const zonesQ = useQuery({
     queryKey: ["parcelles-zones-filtres"],
@@ -1032,8 +1034,52 @@ function OngletCarteGlobale() {
     }
   }
 
+  async function handleExportPDF() {
+    const el = exportRef.current;
+    if (!el) return;
+    setIsExporting(true);
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+      const canvas = await html2canvas(el, {
+        useCORS: true,
+        scale: 1.5,
+        logging: false,
+        allowTaint: false,
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 14;
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(14);
+      pdf.text("Rapport EUDR — Couverture GPS parcelles", margin, 13);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.text(
+        `Généré le ${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })} · CoopDigital`,
+        margin,
+        20,
+      );
+
+      const imgW = pageW - margin * 2;
+      const imgH = Math.min((canvas.height * imgW) / canvas.width, pageH - 28);
+      pdf.addImage(imgData, "PNG", margin, 25, imgW, imgH);
+      pdf.save(`eudr_rapport_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (e) {
+      console.error(e);
+      alert("Erreur lors de la génération du PDF. Vérifiez que la carte est bien chargée.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   return (
-    <div className="space-y-4">
+    <div ref={exportRef} className="space-y-4">
       {/* Statistiques de couverture */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCouverture
@@ -1150,6 +1196,17 @@ function OngletCarteGlobale() {
         <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
           {(isLoading || isVerifying) && <RefreshCw size={13} className="animate-spin" />}
           <span>{parcelles.length} parcelle{parcelles.length > 1 ? "s" : ""} affichée{parcelles.length > 1 ? "s" : ""}</span>
+          <button
+            onClick={handleExportPDF}
+            disabled={isExporting || isLoading}
+            title="Exporter la carte et les statistiques en PDF"
+            className="flex items-center gap-1 px-2.5 py-1 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            {isExporting
+              ? <RefreshCw size={11} className="animate-spin" />
+              : <FileDown size={11} />}
+            {isExporting ? "Génération…" : "Exporter PDF"}
+          </button>
         </div>
       </div>
 
