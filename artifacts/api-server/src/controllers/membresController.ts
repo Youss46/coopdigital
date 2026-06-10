@@ -80,7 +80,7 @@ export async function listDeleguesPourMembres(req: Request, res: Response): Prom
 
 // ── Liste membres ─────────────────────────────────────────────────────────────
 
-export function computeCompletude(m: Record<string, unknown>): number {
+export function computeCompletudIdentite(m: Record<string, unknown>): number {
   const champs = [
     !!m["nom"] && String(m["nom"]).trim() !== "",
     !!m["prenoms"] && String(m["prenoms"]).trim() !== "",
@@ -89,16 +89,26 @@ export function computeCompletude(m: Record<string, unknown>): number {
     !!m["date_naissance"] || !!m["dateNaissance"],
     !!m["sexe"] && String(m["sexe"]).trim() !== "",
     !!m["numero_cni"] || !!m["numeroCni"],
-    !!m["gps_parcelles"] || !!m["gpsParcelles"],
-    !!m["superficie_totale"] || !!m["superficieTotale"],
-    !!m["nombre_parcelles"] || !!m["nombreParcelles"],
     !!m["date_adhesion"] || !!m["dateAdhesion"],
     !!m["type_fournisseur"] || !!m["typeFournisseur"],
     (m["nbre_parts_souscrites"] !== undefined
       ? Number(m["nbre_parts_souscrites"]) > 0
       : Number(m["nbrePartsSouscrites"] ?? 0) > 0),
   ];
-  return Math.round((champs.filter(Boolean).length / 13) * 100);
+  return Math.round((champs.filter(Boolean).length / 10) * 100);
+}
+
+export function computeCompletudEudr(m: Record<string, unknown>): number {
+  const champs = [
+    !!m["gps_parcelles"] || !!m["gpsParcelles"],
+    !!m["superficie_totale"] || !!m["superficieTotale"],
+    !!m["nombre_parcelles"] || !!m["nombreParcelles"],
+  ];
+  return Math.round((champs.filter(Boolean).length / 3) * 100);
+}
+
+export function computeCompletude(m: Record<string, unknown>): number {
+  return computeCompletudIdentite(m);
 }
 
 export async function listMembres(req: Request, res: Response): Promise<void> {
@@ -380,6 +390,37 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
       })
       .returning();
 
+    // ── Calculer completude_identite + completude_eudr après insertion ──────
+    {
+      const row: Record<string, unknown> = {
+        nom: membre.nom,
+        prenoms: membre.prenoms,
+        telephone: membre.telephone,
+        village: membre.village,
+        dateNaissance: membre.dateNaissance,
+        sexe: membre.sexe,
+        numeroCni: membre.numeroCni,
+        dateAdhesion: membre.dateAdhesion,
+        typeFournisseur: membre.typeFournisseur,
+        nbrePartsSouscrites: membre.nbrePartsSouscrites,
+        gpsParcelles: membre.gpsParcelles,
+        superficieTotale: membre.superficieTotale,
+        nombreParcelles: membre.nombreParcelles,
+      };
+      const ci = computeCompletudIdentite(row);
+      const ce = computeCompletudEudr(row);
+      const se = ce === 100 ? "conforme" : "non_conforme";
+      const mgr = membre.statutMembre === "actif" && ce < 100;
+      await db.update(membresTable)
+        .set({ completudeIdentite: ci, completudeEudr: ce, statutEudr: se, missionGpsRequise: mgr, completudeFiche: ci })
+        .where(eq(membresTable.id, membre.id));
+      membre.completudeIdentite = ci;
+      membre.completudeEudr = ce;
+      membre.statutEudr = se;
+      membre.missionGpsRequise = mgr;
+      membre.completudeFiche = ci;
+    }
+
     // Auto-création fournisseur uniquement pour membres actifs directs
     if (statutMembreFinal === "actif") {
       void autoCreateFournisseurMembre(cooperativeId, membre);
@@ -456,6 +497,31 @@ export async function updateMembre(req: Request, res: Response): Promise<void> {
       res.status(404).json({ erreur: "Membre introuvable" });
       return;
     }
+
+    // Recalcul completude après mise à jour
+    {
+      const row: Record<string, unknown> = {
+        nom: membre.nom, prenoms: membre.prenoms, telephone: membre.telephone,
+        village: membre.village, dateNaissance: membre.dateNaissance, sexe: membre.sexe,
+        numeroCni: membre.numeroCni, dateAdhesion: membre.dateAdhesion,
+        typeFournisseur: membre.typeFournisseur, nbrePartsSouscrites: membre.nbrePartsSouscrites,
+        gpsParcelles: membre.gpsParcelles, superficieTotale: membre.superficieTotale,
+        nombreParcelles: membre.nombreParcelles,
+      };
+      const ci = computeCompletudIdentite(row);
+      const ce = computeCompletudEudr(row);
+      const se = ce === 100 ? "conforme" : "non_conforme";
+      const mgr = membre.statutMembre === "actif" && ce < 100;
+      await db.update(membresTable)
+        .set({ completudeIdentite: ci, completudeEudr: ce, statutEudr: se, missionGpsRequise: mgr, completudeFiche: ci })
+        .where(eq(membresTable.id, membre.id));
+      membre.completudeIdentite = ci;
+      membre.completudeEudr = ce;
+      membre.statutEudr = se;
+      membre.missionGpsRequise = mgr;
+      membre.completudeFiche = ci;
+    }
+
     res.json(enrichMembre(membre));
   } catch (err) {
     req.log.error({ err }, "Erreur updateMembre");
@@ -745,11 +811,21 @@ export async function validerMembre(req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const completude = computeCompletude(existing as unknown as Record<string, unknown>);
-    if (completude < 100) {
-      res.status(400).json({ erreur: `Fiche incomplète (${completude}%). Complétez les 13 champs obligatoires.`, completude });
+    const row = existing as unknown as Record<string, unknown>;
+    const completudeIdentite = computeCompletudIdentite(row);
+    const completudeEudr = computeCompletudEudr(row);
+
+    if (completudeIdentite < 100) {
+      res.status(400).json({
+        erreur: `Fiche identité incomplète (${completudeIdentite}%). Complétez les 10 champs du Groupe A.`,
+        completudeIdentite,
+        completudeEudr,
+      });
       return;
     }
+
+    const missionGpsRequise = completudeEudr < 100;
+    const statutEudr = completudeEudr === 100 ? "conforme" : "non_conforme";
 
     const [membre] = await db
       .update(membresTable)
@@ -757,7 +833,11 @@ export async function validerMembre(req: Request, res: Response): Promise<void> 
         statutMembre: "actif",
         validePar: userId,
         dateValidation: new Date(),
-        completudeFiche: completude,
+        completudeFiche: completudeIdentite,
+        completudeIdentite,
+        completudeEudr,
+        statutEudr,
+        missionGpsRequise,
         updatedAt: new Date(),
       })
       .where(eq(membresTable.id, id))

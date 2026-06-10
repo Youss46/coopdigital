@@ -54,6 +54,10 @@ interface StatsRT {
   parcellesNonVerifiees: number;
   tauxEudrConforme: number;
   tauxCompletionGps: number;
+  membresEudrConformes: number;
+  membresIdentiteComplets: number;
+  tauxEudrMembres: number;
+  tauxIdentite: number;
 }
 
 function JaugeCirculaire({ pct, couleur, taille = 80 }: { pct: number; couleur: string; taille?: number }) {
@@ -145,6 +149,7 @@ function DashboardRT() {
     membresTotal: 0, membresSansGps: 0, demandesEnAttente: 0, missionsSoumises: 0,
     parcellesTotal: 0, parcellesConformes: 0, parcellesNonConformes: 0, parcellesNonVerifiees: 0,
     tauxEudrConforme: 0, tauxCompletionGps: 0,
+    membresEudrConformes: 0, membresIdentiteComplets: 0, tauxEudrMembres: 0, tauxIdentite: 0,
   };
 
   const parSections = (conformite?.par_section ?? []).slice(0, 6);
@@ -336,6 +341,67 @@ function DashboardRT() {
             <CheckCircle2 size={22} className="mx-auto mb-2 text-green-500" />
             <p className="text-sm font-medium text-green-700">Toutes les sections sont au-dessus de l'objectif</p>
             <p className="text-xs text-gray-400 mt-1">Seuil danger : {seuils.warning}% · Objectif : {seuils.objectif}%</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Complétion des fiches membres — 2 groupes ────────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <h2 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+          <Users size={15} className="text-gray-400" />
+          Complétion des fiches membres
+          <span className="text-xs font-normal text-gray-400 ml-1">({s.membresTotal} actifs)</span>
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* Groupe A */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-gray-700">Groupe A — Identité</p>
+                <p className="text-[11px] text-gray-400">10 champs · requis pour activation</p>
+              </div>
+              <span className={`text-lg font-bold ${s.tauxIdentite === 100 ? "text-green-600" : s.tauxIdentite >= 60 ? "text-yellow-600" : "text-red-500"}`}>
+                {s.tauxIdentite}%
+              </span>
+            </div>
+            <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${s.tauxIdentite === 100 ? "bg-green-500" : s.tauxIdentite >= 60 ? "bg-yellow-400" : "bg-red-400"}`}
+                style={{ width: `${s.tauxIdentite}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              <span className="font-medium text-gray-700">{s.membresIdentiteComplets}</span> / {s.membresTotal} membres complets
+            </p>
+          </div>
+          {/* Groupe B */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-gray-700">Groupe B — EUDR / GPS</p>
+                <p className="text-[11px] text-gray-400">3 champs · requis pour conformité EUDR</p>
+              </div>
+              <span className={`text-lg font-bold ${s.tauxEudrMembres === 100 ? "text-green-600" : s.tauxEudrMembres >= 60 ? "text-blue-600" : "text-gray-400"}`}>
+                {s.tauxEudrMembres}%
+              </span>
+            </div>
+            <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${s.tauxEudrMembres === 100 ? "bg-green-500" : s.tauxEudrMembres >= 60 ? "bg-blue-500" : "bg-gray-300"}`}
+                style={{ width: `${s.tauxEudrMembres}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              <span className="font-medium text-gray-700">{s.membresEudrConformes}</span> / {s.membresTotal} membres conformes EUDR
+            </p>
+          </div>
+        </div>
+        {s.membresTotal > 0 && s.tauxEudrMembres < 100 && (
+          <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+            <AlertTriangle size={13} className="text-amber-500 shrink-0" />
+            <p className="text-xs text-amber-700">
+              <span className="font-semibold">{s.membresTotal - s.membresEudrConformes}</span> membre{(s.membresTotal - s.membresEudrConformes) > 1 ? "s" : ""} actif{(s.membresTotal - s.membresEudrConformes) > 1 ? "s" : ""} sans données GPS — missions terrain requises.
+            </p>
           </div>
         )}
       </div>

@@ -23,6 +23,10 @@ interface MembreRow {
   telephone: string; village?: string | null;
   statut: string; statutMembre?: string | null;
   completudeFiche?: number | null;
+  completudeIdentite?: number | null;
+  completudeEudr?: number | null;
+  statutEudr?: string | null;
+  missionGpsRequise?: boolean | null;
   delegueId?: number | null; rattachementType?: string | null;
   zoneNom?: string | null; sexe?: string | null;
   superficieHa: string; codeMembre?: string;
@@ -45,6 +49,31 @@ function badgeStatutMembre(s: string | null | undefined) {
     case "suspendu":   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">Suspendu</span>;
     default:           return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">{s ?? "—"}</span>;
   }
+}
+
+function BarreCompletudeDuo({ identite, eudr }: { identite: number | null | undefined; eudr: number | null | undefined }) {
+  const ci = identite ?? 0;
+  const ce = eudr ?? 0;
+  const colI = ci === 100 ? "bg-green-500" : ci >= 60 ? "bg-yellow-400" : "bg-red-400";
+  const colE = ce === 100 ? "bg-green-500" : ce >= 60 ? "bg-blue-400" : "bg-gray-300";
+  return (
+    <div className="w-full space-y-1">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] text-gray-400 w-5">ID</span>
+        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full ${colI}`} style={{ width: `${ci}%` }} />
+        </div>
+        <span className="text-[10px] text-gray-500 w-6 text-right">{ci}%</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] text-gray-400 w-5">GPS</span>
+        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full ${colE}`} style={{ width: `${ce}%` }} />
+        </div>
+        <span className="text-[10px] text-gray-500 w-6 text-right">{ce}%</span>
+      </div>
+    </div>
+  );
 }
 
 function BarreCompletude({ pct }: { pct: number | null | undefined }) {
@@ -389,8 +418,8 @@ export default function Membres() {
                     </td>
                   )}
                   {(estRT || estDirection) && (
-                    <td className="px-4 py-3 hidden lg:table-cell w-28">
-                      <BarreCompletude pct={m.completudeFiche} />
+                    <td className="px-4 py-3 hidden lg:table-cell w-32">
+                      <BarreCompletudeDuo identite={m.completudeIdentite} eudr={m.completudeEudr} />
                     </td>
                   )}
                   <td className="px-4 py-3 text-center">

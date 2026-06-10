@@ -647,6 +647,100 @@ export default function MembreFiche() {
         )}
       </div>
 
+      {/* ── Complétion fiche (2 groupes) ──────────────────────────────────────── */}
+      {(() => {
+        const m = membre as unknown as Record<string, unknown>;
+        const ci = Number(m["completudeIdentite"] ?? m["completude_identite"] ?? 0);
+        const ce = Number(m["completudeEudr"] ?? m["completude_eudr"] ?? 0);
+        const mgr = Boolean(m["missionGpsRequise"] ?? m["mission_gps_requise"] ?? false);
+        const colI = ci === 100 ? "bg-green-500" : ci >= 60 ? "bg-yellow-400" : "bg-red-400";
+        const colE = ce === 100 ? "bg-green-500" : ce >= 60 ? "bg-blue-400" : "bg-gray-300";
+        const campsA = [
+          { label: "Nom", ok: !!membre.nom },
+          { label: "Prénoms", ok: !!membre.prenoms },
+          { label: "Téléphone", ok: !!membre.telephone },
+          { label: "Village", ok: !!membre.village },
+          { label: "Date de naissance", ok: !!(m["dateNaissance"] ?? m["date_naissance"]) },
+          { label: "Sexe", ok: !!(m["sexe"]) },
+          { label: "N° CNI", ok: !!(m["numeroCni"] ?? m["numero_cni"]) },
+          { label: "Date d'adhésion", ok: !!(m["dateAdhesion"] ?? m["date_adhesion"]) },
+          { label: "Type fournisseur", ok: !!(m["typeFournisseur"] ?? m["type_fournisseur"]) },
+          { label: "Parts souscrites", ok: Number(m["nbrePartsSouscrites"] ?? m["nbre_parts_souscrites"] ?? 0) > 0 },
+        ];
+        const campsB = [
+          { label: "Polygones GPS", ok: !!(m["gpsParcelles"] ?? m["gps_parcelles"]) },
+          { label: "Superficie totale", ok: !!(m["superficieTotale"] ?? m["superficie_totale"]) },
+          { label: "Nombre de parcelles", ok: !!(m["nombreParcelles"] ?? m["nombre_parcelles"]) },
+        ];
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <h2 className="font-semibold text-gray-900 text-sm">Complétion de la fiche</h2>
+            {mgr && (
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+                <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-amber-800">
+                  <span className="font-semibold">Mission GPS requise</span> — Les données terrain (Groupe B) sont incomplètes. Une mission terrain doit être créée pour cartographier les parcelles.
+                </p>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Groupe A */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">Groupe A — Identité</p>
+                    <p className="text-[10px] text-gray-400">Requis pour activation</p>
+                  </div>
+                  <span className={`text-sm font-bold ${ci === 100 ? "text-green-600" : ci >= 60 ? "text-yellow-600" : "text-red-500"}`}>{ci}%</span>
+                </div>
+                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all ${colI}`} style={{ width: `${ci}%` }} />
+                </div>
+                <div className="space-y-0.5">
+                  {campsA.map((c) => (
+                    <div key={c.label} className="flex items-center gap-1.5 text-xs">
+                      {c.ok
+                        ? <CheckCircle2 size={11} className="text-green-500 shrink-0" />
+                        : <XCircle size={11} className="text-red-400 shrink-0" />}
+                      <span className={c.ok ? "text-gray-600" : "text-red-500"}>{c.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Groupe B */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">Groupe B — EUDR / GPS</p>
+                    <p className="text-[10px] text-gray-400">Requis pour conformité EUDR</p>
+                  </div>
+                  <span className={`text-sm font-bold ${ce === 100 ? "text-green-600" : ce >= 60 ? "text-blue-600" : "text-gray-400"}`}>{ce}%</span>
+                </div>
+                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all ${colE}`} style={{ width: `${ce}%` }} />
+                </div>
+                <div className="space-y-0.5">
+                  {campsB.map((c) => (
+                    <div key={c.label} className="flex items-center gap-1.5 text-xs">
+                      {c.ok
+                        ? <CheckCircle2 size={11} className="text-green-500 shrink-0" />
+                        : <XCircle size={11} className="text-gray-300 shrink-0" />}
+                      <span className={c.ok ? "text-gray-600" : "text-gray-400"}>{c.label}</span>
+                    </div>
+                  ))}
+                </div>
+                {ce === 100 && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <CheckCircle2 size={13} className="text-green-500" />
+                    <span className="text-xs text-green-700 font-medium">Conforme EUDR</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* QR Code */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col items-center gap-3 max-w-xs">
         <h2 className="font-semibold text-gray-900 text-sm w-full">QR Code membre</h2>

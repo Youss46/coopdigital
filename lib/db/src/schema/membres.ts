@@ -76,6 +76,10 @@ export const membresTable = pgTable("membres", {
 
   // ── Complétion & terrain ────────────────────────────────────────────────────
   completudeFiche: integer("completude_fiche").default(0),
+  completudeIdentite: integer("completude_identite").default(0),
+  completudeEudr: integer("completude_eudr").default(0),
+  statutEudr: varchar("statut_eudr", { length: 20 }).default("non_conforme"),
+  missionGpsRequise: boolean("mission_gps_requise").default(false),
   gpsCollectePar: integer("gps_collecte_par"),
   gpsValidePar: integer("gps_valide_par"),
   dateCollecteGps: timestamp("date_collecte_gps", { withTimezone: true }),

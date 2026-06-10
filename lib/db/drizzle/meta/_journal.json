@@ -57,6 +57,13 @@
       "when": 1749715800000,
       "tag": "0007_messages_mission",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1749802200000,
+      "tag": "0008_completude_split",
+      "breakpoints": true
     }
   ]
 }

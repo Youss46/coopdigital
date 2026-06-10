@@ -160,6 +160,8 @@ export async function getDashboardTracabilite(req: Request, res: Response): Prom
       [demandesRow],
       parcellesRows,
       [missionsRow],
+      [eudrConformesRow],
+      [identiteCompletsRow],
     ] = await Promise.all([
       db.select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
@@ -188,12 +190,28 @@ export async function getDashboardTracabilite(req: Request, res: Response): Prom
           eq(missionsTerrainTable.cooperativeId, cooperativeId),
           sql`${missionsTerrainTable.statut} = 'soumise'`,
         )),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(membresTable)
+        .where(and(
+          eq(membresTable.cooperativeId, cooperativeId),
+          sql`${membresTable.statutMembre} = 'actif'`,
+          sql`${membresTable.completudeEudr} = 100`,
+        )),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(membresTable)
+        .where(and(
+          eq(membresTable.cooperativeId, cooperativeId),
+          sql`${membresTable.statutMembre} = 'actif'`,
+          sql`${membresTable.completudeIdentite} = 100`,
+        )),
     ]);
 
     const membresTotal = membresRow?.count ?? 0;
     const membresSansGps = sansGpsRow?.count ?? 0;
     const demandesEnAttente = demandesRow?.count ?? 0;
     const missionsSoumises = missionsRow?.count ?? 0;
+    const membresEudrConformes = eudrConformesRow?.count ?? 0;
+    const membresIdentiteComplets = identiteCompletsRow?.count ?? 0;
 
     let parcellesTotal = 0, parcellesConformes = 0, parcellesNonConformes = 0, parcellesNonVerifiees = 0;
     for (const r of parcellesRows) {
@@ -205,11 +223,14 @@ export async function getDashboardTracabilite(req: Request, res: Response): Prom
 
     const tauxEudrConforme   = parcellesTotal > 0 ? Math.round((parcellesConformes / parcellesTotal) * 100) : 0;
     const tauxCompletionGps  = membresTotal   > 0 ? Math.round(((membresTotal - membresSansGps) / membresTotal) * 100) : 0;
+    const tauxEudrMembres    = membresTotal   > 0 ? Math.round((membresEudrConformes / membresTotal) * 100) : 0;
+    const tauxIdentite       = membresTotal   > 0 ? Math.round((membresIdentiteComplets / membresTotal) * 100) : 0;
 
     res.json({
       membresTotal, membresSansGps, demandesEnAttente, missionsSoumises,
       parcellesTotal, parcellesConformes, parcellesNonConformes, parcellesNonVerifiees,
       tauxEudrConforme, tauxCompletionGps,
+      membresEudrConformes, membresIdentiteComplets, tauxEudrMembres, tauxIdentite,
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboardTracabilite");
