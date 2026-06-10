@@ -234,6 +234,7 @@ export default function Membres() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.sexe) { alert("Veuillez sélectionner une civilité (Monsieur / Madame)."); return; }
     if (!form.nom || !form.prenoms || !form.telephone || !form.superficieHa) return;
     const delegueIdFinal = estDelegue ? utilisateur?.id : form.delegueId;
     const rattachementTypeFinal = estDelegue ? "delegue" : form.rattachementType;
@@ -559,7 +560,7 @@ export default function Membres() {
 
               {/* Civilité */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Civilité / Genre</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Civilité / Genre *</label>
                 <div className="flex gap-3">
                   {(["M", "F"] as const).map((v) => (
                     <label key={v} className="flex items-center gap-1.5 cursor-pointer">
