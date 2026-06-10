@@ -97,6 +97,7 @@ export async function getParcellesCarte(req: Request, res: Response): Promise<vo
     const eudrStatutQ = req.query["eudr_statut"] as string | undefined;
     const cultureQ    = req.query["culture"]     as string | undefined;
     const sectionQ    = req.query["section"]     as string | undefined;
+    const villageQ    = req.query["village"]     as string | undefined;
 
     const conditions: ReturnType<typeof eq>[] = [
       eq(parcellesTable.cooperativeId, coopId),
@@ -105,6 +106,7 @@ export async function getParcellesCarte(req: Request, res: Response): Promise<vo
     if (eudrStatutQ) conditions.push(eq(parcellesTable.eudrStatut, eudrStatutQ));
     if (cultureQ)    conditions.push(eq(parcellesTable.culturePrincipale, cultureQ));
     if (sectionQ)    conditions.push(eq(parcellesTable.section, sectionQ));
+    if (villageQ)    conditions.push(eq(parcellesTable.village, villageQ));
 
     const rows = await db.select({
       id:               parcellesTable.id,
@@ -469,6 +471,45 @@ export async function getGpsTerrain(req: Request, res: Response): Promise<void> 
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getGpsTerrain");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ── Zones / filtres disponibles ───────────────────────────────────────────────
+
+export async function getZonesFiltres(req: Request, res: Response): Promise<void> {
+  try {
+    const coopId = COOP_ID(req);
+    const [villages, sections, typesZone] = await Promise.all([
+      db.selectDistinct({ village: parcellesTable.village })
+        .from(parcellesTable)
+        .where(and(
+          eq(parcellesTable.cooperativeId, coopId),
+          eq(parcellesTable.actif, true),
+          sql`${parcellesTable.village} IS NOT NULL`,
+        ))
+        .orderBy(parcellesTable.village),
+      db.selectDistinct({ section: parcellesTable.section })
+        .from(parcellesTable)
+        .where(and(
+          eq(parcellesTable.cooperativeId, coopId),
+          eq(parcellesTable.actif, true),
+          sql`${parcellesTable.section} IS NOT NULL`,
+        ))
+        .orderBy(parcellesTable.section),
+      db.selectDistinct({ typeZone: zonesRisqueEudrTable.typeZone })
+        .from(zonesRisqueEudrTable)
+        .where(eq(zonesRisqueEudrTable.cooperativeId, coopId))
+        .orderBy(zonesRisqueEudrTable.typeZone),
+    ]);
+    res.json({
+      villages:   villages.map(r => r.village).filter(Boolean) as string[],
+      sections:   sections.map(r => r.section).filter(Boolean) as string[],
+      typesZone:  typesZone.map(r => r.typeZone).filter(Boolean) as string[],
+    });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur getZonesFiltres");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

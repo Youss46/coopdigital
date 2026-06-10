@@ -6,6 +6,7 @@ import L from "leaflet";
 import {
   Map, List, ShieldCheck, Download, Plus, RefreshCw, X, CheckCircle2,
   AlertTriangle, XCircle, Clock, HelpCircle, ChevronRight, Leaf, Navigation,
+  Globe, Users, Layers, Filter,
 } from "lucide-react";
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)["_getIconUrl"];
@@ -920,18 +921,333 @@ function OngletConformite({ stats, isLoading }: { stats: ConformiteStats | undef
   );
 }
 
+// ── Onglet Carte Globale ──────────────────────────────────────────────────────
+
+interface ZonesFiltres { villages: string[]; sections: string[]; typesZone: string[]; }
+
+function StatCouverture({ label, value, sub, color, icon: Icon }: {
+  label: string; value: string | number; sub?: string;
+  color: "green" | "blue" | "amber" | "gray";
+  icon: typeof Globe;
+}) {
+  const cls = {
+    green: { bg: "bg-green-50", border: "border-green-200", val: "text-green-700", lbl: "text-green-600" },
+    blue:  { bg: "bg-blue-50",  border: "border-blue-200",  val: "text-blue-700",  lbl: "text-blue-600"  },
+    amber: { bg: "bg-amber-50", border: "border-amber-200", val: "text-amber-700", lbl: "text-amber-600" },
+    gray:  { bg: "bg-gray-50",  border: "border-gray-200",  val: "text-gray-700",  lbl: "text-gray-500"  },
+  }[color];
+  return (
+    <div className={`${cls.bg} border ${cls.border} rounded-xl p-4 flex items-start gap-3`}>
+      <div className={`mt-0.5 p-2 rounded-lg ${cls.bg} border ${cls.border}`}>
+        <Icon size={16} className={cls.val} />
+      </div>
+      <div>
+        <p className={`text-2xl font-bold ${cls.val}`}>{value}</p>
+        {sub && <p className={`text-sm font-medium ${cls.val}`}>{sub}</p>}
+        <p className={`text-xs ${cls.lbl} mt-0.5`}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function OngletCarteGlobale() {
+  const qc = useQueryClient();
+  const [filterEudr, setFilterEudr] = useState("all");
+  const [filterVillage, setFilterVillage] = useState("");
+  const [filterSection, setFilterSection] = useState("");
+  const [filterZoneType, setFilterZoneType] = useState("");
+  const [showZones, setShowZones] = useState(true);
+  const [showGpsTerrain, setShowGpsTerrain] = useState(true);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const zonesQ = useQuery({
+    queryKey: ["parcelles-zones-filtres"],
+    queryFn: () => apiFetch<ZonesFiltres>("/api/parcelles/zones-filtres"),
+  });
+
+  const carteQ = useQuery({
+    queryKey: ["parcelles-carte-globale", filterEudr, filterVillage, filterSection],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (filterEudr !== "all") params.set("eudr_statut", filterEudr);
+      if (filterVillage) params.set("village", filterVillage);
+      if (filterSection) params.set("section", filterSection);
+      const qs = params.toString();
+      return apiFetch<{ parcelles: ParcelleCarte[]; zones: ZoneRisque[] }>(
+        `/api/parcelles/carte${qs ? `?${qs}` : ""}`,
+      );
+    },
+  });
+
+  const gpsTerrainQ = useQuery({
+    queryKey: ["parcelles-gps-terrain-globale"],
+    queryFn: () => apiFetch<{ polygones: GpsTerrainPolygon[] }>("/api/parcelles/gps-terrain"),
+  });
+
+  const conformiteQ = useQuery({
+    queryKey: ["parcelles-conformite-globale"],
+    queryFn: () => apiFetch<ConformiteStats>("/api/parcelles/conformite"),
+  });
+
+  const parcelles = carteQ.data?.parcelles ?? [];
+  const allZones = carteQ.data?.zones ?? [];
+  const stats = conformiteQ.data;
+
+  // Fix 2: filter GPS terrain polygons by village/section consistently with parcel filter
+  const allGpsPolygones = gpsTerrainQ.data?.polygones ?? [];
+  const gpsPolygones = allGpsPolygones.filter(p => {
+    if (filterVillage && p.village !== filterVillage) return false;
+    if (filterSection && p.section !== filterSection) return false;
+    return true;
+  });
+
+  // Fix 1: filter protected zones by type
+  const filteredZones = filterZoneType
+    ? allZones.filter(z => z.typeZone === filterZoneType)
+    : allZones;
+
+  const totalMembres = (stats?.membres_avec_parcelle ?? 0) + (stats?.membres_sans_parcelle ?? 0);
+  const pctCouverture = totalMembres > 0
+    ? Math.round(((stats?.membres_avec_parcelle ?? 0) / totalMembres) * 100)
+    : 0;
+  const superficieTotale = parseFloat(String(stats?.superficie_totale_ha ?? 0));
+  const membresTerrainUniques = new Set(allGpsPolygones.map(p => p.membreId)).size;
+
+  const selectedParcelle = parcelles.find(p => p.id === selected) ?? null;
+  const isLoading = carteQ.isFetching || conformiteQ.isLoading;
+
+  // Fix 3: wire up EUDR verification properly
+  async function handleVerifier(id: number) {
+    setIsVerifying(true);
+    try {
+      await apiFetch(`/api/parcelles/${id}/verifier-eudr`, { method: "PUT" });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["parcelles-carte-globale"] }),
+        qc.invalidateQueries({ queryKey: ["parcelles-conformite-globale"] }),
+      ]);
+    } finally {
+      setIsVerifying(false);
+      setSelected(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Statistiques de couverture */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCouverture
+          label="Couverture GPS parcelles"
+          value={`${pctCouverture}%`}
+          sub={`${stats?.membres_avec_parcelle ?? "—"} / ${totalMembres || "—"} membres`}
+          color={pctCouverture >= 80 ? "green" : pctCouverture >= 50 ? "amber" : "gray"}
+          icon={Globe}
+        />
+        <StatCouverture
+          label="Superficie totale cartographiée"
+          value={superficieTotale > 0 ? `${superficieTotale.toFixed(1)} ha` : "—"}
+          sub={stats ? `${stats.nb_parcelles_total} parcelle${stats.nb_parcelles_total > 1 ? "s" : ""}` : undefined}
+          color="blue"
+          icon={Layers}
+        />
+        <StatCouverture
+          label="Membres avec GPS terrain"
+          value={membresTerrainUniques || "—"}
+          sub={`${allGpsPolygones.length} polygone${allGpsPolygones.length > 1 ? "s" : ""} collecté${allGpsPolygones.length > 1 ? "s" : ""}`}
+          color="amber"
+          icon={Navigation}
+        />
+        <StatCouverture
+          label="Membres sans GPS"
+          value={stats?.membres_sans_parcelle ?? "—"}
+          sub={totalMembres > 0 ? `${100 - pctCouverture}% non couverts` : undefined}
+          color="gray"
+          icon={Users}
+        />
+      </div>
+
+      {/* Barre filtres */}
+      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-2">
+        <Filter size={14} className="text-gray-400 shrink-0" />
+
+        {/* Filtre statut EUDR */}
+        <select
+          value={filterEudr}
+          onChange={e => setFilterEudr(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        >
+          <option value="all">Tous les statuts EUDR</option>
+          <option value="conforme">Conformes</option>
+          <option value="non_conforme">Non conformes</option>
+          <option value="en_cours">En cours</option>
+          <option value="non_verifie">Non vérifiés</option>
+        </select>
+
+        {/* Filtre village */}
+        {(zonesQ.data?.villages ?? []).length > 0 && (
+          <select
+            value={filterVillage}
+            onChange={e => { setFilterVillage(e.target.value); }}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="">Tous les villages</option>
+            {(zonesQ.data?.villages ?? []).map(v => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Filtre section */}
+        {(zonesQ.data?.sections ?? []).length > 0 && (
+          <select
+            value={filterSection}
+            onChange={e => { setFilterSection(e.target.value); }}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="">Toutes les sections</option>
+            {(zonesQ.data?.sections ?? []).map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Filtre type de zone protégée */}
+        {(zonesQ.data?.typesZone ?? []).length > 0 && (
+          <select
+            value={filterZoneType}
+            onChange={e => setFilterZoneType(e.target.value)}
+            className="border border-purple-300 rounded-lg px-3 py-1.5 text-sm text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            <option value="">Toutes les zones protégées</option>
+            {(zonesQ.data?.typesZone ?? []).map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        )}
+
+        <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+          <input type="checkbox" checked={showZones} onChange={e => setShowZones(e.target.checked)} className="rounded" />
+          <span className="inline-block w-2.5 h-2.5 rounded-sm border-2 border-purple-600" style={{ borderStyle: "dashed" }} />
+          Zones
+          {filterZoneType && filteredZones.length > 0 && (
+            <span className="ml-0.5 text-xs bg-purple-100 text-purple-700 rounded-full px-1.5 py-0.5 font-medium">
+              {filteredZones.length}
+            </span>
+          )}
+        </label>
+
+        <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+          <input type="checkbox" checked={showGpsTerrain} onChange={e => setShowGpsTerrain(e.target.checked)} className="rounded" />
+          <Navigation size={12} className="text-amber-500" />
+          GPS Terrain
+          {gpsPolygones.length > 0 && (
+            <span className="ml-0.5 text-xs bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 font-medium">
+              {gpsPolygones.length}
+            </span>
+          )}
+        </label>
+
+        <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
+          {(isLoading || isVerifying) && <RefreshCw size={13} className="animate-spin" />}
+          <span>{parcelles.length} parcelle{parcelles.length > 1 ? "s" : ""} affichée{parcelles.length > 1 ? "s" : ""}</span>
+        </div>
+      </div>
+
+      {/* Légende */}
+      <div className="flex flex-wrap gap-3">
+        {Object.entries(EUDR_CONFIG).map(([k, v]) => (
+          <span key={k} className="flex items-center gap-1.5 text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-full" style={{ background: v.color }} />
+            {v.label}
+          </span>
+        ))}
+        {showZones && filteredZones.length > 0 && (
+          <span className="flex items-center gap-1.5 text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-sm border-2 border-purple-600 border-dashed" />
+            Zone protégée{filterZoneType ? ` (${filterZoneType})` : ""}
+          </span>
+        )}
+        {showGpsTerrain && gpsPolygones.length > 0 && (
+          <span className="flex items-center gap-1.5 text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-sm border-2 border-amber-500" style={{ borderStyle: "dashed" }} />
+            GPS Terrain{(filterVillage || filterSection) ? " (filtré)" : ""}
+          </span>
+        )}
+      </div>
+
+      {/* Carte */}
+      <div className="relative rounded-xl overflow-hidden border border-gray-200" style={{ height: 560 }}>
+        <LeafletMap
+          parcelles={parcelles}
+          zones={filteredZones}
+          selectedId={selected}
+          onSelect={setSelected}
+          drawingMode={false}
+          drawVertices={[]}
+          onAddVertex={() => {}}
+          showZones={showZones}
+          gpsTerrainPolygons={gpsPolygones}
+          showGpsTerrain={showGpsTerrain}
+        />
+        {selectedParcelle && (
+          <SidePanel
+            parcelle={selectedParcelle}
+            onClose={() => setSelected(null)}
+            onVerifier={handleVerifier}
+          />
+        )}
+      </div>
+
+      {/* Répartition par section */}
+      {stats && stats.par_section.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+            <Layers size={14} className="text-gray-400" />
+            <h3 className="font-semibold text-gray-800 text-sm">Couverture par section</h3>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {stats.par_section
+              .filter(s => !filterSection || s.section === filterSection)
+              .map(s => (
+                <div key={s.section} className="flex items-center gap-4 px-5 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-700 truncate">{s.section}</p>
+                    <p className="text-xs text-gray-500">{s.conformes}/{s.total} conformes</p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${s.pct}%`,
+                          background: s.pct >= 80 ? "#16a34a" : s.pct >= 50 ? "#f59e0b" : "#dc2626",
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm font-semibold text-gray-700 w-10 text-right">{s.pct}%</span>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Page principale ───────────────────────────────────────────────────────────
 
-type Tab = "carte" | "liste" | "conformite";
+type Tab = "carte" | "carte_globale" | "liste" | "conformite";
 
 export default function ParcellePage() {
-  const [tab, setTab] = useState<Tab>("carte");
+  const [tab, setTab] = useState<Tab>("carte_globale");
   const [isVerifying, setIsVerifying] = useState(false);
   const qc = useQueryClient();
 
   const carteQ = useQuery({
     queryKey: ["parcelles-carte"],
     queryFn: () => apiFetch<{ parcelles: ParcelleCarte[]; zones: ZoneRisque[] }>("/api/parcelles/carte"),
+    enabled: tab === "carte",
   });
 
   const gpsTerrainQ = useQuery({
@@ -972,9 +1288,10 @@ export default function ParcellePage() {
   }
 
   const tabs: { id: Tab; label: string; icon: typeof Map }[] = [
-    { id: "carte",       label: "Carte",             icon: Map },
-    { id: "liste",       label: "Liste",              icon: List },
-    { id: "conformite",  label: "Conformité EUDR",    icon: ShieldCheck },
+    { id: "carte_globale", label: "Vue globale",       icon: Globe },
+    { id: "carte",         label: "Carte par mission", icon: Map },
+    { id: "liste",         label: "Liste",             icon: List },
+    { id: "conformite",    label: "Conformité EUDR",   icon: ShieldCheck },
   ];
 
   return (
@@ -1020,6 +1337,9 @@ export default function ParcellePage() {
       </div>
 
       {/* Contenu onglet */}
+      {tab === "carte_globale" && (
+        <OngletCarteGlobale />
+      )}
       {tab === "carte" && (
         <OngletCarte
           parcelles={carteQ.data?.parcelles ?? []}
