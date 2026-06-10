@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { terrainAuthMiddleware } from "../middlewares/terrainAuth.js";
+import { terrainAuthMiddleware, delegueOnly } from "../middlewares/terrainAuth.js";
 import {
   loginTerrainHandler,
   getProfilHandler,
@@ -31,17 +31,19 @@ const router = Router();
 router.post("/terrain/auth/login", loginTerrainHandler);
 router.post("/terrain/auth/change-password", terrainAuthMiddleware, changePasswordHandler);
 
-// Routes protégées (délégué)
+// Routes partagées (délégué + agent terrain)
 router.get("/terrain/profil", terrainAuthMiddleware, getProfilHandler);
 router.get("/terrain/prix", terrainAuthMiddleware, getPrixHandler);
-router.get("/terrain/fournisseurs", terrainAuthMiddleware, getFournisseursHandler);
-router.get("/terrain/fournisseur/:id/recap", terrainAuthMiddleware, getFournisseurRecapHandler);
-router.post("/terrain/collecte", terrainAuthMiddleware, postCollecteHandler);
-router.post("/terrain/paiement", terrainAuthMiddleware, postPaiementHandler);
-router.post("/terrain/avance", terrainAuthMiddleware, postAvanceHandler);
-router.get("/terrain/bilan-jour", terrainAuthMiddleware, getBilanJourHandler);
 router.post("/terrain/sync", terrainAuthMiddleware, postSyncHandler);
-router.post("/terrain/rapport-journalier", terrainAuthMiddleware, postRapportHandler);
+
+// Routes protégées délégué uniquement
+router.get("/terrain/fournisseurs", terrainAuthMiddleware, delegueOnly, getFournisseursHandler);
+router.get("/terrain/fournisseur/:id/recap", terrainAuthMiddleware, delegueOnly, getFournisseurRecapHandler);
+router.post("/terrain/collecte", terrainAuthMiddleware, delegueOnly, postCollecteHandler);
+router.post("/terrain/paiement", terrainAuthMiddleware, delegueOnly, postPaiementHandler);
+router.post("/terrain/avance", terrainAuthMiddleware, delegueOnly, postAvanceHandler);
+router.get("/terrain/bilan-jour", terrainAuthMiddleware, delegueOnly, getBilanJourHandler);
+router.post("/terrain/rapport-journalier", terrainAuthMiddleware, delegueOnly, postRapportHandler);
 
 // Routes agent terrain
 router.get("/terrain/missions", terrainAuthMiddleware, getMissionsHandler);

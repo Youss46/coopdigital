@@ -169,11 +169,19 @@ export async function postSyncHandler(req: Request, res: Response): Promise<void
     res.status(400).json({ erreur: "operations doit être un tableau" });
     return;
   }
+  const role = req.agent!.role;
+  const allowedTypes = role === "delegue"
+    ? ["collecte", "paiement", "avance"]
+    : ["gps_collecte"];
+  const filtered = (operations as Array<{ type?: string }>).filter(
+    (op) => allowedTypes.includes(op.type ?? ""),
+  );
+
   try {
     const result = await terrainService.syncOperations(
       id,
       cooperativeId,
-      operations as Parameters<typeof terrainService.syncOperations>[2]
+      filtered as Parameters<typeof terrainService.syncOperations>[2]
     );
     res.json(result);
   } catch (err) {

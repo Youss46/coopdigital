@@ -1,9 +1,9 @@
-import type { PendingOp, CollecteInput, PaiementInput, AvanceInput, GpsCollecteInput, PrixActuel, Fournisseur } from "./types";
+import type { PendingOp, CollecteInput, PaiementInput, AvanceInput, GpsCollecteInput, PrixActuel, Fournisseur, MissionTerrain } from "./types";
 
 export type PendingOpType = "collecte" | "paiement" | "avance" | "gps_collecte";
 
 const DB_NAME = "coopdigital-terrain";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let _db: IDBDatabase | null = null;
 
@@ -22,6 +22,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains("cache")) {
         db.createObjectStore("cache", { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains("missions_cache")) {
+        db.createObjectStore("missions_cache", { keyPath: "id" });
       }
     };
 
@@ -207,6 +210,28 @@ export async function getAllOps(): Promise<PendingOp[]> {
       const results = (req.result as PendingOp[]).sort((a, b) => b.timestamp - a.timestamp);
       resolve(results.slice(0, 50));
     };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function cacheMissions(missions: MissionTerrain[]): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("missions_cache", "readwrite");
+    const store = transaction.objectStore("missions_cache");
+    store.clear();
+    missions.forEach((m) => store.put(m));
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+export async function getCachedMissions(): Promise<MissionTerrain[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("missions_cache", "readonly", db);
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result as MissionTerrain[]);
     req.onerror = () => reject(req.error);
   });
 }

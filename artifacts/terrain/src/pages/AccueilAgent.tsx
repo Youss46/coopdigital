@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { getStatsAgent, getMissions } from "../lib/api";
+import { cacheMissions, getCachedMissions } from "../lib/idb";
 import { useAuth } from "../contexts/AuthContext";
 import { useOffline } from "../contexts/OfflineContext";
 import OfflineBanner from "../components/OfflineBanner";
@@ -24,11 +25,19 @@ export default function AccueilAgent() {
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
 
   useEffect(() => {
-    if (!isOnline) { setLoading(false); return; }
-    Promise.all([
-      getStatsAgent().then(setStats).catch(() => {}),
-      getMissions().then(setMissions).catch(() => {}),
-    ]).finally(() => setLoading(false));
+    if (isOnline) {
+      Promise.all([
+        getStatsAgent().then(setStats).catch(() => {}),
+        getMissions()
+          .then((data) => { setMissions(data); cacheMissions(data).catch(() => {}); })
+          .catch(() => {}),
+      ]).finally(() => setLoading(false));
+    } else {
+      getCachedMissions()
+        .then(setMissions)
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
   }, [isOnline]);
 
   const activeMissions = missions.filter((m) => m.statut === "planifiee" || m.statut === "en_cours");

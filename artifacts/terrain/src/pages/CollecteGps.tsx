@@ -8,6 +8,7 @@ import type { MissionMembre } from "../lib/types";
 import type { GpsPoint } from "../lib/types";
 
 const MAX_PHOTOS = 3;
+const MIN_PHOTOS = 2;
 
 const PROBLEME_TYPES = ["Accès difficile", "Conflit foncier", "Parcelle inexistante", "Membre absent", "Autre"];
 
@@ -115,9 +116,15 @@ export default function CollecteGps() {
     e.target.value = "";
   };
 
+  const canSubmit = gps.points.length >= 3 && photos.length >= MIN_PHOTOS;
+
   const handleSubmit = async () => {
     if (gps.points.length < 3) {
       setErreur("Tracez au moins 3 points GPS pour délimiter la parcelle");
+      return;
+    }
+    if (photos.length < MIN_PHOTOS) {
+      setErreur(`Ajoutez au moins ${MIN_PHOTOS} photos de la parcelle`);
       return;
     }
     setSubmitting(true);
@@ -254,7 +261,14 @@ export default function CollecteGps() {
         {/* Photos */}
         <div className="t-card" style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div className="t-card__title">📷 Photos ({photos.length}/{MAX_PHOTOS})</div>
+            <div className="t-card__title">
+              📷 Photos ({photos.length}/{MAX_PHOTOS})
+              {photos.length < MIN_PHOTOS && (
+                <span style={{ color: "#ef4444", fontSize: ".72rem", marginLeft: 6, fontWeight: 400 }}>
+                  min. {MIN_PHOTOS} requises
+                </span>
+              )}
+            </div>
             {photos.length < MAX_PHOTOS && (
               <button
                 onClick={() => photoInputRef.current?.click()}
@@ -275,9 +289,9 @@ export default function CollecteGps() {
           {photos.length === 0 ? (
             <div
               onClick={() => photos.length < MAX_PHOTOS && photoInputRef.current?.click()}
-              style={{ border: "2px dashed #334155", borderRadius: 10, padding: "20px", textAlign: "center", color: "#475569", cursor: "pointer" }}
+              style={{ border: "2px dashed #ef444466", borderRadius: 10, padding: "20px", textAlign: "center", color: "#ef4444", cursor: "pointer" }}
             >
-              📷 Photographier la parcelle
+              📷 Photographier la parcelle (min. {MIN_PHOTOS})
             </div>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -345,11 +359,17 @@ export default function CollecteGps() {
 
         <button
           onClick={handleSubmit}
-          disabled={submitting || gps.points.length < 3}
+          disabled={submitting || !canSubmit}
           className="t-btn t-btn--primary"
-          style={{ width: "100%", padding: "14px", fontSize: "1rem", opacity: gps.points.length < 3 ? .5 : 1 }}
+          style={{ width: "100%", padding: "14px", fontSize: "1rem", opacity: canSubmit ? 1 : .5 }}
         >
-          {submitting ? "Enregistrement…" : gps.points.length < 3 ? `Tracez au moins 3 points (${gps.points.length}/3)` : "✅ Valider la collecte"}
+          {submitting
+            ? "Enregistrement…"
+            : gps.points.length < 3
+              ? `GPS : ${gps.points.length}/3 points minimum`
+              : photos.length < MIN_PHOTOS
+                ? `📷 ${photos.length}/${MIN_PHOTOS} photos requises`
+                : "✅ Valider la collecte"}
         </button>
 
         <div style={{ height: 20 }} />

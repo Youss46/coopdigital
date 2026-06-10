@@ -45,3 +45,11 @@ export function terrainAuthMiddleware(req: Request, res: Response, next: NextFun
     res.status(401).json({ erreur: "Token invalide ou expiré" });
   }
 }
+
+export function delegueOnly(req: Request, res: Response, next: NextFunction): void {
+  if (req.agent?.role !== "delegue") {
+    res.status(403).json({ erreur: "Réservé aux délégués de localité" });
+    return;
+  }
+  next();
+}

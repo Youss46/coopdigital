@@ -88,14 +88,15 @@ export async function soumettresMissionHandler(req: Request, res: Response): Pro
 
 export async function getMessagesHandler(req: Request, res: Response): Promise<void> {
   if (!requireAgentTerrain(req, res)) return;
+  const { id } = req.agent!;
   const missionId = Number(req.params["missionId"]);
   if (isNaN(missionId)) { res.status(400).json({ erreur: "ID invalide" }); return; }
   try {
-    const messages = await svc.getMessages(missionId);
+    const messages = await svc.getMessages(missionId, id);
     res.json(messages);
   } catch (err) {
     req.log.error({ err }, "Erreur getMessages");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(400).json({ erreur: (err as Error).message });
   }
 }
 

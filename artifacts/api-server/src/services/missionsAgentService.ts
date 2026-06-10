@@ -119,6 +119,9 @@ export async function collecterParcelleAgent(
     );
 
   if (!missionMembre) throw new Error("Membre non trouvé dans cette mission");
+  if (!data.photos || data.photos.length < 2) {
+    throw new Error("Au moins 2 photos requises pour documenter la parcelle");
+  }
 
   await db
     .update(missionsMembresTable)
@@ -198,7 +201,13 @@ export async function soumettresMission(missionId: number, agentId: number) {
   return { ok: true };
 }
 
-export async function getMessages(missionId: number) {
+export async function getMessages(missionId: number, agentId: number) {
+  const [mission] = await db
+    .select({ agentId: missionsTerrainTable.agentId })
+    .from(missionsTerrainTable)
+    .where(and(eq(missionsTerrainTable.id, missionId), eq(missionsTerrainTable.agentId, agentId)));
+  if (!mission) throw new Error("Mission introuvable ou accès non autorisé");
+
   return db
     .select({
       id: messagesMissionTable.id,
@@ -223,6 +232,12 @@ export async function sendMessage(
   message: string,
   type: string,
 ) {
+  const [mission] = await db
+    .select({ agentId: missionsTerrainTable.agentId })
+    .from(missionsTerrainTable)
+    .where(and(eq(missionsTerrainTable.id, missionId), eq(missionsTerrainTable.agentId, auteurId)));
+  if (!mission) throw new Error("Mission introuvable ou accès non autorisé");
+
   const [msg] = await db
     .insert(messagesMissionTable)
     .values({ missionId, auteurId, message, type: type as "commentaire" | "probleme" | "reponse" })
