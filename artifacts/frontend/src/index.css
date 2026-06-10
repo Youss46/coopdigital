@@ -425,3 +425,34 @@ select:disabled,
 textarea:disabled {
   cursor: not-allowed !important;
 }
+
+/* ── Impression ────────────────────────────────────────────────────────────── */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  aside,
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  body,
+  html {
+    background: #fff !important;
+  }
+
+  main {
+    overflow: visible !important;
+  }
+
+  @page {
+    margin: 18mm 14mm;
+  }
+}

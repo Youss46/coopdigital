@@ -6,7 +6,7 @@ import L from "leaflet";
 import {
   Map, List, ShieldCheck, Download, Plus, RefreshCw, X, CheckCircle2,
   AlertTriangle, XCircle, Clock, HelpCircle, ChevronRight, Leaf, Navigation,
-  Globe, Users, Layers, Filter, FileDown,
+  Globe, Users, Layers, Filter, FileDown, Printer,
 } from "lucide-react";
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)["_getIconUrl"];
@@ -1254,6 +1254,10 @@ function OngletCarteGlobale() {
     }
   }
 
+  function handlePrint() {
+    window.print();
+  }
+
   return (
     <div ref={exportRef} className="space-y-4">
       {/* Statistiques de couverture */}
@@ -1289,7 +1293,7 @@ function OngletCarteGlobale() {
       </div>
 
       {/* Barre filtres */}
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-2">
+      <div className="no-print bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-2">
         <Filter size={14} className="text-gray-400 shrink-0" />
 
         {/* Filtre statut EUDR */}
@@ -1408,6 +1412,14 @@ function OngletCarteGlobale() {
               : <FileDown size={11} />}
             {isExporting ? "Génération…" : "Exporter PDF"}
           </button>
+          <button
+            onClick={handlePrint}
+            title="Imprimer le rapport EUDR directement"
+            className="flex items-center gap-1 px-2.5 py-1 border border-blue-300 rounded-lg text-xs text-blue-700 hover:bg-blue-50 transition-colors"
+          >
+            <Printer size={11} />
+            Imprimer
+          </button>
         </div>
       </div>
 
@@ -1440,7 +1452,7 @@ function OngletCarteGlobale() {
       </div>
 
       {/* Carte */}
-      <div className="relative rounded-xl overflow-hidden border border-gray-200" style={{ height: 560 }}>
+      <div className="no-print relative rounded-xl overflow-hidden border border-gray-200" style={{ height: 560 }}>
         <LeafletMap
           parcelles={parcelles}
           zones={filteredZones}
@@ -1497,6 +1509,75 @@ function OngletCarteGlobale() {
           </div>
         </div>
       )}
+
+      {/* Tableau de synthèse pour impression uniquement */}
+      {stats && stats.par_section.length > 0 && (() => {
+        const totaux = stats.par_section.reduce(
+          (acc, s) => ({ conformes: acc.conformes + s.conformes, total: acc.total + s.total, superficie_ha: acc.superficie_ha + s.superficie_ha }),
+          { conformes: 0, total: 0, superficie_ha: 0 },
+        );
+        const pctTotal = totaux.total > 0 ? Math.round((totaux.conformes / totaux.total) * 100) : 0;
+        const dateStr = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+        return (
+          <div className="print-only">
+            <div style={{ marginBottom: 16 }}>
+              <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Rapport EUDR — Couverture GPS parcelles</h1>
+              <p style={{ fontSize: 11, color: "#555", margin: "4px 0 0" }}>Généré le {dateStr} · CoopDigital</p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
+                <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Couverture GPS</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{pctCouverture}%</div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>{stats.membres_avec_parcelle} / {totalMembres} membres</div>
+              </div>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
+                <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Superficie cartographiée</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{superficieTotale.toFixed(1)} ha</div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>{stats.nb_parcelles_total} parcelles</div>
+              </div>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
+                <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Membres avec GPS terrain</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{membresTerrainUniques || "—"}</div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>{allGpsPolygones.length} polygones collectés</div>
+              </div>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
+                <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Membres sans GPS</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{stats.membres_sans_parcelle}</div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>{100 - pctCouverture}% non couverts</div>
+              </div>
+            </div>
+            <h2 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Synthèse par section</h2>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+              <thead>
+                <tr style={{ background: "#16a34a", color: "#fff" }}>
+                  <th style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600 }}>Section</th>
+                  <th style={{ textAlign: "center", padding: "6px 10px", fontWeight: 600 }}>Membres conformes / Total</th>
+                  <th style={{ textAlign: "center", padding: "6px 10px", fontWeight: 600 }}>% Conformité</th>
+                  <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 600 }}>Superficie totale (ha)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.par_section.map((s, i) => (
+                  <tr key={s.section} style={{ background: i % 2 === 0 ? "#fff" : "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                    <td style={{ padding: "6px 10px" }}>{s.section}</td>
+                    <td style={{ textAlign: "center", padding: "6px 10px" }}>{s.conformes} / {s.total}</td>
+                    <td style={{ textAlign: "center", padding: "6px 10px", fontWeight: 600, color: s.pct >= 80 ? "#16a34a" : s.pct >= 50 ? "#d97706" : "#dc2626" }}>
+                      {s.pct}%
+                    </td>
+                    <td style={{ textAlign: "right", padding: "6px 10px" }}>{s.superficie_ha.toFixed(2)}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: "#f3f4f6", fontWeight: 700, borderTop: "2px solid #d1d5db" }}>
+                  <td style={{ padding: "6px 10px" }}>TOTAL</td>
+                  <td style={{ textAlign: "center", padding: "6px 10px" }}>{totaux.conformes} / {totaux.total}</td>
+                  <td style={{ textAlign: "center", padding: "6px 10px" }}>{pctTotal}%</td>
+                  <td style={{ textAlign: "right", padding: "6px 10px" }}>{totaux.superficie_ha.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
     </div>
   );
 }
