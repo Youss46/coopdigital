@@ -73,6 +73,20 @@ interface ZoneRisque {
   source: string | null;
 }
 
+interface EudrExportRow {
+  membreNom: string;
+  membrePrenoms: string;
+  section: string | null;
+  village: string | null;
+  eudrStatut: string | null;
+  superficieCalculeeHa: string | null;
+  superficieDeclareeHa: string | null;
+  hasPolygone: boolean;
+  hasPoint: boolean;
+  eudrDateVerification: string | null;
+  codeParcelle: string | null;
+}
+
 interface MembreSansGps {
   id: number;
   nom: string;
@@ -1008,6 +1022,7 @@ function OngletCarteGlobale() {
   const [selected, setSelected] = useState<number | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingXlsx, setIsExportingXlsx] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
   const zonesQ = useQuery({
@@ -1137,6 +1152,53 @@ function OngletCarteGlobale() {
       alert("Erreur lors de la génération du PDF. Vérifiez que la carte est bien chargée.");
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  async function handleExportExcel() {
+    setIsExportingXlsx(true);
+    try {
+      const params = new URLSearchParams();
+      if (filterEudr !== "all") params.set("eudr_statut", filterEudr);
+      if (filterVillage) params.set("village", filterVillage);
+      if (filterSection) params.set("section", filterSection);
+      const qs = params.toString();
+
+      const data = await apiFetch<{ parcelles: EudrExportRow[] }>(
+        `/api/parcelles/export-eudr${qs ? `?${qs}` : ""}`,
+      );
+
+      const LABELS: Record<string, string> = {
+        conforme: "Conforme",
+        non_conforme: "Non conforme",
+        en_cours: "En cours",
+        non_verifie: "Non vérifié",
+      };
+
+      const rows = data.parcelles.map(p => ({
+        "Membre":             `${p.membreNom} ${p.membrePrenoms}`,
+        "Section":            p.section ?? "",
+        "Village":            p.village ?? "",
+        "Statut EUDR":        LABELS[p.eudrStatut ?? "non_verifie"] ?? p.eudrStatut ?? "Non vérifié",
+        "Superficie (ha)":    p.superficieCalculeeHa ?? p.superficieDeclareeHa ?? "",
+        "GPS":                (p.hasPolygone || p.hasPoint) ? "Oui" : "Non",
+        "Date vérification":  p.eudrDateVerification ?? "",
+      }));
+
+      const { utils, writeFile } = await import("xlsx");
+      const ws = utils.json_to_sheet(rows);
+      ws["!cols"] = [
+        { wch: 28 }, { wch: 16 }, { wch: 16 },
+        { wch: 16 }, { wch: 16 }, { wch: 6 }, { wch: 18 },
+      ];
+      const wb = utils.book_new();
+      utils.book_append_sheet(wb, ws, "EUDR");
+      writeFile(wb, `eudr_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) {
+      console.error(e);
+      alert("Erreur lors de la génération du fichier Excel.");
+    } finally {
+      setIsExportingXlsx(false);
     }
   }
 
@@ -1272,6 +1334,17 @@ function OngletCarteGlobale() {
         <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
           {(isLoading || isVerifying) && <RefreshCw size={13} className="animate-spin" />}
           <span>{parcelles.length} parcelle{parcelles.length > 1 ? "s" : ""} affichée{parcelles.length > 1 ? "s" : ""}</span>
+          <button
+            onClick={handleExportExcel}
+            disabled={isExportingXlsx || isLoading}
+            title="Exporter les données EUDR en tableau Excel (.xlsx)"
+            className="flex items-center gap-1 px-2.5 py-1 border border-green-300 rounded-lg text-xs text-green-700 hover:bg-green-50 disabled:opacity-50 transition-colors"
+          >
+            {isExportingXlsx
+              ? <RefreshCw size={11} className="animate-spin" />
+              : <FileDown size={11} />}
+            {isExportingXlsx ? "Génération…" : "Exporter Excel"}
+          </button>
           <button
             onClick={handleExportPDF}
             disabled={isExporting || isLoading}

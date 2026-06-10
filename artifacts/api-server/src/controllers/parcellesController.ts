@@ -593,6 +593,50 @@ export async function getZonesFiltres(req: Request, res: Response): Promise<void
   }
 }
 
+// ── Export données EUDR (pour xlsx côté client) ───────────────────────────────
+
+export async function exportEudrData(req: Request, res: Response): Promise<void> {
+  try {
+    const coopId = COOP_ID(req);
+    const eudrStatutQ = req.query["eudr_statut"] as string | undefined;
+    const sectionQ    = req.query["section"]     as string | undefined;
+    const villageQ    = req.query["village"]     as string | undefined;
+
+    const conditions: ReturnType<typeof eq>[] = [
+      eq(parcellesTable.cooperativeId, coopId),
+      eq(parcellesTable.actif, true),
+    ];
+    if (eudrStatutQ) conditions.push(eq(parcellesTable.eudrStatut, eudrStatutQ));
+    if (sectionQ)    conditions.push(eq(parcellesTable.section, sectionQ));
+    if (villageQ)    conditions.push(eq(parcellesTable.village, villageQ));
+
+    const rows = await db
+      .select({
+        membreNom:            membresTable.nom,
+        membrePrenoms:        membresTable.prenoms,
+        section:              parcellesTable.section,
+        village:              parcellesTable.village,
+        eudrStatut:           parcellesTable.eudrStatut,
+        superficieCalculeeHa: parcellesTable.superficieCalculeeHa,
+        superficieDeclareeHa: parcellesTable.superficieDeclareeHa,
+        hasPolygone: sql<boolean>`(${parcellesTable.polygone} IS NOT NULL)`,
+        hasPoint:    sql<boolean>`(${parcellesTable.coordonneesPoint} IS NOT NULL)`,
+        eudrDateVerification: parcellesTable.eudrDateVerification,
+        codeParcelle:         parcellesTable.codeParcelle,
+      })
+      .from(parcellesTable)
+      .innerJoin(membresTable, eq(parcellesTable.membreId, membresTable.id))
+      .where(and(...conditions))
+      .orderBy(parcellesTable.section, parcellesTable.village, membresTable.nom);
+
+    res.json({ parcelles: rows });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur exportEudrData");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 // ── Vérifier toutes les parcelles non vérifiées ───────────────────────────────
 
 export async function verifierTout(req: Request, res: Response): Promise<void> {
