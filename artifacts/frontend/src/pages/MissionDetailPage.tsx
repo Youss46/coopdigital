@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft, MapPin, Users, Calendar, CheckCircle,
-  XCircle, Clock, Target, Loader2, AlertTriangle, Eye,
+  XCircle, Clock, Target, Loader2, AlertTriangle, Eye, Map, List,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
+import MissionCarteGPS from "@/components/MissionCarteGPS";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ const tok = () => localStorage.getItem("coop_token") ?? "";
 const apiFetch = (url: string, opts?: RequestInit) =>
   fetch(url, { ...opts, headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) } });
 
-const STATUT_CFG: Record<string, { label: string; color: string; icon: JSX.Element }> = {
+const STATUT_CFG: Record<string, { label: string; color: string; icon: ReactNode }> = {
   en_attente: { label: "En attente", color: "text-gray-500 bg-gray-100", icon: <Clock size={11} /> },
   collecte:   { label: "Collecté",   color: "text-blue-700 bg-blue-100", icon: <MapPin size={11} /> },
   valide:     { label: "Validé ✓",   color: "text-green-700 bg-green-100", icon: <CheckCircle size={11} /> },
@@ -85,6 +86,7 @@ export default function MissionDetailPage() {
 
   const [modalRejet, setModalRejet] = useState<{ membreId: number; nom: string } | null>(null);
   const [motifRejet, setMotifRejet] = useState("");
+  const [vue, setVue] = useState<"liste" | "carte">("liste");
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -192,7 +194,20 @@ export default function MissionDetailPage() {
         </div>
 
         {/* Actions mission */}
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {/* Toggle liste / carte */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+            <button
+              onClick={() => setVue("liste")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${vue === "liste" ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-500 hover:bg-gray-50"}`}>
+              <List size={14} />Liste
+            </button>
+            <button
+              onClick={() => setVue("carte")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors border-l border-gray-200 ${vue === "carte" ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-500 hover:bg-gray-50"}`}>
+              <Map size={14} />Carte GPS
+            </button>
+          </div>
           {estAgent && mission.statut === "planifiee" && (
             <button onClick={() => demarrer.mutate()} disabled={demarrer.isPending}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
@@ -246,8 +261,16 @@ export default function MissionDetailPage() {
         </div>
       )}
 
+      {/* ── Vue carte GPS ────────────────────────────────────────────────────── */}
+      {vue === "carte" && (
+        <MissionCarteGPS
+          membres={mission.membres}
+          hauteur="460px"
+        />
+      )}
+
       {/* ── Liste des membres ─────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {vue === "liste" && <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
           <h2 className="font-semibold text-gray-800 text-sm">Membres de la mission</h2>
           {peutValider && stats && stats.collectes > 0 && mission.statut === "soumise" && (
@@ -282,14 +305,21 @@ export default function MissionDetailPage() {
                     <p className="text-xs text-red-600 mt-0.5">Motif : {m.motifRejet}</p>
                   )}
                   {/* GPS collecté */}
-                  {m.gpsCollecte && (
+                  {!!m.gpsCollecte && (
                     <div className="mt-1 flex items-center gap-1.5">
                       <MapPin size={10} className="text-green-600" />
-                      <span className="text-xs text-green-700 font-mono">
-                        {typeof m.gpsCollecte === "object" && m.gpsCollecte !== null
-                          ? `${(m.gpsCollecte as { lat?: number }).lat?.toFixed(5) ?? "?"}, ${(m.gpsCollecte as { lng?: number }).lng?.toFixed(5) ?? "?"}`
-                          : JSON.stringify(m.gpsCollecte)}
+                      <span className="text-xs text-green-700">
+                        {Array.isArray(m.gpsCollecte)
+                          ? `${(m.gpsCollecte as unknown[]).length} point${(m.gpsCollecte as unknown[]).length > 1 ? "s" : ""} GPS`
+                          : typeof m.gpsCollecte === "object" && m.gpsCollecte !== null
+                            ? `${(m.gpsCollecte as { lat?: number }).lat?.toFixed(4) ?? "?"}, ${((m.gpsCollecte as { lng?: number; lon?: number }).lng ?? (m.gpsCollecte as { lon?: number }).lon)?.toFixed(4) ?? "?"}`
+                            : "GPS collecté"}
                       </span>
+                      <button
+                        onClick={() => setVue("carte")}
+                        className="text-[10px] text-blue-500 hover:text-blue-700 underline">
+                        Voir sur carte
+                      </button>
                     </div>
                   )}
                 </div>
@@ -320,7 +350,7 @@ export default function MissionDetailPage() {
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* ── Modal rejet parcelle ─────────────────────────────────────────────── */}
       {modalRejet && (
