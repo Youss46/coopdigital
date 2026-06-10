@@ -36,6 +36,7 @@ import {
   Truck,
   Scale,
   MapPinned,
+  MapPin,
   Gift,
   ClipboardList,
   Navigation,
@@ -95,7 +96,7 @@ const navItems = [
     href: "/campagnes",
     label: "Campagnes",
     icon: CalendarDays,
-    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "delegue", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "magasinier", "delegue", "auditeur"],
   },
   {
     href: "/planning",
@@ -107,19 +108,19 @@ const navItems = [
     href: "/livraisons/nouvelle",
     label: "Livraisons",
     icon: Package,
-    roles: ["pca", "directeur", "delegue", "responsable_tracabilite", "comptable", "auditeur"],
+    roles: ["pca", "directeur", "delegue", "comptable", "auditeur"],
   },
   {
     href: "/pesee",
     label: "Pesée",
     icon: Scale,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "magasinier"],
+    roles: ["pca", "directeur", "comptable", "magasinier"],
   },
   {
     href: "/transport",
     label: "Transport",
     icon: Truck,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur", "magasinier"],
+    roles: ["pca", "directeur", "comptable", "auditeur", "magasinier"],
   },
 
   // ── Traçabilité & Conformité ──────────────────────────────────────────────
@@ -134,6 +135,12 @@ const navItems = [
     label: "Parcelles & EUDR",
     icon: MapPinned,
     roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+  },
+  {
+    href: "/missions",
+    label: "Missions terrain",
+    icon: MapPin,
+    roles: ["responsable_tracabilite"],
   },
   {
     href: "/rse",
@@ -153,7 +160,7 @@ const navItems = [
     href: "/refus",
     label: "Stocks refoulés",
     icon: PackageX,
-    roles: ["pca", "directeur", "magasinier", "responsable_tracabilite", "comptable", "auditeur"],
+    roles: ["pca", "directeur", "magasinier", "comptable", "auditeur"],
   },
 
   // ── Finance Membre ────────────────────────────────────────────────────────
@@ -288,7 +295,7 @@ const navItems = [
     href: "/reporting",
     label: "Reporting",
     icon: BarChart3,
-    roles: ["pca", "directeur", "comptable", "magasinier", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
   },
   {
     href: "/anomalies",
