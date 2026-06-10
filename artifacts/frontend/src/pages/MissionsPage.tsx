@@ -292,6 +292,7 @@ export default function MissionsPage() {
     titre: "", zoneType: "village", zoneNom: "", datePrevue: "",
     agentId: "" as string | number, notes: "", membreIdsSelectes: [] as number[],
   });
+  const [rechercheMembre, setRechercheMembre] = useState("");
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -317,14 +318,26 @@ export default function MissionsPage() {
   });
 
   const { data: membresSansGps = [] } = useQuery<MembreSansGps[]>({
-    queryKey: ["membres-sans-gps", form.zoneNom],
+    queryKey: ["membres-sans-gps"],
     queryFn: async () => {
-      const params = form.zoneNom ? `?zoneNom=${encodeURIComponent(form.zoneNom)}` : "";
-      const r = await apiFetch(`/api/missions/sans-gps${params}`);
+      const r = await apiFetch(`/api/missions/sans-gps`);
       if (!r.ok) return [];
       return r.json() as Promise<MembreSansGps[]>;
     },
-    enabled: peutCreer && modalOuvert && !!form.zoneNom,
+    enabled: peutCreer && modalOuvert,
+    staleTime: 30_000,
+  });
+
+  // Filtrage local de la liste membres sans GPS
+  const membresFiltres = membresSansGps.filter((m) => {
+    const q = rechercheMembre.toLowerCase();
+    if (!q) return true;
+    return (
+      m.nom.toLowerCase().includes(q) ||
+      (m.prenoms ?? "").toLowerCase().includes(q) ||
+      (m.village ?? "").toLowerCase().includes(q) ||
+      (m.zoneNom ?? "").toLowerCase().includes(q)
+    );
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────────
@@ -346,6 +359,7 @@ export default function MissionsPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["missions"] });
       setModalOuvert(false);
+      setRechercheMembre("");
       setForm({ titre: "", zoneType: "village", zoneNom: "", datePrevue: "", agentId: "", notes: "", membreIdsSelectes: [] });
     },
     onError: (e: Error) => alert(e.message),
@@ -605,7 +619,7 @@ export default function MissionsPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-bold text-gray-900">Nouvelle mission terrain</h3>
-              <button onClick={() => setModalOuvert(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+              <button onClick={() => { setModalOuvert(false); setRechercheMembre(""); }} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <div className="px-6 py-5 space-y-4">
 
@@ -653,36 +667,57 @@ export default function MissionsPage() {
               </div>
 
               {/* Membres sans GPS */}
-              {form.zoneNom && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-medium text-gray-600">
-                      Membres à mapper ({membresSansGps.length} sans GPS dans cette zone)
-                    </label>
-                    {membresSansGps.length > 0 && (
-                      <button type="button" onClick={() => setForm({ ...form, membreIdsSelectes: membresSansGps.map((m) => m.id) })}
-                        className="text-xs text-green-700 hover:underline">Sélectionner tous</button>
-                    )}
-                  </div>
-                  {membresSansGps.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic">Aucun membre sans GPS dans cette zone</p>
-                  ) : (
-                    <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto">
-                      {membresSansGps.map((m) => (
-                        <label key={m.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
-                          <input type="checkbox" checked={form.membreIdsSelectes.includes(m.id)}
-                            onChange={() => toggleMembre(m.id)} className="accent-green-700" />
-                          <span className="text-sm text-gray-800">{m.prenoms} {m.nom}</span>
-                          {m.village && <span className="text-xs text-gray-400 ml-auto">{m.village}</span>}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  {form.membreIdsSelectes.length > 0 && (
-                    <p className="text-xs text-green-700 mt-1">{form.membreIdsSelectes.length} membre{form.membreIdsSelectes.length > 1 ? "s" : ""} sélectionné{form.membreIdsSelectes.length > 1 ? "s" : ""}</p>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-medium text-gray-600">
+                    Membres à mapper
+                    <span className="ml-1 text-gray-400">
+                      ({membresFiltres.length}{rechercheMembre ? ` résultat${membresFiltres.length !== 1 ? "s" : ""}` : ` sans GPS`})
+                    </span>
+                  </label>
+                  {membresFiltres.length > 0 && (
+                    <button type="button"
+                      onClick={() => setForm({ ...form, membreIdsSelectes: [...new Set([...form.membreIdsSelectes, ...membresFiltres.map((m) => m.id)])] })}
+                      className="text-xs text-green-700 hover:underline font-medium">
+                      Sélectionner tous
+                    </button>
                   )}
                 </div>
-              )}
+                {/* Recherche */}
+                <input
+                  value={rechercheMembre}
+                  onChange={(e) => setRechercheMembre(e.target.value)}
+                  placeholder="Rechercher par nom, village…"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 mb-2"
+                />
+                {membresSansGps.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic px-1">Chargement…</p>
+                ) : membresFiltres.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic px-1">Aucun membre correspond à cette recherche</p>
+                ) : (
+                  <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                    {membresFiltres.map((m) => (
+                      <label key={m.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0">
+                        <input type="checkbox" checked={form.membreIdsSelectes.includes(m.id)}
+                          onChange={() => toggleMembre(m.id)} className="accent-green-700" />
+                        <span className="text-sm text-gray-800">{m.prenoms} {m.nom}</span>
+                        {(m.village ?? m.zoneNom) && (
+                          <span className="text-xs text-gray-400 ml-auto">{m.village ?? m.zoneNom}</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {form.membreIdsSelectes.length > 0 && (
+                  <div className="flex items-center justify-between mt-1.5">
+                    <p className="text-xs text-green-700 font-medium">
+                      {form.membreIdsSelectes.length} membre{form.membreIdsSelectes.length > 1 ? "s" : ""} sélectionné{form.membreIdsSelectes.length > 1 ? "s" : ""}
+                    </p>
+                    <button type="button" onClick={() => setForm({ ...form, membreIdsSelectes: [] })}
+                      className="text-xs text-gray-400 hover:text-red-500">Tout désélectionner</button>
+                  </div>
+                )}
+              </div>
 
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Notes pour l'agent</label>
@@ -698,7 +733,7 @@ export default function MissionsPage() {
               )}
 
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setModalOuvert(false)}
+                <button type="button" onClick={() => { setModalOuvert(false); setRechercheMembre(""); }}
                   className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
                   Annuler
                 </button>
