@@ -115,6 +115,8 @@ export async function exportMissionGeoJSON(req: Request, res: Response): Promise
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
 
   const missionId = parseInt(String(req.params["id"] ?? "0"));
+  const userId    = req.user?.id;
+  const userRole  = req.user?.role;
 
   try {
     const [mission] = await db
@@ -124,6 +126,11 @@ export async function exportMissionGeoJSON(req: Request, res: Response): Promise
       .limit(1);
 
     if (!mission) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
+
+    if (userRole === "agent_terrain" && mission.agentId !== userId) {
+      res.status(403).json({ erreur: "Mission non assignée à cet agent" });
+      return;
+    }
 
     const rows = await db
       .select({
