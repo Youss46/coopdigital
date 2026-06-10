@@ -192,7 +192,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
 
         {/* ——— Phase succès ——— */}
         {phase === "succes" ? (
@@ -268,7 +268,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
               <h3 className="font-bold text-gray-900">Créer un compte</h3>
             </div>
 
-            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Prénom(s)</label>
