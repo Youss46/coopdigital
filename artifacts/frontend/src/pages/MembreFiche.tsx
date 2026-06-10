@@ -378,6 +378,62 @@ export default function MembreFiche() {
   const { utilisateur } = useAuth();
   const peutTransferer = utilisateur?.role === "pca" || utilisateur?.role === "directeur";
 
+  // Modal édition infos membre
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editPending, setEditPending] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    nom: string; prenoms: string; telephone: string; village: string;
+    groupement: string; superficieHa: string; sexe: string; numeroCni: string;
+  }>({ nom: "", prenoms: "", telephone: "", village: "", groupement: "", superficieHa: "", sexe: "", numeroCni: "" });
+
+  function openEditModal() {
+    if (!membre) return;
+    setEditForm({
+      nom: membre.nom ?? "",
+      prenoms: (membre.prenoms as string | null) ?? "",
+      telephone: membre.telephone ?? "",
+      village: (membre.village as string | null) ?? "",
+      groupement: (membre.groupement as string | null) ?? "",
+      superficieHa: membre.superficieHa ?? "",
+      sexe: (membre.sexe as string | null) ?? "",
+      numeroCni: (membre.numeroCni as string | null) ?? "",
+    });
+    setShowEditModal(true);
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault();
+    setEditPending(true);
+    try {
+      const body: Record<string, string> = {};
+      if (editForm.nom.trim())         body["nom"]          = editForm.nom.trim();
+      if (editForm.prenoms.trim())     body["prenoms"]      = editForm.prenoms.trim();
+      if (editForm.telephone.trim())   body["telephone"]    = editForm.telephone.trim();
+      if (editForm.village.trim())     body["village"]      = editForm.village.trim();
+      if (editForm.groupement.trim())  body["groupement"]   = editForm.groupement.trim();
+      if (editForm.superficieHa.trim()) body["superficieHa"] = editForm.superficieHa.trim();
+      if (editForm.sexe)               body["sexe"]         = editForm.sexe;
+      if (editForm.numeroCni.trim())   body["numeroCni"]    = editForm.numeroCni.trim();
+      const res = await fetch(`${BASE_FICHE}/api/membres/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokFn()}` },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: (err as { erreur?: string }).erreur ?? "Erreur lors de la modification", variant: "destructive" });
+        return;
+      }
+      toast({ title: "Informations mises à jour" });
+      setShowEditModal(false);
+      void qc.invalidateQueries({ queryKey: getGetMembreByIdQueryKey(id) });
+    } catch {
+      toast({ title: "Erreur réseau", variant: "destructive" });
+    } finally {
+      setEditPending(false);
+    }
+  }
+
   // Modal transfert rattachement
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferPending, setTransferPending] = useState(false);
@@ -498,7 +554,17 @@ export default function MembreFiche() {
         </div>
 
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-gray-900">{membre.nom} {membre.prenoms}</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold text-gray-900">{membre.nom} {membre.prenoms}</h1>
+            {peutModifier && (
+              <button
+                onClick={openEditModal}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 rounded-md px-2 py-0.5 hover:bg-blue-50 transition-colors"
+              >
+                <Edit3 size={11} />Modifier
+              </button>
+            )}
+          </div>
           <div className="mt-1 mb-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-200 text-green-800 text-sm font-mono font-bold">
               {membre.codeMembre ?? "—"}
@@ -1366,6 +1432,119 @@ export default function MembreFiche() {
                   style={{ backgroundColor: "#1a4731" }}
                 >
                   {transferPending ? "Transfert en cours…" : "Confirmer le transfert"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal édition infos membre */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="font-bold text-gray-900">Modifier les informations</h2>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            <form onSubmit={handleEdit} className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
+                  <input
+                    required
+                    value={editForm.nom}
+                    onChange={e => setEditForm(f => ({ ...f, nom: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Prénoms *</label>
+                  <input
+                    required
+                    value={editForm.prenoms}
+                    onChange={e => setEditForm(f => ({ ...f, prenoms: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone *</label>
+                  <input
+                    required
+                    value={editForm.telephone}
+                    onChange={e => setEditForm(f => ({ ...f, telephone: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Village</label>
+                  <input
+                    value={editForm.village}
+                    onChange={e => setEditForm(f => ({ ...f, village: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Groupement</label>
+                  <input
+                    value={editForm.groupement}
+                    onChange={e => setEditForm(f => ({ ...f, groupement: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Superficie déclarée (ha)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editForm.superficieHa}
+                    onChange={e => setEditForm(f => ({ ...f, superficieHa: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Sexe</label>
+                  <select
+                    value={editForm.sexe}
+                    onChange={e => setEditForm(f => ({ ...f, sexe: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  >
+                    <option value="">— Non renseigné —</option>
+                    <option value="M">Masculin</option>
+                    <option value="F">Féminin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">N° CNI / Identité</label>
+                  <input
+                    value={editForm.numeroCni}
+                    onChange={e => setEditForm(f => ({ ...f, numeroCni: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2 pb-1">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={editPending}
+                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
+                  style={{ backgroundColor: "#1a4731" }}
+                >
+                  {editPending ? "Enregistrement…" : "Enregistrer"}
                 </button>
               </div>
             </form>
