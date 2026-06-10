@@ -4,7 +4,7 @@ import { db } from "@workspace/db";
 import { eq, and, desc, sql, asc } from "drizzle-orm";
 import { missionsTerrainTable, missionsMembresTable, messagesMissionTable, usersTable, membresTable } from "@workspace/db";
 import { creerNotification, notifierParRole } from "../services/notificationService.js";
-import { computeCompletude } from "./membresController";
+import { computeCompletude, computeCompletudEudr } from "./membresController";
 import { calculerSuperficie } from "../services/parcelleService.js";
 
 // ── Liste des missions ────────────────────────────────────────────────────────
@@ -479,12 +479,15 @@ export async function validerParcelleMission(req: Request, res: Response): Promi
         .where(eq(membresTable.id, membreId))
         .returning();
 
-      // Recalculer completude
+      // Recalculer completude identite + EUDR
       if (updatedMembre[0]) {
-        const completude = computeCompletude(updatedMembre[0] as unknown as Record<string, unknown>);
+        const row = updatedMembre[0] as unknown as Record<string, unknown>;
+        const completude = computeCompletude(row);
+        const ce = computeCompletudEudr(row);
+        const se = ce === 100 ? "conforme" : "non_conforme";
         await db
           .update(membresTable)
-          .set({ completudeFiche: completude })
+          .set({ completudeFiche: completude, completudeEudr: ce, statutEudr: se, missionGpsRequise: false })
           .where(eq(membresTable.id, membreId));
       }
     }
@@ -742,10 +745,13 @@ export async function validerToutCollectes(req: Request, res: Response): Promise
         .returning();
 
       if (updatedMembre) {
-        const completude = computeCompletude(updatedMembre as unknown as Record<string, unknown>);
+        const r = updatedMembre as unknown as Record<string, unknown>;
+        const completude = computeCompletude(r);
+        const ce = computeCompletudEudr(r);
+        const se = ce === 100 ? "conforme" : "non_conforme";
         await db
           .update(membresTable)
-          .set({ completudeFiche: completude })
+          .set({ completudeFiche: completude, completudeEudr: ce, statutEudr: se, missionGpsRequise: false })
           .where(eq(membresTable.id, row.membreId));
       }
     }
