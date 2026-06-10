@@ -12,7 +12,7 @@ export async function getMissionsAgent(agentId: number, cooperativeId: number) {
       and(
         eq(missionsTerrainTable.cooperativeId, cooperativeId),
         eq(missionsTerrainTable.agentId, agentId),
-        sql`${missionsTerrainTable.statut} IN ('planifiee', 'en_cours', 'soumise', 'rejetee')`,
+        sql`(statut IN ('planifiee', 'en_cours', 'soumise', 'rejetee') OR (statut = 'validee' AND updated_at > NOW() - INTERVAL '30 days'))`,
       ),
     )
     .orderBy(desc(missionsTerrainTable.datePrevue));

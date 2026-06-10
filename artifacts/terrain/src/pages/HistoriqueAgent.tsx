@@ -13,11 +13,20 @@ const STATUT_LABEL: Record<string, { label: string; color: string; icon: string 
   rejetee:   { label: "Rejetée",   color: "#ef4444", icon: "❌" },
 };
 
+type FiltreKey = "toutes" | "en_cours" | "validee" | "rejetee";
+
+const FILTRES: { key: FiltreKey; label: string }[] = [
+  { key: "toutes",    label: "Toutes" },
+  { key: "en_cours",  label: "⚡ En cours" },
+  { key: "validee",   label: "✅ Validées" },
+  { key: "rejetee",   label: "❌ Rejetées" },
+];
+
 export default function HistoriqueAgent() {
   const { isOnline } = useOffline();
   const [missions, setMissions] = useState<MissionTerrain[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filtre, setFiltre] = useState<"toutes" | "validee" | "rejetee">("toutes");
+  const [filtre, setFiltre] = useState<FiltreKey>("toutes");
 
   useEffect(() => {
     if (!isOnline) { setLoading(false); return; }
@@ -36,19 +45,25 @@ export default function HistoriqueAgent() {
 
       <OfflineBanner />
 
-      <div style={{ display: "flex", gap: 8, padding: "12px 16px 0", background: "#0f172a" }}>
-        {(["toutes", "validee", "rejetee"] as const).map((f) => (
+      <div style={{ display: "flex", gap: 6, padding: "12px 16px 0", background: "#0f172a", overflowX: "auto" }}>
+        {FILTRES.map(({ key, label }) => (
           <button
-            key={f}
-            onClick={() => setFiltre(f)}
+            key={key}
+            onClick={() => setFiltre(key)}
             style={{
-              flex: 1, padding: "7px 4px", borderRadius: 8, border: "none",
-              fontSize: ".8rem", fontWeight: 600, cursor: "pointer",
-              background: filtre === f ? "#3b82f6" : "#1e2d45",
-              color: filtre === f ? "#fff" : "#94a3b8",
+              flexShrink: 0,
+              padding: "7px 10px",
+              borderRadius: 8,
+              border: "none",
+              fontSize: ".78rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              background: filtre === key ? "#3b82f6" : "#1e2d45",
+              color: filtre === key ? "#fff" : "#94a3b8",
+              whiteSpace: "nowrap",
             }}
           >
-            {f === "toutes" ? "Toutes" : f === "validee" ? "✅ Validées" : "❌ Rejetées"}
+            {label}
           </button>
         ))}
       </div>
@@ -74,7 +89,7 @@ export default function HistoriqueAgent() {
               <div key={m.id} style={{ background: "#1e2d45", borderRadius: 12, padding: "14px 16px", marginBottom: 10, borderLeft: `3px solid ${s.color}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ fontWeight: 700, fontSize: ".95rem" }}>{m.titre}</div>
-                  <span style={{ fontSize: ".7rem", background: s.color + "33", color: s.color, borderRadius: 4, padding: "2px 7px" }}>
+                  <span style={{ fontSize: ".7rem", background: s.color + "33", color: s.color, borderRadius: 4, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>
                     {s.icon} {s.label}
                   </span>
                 </div>

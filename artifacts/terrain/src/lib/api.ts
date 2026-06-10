@@ -1,5 +1,5 @@
 import { getToken } from "./auth";
-import { queueOp, type PendingOpType } from "./idb";
+import { queueOp, queueGpsOp, type PendingOpType, type GpsOp } from "./idb";
 import type {
   CollecteInput, PaiementInput, AvanceInput,
   MissionTerrain, MissionDetail, StatsAgent, GpsCollecteInput, MessageMission,
@@ -122,11 +122,20 @@ export async function collecterParcelle(
 ): Promise<{ ok: boolean } | null> {
   if (!online) {
     const localId = crypto.randomUUID();
-    const fullData: GpsCollecteInput = { ...data, missionId, membreId, localId };
-    await queueOp({ type: "gps_collecte" as PendingOpType, data: fullData, localId });
+    await queueGpsOp({ localId, missionId, membreId, data });
     return null;
   }
   return apiPost<{ ok: boolean }>(`/missions/${missionId}/parcelle/${membreId}`, data);
+}
+
+export async function syncGpsOps(ops: GpsOp[]): Promise<{ succes: string[]; echecs: Array<{ localId: string; erreur: string }> }> {
+  if (ops.length === 0) return { succes: [], echecs: [] };
+  const operations = ops.map((op) => ({
+    type: "gps_collecte",
+    localId: op.localId,
+    data: { missionId: op.missionId, membreId: op.membreId, ...op.data },
+  }));
+  return apiPost<{ succes: string[]; echecs: Array<{ localId: string; erreur: string }> }>("/sync", { operations });
 }
 
 export async function getMessages(missionId: number): Promise<MessageMission[]> {

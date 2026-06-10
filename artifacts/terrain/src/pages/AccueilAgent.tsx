@@ -13,7 +13,7 @@ const STATUT_LABEL: Record<string, { label: string; color: string }> = {
   en_cours:  { label: "En cours",  color: "#f59e0b" },
   soumise:   { label: "Soumise",   color: "#3b82f6" },
   validee:   { label: "Validée",   color: "#22c55e" },
-  rejetee:   { label: "Rejetée",   color: "#ef4444" },
+  rejetee:   { label: "À corriger", color: "#ef4444" },
 };
 
 export default function AccueilAgent() {
@@ -40,7 +40,15 @@ export default function AccueilAgent() {
     }
   }, [isOnline]);
 
-  const activeMissions = missions.filter((m) => m.statut === "planifiee" || m.statut === "en_cours");
+  const activeMissions = [...missions]
+    .filter((m) => m.statut === "planifiee" || m.statut === "en_cours")
+    .sort((a, b) => new Date(a.datePrevue).getTime() - new Date(b.datePrevue).getTime());
+
+  const prochaineMission = activeMissions[0] ?? null;
+
+  const notifications = missions.filter(
+    (m) => m.statut === "validee" || m.statut === "rejetee",
+  ).slice(0, 3);
 
   return (
     <div className="t-app">
@@ -89,6 +97,66 @@ export default function AccueilAgent() {
               </div>
             )}
 
+            {prochaineMission && (
+              <div className="t-card" style={{ marginBottom: 12, borderLeft: "3px solid #6366f1" }}>
+                <div className="t-card__title" style={{ marginBottom: 8 }}>🎯 Prochaine mission</div>
+                <Link href={`/missions/${prochaineMission.id}`}>
+                  <div style={{ cursor: "pointer" }}>
+                    <div style={{ fontWeight: 700, fontSize: ".95rem" }}>{prochaineMission.titre}</div>
+                    <div style={{ color: "#94a3b8", fontSize: ".78rem", marginTop: 2 }}>
+                      {prochaineMission.zoneNom} · 📅 {new Date(prochaineMission.datePrevue).toLocaleDateString("fr-FR")}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: ".75rem", color: "#94a3b8", marginTop: 8 }}>
+                      <span>{prochaineMission.membresCollectes}/{prochaineMission.membresTotal} parcelles collectées</span>
+                      <span style={{ color: STATUT_LABEL[prochaineMission.statut]?.color ?? "#94a3b8" }}>
+                        {STATUT_LABEL[prochaineMission.statut]?.label ?? prochaineMission.statut}
+                      </span>
+                    </div>
+                    {prochaineMission.membresTotal > 0 && (
+                      <div style={{ height: 4, background: "#1a2035", borderRadius: 2, marginTop: 4 }}>
+                        <div style={{
+                          width: `${Math.round((prochaineMission.membresCollectes / prochaineMission.membresTotal) * 100)}%`,
+                          height: "100%", background: "#22c55e", borderRadius: 2,
+                        }} />
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              </div>
+            )}
+
+            {notifications.length > 0 && (
+              <div className="t-card" style={{ marginBottom: 12 }}>
+                <div className="t-card__title" style={{ marginBottom: 8 }}>🔔 Notifications</div>
+                {notifications.map((m) => {
+                  const isRejetee = m.statut === "rejetee";
+                  return (
+                    <Link key={m.id} href={`/missions/${m.id}`}>
+                      <div style={{
+                        background: isRejetee ? "#ef444411" : "#22c55e11",
+                        borderLeft: `3px solid ${isRejetee ? "#ef4444" : "#22c55e"}`,
+                        borderRadius: 8, padding: "8px 10px", marginBottom: 6, cursor: "pointer",
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
+                            {isRejetee ? "❌" : "✅"} {m.titre}
+                          </div>
+                          <span style={{ fontSize: ".68rem", color: isRejetee ? "#ef4444" : "#22c55e", fontWeight: 600 }}>
+                            {isRejetee ? "À corriger" : "Validée"}
+                          </span>
+                        </div>
+                        {isRejetee && m.motifRejet && (
+                          <div style={{ fontSize: ".75rem", color: "#ef4444", marginTop: 3 }}>
+                            {m.motifRejet}
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="t-card" style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <div className="t-card__title">📍 Missions actives</div>
@@ -97,7 +165,7 @@ export default function AccueilAgent() {
 
               {activeMissions.length === 0 ? (
                 <div style={{ color: "#64748b", fontSize: ".85rem", textAlign: "center", padding: "12px 0" }}>
-                  Aucune mission en cours
+                  {!isOnline && missions.length === 0 ? "📡 Hors ligne — aucune donnée en cache" : "Aucune mission en cours"}
                 </div>
               ) : (
                 activeMissions.slice(0, 3).map((m) => {
@@ -133,7 +201,7 @@ export default function AccueilAgent() {
             {!isOnline && (
               <div className="t-card" style={{ background: "#1e293b", borderLeft: "3px solid #f59e0b" }}>
                 <div style={{ fontSize: ".85rem", color: "#f59e0b" }}>
-                  📡 Hors ligne — la collecte GPS sera sauvegardée localement et synchronisée dès le retour de la connexion.
+                  📡 Hors ligne — la collecte GPS sera sauvegardée et synchronisée à la reconnexion.
                 </div>
               </div>
             )}

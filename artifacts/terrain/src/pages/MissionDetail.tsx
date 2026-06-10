@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { getMissionDetail, soumettresMission, sendMessage } from "../lib/api";
+import { cacheMissionDetail, getCachedMissionDetail } from "../lib/idb";
 import { useOffline } from "../contexts/OfflineContext";
 import OfflineBanner from "../components/OfflineBanner";
 import type { MissionDetail as TMissionDetail, MissionMembre, MessageMission } from "../lib/types";
@@ -143,16 +144,33 @@ export default function MissionDetailPage() {
   const [mission, setMission] = useState<TMissionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [fromCache, setFromCache] = useState(false);
   const [soumission, setSoumission] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [soumissionErreur, setSoumissionErreur] = useState<string | null>(null);
 
   useEffect(() => {
     if (isNaN(missionId)) return;
+    setLoading(true);
+    setErreur(null);
+    setFromCache(false);
+    if (!isOnline) {
+      getCachedMissionDetail(missionId)
+        .then((cached) => {
+          if (cached) { setMission(cached); setFromCache(true); }
+          else setErreur("Données non disponibles hors ligne");
+        })
+        .catch(() => setErreur("Données non disponibles hors ligne"))
+        .finally(() => setLoading(false));
+      return;
+    }
     getMissionDetail(missionId)
-      .then(setMission)
+      .then((data) => {
+        setMission(data);
+        cacheMissionDetail(data).catch(() => {});
+      })
       .catch((e: Error) => setErreur(e.message))
       .finally(() => setLoading(false));
-  }, [missionId]);
+  }, [missionId, isOnline]);
 
   const doSoumettre = async () => {
     if (!mission) return;
@@ -187,7 +205,10 @@ export default function MissionDetailPage() {
         </button>
         <div style={{ flex: 1 }}>
           <div className="t-header__title" style={{ fontSize: ".95rem" }}>{mission.titre}</div>
-          <div className="t-header__sub">{mission.zoneNom}</div>
+          <div className="t-header__sub">
+            {mission.zoneNom}
+            {fromCache && <span style={{ marginLeft: 6, color: "#f59e0b", fontSize: ".7rem" }}>📦 cache</span>}
+          </div>
         </div>
         <span style={{ fontSize: ".72rem", background: statut.color + "33", color: statut.color, borderRadius: 4, padding: "3px 8px" }}>
           {statut.label}

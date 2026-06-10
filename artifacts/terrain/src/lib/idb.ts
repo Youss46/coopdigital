@@ -1,9 +1,19 @@
-import type { PendingOp, CollecteInput, PaiementInput, AvanceInput, GpsCollecteInput, PrixActuel, Fournisseur, MissionTerrain } from "./types";
+import type { PendingOp, CollecteInput, PaiementInput, AvanceInput, GpsCollecteInput, PrixActuel, Fournisseur, MissionTerrain, MissionDetail } from "./types";
+
+export interface GpsOp {
+  localId: string;
+  missionId: number;
+  membreId: number;
+  data: Omit<GpsCollecteInput, "missionId" | "membreId" | "localId">;
+  timestamp: number;
+  status: "pending" | "synced" | "error";
+  tentatives?: number;
+}
 
 export type PendingOpType = "collecte" | "paiement" | "avance" | "gps_collecte";
 
 const DB_NAME = "coopdigital-terrain";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let _db: IDBDatabase | null = null;
 
@@ -25,6 +35,10 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains("missions_cache")) {
         db.createObjectStore("missions_cache", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("pending_gps")) {
+        const gpsStore = db.createObjectStore("pending_gps", { keyPath: "localId" });
+        gpsStore.createIndex("status", "status");
       }
     };
 
@@ -75,8 +89,8 @@ export async function getPendingOps(): Promise<PendingOp[]> {
 }
 
 export async function getPendingCount(): Promise<number> {
-  const ops = await getPendingOps();
-  return ops.length;
+  const [regularOps, gpsOps] = await Promise.all([getPendingOps(), getPendingGpsOps()]);
+  return regularOps.length + gpsOps.length;
 }
 
 export async function markOpSynced(localId: string): Promise<void> {
@@ -212,6 +226,81 @@ export async function getAllOps(): Promise<PendingOp[]> {
     };
     req.onerror = () => reject(req.error);
   });
+}
+
+export async function queueGpsOp(op: Omit<GpsOp, "timestamp" | "status">): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_gps", "readwrite", db);
+    const record: GpsOp = { ...op, timestamp: Date.now(), status: "pending" };
+    const req = store.put(record);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getPendingGpsOps(): Promise<GpsOp[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_gps", "readonly", db);
+    const idx = store.index("status");
+    const req = idx.getAll("pending");
+    req.onsuccess = () => resolve((req.result as GpsOp[]).sort((a, b) => a.timestamp - b.timestamp));
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function markGpsOpSynced(localId: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_gps", "readwrite", db);
+    const getReq = store.get(localId);
+    getReq.onsuccess = () => {
+      const op = getReq.result as GpsOp;
+      if (op) { op.status = "synced"; const p = store.put(op); p.onsuccess = () => resolve(); p.onerror = () => reject(p.error); }
+      else resolve();
+    };
+    getReq.onerror = () => reject(getReq.error);
+  });
+}
+
+export async function markGpsOpError(localId: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_gps", "readwrite", db);
+    const getReq = store.get(localId);
+    getReq.onsuccess = () => {
+      const op = getReq.result as GpsOp;
+      if (op) { op.status = "error"; const p = store.put(op); p.onsuccess = () => resolve(); p.onerror = () => reject(p.error); }
+      else resolve();
+    };
+    getReq.onerror = () => reject(getReq.error);
+  });
+}
+
+export async function incrementGpsTentatives(localId: string): Promise<number> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_gps", "readwrite", db);
+    const getReq = store.get(localId);
+    getReq.onsuccess = () => {
+      const op = getReq.result as GpsOp | undefined;
+      if (op) {
+        const next = (op.tentatives ?? 0) + 1;
+        op.tentatives = next;
+        const p = store.put(op); p.onsuccess = () => resolve(next); p.onerror = () => reject(p.error);
+      } else resolve(0);
+    };
+    getReq.onerror = () => reject(getReq.error);
+  });
+}
+
+export async function cacheMissionDetail(detail: MissionDetail): Promise<void> {
+  await setCache(`mission_detail_${detail.id}`, detail);
+}
+
+export async function getCachedMissionDetail(id: number): Promise<MissionDetail | null> {
+  return getCache<MissionDetail>(`mission_detail_${id}`);
 }
 
 export async function cacheMissions(missions: MissionTerrain[]): Promise<void> {

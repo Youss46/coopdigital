@@ -5,8 +5,9 @@ import {
 import {
   getPendingOps, getPendingCount,
   markOpSyncedWithTs, markOpError, incrementTentatives,
+  getPendingGpsOps, markGpsOpSynced, markGpsOpError, incrementGpsTentatives,
 } from "../lib/idb";
-import { syncOps } from "../lib/api";
+import { syncOps, syncGpsOps } from "../lib/api";
 
 export interface SyncResult {
   succes: number;
@@ -43,29 +44,36 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
   const triggerSync = useCallback(async () => {
     if (syncingRef.current || !navigator.onLine) return;
-    const ops = await getPendingOps();
-    if (ops.length === 0) return;
+    const [ops, gpsOps] = await Promise.all([getPendingOps(), getPendingGpsOps()]);
+    if (ops.length === 0 && gpsOps.length === 0) return;
 
     syncingRef.current = true;
     setSyncStatus("syncing");
     setSyncResult(null);
     if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
 
-    try {
-      const result = await syncOps(ops);
-      let nbSucces = 0;
-      let nbEchecs = 0;
+    let nbSucces = 0;
+    let nbEchecs = 0;
 
-      for (const localId of result.succes) {
-        await markOpSyncedWithTs(localId);
-        nbSucces++;
-      }
-      for (const { localId, erreur } of result.echecs) {
-        const tentatives = await incrementTentatives(localId);
-        if (tentatives >= 3) {
-          await markOpError(localId, `Échec définitif (${tentatives} tentatives) : ${erreur}`);
+    try {
+      if (ops.length > 0) {
+        const result = await syncOps(ops);
+        for (const localId of result.succes) { await markOpSyncedWithTs(localId); nbSucces++; }
+        for (const { localId, erreur } of result.echecs) {
+          const t = await incrementTentatives(localId);
+          if (t >= 3) await markOpError(localId, `Échec définitif (${t} tentatives) : ${erreur}`);
+          nbEchecs++;
         }
-        nbEchecs++;
+      }
+
+      if (gpsOps.length > 0) {
+        const gpsResult = await syncGpsOps(gpsOps);
+        for (const localId of gpsResult.succes) { await markGpsOpSynced(localId); nbSucces++; }
+        for (const { localId } of gpsResult.echecs) {
+          const t = await incrementGpsTentatives(localId);
+          if (t >= 3) await markGpsOpError(localId);
+          nbEchecs++;
+        }
       }
 
       await refreshCount();
