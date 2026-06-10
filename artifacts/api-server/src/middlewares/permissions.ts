@@ -28,11 +28,12 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE MISSIONS TERRAIN
   missions: {
-    lire:     ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
-    creer:    ["pca", "directeur", "responsable_tracabilite"],
-    modifier: ["pca", "directeur", "responsable_tracabilite"],
-    valider:  ["pca", "directeur", "responsable_tracabilite"],
-    executer: ["agent_terrain"],
+    lire:                ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
+    creer:               ["pca", "directeur", "responsable_tracabilite"],
+    modifier:            ["pca", "directeur", "responsable_tracabilite"],
+    valider:             ["pca", "directeur", "responsable_tracabilite"],
+    executer:            ["agent_terrain"],
+    creer_agent_terrain: ["pca", "directeur", "responsable_tracabilite"],
   },
 
   // MODULE M02 — TRAÇABILITÉ
