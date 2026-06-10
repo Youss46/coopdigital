@@ -375,7 +375,9 @@ export async function exportGeoJSONController(req: Request, res: Response): Prom
 export async function getConformite(req: Request, res: Response): Promise<void> {
   try {
     const coopId = COOP_ID(req);
-    const stats = await calculerConformiteGlobale(coopId);
+    const village = req.query["village"] as string | undefined;
+    const section = req.query["section"] as string | undefined;
+    const stats = await calculerConformiteGlobale(coopId, { village, section });
     res.json(stats);
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }

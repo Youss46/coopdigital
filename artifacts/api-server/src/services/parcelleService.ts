@@ -219,7 +219,14 @@ export interface ConformiteStats {
   par_section: { section: string; total: number; conformes: number; pct: number; superficie_ha: number }[];
 }
 
-export async function calculerConformiteGlobale(cooperativeId: number): Promise<ConformiteStats> {
+export async function calculerConformiteGlobale(
+  cooperativeId: number,
+  filters?: { village?: string; section?: string },
+): Promise<ConformiteStats> {
+  const parcelleConditions = [eq(parcellesTable.cooperativeId, cooperativeId), eq(parcellesTable.actif, true)];
+  if (filters?.village) parcelleConditions.push(eq(parcellesTable.village, filters.village));
+  if (filters?.section) parcelleConditions.push(eq(parcellesTable.section, filters.section));
+
   const rows = await db
     .select({
       eudrStatut:           parcellesTable.eudrStatut,
@@ -229,7 +236,7 @@ export async function calculerConformiteGlobale(cooperativeId: number): Promise<
       membreId:             parcellesTable.membreId,
     })
     .from(parcellesTable)
-    .where(and(eq(parcellesTable.cooperativeId, cooperativeId), eq(parcellesTable.actif, true)));
+    .where(and(...parcelleConditions));
 
   const total = rows.length;
   const conformes = rows.filter(r => r.eudrStatut === "conforme");
@@ -243,10 +250,14 @@ export async function calculerConformiteGlobale(cooperativeId: number): Promise<
 
   const membresAvecParcelle = new Set(rows.map(r => r.membreId)).size;
 
+  const membreConditions = [eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif")];
+  if (filters?.village) membreConditions.push(eq(membresTable.village, filters.village));
+  if (filters?.section) membreConditions.push(eq(membresTable.section, filters.section));
+
   const [{ totalMembres }] = await db
     .select({ totalMembres: sql<number>`count(*)::int` })
     .from(membresTable)
-    .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif")));
+    .where(and(...membreConditions));
 
   const sectionMap = new Map<string, { total: number; conformes: number; superficie_ha: number }>();
   for (const r of rows) {

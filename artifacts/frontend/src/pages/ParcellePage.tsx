@@ -1050,8 +1050,14 @@ function OngletCarteGlobale() {
   });
 
   const conformiteQ = useQuery({
-    queryKey: ["parcelles-conformite-globale"],
-    queryFn: () => apiFetch<ConformiteStats>("/api/parcelles/conformite"),
+    queryKey: ["parcelles-conformite-globale", filterVillage, filterSection],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (filterVillage) params.set("village", filterVillage);
+      if (filterSection) params.set("section", filterSection);
+      const qs = params.toString();
+      return apiFetch<ConformiteStats>(`/api/parcelles/conformite${qs ? `?${qs}` : ""}`);
+    },
   });
 
   const membresSansGpsQ = useQuery({
@@ -1512,38 +1518,54 @@ function OngletCarteGlobale() {
 
       {/* Tableau de synthèse pour impression uniquement */}
       {stats && stats.par_section.length > 0 && (() => {
-        const totaux = stats.par_section.reduce(
+        // Filter sections by the active filterSection (par_section has no village dimension)
+        const sectionsFiltrées = stats.par_section.filter(s => !filterSection || s.section === filterSection);
+        const totaux = sectionsFiltrées.reduce(
           (acc, s) => ({ conformes: acc.conformes + s.conformes, total: acc.total + s.total, superficie_ha: acc.superficie_ha + s.superficie_ha }),
           { conformes: 0, total: 0, superficie_ha: 0 },
         );
         const pctTotal = totaux.total > 0 ? Math.round((totaux.conformes / totaux.total) * 100) : 0;
+
+        // Print KPIs — conformiteQ is now filter-aware (village+section params); stats already reflects the active filter scope
+        const printTotal = (stats.membres_avec_parcelle) + (stats.membres_sans_parcelle);
+        const printPct = printTotal > 0 ? Math.round((stats.membres_avec_parcelle / printTotal) * 100) : 0;
+        // GPS terrain KPIs — gpsPolygones is already filtered by village+section client-side
+        const printTerrainUniques = new Set(gpsPolygones.map(p => p.membreId)).size;
+        const printNbPolygones = gpsPolygones.length;
+
         const dateStr = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+        const filtreLabel = filterSection
+          ? filterVillage ? `Section : ${filterSection} · Village : ${filterVillage}` : `Section : ${filterSection}`
+          : filterVillage ? `Village : ${filterVillage}` : null;
         return (
           <div className="print-only">
             <div style={{ marginBottom: 16 }}>
               <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Rapport EUDR — Couverture GPS parcelles</h1>
-              <p style={{ fontSize: 11, color: "#555", margin: "4px 0 0" }}>Généré le {dateStr} · CoopDigital</p>
+              <p style={{ fontSize: 11, color: "#555", margin: "4px 0 0" }}>
+                Généré le {dateStr} · CoopDigital
+                {filtreLabel && <span style={{ marginLeft: 8, background: "#dcfce7", color: "#15803d", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>Filtre : {filtreLabel}</span>}
+              </p>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
                 <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Couverture GPS</div>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{pctCouverture}%</div>
-                <div style={{ fontSize: 10, color: "#6b7280" }}>{stats.membres_avec_parcelle} / {totalMembres} membres</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{printPct}%</div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>{stats.membres_avec_parcelle} / {printTotal} membres</div>
               </div>
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
                 <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Superficie cartographiée</div>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{superficieTotale.toFixed(1)} ha</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{parseFloat(String(stats.superficie_totale_ha)).toFixed(1)} ha</div>
                 <div style={{ fontSize: 10, color: "#6b7280" }}>{stats.nb_parcelles_total} parcelles</div>
               </div>
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
                 <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Membres avec GPS terrain</div>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{membresTerrainUniques || "—"}</div>
-                <div style={{ fontSize: 10, color: "#6b7280" }}>{allGpsPolygones.length} polygones collectés</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{printTerrainUniques || "—"}</div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>{printNbPolygones} polygones collectés</div>
               </div>
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
                 <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Membres sans GPS</div>
                 <div style={{ fontSize: 20, fontWeight: 700 }}>{stats.membres_sans_parcelle}</div>
-                <div style={{ fontSize: 10, color: "#6b7280" }}>{100 - pctCouverture}% non couverts</div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>{100 - printPct}% non couverts</div>
               </div>
             </div>
             <h2 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Synthèse par section</h2>
@@ -1557,7 +1579,7 @@ function OngletCarteGlobale() {
                 </tr>
               </thead>
               <tbody>
-                {stats.par_section.map((s, i) => (
+                {sectionsFiltrées.map((s, i) => (
                   <tr key={s.section} style={{ background: i % 2 === 0 ? "#fff" : "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                     <td style={{ padding: "6px 10px" }}>{s.section}</td>
                     <td style={{ textAlign: "center", padding: "6px 10px" }}>{s.conformes} / {s.total}</td>
