@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,7 @@ export default function Membres() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const { utilisateur } = useAuth();
+  const { toast } = useToast();
 
   const peutCreer   = usePermission("membres", "creer");
   const peutExporter = usePermission("membres", "exporter");
@@ -191,7 +193,7 @@ export default function Membres() {
       void queryClient.invalidateQueries({ queryKey: ["membres-list"] });
       void queryClient.invalidateQueries({ queryKey: ["membres-demandes"] });
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const rejeterMutation = useMutation({
@@ -206,7 +208,7 @@ export default function Membres() {
       void queryClient.invalidateQueries({ queryKey: ["membres-list"] });
       void queryClient.invalidateQueries({ queryKey: ["membres-demandes"] });
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -226,7 +228,7 @@ export default function Membres() {
       a.href = url; a.download = `membres-${statut || "tous"}-${new Date().toISOString().slice(0, 10)}.pdf`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 200);
-    } catch { alert("Impossible de générer le PDF"); }
+    } catch { toast({ title: "Impossible de générer le PDF", variant: "destructive" }); }
     finally { setExportPending(false); }
   }
 
