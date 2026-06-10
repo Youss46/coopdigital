@@ -17,10 +17,11 @@ L.Icon.Default.mergeOptions({
 });
 
 const TOKEN_KEY = "coop_token";
+const BASE = import.meta.env.VITE_API_URL ?? "";
 
 async function apiFetch<T = unknown>(url: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem(TOKEN_KEY);
-  const res = await fetch(url, {
+  const res = await fetch(`${BASE}${url}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",

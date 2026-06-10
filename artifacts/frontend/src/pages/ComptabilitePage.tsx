@@ -1001,26 +1001,27 @@ function OngletDevises() {
 }
 
 // ─── Plan comptable — helpers API ────────────────────────────────────────────
+const _BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const hdr = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
 
 async function apiFetch<T>(path: string): Promise<T> {
-  const r = await fetch(path, { headers: hdr() });
+  const r = await fetch(`${_BASE}${path}`, { headers: hdr() });
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
   return r.json() as Promise<T>;
 }
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(path, { method: "POST", headers: hdr(), body: JSON.stringify(body) });
+  const r = await fetch(`${_BASE}${path}`, { method: "POST", headers: hdr(), body: JSON.stringify(body) });
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
   return r.json() as Promise<T>;
 }
 async function apiPut<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(path, { method: "PUT", headers: hdr(), body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(`${_BASE}${path}`, { method: "PUT", headers: hdr(), body: body ? JSON.stringify(body) : undefined });
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
   return r.json() as Promise<T>;
 }
 async function apiDelete<T>(path: string): Promise<T> {
-  const r = await fetch(path, { method: "DELETE", headers: hdr() });
+  const r = await fetch(`${_BASE}${path}`, { method: "DELETE", headers: hdr() });
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
   return r.json() as Promise<T>;
 }

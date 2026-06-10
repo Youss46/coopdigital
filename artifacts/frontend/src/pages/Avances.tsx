@@ -20,9 +20,11 @@ function formaterFCFA(n: number) {
 function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
+const BASE = import.meta.env.VITE_API_URL ?? "";
+
 async function downloadPdf(url: string, filename: string) {
   const token = localStorage.getItem("coop_token") ?? "";
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) return;
   const blob = await res.blob();
   if (blob.size === 0) return;
