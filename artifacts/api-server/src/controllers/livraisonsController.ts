@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable, campagnesTable, entrepotsTable, mouvementsStockTable } from "@workspace/db";
+import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable, lotsTable, campagnesTable, entrepotsTable, mouvementsStockTable } from "@workspace/db";
 import { eq, and, desc, notInArray } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
 import { checkLivraison, creerAnomalies } from "../services/anomalieService";
@@ -275,7 +275,11 @@ export async function getLivraisonsNonLotees(req: Request, res: Response): Promi
   }
 
   try {
-    const deja = await db.select({ livraisonId: lotLivraisonsTable.livraisonId }).from(lotLivraisonsTable);
+    const deja = await db
+      .select({ livraisonId: lotLivraisonsTable.livraisonId })
+      .from(lotLivraisonsTable)
+      .innerJoin(lotsTable, eq(lotLivraisonsTable.lotId, lotsTable.id))
+      .where(eq(lotsTable.cooperativeId, cooperativeId));
     const dejaIds = deja.map((d) => d.livraisonId);
 
     const coopCondition = eq(membresTable.cooperativeId, cooperativeId);

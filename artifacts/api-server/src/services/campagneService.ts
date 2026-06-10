@@ -55,9 +55,11 @@ export async function verifierAvantCloture(cooperativeId: number, campagneId: nu
   try {
     const r = await db.execute(sql`
       SELECT COUNT(*) AS nb,
-             COALESCE(SUM(solde_restant_fcfa), 0) AS total
-      FROM avances
-      WHERE statut = 'en_cours'
+             COALESCE(SUM(a.solde_restant_fcfa), 0) AS total
+      FROM avances a
+      INNER JOIN membres m ON m.id = a.membre_id
+      WHERE a.statut = 'en_cours'
+        AND m.cooperative_id = ${cooperativeId}
     `);
     const row = r.rows[0] as { nb: string; total: string };
     const nb = Number(row?.nb ?? 0);
@@ -110,6 +112,7 @@ export async function verifierAvantCloture(cooperativeId: number, campagneId: nu
       SELECT COUNT(*) AS nb
       FROM traitements_refus
       WHERE statut = 'en_attente'
+        AND cooperative_id = ${cooperativeId}
     `);
     const nb = Number((r.rows[0] as { nb: string })?.nb ?? 0);
     resultats.push(nb > 0
@@ -125,6 +128,7 @@ export async function verifierAvantCloture(cooperativeId: number, campagneId: nu
       SELECT COUNT(*) AS nb
       FROM ecritures_en_attente
       WHERE statut = 'en_attente'
+        AND cooperative_id = ${cooperativeId}
     `);
     const nb = Number((r.rows[0] as { nb: string })?.nb ?? 0);
     resultats.push(nb > 0
@@ -140,6 +144,7 @@ export async function verifierAvantCloture(cooperativeId: number, campagneId: nu
       SELECT COUNT(*) AS nb
       FROM bulletins_paie
       WHERE statut != 'paye'
+        AND cooperative_id = ${cooperativeId}
     `);
     const nb = Number((r.rows[0] as { nb: string })?.nb ?? 0);
     resultats.push(nb > 0
@@ -263,10 +268,12 @@ export async function genererBilan(cooperativeId: number, campagneId: number, us
 
   const avances = await db.execute(sql`
     SELECT
-      COALESCE(SUM(montant_octroye_fcfa), 0)                   AS avances_octroyees,
-      COALESCE(SUM(montant_rembourse_fcfa), 0)                  AS avances_remboursees,
-      COALESCE(SUM(solde_restant_fcfa), 0)                      AS avances_solde
-    FROM avances
+      COALESCE(SUM(a.montant_octroye_fcfa), 0)                  AS avances_octroyees,
+      COALESCE(SUM(a.montant_rembourse_fcfa), 0)                AS avances_remboursees,
+      COALESCE(SUM(a.solde_restant_fcfa), 0)                    AS avances_solde
+    FROM avances a
+    INNER JOIN membres m ON m.id = a.membre_id
+    WHERE m.cooperative_id = ${cooperativeId}
   `);
   const av = avances.rows[0] as Record<string, string>;
 
@@ -282,6 +289,7 @@ export async function genererBilan(cooperativeId: number, campagneId: number, us
     SELECT COALESCE(SUM(salaire_net_fcfa), 0) AS charges_personnel
     FROM bulletins_paie
     WHERE statut = 'paye'
+      AND cooperative_id = ${cooperativeId}
   `);
   const sal = salaires.rows[0] as Record<string, string>;
 

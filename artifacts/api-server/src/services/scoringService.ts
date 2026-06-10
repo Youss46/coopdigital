@@ -176,7 +176,9 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
       COALESCE(SUM(a.montant_octroye_fcfa), 0)    AS total_octroye,
       COALESCE(SUM(a.montant_rembourse_fcfa), 0)  AS total_rembourse
     FROM avances a
+    INNER JOIN membres m ON m.id = a.membre_id
     WHERE a.membre_id = ${membreId}
+      AND m.cooperative_id = ${cooperativeId}
   `);
   const av = avRows.rows[0];
 
@@ -197,7 +199,10 @@ export async function calculerScore(cooperativeId: number, membreId: number, cam
   const fidRows = await db.execute<{ nb_campagnes: string }>(sql`
     SELECT COUNT(DISTINCT l.campagne_id) AS nb_campagnes
     FROM livraisons l
-    WHERE l.membre_id = ${membreId} AND l.campagne_id IS NOT NULL
+    INNER JOIN membres m ON m.id = l.membre_id
+    WHERE l.membre_id = ${membreId}
+      AND l.campagne_id IS NOT NULL
+      AND m.cooperative_id = ${cooperativeId}
   `);
   const nbCampagnes = Number(fidRows.rows[0]?.nb_campagnes ?? 0);
   const scoreFidelite = Math.min(100, nbCampagnes * 20);
