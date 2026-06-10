@@ -64,10 +64,17 @@ function FitBounds({ polygons }: { polygons: [number, number][][] }) {
     if (polygons.length === 0) return;
     const all: [number, number][] = polygons.flat();
     if (all.length === 0) return;
-    try {
-      map.fitBounds(L.latLngBounds(all), { padding: [32, 32], maxZoom: 16 });
-    } catch { /* ignore */ }
-  }, [map, polygons]);
+    const fit = () => {
+      try {
+        map.invalidateSize();
+        map.fitBounds(L.latLngBounds(all), { padding: [48, 48], maxZoom: 18 });
+      } catch { /* ignore */ }
+    };
+    fit();
+    const t = setTimeout(fit, 150);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, polygons.length]);
   return null;
 }
 
