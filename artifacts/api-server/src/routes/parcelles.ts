@@ -10,6 +10,7 @@ import {
   getHistoriqueRendements,
   exportGeoJSONController,
   getConformite,
+  getStatsGps,
   importZonesRisque,
   verifierEUDRController,
   verifierTout,
@@ -24,6 +25,7 @@ router.get(  "/parcelles/zones-filtres",         checkPermission("parcelles", "v
 router.get(  "/parcelles/carte",               checkPermission("parcelles", "voir_carte"),        getParcellesCarte);
 router.get(  "/parcelles/export-geojson",       checkPermission("parcelles", "exporter_geojson"),  exportGeoJSONController);
 router.get(  "/parcelles/conformite",           checkPermission("parcelles", "voir_carte"),        getConformite);
+router.get(  "/parcelles/stats-gps",            checkPermission("parcelles", "voir_carte"),        getStatsGps);
 router.post( "/parcelles/verifier-tout",        checkPermission("parcelles", "verifier_eudr"),     verifierTout);
 router.post( "/parcelles/import-zones-risque",  checkPermission("parcelles", "importer_zones"),    importZonesRisque);
 router.get(  "/parcelles/membre/:membre_id",    checkPermission("parcelles", "voir_carte"),        getParcellesMembre);

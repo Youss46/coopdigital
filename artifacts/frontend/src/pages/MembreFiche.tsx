@@ -23,8 +23,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowLeft, MapPin, Phone, Users, Leaf, Calendar, TrendingDown,
-  Coins, Plus, Loader2, ChevronDown, ChevronUp, UserCheck, UserX, Gift,
+  Coins, Loader2, ChevronDown, ChevronUp, UserCheck, UserX, Gift,
   GraduationCap, Award, Download, Building2, User, Edit3, AlertTriangle,
+  Satellite, CheckCircle2, XCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
@@ -260,6 +261,20 @@ function DonsRecusMembre({ membreId }: { membreId: number }) {
   );
 }
 
+// ── Interface parcelle GPS ────────────────────────────────────────────────────
+interface ParcelleGps {
+  id: number;
+  codeParcelle: string;
+  nomParcelle: string | null;
+  superficieDeclareeHa: string | null;
+  superficieCalculeeHa: string | null;
+  eudrStatut: string | null;
+  culturePrincipale: string | null;
+  village: string | null;
+}
+
+const SEUIL_ALERTE_SUPERFICIE_PCT = 20;
+
 const INPUT_CLS =
   "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white";
 const BTN_CLS =
@@ -272,7 +287,7 @@ function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const TABS = ["Avances", "Livraisons", "Impayées", "Parts sociales", "Score", "Dons reçus", "Formations"] as const;
+const TABS = ["Avances", "Livraisons", "Impayées", "Parts sociales", "Score", "Dons reçus", "Formations", "Parcelles GPS"] as const;
 type Tab = (typeof TABS)[number];
 
 const NIVEAUX_SCORE: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
@@ -317,6 +332,26 @@ export default function MembreFiche() {
   const { data: paiementsImpayees = [], isLoading: impayeesLoading } = useListPaiements(impayeesParams, {
     query: { queryKey: getListPaiementsQueryKey(impayeesParams), enabled: !!id && activeTab === "Impayées" },
   });
+
+  const { data: parcellesGps = [] } = useQuery<ParcelleGps[]>({
+    queryKey: ["parcelles-membre-gps", id],
+    queryFn: async () => {
+      const r = await fetch(`/api/parcelles/membre/${id}`, {
+        headers: { Authorization: `Bearer ${tokFn()}` },
+      });
+      if (!r.ok) return [];
+      return r.json() as Promise<ParcelleGps[]>;
+    },
+    enabled: !!id,
+  });
+
+  const parcellesAvecGps = parcellesGps.filter((p) => p.superficieCalculeeHa !== null && p.superficieCalculeeHa !== undefined);
+  const superficieGpsTotale = parcellesAvecGps.reduce((sum, p) => sum + parseFloat(p.superficieCalculeeHa!), 0);
+  const superficieDeclareeNb = membre ? parseFloat(String(membre.superficieHa)) : 0;
+  const diffSuperficiePct = superficieDeclareeNb > 0 && parcellesAvecGps.length > 0
+    ? Math.abs(superficieGpsTotale - superficieDeclareeNb) / superficieDeclareeNb * 100
+    : 0;
+  const alerteSuperficieGps = parcellesAvecGps.length > 0 && diffSuperficiePct > SEUIL_ALERTE_SUPERFICIE_PCT;
 
   const liberationMut = useEnregistrerLiberation();
   const statutMut = useModifierStatutMembre({
@@ -473,7 +508,18 @@ export default function MembreFiche() {
             <span className="flex items-center gap-1"><Phone size={13} />{membre.telephone}</span>
             {membre.village && <span className="flex items-center gap-1"><MapPin size={13} />{membre.village}</span>}
             {membre.groupement && <span className="flex items-center gap-1"><Users size={13} />{membre.groupement}</span>}
-            <span className="flex items-center gap-1"><Leaf size={13} />{parseFloat(membre.superficieHa).toFixed(2)} ha</span>
+            <span className="flex items-center gap-1"><Leaf size={13} />{parseFloat(membre.superficieHa).toFixed(2)} ha déclarée</span>
+            {parcellesAvecGps.length > 0 && (
+              <span className={`flex items-center gap-1 font-medium ${alerteSuperficieGps ? "text-amber-600" : "text-green-600"}`}>
+                <Satellite size={13} />
+                {superficieGpsTotale.toFixed(2)} ha GPS
+                {alerteSuperficieGps && (
+                  <span title={`Écart de ${diffSuperficiePct.toFixed(0)}% avec la superficie déclarée`}>
+                    <AlertTriangle size={12} className="text-amber-500" />
+                  </span>
+                )}
+              </span>
+            )}
             <span className="flex items-center gap-1"><Calendar size={13} />Adhésion : {formaterDate(membre.dateAdhesion)}</span>
           </div>
         </div>
@@ -511,6 +557,16 @@ export default function MembreFiche() {
               <TrendingDown size={11} />
               {formaterFCFA(soldeCredit)} dû
             </span>
+          )}
+          {alerteSuperficieGps && (
+            <button
+              onClick={() => setActiveTab("Parcelles GPS")}
+              className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 flex items-center gap-1"
+              title={`Écart de ${diffSuperficiePct.toFixed(0)}% entre superficie déclarée et GPS`}
+            >
+              <AlertTriangle size={11} />
+              Écart superficie {diffSuperficiePct.toFixed(0)}%
+            </button>
           )}
           {scoreResume && (() => {
             const resume = scoreResume as { niveau?: string; score_global?: string | number };
@@ -915,6 +971,134 @@ export default function MembreFiche() {
 
         {/* Formations */}
         {activeTab === "Formations" && <FormationsMembre membreId={id} />}
+
+        {/* Parcelles GPS */}
+        {activeTab === "Parcelles GPS" && (
+          <div className="divide-y">
+            {/* Résumé GPS */}
+            <div className="px-5 py-4 bg-green-50">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-green-700">{parcellesGps.length}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">parcelle(s)</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-green-700">{parcellesAvecGps.length}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">avec GPS</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-green-700">
+                    {parcellesAvecGps.length > 0 ? superficieGpsTotale.toFixed(2) : "—"}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">ha GPS total</p>
+                </div>
+              </div>
+              {parcellesAvecGps.length > 0 && (
+                <div className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+                  alerteSuperficieGps
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-green-100 text-green-800"
+                }`}>
+                  {alerteSuperficieGps ? (
+                    <AlertTriangle size={13} className="shrink-0" />
+                  ) : (
+                    <CheckCircle2 size={13} className="shrink-0" />
+                  )}
+                  <span>
+                    Superficie déclarée : <strong>{superficieDeclareeNb.toFixed(2)} ha</strong>
+                    {" · "}Superficie GPS : <strong>{superficieGpsTotale.toFixed(2)} ha</strong>
+                    {" · "}Écart : <strong>{diffSuperficiePct.toFixed(1)}%</strong>
+                    {alerteSuperficieGps && ` — dépasse le seuil de ${SEUIL_ALERTE_SUPERFICIE_PCT}%`}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Tableau des parcelles */}
+            {parcellesGps.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <Satellite className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Aucune parcelle enregistrée pour ce membre</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left">
+                      <th className="px-4 py-2.5 text-xs font-semibold text-gray-500">Code</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-gray-500">Village</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-gray-500">Culture</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 text-right">Sup. déclarée</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 text-right">Sup. GPS</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 text-center">Écart</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 text-center">EUDR</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {parcellesGps.map((p) => {
+                      const dec = p.superficieDeclareeHa ? parseFloat(p.superficieDeclareeHa) : null;
+                      const gps = p.superficieCalculeeHa ? parseFloat(p.superficieCalculeeHa) : null;
+                      const ecart = dec && gps && dec > 0 ? Math.abs(gps - dec) / dec * 100 : null;
+                      const ecartAlerte = ecart !== null && ecart > SEUIL_ALERTE_SUPERFICIE_PCT;
+                      return (
+                        <tr key={p.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{p.codeParcelle}</td>
+                          <td className="px-4 py-2.5 text-xs text-gray-500">{p.village ?? "—"}</td>
+                          <td className="px-4 py-2.5 text-xs text-gray-500">{p.culturePrincipale ?? "—"}</td>
+                          <td className="px-4 py-2.5 text-xs text-right text-gray-600">
+                            {dec !== null ? `${dec.toFixed(2)} ha` : "—"}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-right font-medium text-green-700">
+                            {gps !== null ? (
+                              <span className="flex items-center justify-end gap-1">
+                                <Satellite size={11} />
+                                {gps.toFixed(2)} ha
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-center">
+                            {ecart !== null ? (
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ${
+                                ecartAlerte ? "bg-amber-100 text-amber-700" : "bg-green-50 text-green-700"
+                              }`}>
+                                {ecartAlerte ? <AlertTriangle size={10} /> : <CheckCircle2 size={10} />}
+                                {ecart.toFixed(1)}%
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            {p.eudrStatut ? (
+                              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+                                p.eudrStatut === "conforme"
+                                  ? "bg-green-100 text-green-700"
+                                  : p.eudrStatut === "non_conforme"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-gray-100 text-gray-500"
+                              }`}>
+                                {p.eudrStatut === "conforme" ? (
+                                  <CheckCircle2 size={10} />
+                                ) : p.eudrStatut === "non_conforme" ? (
+                                  <XCircle size={10} />
+                                ) : null}
+                                {p.eudrStatut === "conforme" ? "Conforme" : p.eudrStatut === "non_conforme" ? "Non conforme" : "Non vérifié"}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-300">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Score */}
         {activeTab === "Score" && (

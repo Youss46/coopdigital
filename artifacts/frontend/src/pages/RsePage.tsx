@@ -8,7 +8,7 @@ import {
 import {
   Leaf, Users, ShieldCheck, TrendingUp, Award, GraduationCap,
   Handshake, Calculator, FileText, Plus, ChevronDown,
-  Download, AlertTriangle, RefreshCw, CheckCircle2,
+  Download, AlertTriangle, RefreshCw, CheckCircle2, Satellite,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -221,6 +221,22 @@ export default function RsePage() {
       const r = await authFetch("/api/rse/comparaison");
       if (!r.ok) return [];
       return r.json() as Promise<Comparaison[]>;
+    },
+  });
+
+  // Stats GPS parcelles
+  const { data: statsGps } = useQuery<{
+    nbParcellesTotal: number;
+    nbParcellesAvecGps: number;
+    pctParcellesAvecGps: number;
+    superficieGpsTotaleHa: number;
+    superficieCombineeTotaleHa: number;
+  }>({
+    queryKey: ["parcelles", "stats-gps"],
+    queryFn: async () => {
+      const r = await authFetch("/api/parcelles/stats-gps");
+      if (!r.ok) return null;
+      return r.json();
     },
   });
 
@@ -442,6 +458,23 @@ export default function RsePage() {
                       <p className="font-semibold text-gray-900">{n(ind.superficieCertifieeHa).toFixed(1)} ha</p>
                     </div>
                   </div>
+                  {statsGps && statsGps.nbParcellesTotal > 0 && (
+                    <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+                      statsGps.pctParcellesAvecGps >= 80
+                        ? "bg-green-50 text-green-800"
+                        : statsGps.pctParcellesAvecGps >= 50
+                        ? "bg-blue-50 text-blue-800"
+                        : "bg-amber-50 text-amber-800"
+                    }`}>
+                      <Satellite size={13} className="shrink-0" />
+                      <span>
+                        Superficie calculée via GPS pour{" "}
+                        <strong>{statsGps.nbParcellesAvecGps}/{statsGps.nbParcellesTotal}</strong>{" "}
+                        parcelles ({statsGps.pctParcellesAvecGps}%) —{" "}
+                        <strong>{statsGps.superficieGpsTotaleHa.toFixed(1)} ha</strong> mesurés par GPS
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

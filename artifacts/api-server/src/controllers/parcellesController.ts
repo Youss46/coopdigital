@@ -278,6 +278,37 @@ export async function updateParcelle(req: Request, res: Response): Promise<void>
   }
 }
 
+// ── Statistiques GPS des parcelles ───────────────────────────────────────────
+
+export async function getStatsGps(req: Request, res: Response): Promise<void> {
+  try {
+    const coopId = COOP_ID(req);
+    const [row] = await db
+      .select({
+        total:           sql<number>`count(*)::int`,
+        avecGps:         sql<number>`count(superficie_calculee_ha)::int`,
+        superficieGpsHa: sql<string>`coalesce(sum(superficie_calculee_ha::numeric), 0)`,
+        superficieTotaleHa: sql<string>`sum(coalesce(superficie_calculee_ha::numeric, superficie_declaree_ha::numeric, 0))`,
+      })
+      .from(parcellesTable)
+      .where(and(eq(parcellesTable.cooperativeId, coopId), eq(parcellesTable.actif, true)));
+
+    const total   = row?.total   ?? 0;
+    const avecGps = row?.avecGps ?? 0;
+    res.json({
+      nbParcellesTotal:    total,
+      nbParcellesAvecGps:  avecGps,
+      pctParcellesAvecGps: total > 0 ? Math.round((avecGps / total) * 100) : 0,
+      superficieGpsTotaleHa:    parseFloat(row?.superficieGpsHa     ?? "0") || 0,
+      superficieCombineeTotaleHa: parseFloat(row?.superficieTotaleHa ?? "0") || 0,
+    });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur getStatsGps");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 // ── Parcelles d'un membre ─────────────────────────────────────────────────────
 
 export async function getParcellesMembre(req: Request, res: Response): Promise<void> {
