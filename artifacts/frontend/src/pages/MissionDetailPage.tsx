@@ -9,6 +9,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
 import MissionCarteGPS from "@/components/MissionCarteGPS";
+import { useToast } from "@/hooks/use-toast";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,9 +60,10 @@ interface Message {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const apiFetch = (url: string, opts?: RequestInit) =>
-  fetch(url, { ...opts, headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) } });
+  fetch(`${BASE}${url}`, { ...opts, headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) } });
 
 const STATUT_CFG: Record<string, { label: string; color: string; icon: ReactNode }> = {
   a_faire:    { label: "À faire",    color: "text-gray-500 bg-gray-100", icon: <Clock size={11} /> },
@@ -159,6 +161,7 @@ function MessagingPanel({ missionId, userId }: { missionId: string; userId: numb
   const [ouvert, setOuvert] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["mission-messages", missionId],
@@ -190,7 +193,7 @@ function MessagingPanel({ missionId, userId }: { missionId: string; userId: numb
       setTexte("");
       void queryClient.invalidateQueries({ queryKey: ["mission-messages", missionId] });
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const nonLus = messages.filter((m) => !m.lu && m.auteurId !== userId).length;
@@ -284,6 +287,7 @@ export default function MissionDetailPage() {
   const { utilisateur } = useAuth();
   const peutValider = usePermission("missions", "valider");
   const estAgent = utilisateur?.role === "agent_terrain";
+  const { toast } = useToast();
 
   const [modalRejet, setModalRejet] = useState<{ membreId: number; nom: string } | null>(null);
   const [motifRejet, setMotifRejet] = useState("");
@@ -315,7 +319,7 @@ export default function MissionDetailPage() {
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as { erreur?: string }).erreur ?? "Erreur"); }
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["mission-detail", missionId] }),
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const rejeter = useMutation({
@@ -328,7 +332,7 @@ export default function MissionDetailPage() {
       setMotifRejet("");
       void queryClient.invalidateQueries({ queryKey: ["mission-detail", missionId] });
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const validerMission = useMutation({
@@ -340,7 +344,7 @@ export default function MissionDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ["mission-detail", missionId] });
       void queryClient.invalidateQueries({ queryKey: ["missions"] });
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const rejeterMission = useMutation({
@@ -354,7 +358,7 @@ export default function MissionDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ["mission-detail", missionId] });
       void queryClient.invalidateQueries({ queryKey: ["missions"] });
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const validerTout = useMutation({
@@ -366,9 +370,9 @@ export default function MissionDetailPage() {
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ["mission-detail", missionId] });
       void queryClient.invalidateQueries({ queryKey: ["missions"] });
-      alert(`${data.valides} collecte${data.valides > 1 ? "s" : ""} GPS validée${data.valides > 1 ? "s" : ""} avec succès.`);
+      toast({ title: `${data.valides} collecte${data.valides > 1 ? "s" : ""} GPS validée${data.valides > 1 ? "s" : ""} avec succès.` });
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const rejeterTout = useMutation({
@@ -382,9 +386,9 @@ export default function MissionDetailPage() {
       setMotifRejetTout("");
       void queryClient.invalidateQueries({ queryKey: ["mission-detail", missionId] });
       void queryClient.invalidateQueries({ queryKey: ["missions"] });
-      alert(`${data.rejetes} collecte${data.rejetes > 1 ? "s" : ""} GPS rejetée${data.rejetes > 1 ? "s" : ""}.`);
+      toast({ title: `${data.rejetes} collecte${data.rejetes > 1 ? "s" : ""} GPS rejetée${data.rejetes > 1 ? "s" : ""}.` });
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const demarrer = useMutation({
@@ -393,7 +397,7 @@ export default function MissionDetailPage() {
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as { erreur?: string }).erreur ?? "Erreur"); }
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["mission-detail", missionId] }),
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const soumettre = useMutation({
@@ -402,7 +406,7 @@ export default function MissionDetailPage() {
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as { erreur?: string }).erreur ?? "Erreur"); }
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["mission-detail", missionId] }),
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   // ── Export GeoJSON ────────────────────────────────────────────────────────
