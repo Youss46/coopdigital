@@ -17,6 +17,7 @@ import {
   sendMessageMission,
   validerMissionComplete,
   rejeterMissionComplete,
+  validerToutCollectes,
 } from "../controllers/missionsController";
 
 const router: IRouter = Router();
@@ -33,6 +34,7 @@ router.post("/missions/:id/demarrer",   checkPermission("missions", "executer"),
 router.post("/missions/:id/soumettre",  checkPermission("missions", "executer"), soumettreMission);
 router.get("/missions/:id/messages",    checkPermission("missions", "lire"),    getMessagesMission);
 router.post("/missions/:id/messages",   checkPermission("missions", "lire"),    sendMessageMission);
+router.post("/missions/:id/valider-tout", checkPermission("missions", "valider"), validerToutCollectes);
 router.post("/missions/:id/valider",    checkPermission("missions", "valider"), validerMissionComplete);
 router.post("/missions/:id/rejeter",    checkPermission("missions", "valider"), rejeterMissionComplete);
 router.patch("/missions/:id/membres/:membreId/collecte",

@@ -671,6 +671,124 @@ export async function sendMessageMission(req: Request, res: Response): Promise<v
 
 // ── Valider / Rejeter la mission entière (RT) ─────────────────────────────────
 
+// ── Validation en lot de toutes les collectes GPS d'une mission ───────────────
+
+export async function validerToutCollectes(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const userId = req.user?.id;
+  if (!cooperativeId || !userId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const missionId = parseInt(String(req.params["id"] ?? "0"));
+
+  try {
+    const [mission] = await db
+      .select()
+      .from(missionsTerrainTable)
+      .where(and(eq(missionsTerrainTable.id, missionId), eq(missionsTerrainTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!mission) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
+    if (mission.statut !== "soumise") {
+      res.status(400).json({ erreur: "La mission doit être soumise pour valider les collectes" });
+      return;
+    }
+
+    // Récupérer tous les membres à valider
+    const toValider = await db
+      .select({
+        membreId:    missionsMembresTable.membreId,
+        gpsCollecte: missionsMembresTable.gpsCollecte,
+        dateCollecte: missionsMembresTable.dateCollecte,
+      })
+      .from(missionsMembresTable)
+      .where(
+        and(
+          eq(missionsMembresTable.missionId, missionId),
+          sql`${missionsMembresTable.statut} = 'collecte'`,
+          sql`${missionsMembresTable.gpsCollecte} IS NOT NULL`,
+        ),
+      );
+
+    if (toValider.length === 0) {
+      res.status(400).json({ erreur: "Aucune collecte GPS en attente de validation" });
+      return;
+    }
+
+    // Batch update missions_membres
+    await db
+      .update(missionsMembresTable)
+      .set({ statut: "valide" })
+      .where(
+        and(
+          eq(missionsMembresTable.missionId, missionId),
+          sql`${missionsMembresTable.statut} = 'collecte'`,
+          sql`${missionsMembresTable.gpsCollecte} IS NOT NULL`,
+        ),
+      );
+
+    // Pour chaque membre : intégrer les données GPS + recalculer complétude
+    for (const row of toValider) {
+      const [updatedMembre] = await db
+        .update(membresTable)
+        .set({
+          gpsParcelles:     row.gpsCollecte,
+          gpsCollectePar:   mission.agentId,
+          gpsValidePar:     userId,
+          dateCollecteGps:  row.dateCollecte ?? new Date(),
+          updatedAt:        new Date(),
+        })
+        .where(eq(membresTable.id, row.membreId))
+        .returning();
+
+      if (updatedMembre) {
+        const completude = computeCompletude(updatedMembre as unknown as Record<string, unknown>);
+        await db
+          .update(membresTable)
+          .set({ completudeFiche: completude })
+          .where(eq(membresTable.id, row.membreId));
+      }
+    }
+
+    // Vérifier si toute la mission est maintenant validée
+    const [{ pending }] = await db
+      .select({ pending: sql<number>`count(*)::int` })
+      .from(missionsMembresTable)
+      .where(
+        and(
+          eq(missionsMembresTable.missionId, missionId),
+          sql`${missionsMembresTable.statut} NOT IN ('valide', 'rejete')`,
+        ),
+      );
+
+    if (Number(pending) === 0) {
+      await db
+        .update(missionsTerrainTable)
+        .set({ statut: "validee", updatedAt: new Date() })
+        .where(eq(missionsTerrainTable.id, missionId));
+
+      if (mission.agentId) {
+        void creerNotification(cooperativeId, [mission.agentId], {
+          type:         "mission_validee",
+          titre:        `Mission validée ✓ : ${mission.titre}`,
+          message:      `Toutes les collectes GPS ont été validées. ${toValider.length} parcelle(s) intégrée(s).`,
+          lien:         `/missions/${mission.id}`,
+          lienLibelle:  "Voir la mission",
+          gravite:      "info",
+          sourceModule: "missions",
+          sourceId:     mission.id,
+        });
+      }
+    }
+
+    res.json({ ok: true, valides: toValider.length });
+  } catch (err) {
+    req.log.error({ err }, "Erreur validerToutCollectes");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ── Valider mission complète (RT) ─────────────────────────────────────────────
+
 export async function validerMissionComplete(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   const userId = req.user?.id;

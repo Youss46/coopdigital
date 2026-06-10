@@ -355,6 +355,20 @@ export default function MissionDetailPage() {
     onError: (e: Error) => alert(e.message),
   });
 
+  const validerTout = useMutation({
+    mutationFn: async () => {
+      const r = await apiFetch(`/api/missions/${missionId}/valider-tout`, { method: "POST" });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as { erreur?: string }).erreur ?? "Erreur"); }
+      return r.json() as Promise<{ ok: boolean; valides: number }>;
+    },
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: ["mission-detail", missionId] });
+      void queryClient.invalidateQueries({ queryKey: ["missions"] });
+      alert(`${data.valides} collecte${data.valides > 1 ? "s" : ""} GPS validée${data.valides > 1 ? "s" : ""} avec succès.`);
+    },
+    onError: (e: Error) => alert(e.message),
+  });
+
   const demarrer = useMutation({
     mutationFn: async () => {
       const r = await apiFetch(`/api/missions/${missionId}/demarrer`, { method: "POST" });
@@ -474,6 +488,23 @@ export default function MissionDetailPage() {
             <button onClick={() => soumettre.mutate()} disabled={soumettre.isPending}
               className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50">
               {soumettre.isPending ? "…" : "Soumettre pour validation"}
+            </button>
+          )}
+          {/* Bouton RT : Valider toutes les collectes en lot */}
+          {peutValiderMission && stats && stats.collectes > 0 && (
+            <button
+              onClick={() => {
+                if (window.confirm(`Valider les ${stats.collectes} collecte${stats.collectes > 1 ? "s" : ""} GPS en attente ? Les données seront intégrées dans les fiches membres.`)) {
+                  validerTout.mutate();
+                }
+              }}
+              disabled={validerTout.isPending}
+              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {validerTout.isPending
+                ? <Loader2 size={14} className="animate-spin" />
+                : <CheckCircle size={14} />}
+              Valider tout ({stats.collectes})
             </button>
           )}
           {/* Boutons RT : Valider / Rejeter la mission entière */}
