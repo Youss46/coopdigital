@@ -289,6 +289,8 @@ export default function MissionDetailPage() {
   const [motifRejet, setMotifRejet] = useState("");
   const [modalRejetMission, setModalRejetMission] = useState(false);
   const [motifRejetMission, setMotifRejetMission] = useState("");
+  const [modalRejetTout, setModalRejetTout] = useState(false);
+  const [motifRejetTout, setMotifRejetTout] = useState("");
   const [vue, setVue] = useState<"liste" | "carte">("liste");
   const [galerie, setGalerie] = useState<{ photos: string[]; nom: string } | null>(null);
   const [membreExpanded, setMembreExpanded] = useState<number | null>(null);
@@ -365,6 +367,22 @@ export default function MissionDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ["mission-detail", missionId] });
       void queryClient.invalidateQueries({ queryKey: ["missions"] });
       alert(`${data.valides} collecte${data.valides > 1 ? "s" : ""} GPS validée${data.valides > 1 ? "s" : ""} avec succès.`);
+    },
+    onError: (e: Error) => alert(e.message),
+  });
+
+  const rejeterTout = useMutation({
+    mutationFn: async (motif: string) => {
+      const r = await apiFetch(`/api/missions/${missionId}/rejeter-tout`, { method: "POST", body: JSON.stringify({ motif }) });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as { erreur?: string }).erreur ?? "Erreur"); }
+      return r.json() as Promise<{ ok: boolean; rejetes: number }>;
+    },
+    onSuccess: (data) => {
+      setModalRejetTout(false);
+      setMotifRejetTout("");
+      void queryClient.invalidateQueries({ queryKey: ["mission-detail", missionId] });
+      void queryClient.invalidateQueries({ queryKey: ["missions"] });
+      alert(`${data.rejetes} collecte${data.rejetes > 1 ? "s" : ""} GPS rejetée${data.rejetes > 1 ? "s" : ""}.`);
     },
     onError: (e: Error) => alert(e.message),
   });
@@ -490,22 +508,32 @@ export default function MissionDetailPage() {
               {soumettre.isPending ? "…" : "Soumettre pour validation"}
             </button>
           )}
-          {/* Bouton RT : Valider toutes les collectes en lot */}
+          {/* Boutons RT : lot valider / rejeter toutes les collectes */}
           {peutValiderMission && stats && stats.collectes > 0 && (
-            <button
-              onClick={() => {
-                if (window.confirm(`Valider les ${stats.collectes} collecte${stats.collectes > 1 ? "s" : ""} GPS en attente ? Les données seront intégrées dans les fiches membres.`)) {
-                  validerTout.mutate();
-                }
-              }}
-              disabled={validerTout.isPending}
-              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-            >
-              {validerTout.isPending
-                ? <Loader2 size={14} className="animate-spin" />
-                : <CheckCircle size={14} />}
-              Valider tout ({stats.collectes})
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  if (window.confirm(`Valider les ${stats.collectes} collecte${stats.collectes > 1 ? "s" : ""} GPS en attente ? Les données seront intégrées dans les fiches membres.`)) {
+                    validerTout.mutate();
+                  }
+                }}
+                disabled={validerTout.isPending}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {validerTout.isPending
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : <CheckCircle size={14} />}
+                Valider tout ({stats.collectes})
+              </button>
+              <button
+                onClick={() => { setModalRejetTout(true); setMotifRejetTout(""); }}
+                disabled={rejeterTout.isPending}
+                className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                <XCircle size={14} />
+                Rejeter tout ({stats.collectes})
+              </button>
+            </>
           )}
           {/* Boutons RT : Valider / Rejeter la mission entière */}
           {peutValiderMission && (
@@ -775,6 +803,49 @@ export default function MissionDetailPage() {
                   onClick={() => rejeterMission.mutate(motifRejetMission)}
                   className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium bg-red-600 hover:bg-red-700 disabled:opacity-50">
                   {rejeterMission.isPending ? <Loader2 size={14} className="animate-spin mx-auto" /> : "Rejeter la mission"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal rejet en lot (Rejeter tout) ─────────────────────────────────── */}
+      {modalRejetTout && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">Rejeter toutes les collectes</h3>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {stats && stats.collectes > 0
+                  ? `${stats.collectes} collecte${stats.collectes > 1 ? "s" : ""} GPS en attente`
+                  : mission.titre}
+              </p>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <p className="text-sm text-gray-600">
+                Toutes les collectes en statut « À valider » seront rejetées avec ce motif commun. L'agent terrain sera notifié.
+              </p>
+              <label className="block text-xs font-medium text-gray-600 mt-2">Motif de rejet commun *</label>
+              <textarea
+                value={motifRejetTout}
+                onChange={(e) => setMotifRejetTout(e.target.value)}
+                rows={3}
+                placeholder="Ex: Signal GPS insuffisant lors de la session, zone incorrecte, données incohérentes…"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none"
+                autoFocus
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setModalRejetTout(false); setMotifRejetTout(""); }}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                  Annuler
+                </button>
+                <button
+                  disabled={!motifRejetTout.trim() || rejeterTout.isPending}
+                  onClick={() => rejeterTout.mutate(motifRejetTout)}
+                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium bg-red-600 hover:bg-red-700 disabled:opacity-50">
+                  {rejeterTout.isPending ? <Loader2 size={14} className="animate-spin mx-auto" /> : "Rejeter tout"}
                 </button>
               </div>
             </div>

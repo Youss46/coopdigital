@@ -787,6 +787,82 @@ export async function validerToutCollectes(req: Request, res: Response): Promise
   }
 }
 
+// ── Rejeter toutes les collectes en lot (RT) ──────────────────────────────────
+
+export async function rejeterToutCollectes(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const userId = req.user?.id;
+  if (!cooperativeId || !userId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const missionId = parseInt(String(req.params["id"] ?? "0"));
+  const { motif } = req.body as { motif?: string };
+
+  if (!motif || !motif.trim()) {
+    res.status(400).json({ erreur: "Le motif de rejet est obligatoire" });
+    return;
+  }
+
+  try {
+    const [mission] = await db
+      .select()
+      .from(missionsTerrainTable)
+      .where(and(eq(missionsTerrainTable.id, missionId), eq(missionsTerrainTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!mission) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
+    if (mission.statut !== "soumise") {
+      res.status(400).json({ erreur: "La mission doit être soumise pour rejeter les collectes" });
+      return;
+    }
+
+    // Compter les collectes à rejeter
+    const toRejeter = await db
+      .select({ membreId: missionsMembresTable.membreId })
+      .from(missionsMembresTable)
+      .where(
+        and(
+          eq(missionsMembresTable.missionId, missionId),
+          sql`${missionsMembresTable.statut} = 'collecte'`,
+        ),
+      );
+
+    if (toRejeter.length === 0) {
+      res.status(400).json({ erreur: "Aucune collecte en attente de validation" });
+      return;
+    }
+
+    // Batch update : rejeter toutes les collectes avec le motif commun
+    await db
+      .update(missionsMembresTable)
+      .set({ statut: "rejete", motifRejet: motif.trim() })
+      .where(
+        and(
+          eq(missionsMembresTable.missionId, missionId),
+          sql`${missionsMembresTable.statut} = 'collecte'`,
+        ),
+      );
+
+    // Notifier l'agent terrain
+    if (mission.agentId) {
+      void creerNotification(cooperativeId, [mission.agentId], {
+        type:         "mission_parcelle_rejetee",
+        titre:        `Collectes rejetées — ${mission.titre}`,
+        message:      `${toRejeter.length} collecte${toRejeter.length > 1 ? "s" : ""} GPS rejetée${toRejeter.length > 1 ? "s" : ""} en lot. Motif : ${motif.trim()}.`,
+        lien:         `/missions/${mission.id}`,
+        lienLibelle:  "Voir les corrections",
+        gravite:      "attention",
+        sourceModule: "missions",
+        sourceId:     mission.id,
+      });
+    }
+
+    res.json({ ok: true, rejetes: toRejeter.length });
+  } catch (err) {
+    req.log.error({ err }, "Erreur rejeterToutCollectes");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 // ── Valider mission complète (RT) ─────────────────────────────────────────────
 
 export async function validerMissionComplete(req: Request, res: Response): Promise<void> {
