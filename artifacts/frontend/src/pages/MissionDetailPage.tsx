@@ -290,6 +290,9 @@ export default function MissionDetailPage() {
         <MissionCarteGPS
           membres={mission.membres}
           hauteur="460px"
+          peutValider={peutValider && mission.statut === "soumise"}
+          onValider={(id) => valider.mutate(id)}
+          onRejeter={(id, nom) => setModalRejet({ membreId: id, nom })}
         />
       )}
 

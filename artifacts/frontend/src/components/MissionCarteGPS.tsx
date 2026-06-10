@@ -92,9 +92,12 @@ function Legende() {
 interface Props {
   membres: MembreMissionCarte[];
   hauteur?: string;
+  peutValider?: boolean;
+  onValider?: (membreId: number) => void;
+  onRejeter?: (membreId: number, nom: string) => void;
 }
 
-export default function MissionCarteGPS({ membres, hauteur = "420px" }: Props) {
+export default function MissionCarteGPS({ membres, hauteur = "420px", peutValider, onValider, onRejeter }: Props) {
   const avecGps = membres.filter((m) => parsePolygon(m.gpsCollecte) !== null);
   const polygons = avecGps
     .map((m) => parsePolygon(m.gpsCollecte))
@@ -171,7 +174,7 @@ export default function MissionCarteGPS({ membres, hauteur = "420px" }: Props) {
                   weight: 2,
                 }}
               >
-                <Popup maxWidth={220} minWidth={160}>
+                <Popup maxWidth={240} minWidth={180}>
                   <div className="text-xs space-y-1 py-0.5">
                     <p className="font-bold text-gray-900 text-sm">{m.prenoms} {m.nom}</p>
                     {m.village && <p className="text-gray-500">{m.village}</p>}
@@ -196,6 +199,24 @@ export default function MissionCarteGPS({ membres, hauteur = "420px" }: Props) {
                     <p className="text-gray-300 text-[10px] font-mono mt-1">
                       {center[0].toFixed(5)}, {center[1].toFixed(5)}
                     </p>
+                    {peutValider && m.statut === "collecte" && onValider && onRejeter && (
+                      <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100">
+                        <button
+                          onClick={() => onValider(m.membreId)}
+                          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
+                        >
+                          <CheckCircle size={10} />
+                          Valider
+                        </button>
+                        <button
+                          onClick={() => onRejeter(m.membreId, `${m.prenoms} ${m.nom}`)}
+                          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-colors"
+                        >
+                          <XCircle size={10} />
+                          Rejeter
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </Popup>
               </Polygon>
