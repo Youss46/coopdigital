@@ -97,7 +97,7 @@ function parsePhotos(raw: unknown): string[] {
 }
 
 function isSignedUrl(url: string): boolean {
-  return url.startsWith("http") || url.startsWith("/");
+  return url.startsWith("http") || url.startsWith("/") || url.startsWith("data:");
 }
 
 // ── Photo gallery modal ───────────────────────────────────────────────────────
