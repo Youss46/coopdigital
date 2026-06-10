@@ -1736,7 +1736,7 @@ export default function ParcellePage() {
   function handleExportGeoJSON() {
     const token = localStorage.getItem(TOKEN_KEY);
     const a = document.createElement("a");
-    a.href = `/api/parcelles/export-geojson?_token=${encodeURIComponent(token ?? "")}`;
+    a.href = `${BASE}/api/parcelles/export-geojson?_token=${encodeURIComponent(token ?? "")}`;
     a.download = `eudr_export_${new Date().toISOString().slice(0, 10)}.geojson`;
     a.click();
   }
