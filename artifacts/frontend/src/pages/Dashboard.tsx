@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useGetDashboard, useGetDashboardLivraisons, useGetDashboardAvancesRetard } from "@workspace/api-client-react";
-import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation } from "lucide-react";
+import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation, Settings } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 
@@ -76,8 +77,33 @@ function JaugeCirculaire({ pct, couleur, taille = 80 }: { pct: number; couleur: 
   );
 }
 
+const SEUILS_KEY = "coop_gps_seuils";
+const DEFAULT_SEUILS = { warning: 50, objectif: 80 };
+function readSeuils(): { warning: number; objectif: number } {
+  try { return JSON.parse(localStorage.getItem(SEUILS_KEY) ?? "null") ?? DEFAULT_SEUILS; }
+  catch { return DEFAULT_SEUILS; }
+}
+
 function DashboardRT() {
   const [, navigate] = useLocation();
+  const [seuils, setSeuils] = useState<{ warning: number; objectif: number }>(readSeuils);
+  const [editingSeuils, setEditingSeuils] = useState(false);
+  const [seuilWarningDraft, setSeuilWarningDraft] = useState(String(DEFAULT_SEUILS.warning));
+  const [seuilObjectifDraft, setSeuilObjectifDraft] = useState(String(DEFAULT_SEUILS.objectif));
+
+  function openEditSeuils() {
+    setSeuilWarningDraft(String(seuils.warning));
+    setSeuilObjectifDraft(String(seuils.objectif));
+    setEditingSeuils(true);
+  }
+  function saveSeuils() {
+    const w = Math.max(0, Math.min(100, parseInt(seuilWarningDraft) || DEFAULT_SEUILS.warning));
+    const o = Math.max(0, Math.min(100, parseInt(seuilObjectifDraft) || DEFAULT_SEUILS.objectif));
+    const next = { warning: w, objectif: o };
+    setSeuils(next);
+    localStorage.setItem(SEUILS_KEY, JSON.stringify(next));
+    setEditingSeuils(false);
+  }
 
   const { data: stats, isLoading } = useQuery<StatsRT>({
     queryKey: ["dashboard-tracabilite"],
@@ -122,6 +148,11 @@ function DashboardRT() {
   };
 
   const parSections = (conformite?.par_section ?? []).slice(0, 6);
+
+  const allSections = conformite?.par_section ?? [];
+  const sectionsEnDanger = allSections.filter(sec => sec.pct < seuils.warning);
+  const sectionsEnAvertissement = allSections.filter(sec => sec.pct >= seuils.warning && sec.pct < seuils.objectif);
+  const hasAlertes = sectionsEnDanger.length > 0 || sectionsEnAvertissement.length > 0;
 
   return (
     <div className="space-y-6">
@@ -219,6 +250,87 @@ function DashboardRT() {
           )}
         </div>
       </div>
+
+      {/* ── Alertes couverture GPS par section ───────────────────────────────── */}
+      {hasAlertes && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h2 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+              <AlertTriangle size={15} className="text-amber-500" />
+              Alertes couverture GPS — sections sous objectif
+              <span className="text-xs font-normal text-gray-500">
+                ({sectionsEnDanger.length} critique{sectionsEnDanger.length !== 1 ? "s" : ""}, {sectionsEnAvertissement.length} avertissement{sectionsEnAvertissement.length !== 1 ? "s" : ""})
+              </span>
+            </h2>
+            <button
+              onClick={editingSeuils ? () => setEditingSeuils(false) : openEditSeuils}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <Settings size={12} />
+              {editingSeuils ? "Fermer" : `Seuils : ${seuils.warning}% / ${seuils.objectif}%`}
+            </button>
+          </div>
+
+          {editingSeuils && (
+            <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <span className="text-red-700 font-medium text-xs">⚠ Seuil danger (%)</span>
+                <input
+                  type="number" min="0" max="100" value={seuilWarningDraft}
+                  onChange={e => setSeuilWarningDraft(e.target.value)}
+                  className="w-16 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-red-400"
+                />
+              </label>
+              <label className="flex items-center gap-2">
+                <span className="text-amber-700 font-medium text-xs">◎ Objectif (%)</span>
+                <input
+                  type="number" min="0" max="100" value={seuilObjectifDraft}
+                  onChange={e => setSeuilObjectifDraft(e.target.value)}
+                  className="w-16 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400"
+                />
+              </label>
+              <button
+                onClick={saveSeuils}
+                className="px-3 py-1 bg-green-700 text-white rounded-lg text-xs hover:bg-green-800 transition-colors"
+              >
+                Enregistrer
+              </button>
+            </div>
+          )}
+
+          <div className="divide-y divide-gray-100">
+            {[...sectionsEnDanger, ...sectionsEnAvertissement].map(sec => {
+              const isDanger = sec.pct < seuils.warning;
+              return (
+                <div key={sec.section} className={`flex items-center gap-4 px-5 py-3 ${isDanger ? "bg-red-50" : "bg-amber-50"}`}>
+                  <AlertTriangle size={14} className={`shrink-0 ${isDanger ? "text-red-500" : "text-amber-500"}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{sec.section}</p>
+                    <p className="text-xs text-gray-500">{sec.conformes}/{sec.total} parcelles conformes</p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${isDanger ? "bg-red-400" : "bg-amber-400"}`}
+                        style={{ width: `${sec.pct}%` }}
+                      />
+                    </div>
+                    <span className={`text-sm font-bold w-10 text-right ${isDanger ? "text-red-600" : "text-amber-600"}`}>
+                      {sec.pct}%
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => navigate(`/parcelles`)}
+                    className="text-xs text-blue-600 hover:underline shrink-0"
+                  >
+                    Voir →
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {s.demandesEnAttente > 0 && (

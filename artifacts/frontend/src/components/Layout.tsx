@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -135,6 +136,7 @@ const navItems = [
     label: "Parcelles & EUDR",
     icon: MapPinned,
     roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    showEudrAlerteBadge: true,
   },
   {
     href: "/missions",
@@ -344,10 +346,11 @@ const navItems = [
   },
 ];
 
-type NavItem = { href: string; label: string; icon: React.ElementType; roles?: string[]; showBadge?: boolean; showAnomaliesBadge?: boolean };
+type NavItem = { href: string; label: string; icon: React.ElementType; roles?: string[]; showBadge?: boolean; showAnomaliesBadge?: boolean; showEudrAlerteBadge?: boolean };
 
 const BADGE_ROLES = ["pca", "directeur", "comptable"];
 const ANOMALIE_BADGE_ROLES = ["pca", "directeur", "comptable", "auditeur"];
+const EUDR_ALERTE_ROLES = ["responsable_tracabilite"];
 
 function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout: () => void }) {
   const [location] = useLocation();
@@ -355,10 +358,26 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
 
   const showBadge = BADGE_ROLES.includes(utilisateur?.role ?? "");
   const showAnomaliesBadge = ANOMALIE_BADGE_ROLES.includes(utilisateur?.role ?? "");
+  const showEudrAlerteBadge = EUDR_ALERTE_ROLES.includes(utilisateur?.role ?? "");
   const { data: countData } = useCountEcrituresEnAttente({ query: { queryKey: getCountEcrituresEnAttenteQueryKey(), enabled: showBadge } });
   const nbEnAttente = countData?.count ?? 0;
   const { data: statsData } = useGetAnomaliesStats({ query: { queryKey: getGetAnomaliesStatsQueryKey(), enabled: showAnomaliesBadge } });
   const nbCritiques = Number(statsData?.nb_critiques ?? 0);
+  const { data: conformiteNav } = useQuery({
+    queryKey: ["parcelles-conformite"],
+    queryFn: async () => {
+      const token = localStorage.getItem("coop_token") ?? "";
+      const r = await fetch("/api/parcelles/conformite", { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) return null;
+      return r.json() as Promise<{ par_section: { pct: number }[] }>;
+    },
+    enabled: showEudrAlerteBadge,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+  const nbSectionsAlerte = showEudrAlerteBadge
+    ? (conformiteNav?.par_section ?? []).filter(s => s.pct < 50).length
+    : 0;
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#1a4731" }}>
@@ -388,10 +407,12 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {(navItems as NavItem[])
           .filter(({ roles }) => !roles || roles.includes(utilisateur?.role ?? ""))
-          .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge }) => {
+          .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge, showEudrAlerteBadge: hasEudrAlerteBadge }) => {
             const isActive = location === href || location.startsWith(href + "/");
             const badgeCount = hasAnomaliesBadge && showAnomaliesBadge ? nbCritiques
-              : hasBadge && showBadge ? nbEnAttente : 0;
+              : hasBadge && showBadge ? nbEnAttente
+              : hasEudrAlerteBadge && showEudrAlerteBadge ? nbSectionsAlerte
+              : 0;
             return (
               <Link
                 key={href}
