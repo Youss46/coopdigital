@@ -163,6 +163,16 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     traiter: ["pca", "directeur", "magasinier", "responsable_tracabilite"],
   },
 
+  missions: {
+    lire:                ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
+    creer:               ["pca", "directeur", "responsable_tracabilite"],
+    modifier:            ["pca", "directeur", "responsable_tracabilite"],
+    valider:             ["pca", "directeur", "responsable_tracabilite"],
+    rejeter:             ["pca", "directeur", "responsable_tracabilite"],
+    executer:            ["agent_terrain"],
+    creer_agent_terrain: ["pca", "directeur", "responsable_tracabilite"],
+  },
+
   anomalies: {
     lire:       ["pca", "directeur", "comptable", "auditeur"],
     traiter:    ["pca", "directeur", "comptable"],
