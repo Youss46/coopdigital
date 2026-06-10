@@ -2,10 +2,63 @@ import { type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { eq, and, desc, sql, asc } from "drizzle-orm";
-import { missionsTerrainTable, missionsMembresTable, messagesMissionTable, usersTable, membresTable } from "@workspace/db";
+import { missionsTerrainTable, missionsMembresTable, messagesMissionTable, usersTable, membresTable, parcellesTable } from "@workspace/db";
 import { creerNotification, notifierParRole } from "../services/notificationService.js";
 import { computeCompletude, computeCompletudEudr } from "./membresController";
-import { calculerSuperficie } from "../services/parcelleService.js";
+import { calculerSuperficie, genererCodeParcelle } from "../services/parcelleService.js";
+
+// ── Helper : auto-création / mise à jour parcelle depuis mission GPS ──────────
+
+interface GpsPointRaw { lat: number; lon: number; ts?: number; accuracy?: number; }
+
+async function autoCreerParcelleMission(opts: {
+  cooperativeId: number;
+  membreId: number;
+  gpsCollecte: unknown;
+  enregistrePar: number;
+  membre: { village?: string | null; section?: string | null; superficieHa?: string | null; culturePrincipale?: string | null };
+}): Promise<void> {
+  const pts = opts.gpsCollecte as GpsPointRaw[] | null;
+  if (!pts || !Array.isArray(pts)) return;
+  const polygone: [number, number][] = pts
+    .filter(p => typeof p.lat === "number" && typeof p.lon === "number")
+    .map(p => [p.lat, p.lon] as [number, number]);
+  if (polygone.length < 3) return;
+
+  const superficieCalculeeHa = calculerSuperficie(polygone).toString();
+
+  const [existing] = await db
+    .select({ id: parcellesTable.id })
+    .from(parcellesTable)
+    .where(and(eq(parcellesTable.membreId, opts.membreId), eq(parcellesTable.cooperativeId, opts.cooperativeId), eq(parcellesTable.actif, true)))
+    .orderBy(parcellesTable.createdAt)
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(parcellesTable)
+      .set({ polygone, superficieCalculeeHa, updatedAt: new Date() })
+      .where(eq(parcellesTable.id, existing.id));
+  } else {
+    const codeParcelle = await genererCodeParcelle(opts.membreId);
+    await db.insert(parcellesTable).values({
+      cooperativeId:       opts.cooperativeId,
+      membreId:            opts.membreId,
+      codeParcelle,
+      polygone,
+      superficieDeclareeHa: opts.membre.superficieHa ?? null,
+      superficieCalculeeHa,
+      village:             opts.membre.village ?? null,
+      section:             opts.membre.section ?? null,
+      culturePrincipale:   opts.membre.culturePrincipale ?? "cacao",
+      eudrStatut:          "non_verifie",
+      eudrRisqueDeforestation: "inconnu",
+      actif:               true,
+      enregistrePar:       opts.enregistrePar,
+      dateEnregistrement:  new Date().toISOString().slice(0, 10),
+    });
+  }
+}
 
 // ── Liste des missions ────────────────────────────────────────────────────────
 
@@ -490,6 +543,20 @@ export async function validerParcelleMission(req: Request, res: Response): Promi
           .set({ completudeFiche: completude, completudeEudr: ce, statutEudr: se, missionGpsRequise: false })
           .where(eq(membresTable.id, membreId));
       }
+
+      // Auto-créer ou mettre à jour la parcelle dans parcellesTable
+      void autoCreerParcelleMission({
+        cooperativeId,
+        membreId,
+        gpsCollecte: mm.gpsCollecte,
+        enregistrePar: userId,
+        membre: {
+          village:           membreActuel?.village ?? null,
+          section:           membreActuel?.section ?? null,
+          superficieHa:      membreActuel?.superficieHa ?? null,
+          culturePrincipale: null,
+        },
+      });
     }
 
     // Vérifier si toute la mission est validée
@@ -753,6 +820,20 @@ export async function validerToutCollectes(req: Request, res: Response): Promise
           .update(membresTable)
           .set({ completudeFiche: completude, completudeEudr: ce, statutEudr: se, missionGpsRequise: false })
           .where(eq(membresTable.id, row.membreId));
+
+        // Auto-créer ou mettre à jour la parcelle dans parcellesTable
+        void autoCreerParcelleMission({
+          cooperativeId,
+          membreId: row.membreId,
+          gpsCollecte: row.gpsCollecte,
+          enregistrePar: userId,
+          membre: {
+            village:           updatedMembre.village ?? null,
+            section:           updatedMembre.section ?? null,
+            superficieHa:      updatedMembre.superficieHa ?? null,
+            culturePrincipale: null,
+          },
+        });
       }
     }
 
