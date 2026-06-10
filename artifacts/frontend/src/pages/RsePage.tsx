@@ -14,9 +14,11 @@ import { useToast } from "@/hooks/use-toast";
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
 
+const BASE = import.meta.env.VITE_API_URL ?? "";
+
 function authFetch(path: string, opts: RequestInit = {}) {
   const token = localStorage.getItem("coop_token");
-  return fetch(path, {
+  return fetch(`${BASE}${path}`, {
     ...opts,
     headers: {
       "Content-Type": "application/json",

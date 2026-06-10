@@ -37,9 +37,10 @@ interface MembreRow {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const COOP_ID_PAR_DEFAUT = 1;
+const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const apiFetch = (url: string, opts?: RequestInit) =>
-  fetch(url, { ...opts, headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) } });
+  fetch(`${BASE}${url}`, { ...opts, headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) } });
 
 function badgeStatutMembre(s: string | null | undefined) {
   switch (s) {

@@ -196,7 +196,7 @@ function DonsRecusMembre({ membreId }: { membreId: number }) {
   const { data, isLoading } = useQuery<{ dons: DonMembre[]; totalRecu: number }>({
     queryKey: ["dons-membre", membreId],
     queryFn: async () => {
-      const r = await fetch(`/api/dons/membre/${membreId}`, {
+      const r = await fetch(`${BASE_FICHE}/api/dons/membre/${membreId}`, {
         headers: { Authorization: `Bearer ${tokFn()}` },
       });
       if (!r.ok) throw new Error("Erreur chargement dons");
@@ -336,7 +336,7 @@ export default function MembreFiche() {
   const { data: parcellesGps = [] } = useQuery<ParcelleGps[]>({
     queryKey: ["parcelles-membre-gps", id],
     queryFn: async () => {
-      const r = await fetch(`/api/parcelles/membre/${id}`, {
+      const r = await fetch(`${BASE_FICHE}/api/parcelles/membre/${id}`, {
         headers: { Authorization: `Bearer ${tokFn()}` },
       });
       if (!r.ok) return [];
@@ -389,7 +389,7 @@ export default function MembreFiche() {
   const { data: deleguesList = [] } = useQuery<Array<{ id: number; nom: string; prenoms: string; zoneNom: string | null; telephone: string | null }>>({
     queryKey: ["delegues-pour-fiche"],
     queryFn: async () => {
-      const r = await fetch("/api/membres/delegues-list", { headers: { Authorization: `Bearer ${tokFn()}` } });
+      const r = await fetch(`${BASE_FICHE}/api/membres/delegues-list`, { headers: { Authorization: `Bearer ${tokFn()}` } });
       if (!r.ok) return [];
       return r.json();
     },
@@ -402,7 +402,7 @@ export default function MembreFiche() {
     if (transferForm.rattachementType === "delegue" && !transferForm.delegueId) return;
     setTransferPending(true);
     try {
-      const res = await fetch(`/api/membres/${id}/rattachement`, {
+      const res = await fetch(`${BASE_FICHE}/api/membres/${id}/rattachement`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokFn()}` },
         body: JSON.stringify(transferForm),
