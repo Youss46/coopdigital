@@ -1014,6 +1014,7 @@ interface CoopConfig {
   nom_complet: string | null;
   nom_abrege: string | null;
   region: string | null;
+  logo_url: string | null;
 }
 
 function OngletCarteGlobale() {
@@ -1039,6 +1040,7 @@ function OngletCarteGlobale() {
 
   const coopNom = configQ.data?.nom_complet ?? configQ.data?.nom_abrege ?? "CoopDigital";
   const coopRegion = configQ.data?.region;
+  const coopLogo = configQ.data?.logo_url ?? null;
 
   const zonesQ = useQuery({
     queryKey: ["parcelles-zones-filtres"],
@@ -1554,15 +1556,24 @@ function OngletCarteGlobale() {
           : filterVillage ? `Village : ${filterVillage}` : null;
         return (
           <div className="print-only">
-            <div style={{ marginBottom: 16, borderBottom: "2px solid #15803d", paddingBottom: 10 }}>
-              <p style={{ fontSize: 10, color: "#6b7280", margin: "0 0 2px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                {coopNom}{coopRegion ? ` · ${coopRegion}` : ""}
-              </p>
-              <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "#111" }}>Rapport EUDR — Couverture GPS parcelles</h1>
-              <p style={{ fontSize: 11, color: "#555", margin: "4px 0 0" }}>
-                Généré le {dateStr}
-                {filtreLabel && <span style={{ marginLeft: 8, background: "#dcfce7", color: "#15803d", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>Filtre : {filtreLabel}</span>}
-              </p>
+            <div style={{ marginBottom: 16, borderBottom: "2px solid #15803d", paddingBottom: 10, display: "flex", alignItems: "center", gap: 14 }}>
+              {coopLogo && (
+                <img
+                  src={coopLogo}
+                  alt="Logo coopérative"
+                  style={{ height: 50, width: "auto", objectFit: "contain", flexShrink: 0 }}
+                />
+              )}
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 10, color: "#6b7280", margin: "0 0 2px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  {coopNom}{coopRegion ? ` · ${coopRegion}` : ""}
+                </p>
+                <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "#111" }}>Rapport EUDR — Couverture GPS parcelles</h1>
+                <p style={{ fontSize: 11, color: "#555", margin: "4px 0 0" }}>
+                  Généré le {dateStr}
+                  {filtreLabel && <span style={{ marginLeft: 8, background: "#dcfce7", color: "#15803d", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>Filtre : {filtreLabel}</span>}
+                </p>
+              </div>
             </div>
             <div className="print-page-footer">
               {coopNom}{coopRegion ? ` · ${coopRegion}` : ""} &nbsp;·&nbsp; Rapport EUDR généré le {dateStr}
