@@ -81,13 +81,11 @@ export default function DocumentsPage() {
   const carteUrl = api.carteMembreUrl();
   const downloadCarte = () => {
     const filename = `carte-${profil?.codeMembre ?? "membre"}.pdf`;
-    const a = document.createElement("a");
-    a.target = "_blank";
-    a.rel = "noreferrer";
     fetch(carteUrl, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.blob())
       .then(blob => {
         const burl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
         a.href = burl;
         a.download = filename;
         document.body.appendChild(a);
