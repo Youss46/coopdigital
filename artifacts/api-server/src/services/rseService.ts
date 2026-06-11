@@ -292,13 +292,26 @@ export async function calculerIndicateurs(
     calculePar:                userId ?? null,
   } as const;
 
-  await db
-    .insert(indicateursRseTable)
-    .values(values)
-    .onConflictDoUpdate({
-      target: [indicateursRseTable.cooperativeId, indicateursRseTable.campagneId],
-      set:    { ...values, dateCalcul: new Date() },
-    });
+  // Upsert manuel — évite onConflictDoUpdate qui requiert une contrainte UNIQUE
+  const [existing] = await db
+    .select({ id: indicateursRseTable.id })
+    .from(indicateursRseTable)
+    .where(
+      and(
+        eq(indicateursRseTable.cooperativeId, cooperativeId),
+        eq(indicateursRseTable.campagneId, campagneId),
+      ),
+    )
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(indicateursRseTable)
+      .set({ ...values, dateCalcul: new Date() })
+      .where(eq(indicateursRseTable.id, existing.id));
+  } else {
+    await db.insert(indicateursRseTable).values({ ...values });
+  }
 
   const [result] = await db
     .select()
