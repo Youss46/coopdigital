@@ -34,7 +34,10 @@ const COL1    = MARGIN;
 const COL2    = PAGE_W / 2;
 
 function formaterFCFA(n: number): string {
-  return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+  // Intl en Node.js utilise U+202F (espace insécable étroit) comme séparateur de milliers
+  // en locale fr-FR. PDFKit ne supporte pas ce caractère et l'affiche comme "¬" ou "|".
+  // On remplace par un espace ordinaire pour un rendu correct.
+  return new Intl.NumberFormat("fr-FR").format(n).replace(/[\u202F\u00A0]/g, " ") + " FCFA";
 }
 function formaterDate(d: string | Date): string {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -260,43 +263,47 @@ export async function generateRapportMensuel(cooperativeId: number, mois: number
     doc.fontSize(13).fillColor(VERT).font("Helvetica-Bold").text(kpi.val, col + 8, y + 15, { width: 200 });
   });
 
-  // Page 2 – Livraisons
-  doc.addPage();
-  await drawHeader(doc, cooperativeId, { titre_document: "Livraisons du mois" });
-  const lCols = [80, 140, 60, 90, 90];
-  y = doc.y;
-  ligneTableau(doc, ["Date", "Producteur", "Poids (kg)", "Brut FCFA", "Net FCFA"], lCols, MARGIN, y, VERT);
-  y += 18;
-  for (const [idx, l] of livraisons.entries()) {
-    if (y > 730) {
-      doc.addPage();
-      await drawHeader(doc, cooperativeId, { titre_document: "Livraisons (suite)" });
-      y = doc.y;
+  // Page 2 – Livraisons (seulement s'il y en a)
+  if (livraisons.length > 0) {
+    doc.addPage();
+    await drawHeader(doc, cooperativeId, { titre_document: "Livraisons du mois" });
+    const lCols = [80, 140, 60, 90, 90];
+    y = doc.y;
+    ligneTableau(doc, ["Date", "Producteur", "Poids (kg)", "Brut FCFA", "Net FCFA"], lCols, MARGIN, y, VERT);
+    y += 18;
+    for (const [idx, l] of livraisons.entries()) {
+      if (y > 730) {
+        doc.addPage();
+        await drawHeader(doc, cooperativeId, { titre_document: "Livraisons (suite)" });
+        y = doc.y;
+      }
+      if (idx % 2 === 0) doc.rect(MARGIN, y, lCols.reduce((a, b) => a + b, 0), 16).fill("#f0fdf4");
+      ligneTableau(doc, [formaterDate(l.dateLivraison), `${l.membreNom} ${l.membrePrenoms}`, parseFloat(l.poidsKg).toFixed(0), formaterFCFA(l.montantBrutFcfa), formaterFCFA(l.montantNetFcfa)], lCols, MARGIN, y);
+      y += 16;
     }
-    if (idx % 2 === 0) doc.rect(MARGIN, y, lCols.reduce((a, b) => a + b, 0), 16).fill("#f0fdf4");
-    ligneTableau(doc, [formaterDate(l.dateLivraison), `${l.membreNom} ${l.membrePrenoms}`, parseFloat(l.poidsKg).toFixed(0), formaterFCFA(l.montantBrutFcfa), formaterFCFA(l.montantNetFcfa)], lCols, MARGIN, y);
-    y += 16;
   }
 
-  // Page 3 – Ventes
-  doc.addPage();
-  await drawHeader(doc, cooperativeId, { titre_document: "Ventes exportateurs" });
-  const vCols = [80, 140, 100, 80, 70];
-  y = doc.y;
-  ligneTableau(doc, ["Date", "Exportateur", "Montant total", "Solde dû", "Statut"], vCols, MARGIN, y, OR);
-  y += 18;
-  for (const [idx, v] of ventes.entries()) {
-    if (y > 730) {
-      doc.addPage();
-      await drawHeader(doc, cooperativeId, { titre_document: "Ventes (suite)" });
-      y = doc.y;
+  // Page 3 – Ventes (seulement s'il y en a)
+  if (ventes.length > 0) {
+    doc.addPage();
+    await drawHeader(doc, cooperativeId, { titre_document: "Ventes exportateurs" });
+    const vCols = [80, 140, 100, 80, 70];
+    y = doc.y;
+    ligneTableau(doc, ["Date", "Exportateur", "Montant total", "Solde dû", "Statut"], vCols, MARGIN, y, OR);
+    y += 18;
+    for (const [idx, v] of ventes.entries()) {
+      if (y > 730) {
+        doc.addPage();
+        await drawHeader(doc, cooperativeId, { titre_document: "Ventes (suite)" });
+        y = doc.y;
+      }
+      if (idx % 2 === 0) doc.rect(MARGIN, y, vCols.reduce((a, b) => a + b, 0), 16).fill("#fffbeb");
+      ligneTableau(doc, [formaterDate(v.dateVente), v.exportateurNom ?? "—", formaterFCFA(v.montantTotalFcfa), formaterFCFA(v.soldeDuFcfa), v.statut], vCols, MARGIN, y);
+      y += 16;
     }
-    if (idx % 2 === 0) doc.rect(MARGIN, y, vCols.reduce((a, b) => a + b, 0), 16).fill("#fffbeb");
-    ligneTableau(doc, [formaterDate(v.dateVente), v.exportateurNom ?? "—", formaterFCFA(v.montantTotalFcfa), formaterFCFA(v.soldeDuFcfa), v.statut], vCols, MARGIN, y);
-    y += 16;
   }
 
-  // Page 4 – Compte de résultat simplifié
+  // Page suivante – Compte de résultat simplifié (toujours inclus)
   doc.addPage();
   await drawHeader(doc, cooperativeId, { titre_document: "Compte de résultat" });
   const margeNette = caProduits - coutAchats;
@@ -315,22 +322,24 @@ export async function generateRapportMensuel(cooperativeId: number, mois: number
     y += 24;
   });
 
-  // Page 5 – Avances en retard
-  doc.addPage();
-  await drawHeader(doc, cooperativeId, { titre_document: "Avances en retard" });
-  const aCols = [160, 100, 100, 100];
-  y = doc.y;
-  ligneTableau(doc, ["Membre", "Montant octroyé", "Solde dû", "Échéance"], aCols, MARGIN, y, "#ef4444");
-  y += 18;
-  for (const [idx, a] of avancesRetard.entries()) {
-    if (y > 730) {
-      doc.addPage();
-      await drawHeader(doc, cooperativeId, { titre_document: "Avances en retard (suite)" });
-      y = doc.y;
+  // Page suivante – Avances en retard (seulement s'il y en a)
+  if (avancesRetard.length > 0) {
+    doc.addPage();
+    await drawHeader(doc, cooperativeId, { titre_document: "Avances en retard" });
+    const aCols = [160, 100, 100, 100];
+    y = doc.y;
+    ligneTableau(doc, ["Membre", "Montant octroyé", "Solde dû", "Échéance"], aCols, MARGIN, y, "#ef4444");
+    y += 18;
+    for (const [idx, a] of avancesRetard.entries()) {
+      if (y > 730) {
+        doc.addPage();
+        await drawHeader(doc, cooperativeId, { titre_document: "Avances en retard (suite)" });
+        y = doc.y;
+      }
+      if (idx % 2 === 0) doc.rect(MARGIN, y, aCols.reduce((a, b) => a + b, 0), 16).fill("#fff1f2");
+      ligneTableau(doc, [`${a.membreNom} ${a.membrePrenoms}`, formaterFCFA(a.montantOctroyeFcfa), formaterFCFA(a.soldeRestantFcfa), a.dateEcheance ? formaterDate(a.dateEcheance) : "—"], aCols, MARGIN, y);
+      y += 16;
     }
-    if (idx % 2 === 0) doc.rect(MARGIN, y, aCols.reduce((a, b) => a + b, 0), 16).fill("#fff1f2");
-    ligneTableau(doc, [`${a.membreNom} ${a.membrePrenoms}`, formaterFCFA(a.montantOctroyeFcfa), formaterFCFA(a.soldeRestantFcfa), a.dateEcheance ? formaterDate(a.dateEcheance) : "—"], aCols, MARGIN, y);
-    y += 16;
   }
 
   await addFooters(doc, cooperativeId);
@@ -433,31 +442,38 @@ export async function generateBilanCampagne(cooperativeId: number, annee: number
     y += 16;
   }
 
-  // Page 3 – Top producteurs
-  doc.addPage();
-  await drawHeader(doc, cooperativeId, { titre_document: "Top 10 producteurs" });
-  const pCols = [160, 90, 90, 90];
-  y = doc.y;
-  ligneTableau(doc, ["Producteur", "Tonnage (T)", "Achats FCFA", "Rang"], pCols, MARGIN, y, VERT);
-  y += 18;
-  topProducteurs.forEach((p, i) => {
-    if (i % 2 === 0) doc.rect(MARGIN, y, pCols.reduce((a, b) => a + b, 0), 16).fill("#f0fdf4");
-    ligneTableau(doc, [`${p.nom} ${p.prenoms}`, (p.tonnage / 1000).toFixed(2), formaterFCFA(p.caFcfa), String(i + 1)], pCols, MARGIN, y);
-    y += 16;
-  });
+  // Page 3 – Top producteurs (seulement s'il y en a)
+  if (topProducteurs.length > 0) {
+    doc.addPage();
+    await drawHeader(doc, cooperativeId, { titre_document: "Top 10 producteurs" });
+    const pCols = [160, 90, 90, 90];
+    y = doc.y;
+    ligneTableau(doc, ["Producteur", "Tonnage (T)", "Achats FCFA", "Rang"], pCols, MARGIN, y, VERT);
+    y += 18;
+    topProducteurs.forEach((p, i) => {
+      if (i % 2 === 0) doc.rect(MARGIN, y, pCols.reduce((a, b) => a + b, 0), 16).fill("#f0fdf4");
+      ligneTableau(doc, [`${p.nom} ${p.prenoms}`, (p.tonnage / 1000).toFixed(2), formaterFCFA(p.caFcfa), String(i + 1)], pCols, MARGIN, y);
+      y += 16;
+    });
+  }
 
-  // Page 4 – Top exportateurs + Bilan
+  // Page 4 – Top exportateurs + Bilan (toujours inclus car le bilan OHADA l'est)
   doc.addPage();
   await drawHeader(doc, cooperativeId, { titre_document: "Top 5 exportateurs" });
   const eCols = [160, 120, 100];
   y = doc.y;
-  ligneTableau(doc, ["Exportateur", "CA total FCFA", "Solde dû FCFA"], eCols, MARGIN, y, OR);
-  y += 18;
-  topExportateurs.forEach((e, i) => {
-    if (i % 2 === 0) doc.rect(MARGIN, y, eCols.reduce((a, b) => a + b, 0), 16).fill("#fffbeb");
-    ligneTableau(doc, [e.nom ?? "—", formaterFCFA(e.caTotalFcfa), formaterFCFA(e.soldeDuFcfa)], eCols, MARGIN, y);
-    y += 16;
-  });
+  if (topExportateurs.length > 0) {
+    ligneTableau(doc, ["Exportateur", "CA total FCFA", "Solde dû FCFA"], eCols, MARGIN, y, OR);
+    y += 18;
+    topExportateurs.forEach((e, i) => {
+      if (i % 2 === 0) doc.rect(MARGIN, y, eCols.reduce((a, b) => a + b, 0), 16).fill("#fffbeb");
+      ligneTableau(doc, [e.nom ?? "—", formaterFCFA(e.caTotalFcfa), formaterFCFA(e.soldeDuFcfa)], eCols, MARGIN, y);
+      y += 16;
+    });
+  } else {
+    doc.fontSize(8).fillColor(GRIS).text("Aucune vente exportateur enregistrée sur la période.", MARGIN, y + 4);
+    y += 20;
+  }
 
   // Bilan simplifié OHADA
   y += 20;
