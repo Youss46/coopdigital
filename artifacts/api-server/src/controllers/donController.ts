@@ -18,9 +18,14 @@ export async function getCategoriesHandler(req: Request, res: Response): Promise
 export async function getStatsDonsHandler(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
-  const campagneId = req.query.campagne_id ? pid(req.query.campagne_id as string) : undefined;
-  const stats = await donService.getStatsDons(cooperativeId, campagneId);
-  res.json(stats);
+  try {
+    const campagneId = req.query.campagne_id ? pid(req.query.campagne_id as string) : undefined;
+    const stats = await donService.getStatsDons(cooperativeId, campagneId);
+    res.json(stats);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur interne";
+    res.status(500).json({ erreur: `Impossible de charger les statistiques : ${msg}` });
+  }
 }
 
 // ── Liste des dons ─────────────────────────────────────────────────────────────

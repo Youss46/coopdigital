@@ -459,10 +459,11 @@ export default function DonsPage() {
 
   const qc = useQueryClient();
 
-  const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
+  const { data: stats, isLoading: statsLoading, isError: statsError, error: statsErrObj, refetch: refetchStats } = useQuery<Stats>({
     queryKey: ["dons-stats"],
     queryFn: () => apiFetch<Stats>("/api/dons/stats"),
     enabled: activeTab === "Tableau de bord",
+    retry: 1,
   });
 
   const { data: categories = [] } = useQuery<Categorie[]>({
@@ -600,7 +601,33 @@ export default function DonsPage() {
                 <Loader2 size={24} className="animate-spin mr-3" /> Chargement…
               </div>
             )}
-            {stats && (
+            {statsError && !statsLoading && (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="size-14 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <XCircle size={28} className="text-destructive" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-destructive mb-1">Impossible de charger le tableau de bord</p>
+                  <p className="text-sm text-muted-foreground max-w-sm">
+                    {statsErrObj instanceof Error ? statsErrObj.message : "Erreur lors du chargement des statistiques"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => void refetchStats()}
+                  className="flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted"
+                >
+                  <RefreshCw size={14} /> Réessayer
+                </button>
+              </div>
+            )}
+            {!statsLoading && !statsError && stats && stats.donsEffectues.nb === 0 && stats.donsRecus.nb === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+                <Gift size={40} className="opacity-20" />
+                <p className="font-medium">Aucun don validé pour le moment</p>
+                <p className="text-sm">Enregistrez et validez des dons pour voir les statistiques ici.</p>
+              </div>
+            )}
+            {stats && (stats.donsEffectues.nb > 0 || stats.donsRecus.nb > 0) && (
               <>
                 {/* KPIs */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
