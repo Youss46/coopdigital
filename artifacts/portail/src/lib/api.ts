@@ -89,8 +89,8 @@ export const api = {
   intrants: () => req<Intrant[]>("/intrants"),
   partsSociales: () => req<PartsSociales>("/parts-sociales"),
   score: () => req<Score>("/score"),
-  recuPdfUrl: (livraisonId: number) => `/api/portail/recus/${livraisonId}`,
-  carteMembreUrl: () => `/api/portail/carte-membre`,
+  recuPdfUrl: (livraisonId: number) => `${BASE}/recus/${livraisonId}`,
+  carteMembreUrl: () => `${BASE}/carte-membre`,
   uploadPhoto: (photoDataUrl: string) =>
     req<{ ok: boolean }>("/photo", {
       method: "PUT",
