@@ -54,13 +54,16 @@ function ligneTableau(doc: InstanceType<typeof PDFDocument>, colonnes: string[],
   doc.fillColor("black");
 }
 
-/** Helper : ajoute les pieds de page sur toutes les pages bufferisées */
+/** Helper : ajoute les pieds de page sur toutes les pages bufferisées puis libère le buffer.
+ *  Le flushPages() DOIT être appelé avant doc.end() avec bufferPages:true, sinon PDFKit
+ *  génère des pages vides résiduelles après les pages de contenu. */
 async function addFooters(doc: InstanceType<typeof PDFDocument>, cooperativeId: number): Promise<void> {
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(i);
     await drawFooter(doc, cooperativeId, i + 1, range.count);
   }
+  doc.flushPages();
 }
 
 /** Helper : crée un PDFDocument avec collecte en Buffer */
