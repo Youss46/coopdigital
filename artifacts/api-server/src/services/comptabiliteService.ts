@@ -136,7 +136,7 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
     promises.push(proposerEcriture(cooperativeId, {
       source: "livraison", sourceId: livraisonId,
       libelle: `Déduction avance sur livraison – ${membreNom}`,
-      compteDebit: "401", compteCredit: "416",
+      compteDebit: "401", compteCredit: "4091",
       montantFcfa: avanceDeduiteFcfa, date: dateLivraison, numeroPiece: piece,
     }));
   }
@@ -156,7 +156,7 @@ export async function generateEcrituresAvance(cooperativeId: number, params: {
   await proposerEcriture(cooperativeId, {
     source: "avance", sourceId: params.avanceId,
     libelle: `Avance octroyée – ${params.membreNom}`,
-    compteDebit: "416", compteCredit: "521",
+    compteDebit: "4091", compteCredit: "521",
     montantFcfa: params.montantFcfa, date: params.dateOctroi,
     numeroPiece: `AVA-${params.avanceId}`,
   });
@@ -234,7 +234,7 @@ export async function generateEcrituresSalaire(cooperativeId: number, params: {
     promises.push(proposerEcriture(cooperativeId, {
       source: "salaire", sourceId: bulletinId,
       libelle: `Cotisations CNPS salarié – ${personnelNom}`,
-      compteDebit: "432", compteCredit: "421",
+      compteDebit: "431", compteCredit: "421",
       montantFcfa: cotisationsSalarieFcfa, date: datePaiement, numeroPiece: piece,
     }));
   }

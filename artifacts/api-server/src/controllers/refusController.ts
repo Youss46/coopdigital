@@ -227,12 +227,12 @@ export async function traiterRefus(req: Request, res: Response) {
   } else if (decision === "autre_acheteur" && prixUnitaireNouveauFcfa) {
     const montant = Math.round(Number(refus.poidsRefuleKg) * prixUnitaireNouveauFcfa);
     const estImmediat = modeReglement === "immediat";
-    // Immédiat : Caisse/Ventes — À crédit : Créances/Ventes
+    // Immédiat : Caisse/Ventes — À crédit : Clients/Ventes
     void proposerEcriture(cooperativeId, {
       source: "vente",
       sourceId: refus.id,
       libelle: `Vente lot refoulé — acheteur #${exportateurIdFinal}`,
-      compteDebit: estImmediat ? "571" : "413",
+      compteDebit: estImmediat ? "571" : "4111",
       compteCredit: "701",
       montantFcfa: montant,
       date: dateOp,

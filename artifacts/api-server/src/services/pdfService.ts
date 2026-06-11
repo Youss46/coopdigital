@@ -465,7 +465,7 @@ export async function generateBilanCampagne(cooperativeId: number, annee: number
   y += 18;
   const bilanData = [
     { sect: "ACTIF", label: "Créances exportateurs (4111)", montant: ecritures.filter(e => e.compteDebit === "4111").reduce((s, e) => s + e.montantFcfa, 0) - ecritures.filter(e => e.compteCredit === "4111").reduce((s, e) => s + e.montantFcfa, 0) },
-    { sect: "ACTIF", label: "Créances producteurs avances (416)", montant: ecritures.filter(e => e.compteDebit === "416").reduce((s, e) => s + e.montantFcfa, 0) - ecritures.filter(e => e.compteCredit === "416").reduce((s, e) => s + e.montantFcfa, 0) },
+    { sect: "ACTIF", label: "Avances producteurs (4091)", montant: ecritures.filter(e => e.compteDebit === "4091").reduce((s, e) => s + e.montantFcfa, 0) - ecritures.filter(e => e.compteCredit === "4091").reduce((s, e) => s + e.montantFcfa, 0) },
     { sect: "ACTIF", label: "Banque (521)", montant: soldeBanque },
     { sect: "PASSIF", label: "Dettes fournisseurs producteurs (401)", montant: ecritures.filter(e => e.compteCredit === "401").reduce((s, e) => s + e.montantFcfa, 0) - ecritures.filter(e => e.compteDebit === "401").reduce((s, e) => s + e.montantFcfa, 0) },
     { sect: "PASSIF", label: "Résultat de l'exercice (130)", montant: resultatNet },

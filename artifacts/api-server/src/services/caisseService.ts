@@ -14,22 +14,22 @@ interface CompteMapping { debit: string; credit: string }
 function comptesForMouvement(type: string, motif: string): CompteMapping {
   if (type === "entree") {
     const credits: Record<string, string> = {
-      don:            "74",
-      retrait_banque: "521",
-      remboursement:  "162",
-      autre:          "44",
+      don:            "758",  // Produits divers (dons reçus)
+      retrait_banque: "521",  // Banque
+      remboursement:  "162",  // Emprunts établissements de crédit
+      autre:          "471",  // Créditeurs divers
     };
-    return { debit: "571", credit: credits[motif] ?? "44" };
+    return { debit: "571", credit: credits[motif] ?? "471" };
   }
   // sortie
   const debits: Record<string, string> = {
-    paiement_producteur:  "401",
-    avance:               "271",
-    achat_intrants:       "382",
-    frais_fonctionnement: "625",
-    depot_banque:         "521",
-    remboursement:        "162",
-    autre:                "628",
+    paiement_producteur:  "401",   // Fournisseurs
+    avance:               "4091",  // Fournisseurs, avances et acomptes versés
+    achat_intrants:       "604",   // Achats stockés de matières et fournitures
+    frais_fonctionnement: "638",   // Autres charges externes
+    depot_banque:         "521",   // Banque
+    remboursement:        "162",   // Emprunts établissements de crédit
+    autre:                "628",   // Frais de télécommunications / divers
   };
   return { debit: debits[motif] ?? "628", credit: "571" };
 }

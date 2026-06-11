@@ -161,14 +161,14 @@ export async function validerDon(donId: number, userId: number) {
           numeroPiece: don.reference ?? undefined,
         });
       } else {
-        // 521 Banque ou 31 Stocks / 754 Dons et subventions reçus
+        // 521 Banque ou 31 Stocks / 758 Produits divers (dons reçus)
         const compteDebit = don.forme === "especes" ? "521" : "31";
         await proposerEcriture(don.cooperativeId, {
           source: "don",
           sourceId: donId,
           libelle: `Don reçu – ${don.libelle} [${don.reference ?? ""}]`,
           compteDebit,
-          compteCredit: "754",
+          compteCredit: "758",
           montantFcfa: montant,
           date: toDateStr(don.dateDon),
           numeroPiece: don.reference ?? undefined,
