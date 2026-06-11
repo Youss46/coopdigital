@@ -25,7 +25,7 @@ import {
   ArrowLeft, MapPin, Phone, Users, Leaf, Calendar, TrendingDown,
   Coins, Loader2, ChevronDown, ChevronUp, UserCheck, UserX, Gift,
   GraduationCap, Award, Download, Building2, User, Edit3, AlertTriangle,
-  Satellite, CheckCircle2, XCircle,
+  Satellite, CheckCircle2, XCircle, CreditCard,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
@@ -386,9 +386,10 @@ export default function MembreFiche() {
   const [editForm, setEditForm] = useState<{
     nom: string; prenoms: string; telephone: string; village: string;
     groupement: string; superficieHa: string; sexe: string; numeroCni: string;
+    carteProducteur: string;
     dateNaissance: string; dateAdhesion: string; typeFournisseur: string; nbrePartsSouscrites: string;
     superficieTotale: string; nombreParcelles: string;
-  }>({ nom: "", prenoms: "", telephone: "", village: "", groupement: "", superficieHa: "", sexe: "", numeroCni: "", dateNaissance: "", dateAdhesion: "", typeFournisseur: "", nbrePartsSouscrites: "", superficieTotale: "", nombreParcelles: "" });
+  }>({ nom: "", prenoms: "", telephone: "", village: "", groupement: "", superficieHa: "", sexe: "", numeroCni: "", carteProducteur: "", dateNaissance: "", dateAdhesion: "", typeFournisseur: "", nbrePartsSouscrites: "", superficieTotale: "", nombreParcelles: "" });
 
   function openEditModal() {
     if (!membre) return;
@@ -401,6 +402,7 @@ export default function MembreFiche() {
       superficieHa: membre.superficieHa ?? "",
       sexe: (membre.sexe as string | null) ?? "",
       numeroCni: (membre.numeroCni as string | null) ?? "",
+      carteProducteur: (membre.carteProducteur as string | null) ?? "",
       dateNaissance: (membre.dateNaissance as string | null) ?? "",
       dateAdhesion: (membre.dateAdhesion as string | null) ?? "",
       typeFournisseur: (membre.typeFournisseur as string | null) ?? "",
@@ -424,6 +426,7 @@ export default function MembreFiche() {
       if (editForm.superficieHa.trim())     body["superficieHa"]      = editForm.superficieHa.trim();
       if (editForm.sexe)                    body["sexe"]              = editForm.sexe;
       if (editForm.numeroCni.trim())        body["numeroCni"]         = editForm.numeroCni.trim();
+      if (editForm.carteProducteur.trim()) body["carteProducteur"]   = editForm.carteProducteur.trim();
       if (editForm.dateNaissance.trim())    body["dateNaissance"]     = editForm.dateNaissance.trim();
       if (editForm.dateAdhesion.trim())     body["dateAdhesion"]      = editForm.dateAdhesion.trim();
       if (editForm.typeFournisseur)         body["typeFournisseur"]   = editForm.typeFournisseur;
@@ -603,6 +606,12 @@ export default function MembreFiche() {
               </span>
             )}
             <span className="flex items-center gap-1"><Calendar size={13} />Adhésion : {formaterDate(membre.dateAdhesion)}</span>
+            {(membre as unknown as Record<string, unknown>)["carteProducteur"] && (
+              <span className="flex items-center gap-1">
+                <CreditCard size={13} />
+                Carte producteur : {String((membre as unknown as Record<string, unknown>)["carteProducteur"])}
+              </span>
+            )}
           </div>
         </div>
 
@@ -1560,6 +1569,15 @@ export default function MembreFiche() {
                   <input
                     value={editForm.numeroCni}
                     onChange={e => setEditForm(f => ({ ...f, numeroCni: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">N° Carte producteur</label>
+                  <input
+                    value={editForm.carteProducteur}
+                    onChange={e => setEditForm(f => ({ ...f, carteProducteur: e.target.value }))}
+                    placeholder="Ex: CI-2024-00123"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
                   />
                 </div>
