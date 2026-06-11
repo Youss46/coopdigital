@@ -1,6 +1,11 @@
 # CoopDigital
 
-Plateforme de gestion des coopératives cacaoyères en Côte d'Ivoire (langue française). Couvre la gestion des membres (M01) et des avances & paiements (M04).
+Plateforme SaaS **multi-tenants** de gestion des coopératives cacaoyères en Côte d'Ivoire (langue française). Chaque coopérative est un tenant isolé. Couvre la gestion des membres (M01) et des avances & paiements (M04).
+
+## Déploiement
+
+- **Backend + BDD** : Railway (Express API + PostgreSQL)
+- **Frontend** : Vercel (build Vite statique)
 
 ## Run & Operate
 
