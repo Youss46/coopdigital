@@ -7172,6 +7172,8 @@ components:
           enum: [entree, sortie]
         poidsKg:
           type: string
+        prixUnitaireFcfa:
+          type: ["number", "null"]
         motif:
           type: ["string", "null"]
         agentId:
@@ -7188,6 +7190,8 @@ components:
         lotId:
           type: integer
         poidsKg:
+          type: number
+        prixUnitaireFcfa:
           type: number
         motif:
           type: string

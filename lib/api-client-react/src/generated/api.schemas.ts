@@ -684,16 +684,6 @@ export interface Membre {
   parcelleLng?: string | null;
   createdAt: string;
   updatedAt: string;
-  /** @nullable */
-  delegueId?: number | null;
-  /** @nullable */
-  rattachementType?: string | null;
-  /** @nullable */
-  zoneType?: string | null;
-  /** @nullable */
-  zoneNom?: string | null;
-  creeParDelegue?: boolean | null;
-  delegueInfo?: { nom: string; prenoms: string; telephone: string | null; zoneNom: string | null } | null;
 }
 
 export type MembreInputStatut = typeof MembreInputStatut[keyof typeof MembreInputStatut];
@@ -727,8 +717,6 @@ export interface MembreInput {
   sexe?: MembreInputSexe;
   parcelleLat?: string;
   parcelleLng?: string;
-  delegueId?: number;
-  rattachementType?: 'delegue' | 'base_centrale';
 }
 
 export type MembreUpdateStatut = typeof MembreUpdateStatut[keyof typeof MembreUpdateStatut];
@@ -747,6 +735,15 @@ export const MembreUpdateSexe = {
   F: 'F',
 } as const;
 
+export type MembreUpdateTypeFournisseur = typeof MembreUpdateTypeFournisseur[keyof typeof MembreUpdateTypeFournisseur];
+
+
+export const MembreUpdateTypeFournisseur = {
+  membre: 'membre',
+  pisteur: 'pisteur',
+  externe: 'externe',
+} as const;
+
 export interface MembreUpdate {
   nom?: string;
   prenoms?: string;
@@ -760,6 +757,14 @@ export interface MembreUpdate {
   photoUrl?: string;
   parcelleLat?: string;
   parcelleLng?: string;
+  dateNaissance?: string;
+  dateAdhesion?: string;
+  typeFournisseur?: MembreUpdateTypeFournisseur;
+  nbrePartsSouscrites?: number;
+  /** Superficie totale GPS (ha) */
+  superficieTotale?: string;
+  /** Nombre de parcelles enregistrées */
+  nombreParcelles?: number;
 }
 
 export type ModifierStatutMembreBodyStatut = typeof ModifierStatutMembreBodyStatut[keyof typeof ModifierStatutMembreBodyStatut];
@@ -1180,6 +1185,8 @@ export interface MouvementStock {
   type: MouvementStockType;
   poidsKg: string;
   /** @nullable */
+  prixUnitaireFcfa?: number | null;
+  /** @nullable */
   motif?: string | null;
   /** @nullable */
   agentId?: number | null;
@@ -1190,6 +1197,7 @@ export interface MouvementInput {
   entrepotId: number;
   lotId?: number;
   poidsKg: number;
+  prixUnitaireFcfa?: number;
   motif?: string;
 }
 
@@ -1496,7 +1504,7 @@ export const UtilisateurCompteRole = {
   comptable: 'comptable',
   magasinier: 'magasinier',
   responsable_tracabilite: 'responsable_tracabilite',
-  delegue: 'delegue',
+  agent_terrain: 'agent_terrain',
   auditeur: 'auditeur',
 } as const;
 
@@ -1521,7 +1529,7 @@ export const CreateUserInputRole = {
   comptable: 'comptable',
   magasinier: 'magasinier',
   responsable_tracabilite: 'responsable_tracabilite',
-  delegue: 'delegue',
+  agent_terrain: 'agent_terrain',
   auditeur: 'auditeur',
 } as const;
 
@@ -1533,10 +1541,6 @@ export interface CreateUserInput {
   role: CreateUserInputRole;
   /** @minLength 8 */
   motDePasse: string;
-  section?: string;
-  zoneType?: 'section' | 'groupement' | 'village';
-  zoneNom?: string;
-  zoneVillages?: string;
 }
 
 export interface UpdateUserInput {
@@ -4264,8 +4268,6 @@ page?: number;
 limit?: number;
 search?: string;
 statut?: GetMembresStatut;
-delegueId?: number;
-rattachementType?: 'delegue' | 'base_centrale';
 };
 
 export type GetMembresStatut = typeof GetMembresStatut[keyof typeof GetMembresStatut];

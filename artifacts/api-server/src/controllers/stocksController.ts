@@ -3,6 +3,7 @@ import { checkStock, creerAnomalies } from "../services/anomalieService";
 import { db, entrepotsTable, mouvementsStockTable, usersTable, livraisonsTable, lotLivraisonsTable, membresTable } from "@workspace/db";
 import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
 import { EntreeStockBody, SortieStockBody } from "@workspace/api-zod";
+import { proposerEcriture } from "../services/comptabiliteService";
 
 async function calcStockActuel(entrepotId: number): Promise<number> {
   const [row] = await db
@@ -125,6 +126,7 @@ export async function entreeStock(req: Request, res: Response): Promise<void> {
     if (!entrepot) { res.status(403).json({ erreur: "Entrepôt introuvable ou non autorisé" }); return; }
 
     const agentId = (req as Request & { user?: { id: number } }).user?.id ?? null;
+    const pu = parse.data.prixUnitaireFcfa ?? null;
     const [mouvement] = await db
       .insert(mouvementsStockTable)
       .values({
@@ -132,6 +134,7 @@ export async function entreeStock(req: Request, res: Response): Promise<void> {
         lotId: parse.data.lotId ?? null,
         type: "entree",
         poidsKg: String(parse.data.poidsKg),
+        prixUnitaireFcfa: pu != null ? String(pu) : null,
         motif: parse.data.motif ?? null,
         agentId,
       })
@@ -145,6 +148,7 @@ export async function entreeStock(req: Request, res: Response): Promise<void> {
         lotId: mouvementsStockTable.lotId,
         type: mouvementsStockTable.type,
         poidsKg: mouvementsStockTable.poidsKg,
+        prixUnitaireFcfa: mouvementsStockTable.prixUnitaireFcfa,
         motif: mouvementsStockTable.motif,
         agentId: mouvementsStockTable.agentId,
         createdAt: mouvementsStockTable.createdAt,
@@ -152,6 +156,23 @@ export async function entreeStock(req: Request, res: Response): Promise<void> {
       .from(mouvementsStockTable)
       .leftJoin(entrepotsTable, eq(entrepotsTable.id, mouvementsStockTable.entrepotId))
       .where(eq(mouvementsStockTable.id, mouvement!.id));
+
+    // Écriture comptable entrée stock manuelle (si prix fourni et sans lot livraison)
+    if (pu != null && !parse.data.lotId) {
+      const montant = Math.round(parse.data.poidsKg * pu);
+      if (montant > 0) {
+        void proposerEcriture(cooperativeId, {
+          source: "stock",
+          sourceId: mouvement!.id,
+          libelle: `Entrée stock manuelle – ${parse.data.motif ?? "ajustement"}`,
+          compteDebit:  "311",  // Stocks de marchandises
+          compteCredit: "6031", // Variation de stocks
+          montantFcfa:  montant,
+          date:         new Date().toISOString().slice(0, 10),
+          numeroPiece:  `STK-IN-${mouvement!.id}`,
+        });
+      }
+    }
 
     res.status(201).json(withNom);
   } catch (err) {
@@ -208,6 +229,7 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
     }
     const anomaliesAttention = anomaliesDetectees.filter((a) => a.niveauGravite !== "critique");
 
+    const pu2 = parse.data.prixUnitaireFcfa ?? null;
     const [mouvement] = await db
       .insert(mouvementsStockTable)
       .values({
@@ -215,6 +237,7 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
         lotId: parse.data.lotId ?? null,
         type: "sortie",
         poidsKg: String(parse.data.poidsKg),
+        prixUnitaireFcfa: pu2 != null ? String(pu2) : null,
         motif: parse.data.motif ?? null,
         agentId,
       })
@@ -228,6 +251,7 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
         lotId: mouvementsStockTable.lotId,
         type: mouvementsStockTable.type,
         poidsKg: mouvementsStockTable.poidsKg,
+        prixUnitaireFcfa: mouvementsStockTable.prixUnitaireFcfa,
         motif: mouvementsStockTable.motif,
         agentId: mouvementsStockTable.agentId,
         createdAt: mouvementsStockTable.createdAt,
@@ -235,6 +259,23 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
       .from(mouvementsStockTable)
       .leftJoin(entrepotsTable, eq(entrepotsTable.id, mouvementsStockTable.entrepotId))
       .where(eq(mouvementsStockTable.id, mouvement!.id));
+
+    // Écriture comptable sortie stock (perte/ajustement, si prix fourni)
+    if (pu2 != null) {
+      const montant = Math.round(parse.data.poidsKg * pu2);
+      if (montant > 0) {
+        void proposerEcriture(cooperativeId, {
+          source: "stock",
+          sourceId: mouvement!.id,
+          libelle: `Sortie stock – ${parse.data.motif ?? "ajustement"}`,
+          compteDebit:  "6031", // Variation de stocks (charge)
+          compteCredit: "311",  // Stocks de marchandises
+          montantFcfa:  montant,
+          date:         new Date().toISOString().slice(0, 10),
+          numeroPiece:  `STK-OUT-${mouvement!.id}`,
+        });
+      }
+    }
 
     if (anomaliesAttention.length > 0) {
       void creerAnomalies(cooperativeId, anomaliesAttention, "stocks", { entiteId: mouvement!.id, entiteType: "mouvement_stock" });

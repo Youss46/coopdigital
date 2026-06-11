@@ -47,9 +47,7 @@ export const GetMembresQueryParams = zod.object({
   "page": zod.coerce.number().default(getMembresQueryPageDefault),
   "limit": zod.coerce.number().default(getMembresQueryLimitDefault),
   "search": zod.coerce.string().optional(),
-  "statut": zod.enum(['actif', 'inactif']).optional(),
-  "delegueId": zod.coerce.number().optional(),
-  "rattachementType": zod.enum(['delegue', 'base_centrale']).optional()
+  "statut": zod.enum(['actif', 'inactif']).optional()
 })
 
 export const GetMembresResponse = zod.object({
@@ -97,9 +95,7 @@ export const CreateMembreBody = zod.object({
   "photoUrl": zod.string().optional(),
   "sexe": zod.enum(['M', 'F']).optional(),
   "parcelleLat": zod.string().optional(),
-  "parcelleLng": zod.string().optional(),
-  "delegueId": zod.number().optional(),
-  "rattachementType": zod.enum(['delegue', 'base_centrale']).optional()
+  "parcelleLng": zod.string().optional()
 })
 
 
@@ -183,12 +179,12 @@ export const UpdateMembreBody = zod.object({
   "photoUrl": zod.string().optional(),
   "parcelleLat": zod.string().optional(),
   "parcelleLng": zod.string().optional(),
-  "dateNaissance": zod.string().optional(),
-  "dateAdhesion": zod.string().optional(),
+  "dateNaissance": zod.coerce.date().optional(),
+  "dateAdhesion": zod.coerce.date().optional(),
   "typeFournisseur": zod.enum(['membre', 'pisteur', 'externe']).optional(),
   "nbrePartsSouscrites": zod.number().optional(),
-  "superficieTotale": zod.string().optional(),
-  "nombreParcelles": zod.number().optional()
+  "superficieTotale": zod.string().optional().describe('Superficie totale GPS (ha)'),
+  "nombreParcelles": zod.number().optional().describe('Nombre de parcelles enregistrées')
 })
 
 export const UpdateMembreResponse = zod.object({
@@ -765,6 +761,7 @@ export const GetMouvementsStockResponseItem = zod.object({
   "lotId": zod.number().nullish(),
   "type": zod.enum(['entree', 'sortie']),
   "poidsKg": zod.string(),
+  "prixUnitaireFcfa": zod.number().nullish(),
   "motif": zod.string().nullish(),
   "agentId": zod.number().nullish(),
   "createdAt": zod.string()
@@ -779,6 +776,7 @@ export const EntreeStockBody = zod.object({
   "entrepotId": zod.number(),
   "lotId": zod.number().optional(),
   "poidsKg": zod.number(),
+  "prixUnitaireFcfa": zod.number().optional(),
   "motif": zod.string().optional()
 })
 
@@ -790,6 +788,7 @@ export const SortieStockBody = zod.object({
   "entrepotId": zod.number(),
   "lotId": zod.number().optional(),
   "poidsKg": zod.number(),
+  "prixUnitaireFcfa": zod.number().optional(),
   "motif": zod.string().optional()
 })
 
@@ -1396,7 +1395,7 @@ export const GetUsersResponseItem = zod.object({
   "prenoms": zod.string(),
   "email": zod.string(),
   "telephone": zod.string().nullish(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'delegue', 'auditeur']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
   "createdAt": zod.coerce.date()
@@ -1416,12 +1415,8 @@ export const CreateUserBody = zod.object({
   "prenoms": zod.string(),
   "email": zod.string().email(),
   "telephone": zod.string().optional(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'delegue', 'auditeur']),
-  "motDePasse": zod.string().min(createUserBodyMotDePasseMin),
-  "section": zod.string().optional(),
-  "zoneType": zod.enum(['section', 'groupement', 'village']).optional(),
-  "zoneNom": zod.string().optional(),
-  "zoneVillages": zod.string().optional(),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "motDePasse": zod.string().min(createUserBodyMotDePasseMin)
 })
 
 
@@ -1445,7 +1440,7 @@ export const UpdateUserResponse = zod.object({
   "prenoms": zod.string(),
   "email": zod.string(),
   "telephone": zod.string().nullish(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'delegue', 'auditeur']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
   "createdAt": zod.coerce.date()
@@ -1497,7 +1492,7 @@ export const ToggleUserActifResponse = zod.object({
   "prenoms": zod.string(),
   "email": zod.string(),
   "telephone": zod.string().nullish(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'delegue', 'auditeur']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
   "createdAt": zod.coerce.date()

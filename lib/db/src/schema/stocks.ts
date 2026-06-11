@@ -29,6 +29,7 @@ export const mouvementsStockTable = pgTable("mouvements_stock", {
   lotId: integer("lot_id").references(() => lotsTable.id),
   type: mouvementTypeEnum("type").notNull(),
   poidsKg: numeric("poids_kg", { precision: 10, scale: 2 }).notNull(),
+  prixUnitaireFcfa: numeric("prix_unitaire_fcfa", { precision: 12, scale: 2 }),
   motif: text("motif"),
   agentId: integer("agent_id").references(() => usersTable.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
