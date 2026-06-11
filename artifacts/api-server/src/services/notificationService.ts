@@ -37,6 +37,8 @@ export type NotifType =
   | "mission_assignee"
   | "mission_soumise"
   | "mission_parcelle_rejetee"
+  | "mission_validee"
+  | "mission_rejetee"
   // ── Délégués ──────────────────────────────────────────
   | "caisse_delegue";
 
@@ -79,6 +81,8 @@ const PREF_COL: Record<NotifType, keyof typeof preferencesNotificationsTable.$in
   mission_assignee:         "notifMessageRecu",
   mission_soumise:          "notifAnomalieCritique",
   mission_parcelle_rejetee: "notifMessageRecu",
+  mission_validee:          "notifMessageRecu",
+  mission_rejetee:          "notifMessageRecu",
   // Délégués
   caisse_delegue:           "notifMessageRecu",
 };

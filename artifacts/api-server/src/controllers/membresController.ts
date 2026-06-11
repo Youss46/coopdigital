@@ -282,8 +282,9 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
     creeParDelegue = true;
   } else {
     // pca / directeur : utilise les valeurs du body
-    const bodyRattachement = data.rattachementType;
-    const bodyDelegueId = data.delegueId;
+    const rawBody = req.body as Record<string, unknown>;
+    const bodyRattachement = rawBody["rattachementType"] as string | undefined;
+    const bodyDelegueId = rawBody["delegueId"] ? Number(rawBody["delegueId"]) : undefined;
 
     if (bodyRattachement === "base_centrale") {
       rattachementTypeFinal = "base_centrale";
@@ -361,14 +362,14 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
         numeroCni: data.numeroCni ?? null,
         carteProducteur: (body["carteProducteur"] ?? null) as string | null,
         sexe: (data.sexe ?? body["sexe"] ?? null) as string | null,
-        dateNaissance: (data.dateNaissance ?? body["dateNaissance"] ?? null) as string | null,
+        dateNaissance: (body["dateNaissance"] ?? null) as string | null,
         photoUrl: data.photoUrl ?? null,
         parcelleLat: data.parcelleLat ?? null,
         parcelleLng: data.parcelleLng ?? null,
-        typeFournisseur: (data.typeFournisseur ?? body["typeFournisseur"] ?? null) as string | null,
-        section: (data.section ?? body["section"] ?? null) as string | null,
-        nbrePartsSouscrites: (data.nbrePartsSouscrites ?? Number(body["nbrePartsSouscrites"] ?? 0)) as number,
-        valeurNominalePartFcfa: (data.valeurNominalePartFcfa ?? Number(body["valeurNominalePartFcfa"] ?? 0)) as number,
+        typeFournisseur: (body["typeFournisseur"] ?? null) as string | null,
+        section: (body["section"] ?? null) as string | null,
+        nbrePartsSouscrites: Number(body["nbrePartsSouscrites"] ?? 0),
+        valeurNominalePartFcfa: Number(body["valeurNominalePartFcfa"] ?? 0),
         delegueId: delegueIdFinal,
         rattachementType: rattachementTypeFinal,
         zoneType: zoneTypeFinal,
@@ -500,9 +501,13 @@ export async function updateMembre(req: Request, res: Response): Promise<void> {
     if (body["nombreParcelles"] !== undefined)  extraFields["nombreParcelles"]   = Number(body["nombreParcelles"]);
     if (body["carteProducteur"] !== undefined)  extraFields["carteProducteur"]   = (body["carteProducteur"] as string | null) ?? null;
 
+    // dateAdhesion dans parse.data est un Date (zod.coerce.date) — exclure et laisser extraFields gérer
+    const { dateAdhesion: _da, dateNaissance: _dn, typeFournisseur: _tf, nbrePartsSouscrites: _np, ...restParseData } = parse.data as Record<string, unknown>;
+    void _da; void _dn; void _tf; void _np;
+
     const [membre] = await db
       .update(membresTable)
-      .set({ ...parse.data, ...extraFields, updatedAt: new Date() })
+      .set({ ...restParseData, ...extraFields, updatedAt: new Date() })
       .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
       .returning();
 

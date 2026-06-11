@@ -1075,7 +1075,7 @@ export async function rejeterMissionComplete(req: Request, res: Response): Promi
           message:      `Motif : ${motif.trim()}. Veuillez corriger et resoumettre.`,
           lien:         `/missions/${mission.id}`,
           lienLibelle:  "Voir les corrections",
-          gravite:      "alerte",
+          gravite:      "attention",
           sourceModule: "missions",
           sourceId:     mission.id,
         });

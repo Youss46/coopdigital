@@ -73,7 +73,12 @@ export async function createUser(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { nom, prenoms, email, telephone, role, motDePasse, section, zoneType, zoneNom, zoneVillages } = parse.data;
+  const { nom, prenoms, email, telephone, role, motDePasse } = parse.data;
+  const rawBody = req.body as Record<string, unknown>;
+  const section      = (rawBody["section"]      ?? undefined) as string | undefined;
+  const zoneType     = (rawBody["zoneType"]     ?? undefined) as string | undefined;
+  const zoneNom      = (rawBody["zoneNom"]      ?? undefined) as string | undefined;
+  const zoneVillages = (rawBody["zoneVillages"] ?? undefined) as string | undefined;
 
   if (!canCreateUser(requesterRole, role)) {
     res.status(403).json({ erreur: "Vous ne pouvez pas créer un compte avec ce rôle" });
