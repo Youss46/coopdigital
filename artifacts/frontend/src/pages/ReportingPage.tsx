@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -492,18 +492,52 @@ function TabRapports() {
   );
 }
 
+interface MembreResult { id: number; nom: string; prenoms: string | null; telephone: string | null; groupement: string | null; }
+
 function FicheMembre() {
-  const [membreId, setMembreId] = useState("");
+  const [recherche, setRecherche] = useState("");
+  const [selectionne, setSelectionne] = useState<MembreResult | null>(null);
+  const [ouvert, setOuvert] = useState(false);
   const [loading, setLoading] = useState(false);
   const peutGenererFiche = usePermission("reporting", "generer_fiche_membre");
+  const refInput = useRef<HTMLInputElement>(null);
+  const refListe = useRef<HTMLDivElement>(null);
+
+  const { data: resultats = [], isFetching } = useQuery<MembreResult[]>({
+    queryKey: ["membres-search-fiche", recherche],
+    queryFn: async () => {
+      if (recherche.trim().length < 2) return [];
+      const token = getAuthToken();
+      const r = await fetch(`${BASE}/api/membres?search=${encodeURIComponent(recherche)}&limit=10`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!r.ok) return [];
+      const d = await r.json() as { membres?: MembreResult[] } | MembreResult[];
+      return Array.isArray(d) ? d : (d.membres ?? []);
+    },
+    enabled: recherche.trim().length >= 2 && !selectionne,
+    staleTime: 10_000,
+  });
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        refInput.current && !refInput.current.contains(e.target as Node) &&
+        refListe.current && !refListe.current.contains(e.target as Node)
+      ) {
+        setOuvert(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   async function telechargerFiche() {
-    const id = parseInt(membreId);
-    if (!id) return;
+    if (!selectionne) return;
     setLoading(true);
     try {
       const token = getAuthToken();
-      const resp = await fetch(`${BASE}/api/rapports/membre/${id}`, {
+      const resp = await fetch(`${BASE}/api/rapports/membre/${selectionne.id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!resp.ok) {
@@ -514,7 +548,7 @@ function FicheMembre() {
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = href;
-      a.download = `fiche_membre_${id}.pdf`;
+      a.download = `fiche_membre_${selectionne.id}.pdf`;
       a.click();
       URL.revokeObjectURL(href);
     } catch (e) {
@@ -526,22 +560,99 @@ function FicheMembre() {
 
   if (!peutGenererFiche) return null;
 
+  const afficherListe = ouvert && recherche.trim().length >= 2 && !selectionne;
+
   return (
-    <div className="flex gap-3 items-center">
-      <input
-        type="number"
-        placeholder="ID du membre (ex: 1)"
-        value={membreId}
-        onChange={(e) => setMembreId(e.target.value)}
-        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-48"
-      />
+    <div className="space-y-3">
+      <div className="relative">
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clipRule="evenodd" />
+          </svg>
+          <input
+            ref={refInput}
+            type="text"
+            placeholder="Rechercher par nom ou prénom…"
+            value={selectionne ? `${selectionne.prenoms ?? ""} ${selectionne.nom}`.trim() : recherche}
+            onChange={(e) => {
+              setRecherche(e.target.value);
+              setSelectionne(null);
+              setOuvert(true);
+            }}
+            onFocus={() => setOuvert(true)}
+            className="w-full border border-gray-300 rounded-lg pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+          {(selectionne || recherche) && (
+            <button
+              onClick={() => { setSelectionne(null); setRecherche(""); setOuvert(false); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {afficherListe && (
+          <div
+            ref={refListe}
+            className="absolute z-20 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto"
+          >
+            {isFetching ? (
+              <div className="px-4 py-3 text-sm text-gray-400">Recherche…</div>
+            ) : resultats.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-gray-400">Aucun membre trouvé</div>
+            ) : (
+              resultats.map((m) => (
+                <button
+                  key={m.id}
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-green-50 flex items-center justify-between gap-3"
+                  onClick={() => { setSelectionne(m); setOuvert(false); }}
+                >
+                  <span className="font-medium text-gray-900">
+                    {m.prenoms ? `${m.prenoms} ` : ""}{m.nom}
+                  </span>
+                  <span className="text-xs text-gray-400 shrink-0">
+                    {m.groupement ?? `#${m.id}`}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {selectionne && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm">
+          <svg className="w-4 h-4 text-green-600 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+          </svg>
+          <span className="text-green-800 font-medium">{selectionne.prenoms ? `${selectionne.prenoms} ` : ""}{selectionne.nom}</span>
+          {selectionne.telephone && <span className="text-green-600 text-xs">· {selectionne.telephone}</span>}
+        </div>
+      )}
+
       <button
         onClick={() => void telechargerFiche()}
-        disabled={!membreId || loading}
+        disabled={!selectionne || loading}
         className="flex items-center gap-2 py-2 px-4 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
         style={{ backgroundColor: VERT }}
       >
-        {loading ? "Génération…" : "Télécharger fiche"}
+        {loading ? (
+          <>
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25" />
+              <path fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
+            Génération…
+          </>
+        ) : (
+          <>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+            Télécharger la fiche
+          </>
+        )}
       </button>
     </div>
   );
