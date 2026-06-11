@@ -24,6 +24,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Building2, PlusCircle, ChevronRight, ArrowLeft, AlertTriangle, Loader2 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -54,6 +55,7 @@ const REFUS_INIT = { poidsRefuleKg: "", nombreSacsRefoules: "", dateRefus: new D
 export default function ExportateursPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
   const peutCreer = usePermission("exportateurs", "creer");
   const peutSignalerRefus = usePermission("refus", "traiter");
   const [vueFiche, setVueFiche] = useState<number | null>(null);
@@ -449,7 +451,7 @@ export default function ExportateursPage() {
             <div className="px-6 pb-5 flex gap-3">
               <button onClick={() => setModalExp(false)} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700">Annuler</button>
               <button
-                onClick={() => mutExp.mutate({ data: { cooperativeId: 1, ...formExp } })}
+                onClick={() => mutExp.mutate({ data: { cooperativeId: user?.cooperativeId ?? 0, ...formExp } })}
                 disabled={!formExp.nom || mutExp.isPending}
                 className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50"
                 style={{ backgroundColor: "#1a4731" }}
