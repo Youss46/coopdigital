@@ -33,6 +33,29 @@ export async function supprimerSubscription(userId: number, endpoint: string): P
   void endpoint;
 }
 
+async function envoyerPushAuxSubs(
+  subs: { id: number; endpoint: string; p256dh: string; auth: string }[],
+  data: string,
+): Promise<void> {
+  await Promise.allSettled(
+    subs.map(async (s) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+          data,
+        );
+      } catch (err: unknown) {
+        const status = (err as { statusCode?: number }).statusCode;
+        if (status === 410 || status === 404) {
+          await db.delete(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.id, s.id));
+        } else {
+          logger.error({ err }, "Erreur envoi push notification");
+        }
+      }
+    })
+  );
+}
+
 export async function envoyerPushNotification(userId: number, payload: {
   title: string;
   body: string;
@@ -49,25 +72,28 @@ export async function envoyerPushNotification(userId: number, payload: {
     .where(eq(pushSubscriptionsTable.userId, userId));
 
   if (subs.length === 0) return;
-
   const data = JSON.stringify({ titre: payload.title, message: payload.body, url: payload.url });
+  await envoyerPushAuxSubs(subs, data);
+}
 
-  await Promise.allSettled(
-    subs.map(async (s) => {
-      try {
-        await webpush.sendNotification(
-          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          data,
-        );
-      } catch (err: unknown) {
-        const status = (err as { statusCode?: number }).statusCode;
-        if (status === 410 || status === 404) {
-          await db.delete(pushSubscriptionsTable)
-            .where(eq(pushSubscriptionsTable.id, s.id));
-        } else {
-          logger.error({ err, userId }, "Erreur envoi push notification");
-        }
-      }
-    })
-  );
+export async function envoyerPushGroupe(userIds: number[], payload: {
+  title: string;
+  body: string;
+  url?: string;
+}): Promise<void> {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    logger.warn("VAPID keys non configurées — push ignoré");
+    return;
+  }
+  if (userIds.length === 0) return;
+
+  const { inArray } = await import("drizzle-orm");
+  const subs = await db
+    .select()
+    .from(pushSubscriptionsTable)
+    .where(inArray(pushSubscriptionsTable.userId, userIds));
+
+  if (subs.length === 0) return;
+  const data = JSON.stringify({ titre: payload.title, message: payload.body, url: payload.url });
+  await envoyerPushAuxSubs(subs, data);
 }
