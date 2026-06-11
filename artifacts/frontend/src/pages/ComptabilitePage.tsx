@@ -25,7 +25,7 @@ import {
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, RefreshCw, DollarSign, List, Sliders, RotateCcw, Plus, Pencil, Ban, ChevronDown, ChevronUp, Search, RotateCw } from "lucide-react";
+import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, RefreshCw, DollarSign, List, Sliders, RotateCcw, Plus, Pencil, Ban, ChevronDown, ChevronUp, Search, RotateCw, FileText, Scale, Droplets, Lock, Download, Filter } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { type TauxChange } from "@workspace/api-client-react";
 
@@ -194,6 +194,9 @@ function OngletConfiguration() {
           {isPending ? "Enregistrement…" : "Enregistrer la configuration"}
         </button>
       </div>
+
+      {/* ── Clôture d'exercice ─────────────────────────────────── */}
+      <ClotureSection />
     </div>
   );
 }
@@ -1792,32 +1795,628 @@ export function WidgetTauxChange() {
   );
 }
 
+// ─── Export CSV helper ────────────────────────────────────────────────────────
+function exportCSV(filename: string, headers: string[], rows: string[][]): void {
+  const bom = "\uFEFF";
+  const lines = [headers.join(";"), ...rows.map((r) => r.map((c) => c.includes(";") ? `"${c}"` : c).join(";"))];
+  const blob = new Blob([bom + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Onglet Grand-livre ───────────────────────────────────────────────────────
+interface GrandLivreLigne {
+  id: number; dateEcriture: string; numeroPiece: string | null; libelle: string;
+  compteDebit: string; compteCredit: string; montantFcfa: number; source: string; exercice: number;
+}
+
+function OngletGrandLivre() {
+  const anneeActuelle = new Date().getFullYear();
+  const [exercice, setExercice] = useState(anneeActuelle);
+  const [compte, setCompte] = useState("");
+  const [compteFiltre, setCompteFiltre] = useState("");
+  const [page, setPage] = useState(1);
+  const LIMIT = 50;
+
+  const params = new URLSearchParams({ exercice: String(exercice), page: String(page), limit: String(LIMIT) });
+  if (compteFiltre) params.set("compte", compteFiltre);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["grand-livre", exercice, compteFiltre, page],
+    queryFn: () => apiFetch<{ ecritures: GrandLivreLigne[]; total: number }>(`/api/comptabilite/grand-livre?${params.toString()}`),
+  });
+
+  const list = data?.ecritures ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+  const annees = Array.from({ length: 5 }, (_, i) => anneeActuelle - i);
+
+  const handleFilter = () => { setCompteFiltre(compte); setPage(1); };
+
+  const handleExport = () => {
+    exportCSV(
+      `grand_livre_${exercice}${compteFiltre ? "_" + compteFiltre : ""}.csv`,
+      ["Date", "Pièce", "Libellé", "Compte Débit", "Compte Crédit", "Montant FCFA", "Source"],
+      list.map((e) => [
+        new Date(e.dateEcriture).toLocaleDateString("fr-FR"),
+        e.numeroPiece ?? "",
+        e.libelle.replace(/;/g, ","),
+        e.compteDebit,
+        e.compteCredit,
+        String(e.montantFcfa),
+        SOURCE_LABELS[e.source] ?? e.source,
+      ])
+    );
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-end gap-3 mb-5">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Exercice</label>
+          <select value={exercice} onChange={(e) => { setExercice(Number(e.target.value)); setPage(1); }}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
+            {annees.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div className="flex gap-2 items-end">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Compte (optionnel)</label>
+            <input type="text" value={compte} onChange={(e) => setCompte(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleFilter()}
+              placeholder="ex : 401"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 w-28" />
+          </div>
+          <button onClick={handleFilter}
+            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 flex items-center gap-1.5">
+            <Filter size={14} /> Filtrer
+          </button>
+          {compteFiltre && (
+            <button onClick={() => { setCompte(""); setCompteFiltre(""); setPage(1); }}
+              className="px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 flex items-center gap-1">
+              <X size={13} /> Effacer
+            </button>
+          )}
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          <p className="text-sm text-gray-500">{total} écriture{total > 1 ? "s" : ""}</p>
+          <button onClick={handleExport} disabled={list.length === 0}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-40">
+            <Download size={14} /> Exporter CSV
+          </button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-green-600 border-t-transparent" /></div>
+      ) : list.length === 0 ? (
+        <div className="text-center py-16">
+          <FileText className="mx-auto mb-3 text-gray-300" size={40} />
+          <p className="text-gray-500 text-sm">Aucune écriture pour cet exercice{compteFiltre ? ` / compte ${compteFiltre}` : ""}</p>
+        </div>
+      ) : (
+        <>
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    {["Date", "Pièce", "Libellé", "Compte Débit", "Compte Crédit", "Montant", "Source"].map((h) => (
+                      <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((e) => (
+                    <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(e.dateEcriture).toLocaleDateString("fr-FR")}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.numeroPiece ?? "—"}</td>
+                      <td className="px-4 py-3 text-gray-900 max-w-[220px] truncate" title={e.libelle}>{e.libelle}</td>
+                      <td className="px-4 py-3 font-mono font-medium text-gray-700">{e.compteDebit}</td>
+                      <td className="px-4 py-3 font-mono font-medium text-gray-700">{e.compteCredit}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{FCFA(e.montantFcfa)}</td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{SOURCE_LABELS[e.source] ?? e.source}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">Page {page} / {totalPages}</p>
+            <div className="flex gap-2">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"><ChevronLeft size={16} /></button>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"><ChevronRight size={16} /></button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Onglet Balance des comptes ───────────────────────────────────────────────
+interface BalanceLigne {
+  numeroCompte: string; libelle: string; type: string;
+  totalDebit: number; totalCredit: number; solde: number;
+}
+
+function OngletBalance() {
+  const anneeActuelle = new Date().getFullYear();
+  const [exercice, setExercice] = useState(anneeActuelle);
+  const annees = Array.from({ length: 5 }, (_, i) => anneeActuelle - i);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["balance", exercice],
+    queryFn: () => apiFetch<BalanceLigne[]>(`/api/comptabilite/balance?exercice=${exercice}`),
+  });
+
+  const list = data ?? [];
+  const totalDebit  = list.reduce((s, l) => s + l.totalDebit,  0);
+  const totalCredit = list.reduce((s, l) => s + l.totalCredit, 0);
+
+  const handleExport = () => {
+    exportCSV(
+      `balance_${exercice}.csv`,
+      ["N° Compte", "Libellé", "Type", "Total Débit", "Total Crédit", "Solde"],
+      list.map((l) => [l.numeroCompte, l.libelle.replace(/;/g, ","), l.type, String(l.totalDebit), String(l.totalCredit), String(l.solde)])
+    );
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-end gap-3 mb-5">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Exercice</label>
+          <select value={exercice} onChange={(e) => setExercice(Number(e.target.value))}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
+            {annees.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          <p className="text-sm text-gray-500">{list.length} compte{list.length > 1 ? "s" : ""} mouvementés</p>
+          <button onClick={handleExport} disabled={list.length === 0}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-40">
+            <Download size={14} /> Exporter CSV
+          </button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-green-600 border-t-transparent" /></div>
+      ) : list.length === 0 ? (
+        <div className="text-center py-16">
+          <Scale className="mx-auto mb-3 text-gray-300" size={40} />
+          <p className="text-gray-500 text-sm">Aucun mouvement pour l'exercice {exercice}</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">N° Compte</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Libellé</th>
+                  <th className="text-center text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Type</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Total Débit</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Total Crédit</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Solde</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((l) => {
+                  const ti = TYPES_COMPTE[l.type] ?? { label: l.type, color: "#6b7280" };
+                  return (
+                    <tr key={l.numeroCompte} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td className="px-4 py-3 font-mono font-semibold text-gray-800">{l.numeroCompte}</td>
+                      <td className="px-4 py-3 text-gray-700">{l.libelle}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: `${ti.color}18`, color: ti.color }}>{ti.label}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-gray-700">{FCFA(l.totalDebit)}</td>
+                      <td className="px-4 py-3 text-right font-medium text-gray-700">{FCFA(l.totalCredit)}</td>
+                      <td className={`px-4 py-3 text-right font-bold ${l.solde >= 0 ? "text-green-700" : "text-red-600"}`}>
+                        {l.solde < 0 && "-"}{FCFA(Math.abs(l.solde))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-200 bg-gray-50">
+                  <td colSpan={3} className="px-4 py-3 font-bold text-gray-700 text-sm">TOTAUX</td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-900">{FCFA(totalDebit)}</td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-900">{FCFA(totalCredit)}</td>
+                  <td className={`px-4 py-3 text-right font-bold ${totalDebit >= totalCredit ? "text-green-700" : "text-red-600"}`}>
+                    {FCFA(Math.abs(totalDebit - totalCredit))}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Onglet Flux de trésorerie ────────────────────────────────────────────────
+interface FluxData {
+  fluxOperationnelsFcfa: number; fluxFinancementFcfa: number;
+  encaissementsExportateursFcfa: number; paiementsProducteursFcfa: number;
+  avancesOctroyes: number; avancesRembourses: number;
+  soldeDebutFcfa: number; soldeFinalFcfa: number; exercice: number;
+}
+
+function OngletFluxTresorerie() {
+  const anneeActuelle = new Date().getFullYear();
+  const [exercice, setExercice] = useState(anneeActuelle);
+  const annees = Array.from({ length: 5 }, (_, i) => anneeActuelle - i);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["flux-tresorerie", exercice],
+    queryFn: () => apiFetch<FluxData>(`/api/etats-financiers/flux-tresorerie?exercice=${exercice}`),
+  });
+
+  const d: FluxData = data ?? {
+    fluxOperationnelsFcfa: 0, fluxFinancementFcfa: 0,
+    encaissementsExportateursFcfa: 0, paiementsProducteursFcfa: 0,
+    avancesOctroyes: 0, avancesRembourses: 0,
+    soldeDebutFcfa: 0, soldeFinalFcfa: 0, exercice,
+  };
+
+  if (isLoading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-green-600 border-t-transparent" /></div>;
+
+  const sections = [
+    {
+      titre: "Flux opérationnels",
+      lignes: [
+        { label: "Encaissements exportateurs", montant: d.encaissementsExportateursFcfa, positif: true },
+        { label: "Paiements producteurs",       montant: d.paiementsProducteursFcfa,       positif: false },
+      ],
+      total: d.fluxOperationnelsFcfa,
+      color: VERT,
+    },
+    {
+      titre: "Flux de financement",
+      lignes: [
+        { label: "Avances octroyées",   montant: d.avancesOctroyes,   positif: false },
+        { label: "Avances remboursées", montant: d.avancesRembourses, positif: true  },
+      ],
+      total: d.fluxFinancementFcfa,
+      color: OR,
+    },
+  ];
+
+  return (
+    <div>
+      <div className="flex items-end gap-3 mb-6">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Exercice</label>
+          <select value={exercice} onChange={(e) => setExercice(Number(e.target.value))}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
+            {annees.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Solde final */}
+      <div className={`rounded-xl p-5 mb-6 flex items-center justify-between ${d.soldeFinalFcfa >= 0 ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+        <div>
+          <p className="text-sm font-medium text-gray-600">Variation nette de trésorerie — {exercice}</p>
+          <p className={`text-3xl font-bold mt-1 ${d.soldeFinalFcfa >= 0 ? "text-green-700" : "text-red-700"}`}>
+            {d.soldeFinalFcfa >= 0 ? "+" : ""}{FCFA(d.soldeFinalFcfa)}
+          </p>
+        </div>
+        <Droplets size={36} className={d.soldeFinalFcfa >= 0 ? "text-green-400" : "text-red-400"} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {sections.map((s) => (
+          <div key={s.titre} className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="font-semibold mb-4 text-sm" style={{ color: s.color }}>{s.titre}</h3>
+            <div className="space-y-2 mb-4">
+              {s.lignes.map((l) => (
+                <div key={l.label} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">{l.label}</span>
+                  <span className={`font-medium ${l.positif ? "text-green-700" : "text-red-600"}`}>
+                    {l.positif ? "+" : "-"}{FCFA(l.montant)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-700">Solde</span>
+              <span className={`font-bold ${s.total >= 0 ? "text-green-700" : "text-red-600"}`}>
+                {s.total >= 0 ? "+" : ""}{FCFA(s.total)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal Saisie manuelle d'écriture ─────────────────────────────────────────
+function ModalSaisieManuelle({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [form, setForm] = useState({
+    dateEcriture: new Date().toISOString().slice(0, 10),
+    numeroPiece: "",
+    libelle: "",
+    compteDebit: "",
+    compteCredit: "",
+    montantFcfa: "",
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const montant = parseInt(form.montantFcfa.replace(/\s/g, ""), 10);
+    if (!form.libelle.trim() || !form.compteDebit.trim() || !form.compteCredit.trim() || isNaN(montant) || montant <= 0) {
+      toast({ title: "Tous les champs obligatoires doivent être renseignés", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      await apiPost("/api/comptabilite/ecriture", {
+        dateEcriture: form.dateEcriture,
+        numeroPiece: form.numeroPiece.trim() || null,
+        libelle: form.libelle.trim(),
+        compteDebit: form.compteDebit.trim(),
+        compteCredit: form.compteCredit.trim(),
+        montantFcfa: montant,
+      });
+      toast({ title: "Écriture enregistrée" });
+      void qc.invalidateQueries({ queryKey: ["grand-livre"] });
+      void qc.invalidateQueries({ queryKey: getGetJournalComptableQueryKey() });
+      onSuccess();
+    } catch (err) {
+      toast({ title: "Erreur", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-bold text-gray-900">Saisie manuelle d'écriture</h3>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+        </div>
+        <form onSubmit={(e) => { void handleSubmit(e); }} className="px-6 py-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Date *</label>
+              <input type="date" value={form.dateEcriture}
+                onChange={(e) => setForm((f) => ({ ...f, dateEcriture: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">N° Pièce</label>
+              <input type="text" value={form.numeroPiece} placeholder="ex : OV-2024-001"
+                onChange={(e) => setForm((f) => ({ ...f, numeroPiece: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Libellé *</label>
+            <input type="text" value={form.libelle} placeholder="ex : Achat fournitures de bureau"
+              onChange={(e) => setForm((f) => ({ ...f, libelle: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Compte Débit *</label>
+              <input type="text" value={form.compteDebit} placeholder="ex : 6011"
+                onChange={(e) => setForm((f) => ({ ...f, compteDebit: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Compte Crédit *</label>
+              <input type="text" value={form.compteCredit} placeholder="ex : 401"
+                onChange={(e) => setForm((f) => ({ ...f, compteCredit: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Montant FCFA *</label>
+            <input type="number" min="1" value={form.montantFcfa} placeholder="ex : 150000"
+              onChange={(e) => setForm((f) => ({ ...f, montantFcfa: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+          </div>
+          <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700">
+            <strong>OHADA :</strong> débit = crédit. L'écriture sera soumise à validation si le mode manuel est activé.
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              Annuler
+            </button>
+            <button type="submit" disabled={loading}
+              className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              style={{ backgroundColor: VERT }}>
+              {loading ? "Enregistrement…" : "Enregistrer"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Section Clôture (dans OngletConfiguration) ───────────────────────────────
+interface ExerciceStatut { id: number; annee: number; statut: string; }
+
+function ClotureSection() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const anneeActuelle = new Date().getFullYear();
+  const [annee, setAnnee] = useState(anneeActuelle - 1);
+  const [confirm, setConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const { data: exercices, refetch } = useQuery({
+    queryKey: ["exercices-statuts"],
+    queryFn: () => apiFetch<ExerciceStatut[]>("/api/comptabilite/exercices"),
+  });
+
+  const statutAnnee = exercices?.find((e) => e.annee === annee)?.statut;
+  const annees = Array.from({ length: 5 }, (_, i) => anneeActuelle - 1 - i);
+
+  const handleCloture = async () => {
+    setLoading(true);
+    try {
+      const res = await apiPost<{ message: string; totalProduits: number; totalCharges: number; resultatNet: number; ecrituresGenerees: number }>(
+        "/api/comptabilite/cloture", { exercice: annee }
+      );
+      toast({
+        title: `Exercice ${annee} clôturé`,
+        description: `Résultat net : ${FCFA(res.resultatNet)} — ${res.ecrituresGenerees} écriture${res.ecrituresGenerees > 1 ? "s" : ""} de clôture générée${res.ecrituresGenerees > 1 ? "s" : ""}`,
+      });
+      void refetch();
+      void qc.invalidateQueries({ queryKey: ["grand-livre"] });
+      void qc.invalidateQueries({ queryKey: ["balance"] });
+      setConfirm(false);
+    } catch (err) {
+      toast({ title: "Erreur lors de la clôture", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-8 pt-6 border-t border-gray-200">
+      <h2 className="text-lg font-bold text-gray-900 mb-1">Clôture d'exercice</h2>
+      <p className="text-sm text-gray-500 mb-5">
+        Génère les écritures de clôture OHADA (virement des charges et produits vers le compte 130 — Résultat de l'exercice)
+        et verrouille définitivement l'exercice sélectionné.
+      </p>
+
+      {/* Liste des exercices */}
+      {exercices && exercices.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Exercice</th>
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {exercices.map((e) => (
+                <tr key={e.id} className="border-b border-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-800">{e.annee}</td>
+                  <td className="px-4 py-3">
+                    {e.statut === "cloture" ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        <Lock size={11} /> Clôturé
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-green-50 text-green-700">Ouvert</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Formulaire */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Exercice à clôturer</label>
+          <select value={annee} onChange={(e) => { setAnnee(Number(e.target.value)); setConfirm(false); }}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
+            {annees.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        {statutAnnee === "cloture" ? (
+          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500">
+            <Lock size={14} /> Exercice {annee} déjà clôturé
+          </div>
+        ) : !confirm ? (
+          <button onClick={() => setConfirm(true)}
+            className="px-4 py-2 border border-red-200 text-red-700 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2">
+            <Lock size={14} /> Clôturer l'exercice {annee}
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium">
+              ⚠ Irréversible. Confirmer ?
+            </div>
+            <button onClick={() => { void handleCloture(); }} disabled={loading}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
+              {loading ? "Clôture…" : "Oui, clôturer"}
+            </button>
+            <button onClick={() => setConfirm(false)}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              Annuler
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page principale ──────────────────────────────────────────────────────────
-type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable";
+type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable" | "grand_livre" | "balance" | "flux";
 
 export default function ComptabilitePage() {
   const [onglet, setOnglet] = useState<Onglet>("en_attente");
+  const [showSaisie, setShowSaisie] = useState(false);
+
   const peutVoirConfig  = usePermission("comptabilite", "voir_config");
   const peutVoirAttente = usePermission("comptabilite", "voir_ecritures_attente");
   const peutVoirPlan    = usePermission("comptabilite", "voir_plan");
+  const peutGrandLivre  = usePermission("comptabilite", "voir_grand_livre");
+  const peutBalance     = usePermission("comptabilite", "voir_balance");
+  const peutSaisir      = usePermission("comptabilite", "saisir_ecriture_manuelle");
+
   const { data: countData } = useCountEcrituresEnAttente({ query: { queryKey: getCountEcrituresEnAttenteQueryKey(), enabled: peutVoirAttente } });
   const nbEnAttente = countData?.count ?? 0;
 
   const peutVoirTaux = usePermission("devises", "voir_taux");
 
   const tabs: { id: Onglet; label: string; icon: React.ElementType; badge?: number }[] = [
-    { id: "en_attente",     label: "Écritures en attente", icon: Clock,     badge: nbEnAttente > 0 ? nbEnAttente : undefined },
-    { id: "journal",        label: "Journal comptable",    icon: BookOpen },
-    ...(peutVoirTaux  ? [{ id: "devises" as Onglet,        label: "Devises",             icon: DollarSign }] : []),
-    ...(peutVoirPlan  ? [{ id: "plan_comptable" as Onglet, label: "Plan comptable",      icon: List }] : []),
-    ...(peutVoirConfig ? [{ id: "config" as Onglet,        label: "Configuration",       icon: Settings }] : []),
+    { id: "en_attente",  label: "En attente",      icon: Clock,     badge: nbEnAttente > 0 ? nbEnAttente : undefined },
+    { id: "journal",     label: "Journal",          icon: BookOpen },
+    ...(peutGrandLivre ? [{ id: "grand_livre" as Onglet, label: "Grand-livre",  icon: FileText }] : []),
+    ...(peutBalance    ? [{ id: "balance"     as Onglet, label: "Balance",      icon: Scale }] : []),
+    { id: "flux",        label: "Flux trésorerie",  icon: Droplets },
+    ...(peutVoirTaux   ? [{ id: "devises"         as Onglet, label: "Devises",        icon: DollarSign }] : []),
+    ...(peutVoirPlan   ? [{ id: "plan_comptable"  as Onglet, label: "Plan comptable", icon: List }] : []),
+    ...(peutVoirConfig ? [{ id: "config"          as Onglet, label: "Configuration",  icon: Settings }] : []),
   ];
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Comptabilité</h1>
-        <p className="text-sm text-gray-500 mt-1">Gestion des écritures comptables OHADA</p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Comptabilité</h1>
+          <p className="text-sm text-gray-500 mt-1">Gestion des écritures comptables OHADA</p>
+        </div>
+        {peutSaisir && (
+          <button
+            onClick={() => setShowSaisie(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold shadow-sm"
+            style={{ backgroundColor: VERT }}
+          >
+            <Plus size={16} /> Saisie manuelle
+          </button>
+        )}
       </div>
 
       {/* Onglets */}
@@ -1850,11 +2449,22 @@ export default function ComptabilitePage() {
           <WidgetTauxChange />
         </div>
       )}
+
       {onglet === "en_attente"    && <OngletEnAttente />}
       {onglet === "journal"       && <OngletJournal />}
-      {onglet === "devises"       && peutVoirTaux  && <OngletDevises />}
-      {onglet === "plan_comptable"&& peutVoirPlan  && <OngletPlanComptableContainer />}
+      {onglet === "grand_livre"   && peutGrandLivre && <OngletGrandLivre />}
+      {onglet === "balance"       && peutBalance    && <OngletBalance />}
+      {onglet === "flux"          && <OngletFluxTresorerie />}
+      {onglet === "devises"       && peutVoirTaux   && <OngletDevises />}
+      {onglet === "plan_comptable"&& peutVoirPlan   && <OngletPlanComptableContainer />}
       {onglet === "config"        && peutVoirConfig && <OngletConfiguration />}
+
+      {showSaisie && (
+        <ModalSaisieManuelle
+          onClose={() => setShowSaisie(false)}
+          onSuccess={() => setShowSaisie(false)}
+        />
+      )}
     </div>
   );
 }

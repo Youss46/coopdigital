@@ -15,6 +15,8 @@ import {
   validerEcritureEnAttente,
   rejeterEcritureEnAttente,
   validerToutEcrituresEnAttente,
+  cloturerExercice,
+  getStatutsExercices,
 } from "../controllers/comptabiliteController";
 import {
   listPlanComptableHandler,
@@ -42,6 +44,10 @@ router.get("/comptabilite/journal",       checkPermission("comptabilite", "lire"
 router.post("/comptabilite/ecriture",     checkPermission("comptabilite", "saisir_ecriture_manuelle"), createEcritureManuelle);
 router.get("/comptabilite/marge-collecte",checkPermission("comptabilite", "lire"),                    getMargeCollecte);
 router.get("/comptabilite/tresorerie",    checkPermission("comptabilite", "lire"),                    getTresorerie);
+
+// ─── Clôture d'exercice ───────────────────────────────────────────────────────
+router.get("/comptabilite/exercices",        checkPermission("comptabilite", "voir_config"),    getStatutsExercices);
+router.post("/comptabilite/cloture",         checkPermission("comptabilite", "modifier_config"), cloturerExercice);
 
 // ─── Config comptable ─────────────────────────────────────────────────────────
 router.get("/comptabilite/config",  checkPermission("comptabilite", "voir_config"),    getConfigComptable);

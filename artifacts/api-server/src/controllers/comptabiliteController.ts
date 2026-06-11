@@ -499,3 +499,118 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
+
+// ─── Clôture d'exercice ───────────────────────────────────────────────────────
+export async function cloturerExercice(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+    const annee = req.body.exercice ? parseInt(String(req.body.exercice)) : exerciceCourant();
+
+    if (isNaN(annee) || annee < 2000 || annee > exerciceCourant()) {
+      res.status(400).json({ erreur: "Exercice invalide" });
+      return;
+    }
+
+    // Vérifier si déjà clôturé
+    const existing = await db.select().from(exercicesTable)
+      .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, annee)));
+
+    if (existing[0]?.statut === "cloture") {
+      res.status(409).json({ erreur: `L'exercice ${annee} est déjà clôturé` });
+      return;
+    }
+
+    // Calculer totaux produits (7xx) et charges (6xx)
+    const totaux = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN LEFT(compte_credit, 1) = '7' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalProduits",
+        COALESCE(SUM(CASE WHEN LEFT(compte_debit,  1) = '6' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalCharges"
+      FROM ecritures_comptables
+      WHERE cooperative_id = ${coop} AND exercice = ${annee}
+    `);
+
+    const r = totaux.rows[0] as { totalProduits: number; totalCharges: number };
+    const totalProduits = r?.totalProduits ?? 0;
+    const totalCharges  = r?.totalCharges  ?? 0;
+    const resultatNet   = totalProduits - totalCharges;
+
+    const dateClot = `${annee}-12-31`;
+    type EntreeClot = {
+      cooperativeId: number; dateEcriture: string; numeroPiece: string | null;
+      libelle: string; compteDebit: string; compteCredit: string;
+      montantFcfa: number; source: "manuel"; sourceId: null; exercice: number;
+    };
+    const entries: EntreeClot[] = [];
+
+    if (totalProduits > 0) {
+      entries.push({
+        cooperativeId: coop,
+        dateEcriture: dateClot,
+        numeroPiece: `CLOT-${annee}-PRD`,
+        libelle: `Clôture comptes de produits — exercice ${annee}`,
+        compteDebit: "701",
+        compteCredit: "130",
+        montantFcfa: totalProduits,
+        source: "manuel",
+        sourceId: null,
+        exercice: annee,
+      });
+    }
+
+    if (totalCharges > 0) {
+      entries.push({
+        cooperativeId: coop,
+        dateEcriture: dateClot,
+        numeroPiece: `CLOT-${annee}-CHG`,
+        libelle: `Clôture comptes de charges — exercice ${annee}`,
+        compteDebit: "130",
+        compteCredit: "601",
+        montantFcfa: totalCharges,
+        source: "manuel",
+        sourceId: null,
+        exercice: annee,
+      });
+    }
+
+    if (entries.length > 0) {
+      await db.insert(ecrituresComptablesTable).values(entries);
+    }
+
+    // Marquer l'exercice comme clôturé
+    if (existing.length > 0) {
+      await db.update(exercicesTable)
+        .set({ statut: "cloture" })
+        .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, annee)));
+    } else {
+      await db.insert(exercicesTable).values({ cooperativeId: coop, annee, statut: "cloture" });
+    }
+
+    res.json({
+      message: `Exercice ${annee} clôturé avec succès`,
+      exercice: annee,
+      totalProduits,
+      totalCharges,
+      resultatNet,
+      ecrituresGenerees: entries.length,
+    });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur cloturerExercice");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── Statut des exercices ─────────────────────────────────────────────────────
+export async function getStatutsExercices(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+    const rows = await db.select().from(exercicesTable)
+      .where(eq(exercicesTable.cooperativeId, coop))
+      .orderBy(desc(exercicesTable.annee));
+    res.json(rows);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur getStatutsExercices");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
