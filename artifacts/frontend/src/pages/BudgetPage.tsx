@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   useGetBudgetCampagneId,
   usePostBudgetCampagneId,
@@ -27,7 +28,17 @@ import {
 } from "lucide-react";
 
 const VERT = "#1a4731";
-const CAMPAGNE_ID = 1;
+
+const BASE = import.meta.env.VITE_API_URL ?? "";
+const tok = () => localStorage.getItem("coop_token") ?? "";
+
+async function apiFetchCampagne<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}/api${path}`, {
+    headers: { Authorization: `Bearer ${tok()}` },
+  });
+  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  return res.json() as Promise<T>;
+}
 
 const FCFA = (n: number | undefined | null) =>
   new Intl.NumberFormat("fr-FR").format(Math.round(n ?? 0)) + " FCFA";
@@ -69,7 +80,7 @@ function ecartIcon(pct: number) {
 }
 
 // ─── Onglet 1 : Hypothèses ────────────────────────────────────────────────────
-function OngletHypotheses({ budgetId }: { budgetId: number }) {
+function OngletHypotheses({ budgetId, campagneId }: { budgetId: number; campagneId: number }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const peutModifier = usePermission("budget", "modifier");
@@ -84,7 +95,7 @@ function OngletHypotheses({ budgetId }: { budgetId: number }) {
   const mutHypo = usePostBudgetIdHypotheses({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetBudgetCampagneIdQueryKey(CAMPAGNE_ID) });
+        queryClient.invalidateQueries({ queryKey: getGetBudgetCampagneIdQueryKey(campagneId) });
         toast({ title: "Hypothèses enregistrées" });
       },
       onError: () => toast({ title: "Erreur", variant: "destructive" }),
@@ -167,8 +178,8 @@ function OngletHypotheses({ budgetId }: { budgetId: number }) {
 }
 
 // ─── Modal modifier ligne ─────────────────────────────────────────────────────
-function ModalModifierLigne({ ligne, budgetId, onClose }: {
-  ligne: LigneBudget; budgetId: number; onClose: () => void;
+function ModalModifierLigne({ ligne, budgetId, campagneId, onClose }: {
+  ligne: LigneBudget; budgetId: number; campagneId: number; onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -179,7 +190,7 @@ function ModalModifierLigne({ ligne, budgetId, onClose }: {
   const mutLigne = usePutBudgetIdLigne({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetBudgetCampagneIdQueryKey(CAMPAGNE_ID) });
+        queryClient.invalidateQueries({ queryKey: getGetBudgetCampagneIdQueryKey(campagneId) });
         queryClient.invalidateQueries({ queryKey: getGetBudgetIdRapportQueryKey(budgetId) });
         toast({ title: "Ligne mise à jour" });
         onClose();
@@ -239,7 +250,7 @@ function ModalModifierLigne({ ligne, budgetId, onClose }: {
 }
 
 // ─── Onglet 2 : Budget détaillé ───────────────────────────────────────────────
-function OngletBudgetDetail({ data, budgetId }: { data: BudgetDetail; budgetId: number }) {
+function OngletBudgetDetail({ data, budgetId, campagneId }: { data: BudgetDetail; budgetId: number; campagneId: number }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const peutModifier = usePermission("budget", "modifier");
@@ -249,7 +260,7 @@ function OngletBudgetDetail({ data, budgetId }: { data: BudgetDetail; budgetId: 
   const mutSync = usePostBudgetIdSync({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetBudgetCampagneIdQueryKey(CAMPAGNE_ID) });
+        queryClient.invalidateQueries({ queryKey: getGetBudgetCampagneIdQueryKey(campagneId) });
         toast({ title: "Réalisé synchronisé" });
       },
     },
@@ -258,7 +269,7 @@ function OngletBudgetDetail({ data, budgetId }: { data: BudgetDetail; budgetId: 
   const mutValider = usePutBudgetIdValider({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetBudgetCampagneIdQueryKey(CAMPAGNE_ID) });
+        queryClient.invalidateQueries({ queryKey: getGetBudgetCampagneIdQueryKey(campagneId) });
         toast({ title: "Budget validé ✓" });
       },
     },
@@ -389,7 +400,7 @@ function OngletBudgetDetail({ data, budgetId }: { data: BudgetDetail; budgetId: 
       </div>
 
       {ligneEdit && (
-        <ModalModifierLigne ligne={ligneEdit} budgetId={budgetId} onClose={() => setLigneEdit(null)} />
+        <ModalModifierLigne ligne={ligneEdit} budgetId={budgetId} campagneId={campagneId} onClose={() => setLigneEdit(null)} />
       )}
     </div>
   );
@@ -542,6 +553,8 @@ function OngletSuivi({ budgetId }: { budgetId: number }) {
 // ─── Page principale ───────────────────────────────────────────────────────────
 type Onglet = "hypotheses" | "detail" | "suivi";
 
+interface CampagneActive { id: number; nom: string; statut: string }
+
 export default function BudgetPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -550,26 +563,43 @@ export default function BudgetPage() {
   const [budgetId, setBudgetId] = useState<number | null>(null);
   const [initDone, setInitDone] = useState(false);
 
+  // ── 1. Récupère la campagne ouverte dynamiquement ───────────────────────────
+  const { data: campagne, isLoading: campagneLoading, isError: campagneError } =
+    useQuery<CampagneActive>({
+      queryKey: ["campagne-active"],
+      queryFn: () => apiFetchCampagne<CampagneActive>("/campagnes/active"),
+      retry: false,
+      staleTime: 5 * 60_000,
+    });
+
+  const campagneId = campagne?.id;
+
+  // ── 2. Mutation créer/récupérer budget ──────────────────────────────────────
   const mutCreate = usePostBudgetCampagneId({
     mutation: {
       onSuccess: (data) => {
         setBudgetId(data.budget.id);
-        queryClient.invalidateQueries({ queryKey: getGetBudgetCampagneIdQueryKey(CAMPAGNE_ID) });
+        if (campagneId) {
+          queryClient.invalidateQueries({ queryKey: getGetBudgetCampagneIdQueryKey(campagneId) });
+        }
       },
       onError: () => toast({ title: "Erreur initialisation budget", variant: "destructive" }),
     },
   });
 
+  // ── 3. Auto-init : crée le budget si pas encore fait ─────────────────────────
   useEffect(() => {
-    if (!initDone && peutCreer) {
+    if (!initDone && peutCreer && campagneId) {
       setInitDone(true);
-      mutCreate.mutate({ id: CAMPAGNE_ID });
+      mutCreate.mutate({ id: campagneId });
     }
-  }, [initDone, peutCreer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initDone, peutCreer, campagneId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: budgetData, isLoading } = useGetBudgetCampagneId(CAMPAGNE_ID, {
-    query: { queryKey: getGetBudgetCampagneIdQueryKey(CAMPAGNE_ID), enabled: true, retry: false },
-  });
+  // ── 4. Charge le détail budget ───────────────────────────────────────────────
+  const { data: budgetData, isLoading: budgetLoading } = useGetBudgetCampagneId(
+    campagneId ?? 0,
+    { query: { queryKey: getGetBudgetCampagneIdQueryKey(campagneId ?? 0), enabled: !!campagneId, retry: false } },
+  );
 
   const detail = budgetData as BudgetDetail | undefined;
   const currentBudgetId = budgetId ?? detail?.budget.id;
@@ -580,16 +610,29 @@ export default function BudgetPage() {
     }
   }, [detail?.budget.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const isLoading = campagneLoading || (!!campagneId && budgetLoading && !detail);
+
   const tabs: { id: Onglet; label: string }[] = [
     { id: "hypotheses", label: "Hypothèses de campagne" },
     { id: "detail",     label: "Budget détaillé" },
     { id: "suivi",      label: "Suivi graphique" },
   ];
 
-  if (isLoading && !detail) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-40">
         <div className="w-6 h-6 border-2 border-gray-200 border-t-green-700 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (campagneError || !campagneId) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+        <p className="text-gray-500 font-medium">Aucune campagne ouverte</p>
+        <p className="text-gray-400 text-sm mt-1">
+          Ouvrez ou créez une campagne depuis la page Campagnes pour gérer le budget.
+        </p>
       </div>
     );
   }
@@ -598,7 +641,7 @@ export default function BudgetPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Budget prévisionnel</h1>
-        <p className="text-sm text-gray-500 mt-1">Campagne 2025-2026 — Gestion et suivi budgétaire</p>
+        <p className="text-sm text-gray-500 mt-1">{campagne?.nom ?? ""} — Gestion et suivi budgétaire</p>
       </div>
 
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
@@ -616,21 +659,21 @@ export default function BudgetPage() {
       </div>
 
       {onglet === "hypotheses" && currentBudgetId && (
-        <OngletHypotheses budgetId={currentBudgetId} />
+        <OngletHypotheses budgetId={currentBudgetId} campagneId={campagneId} />
       )}
       {onglet === "detail" && detail && currentBudgetId && (
-        <OngletBudgetDetail data={detail} budgetId={currentBudgetId} />
+        <OngletBudgetDetail data={detail} budgetId={currentBudgetId} campagneId={campagneId} />
       )}
       {onglet === "suivi" && currentBudgetId && (
         <OngletSuivi budgetId={currentBudgetId} />
       )}
 
-      {!detail && !isLoading && (
+      {!detail && !budgetLoading && (
         <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
           <p className="text-gray-400 text-sm">Aucun budget pour cette campagne.</p>
           {peutCreer && (
             <button
-              onClick={() => mutCreate.mutate({ id: CAMPAGNE_ID })}
+              onClick={() => mutCreate.mutate({ id: campagneId })}
               className="mt-3 px-4 py-2 text-sm font-medium text-white rounded-lg"
               style={{ backgroundColor: VERT }}
             >
