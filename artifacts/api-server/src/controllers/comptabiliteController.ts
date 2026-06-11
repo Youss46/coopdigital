@@ -500,154 +500,274 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
   }
 }
 
-// ─── Clôture d'exercice — 6 étapes OHADA SYSCOHADA ───────────────────────────
+// ─── Clôture d'exercice — SYSCOHADA 6 phases complètes ───────────────────────
 export async function cloturerExercice(req: Request, res: Response): Promise<void> {
   try {
-    const coop = coopId(req);
-    const annee = req.body.exercice ? parseInt(String(req.body.exercice)) : exerciceCourant();
+    const coop          = coopId(req);
+    const annee         = req.body.exercice       ? parseInt(String(req.body.exercice))        : exerciceCourant();
+    const stockFinal    = req.body.stockFinalCacao != null ? Math.round(Number(req.body.stockFinalCacao)) : null;
+    const impotResultat = req.body.impotResultat   != null ? Math.round(Number(req.body.impotResultat))   : 0;
 
     if (isNaN(annee) || annee < 2000 || annee > exerciceCourant()) {
-      res.status(400).json({ erreur: "Exercice invalide" });
-      return;
+      res.status(400).json({ erreur: "Exercice invalide" }); return;
     }
 
-    // ── Vérifier si déjà clôturé ─────────────────────────────────────────────
     const existing = await db.select().from(exercicesTable)
       .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, annee)));
-
     if (existing[0]?.statut === "cloture") {
-      res.status(409).json({ erreur: `L'exercice ${annee} est déjà clôturé` });
-      return;
+      res.status(409).json({ erreur: `L'exercice ${annee} est déjà clôturé` }); return;
     }
 
-    // ── Calculer les soldes de tous les groupes de comptes ───────────────────
-    // Solde compte = SUM(crédits) - SUM(débits) pour les produits (solde créditeur normal)
-    //             = SUM(débits) - SUM(crédits) pour les charges (solde débiteur normal)
-    const totaux = await db.execute(sql`
-      SELECT
-        -- Produits d'exploitation (70x, 71x, 75x)
-        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('70','71','75') THEN montant_fcfa ELSE 0 END), 0)
-         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('70','71','75') THEN montant_fcfa ELSE 0 END), 0))::int
-        AS "prodExploitation",
-
-        -- Charges d'exploitation (60x, 61x, 62x, 63x, 64x, 65x)
-        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('60','61','62','63','64','65') THEN montant_fcfa ELSE 0 END), 0)
-         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('60','61','62','63','64','65') THEN montant_fcfa ELSE 0 END), 0))::int
-        AS "chargesExploitation",
-
-        -- Produits financiers (76x)
-        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '76' THEN montant_fcfa ELSE 0 END), 0)
-         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '76' THEN montant_fcfa ELSE 0 END), 0))::int
-        AS "prodFinanciers",
-
-        -- Charges financières (66x)
-        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '66' THEN montant_fcfa ELSE 0 END), 0)
-         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '66' THEN montant_fcfa ELSE 0 END), 0))::int
-        AS "chargesFinancieres",
-
-        -- Produits HAO (77x)
-        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '77' THEN montant_fcfa ELSE 0 END), 0)
-         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '77' THEN montant_fcfa ELSE 0 END), 0))::int
-        AS "prodHAO",
-
-        -- Charges HAO (67x)
-        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '67' THEN montant_fcfa ELSE 0 END), 0)
-         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '67' THEN montant_fcfa ELSE 0 END), 0))::int
-        AS "chargesHAO"
-
-      FROM ecritures_comptables
-      WHERE cooperative_id = ${coop} AND exercice = ${annee}
-        AND LEFT(type_ecriture, 7) != 'cloture'
-    `);
-
-    const g = totaux.rows[0] as {
-      prodExploitation: number; chargesExploitation: number;
-      prodFinanciers: number; chargesFinancieres: number;
-      prodHAO: number; chargesHAO: number;
-    };
-
-    const prodExploitation   = g?.prodExploitation   ?? 0;
-    const chargesExploitation= g?.chargesExploitation?? 0;
-    const prodFinanciers     = g?.prodFinanciers     ?? 0;
-    const chargesFinancieres = g?.chargesFinancieres ?? 0;
-    const prodHAO            = g?.prodHAO            ?? 0;
-    const chargesHAO         = g?.chargesHAO         ?? 0;
-
-    // Soldes intermédiaires (avant écritures de clôture)
-    const solde135 = prodExploitation - chargesExploitation;   // Résultat exploitation
-    const solde136 = prodFinanciers - chargesFinancieres;      // Résultat financier
-    const solde137 = solde135 + solde136;                      // RAO
-    const solde138 = prodHAO - chargesHAO;                     // RHAO
-    const resultatNet = solde137 + solde138;
-
-    const dateClot = `${annee}-12-31`;
+    // ── Type partagé pour toutes les écritures générées ──────────────────────
     type EntreeClot = {
       cooperativeId: number; dateEcriture: string; numeroPiece: string | null;
       libelle: string; compteDebit: string; compteCredit: string;
       montantFcfa: number; source: "manuel"; sourceId: null; exercice: number;
       typeEcriture: string;
     };
+    const dateClot = `${annee}-12-31`;
+    const dateOuv  = `${annee + 1}-01-01`;
+
+    const mkE = (exo: number, type: string) =>
+      (piece: string, libelle: string, debit: string, credit: string, montant: number): EntreeClot[] => {
+        const m = Math.round(montant);
+        if (m <= 0) return [];
+        return [{ cooperativeId: coop, dateEcriture: exo === annee ? dateClot : dateOuv,
+                  numeroPiece: piece, libelle, compteDebit: debit, compteCredit: credit,
+                  montantFcfa: m, source: "manuel", sourceId: null, exercice: exo, typeEcriture: type }];
+      };
+    const ec = mkE(annee, "cloture");
+    const ea = mkE(annee + 1, "a_nouveau");
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // PHASE 1 — Vérifications préalables (informationnel, non-bloquant)
+    // ══════════════════════════════════════════════════════════════════════════
+    const v1 = await db.execute(sql`
+      SELECT
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('52','57') THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('52','57') THEN montant_fcfa ELSE 0 END), 0))::bigint AS "soldeTresorerie",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '40' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '40' THEN montant_fcfa ELSE 0 END), 0))::bigint AS "soldeFournisseurs",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '42' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '42' THEN montant_fcfa ELSE 0 END), 0))::bigint AS "soldePersonnel",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '48' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '48' THEN montant_fcfa ELSE 0 END), 0))::bigint AS "soldeRegularisation",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '31' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '31' THEN montant_fcfa ELSE 0 END), 0))::bigint AS "soldeStock311"
+      FROM ecritures_comptables
+      WHERE cooperative_id = ${coop} AND exercice = ${annee}
+        AND type_ecriture NOT IN ('cloture','a_nouveau')
+    `);
+    const p1 = v1.rows[0] as {
+      soldeTresorerie: number; soldeFournisseurs: number; soldePersonnel: number;
+      soldeRegularisation: number; soldeStock311: number;
+    };
+    const alertes: string[] = [];
+    if (Number(p1?.soldeTresorerie ?? 0) < 0)
+      alertes.push("⚠ Solde trésorerie négatif — vérifier comptes 52x/57x avant clôture");
+    if (Number(p1?.soldeRegularisation ?? 0) !== 0)
+      alertes.push("⚠ Comptes 48x non soldés — régulariser 481/476/477 avant clôture");
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // PHASE 2 — Amortissements non encore journalisés (681 → 28x)
+    // ══════════════════════════════════════════════════════════════════════════
+    const dotRows = await db.execute(sql`
+      SELECT cat.compte_amortissement AS "compteAmort",
+             SUM(d.dotation_fcfa)::bigint AS "total"
+      FROM   dotations_amortissement d
+      JOIN   equipements              e   ON e.id  = d.equipement_id
+      JOIN   categories_equipements   cat ON cat.id = e.categorie_id
+      WHERE  d.cooperative_id = ${coop}
+        AND  d.exercice       = ${annee}
+        AND  d.ecriture_id IS NULL
+      GROUP  BY cat.compte_amortissement
+      HAVING SUM(d.dotation_fcfa) > 0
+    `);
+    const phase2: EntreeClot[] = [];
+    for (const row of dotRows.rows as { compteAmort: string; total: number }[]) {
+      phase2.push(...ec(
+        `CLOT-${annee}-AMORT`,
+        `Dotations amortissements ${annee}`,
+        "681", row.compteAmort || "284",
+        Number(row.total),
+      ));
+    }
+    if (phase2.length > 0) await db.insert(ecrituresComptablesTable).values(phase2);
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // PHASE 3 — Variation de stocks cacao (si stockFinalCacao fourni)
+    // ══════════════════════════════════════════════════════════════════════════
+    const phase3: EntreeClot[] = [];
+    if (stockFinal !== null) {
+      const stockInitial = Math.max(0, Number(p1?.soldeStock311 ?? 0));
+      if (stockInitial > 0)
+        phase3.push(...ec(`CLOT-${annee}-STK-INIT`, `Annulation stock initial cacao ${annee}`, "6031", "311", stockInitial));
+      if (stockFinal > 0)
+        phase3.push(...ec(`CLOT-${annee}-STK-FIN`,  `Constatation stock final cacao ${annee}`, "311", "6031", stockFinal));
+      if (phase3.length > 0) await db.insert(ecrituresComptablesTable).values(phase3);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // PHASE 4 — Calcul des soldes (APRÈS phases 2+3 = journal complet)
+    //   SYSCOHADA correct :
+    //     Charges exploitation : 60x-66x, 68x, 69x (incl. personnel, amort, provisions)
+    //     Charges financières  : 67x  (frais financiers)
+    //     Produits financiers  : 77x  (revenus financiers)
+    //     Produits HAO         : 82x, 84x, 86x
+    //     Charges HAO          : 81x, 83x, 85x
+    // ══════════════════════════════════════════════════════════════════════════
+    const soldesQ = await db.execute(sql`
+      SELECT
+        -- Produits exploitation (70x, 71x, 75x)
+        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('70','71','75') THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('70','71','75') THEN montant_fcfa ELSE 0 END), 0))::bigint
+        AS "prodExpl",
+        -- Charges exploitation (60x–66x, 68x, 69x — personnel, amort, provisions inclus)
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('60','61','62','63','64','65','66','68','69') THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('60','61','62','63','64','65','66','68','69') THEN montant_fcfa ELSE 0 END), 0))::bigint
+        AS "chgExpl",
+        -- Produits financiers (77x — revenus financiers SYSCOHADA)
+        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '77' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '77' THEN montant_fcfa ELSE 0 END), 0))::bigint
+        AS "prodFin",
+        -- Charges financières (67x — frais financiers SYSCOHADA)
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '67' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '67' THEN montant_fcfa ELSE 0 END), 0))::bigint
+        AS "chgFin",
+        -- Produits HAO (82x, 84x, 86x)
+        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('82','84','86') THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('82','84','86') THEN montant_fcfa ELSE 0 END), 0))::bigint
+        AS "prodHAO",
+        -- Charges HAO (81x, 83x, 85x)
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('81','83','85') THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('81','83','85') THEN montant_fcfa ELSE 0 END), 0))::bigint
+        AS "chgHAO"
+      FROM ecritures_comptables
+      WHERE cooperative_id = ${coop} AND exercice = ${annee}
+        AND type_ecriture NOT IN ('cloture','a_nouveau')
+    `);
+    const g = soldesQ.rows[0] as {
+      prodExpl: number; chgExpl: number; prodFin: number; chgFin: number;
+      prodHAO: number; chgHAO: number;
+    };
+    const prodExpl = Number(g?.prodExpl ?? 0);
+    const chgExpl  = Number(g?.chgExpl  ?? 0);
+    const prodFin  = Number(g?.prodFin  ?? 0);
+    const chgFin   = Number(g?.chgFin   ?? 0);
+    const prodHAO  = Number(g?.prodHAO  ?? 0);
+    const chgHAO   = Number(g?.chgHAO   ?? 0);
+
+    // Soldes intermédiaires de gestion
+    const solde135 = prodExpl - chgExpl;        // Résultat exploitation
+    const solde136 = prodFin  - chgFin;          // Résultat financier
+    const solde137 = solde135 + solde136;         // RAO
+    const solde138 = prodHAO  - chgHAO;           // RHAO
+    const resAvantImpot = solde137 + solde138;
+    const resultatNet   = resAvantImpot - impotResultat;
+
     const entries: EntreeClot[] = [];
 
-    const add = (piece: string, libelle: string, debit: string, credit: string, montant: number) => {
-      if (montant <= 0) return;
-      entries.push({ cooperativeId: coop, dateEcriture: dateClot, numeroPiece: piece, libelle, compteDebit: debit, compteCredit: credit, montantFcfa: Math.round(montant), source: "manuel", sourceId: null, exercice: annee, typeEcriture: "cloture" });
-    };
+    // ── Phase 4A : Résultat d'exploitation → 135 ─────────────────────────────
+    entries.push(...ec(`CLOT-${annee}-E1-PRD`, `Clôture exploitation ${annee}`, "701", "135", prodExpl));
+    entries.push(...ec(`CLOT-${annee}-E1-CHG`, `Clôture exploitation ${annee}`, "135", "601", chgExpl));
 
-    // ── ÉTAPE 1 : Résultat d'exploitation → compte 135 ───────────────────────
-    const lib1 = `Clôture exploitation ${annee}`;
-    add(`CLOT-${annee}-E1-PRD`, lib1, "701", "135", prodExploitation);
-    add(`CLOT-${annee}-E1-CHG`, lib1, "135", "601", chargesExploitation);
+    // ── Phase 4B : Résultat financier → 136 ──────────────────────────────────
+    entries.push(...ec(`CLOT-${annee}-E2-PRD`, `Clôture financier ${annee}`, "771", "136", prodFin));
+    entries.push(...ec(`CLOT-${annee}-E2-CHG`, `Clôture financier ${annee}`, "136", "671", chgFin));
 
-    // ── ÉTAPE 2 : Résultat financier → compte 136 ────────────────────────────
-    const lib2 = `Clôture financier ${annee}`;
-    add(`CLOT-${annee}-E2-PRD`, lib2, "760", "136", prodFinanciers);
-    add(`CLOT-${annee}-E2-CHG`, lib2, "136", "660", chargesFinancieres);
+    // ── Phase 4C : RAO — virer 135 + 136 → 137 ───────────────────────────────
+    if (solde135 > 0) entries.push(...ec(`CLOT-${annee}-E3-135P`, `Calcul RAO ${annee}`, "135",    "137",    solde135));
+    if (solde135 < 0) entries.push(...ec(`CLOT-${annee}-E3-135N`, `Calcul RAO ${annee}`, "137",    "135",   -solde135));
+    if (solde136 > 0) entries.push(...ec(`CLOT-${annee}-E3-136P`, `Calcul RAO ${annee}`, "136",    "137",    solde136));
+    if (solde136 < 0) entries.push(...ec(`CLOT-${annee}-E3-136N`, `Calcul RAO ${annee}`, "137",    "136",   -solde136));
 
-    // ── ÉTAPE 3 : Virer 135 + 136 → compte 137 (RAO) ────────────────────────
-    const lib3 = `Calcul RAO ${annee}`;
-    if (solde135 > 0)  add(`CLOT-${annee}-E3-135`, lib3, "135", "137",  solde135);
-    if (solde135 < 0)  add(`CLOT-${annee}-E3-135`, lib3, "137", "135", -solde135);
-    if (solde136 > 0)  add(`CLOT-${annee}-E3-136`, lib3, "136", "137",  solde136);
-    if (solde136 < 0)  add(`CLOT-${annee}-E3-136`, lib3, "137", "136", -solde136);
+    // ── Phase 4D : RHAO → 138 ────────────────────────────────────────────────
+    entries.push(...ec(`CLOT-${annee}-E4-PRD`, `Clôture HAO ${annee}`, "820", "138", prodHAO));
+    entries.push(...ec(`CLOT-${annee}-E4-CHG`, `Clôture HAO ${annee}`, "138", "810", chgHAO));
 
-    // ── ÉTAPE 4 : Résultat HAO → compte 138 ─────────────────────────────────
-    const lib4 = `Clôture HAO ${annee}`;
-    add(`CLOT-${annee}-E4-PRD`, lib4, "770", "138", prodHAO);
-    add(`CLOT-${annee}-E4-CHG`, lib4, "138", "670", chargesHAO);
+    // ── Phase E : Impôt sur le résultat (891 / 441) ───────────────────────────
+    if (impotResultat > 0)
+      entries.push(...ec(`CLOT-${annee}-IMPOT`, `Impôt sur résultat ${annee}`, "891", "441", impotResultat));
 
-    // ── ÉTAPE 5 : Résultat net → 131 (bénéfice) ou 139 (perte) ──────────────
-    const lib5 = `Résultat net ${annee}`;
-    const cptRes = resultatNet >= 0 ? "131" : "139";
-    if (solde137 > 0)  add(`CLOT-${annee}-E5-137`, lib5, "137",   cptRes, solde137);
-    if (solde137 < 0)  add(`CLOT-${annee}-E5-137`, lib5, cptRes, "137",  -solde137);
-    if (solde138 > 0)  add(`CLOT-${annee}-E5-138`, lib5, "138",   cptRes, solde138);
-    if (solde138 < 0)  add(`CLOT-${annee}-E5-138`, lib5, cptRes, "138",  -solde138);
+    // ── Phase F : Résultat net → 131 (bénéfice) ou 139 (perte) ───────────────
+    const cptRes  = resultatNet >= 0 ? "131" : "139";
+    const libRes  = `Résultat net ${annee}`;
+    if (solde137 > 0)        entries.push(...ec(`CLOT-${annee}-E5-137P`, libRes, "137",   cptRes,  solde137));
+    if (solde137 < 0)        entries.push(...ec(`CLOT-${annee}-E5-137N`, libRes, cptRes,  "137",  -solde137));
+    if (solde138 > 0)        entries.push(...ec(`CLOT-${annee}-E5-138P`, libRes, "138",   cptRes,  solde138));
+    if (solde138 < 0)        entries.push(...ec(`CLOT-${annee}-E5-138N`, libRes, cptRes,  "138",  -solde138));
+    if (impotResultat > 0)   entries.push(...ec(`CLOT-${annee}-E5-IMP`,  libRes, cptRes,  "891",   impotResultat));
 
-    // ── Insérer toutes les écritures ─────────────────────────────────────────
-    if (entries.length > 0) {
-      await db.insert(ecrituresComptablesTable).values(entries);
+    if (entries.length > 0) await db.insert(ecrituresComptablesTable).values(entries);
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // PHASE 5 — Balance d'ouverture (À-nouveaux exercice+1)
+    //   Tous les comptes classes 1,2,3,4,5 avec solde non nul
+    //   Solde débiteur  → DEBIT compte  / CREDIT "ANOUV"
+    //   Solde créditeur → DEBIT "ANOUV" / CREDIT compte
+    // ══════════════════════════════════════════════════════════════════════════
+    const bilanQ = await db.execute(sql`
+      SELECT compte, (SUM(td) - SUM(tc))::bigint AS solde
+      FROM (
+        SELECT compte_debit  AS compte, montant_fcfa AS td, 0 AS tc
+        FROM   ecritures_comptables
+        WHERE  cooperative_id = ${coop} AND exercice = ${annee}
+          AND  LEFT(compte_debit, 1) IN ('1','2','3','4','5')
+        UNION ALL
+        SELECT compte_credit AS compte, 0 AS td, montant_fcfa AS tc
+        FROM   ecritures_comptables
+        WHERE  cooperative_id = ${coop} AND exercice = ${annee}
+          AND  LEFT(compte_credit, 1) IN ('1','2','3','4','5')
+      ) t
+      GROUP  BY compte
+      HAVING SUM(td) - SUM(tc) != 0
+      ORDER  BY compte
+    `);
+    const aNouveaux: EntreeClot[] = [];
+    for (const row of bilanQ.rows as { compte: string; solde: number }[]) {
+      const s = Number(row.solde);
+      if (s > 0)      aNouveaux.push(...ea(`AN-${annee + 1}`, `À-nouveau ${annee + 1}`, row.compte, "ANOUV", s));
+      else if (s < 0) aNouveaux.push(...ea(`AN-${annee + 1}`, `À-nouveau ${annee + 1}`, "ANOUV", row.compte, -s));
     }
+    if (aNouveaux.length > 0) await db.insert(ecrituresComptablesTable).values(aNouveaux);
 
-    // ── ÉTAPE 6 : Verrouiller l'exercice ────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    // PHASE 6 — Verrouillage exercice clôturé + ouverture exercice suivant
+    // ══════════════════════════════════════════════════════════════════════════
     if (existing.length > 0) {
       await db.update(exercicesTable)
-        .set({ statut: "cloture" })
+        .set({ statut: "cloture", dateCloture: new Date() })
         .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, annee)));
     } else {
-      await db.insert(exercicesTable).values({ cooperativeId: coop, annee, statut: "cloture" });
+      await db.insert(exercicesTable).values({ cooperativeId: coop, annee, statut: "cloture", dateCloture: new Date() });
     }
+    const nextEx = await db.select().from(exercicesTable)
+      .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, annee + 1)));
+    if (nextEx.length === 0)
+      await db.insert(exercicesTable).values({ cooperativeId: coop, annee: annee + 1, statut: "ouvert" });
 
     res.json({
       message: `Exercice ${annee} clôturé avec succès`,
       exercice: annee,
-      soldeResultatExploitation: solde135,
-      soldeResultatFinancier: solde136,
-      soldeRAO: solde137,
-      soldeRHAO: solde138,
-      resultatNet,
+      prochainExercice: annee + 1,
+      alertes,
+      soldes: {
+        exploitation: solde135,
+        financier:    solde136,
+        rao:          solde137,
+        rhao:         solde138,
+        avantImpot:   resAvantImpot,
+        impot:        impotResultat,
+        net:          resultatNet,
+      },
       compteResultat: cptRes,
-      ecrituresGenerees: entries.length,
+      ecrituresGenerees: phase2.length + phase3.length + entries.length + aNouveaux.length,
+      detailEcritures: {
+        amortissements:  phase2.length,
+        variationStocks: phase3.length,
+        cloture:         entries.length,
+        aNouveaux:       aNouveaux.length,
+      },
     });
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
