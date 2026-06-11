@@ -23,7 +23,7 @@ interface CarteMembre {
 }
 
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("coop_token");
   const res = await fetch(`${BASE}/api${path}`, {
     ...init,
     headers: {
@@ -92,7 +92,7 @@ export default function CartesMembres() {
     suspendues: cartes.filter((c) => c.carteStatut === "suspendue").length,
   };
 
-  const token = localStorage.getItem("token") ?? "";
+  const token = localStorage.getItem("coop_token") ?? "";
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
