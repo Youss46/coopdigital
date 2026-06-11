@@ -11,10 +11,12 @@ import {
   getRecuLivraisonHandler,
   getCarteMembreHandler,
   savePhotoHandler,
+  verifierMembreHandler,
 } from "../controllers/portailController";
 
 const router = Router();
 
+router.get("/portail/verifier/:code", verifierMembreHandler);
 router.post("/portail/connexion", connexionPortail);
 
 router.get("/portail/profil",          portailAuthMiddleware, getProfilHandler);

@@ -8,6 +8,7 @@ import PartsSocialesPage from "@/pages/PartsSocialesPage";
 import DocumentsPage from "@/pages/DocumentsPage";
 import { InstallBanner, OfflineBanner, OnlineToast } from "@/components/InstallPrompt";
 import { Loader2 } from "lucide-react";
+import VerifierPage from "@/pages/VerifierPage";
 
 function AppRoutes() {
   const { profil, loading } = useAuth();
@@ -23,6 +24,7 @@ function AppRoutes() {
   if (!profil) {
     return (
       <Switch>
+        <Route path="/verifier/:code" component={VerifierPage} />
         <Route path="/connexion" component={ConnexionPage} />
         <Route><Redirect to="/connexion" /></Route>
       </Switch>

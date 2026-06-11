@@ -375,6 +375,43 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
 
 // ─── PDF carte membre ─────────────────────────────────────────────────────────
 
+// ─── Vérification publique d'une carte (sans auth) ───────────────────────────
+export async function verifierMembrePublic(codeMembre: string): Promise<{
+  nom: string; prenoms: string; coopNom: string; coopVille: string;
+  statut: string; village: string | null; superficieHa: string | null;
+  dateAdhesion: string; codeMembre: string;
+} | null> {
+  // Extraire l'id depuis le format MBR-AAAA-NNNN
+  const match = codeMembre.match(/^MBR-\d{4}-(\d+)$/);
+  if (!match) return null;
+  const id = parseInt(match[1]!, 10);
+
+  const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, id));
+  if (!membre) return null;
+
+  // Vérifier que le code calculé correspond bien
+  const codeCalcule = computeCodeMembre(membre.id, membre.dateAdhesion);
+  if (codeCalcule !== codeMembre) return null;
+
+  const [coop] = await db
+    .select({ nom: sql<string>`nom`, ville: sql<string>`ville` })
+    .from(sql`cooperatives`)
+    .where(sql`id = ${membre.cooperativeId}`)
+    .limit(1);
+
+  return {
+    nom: membre.nom,
+    prenoms: membre.prenoms ?? "",
+    coopNom: (coop as Record<string, string> | undefined)?.nom ?? "CoopDigital",
+    coopVille: (coop as Record<string, string> | undefined)?.ville ?? "",
+    statut: membre.statut,
+    village: membre.village ?? null,
+    superficieHa: membre.superficieHa ?? null,
+    dateAdhesion: membre.dateAdhesion,
+    codeMembre,
+  };
+}
+
 export async function generateCarteMembre(membreId: number): Promise<Buffer> {
   const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, membreId));
   if (!membre) throw new Error("Membre introuvable");
@@ -390,7 +427,11 @@ export async function generateCarteMembre(membreId: number): Promise<Buffer> {
   const carteNo = membre.carteNumero ?? `C-${new Date().getFullYear()}-${String(membre.id).padStart(6, "0")}`;
 
   // ── QR code (PNG buffer) ─────────────────────────────────────────────────
-  const qrBuffer: Buffer = await QRCode.toBuffer(codeMembre, {
+  const host = (process.env.REPLIT_DOMAINS ?? "").split(",")[0]?.trim() || "localhost";
+  const verifyUrl = host === "localhost"
+    ? `http://localhost/portail/verifier/${codeMembre}`
+    : `https://${host}/portail/verifier/${codeMembre}`;
+  const qrBuffer: Buffer = await QRCode.toBuffer(verifyUrl, {
     type: "png",
     width: 140,
     margin: 1,
@@ -515,7 +556,7 @@ export async function generateCarteMembre(membreId: number): Promise<Buffer> {
 
   const isActif = membre.statut === "actif";
   doc.fontSize(9).font("Helvetica-Bold").fillColor(isActif ? "#22c55e" : "#ef4444")
-    .text(isActif ? "● ACTIF" : "● INACTIF", 14, H - 27);
+    .text(isActif ? "\u2022 ACTIF" : "\u2022 INACTIF", 14, H - 27);
   doc.fontSize(8).font("Helvetica").fillColor("#86efac").text(carteNo, 105, H - 27);
   doc.fontSize(6.5).fillColor(VERT_CLAIR)
     .text("CoopDigital — Système de gestion coopérative", 0, H - 14, { width: W, align: "center" });

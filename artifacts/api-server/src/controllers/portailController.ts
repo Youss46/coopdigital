@@ -12,6 +12,7 @@ import {
   getScoreMembre,
   generateRecuLivraison,
   generateCarteMembre,
+  verifierMembrePublic,
 } from "../services/portailService";
 import { db, membresTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -209,6 +210,20 @@ export async function savePhotoHandler(req: Request, res: Response): Promise<voi
       .set({ photoUrl: url })
       .where(eq(membresTable.id, membreId));
     res.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur";
+    res.status(500).json({ erreur: msg });
+  }
+}
+
+// ─── GET /portail/verifier/:code — public, sans auth ─────────────────────────
+export async function verifierMembreHandler(req: Request, res: Response): Promise<void> {
+  const code = String(req.params["code"] ?? "").trim().toUpperCase();
+  if (!code) { res.status(400).json({ erreur: "Code membre requis" }); return; }
+  try {
+    const data = await verifierMembrePublic(code);
+    if (!data) { res.status(404).json({ erreur: "Carte non reconnue" }); return; }
+    res.json(data);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur";
     res.status(500).json({ erreur: msg });
