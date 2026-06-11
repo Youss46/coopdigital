@@ -80,17 +80,20 @@ export default function DocumentsPage() {
   const token = localStorage.getItem("portail_token") ?? "";
   const carteUrl = api.carteMembreUrl();
   const downloadCarte = () => {
+    const filename = `carte-${profil?.codeMembre ?? "membre"}.pdf`;
+    const a = document.createElement("a");
+    a.target = "_blank";
+    a.rel = "noreferrer";
     fetch(carteUrl, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => {
-        if (!r.ok) return r.json().then(b => { throw new Error((b as { erreur?: string }).erreur ?? "Erreur"); });
-        return r.blob();
-      })
+      .then(r => r.blob())
       .then(blob => {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `carte-${profil?.codeMembre ?? "membre"}.pdf`;
+        const burl = URL.createObjectURL(blob);
+        a.href = burl;
+        a.download = filename;
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(a.href);
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(burl), 1000);
       })
       .catch(err => alert(err instanceof Error ? err.message : "Erreur téléchargement"));
   };

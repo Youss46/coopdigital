@@ -80,7 +80,11 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
-            urlPattern: /^\/api\/portail\//,
+            // Exclure les endpoints PDF/binaires du cache SW (carte-membre, recus)
+            urlPattern: ({ url }: { url: URL }) =>
+              url.pathname.startsWith("/api/portail/") &&
+              !url.pathname.includes("carte-membre") &&
+              !url.pathname.includes("/recus/"),
             handler: "NetworkFirst",
             options: {
               cacheName: "api-portail-v1",
