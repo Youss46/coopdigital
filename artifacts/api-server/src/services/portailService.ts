@@ -427,13 +427,18 @@ export async function generateCarteMembre(membreId: number): Promise<Buffer> {
   const carteNo = membre.carteNumero ?? `C-${new Date().getFullYear()}-${String(membre.id).padStart(6, "0")}`;
 
   // ── QR code (PNG buffer) ─────────────────────────────────────────────────
-  const host = (process.env.REPLIT_DOMAINS ?? "").split(",")[0]?.trim() || "localhost";
-  const verifyUrl = host === "localhost"
-    ? `http://localhost/portail/verifier/${codeMembre}`
-    : `https://${host}/portail/verifier/${codeMembre}`;
+  // PORTAIL_BASE_URL doit être défini en production (ex: https://mon-domaine.ci)
+  const portailBase =
+    process.env.PORTAIL_BASE_URL?.replace(/\/$/, "") ||
+    (process.env.REPLIT_DOMAINS
+      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]?.trim()}`
+      : null);
+  const verifyUrl = portailBase
+    ? `${portailBase}/portail/verifier/${codeMembre}`
+    : `https://coopdigital.app/portail/verifier/${codeMembre}`;
   const qrBuffer: Buffer = await QRCode.toBuffer(verifyUrl, {
     type: "png",
-    width: 140,
+    width: 120,
     margin: 1,
     color: { dark: "#1a4731", light: "#ffffff" },
   });
@@ -543,13 +548,14 @@ export async function generateCarteMembre(membreId: number): Promise<Buffer> {
   doc.restore();
   doc.circle(photoCX, photoCY, photoR).lineWidth(2.5).strokeColor(OR).stroke();
 
-  // ── QR code ──
-  const qrSize = 68;
-  const qrX = W - 14 - qrSize, qrY = H - 14 - 38 - qrSize;
-  doc.rect(qrX - 3, qrY - 3, qrSize + 6, qrSize + 6).fill(BLANC);
+  // ── QR code — positionné sous le cercle photo ──
+  const qrSize = 45;
+  const qrX = W - 12 - qrSize;          // aligné à droite
+  const qrY = photoCY + photoR + 6;     // 6 px sous le bas du cercle (y=164)
+  doc.rect(qrX - 2, qrY - 2, qrSize + 4, qrSize + 4).fill(BLANC);
   doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
-  doc.fontSize(5.5).fillColor(VERT_CLAIR).font("Helvetica")
-    .text("SCANNER", qrX - 3, qrY + qrSize + 4, { width: qrSize + 6, align: "center" });
+  doc.fontSize(5).fillColor(VERT_CLAIR).font("Helvetica")
+    .text("SCANNER", qrX - 2, qrY + qrSize + 3, { width: qrSize + 4, align: "center" });
 
   // ── Bandeau inférieur ──
   doc.rect(0, H - 38, W, 38).fill(VERT_DARK);
