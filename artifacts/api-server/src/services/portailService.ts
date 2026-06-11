@@ -89,11 +89,36 @@ export async function authentifierMembre(
 // ─── Profil ───────────────────────────────────────────────────────────────────
 
 export async function getProfilMembre(membreId: number) {
+  // Sélection explicite des colonnes stables (migration 0000) pour résister
+  // à une DB de production qui n'aurait pas encore les migrations récentes.
   const [membre] = await db
-    .select()
+    .select({
+      id:            membresTable.id,
+      nom:           membresTable.nom,
+      prenoms:       membresTable.prenoms,
+      telephone:     membresTable.telephone,
+      village:       membresTable.village,
+      groupement:    membresTable.groupement,
+      section:       membresTable.section,
+      superficieHa:  membresTable.superficieHa,
+      dateAdhesion:  membresTable.dateAdhesion,
+      statut:        membresTable.statut,
+      photoUrl:      membresTable.photoUrl,
+      cooperativeId: membresTable.cooperativeId,
+    })
     .from(membresTable)
     .where(eq(membresTable.id, membreId));
   if (!membre) throw new Error("Membre introuvable");
+
+  // carteStatut ajouté en migration 0012 — peut être absent sur anciens déploiements
+  let carteStatut = "non_emise";
+  try {
+    const res = await db
+      .select({ carteStatut: membresTable.carteStatut })
+      .from(membresTable)
+      .where(eq(membresTable.id, membreId));
+    carteStatut = res[0]?.carteStatut ?? "non_emise";
+  } catch { /* colonne absente — on garde "non_emise" */ }
 
   const [campagneActive] = await db
     .select({ id: campagnesTable.id, libelle: campagnesTable.libelle })
@@ -112,7 +137,7 @@ export async function getProfilMembre(membreId: number) {
     dateAdhesion: membre.dateAdhesion,
     statut: membre.statut,
     photoUrl: membre.photoUrl ?? null,
-    carteStatut: membre.carteStatut ?? "non_emise",
+    carteStatut,
     campagneActive: campagneActive ?? null,
   };
 }
