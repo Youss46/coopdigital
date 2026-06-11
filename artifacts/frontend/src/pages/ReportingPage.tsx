@@ -377,7 +377,7 @@ function TabRapports() {
       {
         titre: "Rapport mensuel – mois précédent",
         description: `Synthèse complète de ${new Date(anneeMoisPrecedent, moisPrecedent - 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })} : livraisons, ventes, compte de résultat.`,
-        url: `/api/rapports/mensuel/${moisPrecedent}/${anneeMoisPrecedent}`,
+        url: `${BASE}/api/rapports/mensuel/${moisPrecedent}/${anneeMoisPrecedent}`,
         fichier: `rapport_${anneeMoisPrecedent}_${String(moisPrecedent).padStart(2, "0")}.pdf`,
         cle: "mensuel_precedent",
         icone: "📄",
@@ -385,7 +385,7 @@ function TabRapports() {
       {
         titre: "Rapport mensuel – mois courant",
         description: `Synthèse en cours pour ${new Date(annee, mois - 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}.`,
-        url: `/api/rapports/mensuel/${mois}/${annee}`,
+        url: `${BASE}/api/rapports/mensuel/${mois}/${annee}`,
         fichier: `rapport_${annee}_${String(mois).padStart(2, "0")}.pdf`,
         cle: "mensuel_courant",
         icone: "📋",
@@ -395,7 +395,7 @@ function TabRapports() {
       {
         titre: `Bilan de campagne ${annee}`,
         description: `Bilan annuel complet ${annee} : top producteurs, exportateurs, compte de résultat, ventilation mensuelle.`,
-        url: `/api/rapports/campagne/${annee}`,
+        url: `${BASE}/api/rapports/campagne/${annee}`,
         fichier: `bilan_campagne_${annee}.pdf`,
         cle: `bilan_${annee}`,
         icone: "📊",
@@ -403,7 +403,7 @@ function TabRapports() {
       {
         titre: `Bilan de campagne ${annee - 1}`,
         description: `Bilan annuel complet ${annee - 1} (exercice clos).`,
-        url: `/api/rapports/campagne/${annee - 1}`,
+        url: `${BASE}/api/rapports/campagne/${annee - 1}`,
         fichier: `bilan_campagne_${annee - 1}.pdf`,
         cle: `bilan_${annee - 1}`,
         icone: "📁",
