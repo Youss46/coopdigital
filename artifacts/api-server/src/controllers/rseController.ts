@@ -42,9 +42,15 @@ export async function calculerIndicateursHandler(req: Request, res: Response): P
   const campagneId = parseInt(String(req.params["campagne_id"] ?? ""), 10);
   if (!coopId || isNaN(campagneId)) { res.status(400).json({ error: "Paramètres invalides" }); return; }
 
-  req.log.info({ coopId, campagneId }, "RSE: calcul indicateurs");
-  const ind = await calculerIndicateurs(coopId, campagneId, req.user?.id);
-  res.json({ success: true, indicateurs: ind });
+  try {
+    req.log.info({ coopId, campagneId }, "RSE: calcul indicateurs");
+    const ind = await calculerIndicateurs(coopId, campagneId, req.user?.id);
+    res.json({ success: true, indicateurs: ind });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur interne";
+    req.log.error({ err, coopId, campagneId }, "RSE: erreur calcul indicateurs");
+    res.status(500).json({ error: `Erreur lors du calcul des indicateurs : ${msg}` });
+  }
 }
 
 export async function getComparaisonHandler(req: Request, res: Response): Promise<void> {

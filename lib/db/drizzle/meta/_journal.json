@@ -92,6 +92,13 @@
       "when": 1750062000000,
       "tag": "0012_membres_carte",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1749975600000,
+      "tag": "0013_rse_unique_constraint",
+      "breakpoints": true
     }
   ]
 }
