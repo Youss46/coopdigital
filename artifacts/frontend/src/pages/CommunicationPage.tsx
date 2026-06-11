@@ -145,14 +145,6 @@ function TabComposer({ onSuccess }: { onSuccess: () => void }) {
         />
       </div>
 
-      {sujet.trim() && contenu.trim() && (
-        <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 space-y-1">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Aperçu</p>
-          <p className="text-sm font-semibold text-gray-900">{sujet}</p>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{contenu}</p>
-        </div>
-      )}
-
       <button
         onClick={() => mutation.mutate()}
         disabled={!sujet.trim() || !contenu.trim() || mutation.isPending}
