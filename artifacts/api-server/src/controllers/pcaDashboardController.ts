@@ -149,6 +149,8 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
     const tonnageCampagne = tonnageCampagneRow?.t ?? 0;
     const objectifCampagne = hypotheseRows[0]?.tonnagePrev ? Number(hypotheseRows[0].tonnagePrev) * 1000 : 0;
 
+    const exerciceCourant = new Date().getFullYear();
+
     // 3. Financier (parallel)
     const [
       [caRow],
@@ -157,6 +159,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
       [avancesRow],
       [empruntsRow],
       [tresorerieRow],
+      [fluxRow],
       creancesEnRetardRows,
     ] = await Promise.all([
       campagneId && campagne
@@ -201,6 +204,14 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
         }).from(caissesTable)
         .where(and(eq(caissesTable.cooperativeId, cooperativeId), eq(caissesTable.actif, true))),
 
+      db.execute(sql`
+        SELECT
+          COALESCE(SUM(CASE WHEN compte_debit = '521' THEN montant_fcfa ELSE 0 END), 0)::bigint AS "totalEntrees",
+          COALESCE(SUM(CASE WHEN compte_credit = '521' THEN montant_fcfa ELSE 0 END), 0)::bigint AS "totalSorties"
+        FROM ecritures_comptables
+        WHERE cooperative_id = ${cooperativeId} AND exercice = ${exerciceCourant}
+      `).then(r => [r.rows[0] as { totalEntrees: number; totalSorties: number } | undefined]),
+
       db.select({ count: sql<number>`count(*)::int` })
         .from(ventesExportateursTable)
         .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
@@ -211,7 +222,9 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
     const bilan = bilanRow ?? null;
     const margeNette = bilan ? Number(bilan.margeNetteFcfa ?? 0) : Math.round(caCampagne * 0.09);
     const margeKg = tonnageCampagne > 0 ? Math.round(margeNette / (tonnageCampagne / 1000)) : 0;
-    const tresorerieDisponible = Number(tresorerieRow?.tresorerie ?? 0);
+    const soldeCaisses = Number(tresorerieRow?.tresorerie ?? 0);
+    const fluxNet = Number(fluxRow?.totalEntrees ?? 0) - Number(fluxRow?.totalSorties ?? 0);
+    const tresorerieDisponible = soldeCaisses + fluxNet;
 
     // 4. Budget
     const [budgetRows, lignesDepassementRows] = await Promise.all([
