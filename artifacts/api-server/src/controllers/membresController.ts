@@ -359,6 +359,7 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
         village: data.village ?? null,
         groupement: data.groupement ?? null,
         numeroCni: data.numeroCni ?? null,
+        carteProducteur: (body["carteProducteur"] ?? null) as string | null,
         sexe: (data.sexe ?? body["sexe"] ?? null) as string | null,
         dateNaissance: (data.dateNaissance ?? body["dateNaissance"] ?? null) as string | null,
         photoUrl: data.photoUrl ?? null,
@@ -497,6 +498,7 @@ export async function updateMembre(req: Request, res: Response): Promise<void> {
     if (body["nbrePartsSouscrites"] !== undefined) extraFields["nbrePartsSouscrites"] = Number(body["nbrePartsSouscrites"]);
     if (body["superficieTotale"] !== undefined) extraFields["superficieTotale"]  = String(body["superficieTotale"]);
     if (body["nombreParcelles"] !== undefined)  extraFields["nombreParcelles"]   = Number(body["nombreParcelles"]);
+    if (body["carteProducteur"] !== undefined)  extraFields["carteProducteur"]   = (body["carteProducteur"] as string | null) ?? null;
 
     const [membre] = await db
       .update(membresTable)

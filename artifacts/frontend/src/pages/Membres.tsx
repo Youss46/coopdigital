@@ -600,6 +600,15 @@ export default function Membres() {
                 </div>
               </div>
 
+              {/* Carte producteur */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">N° Carte producteur <span className="text-gray-400">(optionnel — délivré par le Ministère de l'Agriculture)</span></label>
+                <input value={((form as Record<string, unknown>)["carteProducteur"] as string) ?? ""}
+                  onChange={(e) => setForm({ ...form, carteProducteur: e.target.value } as typeof form)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1"
+                  placeholder="Ex : CP-2024-00001" />
+              </div>
+
               {/* Village + Groupement */}
               <div className="grid grid-cols-2 gap-3">
                 <div>

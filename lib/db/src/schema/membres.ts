@@ -59,6 +59,9 @@ export const membresTable = pgTable("membres", {
   validePar: integer("valide_par"),
   dateValidation: timestamp("date_validation", { withTimezone: true }),
 
+  // ── Carte producteur (Ministère de l'Agriculture) ───────────────────────────
+  carteProducteur: varchar("carte_producteur", { length: 100 }),
+
   // ── Contact enrichi ─────────────────────────────────────────────────────────
   telephoneSecondaire: varchar("telephone_secondaire", { length: 20 }),
 
