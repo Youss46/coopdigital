@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { usePushSubscription } from "@/hooks/usePushSubscription";
 import SplashScreen from "@/components/SplashScreen";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -75,6 +76,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
 function AppRoutes() {
   const { estConnecte, utilisateur } = useAuth();
+  usePushSubscription(estConnecte);
   const accueil = utilisateur?.role === "agent_terrain" ? "/missions" : "/dashboard";
   return (
     <Switch>

@@ -9,8 +9,17 @@ import {
   getPreferences,
   updatePreferences,
 } from "../controllers/notificationsController";
+import {
+  getVapidPublicKey,
+  subscribePush,
+  unsubscribePush,
+} from "../controllers/pushController";
 
 const router = Router();
+
+router.get("/notifications/push/vapid-key",  getVapidPublicKey);
+router.post("/notifications/push/subscribe", authMiddleware, subscribePush);
+router.delete("/notifications/push/subscribe", authMiddleware, unsubscribePush);
 
 router.get("/notifications/count",          authMiddleware, getNotificationsCount);
 router.get("/notifications/preferences",    authMiddleware, getPreferences);
