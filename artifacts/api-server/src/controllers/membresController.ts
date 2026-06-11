@@ -930,3 +930,107 @@ export async function rejeterMembre(req: Request, res: Response): Promise<void> 
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
+
+// ─── GET /membres/cartes — liste des cartes membres ───────────────────────────
+
+export async function getCartesMembres(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non identifiée" }); return; }
+
+  try {
+    const rows = await db
+      .select({
+        id: membresTable.id,
+        nom: membresTable.nom,
+        prenoms: membresTable.prenoms,
+        telephone: membresTable.telephone,
+        village: membresTable.village,
+        dateAdhesion: membresTable.dateAdhesion,
+        statut: membresTable.statut,
+        photoUrl: membresTable.photoUrl,
+        carteStatut: membresTable.carteStatut,
+        carteNumero: membresTable.carteNumero,
+        carteGenereLe: membresTable.carteGenereLe,
+        carteSuspendueLe: membresTable.carteSuspendueLe,
+      })
+      .from(membresTable)
+      .where(eq(membresTable.cooperativeId, cooperativeId))
+      .orderBy(asc(membresTable.nom), asc(membresTable.prenoms));
+
+    res.json(rows);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getCartesMembres");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── GET /membres/:id/carte-pdf — télécharger la carte PDF ───────────────────
+
+export async function getMembreCartePdf(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non identifiée" }); return; }
+
+  const id = parseInt(String(req.params["id"] ?? ""), 10);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+
+  try {
+    const [membre] = await db.select()
+      .from(membresTable)
+      .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!membre) { res.status(404).json({ erreur: "Membre introuvable" }); return; }
+    if (membre.carteStatut === "suspendue") { res.status(403).json({ erreur: "Carte suspendue" }); return; }
+
+    const { generateCarteMembre } = await import("../services/portailService");
+    const pdf = await generateCarteMembre(id);
+    const code = `MBR-${new Date(membre.dateAdhesion).getFullYear()}-${String(membre.id).padStart(4, "0")}`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="carte-${code}.pdf"`);
+    res.send(pdf);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getMembreCartePdf");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── PATCH /membres/:id/carte-statut — suspendre/activer ────────────────────
+
+export async function updateCarteStatut(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non identifiée" }); return; }
+
+  const id = parseInt(String(req.params["id"] ?? ""), 10);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+
+  const { action, motif } = req.body as { action?: string; motif?: string };
+  if (action !== "suspendre" && action !== "activer") {
+    res.status(400).json({ erreur: "action doit être 'suspendre' ou 'activer'" });
+    return;
+  }
+  if (action === "suspendre" && !motif?.trim()) {
+    res.status(400).json({ erreur: "Motif requis pour suspension" });
+    return;
+  }
+
+  try {
+    const [membre] = await db.select()
+      .from(membresTable)
+      .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!membre) { res.status(404).json({ erreur: "Membre introuvable" }); return; }
+
+    const updates =
+      action === "suspendre"
+        ? { carteStatut: "suspendue" as const, carteSuspendueLe: new Date() }
+        : { carteStatut: (membre.carteGenereLe ? "active" : "non_emise") as "active" | "non_emise", carteSuspendueLe: null };
+
+    await db.update(membresTable).set(updates).where(eq(membresTable.id, id));
+
+    res.json({ ok: true, carteStatut: updates.carteStatut });
+  } catch (err) {
+    req.log.error({ err }, "Erreur updateCarteStatut");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}

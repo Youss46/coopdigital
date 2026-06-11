@@ -53,6 +53,7 @@ import InvestissementsPage from "@/pages/InvestissementsPage";
 import DeleguesPage from "@/pages/DeleguesPage";
 import ChangerMotDePassePage from "@/pages/ChangerMotDePassePage";
 import FinancesTableauBordPage from "@/pages/FinancesTableauBordPage";
+import CartesMembres from "@/pages/CartesMembres";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -224,6 +225,9 @@ function AppRoutes() {
       </Route>
       <Route path="/delegues">
         <ProtectedRoute component={DeleguesPage} />
+      </Route>
+      <Route path="/cartes-membres">
+        <ProtectedRoute component={CartesMembres} />
       </Route>
       <Route path="/finances/tableau-bord">
         <ProtectedRoute component={FinancesTableauBordPage} />

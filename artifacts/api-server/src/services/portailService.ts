@@ -13,6 +13,7 @@ import { eq, desc, and, sql, count } from "drizzle-orm";
 import path from "path";
 import fs from "fs";
 import PDFDocument from "pdfkit";
+import QRCode from "qrcode";
 import { getConfig } from "./configService";
 
 const DEFAULT_LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
@@ -110,6 +111,8 @@ export async function getProfilMembre(membreId: number) {
     groupement: membre.groupement,
     dateAdhesion: membre.dateAdhesion,
     statut: membre.statut,
+    photoUrl: membre.photoUrl ?? null,
+    carteStatut: membre.carteStatut ?? "non_emise",
     campagneActive: campagneActive ?? null,
   };
 }
@@ -375,45 +378,159 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
 export async function generateCarteMembre(membreId: number): Promise<Buffer> {
   const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, membreId));
   if (!membre) throw new Error("Membre introuvable");
+  if (membre.carteStatut === "suspendue") throw new Error("Cette carte a été suspendue par l'administration");
 
   const [coop] = await db
-    .select({ nom: sql<string>`nom` })
+    .select({ nom: sql<string>`nom`, ville: sql<string>`ville` })
     .from(sql`cooperatives`)
     .where(sql`id = ${membre.cooperativeId}`)
     .limit(1);
 
-  const doc = new PDFDocument({ size: [242, 153], margin: 0 });
-  const chunks: Buffer[] = [];
-  doc.on("data", (c: Buffer) => chunks.push(c));
-
-  const VERT = "#1a4731";
   const codeMembre = computeCodeMembre(membre.id, membre.dateAdhesion);
+  const carteNo = membre.carteNumero ?? `C-${new Date().getFullYear()}-${String(membre.id).padStart(6, "0")}`;
 
-  doc.rect(0, 0, 242, 153).fill(VERT);
-  doc.rect(0, 0, 242, 50).fill("#15803d");
+  // ── QR code (PNG buffer) ─────────────────────────────────────────────────
+  const qrBuffer: Buffer = await QRCode.toBuffer(codeMembre, {
+    type: "png",
+    width: 140,
+    margin: 1,
+    color: { dark: "#1a4731", light: "#ffffff" },
+  });
 
-  doc.fontSize(11).fillColor("white").font("Helvetica-Bold")
-    .text("CARTE DE MEMBRE", 12, 10)
-    .fontSize(8).font("Helvetica").fillColor("#d1fae5")
-    .text((coop as { nom: string } | undefined)?.nom ?? "CoopDigital", 12, 26);
+  // ── Photo buffer ─────────────────────────────────────────────────────────
+  let photoBuffer: Buffer | null = null;
+  if (membre.photoUrl) {
+    try {
+      if (membre.photoUrl.startsWith("data:image/")) {
+        const b64 = membre.photoUrl.split(",")[1];
+        if (b64) photoBuffer = Buffer.from(b64, "base64");
+      } else {
+        const r = await fetch(membre.photoUrl, { signal: AbortSignal.timeout(5000) });
+        if (r.ok) photoBuffer = Buffer.from(await r.arrayBuffer());
+      }
+    } catch { /* ignore — afficher placeholder */ }
+  }
 
-  doc.fontSize(12).fillColor("white").font("Helvetica-Bold")
-    .text(`${membre.nom} ${membre.prenoms}`, 12, 60, { width: 150 });
-  doc.fontSize(9).font("Helvetica").fillColor("#bbf7d0")
-    .text(codeMembre, 12, 84)
-    .text(`Adhésion : ${new Date(membre.dateAdhesion).toLocaleDateString("fr-FR")}`, 12, 97)
-    .text(membre.village ?? "", 12, 110)
-    .text(membre.statut === "actif" ? "MEMBRE ACTIF" : "INACTIF", 12, 126,
-      { width: 80 });
+  // ── Dimensions carte ─────────────────────────────────────────────────────
+  const W = 420, H = 265;
+  const doc = new PDFDocument({ size: [W, H], margin: 0, bufferPages: true });
+  const chunks: Buffer[] = [];
+  const endPromise = new Promise<Buffer>((resolve, reject) => {
+    doc.on("data", (c: Buffer) => chunks.push(c));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
 
-  const qrData = codeMembre;
-  doc.fontSize(6).fillColor("#6ee7b7").font("Helvetica")
-    .text(`QR: ${qrData}`, 180, 70, { width: 55, align: "center" });
+  const VERT_DARK = "#0d2b1a";
+  const VERT     = "#1a4731";
+  const VERT_MED = "#166534";
+  const OR       = "#c4962a";
+  const BLANC    = "#ffffff";
+  const VERT_PALE  = "#bbf7d0";
+  const VERT_CLAIR = "#6ee7b7";
 
-  doc.rect(175, 60, 62, 62).fill("white").opacity(0.1);
+  // ── Fond principal ──
+  doc.rect(0, 0, W, H).fill(VERT);
+
+  // ── Cercles décoratifs (discrets) ──
+  doc.save();
+  doc.opacity(0.05);
+  doc.circle(395, 20, 90).fill(BLANC);
+  doc.circle(400, H - 10, 80).fill(BLANC);
+  doc.circle(-15, H - 30, 70).fill(BLANC);
+  doc.restore();
+
+  // ── Bandeau supérieur ──
+  doc.rect(0, 0, W, 55).fill(VERT_MED);
+
+  // ── Ligne dorée ──
+  doc.rect(0, 55, W, 3).fill(OR);
+
+  // ── Titre & coop ──
+  doc.fontSize(13).font("Helvetica-Bold").fillColor(BLANC)
+    .text("CARTE DE MEMBRE", 14, 12, { characterSpacing: 1 });
+
+  const coopNom   = (coop as Record<string, string> | undefined)?.nom  ?? "CoopDigital";
+  const coopVille = (coop as Record<string, string> | undefined)?.ville ?? "Côte d'Ivoire";
+  doc.fontSize(8.5).font("Helvetica").fillColor(VERT_PALE).text(coopNom.toUpperCase(), 14, 30);
+  doc.fontSize(7).fillColor(VERT_CLAIR).text(coopVille, 14, 43);
+
+  // ── Nom du membre ──
+  const fullName = `${membre.nom} ${membre.prenoms ?? ""}`.trim();
+  const displayName = fullName.length > 28 ? fullName.slice(0, 26) + "…" : fullName;
+  doc.fontSize(15).font("Helvetica-Bold").fillColor(BLANC)
+    .text(displayName, 14, 70, { width: 250 });
+
+  // ── Code membre (doré) ──
+  doc.fontSize(10).font("Helvetica-Bold").fillColor(OR).text(codeMembre, 14, 92);
+
+  // ── Séparateur ──
+  doc.moveTo(14, 108).lineTo(258, 108).lineWidth(0.5).strokeColor("#22c55e").stroke();
+
+  // ── Informations ──
+  const items: Array<[string, string]> = [
+    ["Village",   membre.village   ?? "—"],
+    ["Adhésion",  new Date(membre.dateAdhesion).toLocaleDateString("fr-FR")],
+    ["Superficie", `${membre.superficieHa} ha`],
+  ];
+  if (membre.section) items.push(["Section", membre.section]);
+
+  let iy = 114;
+  for (const [label, value] of items) {
+    doc.fontSize(6.5).font("Helvetica").fillColor(VERT_CLAIR).text(label.toUpperCase(), 14, iy);
+    doc.fontSize(8.5).font("Helvetica-Bold").fillColor(VERT_PALE).text(value, 88, iy);
+    iy += 16;
+  }
+
+  // ── Photo de profil ──
+  const photoCX = 343, photoCY = 110, photoR = 48;
+  doc.save();
+  doc.circle(photoCX, photoCY, photoR).clip();
+  if (photoBuffer) {
+    try {
+      doc.image(photoBuffer, photoCX - photoR, photoCY - photoR, { width: photoR * 2, height: photoR * 2 });
+    } catch {
+      doc.rect(photoCX - photoR, photoCY - photoR, photoR * 2, photoR * 2).fill("#1e5c39");
+      doc.fontSize(26).fillColor("#4ade80").font("Helvetica-Bold")
+        .text((membre.nom[0] ?? "?").toUpperCase(), photoCX - 14, photoCY - 18);
+    }
+  } else {
+    doc.rect(photoCX - photoR, photoCY - photoR, photoR * 2, photoR * 2).fill("#1e5c39");
+    doc.fontSize(26).fillColor("#4ade80").font("Helvetica-Bold")
+      .text((membre.nom[0] ?? "?").toUpperCase(), photoCX - 14, photoCY - 18);
+  }
+  doc.restore();
+  doc.circle(photoCX, photoCY, photoR).lineWidth(2.5).strokeColor(OR).stroke();
+
+  // ── QR code ──
+  const qrSize = 68;
+  const qrX = W - 14 - qrSize, qrY = H - 14 - 38 - qrSize;
+  doc.rect(qrX - 3, qrY - 3, qrSize + 6, qrSize + 6).fill(BLANC);
+  doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
+  doc.fontSize(5.5).fillColor(VERT_CLAIR).font("Helvetica")
+    .text("SCANNER", qrX - 3, qrY + qrSize + 4, { width: qrSize + 6, align: "center" });
+
+  // ── Bandeau inférieur ──
+  doc.rect(0, H - 38, W, 38).fill(VERT_DARK);
+
+  const isActif = membre.statut === "actif";
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(isActif ? "#22c55e" : "#ef4444")
+    .text(isActif ? "● ACTIF" : "● INACTIF", 14, H - 27);
+  doc.fontSize(8).font("Helvetica").fillColor("#86efac").text(carteNo, 105, H - 27);
+  doc.fontSize(6.5).fillColor(VERT_CLAIR)
+    .text("CoopDigital — Système de gestion coopérative", 0, H - 14, { width: W, align: "center" });
 
   doc.end();
-  return new Promise(resolve => {
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-  });
+  const pdfBuffer = await endPromise;
+
+  // Marquer la carte comme active (seulement si première génération)
+  if (membre.carteStatut === "non_emise") {
+    await db.update(membresTable).set({
+      carteStatut: "active",
+      carteGenereLe: new Date(),
+      carteNumero: carteNo,
+    }).where(eq(membresTable.id, membreId));
+  }
+
+  return pdfBuffer;
 }

@@ -13,6 +13,8 @@ import {
   generateRecuLivraison,
   generateCarteMembre,
 } from "../services/portailService";
+import { db, membresTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 // ─── POST /portail/connexion ──────────────────────────────────────────────────
 
@@ -165,6 +167,48 @@ export async function getCarteMembreHandler(req: Request, res: Response): Promis
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="carte-membre.pdf"`);
     res.send(pdf);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur";
+    const status = msg.includes("suspendue") ? 403 : 500;
+    res.status(status).json({ erreur: msg });
+  }
+}
+
+// ─── PUT /portail/photo ───────────────────────────────────────────────────────
+// Accepte { photoDataUrl: string } (data URL base64) ou { photoUrl: string }
+// et sauvegarde dans membres.photo_url
+
+export async function savePhotoHandler(req: Request, res: Response): Promise<void> {
+  const membreId = req.membre!.membreId;
+  const { photoDataUrl, photoUrl } = req.body as { photoDataUrl?: string; photoUrl?: string };
+
+  const url = photoDataUrl ?? photoUrl;
+  if (!url) {
+    res.status(400).json({ erreur: "photoDataUrl ou photoUrl requis" });
+    return;
+  }
+
+  // Validation basique
+  if (photoDataUrl && !photoDataUrl.startsWith("data:image/")) {
+    res.status(400).json({ erreur: "Format de photo invalide (data URL attendue)" });
+    return;
+  }
+  if (photoUrl && !photoUrl.startsWith("http")) {
+    res.status(400).json({ erreur: "URL de photo invalide" });
+    return;
+  }
+
+  // Limite taille data URL (~2MB)
+  if (url.length > 2_500_000) {
+    res.status(400).json({ erreur: "Photo trop volumineuse (max 2MB)" });
+    return;
+  }
+
+  try {
+    await db.update(membresTable)
+      .set({ photoUrl: url })
+      .where(eq(membresTable.id, membreId));
+    res.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur";
     res.status(500).json({ erreur: msg });

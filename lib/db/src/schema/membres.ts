@@ -77,6 +77,13 @@ export const membresTable = pgTable("membres", {
   certification: varchar("certification", { length: 50 }),
   documentsJoints: jsonb("documents_joints"),
 
+  // ── Carte de membre ─────────────────────────────────────────────────────────
+  carteStatut:      varchar("carte_statut", { length: 20 }).default("non_emise"),
+  // 'non_emise' | 'active' | 'suspendue'
+  carteNumero:      varchar("carte_numero", { length: 50 }),
+  carteGenereLe:    timestamp("carte_genere_le", { withTimezone: true }),
+  carteSuspendueLe: timestamp("carte_suspendue_le", { withTimezone: true }),
+
   // ── Complétion & terrain ────────────────────────────────────────────────────
   completudeFiche: integer("completude_fiche").default(0),
   completudeIdentite: integer("completude_identite").default(0),

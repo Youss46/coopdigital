@@ -39,6 +39,7 @@ export type Profil = {
   id: number; codeMembre: string; nom: string; prenoms: string;
   telephone: string; village: string | null; groupement: string | null;
   dateAdhesion: string; statut: string;
+  photoUrl: string | null; carteStatut: string;
   campagneActive: { id: number; libelle: string } | null;
 };
 
@@ -90,4 +91,9 @@ export const api = {
   score: () => req<Score>("/score"),
   recuPdfUrl: (livraisonId: number) => `/api/portail/recus/${livraisonId}`,
   carteMembreUrl: () => `/api/portail/carte-membre`,
+  uploadPhoto: (photoDataUrl: string) =>
+    req<{ ok: boolean }>("/photo", {
+      method: "PUT",
+      body: JSON.stringify({ photoDataUrl }),
+    }),
 };

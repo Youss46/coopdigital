@@ -88,6 +88,12 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
   },
   {
+    href: "/cartes-membres",
+    label: "Cartes membres",
+    icon: CreditCard,
+    roles: ["pca", "directeur", "comptable", "delegue", "auditeur"],
+  },
+  {
     href: "/scoring",
     label: "Scoring Producteurs",
     icon: Award,

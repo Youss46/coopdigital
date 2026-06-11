@@ -23,3 +23,4 @@
 - [Bypass Orval hooks for non-schema query params](bypass-orval-hooks.md) — quand une page a besoin de params non générés (vue=demandes, statut_membre), remplacer useGetXxx par useQuery + apiFetch direct; évite de regénérer Orval pour chaque ajout de param.
 - [Caisse déléguée — alertes route ordering](caisse-delegue-route-order.md) — GET /delegues/alertes doit être déclaré AVANT GET /delegues/:agentId/caisse dans delegues.ts; sinon Express interprète "alertes" comme un agentId.
 - [Web Push notifications terrain](web-push-terrain.md) — SW lit `{titre,message,url}`; VAPID env vars shared; push PROD seulement; subscriptions 410/404 auto-supprimées.
+- [Carte membre — photo base64 + QR pdfkit](carte-membre-photo.md) — photo portail stockée en data URL (base64 JPEG compressé canvas, max 400px, ~2MB) dans membres.photo_url; generateCarteMembre parse data: prefix ou fetch URL externe; QR via qrcode.toBuffer() embedé dans PDFKit.
