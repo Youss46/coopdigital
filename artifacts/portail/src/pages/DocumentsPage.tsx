@@ -190,7 +190,7 @@ export default function DocumentsPage() {
 
           {/* Aperçu visuel de la carte */}
           <div className="relative rounded-2xl overflow-hidden mb-4"
-            style={{ background: "linear-gradient(135deg, #166534 0%, #1a4731 100%)", aspectRatio: "420/265" }}>
+            style={{ background: "linear-gradient(135deg, #166534 0%, #1a4731 100%)", paddingBottom: "63.1%" }}>
             <div className="absolute inset-0 p-4 flex flex-col justify-between">
               <div>
                 <p className="text-xs font-bold tracking-widest text-white opacity-80">CARTE DE MEMBRE</p>
