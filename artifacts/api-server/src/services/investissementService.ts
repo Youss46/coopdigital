@@ -264,7 +264,7 @@ export async function ajouterDepense(cooperativeId: number, data: CreateDepenseI
   // Écriture comptable : dépense investissement → 2xx Immobilisation / 481 Fournisseurs invest. (ou 521 Banque)
   if (data.montantFcfa > 0) {
     void proposerEcriture(cooperativeId, {
-      source: "paiement",
+      source: "investissement",
       sourceId: result.id,
       libelle: `Dépense projet – ${data.libelle}`,
       compteDebit:  compteImmoFromCategorie(projetCategorie),

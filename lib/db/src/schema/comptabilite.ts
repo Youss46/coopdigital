@@ -64,18 +64,24 @@ export const exercicesTable = pgTable("exercices", {
 });
 
 export const configComptableTable = pgTable("config_comptable", {
-  id:                 serial("id").primaryKey(),
-  cooperativeId:      integer("cooperative_id").notNull(),
-  autoLivraisons:     boolean("auto_livraisons").notNull().default(false),
-  autoPaiements:      boolean("auto_paiements").notNull().default(false),
-  autoAvances:        boolean("auto_avances").notNull().default(false),
-  autoVentesExport:   boolean("auto_ventes_export").notNull().default(false),
-  autoEncaissements:  boolean("auto_encaissements").notNull().default(false),
-  autoSalaires:       boolean("auto_salaires").notNull().default(false),
-  autoStocks:         boolean("auto_stocks").notNull().default(false),
-  autoDons:           boolean("auto_dons").notNull().default(false),
-  modifiePar:         integer("modifie_par"),
-  updatedAt:          timestamp("updated_at", { withTimezone: true }),
+  id:                  serial("id").primaryKey(),
+  cooperativeId:       integer("cooperative_id").notNull(),
+  autoLivraisons:      boolean("auto_livraisons").notNull().default(false),
+  autoPaiements:       boolean("auto_paiements").notNull().default(false),
+  autoAvances:         boolean("auto_avances").notNull().default(false),
+  autoVentesExport:    boolean("auto_ventes_export").notNull().default(false),
+  autoEncaissements:   boolean("auto_encaissements").notNull().default(false),
+  autoSalaires:        boolean("auto_salaires").notNull().default(false),
+  autoStocks:          boolean("auto_stocks").notNull().default(false),
+  autoDons:            boolean("auto_dons").notNull().default(false),
+  // Sources granulaires (remplacent autoPaiements pour chaque module)
+  autoEmprunts:        boolean("auto_emprunts").notNull().default(false),
+  autoTransport:       boolean("auto_transport").notNull().default(false),
+  autoInvestissements: boolean("auto_investissements").notNull().default(false),
+  autoMaintenances:    boolean("auto_maintenances").notNull().default(false),
+  autoIntrants:        boolean("auto_intrants").notNull().default(false),
+  modifiePar:          integer("modifie_par"),
+  updatedAt:           timestamp("updated_at", { withTimezone: true }),
 });
 
 export const ecrituresEnAttenteTable = pgTable("ecritures_en_attente", {

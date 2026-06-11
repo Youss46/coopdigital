@@ -167,7 +167,7 @@ export async function handleCreateEntretien(req: Request, res: Response): Promis
     if (d.cout_fcfa && d.cout_fcfa > 0) {
       const dateStr = toDateStr(d.date_entretien) as string;
       void proposerEcriture(cooperativeId, {
-        source: "paiement",
+        source: "transport",
         sourceId: entretien.id,
         libelle: `Entretien véhicule – ${d.type_entretien}`,
         compteDebit:  "624",
@@ -387,7 +387,7 @@ export async function handleTerminerMission(req: Request, res: Response): Promis
     const piece = `MISS-${id}`;
     if ((d.cout_carburant_fcfa ?? 0) > 0) {
       void proposerEcriture(cooperativeId, {
-        source: "paiement", sourceId: id,
+        source: "transport", sourceId: id,
         libelle: `Carburant mission #${id}`,
         compteDebit: "6042", compteCredit: "521",
         montantFcfa: Math.round(d.cout_carburant_fcfa!), date: dateArrivee, numeroPiece: piece,
@@ -395,7 +395,7 @@ export async function handleTerminerMission(req: Request, res: Response): Promis
     }
     if ((d.cout_chauffeur_fcfa ?? 0) > 0) {
       void proposerEcriture(cooperativeId, {
-        source: "paiement", sourceId: id,
+        source: "transport", sourceId: id,
         libelle: `Rémunération chauffeur mission #${id}`,
         compteDebit: "637", compteCredit: "521",
         montantFcfa: Math.round(d.cout_chauffeur_fcfa!), date: dateArrivee, numeroPiece: piece,
@@ -403,7 +403,7 @@ export async function handleTerminerMission(req: Request, res: Response): Promis
     }
     if ((d.cout_peage_fcfa ?? 0) > 0) {
       void proposerEcriture(cooperativeId, {
-        source: "paiement", sourceId: id,
+        source: "transport", sourceId: id,
         libelle: `Péages mission #${id}`,
         compteDebit: "618", compteCredit: "521",
         montantFcfa: Math.round(d.cout_peage_fcfa!), date: dateArrivee, numeroPiece: piece,
@@ -411,7 +411,7 @@ export async function handleTerminerMission(req: Request, res: Response): Promis
     }
     if ((d.cout_divers_fcfa ?? 0) > 0) {
       void proposerEcriture(cooperativeId, {
-        source: "paiement", sourceId: id,
+        source: "transport", sourceId: id,
         libelle: `Frais divers mission #${id}`,
         compteDebit: "628", compteCredit: "521",
         montantFcfa: Math.round(d.cout_divers_fcfa!), date: dateArrivee, numeroPiece: piece,

@@ -10,7 +10,11 @@ import { db, ecrituresComptablesTable, configComptableTable, ecrituresEnAttenteT
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
-export type SourceEcriture = "livraison" | "paiement" | "avance" | "vente" | "encaissement" | "salaire" | "stock" | "don";
+export type SourceEcriture =
+  | "livraison" | "paiement" | "avance" | "vente"
+  | "encaissement" | "salaire" | "stock" | "don"
+  // Sources granulaires (contrôle par module)
+  | "emprunt" | "transport" | "investissement" | "maintenance" | "intrant";
 
 interface ProposerEcriturePayload {
   source: SourceEcriture;
@@ -24,14 +28,38 @@ interface ProposerEcriturePayload {
 }
 
 const AUTO_KEY_MAP: Record<SourceEcriture, keyof typeof configComptableTable.$inferSelect> = {
-  livraison:    "autoLivraisons",
-  paiement:     "autoPaiements",
-  avance:       "autoAvances",
-  vente:        "autoVentesExport",
-  encaissement: "autoEncaissements",
-  salaire:      "autoSalaires",
-  stock:        "autoStocks",
-  don:          "autoDons",
+  livraison:     "autoLivraisons",
+  paiement:      "autoPaiements",
+  avance:        "autoAvances",
+  vente:         "autoVentesExport",
+  encaissement:  "autoEncaissements",
+  salaire:       "autoSalaires",
+  stock:         "autoStocks",
+  don:           "autoDons",
+  // Granulaires
+  emprunt:       "autoEmprunts",
+  transport:     "autoTransport",
+  investissement:"autoInvestissements",
+  maintenance:   "autoMaintenances",
+  intrant:       "autoIntrants",
+};
+
+// Mapping vers les valeurs d'enum PostgreSQL existantes
+// (les nouveaux types TS granulaires n'ont pas de valeur PG dédiée)
+const DB_SOURCE_MAP: Record<SourceEcriture, "livraison" | "vente" | "avance" | "paiement" | "encaissement" | "salaire" | "stock" | "don"> = {
+  livraison:     "livraison",
+  paiement:      "paiement",
+  avance:        "avance",
+  vente:         "vente",
+  encaissement:  "encaissement",
+  salaire:       "salaire",
+  stock:         "stock",
+  don:           "don",
+  emprunt:       "paiement",
+  transport:     "paiement",
+  investissement:"paiement",
+  maintenance:   "paiement",
+  intrant:       "stock",
 };
 
 async function getConfigComptable(cooperativeId: number) {
@@ -71,7 +99,7 @@ export async function proposerEcriture(
         compteDebit: payload.compteDebit,
         compteCredit: payload.compteCredit,
         montantFcfa: Math.round(payload.montantFcfa),
-        source: payload.source as "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock",
+        source: DB_SOURCE_MAP[payload.source],
         sourceId: payload.sourceId ?? null,
         exercice,
       });
@@ -80,7 +108,7 @@ export async function proposerEcriture(
 
     await db.insert(ecrituresEnAttenteTable).values({
       cooperativeId,
-      source: payload.source,
+      source: DB_SOURCE_MAP[payload.source],
       sourceId: payload.sourceId ?? null,
       libelleProppose: payload.libelle,
       compteDebitPropose: payload.compteDebit,

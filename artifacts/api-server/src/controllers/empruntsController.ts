@@ -192,7 +192,7 @@ export async function createEmprunt(req: Request, res: Response): Promise<void> 
     if (montant > 0) {
       const dateEcriture = debut || new Date().toISOString().slice(0, 10);
       void proposerEcriture(coopId(req), {
-        source: "paiement",
+        source: "emprunt",
         sourceId: emprunt.id,
         libelle: `Réception emprunt – ${String(libelle ?? "")}`,
         compteDebit: "521",
@@ -309,7 +309,7 @@ export async function enregistrerRemboursement(req: Request, res: Response): Pro
     const piece = `REM-${rem.id}`;
     if (capital > 0) {
       void proposerEcriture(coopId(req), {
-        source: "paiement",
+        source: "emprunt",
         sourceId: rem.id,
         libelle: `Remboursement capital – ${emprunt.libelle}`,
         compteDebit: "164",
@@ -321,7 +321,7 @@ export async function enregistrerRemboursement(req: Request, res: Response): Pro
     }
     if (interet > 0) {
       void proposerEcriture(coopId(req), {
-        source: "paiement",
+        source: "emprunt",
         sourceId: rem.id,
         libelle: `Intérêts emprunt – ${emprunt.libelle}`,
         compteDebit: "671",

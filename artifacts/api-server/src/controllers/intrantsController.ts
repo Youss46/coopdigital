@@ -237,7 +237,7 @@ export async function createAppro(req: Request, res: Response): Promise<void> {
     // Écriture comptable : achat intrants → 311 Stocks / 401 Fournisseurs
     if (montantTotal > 0) {
       void proposerEcriture(coopId(req), {
-        source: "stock",
+        source: "intrant",
         sourceId: result.id,
         libelle: `Appro intrants – ${fournisseur ? String(fournisseur) : "fournisseur"}`,
         compteDebit: "311",
@@ -335,7 +335,7 @@ export async function createDistribution(req: Request, res: Response): Promise<v
     if (modeVal === "credit" && montantMembre > 0) {
       // Crédit membre : 4091 Avances fournisseurs / 311 Stocks
       void proposerEcriture(coop, {
-        source: "stock", sourceId: result.id,
+        source: "intrant", sourceId: result.id,
         libelle: `Intrants à crédit – membre #${membreId}`,
         compteDebit: "4091", compteCredit: "311",
         montantFcfa: Math.round(montantMembre), date: dateStr, numeroPiece: piece,
@@ -352,7 +352,7 @@ export async function createDistribution(req: Request, res: Response): Promise<v
       // Part membre à crédit
       if (montantMembre > 0) {
         void proposerEcriture(coop, {
-          source: "stock", sourceId: result.id,
+          source: "intrant", sourceId: result.id,
           libelle: `Intrants subventionnés (part membre) – membre #${membreId}`,
           compteDebit: "4091", compteCredit: "311",
           montantFcfa: Math.round(montantMembre), date: dateStr, numeroPiece: piece,

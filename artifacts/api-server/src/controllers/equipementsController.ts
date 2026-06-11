@@ -203,7 +203,7 @@ export async function postMaintenance(req: Request, res: Response, next: NextFun
     if (body.cout_fcfa && body.cout_fcfa > 0) {
       const dateStr = toDateStr(body.date_maintenance);
       void proposerEcriture(coopId, {
-        source: "paiement",
+        source: "maintenance",
         sourceId: id,
         libelle: `Maintenance équipement – ${body.type}`,
         compteDebit:  "624",

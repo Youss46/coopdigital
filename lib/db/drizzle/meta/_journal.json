@@ -78,6 +78,13 @@
       "when": 1749975000000,
       "tag": "0010_stock_prix_unitaire",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1750061400000,
+      "tag": "0011_config_sources_granulaires",
+      "breakpoints": true
     }
   ]
 }
