@@ -56,8 +56,21 @@ export async function getMonthlyReport(req: Request, res: Response): Promise<voi
 export async function getCampaignBilan(req: Request, res: Response): Promise<void> {
   const annee = parseInt(String(req.params["annee"] ?? "0"));
   if (!annee) { res.status(400).json({ erreur: "Année invalide" }); return; }
+
+  const anneeEnCours = new Date().getFullYear();
+  if (annee >= anneeEnCours) {
+    res.status(422).json({
+      erreur: `La campagne ${annee} n'est pas encore clôturée. Le bilan annuel ne peut être généré qu'après la clôture de l'exercice.`,
+      code: "CAMPAGNE_NON_CLOTUREE",
+    });
+    return;
+  }
+
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+
   try {
-    const buffer = await generateBilanCampagne(1, annee);
+    const buffer = await generateBilanCampagne(cooperativeId, annee);
     sendPdf(res, buffer, `bilan_campagne_${annee}.pdf`);
   } catch (err) {
     req.log.error({ err }, "Erreur getCampaignBilan");

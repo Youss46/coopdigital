@@ -399,6 +399,7 @@ function TabRapports() {
         fichier: `bilan_campagne_${annee}.pdf`,
         cle: `bilan_${annee}`,
         icone: "📊",
+        nonCloture: true,
       },
       {
         titre: `Bilan de campagne ${annee - 1}`,
@@ -407,6 +408,7 @@ function TabRapports() {
         fichier: `bilan_campagne_${annee - 1}.pdf`,
         cle: `bilan_${annee - 1}`,
         icone: "📁",
+        nonCloture: false,
       },
     ] : []),
   ];
@@ -419,40 +421,64 @@ function TabRapports() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {rapports.map((r) => (
-          <div key={r.cle} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex flex-col gap-3">
+          <div
+            key={r.cle}
+            className={`rounded-xl border p-5 shadow-sm flex flex-col gap-3 ${r.nonCloture ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"}`}
+          >
             <div className="flex items-start gap-3">
               <span className="text-2xl">{r.icone}</span>
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 text-sm">{r.titre}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-gray-900 text-sm">{r.titre}</h3>
+                  {r.nonCloture && (
+                    <span className="text-xs font-medium bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5">
+                      Exercice en cours
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500 mt-1">{r.description}</p>
+                {r.nonCloture && (
+                  <p className="text-xs text-amber-700 mt-2 leading-relaxed">
+                    Le bilan annuel ne peut être généré qu'après la clôture de l'exercice comptable.
+                  </p>
+                )}
               </div>
             </div>
-            <button
-              onClick={() => void telechargerPdf(r.url, r.fichier, r.cle)}
-              disabled={loading === r.cle}
-              className="flex items-center justify-center gap-2 w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: loading === r.cle ? "#e5e7eb" : VERT,
-                color: loading === r.cle ? GRIS : "white",
-              }}
-            >
-              {loading === r.cle ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25" />
-                    <path fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                  Génération…
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                  Télécharger PDF
-                </>
-              )}
-            </button>
+            {r.nonCloture ? (
+              <div className="flex items-center justify-center gap-2 w-full py-2 px-4 rounded-lg text-sm font-medium bg-amber-100 text-amber-600 cursor-not-allowed border border-amber-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                </svg>
+                Disponible après clôture
+              </div>
+            ) : (
+              <button
+                onClick={() => void telechargerPdf(r.url, r.fichier, r.cle)}
+                disabled={loading === r.cle}
+                className="flex items-center justify-center gap-2 w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: loading === r.cle ? "#e5e7eb" : VERT,
+                  color: loading === r.cle ? GRIS : "white",
+                }}
+              >
+                {loading === r.cle ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25" />
+                      <path fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Génération…
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                    Télécharger PDF
+                  </>
+                )}
+              </button>
+            )}
           </div>
         ))}
       </div>
