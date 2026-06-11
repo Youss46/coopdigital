@@ -113,6 +113,13 @@
       "when": 1749982800000,
       "tag": "0015_categories_dons_par_sens",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1749986400000,
+      "tag": "0016_categories_dons_upsert",
+      "breakpoints": true
     }
   ]
 }
