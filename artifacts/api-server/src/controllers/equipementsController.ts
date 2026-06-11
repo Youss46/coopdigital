@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import * as svc from "../services/equipementsService.js";
 import { genererTableauAmortissement } from "../services/equipementsService.js";
+import { proposerEcriture } from "../services/comptabiliteService.js";
 
 function toDateStr(d: unknown): string {
   if (d instanceof Date) return d.toISOString().slice(0, 10);
@@ -182,6 +183,7 @@ export async function getMaintenances(req: Request, res: Response, next: NextFun
 
 export async function postMaintenance(req: Request, res: Response, next: NextFunction) {
   try {
+    const coopId = getCoopId(req, res); if (!coopId) return;
     const id = Number(String(req.params["id"]));
     const body = req.body as {
       type: string;
@@ -196,6 +198,22 @@ export async function postMaintenance(req: Request, res: Response, next: NextFun
       date_maintenance: toDateStr(body.date_maintenance),
       prochaine_maintenance: body.prochaine_maintenance ? toDateStr(body.prochaine_maintenance) : undefined,
     });
+
+    // Écriture comptable : frais maintenance équipement → 624 Entretien / 521 Banque
+    if (body.cout_fcfa && body.cout_fcfa > 0) {
+      const dateStr = toDateStr(body.date_maintenance);
+      void proposerEcriture(coopId, {
+        source: "paiement",
+        sourceId: id,
+        libelle: `Maintenance équipement – ${body.type}`,
+        compteDebit:  "624",
+        compteCredit: "521",
+        montantFcfa:  Math.round(body.cout_fcfa),
+        date:         dateStr,
+        numeroPiece:  `MAINT-${id}`,
+      });
+    }
+
     res.status(201).json(data);
   } catch (e) { next(e); }
 }

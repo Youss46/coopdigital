@@ -5,6 +5,7 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, lt, desc } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { proposerEcriture } from "./comptabiliteService";
 
 
 
@@ -196,10 +197,28 @@ export async function deleteProjet(cooperativeId: number, id: number) {
 
 // ─── Dépenses ─────────────────────────────────────────────────────────────────
 
+// Mappe la catégorie d'un projet au compte d'immobilisation SYSCOHADA
+function compteImmoFromCategorie(categorie: string): string {
+  const cat = (categorie ?? "").toLowerCase();
+  if (cat.includes("vehicule") || cat.includes("transport"))          return "245"; // Matériel de transport
+  if (cat.includes("batiment") || cat.includes("construction") ||
+      cat.includes("infrastructure"))                                  return "231"; // Bâtiments industriels
+  if (cat.includes("terrain") || cat.includes("foncier"))             return "221"; // Terrains agricoles
+  if (cat.includes("incorporel") || cat.includes("logiciel") ||
+      cat.includes("brevet"))                                          return "212"; // Logiciels et licences
+  return "244"; // Matériel et mobilier (défaut)
+}
+
 export async function ajouterDepense(cooperativeId: number, data: CreateDepenseInput) {
-  return await db.transaction(async (tx) => {
+  let projetCategorie = "";
+
+  const result = await db.transaction(async (tx) => {
     const [projet] = await tx
-      .select({ id: projetsInvestissementTable.id, statut: projetsInvestissementTable.statut })
+      .select({
+        id:        projetsInvestissementTable.id,
+        statut:    projetsInvestissementTable.statut,
+        categorie: projetsInvestissementTable.categorie,
+      })
       .from(projetsInvestissementTable)
       .where(
         and(
@@ -214,6 +233,7 @@ export async function ajouterDepense(cooperativeId: number, data: CreateDepenseI
     if (projet.statut === "annule" || projet.statut === "termine") {
       throw new Error(`Impossible d'ajouter une dépense sur un projet ${projet.statut}`);
     }
+    projetCategorie = projet.categorie ?? "";
 
     const [depense] = await tx
       .insert(depensesInvestissementTable)
@@ -240,6 +260,22 @@ export async function ajouterDepense(cooperativeId: number, data: CreateDepenseI
 
     return { ...depense, montantFcfa: toInt(depense.montantFcfa) };
   });
+
+  // Écriture comptable : dépense investissement → 2xx Immobilisation / 481 Fournisseurs invest. (ou 521 Banque)
+  if (data.montantFcfa > 0) {
+    void proposerEcriture(cooperativeId, {
+      source: "paiement",
+      sourceId: result.id,
+      libelle: `Dépense projet – ${data.libelle}`,
+      compteDebit:  compteImmoFromCategorie(projetCategorie),
+      compteCredit: data.referenceFacture ? "481" : "521",
+      montantFcfa:  data.montantFcfa,
+      date:         data.dateDepense,
+      numeroPiece:  data.referenceFacture ?? `INV-${result.id}`,
+    });
+  }
+
+  return result;
 }
 
 // ─── Tableau de bord ──────────────────────────────────────────────────────────

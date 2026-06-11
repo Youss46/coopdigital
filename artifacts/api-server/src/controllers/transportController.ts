@@ -8,6 +8,7 @@ import {
   TerminerMissionBody,
   CreateEntretienVehiculeBody,
 } from "@workspace/api-zod";
+import { proposerEcriture } from "../services/comptabiliteService";
 import {
   getVehicules,
   getVehicule,
@@ -161,6 +162,21 @@ export async function handleCreateEntretien(req: Request, res: Response): Promis
       prochainEntretienKm:    d.prochain_entretien_km   ?? null,
       prochainEntretienDate:  toDateStr(d.prochain_entretien_date) ?? null,
     });
+
+    // Écriture comptable : frais entretien véhicule → 624 Entretien & réparations / 521 Banque
+    if (d.cout_fcfa && d.cout_fcfa > 0) {
+      const dateStr = toDateStr(d.date_entretien) as string;
+      void proposerEcriture(cooperativeId, {
+        source: "paiement",
+        sourceId: entretien.id,
+        libelle: `Entretien véhicule – ${d.type_entretien}`,
+        compteDebit:  "624",
+        compteCredit: "521",
+        montantFcfa:  Math.round(d.cout_fcfa),
+        date:         dateStr,
+        numeroPiece:  `ENT-${entretien.id}`,
+      });
+    }
 
     res.status(201).json(entretien);
   } catch (err) {
@@ -365,6 +381,43 @@ export async function handleTerminerMission(req: Request, res: Response): Promis
     });
 
     if (!updated) { res.status(404).json({ erreur: "Mission introuvable ou statut invalide" }); return; }
+
+    // Écritures comptables frais de mission transport
+    const dateArrivee = new Date(d.date_arrivee_reelle).toISOString().slice(0, 10);
+    const piece = `MISS-${id}`;
+    if ((d.cout_carburant_fcfa ?? 0) > 0) {
+      void proposerEcriture(cooperativeId, {
+        source: "paiement", sourceId: id,
+        libelle: `Carburant mission #${id}`,
+        compteDebit: "6042", compteCredit: "521",
+        montantFcfa: Math.round(d.cout_carburant_fcfa!), date: dateArrivee, numeroPiece: piece,
+      });
+    }
+    if ((d.cout_chauffeur_fcfa ?? 0) > 0) {
+      void proposerEcriture(cooperativeId, {
+        source: "paiement", sourceId: id,
+        libelle: `Rémunération chauffeur mission #${id}`,
+        compteDebit: "637", compteCredit: "521",
+        montantFcfa: Math.round(d.cout_chauffeur_fcfa!), date: dateArrivee, numeroPiece: piece,
+      });
+    }
+    if ((d.cout_peage_fcfa ?? 0) > 0) {
+      void proposerEcriture(cooperativeId, {
+        source: "paiement", sourceId: id,
+        libelle: `Péages mission #${id}`,
+        compteDebit: "618", compteCredit: "521",
+        montantFcfa: Math.round(d.cout_peage_fcfa!), date: dateArrivee, numeroPiece: piece,
+      });
+    }
+    if ((d.cout_divers_fcfa ?? 0) > 0) {
+      void proposerEcriture(cooperativeId, {
+        source: "paiement", sourceId: id,
+        libelle: `Frais divers mission #${id}`,
+        compteDebit: "628", compteCredit: "521",
+        montantFcfa: Math.round(d.cout_divers_fcfa!), date: dateArrivee, numeroPiece: piece,
+      });
+    }
+
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur terminerMission");

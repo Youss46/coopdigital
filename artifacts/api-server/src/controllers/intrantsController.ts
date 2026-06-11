@@ -3,6 +3,7 @@ import { db, intrantsTable, categoriesIntrantsTable, distributionsIntrantsTable,
 import { eq, and, sql, lt, desc, asc, gte } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
 import { getEncoursMembre } from "../services/intrantsService";
+import { proposerEcriture } from "../services/comptabiliteService";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -233,6 +234,20 @@ export async function createAppro(req: Request, res: Response): Promise<void> {
       return appro;
     });
 
+    // Écriture comptable : achat intrants → 311 Stocks / 401 Fournisseurs
+    if (montantTotal > 0) {
+      void proposerEcriture(coopId(req), {
+        source: "stock",
+        sourceId: result.id,
+        libelle: `Appro intrants – ${fournisseur ? String(fournisseur) : "fournisseur"}`,
+        compteDebit: "311",
+        compteCredit: "401",
+        montantFcfa: Math.round(montantTotal),
+        date: String(dateAppro),
+        numeroPiece: numeroFacture ? String(numeroFacture) : `APPRO-${result.id}`,
+      });
+    }
+
     res.status(201).json(result);
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
@@ -312,6 +327,48 @@ export async function createDistribution(req: Request, res: Response): Promise<v
 
       return dist;
     });
+
+    // Écritures comptables distribution intrants
+    const dateStr = String(dateDistribution);
+    const piece = `DIST-${result.id}`;
+    const coop = coopId(req);
+    if (modeVal === "credit" && montantMembre > 0) {
+      // Crédit membre : 4091 Avances fournisseurs / 311 Stocks
+      void proposerEcriture(coop, {
+        source: "stock", sourceId: result.id,
+        libelle: `Intrants à crédit – membre #${membreId}`,
+        compteDebit: "4091", compteCredit: "311",
+        montantFcfa: Math.round(montantMembre), date: dateStr, numeroPiece: piece,
+      });
+    } else if (modeVal === "gratuit" && montantTotal > 0) {
+      // Don intrants : 604 Achats stockés / 311 Stocks
+      void proposerEcriture(coop, {
+        source: "don", sourceId: result.id,
+        libelle: `Intrants gratuits – membre #${membreId}`,
+        compteDebit: "604", compteCredit: "311",
+        montantFcfa: Math.round(montantTotal), date: dateStr, numeroPiece: piece,
+      });
+    } else if (modeVal === "subventionne") {
+      // Part membre à crédit
+      if (montantMembre > 0) {
+        void proposerEcriture(coop, {
+          source: "stock", sourceId: result.id,
+          libelle: `Intrants subventionnés (part membre) – membre #${membreId}`,
+          compteDebit: "4091", compteCredit: "311",
+          montantFcfa: Math.round(montantMembre), date: dateStr, numeroPiece: piece,
+        });
+      }
+      // Part coopérative (charge)
+      const partCoop = montantTotal - montantMembre;
+      if (partCoop > 0) {
+        void proposerEcriture(coop, {
+          source: "don", sourceId: result.id,
+          libelle: `Intrants subventionnés (part coop) – membre #${membreId}`,
+          compteDebit: "604", compteCredit: "311",
+          montantFcfa: Math.round(partCoop), date: dateStr, numeroPiece: piece,
+        });
+      }
+    }
 
     res.status(201).json(result);
   } catch (err: unknown) {

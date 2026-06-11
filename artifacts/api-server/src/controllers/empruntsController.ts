@@ -5,6 +5,7 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, desc, asc, gte, lte, between } from "drizzle-orm";
 import { generateEcheancier, computeEcheancier } from "../services/empruntService";
+import { proposerEcriture } from "../services/comptabiliteService";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -187,6 +188,21 @@ export async function createEmprunt(req: Request, res: Response): Promise<void> 
       periodicite: periode,
     });
 
+    // Écriture comptable : réception emprunt → 521 Banque / 164 Emprunts associés
+    if (montant > 0) {
+      const dateEcriture = debut || new Date().toISOString().slice(0, 10);
+      void proposerEcriture(coopId(req), {
+        source: "paiement",
+        sourceId: emprunt.id,
+        libelle: `Réception emprunt – ${String(libelle ?? "")}`,
+        compteDebit: "521",
+        compteCredit: "164",
+        montantFcfa: montant,
+        date: dateEcriture,
+        numeroPiece: `EMP-${emprunt.id}`,
+      });
+    }
+
     res.status(201).json(emprunt);
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
@@ -288,6 +304,33 @@ export async function enregistrerRemboursement(req: Request, res: Response): Pro
         updatedAt:        new Date(),
       })
       .where(eq(empruntsTable.id, empruntId));
+
+    // Écritures comptables remboursement
+    const piece = `REM-${rem.id}`;
+    if (capital > 0) {
+      void proposerEcriture(coopId(req), {
+        source: "paiement",
+        sourceId: rem.id,
+        libelle: `Remboursement capital – ${emprunt.libelle}`,
+        compteDebit: "164",
+        compteCredit: "521",
+        montantFcfa: capital,
+        date: dateRem,
+        numeroPiece: piece,
+      });
+    }
+    if (interet > 0) {
+      void proposerEcriture(coopId(req), {
+        source: "paiement",
+        sourceId: rem.id,
+        libelle: `Intérêts emprunt – ${emprunt.libelle}`,
+        compteDebit: "671",
+        compteCredit: "521",
+        montantFcfa: interet,
+        date: dateRem,
+        numeroPiece: piece,
+      });
+    }
 
     res.status(201).json(rem);
   } catch (err) {
