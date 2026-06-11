@@ -103,8 +103,8 @@ export async function getTableauBordFinancier(req: Request, res: Response): Prom
     // ── 6. Emprunts en cours ─────────────────────────────────────────────────
     const empruntsRows = await db.execute(sql`
       SELECT
-        COALESCE(SUM(solde_restant::numeric), 0)::bigint AS "totalSoldeRestantFcfa",
-        COUNT(*)::int                                     AS "nombreEnCours"
+        COALESCE(SUM(solde_restant_fcfa::numeric), 0)::bigint AS "totalSoldeRestantFcfa",
+        COUNT(*)::int                                          AS "nombreEnCours"
       FROM emprunts
       WHERE cooperative_id = ${cooperativeId}
         AND statut = 'en_cours'
