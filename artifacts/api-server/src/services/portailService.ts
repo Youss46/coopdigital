@@ -453,18 +453,14 @@ export async function generateCarteMembre(membreId: number): Promise<Buffer> {
   }
 
   // ── Dimensions carte ─────────────────────────────────────────────────────
-  // Coordonnées logiques inchangées — SCALE réduit la taille physique du PDF
-  const SCALE = 0.72;
-  const W = 420, H = 265; // espace logique de dessin
-  const doc = new PDFDocument({ size: [Math.round(W * SCALE), Math.round(H * SCALE)], margin: 0, bufferPages: true });
+  const W = 420, H = 265; // 148 mm × 93 mm — taille carte ID
+  const doc = new PDFDocument({ size: [W, H], margin: 0 });
   const chunks: Buffer[] = [];
   const endPromise = new Promise<Buffer>((resolve, reject) => {
     doc.on("data", (c: Buffer) => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
   });
-  // Toutes les coordonnées de dessin restent dans l'espace 420×265
-  doc.scale(SCALE, SCALE);
 
   const VERT_DARK = "#0d2b1a";
   const VERT     = "#1a4731";
