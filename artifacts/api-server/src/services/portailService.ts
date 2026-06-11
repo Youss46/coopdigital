@@ -559,7 +559,7 @@ export async function generateCarteMembre(membreId: number): Promise<Buffer> {
   doc.circle(photoCX, photoCY, photoR).clip();
   if (photoBuffer) {
     try {
-      doc.image(photoBuffer, photoCX - photoR, photoCY - photoR, { width: photoR * 2, height: photoR * 2 });
+      doc.image(photoBuffer, photoCX - photoR, photoCY - photoR, { cover: [photoR * 2, photoR * 2], align: "center", valign: "center" });
     } catch {
       doc.rect(photoCX - photoR, photoCY - photoR, photoR * 2, photoR * 2).fill("#1e5c39");
       doc.fontSize(26).fillColor("#4ade80").font("Helvetica-Bold")
