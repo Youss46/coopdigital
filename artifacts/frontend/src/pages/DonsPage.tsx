@@ -16,17 +16,17 @@ const headers = () => ({
 });
 
 async function apiFetch<T>(path: string): Promise<T> {
-  const r = await fetch(path, { headers: headers() });
+  const r = await fetch(`${BASE}${path}`, { headers: headers() });
   if (!r.ok) throw new Error((await r.json().catch(() => ({ erreur: r.statusText }))).erreur ?? r.statusText);
   return r.json() as Promise<T>;
 }
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(path, { method: "POST", headers: headers(), body: JSON.stringify(body) });
+  const r = await fetch(`${BASE}${path}`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
   if (!r.ok) throw new Error((await r.json().catch(() => ({ erreur: r.statusText }))).erreur ?? r.statusText);
   return r.json() as Promise<T>;
 }
 async function apiPut<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(path, { method: "PUT", headers: headers(), body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(`${BASE}${path}`, { method: "PUT", headers: headers(), body: body ? JSON.stringify(body) : undefined });
   if (!r.ok) throw new Error((await r.json().catch(() => ({ erreur: r.statusText }))).erreur ?? r.statusText);
   return r.json() as Promise<T>;
 }
