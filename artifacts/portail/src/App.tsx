@@ -33,6 +33,7 @@ function AppRoutes() {
 
   return (
     <Switch>
+      <Route path="/verifier/:code" component={VerifierPage} />
       <Route path="/" component={DashboardPage} />
       <Route path="/livraisons" component={LivraisonsPage} />
       <Route path="/avances" component={AvancesPage} />
