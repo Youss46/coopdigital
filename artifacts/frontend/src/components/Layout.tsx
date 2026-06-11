@@ -215,6 +215,12 @@ const navItems = [
 
   // ── Finance Coopérative ───────────────────────────────────────────────────
   {
+    href: "/finances/tableau-bord",
+    label: "Tableau de bord financier",
+    icon: BarChart3,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
     href: "/budget",
     label: "Budget",
     icon: Target,
