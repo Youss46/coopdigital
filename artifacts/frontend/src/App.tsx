@@ -40,11 +40,9 @@ import NotificationsPage from "@/pages/NotificationsPage";
 import NotificationsPreferencesPage from "@/pages/NotificationsPreferencesPage";
 import ParametresPage from "@/pages/ParametresPage";
 import TransportPage from "@/pages/TransportPage";
-import PeseePage from "@/pages/PeseePage";
 import EquipementsPage from "@/pages/EquipementsPage";
 import PrevisionsPage from "@/pages/PrevisionsPage";
 import DonsPage from "@/pages/DonsPage";
-import PlanningCollectePage from "@/pages/PlanningCollectePage";
 import FormationsPage from "@/pages/FormationsPage";
 import CaissePage from "@/pages/CaissePage";
 import FiscalitePage from "@/pages/FiscalitePage";
@@ -193,9 +191,6 @@ function AppRoutes() {
       <Route path="/transport">
         <ProtectedRoute component={TransportPage} />
       </Route>
-      <Route path="/pesee">
-        <ProtectedRoute component={PeseePage} />
-      </Route>
       <Route path="/equipements">
         <ProtectedRoute component={EquipementsPage} />
       </Route>
@@ -204,9 +199,6 @@ function AppRoutes() {
       </Route>
       <Route path="/dons">
         <ProtectedRoute component={DonsPage} />
-      </Route>
-      <Route path="/planning">
-        <ProtectedRoute component={PlanningCollectePage} />
       </Route>
       <Route path="/formations">
         <ProtectedRoute component={FormationsPage} />
