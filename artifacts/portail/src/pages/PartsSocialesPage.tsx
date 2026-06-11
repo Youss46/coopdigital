@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { api, type PartsSociales } from "@/lib/api";
-import { Loader2, ArrowLeft, Download } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
 const fmt = (n: number | string) => Number(n).toLocaleString("fr-FR");
@@ -78,21 +78,6 @@ export default function PartsSocialesPage() {
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Carte de membre */}
-            <div className="bg-white rounded-3xl shadow-sm p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Ma carte de membre</h2>
-              <a
-                href={api.carteMembreUrl()}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-center gap-3 bg-green-600 hover:bg-green-700 active:bg-green-800
-                  text-white font-bold text-lg rounded-2xl py-5 transition-colors w-full"
-              >
-                <Download className="w-6 h-6" /> Télécharger ma carte de membre
-              </a>
-              <p className="text-sm text-gray-400 text-center mt-3">Format PDF avec QR code</p>
             </div>
 
             {/* Historique versements */}
