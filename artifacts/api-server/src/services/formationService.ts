@@ -229,7 +229,7 @@ export async function inscrireMembres(
   return { inscrits: nouveaux.length, dejaInscrits: existingSet.size };
 }
 
-export async function getInscrits(cooperativeId: number, sessionId: number) {
+export async function getInscrits(cooperativeId: number, sessionId: number, delegueId?: number) {
   const result = await db.execute<{
     id: number; membre_id: number; nom: string; prenoms: string | null;
     telephone: string; village: string | null; section: string | null;
@@ -243,6 +243,7 @@ export async function getInscrits(cooperativeId: number, sessionId: number) {
     FROM inscriptions_formation i
     JOIN membres m ON m.id = i.membre_id
     WHERE i.session_id = ${sessionId}
+      ${delegueId !== undefined ? sql`AND m.delegue_id = ${delegueId}` : sql``}
     ORDER BY m.nom
   `);
   return result.rows;
@@ -367,7 +368,7 @@ export async function genererAttestations(sessionId: number): Promise<{ generees
   return { generees, dejaExistantes };
 }
 
-export async function listAttestations(cooperativeId: number, opts?: { sessionId?: number; membreId?: number; search?: string }) {
+export async function listAttestations(cooperativeId: number, opts?: { sessionId?: number; membreId?: number; search?: string; delegueId?: number }) {
   const result = await db.execute<{
     id: number; session_id: number; membre_id: number; numero_attestation: string;
     date_emission: string; pdf_url: string | null; session_titre: string;
@@ -385,9 +386,10 @@ export async function listAttestations(cooperativeId: number, opts?: { sessionId
     JOIN sessions_formation s ON s.id = a.session_id
     JOIN membres m ON m.id = a.membre_id
     WHERE s.cooperative_id = ${cooperativeId}
-      ${opts?.sessionId ? sql`AND a.session_id = ${opts.sessionId}` : sql``}
-      ${opts?.membreId  ? sql`AND a.membre_id  = ${opts.membreId}`  : sql``}
-      ${opts?.search    ? sql`AND (m.nom ILIKE ${'%' + opts.search + '%'} OR a.numero_attestation ILIKE ${'%' + opts.search + '%'})` : sql``}
+      ${opts?.sessionId  ? sql`AND a.session_id  = ${opts.sessionId}` : sql``}
+      ${opts?.membreId   ? sql`AND a.membre_id   = ${opts.membreId}`  : sql``}
+      ${opts?.delegueId  ? sql`AND m.delegue_id  = ${opts.delegueId}` : sql``}
+      ${opts?.search     ? sql`AND (m.nom ILIKE ${'%' + opts.search + '%'} OR a.numero_attestation ILIKE ${'%' + opts.search + '%'})` : sql``}
     ORDER BY a.created_at DESC
   `);
   return result.rows;

@@ -96,7 +96,8 @@ export async function getInscrits(req: Request, res: Response): Promise<void> {
     const cooperativeId = req.user?.cooperativeId;
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
-    res.json(await svc.getInscrits(cooperativeId, id));
+    const delegueId = req.user?.role === "delegue" ? req.user?.id : undefined;
+    res.json(await svc.getInscrits(cooperativeId, id, delegueId));
   } catch (err) { req.log.error({ err }, "getInscrits"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
@@ -167,10 +168,12 @@ export async function getListeAttestations(req: Request, res: Response): Promise
     const cooperativeId = req.user?.cooperativeId;
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const { session_id, membre_id, q } = req.query as Record<string, string | undefined>;
+    const delegueId = req.user?.role === "delegue" ? req.user?.id : undefined;
     res.json(await svc.listAttestations(cooperativeId, {
       sessionId: session_id ? parseInt(session_id, 10) : undefined,
       membreId:  membre_id  ? parseInt(membre_id, 10)  : undefined,
       search:    q,
+      delegueId,
     }));
   } catch (err) { req.log.error({ err }, "getListeAttestations"); res.status(500).json({ error: "Erreur serveur" }); }
 }
