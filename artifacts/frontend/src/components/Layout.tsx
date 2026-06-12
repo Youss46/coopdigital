@@ -138,13 +138,6 @@ const navItems = [
     icon: MapPin,
     roles: ["responsable_tracabilite"],
   },
-  {
-    href: "/rse",
-    label: "RSE & Durabilité",
-    icon: Leaf,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-
   // ── Stocks ────────────────────────────────────────────────────────────────
   {
     href: "/stocks",
