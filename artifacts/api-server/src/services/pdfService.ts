@@ -371,7 +371,7 @@ export async function generateBilanCampagne(cooperativeId: number, annee: number
         nom: membresTable.nom,
         prenoms: membresTable.prenoms,
         tonnage: sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float8`,
-        caFcfa: sql<number>`coalesce(sum(${livraisonsTable.montantBrutFcfa}), 0)::int`,
+        caFcfa: sql<number>`coalesce(sum(${livraisonsTable.montantBrutFcfa}::bigint), 0)::float8`,
       })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
@@ -386,13 +386,13 @@ export async function generateBilanCampagne(cooperativeId: number, annee: number
 
     db.select({
         nom: exportateursTable.nom,
-        caTotalFcfa: sql<number>`coalesce(sum(${ventesExportateursTable.montantTotalFcfa}), 0)::int`,
-        soldeDuFcfa: sql<number>`coalesce(sum(${ventesExportateursTable.soldeDuFcfa}), 0)::int`,
+        caTotalFcfa: sql<number>`coalesce(sum(${ventesExportateursTable.montantTotalFcfa}::bigint), 0)::float8`,
+        soldeDuFcfa: sql<number>`coalesce(sum(${ventesExportateursTable.soldeDuFcfa}::bigint), 0)::float8`,
       })
       .from(ventesExportateursTable)
       .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
       .where(and(
-        eq(ventesExportateursTable.cooperativeId, cooperativeId),
+        eq(exportateursTable.cooperativeId, cooperativeId),
         gte(ventesExportateursTable.dateVente, dateDebut),
         lte(ventesExportateursTable.dateVente, dateFin),
       ))

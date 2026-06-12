@@ -73,8 +73,10 @@ export async function getCampaignBilan(req: Request, res: Response): Promise<voi
     const buffer = await generateBilanCampagne(cooperativeId, annee);
     sendPdf(res, buffer, `bilan_campagne_${annee}.pdf`);
   } catch (err) {
-    req.log.error({ err }, "Erreur getCampaignBilan");
-    res.status(500).json({ erreur: "Erreur génération PDF" });
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    req.log.error({ err, msg, stack }, "Erreur getCampaignBilan");
+    res.status(500).json({ erreur: "Erreur génération PDF", detail: msg });
   }
 }
 
