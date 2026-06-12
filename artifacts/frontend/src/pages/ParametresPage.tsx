@@ -61,6 +61,123 @@ import {
   FileDown,
 } from "lucide-react";
 
+// ── Composant aperçu en-tête PDF ──────────────────────────────────────────────
+
+interface PdfHeaderPreviewProps {
+  logoUrl: string | null | undefined;
+  nomComplet: string;
+  slogan: string;
+  adresse: string;
+  ville: string;
+  telephone: string;
+  email: string;
+  numeroAgrement: string;
+  couleurPrimaire: string;
+  piedDePagePdf: string;
+  nomCompletFallback: string;
+  titreDocument?: string;
+}
+
+function PdfHeaderPreview({
+  logoUrl,
+  nomComplet,
+  slogan,
+  adresse,
+  ville,
+  telephone,
+  email,
+  numeroAgrement,
+  couleurPrimaire,
+  piedDePagePdf,
+  nomCompletFallback,
+  titreDocument = "RAPPORT MENSUEL",
+}: PdfHeaderPreviewProps) {
+  const couleur = couleurPrimaire || "#1a4731";
+  const infoLines: string[] = [];
+  if (adresse) infoLines.push(adresse);
+  if (ville) infoLines.push(ville);
+  if (telephone) infoLines.push(`Tél : ${telephone}`);
+  if (email) infoLines.push(email);
+
+  const today = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+  const piedTexte = piedDePagePdf || `${nomComplet || "CoopDigital"} — Document confidentiel`;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-semibold text-gray-800">Aperçu en-tête PDF</h2>
+        <span className="text-xs text-gray-400 italic">Mise à jour en temps réel</span>
+      </div>
+
+      {/* Simulation A4 */}
+      <div className="bg-white border border-gray-300 rounded shadow-sm overflow-hidden" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
+
+        {/* Barre colorée top */}
+        <div style={{ height: 4, backgroundColor: couleur }} />
+
+        {/* En-tête */}
+        <div className="flex items-start gap-3 px-6 pt-3 pb-2">
+          {/* Logo */}
+          <div className="flex-shrink-0 w-14 h-14 flex items-center justify-center overflow-hidden rounded">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <div className="w-full h-full border-2 border-dashed rounded flex items-center justify-center" style={{ borderColor: couleur }}>
+                <ImageIcon className="w-5 h-5" style={{ color: couleur, opacity: 0.4 }} />
+              </div>
+            )}
+          </div>
+
+          {/* Infos coopérative */}
+          <div className="flex-1 min-w-0 pt-0.5">
+            <p className="font-bold text-sm leading-tight" style={{ color: couleur }}>
+              {nomComplet || nomCompletFallback}
+            </p>
+            {slogan && (
+              <p className="text-xs italic mt-0.5" style={{ color: "#666" }}>{slogan}</p>
+            )}
+            <div className="mt-1 space-y-0.5">
+              {infoLines.map((line, i) => (
+                <p key={i} className="text-xs" style={{ color: "#444" }}>{line}</p>
+              ))}
+              {numeroAgrement && (
+                <p className="text-xs italic" style={{ color: "#777" }}>Agrément N° {numeroAgrement}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Boîte document */}
+          <div className="flex-shrink-0 w-28 self-start">
+            <div className="px-2 py-2 text-center" style={{ backgroundColor: couleur }}>
+              <p className="text-xs font-bold text-white leading-tight">{titreDocument}</p>
+            </div>
+            <p className="text-center text-xs mt-1.5" style={{ color: "#888" }}>Généré le {today}</p>
+          </div>
+        </div>
+
+        {/* Ligne séparatrice */}
+        <div className="mx-6 mb-2" style={{ height: 1, backgroundColor: couleur }} />
+
+        {/* Corps simulé */}
+        <div className="px-6 py-3 space-y-1.5">
+          {[70, 55, 85, 40].map((w, i) => (
+            <div key={i} className="h-2 rounded-full bg-gray-100" style={{ width: `${w}%` }} />
+          ))}
+        </div>
+
+        {/* Séparatrice pied */}
+        <div className="mx-6 mt-1" style={{ height: 0.5, backgroundColor: "#ddd" }} />
+
+        {/* Pied de page */}
+        <div className="flex items-center justify-between px-6 py-2">
+          <p className="text-xs truncate max-w-xs" style={{ color: "#888", fontSize: 9 }}>{piedTexte}</p>
+          <p className="text-xs font-bold flex-shrink-0 ml-2" style={{ color: couleur, fontSize: 9 }}>Page 1 / 1</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const MONTHS = [
   { value: "1", label: "Janvier" },
   { value: "2", label: "Février" },
@@ -509,44 +626,19 @@ export default function ParametresPage() {
           </div>
 
           {/* Aperçu en-tête PDF */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-800 mb-4">Aperçu en-tête PDF</h2>
-            <div
-              className="rounded-lg border p-4 flex items-start gap-4"
-              style={{ borderColor: v("couleur_primaire") || "#1a4731" }}
-            >
-              <div
-                className="w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center flex-shrink-0 overflow-hidden"
-                style={{ borderColor: v("couleur_primaire") || "#1a4731" }}
-              >
-                {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
-                ) : (
-                  <ImageIcon className="w-6 h-6 text-gray-400" />
-                )}
-              </div>
-              <div>
-                <p className="font-bold text-base" style={{ color: v("couleur_primaire") || "#1a4731" }}>
-                  {v("nom_complet") || "NOM DE LA COOPÉRATIVE"}
-                </p>
-                {v("slogan") && <p className="text-xs italic text-gray-500">{v("slogan")}</p>}
-                <p className="text-xs text-gray-600 mt-1">
-                  {[v("adresse"), v("ville")].filter(Boolean).join(" — ")}
-                  {v("telephone") && ` · ${v("telephone")}`}
-                </p>
-                {(v("email") || v("site_web")) && (
-                  <p className="text-xs text-gray-500">
-                    {v("email")}
-                    {v("email") && v("site_web") && " · "}
-                    {v("site_web")}
-                  </p>
-                )}
-                {v("numero_agrement") && (
-                  <p className="text-xs text-gray-500">Agrément N° {v("numero_agrement")}</p>
-                )}
-              </div>
-            </div>
-          </div>
+          <PdfHeaderPreview
+            logoUrl={logoUrl}
+            nomComplet={v("nom_complet")}
+            slogan={v("slogan")}
+            adresse={v("adresse")}
+            ville={v("ville")}
+            telephone={v("telephone")}
+            email={v("email")}
+            numeroAgrement={v("numero_agrement")}
+            couleurPrimaire={v("couleur_primaire") || "#1a4731"}
+            piedDePagePdf={v("pied_de_page_pdf")}
+            nomCompletFallback={v("nom_complet") || "CoopDigital"}
+          />
         </TabsContent>
 
         {/* ── Onglet 2 : Juridique ────────────────────────────────────── */}
@@ -735,6 +827,21 @@ export default function ParametresPage() {
               </div>
             </div>
           </div>
+
+          <PdfHeaderPreview
+            logoUrl={logoUrl}
+            nomComplet={v("nom_complet")}
+            slogan={v("slogan")}
+            adresse={v("adresse")}
+            ville={v("ville")}
+            telephone={v("telephone")}
+            email={v("email")}
+            numeroAgrement={v("numero_agrement")}
+            couleurPrimaire={v("couleur_primaire") || "#1a4731"}
+            piedDePagePdf={v("pied_de_page_pdf")}
+            nomCompletFallback={v("nom_complet") || "CoopDigital"}
+            titreDocument="FICHE MEMBRE"
+          />
         </TabsContent>
 
         {/* ── Onglet 4 : Documents ─────────────────────────────────────── */}
