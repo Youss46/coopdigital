@@ -596,10 +596,15 @@ function OngletSessions() {
 
 // ─── Onglet Inscriptions ──────────────────────────────────────────────────────
 
+type MembreMinimal = { id: number; nom: string; prenoms: string | null; code_membre: string };
+
 function OngletInscriptions() {
   const [selectedSession, setSelectedSession] = useState<number | "">("");
   const [mode, setMode] = useState<"individuel" | "zone" | "tous">("individuel");
   const [section, setSection] = useState("");
+  const [membreSearch, setMembreSearch] = useState("");
+  const [membresSelectes, setMembresSelectes] = useState<MembreMinimal[]>([]);
+  const [showMembreResults, setShowMembreResults] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
   const canInscrire = usePermission("formation", "inscrire");
@@ -615,15 +620,24 @@ function OngletInscriptions() {
     enabled: !!selectedSession,
   });
 
+  const { data: membreResults = [] } = useQuery({
+    queryKey: ["membres-search-formation", membreSearch],
+    queryFn: () => apiFetch<MembreMinimal[]>(`/api/membres?search=${encodeURIComponent(membreSearch)}&limit=8&statut=actif`),
+    enabled: membreSearch.trim().length >= 2,
+  });
+
   const inscrireMut = useMutation({
-    mutationFn: (opts: { tous?: boolean; section?: string }) =>
+    mutationFn: (opts: { tous?: boolean; section?: string; membreIds?: number[] }) =>
       apiPost(`/api/formations/sessions/${selectedSession}/inscrire`, {
         ...(opts.tous ? { tous: true } : {}),
         ...(opts.section ? { section: opts.section } : {}),
+        ...(opts.membreIds?.length ? { membreIds: opts.membreIds } : {}),
       }),
     onSuccess: (d: unknown) => {
       const r = d as { inscrits: number; dejaInscrits: number };
       toast({ title: `${r.inscrits} inscrit(s) ajouté(s)${r.dejaInscrits ? `, ${r.dejaInscrits} déjà inscrits` : ""}` });
+      setMembresSelectes([]);
+      setMembreSearch("");
       qc.invalidateQueries({ queryKey: ["formations", "inscrits", selectedSession] });
       qc.invalidateQueries({ queryKey: ["formations", "sessions"] });
     },
@@ -685,6 +699,55 @@ function OngletInscriptions() {
                   </button>
                 ))}
               </div>
+              {mode === "individuel" && (
+                <div className="space-y-2">
+                  {/* Membres sélectionnés */}
+                  {membresSelectes.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {membresSelectes.map((m) => (
+                        <span key={m.id} className="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs rounded-full px-2 py-1">
+                          {m.prenoms ? `${m.prenoms} ${m.nom}` : m.nom}
+                          <button type="button" onClick={() => setMembresSelectes((prev) => prev.filter((x) => x.id !== m.id))}>
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Champ de recherche */}
+                  <div className="relative">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                      <input
+                        value={membreSearch}
+                        onChange={(e) => { setMembreSearch(e.target.value); setShowMembreResults(true); }}
+                        onFocus={() => setShowMembreResults(true)}
+                        placeholder="Rechercher un membre par nom…"
+                        className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                    {showMembreResults && membreSearch.trim().length >= 2 && membreResults.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {membreResults
+                          .filter((m) => !membresSelectes.some((s) => s.id === m.id))
+                          .map((m) => (
+                            <button key={m.id} type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setMembresSelectes((prev) => [...prev, m]);
+                                setMembreSearch("");
+                                setShowMembreResults(false);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 flex items-center gap-2">
+                              <span className="font-medium text-gray-900">{m.prenoms ? `${m.prenoms} ${m.nom}` : m.nom}</span>
+                              <span className="text-xs text-gray-400">{m.code_membre}</span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               {mode === "zone" && (
                 <input value={section} onChange={(e) => setSection(e.target.value)}
                   placeholder="Nom de la section / zone"
@@ -693,11 +756,20 @@ function OngletInscriptions() {
               <button
                 onClick={() => inscrireMut.mutate(
                   mode === "tous" ? { tous: true } :
-                  mode === "zone" ? { section } : {}
+                  mode === "zone" ? { section } :
+                  { membreIds: membresSelectes.map((m) => m.id) }
                 )}
-                disabled={inscrireMut.isPending || (mode === "zone" && !section)}
+                disabled={
+                  inscrireMut.isPending ||
+                  (mode === "zone" && !section) ||
+                  (mode === "individuel" && membresSelectes.length === 0)
+                }
                 className="w-full py-2 bg-green-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
-                {inscrireMut.isPending ? "Inscription…" : "Inscrire"}
+                {inscrireMut.isPending ? "Inscription…" : (
+                  mode === "individuel" && membresSelectes.length > 0
+                    ? `Inscrire ${membresSelectes.length} membre${membresSelectes.length > 1 ? "s" : ""}`
+                    : "Inscrire"
+                )}
               </button>
             </div>
           )}
