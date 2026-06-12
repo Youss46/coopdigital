@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   GraduationCap, Plus, Users, CheckCircle, Clock, MapPin,
   BookOpen, BarChart2, FileText, Send, Bell, Award, Search,
-  ChevronDown, X, Download, CalendarDays, RefreshCw, Trash2,
+  ChevronDown, X, Download, CalendarDays, RefreshCw, Trash2, Banknote,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
@@ -42,6 +42,14 @@ async function apiPut<T>(path: string, body: unknown): Promise<T> {
   });
   if (!r.ok) throw new Error(`${r.status}`);
   return r.json() as Promise<T>;
+}
+
+async function apiDelete(path: string): Promise<void> {
+  const r = await fetch(`${BASE}${path}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!r.ok) throw new Error(`${r.status}`);
 }
 
 function fmtDate(d: string | null | undefined) {
@@ -291,7 +299,7 @@ function ModalSession({ onClose, onSaved }: { onClose: () => void; onSaved: () =
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-700 mb-1 block">Programme</label>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Programme <span className="text-gray-400 font-normal">(optionnel)</span></label>
               <select value={form.programmeId} onChange={set("programmeId")}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                 <option value="">— Aucun —</option>
@@ -964,9 +972,200 @@ function OngletStatistiques() {
   );
 }
 
+// ─── Onglet Programmes ────────────────────────────────────────────────────────
+
+type Programme = {
+  id: number; titre: string; description: string | null;
+  thematiques: string[]; financeur: string | null;
+  budgetFcfa: string | null; dateDebut: string | null; dateFin: string | null;
+  statut: string;
+};
+
+const INIT_PROG = { titre: "", description: "", financeur: "", budgetFcfa: "", dateDebut: "", dateFin: "" };
+
+function OngletProgrammes() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const canPlanifier = usePermission("formation", "planifier");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm]         = useState(INIT_PROG);
+  const [delId, setDelId]       = useState<number | null>(null);
+
+  const { data: programmes = [], isLoading } = useQuery<Programme[]>({
+    queryKey: ["formations", "programmes"],
+    queryFn: () => apiFetch("/api/formations/programmes"),
+  });
+
+  const createMut = useMutation({
+    mutationFn: () => apiPost("/api/formations/programmes", {
+      titre:       form.titre,
+      description: form.description || undefined,
+      financeur:   form.financeur   || undefined,
+      budgetFcfa:  form.budgetFcfa  ? parseFloat(form.budgetFcfa) : undefined,
+      dateDebut:   form.dateDebut   || undefined,
+      dateFin:     form.dateFin     || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["formations", "programmes"] });
+      setShowForm(false); setForm(INIT_PROG);
+      toast({ title: "Programme créé" });
+    },
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => apiDelete(`/api/formations/programmes/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["formations", "programmes"] });
+      setDelId(null);
+      toast({ title: "Programme supprimé" });
+    },
+    onError: () => toast({ title: "Erreur suppression", variant: "destructive" }),
+  });
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-gray-500">Les programmes regroupent plusieurs sessions de formation.</p>
+        {canPlanifier && (
+          <button onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-medium">
+            <Plus className="w-4 h-4" />Nouveau programme
+          </button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12 text-gray-400"><RefreshCw className="w-5 h-5 animate-spin" /></div>
+      ) : programmes.length === 0 ? (
+        <div className="py-16 text-center">
+          <BookOpen className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Aucun programme créé</p>
+          {canPlanifier && (
+            <button onClick={() => setShowForm(true)} className="mt-3 text-green-700 text-sm font-medium hover:underline">
+              Créer le premier programme
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {programmes.map((p) => (
+            <div key={p.id} className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-gray-900 text-sm">{p.titre}</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${STATUT_COLORS[p.statut] ?? "bg-gray-100 text-gray-600"}`}>
+                      {STATUT_LABELS[p.statut] ?? p.statut}
+                    </span>
+                  </div>
+                  {p.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.description}</p>}
+                  <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
+                    {p.financeur   && <span className="flex items-center gap-1"><Banknote className="w-3 h-3" />{p.financeur}</span>}
+                    {p.budgetFcfa  && parseFloat(p.budgetFcfa) > 0 && (
+                      <span>{Number(p.budgetFcfa).toLocaleString("fr-FR")} FCFA</span>
+                    )}
+                    {p.dateDebut   && <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" />{fmtDate(p.dateDebut)}{p.dateFin ? ` → ${fmtDate(p.dateFin)}` : ""}</span>}
+                    {p.thematiques?.length > 0 && (
+                      <span>{p.thematiques.length} thématique{p.thematiques.length > 1 ? "s" : ""}</span>
+                    )}
+                  </div>
+                </div>
+                {canPlanifier && (
+                  <button onClick={() => setDelId(p.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 flex-shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal création programme */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b">
+              <h2 className="font-bold text-gray-900">Nouveau programme</h2>
+              <button onClick={() => { setShowForm(false); setForm(INIT_PROG); }}><X className="w-5 h-5 text-gray-400" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-medium text-gray-700 mb-1 block">Titre *</label>
+                <input value={form.titre} onChange={set("titre")} placeholder="Ex : Programme BPA 2025"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700 mb-1 block">Description</label>
+                <textarea value={form.description} onChange={set("description")} rows={2} placeholder="Objectifs du programme…"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">Financeur</label>
+                  <input value={form.financeur} onChange={set("financeur")} placeholder="GIZ, FIRCA…"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">Budget (FCFA)</label>
+                  <input type="number" min="0" value={form.budgetFcfa} onChange={set("budgetFcfa")} placeholder="0"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">Date début</label>
+                  <input type="date" value={form.dateDebut} onChange={set("dateDebut")}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">Date fin</label>
+                  <input type="date" value={form.dateFin} onChange={set("dateFin")}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 p-5 border-t">
+              <button onClick={() => { setShowForm(false); setForm(INIT_PROG); }}
+                className="flex-1 py-2 border border-gray-300 rounded-xl text-sm text-gray-700">Annuler</button>
+              <button onClick={() => createMut.mutate()} disabled={!form.titre || createMut.isPending}
+                className="flex-1 py-2 bg-green-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                {createMut.isPending ? "Création…" : "Créer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation suppression */}
+      {delId !== null && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="font-semibold mb-2">Supprimer ce programme ?</h3>
+            <p className="text-sm text-gray-500 mb-5">Les sessions associées ne seront pas supprimées.</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setDelId(null)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg">Annuler</button>
+              <button onClick={() => deleteMut.mutate(delId)} disabled={deleteMut.isPending}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg disabled:opacity-50">
+                {deleteMut.isPending ? "…" : "Supprimer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 const TABS = [
+  { key: "programmes",     label: "Programmes",     icon: FileText },
   { key: "sessions",       label: "Sessions",       icon: BookOpen },
   { key: "inscriptions",   label: "Inscriptions",   icon: Users },
   { key: "attestations",   label: "Attestations",   icon: Award },
@@ -1011,6 +1210,7 @@ export default function FormationsPage() {
 
       {/* Content */}
       <div className="p-4 max-w-3xl mx-auto">
+        {activeTab === "programmes"   && <OngletProgrammes />}
         {activeTab === "sessions"     && <OngletSessions />}
         {activeTab === "inscriptions" && <OngletInscriptions />}
         {activeTab === "attestations" && <OngletAttestations />}
