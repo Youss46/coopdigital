@@ -95,7 +95,7 @@ const navItems = [
     href: "/scoring",
     label: "Scoring Producteurs",
     icon: Award,
-    roles: ["pca", "directeur", "comptable", "delegue", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
 
   // ── Campagnes & Collecte ──────────────────────────────────────────────────
