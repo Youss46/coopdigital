@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { api, type Livraison, type Avance, type PartsSociales, type Score } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { Loader2, TrendingUp, LogOut } from "lucide-react";
+import { Loader2, TrendingUp, LogOut, Bell, BellOff, BellRing } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const fmt = (n: number | string) => Number(n).toLocaleString("fr-FR");
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("fr-FR");
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const [score, setScore] = useState<Score>(null);
   const [loading, setLoading] = useState(true);
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
+  const { isSupported, permission, subscribed, subscribe } = usePushNotifications(!!profil);
 
   useEffect(() => {
     Promise.all([api.livraisons(), api.avances(), api.partsSociales(), api.score()])
@@ -62,13 +64,41 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
       <div className="bg-green-700 px-5 pt-8 pb-8 relative">
-        <button
-          onClick={() => setConfirmDeconnexion(true)}
-          className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
-          title="Déconnexion"
-        >
-          <LogOut className="w-5 h-5 text-white/70" />
-        </button>
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          {/* Cloche notifications push */}
+          {isSupported && (
+            <button
+              onClick={() => { if (permission !== "denied") subscribe(); }}
+              className={`p-2 rounded-xl transition-colors ${
+                permission === "granted" && subscribed
+                  ? "bg-white/20"
+                  : "bg-white/10 hover:bg-white/20"
+              }`}
+              title={
+                permission === "granted" && subscribed
+                  ? "Notifications activées"
+                  : permission === "denied"
+                  ? "Notifications bloquées (autorisez dans les réglages)"
+                  : "Activer les notifications"
+              }
+            >
+              {permission === "denied" ? (
+                <BellOff className="w-5 h-5 text-white/40" />
+              ) : permission === "granted" && subscribed ? (
+                <BellRing className="w-5 h-5 text-yellow-300" />
+              ) : (
+                <Bell className="w-5 h-5 text-white/70" />
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => setConfirmDeconnexion(true)}
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
+            title="Déconnexion"
+          >
+            <LogOut className="w-5 h-5 text-white/70" />
+          </button>
+        </div>
         <p className="text-green-300 text-base mb-1">Bonjour 👋</p>
         <h1 className="text-3xl font-bold text-white">
           {profil?.prenoms} {profil?.nom}
