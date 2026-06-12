@@ -311,8 +311,8 @@ export async function envoyerConvocations(cooperativeId: number, sessionId: numb
     }).catch((err) => logger.warn({ err }, "Push portail convocation ignoré"));
   }
 
-  logger.info({ sessionId, envoyes: result.envoyes }, "Convocations envoyées");
-  return result;
+  logger.info({ sessionId, envoyes: result.envoyes, total: tousIds.length }, "Convocations envoyées");
+  return { ...result, total: tousIds.length };
 }
 
 export async function envoyerRappels(cooperativeId: number, sessionId: number) {
@@ -351,8 +351,8 @@ export async function envoyerRappels(cooperativeId: number, sessionId: number) {
     }).catch((err) => logger.warn({ err }, "Push portail rappel ignoré"));
   }
 
-  logger.info({ sessionId, envoyes: result.envoyes }, "Rappels envoyés");
-  return result;
+  logger.info({ sessionId, envoyes: result.envoyes, total: tousIds.length }, "Rappels envoyés");
+  return { ...result, total: tousIds.length };
 }
 
 // ─── Attestations ─────────────────────────────────────────────────────────────

@@ -485,19 +485,19 @@ function OngletSessions() {
   const convoquerMut = useMutation({
     mutationFn: (id: number) => apiPost(`/api/formations/sessions/${id}/convoquer`, {}),
     onSuccess: (d: unknown) => {
-      const res = d as { envoyes: number };
-      toast({ title: `${res.envoyes} SMS envoyé(s)` });
+      const res = d as { envoyes: number; total: number };
+      toast({ title: `Convocations envoyées à ${res.total} membre(s)` });
     },
-    onError: () => toast({ title: "Erreur SMS", variant: "destructive" }),
+    onError: () => toast({ title: "Erreur d'envoi", variant: "destructive" }),
   });
 
   const rappelMut = useMutation({
     mutationFn: (id: number) => apiPost(`/api/formations/sessions/${id}/rappel`, {}),
     onSuccess: (d: unknown) => {
-      const res = d as { envoyes: number };
-      toast({ title: `${res.envoyes} rappel(s) envoyé(s)` });
+      const res = d as { envoyes: number; total: number };
+      toast({ title: `Rappels envoyés à ${res.total} membre(s)` });
     },
-    onError: () => toast({ title: "Erreur SMS", variant: "destructive" }),
+    onError: () => toast({ title: "Erreur d'envoi", variant: "destructive" }),
   });
 
   const attMut = useMutation({
@@ -658,11 +658,11 @@ function OngletInscriptions() {
   const convoquerMut = useMutation({
     mutationFn: () => apiPost(`/api/formations/sessions/${selectedSession}/convoquer`, {}),
     onSuccess: (d: unknown) => {
-      const r = d as { envoyes: number };
-      toast({ title: `${r.envoyes} convocation(s) SMS envoyée(s)` });
+      const r = d as { envoyes: number; total: number };
+      toast({ title: `Convocations envoyées à ${r.total} membre(s)` });
       refetchInscrits();
     },
-    onError: () => toast({ title: "Erreur SMS", variant: "destructive" }),
+    onError: () => toast({ title: "Erreur d'envoi", variant: "destructive" }),
   });
 
   const session = sessions.find((s) => s.id === Number(selectedSession));
@@ -774,12 +774,12 @@ function OngletInscriptions() {
             </div>
           )}
 
-          {/* Actions SMS */}
+          {/* Actions convocations */}
           {canInscrire && nbConv > 0 && (
             <button onClick={() => convoquerMut.mutate()} disabled={convoquerMut.isPending}
               className="w-full flex items-center justify-center gap-2 py-2 bg-blue-50 text-blue-700 rounded-xl text-sm font-medium border border-blue-200 disabled:opacity-50">
               <Send className="w-4 h-4" />
-              {convoquerMut.isPending ? "Envoi…" : `Envoyer convocations SMS (${nbConv} sans SMS)`}
+              {convoquerMut.isPending ? "Envoi…" : `Envoyer convocations (${nbConv} non convoqué${nbConv > 1 ? "s" : ""})`}
             </button>
           )}
 
