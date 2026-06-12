@@ -342,6 +342,12 @@ export default function CampagnesPage() {
                   <input type="date" className={INPUT_CLS} value={form.dateFermeture ?? ""}
                     onChange={e => handleField("dateFermeture", e.target.value || null)} />
                 </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Objectif de collecte (kg) <span className="text-gray-400 font-normal">(optionnel)</span></label>
+                  <input type="number" min="0" className={INPUT_CLS} placeholder="Ex : 500000"
+                    value={(form as { tonnageCibleKg?: string | null }).tonnageCibleKg ?? ""}
+                    onChange={e => handleField("tonnageCibleKg" as keyof CampagneInput, e.target.value || null)} />
+                </div>
               </div>
               <div className="flex justify-end gap-3">
                 <button type="button" onClick={() => setShowForm(false)} className={`${BTN} bg-gray-100 text-gray-700 hover:bg-gray-200`}>

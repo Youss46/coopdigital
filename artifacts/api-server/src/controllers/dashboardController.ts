@@ -257,7 +257,7 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
     const debutMoisStr = debutMois.toISOString().split("T")[0]!;
 
     const [campagneActive] = await db
-      .select({ id: campagnesTable.id, libelle: campagnesTable.libelle, anneeDebut: campagnesTable.anneeDebut, anneeFin: campagnesTable.anneeFin })
+      .select({ id: campagnesTable.id, libelle: campagnesTable.libelle, anneeDebut: campagnesTable.anneeDebut, anneeFin: campagnesTable.anneeFin, tonnageCibleKg: campagnesTable.tonnageCibleKg })
       .from(campagnesTable)
       .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
       .limit(1);

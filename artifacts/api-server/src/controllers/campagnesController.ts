@@ -49,12 +49,13 @@ export async function getCampagne(req: Request, res: Response) {
 export async function createCampagne(req: Request, res: Response) {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
-  const { libelle, anneeDebut, anneeFin, dateOuverture, dateFermeture } = req.body as {
+  const { libelle, anneeDebut, anneeFin, dateOuverture, dateFermeture, tonnageCibleKg } = req.body as {
     libelle: string;
     anneeDebut: number;
     anneeFin: number;
     dateOuverture: string;
     dateFermeture?: string | null;
+    tonnageCibleKg?: string | null;
   };
 
   if (!libelle || !anneeDebut || !anneeFin || !dateOuverture) {
@@ -70,6 +71,7 @@ export async function createCampagne(req: Request, res: Response) {
       anneeFin,
       dateOuverture,
       dateFermeture: dateFermeture || null,
+      tonnageCibleKg: tonnageCibleKg || null,
       statut: "ouverte",
     })
     .returning();

@@ -120,6 +120,13 @@
       "when": 1749986400000,
       "tag": "0016_categories_dons_upsert",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1749986500000,
+      "tag": "0017_campagne_tonnage_cible",
+      "breakpoints": true
     }
   ]
 }

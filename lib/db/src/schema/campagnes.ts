@@ -15,6 +15,7 @@ export const campagnesTable = pgTable("campagnes", {
   dateOuverture: date("date_ouverture", { mode: "string" }).notNull(),
   dateFermeture: date("date_fermeture", { mode: "string" }),
   statut: campagneStatutEnum("statut").notNull().default("ouverte"),
+  tonnageCibleKg: numeric("tonnage_cible_kg", { precision: 14, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -1916,6 +1916,8 @@ export interface Campagne {
   /** @nullable */
   dateFermeture?: string | null;
   statut: CampagneStatut;
+  /** @nullable */
+  tonnageCibleKg?: string | null;
   createdAt: string;
 }
 
@@ -1930,6 +1932,8 @@ export interface CampagneInput {
   dateOuverture: string;
   /** @nullable */
   dateFermeture?: string | null;
+  /** @nullable */
+  tonnageCibleKg?: string | null;
 }
 
 export type VerificationClotureStatut = typeof VerificationClotureStatut[keyof typeof VerificationClotureStatut];

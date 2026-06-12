@@ -442,7 +442,7 @@ interface StatsDelegue {
   tonnageCampagne: number;
   tonnageMois: number;
   nbLivraisonsCampagne: number;
-  campagne: { id: number; libelle: string; anneeDebut: number; anneeFin: number } | null;
+  campagne: { id: number; libelle: string; anneeDebut: number; anneeFin: number; tonnageCibleKg: string | null } | null;
   dernieresLivraisons: {
     id: number;
     poidsKg: string;
@@ -482,6 +482,10 @@ function DashboardDelegue() {
   };
 
   const tauxCouleur = s.tauxRemboursement >= 80 ? "#16a34a" : s.tauxRemboursement >= 50 ? "#c4962a" : "#dc2626";
+
+  const cibleKg = s.campagne?.tonnageCibleKg ? parseFloat(s.campagne.tonnageCibleKg) : null;
+  const tauxProgression = cibleKg && cibleKg > 0 ? Math.min(100, Math.round((s.tonnageCampagne / cibleKg) * 100)) : null;
+  const couleurProgression = tauxProgression == null ? "#6b7280" : tauxProgression >= 100 ? "#16a34a" : tauxProgression >= 70 ? "#2563eb" : tauxProgression >= 40 ? "#c4962a" : "#dc2626";
 
   return (
     <div className="space-y-6">
@@ -546,6 +550,48 @@ function DashboardDelegue() {
           </div>
         </div>
       </div>
+
+      {s.campagne && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Progression collecte — campagne en cours</p>
+              <p className="text-xs text-gray-400 mt-0.5">{s.campagne.libelle}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold" style={{ color: couleurProgression }}>
+                {tauxProgression != null ? `${tauxProgression} %` : "—"}
+              </p>
+              {cibleKg && (
+                <p className="text-xs text-gray-400">
+                  sur {(cibleKg / 1000).toLocaleString("fr-FR")} T objectif
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: tauxProgression != null ? `${tauxProgression}%` : "0%",
+                backgroundColor: couleurProgression,
+              }}
+            />
+          </div>
+          <div className="flex justify-between mt-2 text-xs text-gray-500">
+            <span>{(s.tonnageCampagne / 1000).toFixed(2)} T collectées</span>
+            {cibleKg ? (
+              <span>
+                {s.tonnageCampagne < cibleKg
+                  ? `${((cibleKg - s.tonnageCampagne) / 1000).toFixed(2)} T restantes`
+                  : "✓ Objectif atteint"}
+              </span>
+            ) : (
+              <span className="text-gray-400 italic">Aucun objectif défini</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">

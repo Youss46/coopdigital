@@ -8208,6 +8208,8 @@ components:
         statut:
           type: string
           enum: [ouverte, fermee]
+        tonnageCibleKg:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time
@@ -8235,6 +8237,8 @@ components:
         dateFermeture:
           type: ["string", "null"]
           format: date
+        tonnageCibleKg:
+          type: ["string", "null"]
 
     VerificationCloture:
       type: object
