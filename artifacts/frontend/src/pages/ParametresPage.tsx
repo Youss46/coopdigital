@@ -93,11 +93,15 @@ function PdfHeaderPreview({
   titreDocument = "RAPPORT MENSUEL",
 }: PdfHeaderPreviewProps) {
   const couleur = couleurPrimaire || "#1a4731";
-  const infoLines: string[] = [];
-  if (adresse) infoLines.push(adresse);
-  if (ville) infoLines.push(ville);
-  if (telephone) infoLines.push(`Tél : ${telephone}`);
-  if (email) infoLines.push(email);
+  const locParts: string[] = [];
+  if (adresse) locParts.push(adresse);
+  if (ville)   locParts.push(ville);
+  const locLine = locParts.join(" · ");
+
+  const contactParts: string[] = [];
+  if (telephone) contactParts.push(`Tél : ${telephone}`);
+  if (email)     contactParts.push(email);
+  const contactLine = contactParts.join(" · ");
 
   const today = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
   const piedTexte = piedDePagePdf || `${nomComplet || "CoopDigital"} — Document confidentiel`;
@@ -137,9 +141,8 @@ function PdfHeaderPreview({
               <p className="text-xs italic mt-0.5" style={{ color: "#666" }}>{slogan}</p>
             )}
             <div className="mt-1 space-y-0.5">
-              {infoLines.map((line, i) => (
-                <p key={i} className="text-xs" style={{ color: "#444" }}>{line}</p>
-              ))}
+              {locLine && <p className="text-xs" style={{ color: "#444" }}>{locLine}</p>}
+              {contactLine && <p className="text-xs" style={{ color: "#444" }}>{contactLine}</p>}
               {numeroAgrement && (
                 <p className="text-xs italic" style={{ color: "#777" }}>Agrément N° {numeroAgrement}</p>
               )}

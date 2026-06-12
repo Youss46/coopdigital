@@ -160,15 +160,27 @@ export async function drawHeader(
 
   doc.font("Helvetica").fontSize(8).fillColor("#444444");
 
-  const infos: string[] = [];
-  if (config?.adresse)   infos.push(config.adresse);
-  if (config?.ville)     infos.push(config.ville);
-  if (config?.telephone) infos.push(`Tél : ${config.telephone}`);
-  if (config?.email)     infos.push(config.email);
+  // Ligne 1 : localisation (adresse · ville)
+  const locParts: string[] = [];
+  if (config?.adresse) locParts.push(config.adresse);
+  if (config?.ville)   locParts.push(config.ville);
+  const locLine = locParts.join(" · ");
 
-  infos.forEach((ligne, i) => {
-    doc.text(ligne, infoX, 31 + i * 10, { width: infoWidth, lineBreak: false });
-  });
+  // Ligne 2 : contact (Tél · email)
+  const contactParts: string[] = [];
+  if (config?.telephone) contactParts.push(`Tél : ${config.telephone}`);
+  if (config?.email)     contactParts.push(config.email);
+  const contactLine = contactParts.join(" · ");
+
+  let currentY = 31;
+  if (locLine) {
+    doc.text(locLine, infoX, currentY, { width: infoWidth, lineBreak: false });
+    currentY += 11;
+  }
+  if (contactLine) {
+    doc.text(contactLine, infoX, currentY, { width: infoWidth, lineBreak: false });
+    currentY += 11;
+  }
 
   if (config?.numeroAgrement && options.show_agrement !== false) {
     doc
@@ -178,7 +190,7 @@ export async function drawHeader(
       .text(
         `Agrément N° ${config.numeroAgrement}`,
         infoX,
-        31 + infos.length * 10 + 3,
+        currentY + 1,
         { width: infoWidth, lineBreak: false },
       );
   }
