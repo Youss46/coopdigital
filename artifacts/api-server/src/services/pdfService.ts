@@ -354,37 +354,52 @@ export async function generateRapportMensuel(cooperativeId: number, mois: number
 // 3. Bilan de campagne
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateBilanCampagne(cooperativeId: number, annee: number): Promise<Buffer> {
-  const ecritures = await db.select().from(ecrituresComptablesTable)
-    .where(eq(ecrituresComptablesTable.exercice, annee));
+  const dateDebut = `${annee}-01-01`;
+  const dateFin   = `${annee}-12-31`;
 
-  const planComptes = await db.select().from(planComptableTable).where(eq(planComptableTable.cooperativeId, cooperativeId));
+  const [ecritures, planComptes, topProducteurs, topExportateurs] = await Promise.all([
+    db.select().from(ecrituresComptablesTable)
+      .where(and(
+        eq(ecrituresComptablesTable.cooperativeId, cooperativeId),
+        eq(ecrituresComptablesTable.exercice, annee),
+      )),
 
-  const topProducteurs = await db
-    .select({
-      nom: membresTable.nom,
-      prenoms: membresTable.prenoms,
-      tonnage: sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float`,
-      caFcfa: sql<number>`coalesce(sum(${livraisonsTable.montantBrutFcfa}), 0)::int`,
-    })
-    .from(livraisonsTable)
-    .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-    .where(gte(livraisonsTable.dateLivraison, `${annee}-01-01`))
-    .groupBy(membresTable.id, membresTable.nom, membresTable.prenoms)
-    .orderBy(sql`tonnage DESC`)
-    .limit(10);
+    db.select().from(planComptableTable)
+      .where(eq(planComptableTable.cooperativeId, cooperativeId)),
 
-  const topExportateurs = await db
-    .select({
-      nom: exportateursTable.nom,
-      caTotalFcfa: sql<number>`coalesce(sum(${ventesExportateursTable.montantTotalFcfa}), 0)::int`,
-      soldeDuFcfa: sql<number>`coalesce(sum(${ventesExportateursTable.soldeDuFcfa}), 0)::int`,
-    })
-    .from(ventesExportateursTable)
-    .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
-    .where(gte(ventesExportateursTable.dateVente, `${annee}-01-01`))
-    .groupBy(exportateursTable.id, exportateursTable.nom)
-    .orderBy(sql`caTotalFcfa DESC`)
-    .limit(5);
+    db.select({
+        nom: membresTable.nom,
+        prenoms: membresTable.prenoms,
+        tonnage: sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float8`,
+        caFcfa: sql<number>`coalesce(sum(${livraisonsTable.montantBrutFcfa}), 0)::int`,
+      })
+      .from(livraisonsTable)
+      .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+      .where(and(
+        eq(membresTable.cooperativeId, cooperativeId),
+        gte(livraisonsTable.dateLivraison, dateDebut),
+        lte(livraisonsTable.dateLivraison, dateFin),
+      ))
+      .groupBy(membresTable.id, membresTable.nom, membresTable.prenoms)
+      .orderBy(desc(sql`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)`))
+      .limit(10),
+
+    db.select({
+        nom: exportateursTable.nom,
+        caTotalFcfa: sql<number>`coalesce(sum(${ventesExportateursTable.montantTotalFcfa}), 0)::int`,
+        soldeDuFcfa: sql<number>`coalesce(sum(${ventesExportateursTable.soldeDuFcfa}), 0)::int`,
+      })
+      .from(ventesExportateursTable)
+      .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
+      .where(and(
+        eq(ventesExportateursTable.cooperativeId, cooperativeId),
+        gte(ventesExportateursTable.dateVente, dateDebut),
+        lte(ventesExportateursTable.dateVente, dateFin),
+      ))
+      .groupBy(exportateursTable.id, exportateursTable.nom)
+      .orderBy(desc(sql`coalesce(sum(${ventesExportateursTable.montantTotalFcfa}), 0)`))
+      .limit(5),
+  ]);
 
   // Agrégats
   const ca701      = ecritures.filter(e => e.compteCredit === "701").reduce((s, e) => s + e.montantFcfa, 0);
