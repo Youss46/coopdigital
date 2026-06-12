@@ -20,6 +20,10 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
 
     const conditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
     if (membreId) conditions.push(eq(livraisonsTable.membreId, membreId));
+    // Un délégué ne voit que les livraisons des membres qui lui sont rattachés
+    if (req.user?.role === "delegue" && req.user?.id) {
+      conditions.push(eq(membresTable.delegueId, req.user.id));
+    }
 
     const livraisons = await db
       .select({
