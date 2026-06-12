@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable } from "@workspace/db";
+import { db, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable } from "@workspace/db";
 import { eq, sql, desc, gte, and, isNull } from "drizzle-orm";
 
 export async function getDashboard(req: Request, res: Response): Promise<void> {
@@ -238,6 +238,123 @@ export async function getDashboardTracabilite(req: Request, res: Response): Prom
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboardTracabilite");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function getDashboardDelegue(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const delegueId = req.user?.id;
+  if (!cooperativeId || !delegueId) {
+    res.status(403).json({ erreur: "Accès refusé" });
+    return;
+  }
+
+  try {
+    const debutMois = new Date();
+    debutMois.setDate(1);
+    debutMois.setHours(0, 0, 0, 0);
+    const debutMoisStr = debutMois.toISOString().split("T")[0]!;
+
+    const [campagneActive] = await db
+      .select({ id: campagnesTable.id, libelle: campagnesTable.libelle, anneeDebut: campagnesTable.anneeDebut, anneeFin: campagnesTable.anneeFin })
+      .from(campagnesTable)
+      .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
+      .limit(1);
+
+    const campagneId = campagneActive?.id ?? null;
+
+    const membresCond = and(
+      eq(membresTable.cooperativeId, cooperativeId),
+      eq(membresTable.delegueId, delegueId),
+    );
+
+    const [
+      [membresRow],
+      [avancesEnCoursRow],
+      [avancesOctroye],
+      [avancesRembourse],
+      [avancesRetardRow],
+      [tonnageCampagneRow],
+      [tonnageMoisRow],
+      [livraisonsCampagneRow],
+      dernieresLivraisons,
+    ] = await Promise.all([
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(membresTable)
+        .where(and(membresCond, eq(membresTable.statut, "actif"))),
+
+      db.select({ total: sql<number>`coalesce(sum(solde_restant_fcfa),0)::int` })
+        .from(avancesTable)
+        .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .where(and(membresCond, eq(avancesTable.statut, "en_cours"))),
+
+      db.select({ total: sql<number>`coalesce(sum(montant_octroye_fcfa),0)::int` })
+        .from(avancesTable)
+        .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .where(and(membresCond, eq(avancesTable.statut, "en_cours"))),
+
+      db.select({ total: sql<number>`coalesce(sum(montant_rembourse_fcfa),0)::int` })
+        .from(avancesTable)
+        .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .where(and(membresCond, eq(avancesTable.statut, "en_cours"))),
+
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(avancesTable)
+        .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .where(and(membresCond, eq(avancesTable.statut, "en_retard"))),
+
+      campagneId
+        ? db.select({ tonnage: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
+            .from(livraisonsTable)
+            .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+            .where(and(membresCond, eq(livraisonsTable.campagneId, campagneId)))
+        : Promise.resolve([{ tonnage: 0 }]),
+
+      db.select({ tonnage: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
+        .from(livraisonsTable)
+        .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .where(and(membresCond, gte(livraisonsTable.dateLivraison, debutMoisStr))),
+
+      campagneId
+        ? db.select({ count: sql<number>`count(*)::int` })
+            .from(livraisonsTable)
+            .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+            .where(and(membresCond, eq(livraisonsTable.campagneId, campagneId)))
+        : Promise.resolve([{ count: 0 }]),
+
+      db.select({
+          id: livraisonsTable.id,
+          poidsKg: livraisonsTable.poidsKg,
+          montantNetFcfa: livraisonsTable.montantNetFcfa,
+          dateLivraison: livraisonsTable.dateLivraison,
+          membreNom: membresTable.nom,
+          membrePrenoms: membresTable.prenoms,
+        })
+        .from(livraisonsTable)
+        .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .where(membresCond)
+        .orderBy(desc(livraisonsTable.createdAt))
+        .limit(5),
+    ]);
+
+    const montantOctroye = avancesOctroye?.total ?? 0;
+    const montantRembourse = avancesRembourse?.total ?? 0;
+    const tauxRemboursement = montantOctroye > 0 ? Math.round((montantRembourse / montantOctroye) * 100) : 0;
+
+    res.json({
+      membresActifs: membresRow?.count ?? 0,
+      avancesEnCoursMontant: avancesEnCoursRow?.total ?? 0,
+      avancesEnRetardNb: avancesRetardRow?.count ?? 0,
+      tauxRemboursement,
+      tonnageCampagne: tonnageCampagneRow?.tonnage ?? 0,
+      tonnageMois: tonnageMoisRow?.tonnage ?? 0,
+      nbLivraisonsCampagne: livraisonsCampagneRow?.count ?? 0,
+      campagne: campagneActive ?? null,
+      dernieresLivraisons,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Erreur getDashboardDelegue");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

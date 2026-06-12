@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useGetDashboard, useGetDashboardLivraisons, useGetDashboardAvancesRetard } from "@workspace/api-client-react";
-import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation, Settings } from "lucide-react";
+import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation, Settings, TrendingUp, CreditCard, Leaf } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 
@@ -434,6 +434,153 @@ function DashboardRT() {
   );
 }
 
+interface StatsDelegue {
+  membresActifs: number;
+  avancesEnCoursMontant: number;
+  avancesEnRetardNb: number;
+  tauxRemboursement: number;
+  tonnageCampagne: number;
+  tonnageMois: number;
+  nbLivraisonsCampagne: number;
+  campagne: { id: number; libelle: string; anneeDebut: number; anneeFin: number } | null;
+  dernieresLivraisons: {
+    id: number;
+    poidsKg: string;
+    montantNetFcfa: number | null;
+    dateLivraison: string;
+    membreNom: string | null;
+    membrePrenoms: string | null;
+  }[];
+}
+
+function DashboardDelegue() {
+  const { data: stats, isLoading } = useQuery<StatsDelegue>({
+    queryKey: ["dashboard-delegue"],
+    queryFn: async () => {
+      const r = await apiFetch("/api/dashboard/delegue");
+      if (!r.ok) throw new Error("Erreur chargement");
+      return r.json() as Promise<StatsDelegue>;
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse h-24" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const s = stats ?? {
+    membresActifs: 0, avancesEnCoursMontant: 0, avancesEnRetardNb: 0,
+    tauxRemboursement: 0, tonnageCampagne: 0, tonnageMois: 0,
+    nbLivraisonsCampagne: 0, campagne: null, dernieresLivraisons: [],
+  };
+
+  const tauxCouleur = s.tauxRemboursement >= 80 ? "#16a34a" : s.tauxRemboursement >= 50 ? "#c4962a" : "#dc2626";
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Mon tableau de bord</h1>
+        <p className="text-gray-500 text-sm mt-1">
+          {s.campagne
+            ? `Campagne ${s.campagne.libelle} — en cours`
+            : "Aucune campagne active"}
+        </p>
+      </div>
+
+      {s.avancesEnRetardNb > 0 && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <AlertTriangle size={16} className="text-red-500 shrink-0" />
+          <p className="text-sm text-red-700 font-medium">
+            {s.avancesEnRetardNb} avance{s.avancesEnRetardNb > 1 ? "s" : ""} en retard parmi vos membres
+          </p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <CarteKpi
+          titre="Mes membres actifs"
+          valeur={String(s.membresActifs)}
+          icone={Users}
+          couleur="#1a4731"
+          sousTitre="Membres rattachés"
+        />
+        <CarteKpi
+          titre={s.campagne ? `Tonnage campagne` : "Tonnage ce mois"}
+          valeur={`${((s.campagne ? s.tonnageCampagne : s.tonnageMois) / 1000).toFixed(2)} T`}
+          icone={Leaf}
+          couleur="#16a34a"
+          sousTitre={s.campagne
+            ? `${s.nbLivraisonsCampagne} livraison${s.nbLivraisonsCampagne !== 1 ? "s" : ""} · ${(s.tonnageMois / 1000).toFixed(2)} T ce mois`
+            : "Cacao collecté"}
+        />
+        <CarteKpi
+          titre="Avances en cours"
+          valeur={formaterFCFA(s.avancesEnCoursMontant)}
+          icone={CreditCard}
+          couleur="#c4962a"
+          sousTitre="Solde total dû"
+        />
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-start gap-4">
+            <div className="rounded-lg p-2.5 flex-shrink-0" style={{ backgroundColor: tauxCouleur + "15" }}>
+              <TrendingUp size={22} style={{ color: tauxCouleur }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-gray-500 font-medium">Taux de remboursement</p>
+              <p className="text-2xl font-bold mt-0.5" style={{ color: tauxCouleur }}>{s.tauxRemboursement} %</p>
+              <div className="w-full h-1.5 bg-gray-100 rounded-full mt-2 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${s.tauxRemboursement}%`, backgroundColor: tauxCouleur }}
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Des avances en cours</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+          <Clock size={16} className="text-gray-400" />
+          <h2 className="font-semibold text-gray-900 text-sm">Dernières livraisons de mes membres</h2>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {s.dernieresLivraisons.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm py-8">Aucune livraison enregistrée</p>
+          ) : (
+            s.dernieresLivraisons.map((l) => (
+              <div key={l.id} className="px-5 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {l.membreNom} {l.membrePrenoms}
+                  </p>
+                  <p className="text-xs text-gray-400">{formaterDate(l.dateLivraison)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {Number(l.poidsKg).toLocaleString("fr-FR")} kg
+                  </p>
+                  {l.montantNetFcfa != null && (
+                    <p className="text-xs text-green-600">{formaterFCFA(l.montantNetFcfa)}</p>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { utilisateur } = useAuth();
   const { data: kpi, isLoading: kpiChargement } = useGetDashboard();
@@ -442,6 +589,10 @@ export default function Dashboard() {
 
   if (utilisateur?.role === "responsable_tracabilite") {
     return <DashboardRT />;
+  }
+
+  if (utilisateur?.role === "delegue") {
+    return <DashboardDelegue />;
   }
 
   return (
