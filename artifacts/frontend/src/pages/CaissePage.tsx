@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Wallet, Plus, RefreshCw, Lock, Unlock, Download, AlertTriangle, TrendingUp, TrendingDown, ChevronRight, X, CheckCircle2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MoneyInput } from "@/components/ui/money-input";
+import { useAuth } from "@/contexts/AuthContext";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -1172,6 +1173,9 @@ function CaissesDelegueesTab({ caisses }: { caisses: Caisse[] | null }) {
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 export default function CaissePage() {
+  const { utilisateur } = useAuth();
+  const isDelegue = utilisateur?.role === "delegue";
+
   const [tab, setTab] = useState<"etat" | "journal" | "historique" | "delegues">("etat");
   const [journalCaisseId, setJournalCaisseId] = useState<number | undefined>();
   const [caisses, setCaisses] = useState<Caisse[] | null>(null);
@@ -1197,11 +1201,12 @@ export default function CaissePage() {
     setTab("journal");
   };
 
+  // Un délégué n'accède pas à l'onglet "Caisses déléguées" (vue admin)
   const TABS = [
     { id: "etat" as const,        label: "État des caisses" },
     { id: "journal" as const,     label: "Journal de caisse" },
     { id: "historique" as const,  label: "Historique sessions" },
-    { id: "delegues" as const,    label: "Caisses déléguées" },
+    ...(!isDelegue ? [{ id: "delegues" as const, label: "Caisses déléguées" }] : []),
   ];
 
   return (
@@ -1241,7 +1246,7 @@ export default function CaissePage() {
       {tab === "historique" && (
         <HistoriqueSessions caisses={caisses} />
       )}
-      {tab === "delegues" && (
+      {tab === "delegues" && !isDelegue && (
         <CaissesDelegueesTab caisses={caisses} />
       )}
     </div>

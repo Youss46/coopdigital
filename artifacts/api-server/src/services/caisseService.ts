@@ -55,7 +55,7 @@ async function getCoopNom(cooperativeId: number): Promise<string> {
 
 // ─── CRUD Caisses ─────────────────────────────────────────────────────────────
 
-export async function listCaisses(cooperativeId: number) {
+export async function listCaisses(cooperativeId: number, responsableId?: number) {
   const result = await db.execute<{
     id: number; nom: string; responsable_id: number | null; responsable_nom: string | null;
     solde_actuel_fcfa: string; fond_caisse_minimum_fcfa: string; actif: boolean;
@@ -72,6 +72,7 @@ export async function listCaisses(cooperativeId: number) {
     LEFT JOIN sessions_caisse s
       ON s.caisse_id = c.id AND s.date_session = CURRENT_DATE AND s.statut = 'ouverte'
     WHERE c.cooperative_id = ${cooperativeId} AND c.actif = true
+      ${responsableId !== undefined ? sql`AND c.responsable_id = ${responsableId}` : sql``}
     ORDER BY c.nom
   `);
   return result.rows;

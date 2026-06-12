@@ -6,7 +6,9 @@ import * as svc from "../services/caisseService.js";
 export async function getCaisses(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
-  try { res.json(await svc.listCaisses(cooperativeId)); }
+  // Un délégué ne voit que la caisse dont il est responsable
+  const responsableId = req.user?.role === "delegue" ? req.user?.id : undefined;
+  try { res.json(await svc.listCaisses(cooperativeId, responsableId)); }
   catch (err) { req.log.error({ err }, "getCaisses"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
