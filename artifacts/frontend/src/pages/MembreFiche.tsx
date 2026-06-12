@@ -1457,7 +1457,7 @@ export default function MembreFiche() {
               {transferForm.rattachementType === "base_centrale" && (
                 <div className="bg-purple-50 rounded-lg px-3 py-2.5 text-xs text-purple-700">
                   <Building2 size={12} className="inline mr-1" />
-                  Ce membre sera transféré vers la direction. Un SMS sera envoyé à l'ancien délégué.
+                  Ce membre sera transféré vers la direction.
                 </div>
               )}
 

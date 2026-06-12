@@ -1,12 +1,10 @@
 import { db } from "@workspace/db";
 import { ticketsSupportTable, messagesTicketTable } from "@workspace/db";
 import { eq, and, desc, sql, lt, isNull, not } from "drizzle-orm";
-import { sendSMS } from "./smsService.js";
 import { logger } from "../lib/logger";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const YOUSSOUF_TEL   = "0714174082";
 const YOUSSOUF_EMAIL = "contacteyouss@gmail.com";
 
 // ─── Génération de référence ──────────────────────────────────────────────────
@@ -22,26 +20,14 @@ async function genererReference(): Promise<string> {
   return `TKT-${annee}-${n}`;
 }
 
-// ─── SMS ──────────────────────────────────────────────────────────────────────
+// ─── Notifications tickets ────────────────────────────────────────────────────
 
-async function notifierSmsUrgent(reference: string, titre: string, nomCoop: string) {
-  const msg = `🚨 URGENT — Ticket ${reference} de ${nomCoop}. ${titre}. Connecte-toi au dashboard M15.`;
-  try {
-    await sendSMS(YOUSSOUF_TEL, msg);
-    logger.info({ reference }, "SMS urgent envoyé");
-  } catch (err) {
-    logger.error({ err, reference }, "Échec SMS urgent");
-  }
+function notifierUrgent(reference: string, titre: string, nomCoop: string) {
+  logger.warn({ reference, titre, nomCoop }, "🚨 Ticket URGENT — vérifier le dashboard M15");
 }
 
-async function notifierSmsHaute(reference: string, titre: string, nomCoop: string) {
-  const msg = `⚠️ Ticket ${reference} — Priorité HAUTE — ${nomCoop}. ${titre}. Dashboard M15.`;
-  try {
-    await sendSMS(YOUSSOUF_TEL, msg);
-    logger.info({ reference }, "SMS haute priorité envoyé");
-  } catch (err) {
-    logger.error({ err, reference }, "Échec SMS haute priorité");
-  }
+function notifierHaute(reference: string, titre: string, nomCoop: string) {
+  logger.warn({ reference, titre, nomCoop }, "⚠️ Ticket priorité HAUTE — vérifier le dashboard M15");
 }
 
 /** Email de confirmation (simulé — intégration SMTP future) */
@@ -79,7 +65,7 @@ export async function envoyerAlertesHautePriorite() {
     );
 
   for (const t of tickets) {
-    await notifierSmsHaute(t.reference, t.titre, `Coop #${t.cooperativeId}`);
+    notifierHaute(t.reference, t.titre, `Coop #${t.cooperativeId}`);
     await db
       .update(ticketsSupportTable)
       .set({ smsHauteEnvoye: true })
@@ -139,7 +125,7 @@ export async function creerTicket(params: {
 
   // Notifications
   if (priorite === "urgente") {
-    void notifierSmsUrgent(reference, params.titre, `Coop #${params.cooperativeId}`);
+    notifierUrgent(reference, params.titre, `Coop #${params.cooperativeId}`);
   }
   if (userRow?.email) {
     envoyerEmailConfirmation({ to: userRow.email, reference, titre: params.titre });

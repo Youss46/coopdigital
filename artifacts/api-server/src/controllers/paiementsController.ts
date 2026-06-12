@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 import { db, paiementsTable, membresTable, livraisonsTable, usersTable } from "@workspace/db";
 import { eq, desc, and, sql, gte, lt, lte } from "drizzle-orm";
-import { sendSMS } from "../services/smsService";
+import { envoyerPushGroupePortail } from "../services/pushService";
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
 
@@ -238,14 +238,12 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         .where(eq(livraisonsTable.id, row.paiement.livraisonId));
     });
 
-    // 3. Notifier le producteur par SMS (best-effort)
-    const telephone = body.telephone ?? row.telephone;
-    if (telephone) {
-      const montantStr = new Intl.NumberFormat("fr-FR").format(row.paiement.montantFcfa);
-      const modeStr = mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : "espèces";
-      const msg = `CoopDigital: Votre paiement de ${montantStr} FCFA via ${modeStr} a ete valide. Merci ${row.nom ?? ""}.`;
-      sendSMS(telephone, msg).catch(() => {});
-    }
+    // 3. Notifier le producteur (best-effort)
+    void envoyerPushGroupePortail([row.paiement.membreId], {
+      title: "✅ Paiement validé",
+      body: `${new Intl.NumberFormat("fr-FR").format(row.paiement.montantFcfa)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : "espèces"}`,
+      url: "/paiements",
+    });
 
     const updated = await fetchEnrichedPaiement(id);
     res.json(updated);
@@ -323,10 +321,11 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
     });
 
     // 3. Notifier le producteur (best-effort)
-    if (row.telephone) {
-      const msg = `CoopDigital: Votre demande de paiement a ete rejetee. Motif: ${body.motifRejet.trim().slice(0, 80)}. Contactez votre agent.`;
-      sendSMS(row.telephone, msg).catch(() => {});
-    }
+    void envoyerPushGroupePortail([row.paiement.membreId], {
+      title: "❌ Paiement rejeté",
+      body: `Motif : ${body.motifRejet.trim().slice(0, 120)}`,
+      url: "/paiements",
+    });
 
     const updated = await fetchEnrichedPaiement(id);
     res.json(updated);

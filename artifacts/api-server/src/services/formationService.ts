@@ -1,7 +1,6 @@
 import { db, programmesFormationTable, sessionsFormationTable, inscriptionsFormationTable, attestationsFormationTable, evaluationsFormationTable, membresTable } from "@workspace/db";
 import { eq, and, inArray, sql, desc, not } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
-import { sendBulkSMS } from "./smsService.js";
 import PDFDocument from "pdfkit";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 
@@ -283,23 +282,6 @@ export async function envoyerConvocations(cooperativeId: number, sessionId: numb
   const heure    = (session.heure_debut ?? "07:00").slice(0, 5);
   const lieu     = session.lieu ?? "lieu à confirmer";
 
-  // ── SMS : uniquement ceux qui n'ont pas encore reçu la convocation ─────────
-  const aEnvoyerSMS = inscrits.filter((i) => !i.sms_convocation_envoye && i.telephone);
-  let result = { envoyes: 0, echecs: 0 };
-
-  if (aEnvoyerSMS.length > 0) {
-    const message = `Bonjour, vous êtes convoqué(e) à la formation "${session.titre}" le ${dateStr} à ${heure} au ${lieu}. Coopérative ${coopNom}.`;
-    const tels = aEnvoyerSMS.map((i) => i.telephone);
-    result = await sendBulkSMS(tels, message);
-
-    const ids = aEnvoyerSMS.map((i) => i.membre_id);
-    await db.execute(sql`
-      UPDATE inscriptions_formation
-      SET sms_convocation_envoye = true
-      WHERE session_id = ${sessionId} AND membre_id = ANY(${sql.raw(`ARRAY[${ids.join(",")}]::int[]`)})
-    `);
-  }
-
   // ── Push : tous les inscrits ayant une souscription portail ───────────────
   const tousIds = inscrits.map((i) => i.membre_id);
   if (tousIds.length > 0) {
@@ -311,8 +293,8 @@ export async function envoyerConvocations(cooperativeId: number, sessionId: numb
     }).catch((err) => logger.warn({ err }, "Push portail convocation ignoré"));
   }
 
-  logger.info({ sessionId, envoyes: result.envoyes, total: tousIds.length }, "Convocations envoyées");
-  return { ...result, total: tousIds.length };
+  logger.info({ sessionId, total: tousIds.length }, "Convocations envoyées");
+  return { envoyes: tousIds.length, echecs: 0, total: tousIds.length };
 }
 
 export async function envoyerRappels(cooperativeId: number, sessionId: number) {
@@ -322,23 +304,6 @@ export async function envoyerRappels(cooperativeId: number, sessionId: number) {
   const inscrits = await getInscrits(cooperativeId, sessionId);
   const heure    = (session.heure_debut ?? "07:00").slice(0, 5);
   const lieu     = session.lieu ?? "lieu à confirmer";
-
-  // ── SMS : uniquement ceux qui n'ont pas encore reçu le rappel ─────────────
-  const aEnvoyerSMS = inscrits.filter((i) => !i.sms_rappel_envoye && i.telephone);
-  let result = { envoyes: 0, echecs: 0 };
-
-  if (aEnvoyerSMS.length > 0) {
-    const message = `Rappel : formation "${session.titre}" demain à ${heure} au ${lieu}. À demain !`;
-    const tels = aEnvoyerSMS.map((i) => i.telephone);
-    result = await sendBulkSMS(tels, message);
-
-    const ids = aEnvoyerSMS.map((i) => i.membre_id);
-    await db.execute(sql`
-      UPDATE inscriptions_formation
-      SET sms_rappel_envoye = true
-      WHERE session_id = ${sessionId} AND membre_id = ANY(${sql.raw(`ARRAY[${ids.join(",")}]::int[]`)})
-    `);
-  }
 
   // ── Push : tous les inscrits ayant une souscription portail ───────────────
   const tousIds = inscrits.map((i) => i.membre_id);
@@ -351,8 +316,8 @@ export async function envoyerRappels(cooperativeId: number, sessionId: number) {
     }).catch((err) => logger.warn({ err }, "Push portail rappel ignoré"));
   }
 
-  logger.info({ sessionId, envoyes: result.envoyes, total: tousIds.length }, "Rappels envoyés");
-  return { ...result, total: tousIds.length };
+  logger.info({ sessionId, total: tousIds.length }, "Rappels envoyés");
+  return { envoyes: tousIds.length, echecs: 0, total: tousIds.length };
 }
 
 // ─── Attestations ─────────────────────────────────────────────────────────────

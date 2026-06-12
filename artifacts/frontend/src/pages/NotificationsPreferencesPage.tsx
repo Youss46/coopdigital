@@ -178,16 +178,6 @@ export default function NotificationsPreferencesPage() {
         <div className="divide-y divide-gray-100">
           <div className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50">
             <div>
-              <p className="text-sm font-medium text-gray-800">Recevoir par SMS</p>
-              <p className="text-xs text-gray-400 mt-0.5">Requiert un numéro de téléphone renseigné</p>
-            </div>
-            <Toggle
-              checked={form.recevoir_sms}
-              onChange={(v) => setForm((f) => ({ ...f, recevoir_sms: v }))}
-            />
-          </div>
-          <div className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50">
-            <div>
               <p className="text-sm font-medium text-gray-800">Recevoir par email</p>
               <p className="text-xs text-gray-400 mt-0.5">Envoyé à l'adresse email de votre compte</p>
             </div>

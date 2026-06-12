@@ -174,17 +174,17 @@ function ModalSaisirPrix({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Modal : Diffuser SMS ─────────────────────────────────────────────────────
+// ─── Modal : Notifier membres ─────────────────────────────────────────────────
 function ModalDiffuserSMS({ prix, onClose }: { prix: HistoriquePrix; onClose: () => void }) {
   const { toast } = useToast();
   const mut = usePostPrixDiffuserSms({
     mutation: {
       onSuccess: (data) => {
         const d = data as { envoyes?: number; echecs?: number };
-        toast({ title: `SMS envoyés : ${d.envoyes ?? 0} succès, ${d.echecs ?? 0} échec(s)` });
+        toast({ title: `Notification envoyée à ${d.envoyes ?? 0} membre(s)` });
         onClose();
       },
-      onError: () => toast({ title: "Erreur SMS", variant: "destructive" }),
+      onError: () => toast({ title: "Erreur d'envoi", variant: "destructive" }),
     },
   });
 
@@ -192,17 +192,17 @@ function ModalDiffuserSMS({ prix, onClose }: { prix: HistoriquePrix; onClose: ()
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
         <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-bold text-gray-900">Diffuser par SMS</h3>
+          <h3 className="font-bold text-gray-900">Notifier les membres</h3>
           <button onClick={onClose}><X size={16} className="text-gray-400" /></button>
         </div>
         <div className="px-6 py-5 space-y-3">
           <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700">
-            <p className="font-medium mb-2">Message qui sera envoyé :</p>
+            <p className="font-medium mb-2">Notification push qui sera envoyée :</p>
             <p className="italic text-gray-600">
               « Prix bord champ au {new Date(prix.datePrix).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })} : {parseFloat(prix.prixBordChampFcfa).toLocaleString("fr-FR")} FCFA/kg. Votre coopérative CoopDigital. »
             </p>
           </div>
-          <p className="text-xs text-gray-400">Ce message sera envoyé à tous les membres actifs disposant d'un numéro de téléphone.</p>
+          <p className="text-xs text-gray-400">Une notification push sera envoyée à tous les membres actifs connectés au portail.</p>
         </div>
         <div className="px-6 pb-5 flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700">Annuler</button>
@@ -316,7 +316,7 @@ function OngletTempsReel() {
             {peutDiffuser && hp && (
               <button onClick={() => setShowModalSMS(true)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50">
-                <Send size={13} /> Diffuser par SMS
+                <Send size={13} /> Notifier les membres
               </button>
             )}
           </div>

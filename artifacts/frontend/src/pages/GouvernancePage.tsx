@@ -218,7 +218,7 @@ function ModalPlanifierAG({ onClose }: { onClose: () => void }) {
 function ModalConvoquer({ ag, onClose }: { ag: AssembleeGenerale; onClose: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [canal, setCanal] = useState<"sms"|"whatsapp">("sms");
+  const [canal] = useState<"affichage">("affichage");
   const [msgPerso, setMsgPerso] = useState("");
 
   const mut = usePostAgIdConvoquer({
@@ -245,18 +245,7 @@ function ModalConvoquer({ ag, onClose }: { ag: AssembleeGenerale; onClose: () =>
         </div>
         <div className="px-6 py-5 space-y-4">
           <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
-            Message envoyé à tous les membres actifs via <strong>{canal.toUpperCase()}</strong>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Canal</label>
-            <div className="flex gap-2">
-              {(["sms","whatsapp"] as const).map((c) => (
-                <button key={c} onClick={() => setCanal(c)}
-                  className={`flex-1 py-2 text-sm rounded-lg border transition-colors ${canal === c ? "border-green-700 bg-green-50 text-green-800 font-medium" : "border-gray-200 text-gray-600"}`}>
-                  {c.toUpperCase()}
-                </button>
-              ))}
-            </div>
+            Une notification push sera envoyée à tous les membres actifs connectés au portail.
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Message (laisser vide = automatique)</label>

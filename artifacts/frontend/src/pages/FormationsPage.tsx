@@ -667,7 +667,7 @@ function OngletInscriptions() {
   });
 
   const session = sessions.find((s) => s.id === Number(selectedSession));
-  const nbConv  = inscrits.filter((i) => !i.sms_convocation_envoye).length;
+  const nbConv  = inscrits.length;
 
   return (
     <div className="space-y-4">
@@ -811,9 +811,6 @@ function OngletInscriptions() {
                     <span className={`text-xs px-2 py-0.5 rounded-full ${PRESENCE_COLORS[i.statut] ?? "bg-gray-100 text-gray-600"}`}>
                       {i.statut}
                     </span>
-                    {i.sms_convocation_envoye && (
-                      <span title="SMS envoyé"><Send className="w-3 h-3 text-blue-400" /></span>
-                    )}
                     {canInscrire && session?.statut !== "termine" && (
                       <button onClick={() => desinscrireMut.mutate(i.membre_id)}
                         className="text-gray-300 hover:text-red-500 transition-colors">

@@ -8,7 +8,7 @@ import {
 import { and, eq, desc, or, lte, isNotNull, ne } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { sendSMS } from "./smsService.js";
+import { envoyerPushGroupe, envoyerPushNotification } from "./pushService.js";
 import { logger } from "../lib/logger.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -226,7 +226,7 @@ export async function activerLicence(cleLicence: string, cooperativeId: number, 
     .limit(1);
 
   const dateExp = dateExpiration.toLocaleDateString("fr-FR");
-  await sendSMS("0714174082", `Licence CoopDigital activée pour ${coop?.nom ?? ""}. Valide jusqu'au ${dateExp}. M15 Tech`);
+  logger.info({ cooperativeId, dateExp, coopNom: coop?.nom }, "Licence CoopDigital activée");
 
   return { licenceId: licence.id, dateExpiration: expirationStr };
 }
@@ -271,7 +271,7 @@ export async function suspendreCooperative(cooperativeId: number, motif: string,
   invalidateCache(cooperativeId);
 
   const directeurs = await db
-    .select({ telephone: usersTable.telephone })
+    .select({ id: usersTable.id })
     .from(usersTable)
     .where(and(
       eq(usersTable.cooperativeId, cooperativeId),
@@ -279,9 +279,13 @@ export async function suspendreCooperative(cooperativeId: number, motif: string,
     ))
     .limit(3);
 
-  const message = `Votre accès CoopDigital est suspendu. Motif : ${motif}. Contactez M15 Tech : 0714174082`;
-  for (const u of directeurs) {
-    if (u.telephone) await sendSMS(u.telephone, message);
+  const userIds = directeurs.map((u) => u.id);
+  if (userIds.length > 0) {
+    void envoyerPushGroupe(userIds, {
+      title: "⚠️ Accès suspendu",
+      body: `Votre accès CoopDigital est suspendu. Motif : ${motif}. Contactez M15 Tech.`,
+      url: "/",
+    });
   }
 }
 
@@ -322,7 +326,7 @@ export async function reactiverCooperative(cooperativeId: number, m15UserId: num
   invalidateCache(cooperativeId);
 
   const [president] = await db
-    .select({ telephone: usersTable.telephone })
+    .select({ id: usersTable.id })
     .from(usersTable)
     .where(and(
       eq(usersTable.cooperativeId, cooperativeId),
@@ -330,8 +334,12 @@ export async function reactiverCooperative(cooperativeId: number, m15UserId: num
     ))
     .limit(1);
 
-  if (president?.telephone) {
-    await sendSMS(president.telephone, "Votre accès CoopDigital a été réactivé. M15 Tech");
+  if (president?.id) {
+    void envoyerPushNotification(president.id, {
+      title: "✅ Accès réactivé",
+      body: "Votre accès CoopDigital a été réactivé. Bienvenue !",
+      url: "/",
+    });
   }
 }
 
@@ -481,7 +489,7 @@ export async function checkExpirations() {
     const joursRestants = Math.floor((expDate.getTime() - today.getTime()) / (24 * 3600 * 1000));
 
     const presidentRows = await db
-      .select({ telephone: usersTable.telephone, nom: usersTable.nom })
+      .select({ id: usersTable.id })
       .from(usersTable)
       .where(and(
         eq(usersTable.cooperativeId, licence.cooperativeId),
@@ -489,18 +497,17 @@ export async function checkExpirations() {
       ))
       .limit(1);
 
-    const president = presidentRows[0];
-    const tel = president?.telephone;
+    const presidentId = presidentRows[0]?.id;
 
     if (licence.statut === "active") {
-      if (joursRestants === 60 && tel) {
-        await sendSMS(tel, `Votre licence CoopDigital expire dans 60 jours (${expDate.toLocaleDateString("fr-FR")}). Renouvelez sur m15tech.ci`);
-      } else if (joursRestants === 30 && tel) {
-        await sendSMS(tel, `⚠️ Votre licence CoopDigital expire dans 30 jours. Renouvelez maintenant sur m15tech.ci ou au 0714174082`);
-      } else if (joursRestants === 15 && tel) {
-        await sendSMS(tel, `🔴 URGENT — Votre licence CoopDigital expire dans 15 jours ! Renouvelez sur m15tech.ci ou appelez le 0714174082`);
-      } else if (joursRestants > 0 && joursRestants <= 7 && tel) {
-        await sendSMS(tel, `🔴 Votre licence CoopDigital expire dans ${joursRestants} jour(s) ! Renouvelez maintenant : 0714174082`);
+      if (joursRestants === 60 && presidentId) {
+        void envoyerPushNotification(presidentId, { title: "📅 Licence — 60 jours restants", body: `Votre licence expire le ${expDate}. Renouvelez sur m15tech.ci`, url: "/" });
+      } else if (joursRestants === 30 && presidentId) {
+        void envoyerPushNotification(presidentId, { title: "⚠️ Licence — 30 jours restants", body: `Renouvelez votre licence avant le ${expDate} sur m15tech.ci`, url: "/" });
+      } else if (joursRestants === 15 && presidentId) {
+        void envoyerPushNotification(presidentId, { title: "🔴 Licence — 15 jours restants", body: `URGENT : licence expire le ${expDate}. Renouvelez maintenant.`, url: "/" });
+      } else if (joursRestants > 0 && joursRestants <= 7 && presidentId) {
+        void envoyerPushNotification(presidentId, { title: `🔴 Licence — ${joursRestants} jour(s) restant(s)`, body: `Votre licence expire dans ${joursRestants} jour(s). Renouvelez immédiatement.`, url: "/" });
       } else if (joursRestants <= 0) {
         await db.update(licencesTable)
           .set({ statut: "expiree", updatedAt: new Date() })
@@ -514,7 +521,7 @@ export async function checkExpirations() {
           details: { dateExpiration: licence.dateExpiration },
         });
         invalidateCache(licence.cooperativeId);
-        if (tel) await sendSMS(tel, `Votre licence CoopDigital a expiré le ${expDate.toLocaleDateString("fr-FR")}. Renouvelez sur m15tech.ci ou appelez le 0714174082`);
+        if (presidentId) void envoyerPushNotification(presidentId, { title: "❌ Licence expirée", body: `Votre licence a expiré le ${expDate}. Contactez M15 Tech pour renouveler.`, url: "/" });
       }
     }
 
@@ -931,9 +938,7 @@ export async function updatePcaInfo(cooperativeId: number, data: {
     .returning();
 
   if (data.telephone && data.telephone !== ancienTel) {
-    await sendSMS(data.telephone,
-      `Votre numéro de téléphone CoopDigital a été mis à jour. Support : 0714174082 — M15 Tech`
-    );
+    logger.info({ pcaId: pca.id }, "Numéro de téléphone PCA mis à jour");
   }
 
   return updated;

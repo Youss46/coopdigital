@@ -2,7 +2,7 @@ import { type Request, type Response } from "express";
 import { db, historiqueSmsTable, membresTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { SendSmsGroupeBody } from "@workspace/api-zod";
-import { sendBulkSMS } from "../services/smsService";
+import { envoyerPushGroupePortail } from "../services/pushService";
 
 export async function sendSmsGroupe(req: Request, res: Response): Promise<void> {
   const parse = SendSmsGroupeBody.safeParse(req.body);
@@ -22,29 +22,30 @@ export async function sendSmsGroupe(req: Request, res: Response): Promise<void> 
     if (groupement) conditions.push(eq(membresTable.groupement, groupement));
 
     const membres = await db
-      .select({ telephone: membresTable.telephone })
+      .select({ id: membresTable.id })
       .from(membresTable)
       .where(and(...conditions));
 
-    const telephones = membres.map((m) => m.telephone).filter(Boolean);
+    const membreIds = membres.map((m) => m.id);
 
-    const { envoyes, echecs } = await sendBulkSMS(telephones, message);
-
-    const statut: "envoye" | "echec" | "partiel" =
-      echecs === 0 ? "envoye" : envoyes === 0 ? "echec" : "partiel";
+    void envoyerPushGroupePortail(membreIds, {
+      title: "📢 Message de votre coopérative",
+      body: message.slice(0, 200),
+      url: "/",
+    });
 
     await db.insert(historiqueSmsTable).values({
       cooperativeId,
       agentId: user?.id ?? null,
       message,
       groupement: groupement ?? null,
-      nbDestinataires: telephones.length,
-      nbEnvoyes: envoyes,
-      nbEchecs: echecs,
-      statut,
+      nbDestinataires: membreIds.length,
+      nbEnvoyes: membreIds.length,
+      nbEchecs: 0,
+      statut: "envoye",
     });
 
-    res.json({ envoyes, echecs, total: telephones.length });
+    res.json({ envoyes: membreIds.length, echecs: 0, total: membreIds.length });
   } catch (err) {
     req.log.error({ err }, "Erreur sendSmsGroupe");
     res.status(500).json({ erreur: "Erreur interne du serveur" });

@@ -861,7 +861,7 @@ function ModalAlimenter({ delegue, caisses, onClose, onDone }: {
       if (!r.ok) throw new Error(json.erreur ?? json.error ?? "Erreur");
       toast({
         title: "Caisse alimentée",
-        description: `${FCFA(montantNum)} envoyés à ${delegue.nom} ${delegue.prenoms ?? ""}. SMS envoyé automatiquement.`,
+        description: `${FCFA(montantNum)} envoyés à ${delegue.nom} ${delegue.prenoms ?? ""}.`,
       });
       onDone();
     } catch (e) {
@@ -915,9 +915,6 @@ function ModalAlimenter({ delegue, caisses, onClose, onDone }: {
             <input type="text" value={motif} onChange={(e) => setMotif(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="Alimentation journée, campagne…" />
-          </div>
-          <div className="text-xs text-gray-400 bg-gray-50 rounded-lg p-2.5">
-            📱 Un SMS de confirmation sera envoyé automatiquement au délégué.
           </div>
         </div>
         <div className="flex gap-3 p-5 pt-0">

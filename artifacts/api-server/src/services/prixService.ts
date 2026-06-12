@@ -7,7 +7,7 @@ import { livraisonsTable } from "@workspace/db/schema";
 import { lotLivraisonsTable, lotsTable } from "@workspace/db/schema";
 import { campagnesTable } from "@workspace/db/schema";
 import { eq, and, desc, asc, sql, gte, lte } from "drizzle-orm";
-import { sendBulkSMS } from "./smsService";
+import { envoyerPushGroupePortail } from "./pushService";
 import { logger } from "../lib/logger";
 
 
@@ -173,15 +173,20 @@ export async function diffuserPrixSMS(cooperativeId: number, prix: number, date:
   const dateStr = new Date(date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
   const message = `Prix bord champ au ${dateStr} : ${prix} FCFA/kg. Votre coopérative CoopDigital.`;
 
-  const membres = await db.execute<{ telephone: string }>(
-    sql`SELECT m.telephone FROM membres m WHERE m.cooperative_id = ${cooperativeId} AND m.statut = 'actif' AND m.telephone IS NOT NULL`
+  const membres = await db.execute<{ id: number }>(
+    sql`SELECT m.id FROM membres m WHERE m.cooperative_id = ${cooperativeId} AND m.statut = 'actif'`
   );
-  const phones = membres.rows.map((r) => r.telephone).filter(Boolean) as string[];
+  const membreIds = membres.rows.map((r) => r.id).filter(Boolean) as number[];
 
-  if (phones.length === 0) return { envoyes: 0, echecs: 0, total: 0 };
+  if (membreIds.length === 0) return { envoyes: 0, echecs: 0, total: 0 };
 
-  const results = await sendBulkSMS(phones, message);
-  return results;
+  void envoyerPushGroupePortail(membreIds, {
+    title: "💰 Nouveau prix bord champ",
+    body: message,
+    url: "/prix",
+  });
+
+  return { envoyes: membreIds.length, echecs: 0, total: membreIds.length };
 }
 
 // ─── Historique avec filtres ──────────────────────────────────────────────────

@@ -8,7 +8,7 @@ import {
   livraisonsTable,
 } from "@workspace/db";
 import { eq, and, gte, lte, inArray, sql, desc } from "drizzle-orm";
-import { sendBulkSMS } from "./smsService.js";
+import { envoyerPushGroupePortail, envoyerPushGroupe } from "./pushService.js";
 
 
 
@@ -368,9 +368,14 @@ export async function notifierMembresZone(cooperativeId: number, planningId: num
     messagesParMembre.push({ membreId: m.id, telephone: m.telephone, message: msg });
   }
 
-  // Envoi groupé (premier SMS identique pour tous — plus rapide)
   const msgTemplate = `Bonjour, ${coopNom} organise une collecte le ${dateStr} à partir de ${heureDebut} à ${villagesStr}. Préparez votre cacao. Infos : ${agentTel}`;
-  const result = await sendBulkSMS(telephones, msgTemplate);
+  const membreIds = membres.map((m) => m.id);
+
+  void envoyerPushGroupePortail(membreIds, {
+    title: "🚜 Collecte programmée",
+    body: msgTemplate.slice(0, 200),
+    url: "/",
+  });
 
   // Enregistrer dans notifications_collecte
   const now = new Date();
@@ -381,21 +386,21 @@ export async function notifierMembresZone(cooperativeId: number, planningId: num
         membreId: entry.membreId,
         telephone: entry.telephone,
         messageEnvoye: msgTemplate,
-        statutEnvoi: result.envoyes > 0 ? "envoye" : "echec",
+        statutEnvoi: "envoye" as const,
         dateEnvoi: now,
       }))
     );
   }
 
-  // Marquer sms_envoye = true
+  // Marquer notification envoyée
   await db
     .update(planningsCollecteTable)
     .set({ smsEnvoye: true, updatedAt: new Date() })
     .where(eq(planningsCollecteTable.id, planningId));
 
-  logger.info({ planningId, envoyes: result.envoyes, echecs: result.echecs }, "SMS collecte envoyés");
+  logger.info({ planningId, nbMembres: membres.length }, "Notifications collecte envoyées");
 
-  return { envoyes: result.envoyes, echecs: result.echecs, nbMembres: membres.length };
+  return { envoyes: membres.length, echecs: 0, nbMembres: membres.length };
 }
 
 // ──────────────────────────────────────────────
@@ -452,17 +457,20 @@ export async function cloturerPlanning(cooperativeId: number, planningId: number
 
   // Envoyer au directeur (users avec role='directeur')
   try {
-    const directeurs = await db.execute<{ telephone: string }>(sql`
-      SELECT telephone FROM users
+    const directeurs = await db.execute<{ id: number }>(sql`
+      SELECT id FROM users
       WHERE cooperative_id = ${cooperativeId}
         AND role = 'directeur'
         AND actif = true
-        AND telephone IS NOT NULL
     `);
-    const tels = directeurs.rows.map((r) => r.telephone).filter(Boolean);
-    if (tels.length > 0) {
-      await sendBulkSMS(tels, rapportMsg);
-      logger.info({ planningId, tels }, "Rapport clôture envoyé au directeur");
+    const userIds = directeurs.rows.map((r) => r.id).filter(Boolean);
+    if (userIds.length > 0) {
+      void envoyerPushGroupe(userIds, {
+        title: "📊 Rapport de collecte",
+        body: rapportMsg.slice(0, 200),
+        url: "/planning",
+      });
+      logger.info({ planningId, userIds }, "Rapport clôture envoyé aux directeurs");
     }
   } catch (err) {
     logger.warn({ err, planningId }, "Impossible d'envoyer rapport SMS directeur");

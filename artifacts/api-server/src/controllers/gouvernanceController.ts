@@ -9,7 +9,7 @@ import {
   membresTable,
 } from "@workspace/db";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
-import { sendBulkSMS } from "../services/smsService";
+import { envoyerPushGroupePortail } from "../services/pushService";
 import { generatePvAg } from "../services/pdfService";
 
 class TenantError extends Error {
@@ -187,48 +187,30 @@ export async function envoyerConvocations(req: Request, res: Response): Promise<
   if (!ag) { res.status(404).json({ erreur: "AG introuvable" }); return; }
 
   const membres = await db
-    .select({ telephone: membresTable.telephone, nom: membresTable.nom, prenoms: membresTable.prenoms })
+    .select({ id: membresTable.id, nom: membresTable.nom, prenoms: membresTable.prenoms })
     .from(membresTable)
     .where(and(eq(membresTable.cooperativeId, coopId(req)), eq(membresTable.statut, "actif")));
 
   const heureStr = ag.heureDebut ? ` à ${ag.heureDebut.slice(0, 5)}` : "";
-  const ordrePts = (ag.ordreDuJour ?? []).slice(0, 3).join(", ");
-
-  const messages = membres.map((m) => {
-    const prenom = m.prenoms ? m.prenoms.split(" ")[0] : "";
-    const nomComplet = [prenom, m.nom].filter(Boolean).join(" ");
-    const typeFr = ag.type === "ordinaire" ? "Ordinaire" : ag.type === "extraordinaire" ? "Extraordinaire" : "Constitutive";
-    return messagePersonnalise
-      ? messagePersonnalise.replace("{nom}", nomComplet).replace("{type}", typeFr)
-      : `Cher(e) ${nomComplet}, vous êtes convoqué(e) à l'AG ${typeFr} le ${new Date(ag.dateAg).toLocaleDateString("fr-FR")}${heureStr} au ${ag.lieu ?? "siège"}. Ordre du jour : ${ordrePts}. Répondez OUI pour confirmer.`;
-  });
-
-  const telephones = membres.map((m) => m.telephone ?? "").filter(Boolean);
+  const typeFr = ag.type === "ordinaire" ? "Ordinaire" : ag.type === "extraordinaire" ? "Extraordinaire" : "Constitutive";
   const defaultMsg = `Convocation AG ${ag.libelle} — ${new Date(ag.dateAg).toLocaleDateString("fr-FR")}`;
+  const pushBody = messagePersonnalise
+    ? messagePersonnalise.replace("{nom}", "").replace("{type}", typeFr).trim()
+    : `AG ${typeFr} — le ${new Date(ag.dateAg).toLocaleDateString("fr-FR")}${heureStr} au ${ag.lieu ?? "siège"}`;
 
-  // Envoi groupé (1 message par membre pour personnalisation)
-  let envoyes = 0, echecs = 0;
-  const BATCH = 50;
-  for (let i = 0; i < telephones.length; i += BATCH) {
-    const batchTels = telephones.slice(i, i + BATCH);
-    const batchMsgs = messages.slice(i, i + BATCH);
-    // Envoi individualisé
-    const results = await Promise.all(
-      batchTels.map(async (tel, j) => {
-        const msg = batchMsgs[j] ?? defaultMsg;
-        const result = await sendBulkSMS([tel], msg);
-        return result.envoyes;
-      })
-    );
-    envoyes += results.reduce((a, b) => a + b, 0);
-    echecs  += batchTels.length - results.reduce((a, b) => a + b, 0);
-  }
+  const membreIds = membres.map((m) => m.id);
+
+  void envoyerPushGroupePortail(membreIds, {
+    title: "📋 Convocation Assemblée Générale",
+    body: pushBody.slice(0, 200),
+    url: "/ag",
+  });
 
   await db.insert(convocationsAgTable).values({
     agId:          id,
-    canal:         (canal as "sms"|"whatsapp"|"affichage") ?? "sms",
-    nbEnvoyes:     envoyes,
-    messageEnvoye: messages[0] ?? defaultMsg,
+    canal:         (canal as "affichage" | "whatsapp") ?? "affichage",
+    nbEnvoyes:     membreIds.length,
+    messageEnvoye: defaultMsg,
   });
 
   // Mise à jour nb_membres_convoques
@@ -236,8 +218,8 @@ export async function envoyerConvocations(req: Request, res: Response): Promise<
     .set({ nbMembresConvoques: membres.length, updatedAt: new Date() })
     .where(eq(assembleesGeneralesTable.id, id));
 
-  req.log.info({ agId: id, canal, envoyes, echecs }, "Convocations envoyées");
-  res.json({ ok: true, envoyes, echecs, total: membres.length });
+  req.log.info({ agId: id, canal, total: membres.length }, "Convocations push envoyées");
+  res.json({ ok: true, envoyes: membres.length, echecs: 0, total: membres.length });
 }
 
 // ─── PRÉSENCES ────────────────────────────────────────────────────────────────
