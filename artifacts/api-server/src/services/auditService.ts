@@ -267,12 +267,26 @@ export async function getStats(cooperativeId: number) {
 
 /** Liste des sessions */
 export async function getSessions(cooperativeId: number, limit = 50) {
-  return db
+  const rows = await db
     .select()
     .from(sessionsUtilisateursTable)
     .where(eq(sessionsUtilisateursTable.cooperativeId, cooperativeId))
     .orderBy(desc(sessionsUtilisateursTable.dateConnexion))
     .limit(limit);
+
+  return rows.map((s) => ({
+    id:               s.id,
+    cooperative_id:   s.cooperativeId,
+    user_id:          s.userId,
+    session_token:    s.sessionToken,
+    ip_address:       s.ipAddress ?? null,
+    user_agent:       s.userAgent ?? null,
+    date_connexion:   s.dateConnexion.toISOString(),
+    date_deconnexion: s.dateDeconnexion ? s.dateDeconnexion.toISOString() : null,
+    duree_session_min: s.dureeSessionMin ?? null,
+    nb_actions:       s.nbActions,
+    statut:           s.statut,
+  }));
 }
 
 /** Génère un PDF du journal signé avec hash SHA256 */
