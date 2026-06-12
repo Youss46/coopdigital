@@ -26,6 +26,7 @@ import {
   type ComparaisonBilanCampagne,
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -124,6 +125,8 @@ function BilanDetail({ bilan }: { bilan: BilanCampagne }) {
 export default function CampagnesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { utilisateur } = useAuth();
+  const isDelegue = utilisateur?.role === "delegue";
   const peutCreer = usePermission("campagnes", "creer");
   const peutVerifier = usePermission("campagnes", "verifier");
   const peutCloturer = usePermission("campagnes", "cloturer");
@@ -263,11 +266,12 @@ export default function CampagnesPage() {
   const toutOk = verifs?.toutOk ?? false;
   const peutConfirmer = verifs != null && bloquants.length === 0;
 
-  const tabs = [
+  const allTabs = [
     { id: "campagnes" as Tab, label: "Campagnes", icon: CalendarDays },
     { id: "cloture" as Tab, label: "Clôture", icon: XCircle, disabled: !active },
     { id: "bilans" as Tab, label: "Bilans & comparaisons", icon: BarChart3 },
   ];
+  const tabs = isDelegue ? allTabs.filter(t => t.id !== "cloture") : allTabs;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
