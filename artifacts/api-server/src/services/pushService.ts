@@ -1,6 +1,6 @@
 import webpush from "web-push";
-import { db, pushSubscriptionsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, pushSubscriptionsTable, pushSubscriptionsPortailTable } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
 const VAPID_PUBLIC_KEY  = process.env["VAPID_PUBLIC_KEY"]  ?? "";
@@ -12,6 +12,8 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 }
 
 export { VAPID_PUBLIC_KEY };
+
+// ─── Utilisateurs internes ────────────────────────────────────────────────────
 
 export async function sauvegarderSubscription(userId: number, sub: {
   endpoint: string;
@@ -35,6 +37,7 @@ export async function supprimerSubscription(userId: number, endpoint: string): P
 
 async function envoyerPushAuxSubs(
   subs: { id: number; endpoint: string; p256dh: string; auth: string }[],
+  table: typeof pushSubscriptionsTable | typeof pushSubscriptionsPortailTable,
   data: string,
 ): Promise<void> {
   await Promise.allSettled(
@@ -47,7 +50,7 @@ async function envoyerPushAuxSubs(
       } catch (err: unknown) {
         const status = (err as { statusCode?: number }).statusCode;
         if (status === 410 || status === 404) {
-          await db.delete(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.id, s.id));
+          await db.delete(table).where(eq(table.id, s.id));
         } else {
           logger.error({ err }, "Erreur envoi push notification");
         }
@@ -73,7 +76,7 @@ export async function envoyerPushNotification(userId: number, payload: {
 
   if (subs.length === 0) return;
   const data = JSON.stringify({ titre: payload.title, message: payload.body, url: payload.url });
-  await envoyerPushAuxSubs(subs, data);
+  await envoyerPushAuxSubs(subs, pushSubscriptionsTable, data);
 }
 
 export async function envoyerPushGroupe(userIds: number[], payload: {
@@ -87,7 +90,6 @@ export async function envoyerPushGroupe(userIds: number[], payload: {
   }
   if (userIds.length === 0) return;
 
-  const { inArray } = await import("drizzle-orm");
   const subs = await db
     .select()
     .from(pushSubscriptionsTable)
@@ -95,5 +97,48 @@ export async function envoyerPushGroupe(userIds: number[], payload: {
 
   if (subs.length === 0) return;
   const data = JSON.stringify({ titre: payload.title, message: payload.body, url: payload.url });
-  await envoyerPushAuxSubs(subs, data);
+  await envoyerPushAuxSubs(subs, pushSubscriptionsTable, data);
+}
+
+// ─── Membres portail ──────────────────────────────────────────────────────────
+
+export async function sauvegarderSubscriptionPortail(membreId: number, sub: {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}): Promise<void> {
+  await db
+    .insert(pushSubscriptionsPortailTable)
+    .values({ membreId, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth })
+    .onConflictDoUpdate({
+      target: [pushSubscriptionsPortailTable.membreId, pushSubscriptionsPortailTable.endpoint],
+      set:    { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+    });
+}
+
+export async function supprimerSubscriptionPortail(membreId: number, endpoint: string): Promise<void> {
+  await db
+    .delete(pushSubscriptionsPortailTable)
+    .where(eq(pushSubscriptionsPortailTable.endpoint, endpoint));
+  void membreId;
+}
+
+export async function envoyerPushGroupePortail(membreIds: number[], payload: {
+  title: string;
+  body: string;
+  url?: string;
+}): Promise<void> {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    logger.warn("VAPID keys non configurées — push portail ignoré");
+    return;
+  }
+  if (membreIds.length === 0) return;
+
+  const subs = await db
+    .select()
+    .from(pushSubscriptionsPortailTable)
+    .where(inArray(pushSubscriptionsPortailTable.membreId, membreIds));
+
+  if (subs.length === 0) return;
+  const data = JSON.stringify({ titre: payload.title, message: payload.body, url: payload.url });
+  await envoyerPushAuxSubs(subs, pushSubscriptionsPortailTable, data);
 }

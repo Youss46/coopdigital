@@ -12,6 +12,9 @@ import {
   getCarteMembreHandler,
   savePhotoHandler,
   verifierMembreHandler,
+  getVapidKeyPortailHandler,
+  subscribePushPortailHandler,
+  unsubscribePushPortailHandler,
 } from "../controllers/portailController";
 
 const router = Router();
@@ -28,5 +31,10 @@ router.get("/portail/score",           portailAuthMiddleware, getScoreHandler);
 router.get("/portail/recus/:livraison_id", portailAuthMiddleware, getRecuLivraisonHandler);
 router.get("/portail/carte-membre",    portailAuthMiddleware, getCarteMembreHandler);
 router.put("/portail/photo",           portailAuthMiddleware, savePhotoHandler);
+
+// ── Notifications push ────────────────────────────────────────────────────────
+router.get("/portail/push/vapid-key",           getVapidKeyPortailHandler);
+router.post("/portail/push/subscribe",   portailAuthMiddleware, subscribePushPortailHandler);
+router.delete("/portail/push/subscribe", portailAuthMiddleware, unsubscribePushPortailHandler);
 
 export default router;

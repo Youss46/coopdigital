@@ -14,6 +14,11 @@ import {
   generateCarteMembre,
   verifierMembrePublic,
 } from "../services/portailService";
+import {
+  VAPID_PUBLIC_KEY,
+  sauvegarderSubscriptionPortail,
+  supprimerSubscriptionPortail,
+} from "../services/pushService";
 import { db, membresTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -227,5 +232,45 @@ export async function verifierMembreHandler(req: Request, res: Response): Promis
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur";
     res.status(500).json({ erreur: msg });
+  }
+}
+
+// ─── Push notifications portail ───────────────────────────────────────────────
+
+export function getVapidKeyPortailHandler(_req: Request, res: Response): void {
+  res.json({ vapidKey: VAPID_PUBLIC_KEY });
+}
+
+export async function subscribePushPortailHandler(req: Request, res: Response): Promise<void> {
+  const membreId = req.membre?.membreId;
+  if (!membreId) { res.status(401).json({ erreur: "Non authentifié" }); return; }
+  const body = req.body as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+  if (!body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
+    res.status(400).json({ erreur: "endpoint et keys (p256dh, auth) requis" });
+    return;
+  }
+  try {
+    await sauvegarderSubscriptionPortail(membreId, {
+      endpoint: body.endpoint,
+      keys: { p256dh: body.keys.p256dh, auth: body.keys.auth },
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "subscribePushPortail");
+    res.status(500).json({ erreur: "Erreur serveur" });
+  }
+}
+
+export async function unsubscribePushPortailHandler(req: Request, res: Response): Promise<void> {
+  const membreId = req.membre?.membreId;
+  if (!membreId) { res.status(401).json({ erreur: "Non authentifié" }); return; }
+  const { endpoint } = req.body as { endpoint?: string };
+  if (!endpoint) { res.status(400).json({ erreur: "endpoint requis" }); return; }
+  try {
+    await supprimerSubscriptionPortail(membreId, endpoint);
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "unsubscribePushPortail");
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }

@@ -96,4 +96,17 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ photoDataUrl }),
     }),
+
+  // ── Push notifications ──────────────────────────────────────────────────────
+  pushVapidKey: () => req<{ vapidKey: string }>("/push/vapid-key"),
+  pushSubscribe: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+    req<{ ok: boolean }>("/push/subscribe", {
+      method: "POST",
+      body: JSON.stringify(sub),
+    }),
+  pushUnsubscribe: (endpoint: string) =>
+    req<{ ok: boolean }>("/push/subscribe", {
+      method: "DELETE",
+      body: JSON.stringify({ endpoint }),
+    }),
 };

@@ -9,6 +9,23 @@ import DocumentsPage from "@/pages/DocumentsPage";
 import { InstallBanner, OfflineBanner, OnlineToast } from "@/components/InstallPrompt";
 import { Loader2 } from "lucide-react";
 import VerifierPage from "@/pages/VerifierPage";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useEffect } from "react";
+
+function PushSetup() {
+  const { profil } = useAuth();
+  const loggedIn = !!profil;
+  const { subscribe, isSupported } = usePushNotifications(loggedIn);
+
+  useEffect(() => {
+    if (!isSupported || !loggedIn) return;
+    if ("Notification" in window && Notification.permission === "default") {
+      subscribe();
+    }
+  }, [loggedIn, isSupported, subscribe]);
+
+  return null;
+}
 
 function AppRoutes() {
   const { profil, loading } = useAuth();
@@ -50,6 +67,7 @@ export default function App() {
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
         <OfflineBanner />
         <OnlineToast />
+        <PushSetup />
         <AppRoutes />
         <InstallBanner />
       </WouterRouter>

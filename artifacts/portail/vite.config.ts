@@ -73,6 +73,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        importScripts: ["sw-push.js"],
         navigateFallback: `${base}index.html`,
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],

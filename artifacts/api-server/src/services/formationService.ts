@@ -277,23 +277,22 @@ export async function envoyerConvocations(cooperativeId: number, sessionId: numb
   const session = await getSession(cooperativeId, sessionId);
   if (!session) throw new Error("Session introuvable");
 
-  const coopNom = await getCoopNom(cooperativeId);
+  const coopNom  = await getCoopNom(cooperativeId);
   const inscrits = await getInscrits(cooperativeId, sessionId);
-  const aEnvoyer = inscrits.filter((i) => !i.sms_convocation_envoye && i.telephone);
-
-  if (aEnvoyer.length === 0) return { envoyes: 0, echecs: 0 };
-
   const dateStr  = fmtDate(session.date_session);
   const heure    = (session.heure_debut ?? "07:00").slice(0, 5);
   const lieu     = session.lieu ?? "lieu à confirmer";
-  const message  = `Bonjour, vous êtes convoqué(e) à la formation "${session.titre}" le ${dateStr} à ${heure} au ${lieu}. Coopérative ${coopNom}.`;
 
-  const tels = aEnvoyer.map((i) => i.telephone);
-  const result = await sendBulkSMS(tels, message);
+  // ── SMS : uniquement ceux qui n'ont pas encore reçu la convocation ─────────
+  const aEnvoyerSMS = inscrits.filter((i) => !i.sms_convocation_envoye && i.telephone);
+  let result = { envoyes: 0, echecs: 0 };
 
-  // Marquer envoyé
-  const ids = aEnvoyer.map((i) => i.membre_id);
-  if (ids.length > 0) {
+  if (aEnvoyerSMS.length > 0) {
+    const message = `Bonjour, vous êtes convoqué(e) à la formation "${session.titre}" le ${dateStr} à ${heure} au ${lieu}. Coopérative ${coopNom}.`;
+    const tels = aEnvoyerSMS.map((i) => i.telephone);
+    result = await sendBulkSMS(tels, message);
+
+    const ids = aEnvoyerSMS.map((i) => i.membre_id);
     await db.execute(sql`
       UPDATE inscriptions_formation
       SET sms_convocation_envoye = true
@@ -301,7 +300,18 @@ export async function envoyerConvocations(cooperativeId: number, sessionId: numb
     `);
   }
 
-  logger.info({ sessionId, envoyes: result.envoyes }, "Convocations SMS envoyées");
+  // ── Push : tous les inscrits ayant une souscription portail ───────────────
+  const tousIds = inscrits.map((i) => i.membre_id);
+  if (tousIds.length > 0) {
+    const { envoyerPushGroupePortail } = await import("./pushService.js");
+    envoyerPushGroupePortail(tousIds, {
+      title: "📚 Convocation — Formation",
+      body:  `"${session.titre}" · le ${dateStr} à ${heure} — ${lieu}`,
+      url:   "/formations",
+    }).catch((err) => logger.warn({ err }, "Push portail convocation ignoré"));
+  }
+
+  logger.info({ sessionId, envoyes: result.envoyes }, "Convocations envoyées");
   return result;
 }
 
@@ -310,19 +320,19 @@ export async function envoyerRappels(cooperativeId: number, sessionId: number) {
   if (!session) throw new Error("Session introuvable");
 
   const inscrits = await getInscrits(cooperativeId, sessionId);
-  const aEnvoyer = inscrits.filter((i) => !i.sms_rappel_envoye && i.telephone);
+  const heure    = (session.heure_debut ?? "07:00").slice(0, 5);
+  const lieu     = session.lieu ?? "lieu à confirmer";
 
-  if (aEnvoyer.length === 0) return { envoyes: 0, echecs: 0 };
+  // ── SMS : uniquement ceux qui n'ont pas encore reçu le rappel ─────────────
+  const aEnvoyerSMS = inscrits.filter((i) => !i.sms_rappel_envoye && i.telephone);
+  let result = { envoyes: 0, echecs: 0 };
 
-  const heure   = (session.heure_debut ?? "07:00").slice(0, 5);
-  const lieu    = session.lieu ?? "lieu à confirmer";
-  const message = `Rappel : formation "${session.titre}" demain à ${heure} au ${lieu}. À demain !`;
+  if (aEnvoyerSMS.length > 0) {
+    const message = `Rappel : formation "${session.titre}" demain à ${heure} au ${lieu}. À demain !`;
+    const tels = aEnvoyerSMS.map((i) => i.telephone);
+    result = await sendBulkSMS(tels, message);
 
-  const tels = aEnvoyer.map((i) => i.telephone);
-  const result = await sendBulkSMS(tels, message);
-
-  const ids = aEnvoyer.map((i) => i.membre_id);
-  if (ids.length > 0) {
+    const ids = aEnvoyerSMS.map((i) => i.membre_id);
     await db.execute(sql`
       UPDATE inscriptions_formation
       SET sms_rappel_envoye = true
@@ -330,7 +340,18 @@ export async function envoyerRappels(cooperativeId: number, sessionId: number) {
     `);
   }
 
-  logger.info({ sessionId, envoyes: result.envoyes }, "Rappels SMS envoyés");
+  // ── Push : tous les inscrits ayant une souscription portail ───────────────
+  const tousIds = inscrits.map((i) => i.membre_id);
+  if (tousIds.length > 0) {
+    const { envoyerPushGroupePortail } = await import("./pushService.js");
+    envoyerPushGroupePortail(tousIds, {
+      title: "🔔 Rappel — Formation demain",
+      body:  `"${session.titre}" · demain à ${heure} — ${lieu}`,
+      url:   "/formations",
+    }).catch((err) => logger.warn({ err }, "Push portail rappel ignoré"));
+  }
+
+  logger.info({ sessionId, envoyes: result.envoyes }, "Rappels envoyés");
   return result;
 }
 
