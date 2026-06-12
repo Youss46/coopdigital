@@ -158,6 +158,15 @@ export async function drawHeader(
     .fillColor(couleur)
     .text(config?.nomComplet || "CoopDigital", infoX, 16, { width: infoWidth, lineBreak: false });
 
+  // ── Slogan (optionnel, italique, sous le nom) ─────────────────────────────────
+  if (config?.slogan) {
+    doc
+      .font("Helvetica-Oblique")
+      .fontSize(7.5)
+      .fillColor("#555555")
+      .text(config.slogan, infoX, 31, { width: infoWidth, lineBreak: false });
+  }
+
   doc.font("Helvetica").fontSize(8).fillColor("#444444");
 
   // Ligne 1 : localisation (adresse · ville)
@@ -172,7 +181,8 @@ export async function drawHeader(
   if (config?.email)     contactParts.push(config.email);
   const contactLine = contactParts.join(" · ");
 
-  let currentY = 31;
+  // Si slogan présent, les infos démarrent 11pt plus bas
+  let currentY = config?.slogan ? 42 : 31;
   if (locLine) {
     doc.text(locLine, infoX, currentY, { width: infoWidth, lineBreak: false });
     currentY += 11;
