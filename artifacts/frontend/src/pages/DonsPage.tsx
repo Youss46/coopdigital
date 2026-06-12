@@ -517,14 +517,26 @@ export default function DonsPage() {
     void qc.invalidateQueries({ queryKey: ["dons-stats"] });
   }
 
+  const [rapportPdfLoading, setRapportPdfLoading] = useState(false);
+
   async function handleRapportPDF() {
-    const r = await fetch(`${BASE}/api/dons/rapport-pdf`, { headers: { Authorization: `Bearer ${tok()}` } });
-    const blob = await r.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `rapport-dons-${new Date().getFullYear()}.pdf`;
-    a.click();
+    if (rapportPdfLoading) return;
+    setRapportPdfLoading(true);
+    try {
+      const r = await fetch(`${BASE}/api/dons/rapport-pdf`, { headers: { Authorization: `Bearer ${tok()}` } });
+      if (!r.ok) throw new Error(`Erreur ${r.status}`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rapport-dons-${new Date().getFullYear()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // erreur silencieuse
+    } finally {
+      setRapportPdfLoading(false);
+    }
   }
 
   async function creerProgramme(e: React.FormEvent) {
@@ -559,8 +571,9 @@ export default function DonsPage() {
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <button onClick={handleRapportPDF} className="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm hover:bg-muted">
-              <FileText size={14} /> Rapport PDF
+            <button onClick={() => void handleRapportPDF()} disabled={rapportPdfLoading} className="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed">
+              {rapportPdfLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+              Rapport PDF
             </button>
             {activeTab === "Dons effectués" && (
               <button onClick={() => setShowModal("effectue")} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90">

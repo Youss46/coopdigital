@@ -421,6 +421,17 @@ function TabPaie() {
   const [annee, setAnnee] = useState(now.getFullYear());
   const [showPayer, setShowPayer] = useState<BulletinAvecPersonnel | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [downloadingBulletins, setDownloadingBulletins] = useState<Set<number>>(new Set());
+
+  async function handleDownloadBulletin(id: number) {
+    if (downloadingBulletins.has(id)) return;
+    setDownloadingBulletins((prev) => new Set(prev).add(id));
+    try {
+      await downloadPdfBulletin(id);
+    } finally {
+      setDownloadingBulletins((prev) => { const s = new Set(prev); s.delete(id); return s; });
+    }
+  }
 
   const canGenerer = usePermission("salaires", "generer_bulletins");
   const canValider = usePermission("salaires", "valider_bulletins");
@@ -652,10 +663,13 @@ function TabPaie() {
                         )}
                         <button
                           title="Télécharger le bulletin PDF"
-                          onClick={() => void downloadPdfBulletin(bulletin.id)}
-                          className="p-1 text-gray-400 hover:text-green-700 transition-colors"
+                          onClick={() => void handleDownloadBulletin(bulletin.id)}
+                          disabled={downloadingBulletins.has(bulletin.id)}
+                          className="p-1 text-gray-400 hover:text-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <FileDown size={14} />
+                          {downloadingBulletins.has(bulletin.id)
+                            ? <Loader2 size={14} className="animate-spin text-green-600" />
+                            : <FileDown size={14} />}
                         </button>
                       </div>
                     </td>

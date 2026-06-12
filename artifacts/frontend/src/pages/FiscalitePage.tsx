@@ -495,14 +495,25 @@ function RapportAnnuel() {
 
   useEffect(() => { charger(); }, []);
 
-  const telechargerPdf = () => {
-    const a = document.createElement("a");
-    fetch(`${BASE}/api/fiscalite/rapport-pdf?annee=${annee}`, { headers: { Authorization: `Bearer ${tok()}` } })
-      .then(r => r.blob()).then(blob => {
-        a.href = URL.createObjectURL(blob);
-        a.download = `rapport-fiscal-${annee}.pdf`;
-        a.click();
-      });
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const telechargerPdf = async () => {
+    if (pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      const r = await fetch(`${BASE}/api/fiscalite/rapport-pdf?annee=${annee}`, { headers: { Authorization: `Bearer ${tok()}` } });
+      if (!r.ok) throw new Error(`Erreur ${r.status}`);
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `rapport-fiscal-${annee}.pdf`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      // erreur silencieuse
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   const categories: Record<string, string> = {
@@ -524,9 +535,13 @@ function RapportAnnuel() {
             {[2023,2024,2025,2026,2027].map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
-        <button onClick={telechargerPdf}
-          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-          <Download size={14} /> Télécharger PDF
+        <button onClick={() => void telechargerPdf()}
+          disabled={pdfLoading}
+          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+          {pdfLoading
+            ? <RefreshCw size={14} className="animate-spin" />
+            : <Download size={14} />}
+          Télécharger PDF
         </button>
       </div>
 

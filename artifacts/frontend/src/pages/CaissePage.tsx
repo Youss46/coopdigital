@@ -501,16 +501,27 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
     }
   };
 
-  const telechargerPdf = () => {
-    if (!caisseId) return;
-    const a = document.createElement("a");
-    a.href = `${BASE}/api/caisse/${caisseId}/rapport-pdf?date=${date}`;
-    const headers = new Headers({ Authorization: `Bearer ${tok()}` });
-    fetch(a.href, { headers }).then(r => r.blob()).then(blob => {
-      a.href = URL.createObjectURL(blob);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const telechargerPdf = async () => {
+    if (!caisseId || pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      const url = `${BASE}/api/caisse/${caisseId}/rapport-pdf?date=${date}`;
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
+      if (!r.ok) throw new Error(`Erreur ${r.status}`);
+      const blob = await r.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
       a.download = `rapport-caisse-${date}.pdf`;
       a.click();
-    });
+      URL.revokeObjectURL(href);
+    } catch {
+      // erreur silencieuse
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   const caisseSelectionnee = caisses?.find(c => c.id === caisseId);
@@ -556,9 +567,13 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
             </>
           )}
           {journal && (
-            <button onClick={telechargerPdf}
-              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-              <Download size={14} /> Télécharger PDF
+            <button onClick={() => void telechargerPdf()}
+              disabled={pdfLoading}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+              {pdfLoading
+                ? <RefreshCw size={14} className="animate-spin" />
+                : <Download size={14} />}
+              Télécharger PDF
             </button>
           )}
         </div>

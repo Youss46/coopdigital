@@ -89,11 +89,27 @@ function FormationsMembre({ membreId }: { membreId: number }) {
     enabled: !!membreId,
   });
 
-  function downloadAttestation(sessionId: number) {
-    const a = document.createElement("a");
-    a.href = `${BASE_FICHE}/api/formations/sessions/${sessionId}/attestation/${membreId}`;
-    a.setAttribute("download", `attestation-${sessionId}-${membreId}.pdf`);
-    a.click();
+  const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
+
+  async function downloadAttestation(sessionId: number) {
+    if (downloadingIds.has(sessionId)) return;
+    setDownloadingIds((prev) => new Set(prev).add(sessionId));
+    try {
+      const url = `${BASE_FICHE}/api/formations/sessions/${sessionId}/attestation/${membreId}`;
+      const resp = await fetch(url, { headers: { Authorization: `Bearer ${tokFn()}` } });
+      if (!resp.ok) throw new Error(`Erreur ${resp.status}`);
+      const blob = await resp.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `attestation-${sessionId}-${membreId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(href);
+    } catch {
+      // erreur silencieuse
+    } finally {
+      setDownloadingIds((prev) => { const s = new Set(prev); s.delete(sessionId); return s; });
+    }
   }
 
   if (isLoading) {
@@ -166,11 +182,14 @@ function FormationsMembre({ membreId }: { membreId: number }) {
                 </td>
                 <td className="px-4 py-2.5 text-center">
                   {f.numero_attestation ? (
-                    <button onClick={() => downloadAttestation(f.session_id)}
+                    <button onClick={() => void downloadAttestation(f.session_id)}
+                      disabled={downloadingIds.has(f.session_id)}
                       title={f.numero_attestation}
-                      className="inline-flex items-center gap-1 text-xs text-green-700 hover:text-green-900 transition-colors">
+                      className="inline-flex items-center gap-1 text-xs text-green-700 hover:text-green-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                       <Award className="w-3.5 h-3.5" />
-                      <Download className="w-3 h-3" />
+                      {downloadingIds.has(f.session_id)
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Download className="w-3 h-3" />}
                     </button>
                   ) : (
                     <span className="text-gray-300 text-xs">—</span>
