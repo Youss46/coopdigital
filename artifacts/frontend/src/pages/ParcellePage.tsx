@@ -1313,7 +1313,7 @@ function OngletCarteGlobale() {
       }));
 
       const { utils, writeFile } = await import("xlsx");
-      const ws = utils.json_to_sheet(rows, { origin: 2 });
+      const ws = utils.json_to_sheet(rows, { origin: 2 } as any);
       utils.sheet_add_aoa(ws, [
         [data.nomCooperative ?? "Export EUDR"],
         [`Export EUDR — Parcelles · ${new Date().toLocaleDateString("fr-FR")}`],

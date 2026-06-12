@@ -35,7 +35,7 @@ async function registerPushSubscription(): Promise<void> {
     const existing = await reg.pushManager.getSubscription();
     const sub = existing ?? await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
     });
 
     const token = getToken();

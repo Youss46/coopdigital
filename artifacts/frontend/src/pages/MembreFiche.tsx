@@ -316,6 +316,9 @@ export default function MembreFiche() {
   const { data: membre, isLoading } = useGetMembreById(id, {
     query: { queryKey: getGetMembreByIdQueryKey(id), enabled: !!id },
   });
+  // Champs étendus retournés par le serveur mais absents du schéma OpenAPI
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mx = membre as any;
   const { data: historique } = useGetMembreHistorique(id, {
     query: { queryKey: getGetMembreHistoriqueQueryKey(id), enabled: !!id },
   });
@@ -403,13 +406,13 @@ export default function MembreFiche() {
       superficieHa: membre.superficieHa ?? "",
       sexe: (membre.sexe as string | null) ?? "",
       numeroCni: (membre.numeroCni as string | null) ?? "",
-      carteProducteur: (membre.carteProducteur as string | null) ?? "",
-      dateNaissance: (membre.dateNaissance as string | null) ?? "",
+      carteProducteur: (mx?.carteProducteur as string | null) ?? "",
+      dateNaissance: (mx?.dateNaissance as string | null) ?? "",
       dateAdhesion: (membre.dateAdhesion as string | null) ?? "",
-      typeFournisseur: (membre.typeFournisseur as string | null) ?? "",
-      nbrePartsSouscrites: membre.nbrePartsSouscrites != null ? String(membre.nbrePartsSouscrites) : "",
-      superficieTotale: (membre.superficieTotale as string | null) ?? "",
-      nombreParcelles: (membre.nombreParcelles as number | null) != null ? String(membre.nombreParcelles) : "",
+      typeFournisseur: (mx?.typeFournisseur as string | null) ?? "",
+      nbrePartsSouscrites: mx?.nbrePartsSouscrites != null ? String(mx.nbrePartsSouscrites) : "",
+      superficieTotale: (mx?.superficieTotale as string | null) ?? "",
+      nombreParcelles: (mx?.nombreParcelles as number | null) != null ? String(mx.nombreParcelles) : "",
     });
     setShowEditModal(true);
   }
@@ -607,10 +610,10 @@ export default function MembreFiche() {
               </span>
             )}
             <span className="flex items-center gap-1"><Calendar size={13} />Adhésion : {formaterDate(membre.dateAdhesion)}</span>
-            {(membre as unknown as Record<string, unknown>)["carteProducteur"] && (
+            {mx?.carteProducteur && (
               <span className="flex items-center gap-1">
                 <CreditCard size={13} />
-                Carte producteur : {String((membre as unknown as Record<string, unknown>)["carteProducteur"])}
+                Carte producteur : {String(mx.carteProducteur)}
               </span>
             )}
           </div>
@@ -681,8 +684,8 @@ export default function MembreFiche() {
             <button
               onClick={() => {
                 setTransferForm({
-                  rattachementType: (membre.rattachementType as "delegue" | "base_centrale") ?? "delegue",
-                  delegueId: membre.delegueId ?? undefined,
+                  rattachementType: (mx?.rattachementType as "delegue" | "base_centrale") ?? "delegue",
+                  delegueId: mx?.delegueId ?? undefined,
                 });
                 setShowTransferModal(true);
               }}
@@ -694,7 +697,7 @@ export default function MembreFiche() {
           )}
         </div>
 
-        {membre.rattachementType === "base_centrale" ? (
+        {mx?.rattachementType === "base_centrale" ? (
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
               <Building2 size={16} className="text-purple-600" />
@@ -704,24 +707,24 @@ export default function MembreFiche() {
               <p className="text-xs text-gray-500">Géré directement par la direction</p>
             </div>
           </div>
-        ) : membre.delegueId ? (
+        ) : mx?.delegueId ? (
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
               <User size={16} className="text-green-700" />
             </div>
             <div>
               <p className="text-sm font-medium text-gray-900">
-                {membre.delegueInfo
-                  ? `${membre.delegueInfo.nom} ${membre.delegueInfo.prenoms}`
-                  : `Délégué #${membre.delegueId}`}
+                {mx?.delegueInfo
+                  ? `${mx.delegueInfo.nom} ${mx.delegueInfo.prenoms}`
+                  : `Délégué #${mx?.delegueId}`}
               </p>
-              {(membre.zoneNom ?? membre.delegueInfo?.zoneNom) && (
-                <p className="text-xs text-gray-500">Zone : {membre.zoneNom ?? membre.delegueInfo?.zoneNom}</p>
+              {(mx?.zoneNom ?? mx?.delegueInfo?.zoneNom) && (
+                <p className="text-xs text-gray-500">Zone : {mx?.zoneNom ?? mx?.delegueInfo?.zoneNom}</p>
               )}
-              {membre.delegueInfo?.telephone && (
-                <p className="text-xs text-gray-400">{membre.delegueInfo.telephone}</p>
+              {mx?.delegueInfo?.telephone && (
+                <p className="text-xs text-gray-400">{mx.delegueInfo.telephone}</p>
               )}
-              {membre.creeParDelegue && (
+              {mx?.creeParDelegue && (
                 <span className="inline-block mt-1 text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded">Créé par ce délégué</span>
               )}
             </div>

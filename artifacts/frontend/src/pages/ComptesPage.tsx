@@ -164,18 +164,19 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
     if (!form.role) return;
     createMutation.mutate(
       {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: {
           nom: form.nom,
           prenoms: form.prenoms,
           email: form.email,
           telephone: form.telephone || undefined,
-          role: form.role as UserRole,
+          role: form.role as Exclude<UserRole, "delegue">,
           motDePasse,
           section: form.section || undefined,
           zoneType: (form.zoneType || undefined) as "section" | "groupement" | "village" | undefined,
           zoneNom: form.zoneNom || undefined,
           zoneVillages: form.zoneVillages || undefined,
-        },
+        } as any,
       },
       {
         onSuccess: () => {

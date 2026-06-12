@@ -56,7 +56,7 @@ const REFUS_INIT = { poidsRefuleKg: "", nombreSacsRefoules: "", dateRefus: new D
 export default function ExportateursPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { utilisateur: user } = useAuth();
   const peutCreer = usePermission("exportateurs", "creer");
   const peutSignalerRefus = usePermission("refus", "traiter");
   const [vueFiche, setVueFiche] = useState<number | null>(null);

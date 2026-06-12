@@ -26,7 +26,7 @@ async function resoudreDestinataires(cooperativeId: number, cible: string): Prom
       .where(and(
         eq(usersTable.cooperativeId, cooperativeId),
         eq(usersTable.actif, true),
-        inArray(usersTable.role, ROLES_DIRECTION as unknown as string[]),
+        inArray(usersTable.role, [...ROLES_DIRECTION]),
       ));
   } else {
     rows = await db
@@ -35,7 +35,7 @@ async function resoudreDestinataires(cooperativeId: number, cible: string): Prom
       .where(and(
         eq(usersTable.cooperativeId, cooperativeId),
         eq(usersTable.actif, true),
-        eq(usersTable.role, cible),
+        eq(usersTable.role, cible as typeof ROLES_DIRECTION[number]),
       ));
   }
 

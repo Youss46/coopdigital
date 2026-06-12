@@ -39,7 +39,7 @@ export async function creerFormationRse(req: Request, res: Response): Promise<vo
 
 export async function supprimerFormationRse(req: Request, res: Response): Promise<void> {
   const coopId = req.user?.cooperativeId;
-  const id = parseInt(req.params["id"] ?? "", 10);
+  const id = parseInt(String(req.params["id"] ?? ""), 10);
   if (!coopId || isNaN(id)) { res.status(400).json({ erreur: "Paramètres invalides" }); return; }
   await db
     .delete(formationsRseTable)

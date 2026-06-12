@@ -246,10 +246,12 @@ export default function Membres() {
         dateAdhesion: form.dateAdhesion!, statut: form.statut as "actif" | "inactif",
         village: form.village, groupement: form.groupement,
         numeroCni: form.numeroCni, sexe: form.sexe as "M" | "F" | undefined,
-        delegueId: delegueIdFinal, rattachementType: rattachementTypeFinal,
-        dateNaissance: (form as Record<string, unknown>)["dateNaissance"] as string | undefined,
-        typeFournisseur: (form as Record<string, unknown>)["typeFournisseur"] as "membre" | "pisteur" | "externe" | undefined,
-        nbrePartsSouscrites: (form as Record<string, unknown>)["nbrePartsSouscrites"] ? Number((form as Record<string, unknown>)["nbrePartsSouscrites"]) : undefined,
+        ...({ delegueId: delegueIdFinal, rattachementType: rattachementTypeFinal,
+          dateNaissance: (form as Record<string, unknown>)["dateNaissance"],
+          typeFournisseur: (form as Record<string, unknown>)["typeFournisseur"],
+          nbrePartsSouscrites: (form as Record<string, unknown>)["nbrePartsSouscrites"] ? Number((form as Record<string, unknown>)["nbrePartsSouscrites"]) : undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any),
       },
     });
   };
