@@ -326,6 +326,12 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     configurer: ["pca", "directeur"],
   },
 
+  // MODULE — FORMATIONS RSE
+  formations_rse: {
+    voir:  ["pca", "directeur", "comptable", "auditeur"],
+    creer: ["pca", "directeur"],
+  },
+
   // MODULE — FORMATIONS & RENFORCEMENT DE CAPACITÉS
   formation: {
     voir:                  ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],

@@ -44,6 +44,7 @@ import EquipementsPage from "@/pages/EquipementsPage";
 import PrevisionsPage from "@/pages/PrevisionsPage";
 import DonsPage from "@/pages/DonsPage";
 import FormationsPage from "@/pages/FormationsPage";
+import FormationsRsePage from "@/pages/FormationsRsePage";
 import CaissePage from "@/pages/CaissePage";
 import FiscalitePage from "@/pages/FiscalitePage";
 import ReconciliationPage from "@/pages/ReconciliationPage";
@@ -200,6 +201,9 @@ function AppRoutes() {
       </Route>
       <Route path="/formations">
         <ProtectedRoute component={FormationsPage} />
+      </Route>
+      <Route path="/formations-rse">
+        <ProtectedRoute component={FormationsRsePage} />
       </Route>
       <Route path="/caisse">
         <ProtectedRoute component={CaissePage} />

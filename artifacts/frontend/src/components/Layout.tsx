@@ -273,6 +273,12 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "auditeur", "delegue"],
   },
   {
+    href: "/formations-rse",
+    label: "Formations RSE",
+    icon: GraduationCap,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
     href: "/equipements",
     label: "Équipements",
     icon: Package,
