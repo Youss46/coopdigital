@@ -856,8 +856,11 @@ function OngletAttestations() {
   });
 
   const canGenerer = usePermission("formation", "generer_attestation");
+  const [downloading, setDownloading] = React.useState<Set<number>>(new Set());
 
-  async function downloadAttestation(sessionId: number, membreId: number, numero: string) {
+  async function downloadAttestation(sessionId: number, membreId: number, numero: string, attestationId: number) {
+    if (downloading.has(attestationId)) return;
+    setDownloading((prev) => new Set(prev).add(attestationId));
     const url = `${BASE}/api/formations/sessions/${sessionId}/attestation/${membreId}`;
     try {
       const resp = await fetch(url, {
@@ -873,6 +876,8 @@ function OngletAttestations() {
       URL.revokeObjectURL(href);
     } catch {
       toast({ title: "Erreur lors du téléchargement de l'attestation", variant: "destructive" });
+    } finally {
+      setDownloading((prev) => { const s = new Set(prev); s.delete(attestationId); return s; });
     }
   }
 
@@ -937,10 +942,14 @@ function OngletAttestations() {
                   </span>
                 )}
               </div>
-              <button onClick={() => downloadAttestation(a.session_id, a.membre_id, a.numero_attestation)}
+              <button
+                onClick={() => downloadAttestation(a.session_id, a.membre_id, a.numero_attestation, a.id)}
+                disabled={downloading.has(a.id)}
                 title="Télécharger l'attestation PDF"
-                className="p-2 text-gray-400 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors">
-                <Download className="w-4 h-4" />
+                className="p-2 text-gray-400 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {downloading.has(a.id)
+                  ? <RefreshCw className="w-4 h-4 animate-spin text-green-600" />
+                  : <Download className="w-4 h-4" />}
               </button>
             </div>
           ))}
