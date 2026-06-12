@@ -204,4 +204,18 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     exporter:               ["pca", "directeur", "auditeur"],
     voir_historique_entite: ["pca", "directeur", "comptable", "auditeur"],
   },
+
+  formation: {
+    voir:                ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    planifier:           ["pca", "directeur", "responsable_tracabilite"],
+    inscrire:            ["pca", "directeur", "responsable_tracabilite"],
+    gerer_presences:     ["pca", "directeur", "responsable_tracabilite", "delegue"],
+    generer_attestation: ["pca", "directeur", "responsable_tracabilite"],
+    voir_stats:          ["pca", "directeur", "comptable", "auditeur"],
+  },
+
+  formations_rse: {
+    voir:  ["pca", "directeur", "comptable", "auditeur"],
+    creer: ["pca", "directeur"],
+  },
 };
