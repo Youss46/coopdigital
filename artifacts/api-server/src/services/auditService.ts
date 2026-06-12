@@ -3,7 +3,7 @@ import crypto from "crypto";
 import PDFDocument from "pdfkit";
 
 import { db } from "@workspace/db";
-import { auditTrailTable, sessionsUtilisateursTable } from "@workspace/db";
+import { auditTrailTable, sessionsUtilisateursTable, usersTable } from "@workspace/db";
 import { eq, and, gte, lte, desc, sql, type SQL } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
@@ -216,10 +216,16 @@ export async function getStats(cooperativeId: number) {
       .orderBy(desc(sql`COUNT(*)`))
       .limit(10),
 
-    db.select({ userId: auditTrailTable.userId, userNom: auditTrailTable.userNom, userRole: auditTrailTable.userRole, nb: sql<string>`COUNT(*)` })
+    db.select({
+        userId: auditTrailTable.userId,
+        userNom: sql<string>`COALESCE(TRIM(${usersTable.prenoms} || ' ' || ${usersTable.nom}), ${auditTrailTable.userNom})`,
+        userRole: auditTrailTable.userRole,
+        nb: sql<string>`COUNT(*)`,
+      })
       .from(auditTrailTable)
+      .leftJoin(usersTable, eq(usersTable.id, auditTrailTable.userId))
       .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debut30j)))
-      .groupBy(auditTrailTable.userId, auditTrailTable.userNom, auditTrailTable.userRole)
+      .groupBy(auditTrailTable.userId, usersTable.nom, usersTable.prenoms, auditTrailTable.userRole)
       .orderBy(desc(sql`COUNT(*)`))
       .limit(10),
 
