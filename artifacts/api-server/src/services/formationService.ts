@@ -3,6 +3,7 @@ import { eq, and, inArray, sql, desc, not } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
+import { getConfig } from "./configService.js";
 
 
 
@@ -394,33 +395,66 @@ export async function listAttestations(cooperativeId: number, opts?: { sessionId
 
 // ─── Génération PDF attestation ────────────────────────────────────────────────
 
+const THEMATIQUES_MAP: Record<string, string> = {
+  bonnes_pratiques:   "Bonnes pratiques agricoles",
+  qualite_cacao:      "Qualité du cacao",
+  eudr:               "EUDR / Certification",
+  gestion_financiere: "Gestion financière",
+  sante_securite:     "Santé & sécurité",
+  agroforesterie:     "Agroforesterie",
+  certification:      "Certification",
+  numerique:          "Numérique",
+};
+
+function lightenHex(hex: string, factor = 0.91): string {
+  try {
+    const h = hex.replace("#", "");
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    const l = (c: number) => Math.min(255, Math.round(c + (255 - c) * factor));
+    return `#${[l(r), l(g), l(b)].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+  } catch {
+    return "#f0f7f3";
+  }
+}
+
 export async function genererPdfAttestation(cooperativeId: number, sessionId: number, membreId: number): Promise<Buffer> {
-  // Récupérer les données
-  const sessionRes = await db.execute<{
-    titre: string; thematique: string | null; formateur: string | null;
-    organisme_formateur: string | null; lieu: string | null;
-    date_session: string; heure_debut: string | null; heure_fin: string | null;
-    duree_heures: string | null;
-  }>(sql`SELECT titre, thematique, formateur, organisme_formateur, lieu, date_session::text, heure_debut::text, heure_fin::text, duree_heures FROM sessions_formation WHERE id = ${sessionId} AND cooperative_id = ${cooperativeId} LIMIT 1`);
+  // ─── Données ────────────────────────────────────────────────────────────────
+  const [sessionRes, membreRes, attestRes, coopConfig] = await Promise.all([
+    db.execute<{
+      titre: string; thematique: string | null; formateur: string | null;
+      organisme_formateur: string | null; lieu: string | null;
+      date_session: string; duree_heures: string | null;
+    }>(sql`SELECT titre, thematique, formateur, organisme_formateur, lieu, date_session::text, duree_heures
+           FROM sessions_formation WHERE id = ${sessionId} AND cooperative_id = ${cooperativeId} LIMIT 1`),
+    db.execute<{ nom: string; prenoms: string | null; numero_cni: string | null }>(
+      sql`SELECT nom, prenoms, numero_cni FROM membres WHERE id = ${membreId} LIMIT 1`,
+    ),
+    db.execute<{ numero_attestation: string; date_emission: string }>(
+      sql`SELECT numero_attestation, date_emission::text FROM attestations_formation
+          WHERE session_id = ${sessionId} AND membre_id = ${membreId} LIMIT 1`,
+    ),
+    getConfig(cooperativeId),
+  ]);
+
   const session = sessionRes.rows[0];
   if (!session) throw new Error("Session introuvable");
-
-  const membreRes = await db.execute<{ nom: string; prenoms: string | null; numero_cni: string | null }>(
-    sql`SELECT nom, prenoms, numero_cni FROM membres WHERE id = ${membreId} LIMIT 1`
-  );
   const membre = membreRes.rows[0];
   if (!membre) throw new Error("Membre introuvable");
-
-  const attestRes = await db.execute<{ numero_attestation: string; date_emission: string }>(
-    sql`SELECT numero_attestation, date_emission::text FROM attestations_formation WHERE session_id = ${sessionId} AND membre_id = ${membreId} LIMIT 1`
-  );
   const attest = attestRes.rows[0];
 
   const numeroAttestation = attest?.numero_attestation ?? `ATT-${new Date().getFullYear()}-${sessionId}-${membreId}`;
-  const dateEmission = attest?.date_emission ?? new Date().toISOString().slice(0, 10);
+  const dateEmission      = attest?.date_emission ?? new Date().toISOString().slice(0, 10);
+  const couleur           = coopConfig?.couleurPrimaire || "#1a4731";
+  const couleurLight      = lightenHex(couleur, 0.91);
+  const thematiqueLabel   = session.thematique
+    ? (THEMATIQUES_MAP[session.thematique] ?? session.thematique)
+    : null;
+  const nomComplet = [membre.prenoms, membre.nom].filter(Boolean).join(" ").toUpperCase();
 
-  // Générer le PDF
-  const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+  // ─── Document ───────────────────────────────────────────────────────────────
+  const doc    = new PDFDocument({ margin: 40, size: "A4", bufferPages: true });
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
 
@@ -429,90 +463,133 @@ export async function genererPdfAttestation(cooperativeId: number, sessionId: nu
     reference: numeroAttestation,
   });
 
-  const margin = 50;
-  const pageW  = doc.page.width;
+  const margin = 40;
+  const pageW  = doc.page.width;   // 595.28
+  const pageH  = doc.page.height;  // 841.89
   const cW     = pageW - margin * 2;
 
-  // Titre central
-  doc.moveDown(1.5)
-    .font("Helvetica-Bold").fontSize(20)
-    .fillColor("#1a4731")
-    .text("ATTESTATION DE PARTICIPATION", margin, doc.y, { width: cW, align: "center" });
+  // ── Cadre double décoratif ──────────────────────────────────────────────────
+  const fL = margin - 10;
+  const fR = pageW - margin + 10;
+  const fT = 100;
+  const fB = pageH - 48;
 
-  // Ligne décorative
-  doc.moveDown(0.5)
-    .moveTo(margin + 60, doc.y).lineTo(pageW - margin - 60, doc.y)
-    .strokeColor("#1a4731").lineWidth(2).stroke();
+  doc.save().rect(fL, fT, fR - fL, fB - fT).strokeColor(couleur).lineWidth(1.5).stroke().restore();
+  doc.save().rect(fL + 5, fT + 5, fR - fL - 10, fB - fT - 10).strokeColor(couleur).lineWidth(0.4).stroke().restore();
 
-  doc.moveDown(1.2).font("Helvetica").fontSize(12).fillColor("#333333");
-
-  // Corps de l'attestation
-  const nomComplet = [membre.prenoms, membre.nom].filter(Boolean).join(" ");
-  doc.text("La Direction de la Coopérative certifie que :", margin, doc.y, { width: cW, align: "center" });
-
-  doc.moveDown(1)
-    .font("Helvetica-Bold").fontSize(16).fillColor("#1a4731")
-    .text(nomComplet.toUpperCase(), margin, doc.y, { width: cW, align: "center" });
-
-  if (membre.numero_cni) {
-    doc.moveDown(0.3).font("Helvetica").fontSize(10).fillColor("#666666")
-      .text(`CNI : ${membre.numero_cni}`, margin, doc.y, { width: cW, align: "center" });
-  }
-
-  doc.moveDown(1).font("Helvetica").fontSize(12).fillColor("#333333")
-    .text("a participé à la formation :", margin, doc.y, { width: cW, align: "center" });
-
-  doc.moveDown(0.8).font("Helvetica-Bold").fontSize(14).fillColor("#1a4731")
-    .text(`"${session.titre}"`, margin, doc.y, { width: cW, align: "center" });
-
-  if (session.thematique) {
-    doc.moveDown(0.4).font("Helvetica-Oblique").fontSize(11).fillColor("#555555")
-      .text(`Thématique : ${session.thematique}`, margin, doc.y, { width: cW, align: "center" });
-  }
-
-  // Détails de la session
-  doc.moveDown(1.5);
-  const details: Array<[string, string]> = [
-    ["Date", fmtDate(session.date_session)],
-  ];
-  if (session.duree_heures) details.push(["Durée", `${session.duree_heures} heure(s)`]);
-  if (session.lieu)          details.push(["Lieu", session.lieu]);
-  if (session.formateur)     details.push(["Formateur", session.formateur]);
-  if (session.organisme_formateur) details.push(["Organisme", session.organisme_formateur]);
-
-  const boxX = margin + 40;
-  const boxW = cW - 80;
-  const boxY = doc.y;
-  doc.save()
-    .rect(boxX, boxY, boxW, details.length * 20 + 20)
-    .fillColor("#f8f9fa").fill()
-    .restore();
-
-  details.forEach(([label, val], i) => {
-    const y = boxY + 10 + i * 20;
-    doc.font("Helvetica-Bold").fontSize(10).fillColor("#444444")
-      .text(`${label} :`, boxX + 10, y, { width: 90, lineBreak: false });
-    doc.font("Helvetica").fontSize(10).fillColor("#222222")
-      .text(val, boxX + 105, y, { width: boxW - 115, lineBreak: false });
+  // Ornements carrés aux 4 coins
+  ([
+    [fL + 5, fT + 5], [fR - 13, fT + 5],
+    [fL + 5, fB - 13], [fR - 13, fB - 13],
+  ] as [number, number][]).forEach(([cx, cy]) => {
+    doc.save().rect(cx, cy, 8, 8).fillColor(couleur).fill().restore();
   });
 
-  doc.y = boxY + details.length * 20 + 30;
+  // ── Bannière "ATTESTATION DE PARTICIPATION" ─────────────────────────────────
+  const banY = fT + 10;
+  const banH = 40;
+  doc.save().rect(fL + 10, banY, fR - fL - 20, banH).fillColor(couleur).fill().restore();
+  doc.font("Helvetica-Bold").fontSize(15.5).fillColor("#ffffff")
+    .text("ATTESTATION  DE  PARTICIPATION", fL + 10, banY + 13, {
+      width: fR - fL - 20, align: "center", lineBreak: false,
+    });
 
-  // Zone signature
-  doc.moveDown(2);
-  const sigY = doc.y;
+  // ── Corps ───────────────────────────────────────────────────────────────────
+  let y = banY + banH + 20;
+
+  doc.font("Helvetica").fontSize(11).fillColor("#555555")
+    .text("La Direction de la Coopérative certifie que :", margin, y, { width: cW, align: "center" });
+  y += 26;
+
+  // Filet fin avant nom
+  doc.save().moveTo(margin + 70, y).lineTo(pageW - margin - 70, y)
+    .strokeColor(couleur).lineWidth(0.5).stroke().restore();
+  y += 10;
+
+  // Nom du membre
+  doc.font("Helvetica-Bold").fontSize(21).fillColor(couleur)
+    .text(nomComplet, margin, y, { width: cW, align: "center" });
+  y += 30;
+
+  if (membre.numero_cni) {
+    doc.font("Helvetica").fontSize(9).fillColor("#888888")
+      .text(`N° CNI : ${membre.numero_cni}`, margin, y, { width: cW, align: "center" });
+    y += 16;
+  }
+
+  // Filet fin après nom
+  doc.save().moveTo(margin + 70, y + 2).lineTo(pageW - margin - 70, y + 2)
+    .strokeColor(couleur).lineWidth(0.5).stroke().restore();
+  y += 18;
+
+  doc.font("Helvetica").fontSize(11).fillColor("#555555")
+    .text("a participé avec succès à la formation :", margin, y, { width: cW, align: "center" });
+  y += 26;
+
+  // Titre de la formation
+  doc.font("Helvetica-Bold").fontSize(14).fillColor("#1a1a1a")
+    .text(`« ${session.titre} »`, margin, y, { width: cW, align: "center" });
+  y += 22;
+
+  if (thematiqueLabel) {
+    doc.font("Helvetica-Oblique").fontSize(10).fillColor("#666666")
+      .text(`Thématique : ${thematiqueLabel}`, margin, y, { width: cW, align: "center" });
+    y += 16;
+  }
+
+  y += 16;
+
+  // ── Tableau des détails ─────────────────────────────────────────────────────
+  const details: Array<[string, string]> = [["Date", fmtDate(session.date_session)]];
+  if (session.duree_heures)        details.push(["Durée", `${session.duree_heures} heure(s)`]);
+  if (session.lieu)                details.push(["Lieu", session.lieu]);
+  if (session.formateur)           details.push(["Formateur", session.formateur]);
+  if (session.organisme_formateur) details.push(["Organisme", session.organisme_formateur]);
+
+  const tblX  = margin + 30;
+  const tblW  = cW - 60;
+  const rowH  = 22;
+  const labW  = 90;
+  const tblH  = details.length * rowH + 16;
+
+  // Fond clair + barre d'accent gauche
+  doc.save().rect(tblX, y, tblW, tblH).fillColor(couleurLight).fill().restore();
+  doc.save().rect(tblX, y, 3, tblH).fillColor(couleur).fill().restore();
+
+  details.forEach(([label, val], i) => {
+    const ry = y + 8 + i * rowH;
+    if (i > 0) {
+      doc.save().moveTo(tblX + 10, ry - 1).lineTo(tblX + tblW - 10, ry - 1)
+        .strokeColor("#dddddd").lineWidth(0.3).stroke().restore();
+    }
+    doc.font("Helvetica-Bold").fontSize(9.5).fillColor(couleur)
+      .text(label, tblX + 12, ry, { width: labW, lineBreak: false });
+    doc.font("Helvetica").fontSize(9.5).fillColor("#222222")
+      .text(val, tblX + labW + 16, ry, { width: tblW - labW - 26, lineBreak: false });
+  });
+
+  y += tblH + 32;
+
+  // ── Zone signature ──────────────────────────────────────────────────────────
+  const sigW   = 190;
+  const sigX   = margin + 10;
+  const sigLineY = y + 50;
+
   doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
-    .text("Le Directeur / La Direction", margin + 20, sigY, { width: 180, align: "center" });
-  doc.moveTo(margin + 20, sigY + 60).lineTo(margin + 200, sigY + 60)
-    .strokeColor("#888888").lineWidth(0.5).stroke();
-  doc.font("Helvetica").fontSize(8).fillColor("#888888")
-    .text("Signature et cachet", margin + 20, sigY + 64, { width: 180, align: "center" });
+    .text("Le Directeur / La Direction", sigX, y, { width: sigW, align: "center" });
 
-  // Numéro et date
+  doc.save().moveTo(sigX, sigLineY).lineTo(sigX + sigW, sigLineY)
+    .strokeColor("#bbbbbb").lineWidth(0.5).stroke().restore();
   doc.font("Helvetica").fontSize(8).fillColor("#aaaaaa")
-    .text(`N° ${numeroAttestation} — Émise le ${fmtDate(dateEmission)}`, margin, sigY + 64, { width: cW, align: "right" });
+    .text("Signature et cachet", sigX, sigLineY + 5, { width: sigW, align: "center" });
 
-  // Footers
+  // Référence (droite)
+  doc.font("Helvetica").fontSize(8).fillColor("#888888")
+    .text(`N° ${numeroAttestation}`, margin, sigLineY + 5, { width: cW, align: "right" });
+  doc.font("Helvetica-Oblique").fontSize(7.5).fillColor("#aaaaaa")
+    .text(`Émise le ${fmtDate(dateEmission)}`, margin, sigLineY + 17, { width: cW, align: "right" });
+
+  // ── Footers ─────────────────────────────────────────────────────────────────
   const pageRange = doc.bufferedPageRange();
   for (let i = 0; i < pageRange.count; i++) {
     doc.switchToPage(pageRange.start + i);
