@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { MoneyInput } from "@/components/ui/money-input";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 
@@ -270,13 +271,11 @@ export default function DeleguesPage() {
             ) : null; })()}
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Montant (FCFA)</label>
-              <input
-                type="number"
-                min="1"
+              <MoneyInput
                 value={montant}
-                onChange={(e) => setMontant(e.target.value)}
+                onChange={(raw) => setMontant(raw)}
                 style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".95rem" }}
-                placeholder="Ex: 500000"
+                placeholder="Ex: 500 000"
               />
             </div>
             <div style={{ marginBottom: 20 }}>

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Wallet, Plus, RefreshCw, Lock, Unlock, Download, AlertTriangle, TrendingUp, TrendingDown, ChevronRight, X, CheckCircle2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { MoneyInput } from "@/components/ui/money-input";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -156,9 +157,9 @@ function ModalMouvement({ caisseId, onClose, onDone }: { caisseId: number; onClo
           {/* Montant */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Montant (FCFA) *</label>
-            <input type="number" value={montant} onChange={e => setMontant(e.target.value)} min="1"
+            <MoneyInput value={montant} onChange={(raw) => setMontant(raw)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Ex: 50000" />
+              placeholder="Ex: 50 000" />
           </div>
           {/* Libellé */}
           <div>
@@ -219,9 +220,9 @@ function ModalFermeture({ caisseId, onClose, onDone }: { caisseId: number; onClo
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Solde réel compté (FCFA) *</label>
-            <input type="number" value={soldeReel} onChange={e => setSoldeReel(e.target.value)} min="0"
+            <MoneyInput value={soldeReel} onChange={(raw) => setSoldeReel(raw)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Ex: 485000" />
+              placeholder="Ex: 485 000" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Observations</label>
@@ -284,15 +285,15 @@ function ModalCreerCaisse({ onClose, onDone }: { onClose: () => void; onDone: ()
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Solde initial (FCFA)</label>
-            <input type="number" value={soldeInit} onChange={e => setSoldeInit(e.target.value)} min="0"
+            <MoneyInput value={soldeInit} onChange={(raw) => setSoldeInit(raw)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="0" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Fond minimum (FCFA)</label>
-            <input type="number" value={fondMin} onChange={e => setFondMin(e.target.value)} min="0"
+            <MoneyInput value={fondMin} onChange={(raw) => setFondMin(raw)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="100000" />
+              placeholder="100 000" />
           </div>
         </div>
         <div className="flex gap-3 p-5 pt-0">
@@ -896,7 +897,7 @@ function ModalAlimenter({ delegue, caisses, onClose, onDone }: {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Montant (FCFA) *</label>
-            <input type="number" value={montant} onChange={(e) => setMontant(e.target.value)} min="1"
+            <MoneyInput value={montant} onChange={(raw) => setMontant(raw)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="Ex: 100 000" />
           </div>

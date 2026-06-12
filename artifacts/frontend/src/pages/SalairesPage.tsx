@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   Users, FileText, BarChart2, CreditCard,
   Plus, RefreshCw, CheckCircle, Banknote,
@@ -1141,22 +1142,18 @@ function PersonnelModal({
               />
             </Field>
             <Field label="Salaire de base (FCFA)" required>
-              <input
-                type="number"
-                min="0"
+              <MoneyInput
                 className={INPUT_CLS}
-                value={form.salaireBaseFcfa}
-                onChange={(e) => f("salaireBaseFcfa", Number(e.target.value))}
+                value={String(form.salaireBaseFcfa)}
+                onChange={(raw) => f("salaireBaseFcfa", raw ? parseInt(raw) : 0)}
                 required
               />
             </Field>
             <Field label="Sursalaire (FCFA)">
-              <input
-                type="number"
-                min="0"
+              <MoneyInput
                 className={INPUT_CLS}
-                value={form.sursalaireFcfa}
-                onChange={(e) => f("sursalaireFcfa", Number(e.target.value))}
+                value={String(form.sursalaireFcfa)}
+                onChange={(raw) => f("sursalaireFcfa", raw ? parseInt(raw) : 0)}
               />
             </Field>
             <Field label="Mode de paiement">
@@ -1362,12 +1359,10 @@ function AvanceModal({
             </select>
           </Field>
           <Field label="Montant (FCFA)" required>
-            <input
-              type="number"
-              min="1000"
+            <MoneyInput
               className={INPUT_CLS}
               value={form.montantFcfa}
-              onChange={(e) => setForm((f) => ({ ...f, montantFcfa: e.target.value }))}
+              onChange={(raw) => setForm((f) => ({ ...f, montantFcfa: raw }))}
               required
             />
           </Field>

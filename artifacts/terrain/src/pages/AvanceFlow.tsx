@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { MoneyInput } from "../components/ui/money-input";
 import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNav from "../components/BottomNav";
@@ -129,15 +130,11 @@ export default function AvanceFlow() {
               <>
                 <div className="t-field">
                   <label className="t-label">Montant de l'avance (FCFA)</label>
-                  <input
-                    type="number"
+                  <MoneyInput
                     className="t-input t-input--lg"
                     value={montant}
-                    onChange={(e) => setMontant(e.target.value)}
-                    inputMode="numeric"
+                    onChange={(raw) => setMontant(raw)}
                     placeholder="Ex: 50 000"
-                    min="1000"
-                    step="1000"
                   />
                 </div>
 

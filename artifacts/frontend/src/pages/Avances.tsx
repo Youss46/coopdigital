@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   useGetAvances,
   useGetAvancesEncours,
@@ -277,12 +278,10 @@ export default function Avances() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA) *</label>
-                <input
+                <MoneyInput
                   required
-                  type="number"
-                  min="1"
                   value={form.montantOctroyeFcfa}
-                  onChange={(e) => setForm({ ...form, montantOctroyeFcfa: e.target.value })}
+                  onChange={(raw) => setForm({ ...form, montantOctroyeFcfa: raw })}
                   placeholder="150 000"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
                 />
@@ -378,12 +377,9 @@ export default function Avances() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Montant à rembourser (FCFA) *
                 </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={modalRemboursement.solde}
+                <MoneyInput
                   value={montantRemboursement}
-                  onChange={(e) => setMontantRemboursement(e.target.value)}
+                  onChange={(raw) => setMontantRemboursement(raw)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
                   autoFocus
                 />

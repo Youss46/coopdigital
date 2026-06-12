@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetConfig,
@@ -662,7 +663,7 @@ export default function ParametresPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Valeur nominale d'une part (FCFA)</Label>
-                <Input type="number" disabled={!canEdit} value={v("valeur_nominale_part_fcfa")} onChange={(e) => set("valeur_nominale_part_fcfa", e.target.value)} />
+                <MoneyInput value={v("valeur_nominale_part_fcfa")} onChange={(raw) => set("valeur_nominale_part_fcfa", raw)} />
               </div>
               <div>
                 <Label>Nombre de parts minimum</Label>
@@ -670,7 +671,7 @@ export default function ParametresPage() {
               </div>
               <div>
                 <Label>Cotisation annuelle (FCFA)</Label>
-                <Input type="number" disabled={!canEdit} value={v("cotisation_annuelle_fcfa")} onChange={(e) => set("cotisation_annuelle_fcfa", e.target.value)} />
+                <MoneyInput value={v("cotisation_annuelle_fcfa")} onChange={(raw) => set("cotisation_annuelle_fcfa", raw)} />
               </div>
               <div>
                 <Label>Quorum AG requis (%)</Label>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   useGetEmprunts,
   useGetEmpruntsDashboard,
@@ -206,8 +207,8 @@ function ModalNouvelEmprunt({ onClose, onCreated }: { onClose: () => void; onCre
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Montant (FCFA) *</label>
-              <input type="number" value={form.montantFcfa} onChange={e => set("montantFcfa", e.target.value)}
-                placeholder="5000000" className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <MoneyInput value={form.montantFcfa} onChange={(raw) => set("montantFcfa", raw)}
+                placeholder="5 000 000" className="w-full border rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Taux annuel (%) *</label>
@@ -348,12 +349,12 @@ function ModalRemboursement({ empruntId, echeance, onClose, onDone }: {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Capital (FCFA)</label>
-              <input type="number" value={form.montantCapitalFcfa} onChange={e => set("montantCapitalFcfa", e.target.value)}
+              <MoneyInput value={form.montantCapitalFcfa} onChange={(raw) => set("montantCapitalFcfa", raw)}
                 className="w-full border rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Intérêts (FCFA)</label>
-              <input type="number" value={form.montantInteretFcfa} onChange={e => set("montantInteretFcfa", e.target.value)}
+              <MoneyInput value={form.montantInteretFcfa} onChange={(raw) => set("montantInteretFcfa", raw)}
                 className="w-full border rounded-lg px-3 py-2 text-sm" />
             </div>
           </div>

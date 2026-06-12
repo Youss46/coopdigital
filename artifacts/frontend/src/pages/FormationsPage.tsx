@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   GraduationCap, Plus, Users, CheckCircle, Clock, MapPin,
@@ -356,7 +357,7 @@ function ModalSession({ onClose, onSaved }: { onClose: () => void; onSaved: () =
             </div>
             <div>
               <label className="text-xs font-medium text-gray-700 mb-1 block">Coût (FCFA)</label>
-              <input type="number" min="0" value={form.coutFcfa} onChange={set("coutFcfa")} placeholder="0"
+              <MoneyInput value={form.coutFcfa} onChange={(raw) => setForm((f) => ({ ...f, coutFcfa: raw }))} placeholder="0"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
             </div>
           </div>
@@ -1185,7 +1186,7 @@ function OngletProgrammes() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-700 mb-1 block">Budget (FCFA)</label>
-                  <input type="number" min="0" value={form.budgetFcfa} onChange={set("budgetFcfa")} placeholder="0"
+                  <MoneyInput value={form.budgetFcfa} onChange={(raw) => setForm((f) => ({ ...f, budgetFcfa: raw }))} placeholder="0"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                 </div>
               </div>

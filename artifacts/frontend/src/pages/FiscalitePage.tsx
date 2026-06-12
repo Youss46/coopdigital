@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { Calculator, AlertTriangle, CheckCircle2, Clock, Download, Plus, RefreshCw, X, Calendar } from "lucide-react";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -98,7 +99,7 @@ function ModalPaiement({ decl, onClose, onDone }: { decl: Declaration; onClose: 
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Montant payé (FCFA) *</label>
-            <input type="number" value={montant} onChange={e => setMontant(e.target.value)} min="0"
+            <MoneyInput value={montant} onChange={(raw) => setMontant(raw)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
           </div>
           <div>

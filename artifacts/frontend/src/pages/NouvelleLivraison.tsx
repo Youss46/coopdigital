@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   useCreateLivraison,
   useGetMembres,
@@ -441,12 +442,10 @@ export default function NouvelleLivraison() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Prix unitaire (FCFA/kg) *</label>
-              <input
+              <MoneyInput
                 required
-                type="number"
-                min="1"
                 value={prixUnitaire}
-                onChange={(e) => setPrixUnitaire(e.target.value)}
+                onChange={(raw) => setPrixUnitaire(raw)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
               />
             </div>

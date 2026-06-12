@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useQuery, useMutation, useQueryClient as useQC } from "@tanstack/react-query";
 import {
   useGetConfigComptable,
@@ -273,11 +274,10 @@ function ModalModifierValider({ ecriture, onClose, onDone }: { ecriture: Ecritur
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Montant (FCFA)</label>
-            <input
-              type="number"
+            <MoneyInput
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-              value={form.montantFcfa}
-              onChange={(e) => setForm({ ...form, montantFcfa: parseInt(e.target.value) || 0 })}
+              value={String(form.montantFcfa || "")}
+              onChange={(raw) => setForm({ ...form, montantFcfa: raw ? parseInt(raw) : 0 })}
             />
           </div>
           <div>
@@ -1655,8 +1655,8 @@ function OngletCorrigerEcriture() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Nouveau montant FCFA <span className="text-gray-400">(actuellement : {FCFA(selected.montantFcfa)})</span>
                 </label>
-                <input type="number" value={form.nouveauMontant}
-                  onChange={(e) => setForm((f) => ({ ...f, nouveauMontant: e.target.value }))}
+                <MoneyInput value={form.nouveauMontant}
+                  onChange={(raw) => setForm((f) => ({ ...f, nouveauMontant: raw }))}
                   placeholder={String(selected.montantFcfa)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
               </div>
@@ -2231,8 +2231,8 @@ function ModalSaisieManuelle({ onClose, onSuccess }: { onClose: () => void; onSu
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Montant FCFA *</label>
-            <input type="number" min="1" value={form.montantFcfa} placeholder="ex : 150000"
-              onChange={(e) => setForm((f) => ({ ...f, montantFcfa: e.target.value }))}
+            <MoneyInput value={form.montantFcfa} placeholder="150 000"
+              onChange={(raw) => setForm((f) => ({ ...f, montantFcfa: raw }))}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
           </div>
           <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700">

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { MoneyInput } from "../components/ui/money-input";
 import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNav from "../components/BottomNav";
@@ -168,12 +169,10 @@ export default function PaiementFlow() {
 
             <div className="t-field">
               <label className="t-label">Montant à payer (FCFA)</label>
-              <input
-                type="number"
+              <MoneyInput
                 className="t-input t-input--lg"
                 value={montant}
-                onChange={(e) => setMontant(e.target.value)}
-                inputMode="numeric"
+                onChange={(raw) => setMontant(raw)}
                 placeholder="Ex: 75 000"
               />
             </div>

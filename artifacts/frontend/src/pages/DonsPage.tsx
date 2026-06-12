@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Gift, ArrowUpCircle, ArrowDownCircle, TrendingUp, Plus, Loader2,
@@ -267,7 +268,7 @@ function ModalNouveauDon({ sens, categories, onClose, onSuccess }: ModalDonProps
           {forme === "especes" ? (
             <div>
               <label className={labelCls}>Montant FCFA *</label>
-              <input type="number" min="0" value={montantFcfa} onChange={(e) => setMontantFcfa(e.target.value ? parseInt(e.target.value) : "")} placeholder="0" className={inputCls} />
+              <MoneyInput value={String(montantFcfa)} onChange={(raw) => setMontantFcfa(raw ? parseInt(raw) : "")} placeholder="0" className={inputCls} />
             </div>
           ) : (
             <div className="border rounded-lg p-4 space-y-2">
@@ -294,7 +295,7 @@ function ModalNouveauDon({ sens, categories, onClose, onSuccess }: ModalDonProps
                     </div>
                     <div className="col-span-3">
                       {i === 0 && <p className="text-xs text-muted-foreground mb-1">Val. unit.</p>}
-                      <input type="number" min="0" value={l.valeurUnitaireFcfa} onChange={(e) => updateLigne(i, { valeurUnitaireFcfa: parseFloat(e.target.value) || 0 })} placeholder="0" className={`${inputCls} text-xs`} />
+                      <MoneyInput value={String(l.valeurUnitaireFcfa)} onChange={(raw) => updateLigne(i, { valeurUnitaireFcfa: raw ? parseInt(raw) : 0 })} placeholder="0" className={`${inputCls} text-xs`} />
                     </div>
                     <div className="col-span-1 flex justify-center">
                       <button type="button" onClick={() => removeLigne(i)} disabled={lignes.length === 1} className="p-1 text-muted-foreground hover:text-destructive disabled:opacity-30">
@@ -863,7 +864,7 @@ export default function DonsPage() {
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Budget alloué (FCFA) *</label>
-                <input type="number" min="0" value={progBudget} onChange={(e) => setProgBudget(e.target.value ? parseInt(e.target.value) : "")} required placeholder="500000" className={inputCls} />
+                <MoneyInput value={String(progBudget)} onChange={(raw) => setProgBudget(raw ? parseInt(raw) : "")} required placeholder="500 000" className={inputCls} />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Description</label>

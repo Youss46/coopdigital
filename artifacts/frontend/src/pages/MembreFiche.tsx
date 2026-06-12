@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useRoute, useLocation } from "wouter";
 import {
   useGetMembreById,
@@ -1084,13 +1085,10 @@ export default function MembreFiche() {
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Montant FCFA *</label>
-                            <input
-                              type="number"
+                            <MoneyInput
                               className={INPUT_CLS}
-                              placeholder={`Max: ${formaterFCFA(partsData.membre.resteALibererFcfa)}`}
-                              max={partsData.membre.resteALibererFcfa}
-                              value={liberationForm.montantFcfa ?? ""}
-                              onChange={(e) => setLiberationForm((f) => ({ ...f, montantFcfa: parseInt(e.target.value) }))}
+                              value={String(liberationForm.montantFcfa ?? "")}
+                              onChange={(raw) => setLiberationForm((f) => ({ ...f, montantFcfa: raw ? parseInt(raw) : 0 }))}
                               required
                             />
                           </div>

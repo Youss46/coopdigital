@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   useGetBailleurs,
   usePostBailleurs,
@@ -127,8 +128,8 @@ function ModalCreerSubvention({ bailleurs, onClose }: { bailleurs: Bailleur[]; o
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Montant total (FCFA) *</label>
-              <input type="number" value={form.montantTotalFcfa} onChange={(e) => set("montantTotalFcfa", e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="ex : 50000000" />
+              <MoneyInput value={form.montantTotalFcfa} onChange={(raw) => set("montantTotalFcfa", raw)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="50 000 000" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Devise d'origine</label>
@@ -143,7 +144,7 @@ function ModalCreerSubvention({ bailleurs, onClose }: { bailleurs: Bailleur[]; o
             {form.deviseOrigine !== "XOF" && (
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Montant en {form.deviseOrigine}</label>
-                <input type="number" value={form.montantDeviseOrigine} onChange={(e) => set("montantDeviseOrigine", e.target.value)}
+                <MoneyInput value={form.montantDeviseOrigine} onChange={(raw) => set("montantDeviseOrigine", raw)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
               </div>
             )}
@@ -186,8 +187,8 @@ function ModalCreerSubvention({ bailleurs, onClose }: { bailleurs: Bailleur[]; o
               {lignes.map((l, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <span className="text-sm text-gray-600 w-36 shrink-0">{l.posteBudgetaire}</span>
-                  <input type="number" value={l.montantAlloueFcfa}
-                    onChange={(e) => setLignes((prev) => prev.map((x, j) => j === i ? { ...x, montantAlloueFcfa: e.target.value } : x))}
+                  <MoneyInput value={l.montantAlloueFcfa}
+                    onChange={(raw) => setLignes((prev) => prev.map((x, j) => j === i ? { ...x, montantAlloueFcfa: raw } : x))}
                     className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
                     placeholder="Montant FCFA" />
                 </div>
@@ -334,7 +335,7 @@ function ModalTranche({ subventionId, tranche, onClose }: {
         <div className="px-6 py-5 space-y-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Montant reçu (FCFA) *</label>
-            <input type="number" value={form.montantFcfa} onChange={(e) => setForm((f) => ({ ...f, montantFcfa: e.target.value }))}
+            <MoneyInput value={form.montantFcfa} onChange={(raw) => setForm((f) => ({ ...f, montantFcfa: raw }))}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
           </div>
           <div>
@@ -403,8 +404,7 @@ function ModalDepense({ subventionId, ligne, onClose }: {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA) *</label>
-            <input type="number" value={montant} onChange={(e) => setMontant(e.target.value)}
-              max={solde}
+            <MoneyInput value={montant} onChange={(raw) => setMontant(raw)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
               placeholder={`Max : ${FCFA(solde)}`} />
           </div>

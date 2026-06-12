@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   useListIntrants,
   useListCategoriesIntrants,
@@ -93,7 +94,7 @@ function ModalNouvelIntrant({ onClose, categorieOptions }: { onClose: () => void
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Prix unitaire (FCFA)</label>
-              <input type="number" min="0" value={form.prixUnitaireFcfa} onChange={(e) => setForm({ ...form, prixUnitaireFcfa: e.target.value })}
+              <MoneyInput value={form.prixUnitaireFcfa} onChange={(raw) => setForm({ ...form, prixUnitaireFcfa: raw })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="0" />
             </div>
             <div>
@@ -184,7 +185,7 @@ function ModalAppro({ intrantId, intrantNom, unite, onClose }: { intrantId: numb
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Prix unitaire (FCFA) *</label>
-              <input type="number" required min="0" value={form.prixUnitaireFcfa} onChange={(e) => setForm({ ...form, prixUnitaireFcfa: e.target.value })}
+              <MoneyInput required value={form.prixUnitaireFcfa} onChange={(raw) => setForm({ ...form, prixUnitaireFcfa: raw })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="0" />
             </div>
             <div>
@@ -254,7 +255,7 @@ function ModalRemboursement({ distributionId, membreNom, soldeDu, onClose }: { d
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA) — solde dû : {formaterFCFA(soldeDu)}</label>
-            <input type="number" required min="1" max={soldeDu} value={montant} onChange={(e) => setMontant(e.target.value)}
+            <MoneyInput required value={montant} onChange={(raw) => setMontant(raw)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
           </div>
           <div>

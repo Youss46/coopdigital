@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -223,12 +224,10 @@ function ModalNouveauProjet({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1">Montant estimé (FCFA) *</label>
-              <input
+              <MoneyInput
                 required
-                type="number"
-                min={1}
                 value={form.montantEstimeFcfa}
-                onChange={(e) => set("montantEstimeFcfa", e.target.value)}
+                onChange={(raw) => set("montantEstimeFcfa", raw)}
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
@@ -376,12 +375,10 @@ function ModalDepense({
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1">Montant (FCFA) *</label>
-              <input
+              <MoneyInput
                 required
-                type="number"
-                min={1}
                 value={form.montantFcfa}
-                onChange={(e) => set("montantFcfa", e.target.value)}
+                onChange={(raw) => set("montantFcfa", raw)}
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>

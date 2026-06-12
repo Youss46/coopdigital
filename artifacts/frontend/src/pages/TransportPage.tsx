@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetVehicules,
@@ -842,19 +843,19 @@ function TabMissions() {
             </div>
             <div>
               <Label>Coût carburant (FCFA)</Label>
-              <Input type="number" value={terminerForm.cout_carburant_fcfa} onChange={e => setTerminerForm(f => ({ ...f, cout_carburant_fcfa: e.target.value }))} />
+              <MoneyInput value={terminerForm.cout_carburant_fcfa} onChange={(raw) => setTerminerForm(f => ({ ...f, cout_carburant_fcfa: raw }))} />
             </div>
             <div>
               <Label>Coût chauffeur (FCFA)</Label>
-              <Input type="number" value={terminerForm.cout_chauffeur_fcfa} onChange={e => setTerminerForm(f => ({ ...f, cout_chauffeur_fcfa: e.target.value }))} />
+              <MoneyInput value={terminerForm.cout_chauffeur_fcfa} onChange={(raw) => setTerminerForm(f => ({ ...f, cout_chauffeur_fcfa: raw }))} />
             </div>
             <div>
               <Label>Péages (FCFA)</Label>
-              <Input type="number" value={terminerForm.cout_peage_fcfa} onChange={e => setTerminerForm(f => ({ ...f, cout_peage_fcfa: e.target.value }))} />
+              <MoneyInput value={terminerForm.cout_peage_fcfa} onChange={(raw) => setTerminerForm(f => ({ ...f, cout_peage_fcfa: raw }))} />
             </div>
             <div>
               <Label>Divers (FCFA)</Label>
-              <Input type="number" value={terminerForm.cout_divers_fcfa} onChange={e => setTerminerForm(f => ({ ...f, cout_divers_fcfa: e.target.value }))} />
+              <MoneyInput value={terminerForm.cout_divers_fcfa} onChange={(raw) => setTerminerForm(f => ({ ...f, cout_divers_fcfa: raw }))} />
             </div>
             <div className="col-span-2 rounded-lg bg-gray-50 p-3 text-sm">
               <span className="text-gray-500">Coût total estimé : </span>

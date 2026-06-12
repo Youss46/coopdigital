@@ -1,4 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   useGetPrixActuel,
   usePostPrix,
@@ -124,17 +125,17 @@ function ModalSaisirPrix({ onClose }: { onClose: () => void }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Prix bord champ (FCFA/kg) *</label>
-              <input type="number" value={form.prixBordChampFcfa} min={0}
-                onChange={(e) => setForm((f) => ({ ...f, prixBordChampFcfa: e.target.value }))}
+              <MoneyInput value={form.prixBordChampFcfa}
+                onChange={(raw) => setForm((f) => ({ ...f, prixBordChampFcfa: raw }))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                placeholder="ex : 1050" />
+                placeholder="1 050" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Prix vente export (FCFA/kg) *</label>
-              <input type="number" value={form.prixVenteExportFcfa} min={0}
-                onChange={(e) => setForm((f) => ({ ...f, prixVenteExportFcfa: e.target.value }))}
+              <MoneyInput value={form.prixVenteExportFcfa}
+                onChange={(raw) => setForm((f) => ({ ...f, prixVenteExportFcfa: raw }))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                placeholder="ex : 1380" />
+                placeholder="1 380" />
             </div>
           </div>
           <div>
@@ -327,7 +328,7 @@ function OngletTempsReel() {
             <h3 className="font-semibold text-gray-900 mb-1">Simulateur de marge</h3>
             <p className="text-xs text-gray-400 mb-3">Si le prix bord champ change, quelle serait votre marge ?</p>
             <div className="flex gap-2 mb-3">
-              <input type="number" value={simPrix} onChange={(e) => setSimPrix(e.target.value)}
+              <MoneyInput value={simPrix} onChange={(raw) => setSimPrix(raw)}
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 placeholder="Prix hypothétique (FCFA/kg)" />
             </div>
@@ -734,9 +735,8 @@ function OngletAlertes() {
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Marge minimum (FCFA/kg)</label>
-            <input type="number" value={form.seuilMargeMinimumFcfa}
-              onChange={(e) => setForm((f) => ({ ...f, seuilMargeMinimumFcfa: e.target.value }))}
-              disabled={!peutConfigurer}
+            <MoneyInput value={form.seuilMargeMinimumFcfa}
+              onChange={(raw) => setForm((f) => ({ ...f, seuilMargeMinimumFcfa: raw }))}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50" />
             <p className="text-xs text-gray-400 mt-1">Une alerte est créée si la marge brute est en dessous de ce seuil</p>
           </div>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   useGetExportateurs,
   useCreateExportateur,
@@ -583,7 +584,7 @@ export default function ExportateursPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Prix/kg (FCFA) *</label>
-                  <input type="number" value={formVente.prixUnitaireFcfa} onChange={(e) => setFormVente((f) => ({ ...f, prixUnitaireFcfa: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" placeholder="1200" />
+                  <MoneyInput value={formVente.prixUnitaireFcfa} onChange={(raw) => setFormVente((f) => ({ ...f, prixUnitaireFcfa: raw }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" placeholder="1 200" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useQuery } from "@tanstack/react-query";
 import {
   useGetBudgetCampagneId,
@@ -214,10 +215,9 @@ function ModalModifierLigne({ ligne, budgetId, campagneId, onClose }: {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Montant prévisionnel (FCFA)</label>
-            <input
-              type="number"
+            <MoneyInput
               value={montant}
-              onChange={(e) => setMontant(e.target.value)}
+              onChange={(raw) => setMontant(raw)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
               placeholder="0"
             />

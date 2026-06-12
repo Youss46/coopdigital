@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   useGetCreances,
   useEncaisserVente,
@@ -189,12 +190,10 @@ export default function CreancesPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Montant encaissé (FCFA)</label>
-                <input
-                  type="number"
+                <MoneyInput
                   value={montant}
-                  onChange={(e) => setMontant(e.target.value)}
+                  onChange={(raw) => setMontant(raw)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
-                  placeholder={String(modalEncaissement.solde)}
                   autoFocus
                 />
               </div>

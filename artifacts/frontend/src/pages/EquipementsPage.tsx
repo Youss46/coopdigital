@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -387,11 +388,11 @@ function OngletInventaire() {
             </div>
             <div>
               <Label>Valeur d'acquisition (FCFA) *</Label>
-              <Input type="number" value={form.valeur_acquisition_fcfa} onChange={(e) => setForm({ ...form, valeur_acquisition_fcfa: e.target.value })} />
+              <MoneyInput value={form.valeur_acquisition_fcfa} onChange={(raw) => setForm({ ...form, valeur_acquisition_fcfa: raw })} />
             </div>
             <div>
               <Label>Valeur résiduelle (FCFA)</Label>
-              <Input type="number" value={form.valeur_residuelle_fcfa} onChange={(e) => setForm({ ...form, valeur_residuelle_fcfa: e.target.value })} />
+              <MoneyInput value={form.valeur_residuelle_fcfa} onChange={(raw) => setForm({ ...form, valeur_residuelle_fcfa: raw })} />
             </div>
             <div>
               <Label>Durée amortissement (ans) *</Label>
@@ -795,7 +796,7 @@ function OngletMaintenance() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Coût (FCFA)</Label>
-                <Input type="number" value={form.cout_fcfa} onChange={(e) => setForm({ ...form, cout_fcfa: e.target.value })} />
+                <MoneyInput value={form.cout_fcfa} onChange={(raw) => setForm({ ...form, cout_fcfa: raw })} />
               </div>
               <div>
                 <Label>Prestataire</Label>
