@@ -76,6 +76,10 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     const conditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
     if (statut) conditions.push(eq(paiementsTable.statut, statut as "en_attente" | "confirme" | "echec" | "rejete" | "en_cours" | "effectue"));
     if (membreId) conditions.push(eq(paiementsTable.membreId, membreId));
+    // Un délégué ne voit que les règlements des membres qui lui sont rattachés
+    if (req.user?.role === "delegue" && req.user?.id) {
+      conditions.push(eq(membresTable.delegueId, req.user.id));
+    }
 
     const now = new Date();
     if (periode === "today") {
