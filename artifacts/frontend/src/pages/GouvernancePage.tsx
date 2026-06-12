@@ -27,10 +27,25 @@ import {
 } from "recharts";
 import {
   Plus, X, CheckCircle2, Clock, AlertTriangle, Users, Send, FileText,
-  ChevronDown, ChevronUp, Play, Square, Vote, Archive, Calendar,
+  ChevronDown, ChevronUp, Play, Square, Vote, Archive, Calendar, RefreshCw,
 } from "lucide-react";
 
 const VERT = "#1a4731";
+const BASE = import.meta.env.VITE_API_URL ?? "";
+const getToken = () => localStorage.getItem("coop_token") ?? "";
+
+async function downloadPvPdf(agId: number, libelle: string): Promise<void> {
+  const url = `${BASE}/api/ag/${agId}/pv-pdf`;
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });
+  if (!resp.ok) throw new Error(`Erreur ${resp.status}`);
+  const blob = await resp.blob();
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = `pv-ag-${libelle.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+  a.click();
+  URL.revokeObjectURL(href);
+}
 
 const DATE_FR = (d: string | null | undefined) => {
   if (!d) return "—";
@@ -549,6 +564,7 @@ function OngletSeance({ ags }: { ags: AgListItem[] }) {
   });
 
   const agCourante = d?.ag;
+  const [pvLoading, setPvLoading] = useState(false);
 
   // Recherche membre dans les présences (par nom)
   const membresTrouves = (d?.presences ?? []).filter((p) =>
@@ -580,10 +596,16 @@ function OngletSeance({ ags }: { ags: AgListItem[] }) {
           </button>
         )}
         {agCourante && peutPv && agCourante.statut === "cloturee" && (
-          <a href={`/api/ag/${agCourante.id}/pv-pdf`} target="_blank" rel="noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50">
-            <FileText size={13} /> Télécharger PV
-          </a>
+          <button
+            onClick={() => {
+              setPvLoading(true);
+              downloadPvPdf(agCourante.id, agCourante.libelle).finally(() => setPvLoading(false));
+            }}
+            disabled={pvLoading}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+            {pvLoading ? <RefreshCw size={13} className="animate-spin" /> : <FileText size={13} />}
+            Télécharger PV
+          </button>
         )}
       </div>
 
@@ -695,6 +717,7 @@ function OngletSeance({ ags }: { ags: AgListItem[] }) {
 function OngletArchives({ ags }: { ags: AgListItem[] }) {
   const peutPv = usePermission("gouvernance", "generer_pv");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [downloadingPvs, setDownloadingPvs] = useState<Set<number>>(new Set());
 
   const { data: detail } = useGetAgId(selectedId ?? 0, {
     query: { queryKey: getGetAgIdQueryKey(selectedId ?? 0), enabled: !!selectedId },
@@ -760,11 +783,20 @@ function OngletArchives({ ags }: { ags: AgListItem[] }) {
                   <td className="px-4 py-3 text-center text-gray-600">{ag.nbVotes}</td>
                   <td className="px-4 py-3 text-center">
                     {peutPv && (
-                      <a href={`/api/ag/${ag.id}/pv-pdf`} target="_blank" rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 text-xs px-2 py-1 border border-gray-200 rounded text-gray-600 hover:bg-gray-50">
-                        <FileText size={12} /> PDF
-                      </a>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (downloadingPvs.has(ag.id)) return;
+                          setDownloadingPvs((prev) => new Set(prev).add(ag.id));
+                          downloadPvPdf(ag.id, ag.libelle).finally(() =>
+                            setDownloadingPvs((prev) => { const s = new Set(prev); s.delete(ag.id); return s; })
+                          );
+                        }}
+                        disabled={downloadingPvs.has(ag.id)}
+                        className="inline-flex items-center gap-1 text-xs px-2 py-1 border border-gray-200 rounded text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {downloadingPvs.has(ag.id) ? <RefreshCw size={12} className="animate-spin" /> : <FileText size={12} />}
+                        PDF
+                      </button>
                     )}
                   </td>
                 </tr>

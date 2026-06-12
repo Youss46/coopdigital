@@ -160,6 +160,31 @@ export default function CampagnesPage() {
 
   const [rattachPending, setRattachPending] = useState(false);
   const [rattachMsg, setRattachMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [downloadingBilans, setDownloadingBilans] = useState<Set<number>>(new Set());
+
+  async function downloadBilan(campagneId: number, libelle: string) {
+    if (downloadingBilans.has(campagneId)) return;
+    setDownloadingBilans((prev) => new Set(prev).add(campagneId));
+    try {
+      const BASE = import.meta.env.VITE_API_URL ?? "";
+      const tok = localStorage.getItem("coop_token") ?? "";
+      const r = await fetch(`${BASE}/api/campagnes/${campagneId}/bilan-pdf`, {
+        headers: { Authorization: `Bearer ${tok}` },
+      });
+      if (!r.ok) throw new Error(`Erreur ${r.status}`);
+      const blob = await r.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `bilan-${libelle.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(href);
+    } catch {
+      // erreur silencieuse
+    } finally {
+      setDownloadingBilans((prev) => { const s = new Set(prev); s.delete(campagneId); return s; });
+    }
+  }
 
   const createMut = useCreateCampagne();
   const cloturerMut = useCloturerCampagne();
@@ -641,16 +666,17 @@ export default function CampagnesPage() {
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Télécharger les bilans PDF</h3>
                   <div className="flex flex-wrap gap-2">
                     {(comparaison ?? []).filter(({ bilan }) => bilan != null).map(({ campagne: c }) => (
-                      <a
+                      <button
                         key={c.id}
-                        href={`/api/campagnes/${c.id}/bilan-pdf`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`${BTN} bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 text-xs`}
+                        onClick={() => void downloadBilan(c.id, c.libelle)}
+                        disabled={downloadingBilans.has(c.id)}
+                        className={`${BTN} bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 text-xs disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        {downloadingBilans.has(c.id)
+                          ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          : <Download className="w-3.5 h-3.5" />}
                         {c.libelle}
-                      </a>
+                      </button>
                     ))}
                   </div>
                   {!(comparaison ?? []).some(({ bilan }) => bilan != null) && (
