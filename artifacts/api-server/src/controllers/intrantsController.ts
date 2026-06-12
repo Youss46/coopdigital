@@ -425,6 +425,16 @@ export async function getDistributionsMembre(req: Request, res: Response): Promi
 
 export async function getEncours(req: Request, res: Response): Promise<void> {
   try {
+    const encoursConds = [
+      eq(distributionsIntrantsTable.cooperativeId, coopId(req)),
+      sql`statut_remboursement != 'rembourse'`,
+      sql`montant_membre_fcfa > montant_rembourse_fcfa`,
+    ];
+    // Un délégué ne voit que les encours des membres qui lui sont rattachés
+    if (req.user?.role === "delegue" && req.user?.id) {
+      encoursConds.push(eq(membresTable.delegueId, req.user.id));
+    }
+
     const rows = await db
       .select({
         membreId: distributionsIntrantsTable.membreId,
@@ -439,13 +449,7 @@ export async function getEncours(req: Request, res: Response): Promise<void> {
       })
       .from(distributionsIntrantsTable)
       .leftJoin(membresTable, eq(distributionsIntrantsTable.membreId, membresTable.id))
-      .where(
-        and(
-          eq(distributionsIntrantsTable.cooperativeId, coopId(req)),
-          sql`statut_remboursement != 'rembourse'`,
-          sql`montant_membre_fcfa > montant_rembourse_fcfa`
-        )
-      )
+      .where(and(...encoursConds))
       .groupBy(
         distributionsIntrantsTable.membreId,
         membresTable.nom,
