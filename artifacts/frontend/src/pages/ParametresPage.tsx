@@ -555,11 +555,11 @@ export default function ParametresPage() {
                     Changer le logo
                   </Button>
                 )}
-                <p className="text-xs text-gray-500 mt-2">PNG, JPG ou SVG · max 2 Mo</p>
+                <p className="text-xs text-gray-500 mt-2">PNG ou JPG uniquement · max 2 Mo</p>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg"
                   className="hidden"
                   onChange={(e) => e.target.files?.[0] && handleLogoFile(e.target.files[0])}
                 />

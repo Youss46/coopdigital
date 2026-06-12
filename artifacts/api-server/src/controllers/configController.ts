@@ -159,6 +159,16 @@ export async function handleUploadLogo(req: Request, res: Response): Promise<voi
       return;
     }
 
+    // PDFKit ne supporte que PNG et JPEG
+    const FORMATS_SUPPORTES = ["image/png", "image/jpeg", "image/jpg"];
+    const normalizedType = content_type.toLowerCase().split(";")[0]?.trim() ?? "";
+    if (!FORMATS_SUPPORTES.includes(normalizedType)) {
+      res.status(400).json({
+        erreur: `Format "${content_type}" non supporté pour le logo PDF. Utilisez PNG ou JPEG.`,
+      });
+      return;
+    }
+
     // Limite 2 Mo — base64 ≈ 1.37× la taille originale
     const base64Part = data_url.split(",")[1] ?? "";
     if (Math.ceil(base64Part.length * 0.75) > 2 * 1024 * 1024) {
