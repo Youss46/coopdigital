@@ -125,6 +125,31 @@ export async function logRaw(params: AuditLogParams & {
   }
 }
 
+/** Mappe une ligne Drizzle auditTrailTable → shape snake_case conforme au spec AuditEntry */
+function toAuditEntry(r: typeof auditTrailTable.$inferSelect) {
+  return {
+    id:              r.id,
+    cooperative_id:  r.cooperativeId ?? null,
+    user_id:         r.userId ?? null,
+    user_nom:        r.userNom ?? null,
+    user_role:       r.userRole ?? null,
+    user_ip:         r.userIp ?? null,
+    user_agent:      r.userAgent ?? null,
+    action:          r.action,
+    module:          r.module,
+    entite_type:     r.entiteType ?? null,
+    entite_id:       r.entiteId ?? null,
+    valeurs_avant:   r.valeursAvant ?? null,
+    valeurs_apres:   r.valeursApres ?? null,
+    champs_modifies: r.champsModifies ?? null,
+    description:     r.description ?? null,
+    ip_address:      r.ipAddress ?? null,
+    session_id:      r.sessionId ?? null,
+    campagne_id:     r.campagneId ?? null,
+    created_at:      r.createdAt.toISOString(),
+  };
+}
+
 /** Journal filtré avec pagination */
 export async function getJournal(cooperativeId: number, filters: AuditFilters) {
   const conditions: SQL[] = [eq(auditTrailTable.cooperativeId, cooperativeId)];
@@ -160,12 +185,17 @@ export async function getJournal(cooperativeId: number, filters: AuditFilters) {
       .where(where),
   ]);
 
-  return { entries: rows, total: parseInt(countRow?.count ?? "0"), limit, offset };
+  return {
+    entries: rows.map(toAuditEntry),
+    total: parseInt(countRow?.count ?? "0"),
+    limit,
+    offset,
+  };
 }
 
 /** Historique complet d'un enregistrement */
 export async function getHistoriqueEntite(cooperativeId: number, entiteType: string, entiteId: number) {
-  return db
+  const rows = await db
     .select()
     .from(auditTrailTable)
     .where(
@@ -176,11 +206,12 @@ export async function getHistoriqueEntite(cooperativeId: number, entiteType: str
       ),
     )
     .orderBy(desc(auditTrailTable.createdAt));
+  return rows.map(toAuditEntry);
 }
 
 /** Toutes les actions d'un utilisateur */
 export async function getUserActions(cooperativeId: number, userId: number, limit = 100) {
-  return db
+  const rows = await db
     .select()
     .from(auditTrailTable)
     .where(
@@ -191,6 +222,7 @@ export async function getUserActions(cooperativeId: number, userId: number, limi
     )
     .orderBy(desc(auditTrailTable.createdAt))
     .limit(limit);
+  return rows.map(toAuditEntry);
 }
 
 /** Statistiques du journal */
