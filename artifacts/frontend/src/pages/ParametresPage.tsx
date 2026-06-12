@@ -371,22 +371,76 @@ export default function ParametresPage() {
   // ── Logo upload ────────────────────────────────────────────────────────────
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
+  async function resizeAndCompressLogo(file: File): Promise<{ dataUrl: string; contentType: string }> {
+    const MAX_DIM   = 400;
+    const MAX_BYTES = 300 * 1024; // 300 Ko cible avant d'essayer JPEG
+
+    const raw = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = raw;
+    });
+
+    const scale  = Math.min(1, MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight));
+    const width  = Math.round(img.naturalWidth  * scale);
+    const height = Math.round(img.naturalHeight * scale);
+
+    const canvas = document.createElement("canvas");
+    canvas.width  = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0, width, height);
+
+    // Si le fichier original est un PNG et reste léger, garder PNG (transparence)
+    const isPng = file.type === "image/png";
+    if (isPng) {
+      const pngUrl = canvas.toDataURL("image/png");
+      const pngBytes = Math.ceil((pngUrl.split(",")[1]?.length ?? 0) * 0.75);
+      if (pngBytes <= MAX_BYTES) return { dataUrl: pngUrl, contentType: "image/png" };
+    }
+
+    // Sinon exporter en JPEG avec qualité décroissante jusqu'à atteindre la cible
+    for (const quality of [0.90, 0.80, 0.70, 0.60]) {
+      const jpegUrl = canvas.toDataURL("image/jpeg", quality);
+      const jpegBytes = Math.ceil((jpegUrl.split(",")[1]?.length ?? 0) * 0.75);
+      if (jpegBytes <= MAX_BYTES || quality === 0.60) {
+        return { dataUrl: jpegUrl, contentType: "image/jpeg" };
+      }
+    }
+
+    // Fallback (ne devrait pas arriver)
+    return { dataUrl: canvas.toDataURL("image/jpeg", 0.60), contentType: "image/jpeg" };
+  }
+
   async function handleLogoFile(file: File) {
+    const ACCEPTED = ["image/png", "image/jpeg", "image/jpg"];
+    if (!ACCEPTED.includes(file.type)) {
+      toast({
+        title: "Format non supporté",
+        description: "Utilisez un fichier PNG ou JPEG. Les formats SVG, WebP et BMP ne sont pas acceptés.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsUploadingLogo(true);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      const { dataUrl, contentType } = await resizeAndCompressLogo(file);
 
       uploadLogoMut.mutate(
-        { data: { data_url: dataUrl, content_type: file.type } },
+        { data: { data_url: dataUrl, content_type: contentType } },
         { onSettled: () => setIsUploadingLogo(false) },
       );
     } catch {
-      toast({ title: "Erreur lors de la lecture du fichier", variant: "destructive" });
+      toast({ title: "Erreur lors du traitement du fichier", variant: "destructive" });
       setIsUploadingLogo(false);
     }
   }
