@@ -20,6 +20,10 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
     const conditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
     if (statut) conditions.push(eq(avancesTable.statut, statut as "en_cours" | "rembourse" | "en_retard"));
     if (membreId) conditions.push(eq(avancesTable.membreId, membreId));
+    // Un délégué ne voit que les avances des membres qui lui sont rattachés
+    if (req.user?.role === "delegue" && req.user?.id) {
+      conditions.push(eq(membresTable.delegueId, req.user.id));
+    }
 
     const avances = await db
       .select({
