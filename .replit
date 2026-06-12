@@ -24,6 +24,18 @@ args = "Start application"
 task = "workflow.run"
 args = "Start API Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Agent Terrain"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Portail Membre"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "M15"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -48,6 +60,42 @@ waitForPort = 8080
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "Agent Terrain"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/terrain run dev"
+waitForPort = 3001
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Portail Membre"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/portail run dev"
+waitForPort = 3000
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "M15"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/m15 run dev"
+waitForPort = 3002
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
 expertMode = true
@@ -59,6 +107,14 @@ timeoutMs = 20000
 [[ports]]
 localPort = 3000
 externalPort = 4200
+
+[[ports]]
+localPort = 3001
+externalPort = 3001
+
+[[ports]]
+localPort = 3002
+externalPort = 5173
 
 [[ports]]
 localPort = 5000
