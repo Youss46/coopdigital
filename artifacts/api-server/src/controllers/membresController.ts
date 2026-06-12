@@ -937,7 +937,17 @@ export async function getCartesMembres(req: Request, res: Response): Promise<voi
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non identifiée" }); return; }
 
+  const isDelegue = req.user?.role === "delegue";
+  const userId = req.user?.id;
+
+  // Un délégué ne voit que les membres qui lui sont rattachés
+  if (isDelegue && !userId) { res.status(403).json({ erreur: "Utilisateur non identifié" }); return; }
+
   try {
+    const whereClause = isDelegue
+      ? and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.delegueId, userId!))
+      : eq(membresTable.cooperativeId, cooperativeId);
+
     const rows = await db
       .select({
         id: membresTable.id,
@@ -954,7 +964,7 @@ export async function getCartesMembres(req: Request, res: Response): Promise<voi
         carteSuspendueLe: membresTable.carteSuspendueLe,
       })
       .from(membresTable)
-      .where(eq(membresTable.cooperativeId, cooperativeId))
+      .where(whereClause)
       .orderBy(asc(membresTable.nom), asc(membresTable.prenoms));
 
     res.json(rows);
