@@ -555,6 +555,7 @@ export async function genererRapportPdf(cooperativeId: number, releveId: number)
     doc.switchToPage(range.start + i);
     await drawFooter(doc, cooperativeId, i + 1, range.count);
   }
+  doc.flushPages();
 
   doc.end();
   return new Promise<Buffer>(resolve => doc.on("end", () => resolve(Buffer.concat(chunks))));

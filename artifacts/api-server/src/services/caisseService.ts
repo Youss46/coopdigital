@@ -544,6 +544,7 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
     doc.switchToPage(range.start + i);
     await drawFooter(doc, caisse.cooperativeId, i + 1, range.count);
   }
+  doc.flushPages();
 
   doc.end();
   return new Promise<Buffer>((resolve) => doc.on("end", () => resolve(Buffer.concat(chunks))));

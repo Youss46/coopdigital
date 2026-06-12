@@ -595,6 +595,7 @@ export async function genererPdfAttestation(cooperativeId: number, sessionId: nu
     doc.switchToPage(pageRange.start + i);
     await drawFooter(doc, cooperativeId, i + 1, pageRange.count);
   }
+  doc.flushPages();
 
   doc.end();
   return new Promise<Buffer>((resolve) => {
