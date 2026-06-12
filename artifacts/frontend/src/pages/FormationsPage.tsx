@@ -856,7 +856,7 @@ function OngletAttestations() {
   });
 
   const canGenerer = usePermission("formation", "generer_attestation");
-  const [downloading, setDownloading] = React.useState<Set<number>>(new Set());
+  const [downloading, setDownloading] = useState<Set<number>>(new Set());
 
   async function downloadAttestation(sessionId: number, membreId: number, numero: string, attestationId: number) {
     if (downloading.has(attestationId)) return;
