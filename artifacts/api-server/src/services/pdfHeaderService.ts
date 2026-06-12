@@ -134,7 +134,19 @@ export async function drawHeader(
       height: logoSize,
       fit: [logoSize, logoSize],
     });
-  } catch (_) { /* logo facultatif */ }
+  } catch (_) {
+    // Format non supporté par PDFKit (SVG, WebP, etc.) → repli sur logo par défaut
+    if (logoSource === "cooperative") {
+      try {
+        const fallback = fs.readFileSync(DEFAULT_LOGO_PATH);
+        doc.image(fallback, logoX, logoY, {
+          width: logoSize,
+          height: logoSize,
+          fit: [logoSize, logoSize],
+        });
+      } catch (_2) { /* logo facultatif */ }
+    }
+  }
 
   // ── Infos coopérative (centre) ───────────────────────────────────────────────
   const infoX     = logoX + logoSize + 12;

@@ -43,8 +43,10 @@ export async function getMonthlyReport(req: Request, res: Response): Promise<voi
   if (!mois || mois < 1 || mois > 12 || !annee) {
     res.status(400).json({ erreur: "Mois ou année invalide" }); return;
   }
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   try {
-    const buffer = await generateRapportMensuel(1, mois, annee);
+    const buffer = await generateRapportMensuel(cooperativeId, mois, annee);
     const moisStr = String(mois).padStart(2, "0");
     sendPdf(res, buffer, `rapport_mensuel_${annee}_${moisStr}.pdf`);
   } catch (err) {
