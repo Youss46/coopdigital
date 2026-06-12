@@ -130,6 +130,8 @@ export async function handleUpdateConfig(req: Request, res: Response): Promise<v
       piedDePagePdf:            d.pied_de_page_pdf         ?? undefined,
     });
 
+    invalidateLogoCache(cooperativeId);
+
     res.json(updated ? toApiConfig(updated) : {});
   } catch (err) {
     req.log.error({ err }, "Erreur updateConfig");
