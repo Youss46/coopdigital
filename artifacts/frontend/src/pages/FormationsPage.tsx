@@ -857,12 +857,23 @@ function OngletAttestations() {
 
   const canGenerer = usePermission("formation", "generer_attestation");
 
-  function downloadAttestation(sessionId: number, membreId: number, numero: string) {
+  async function downloadAttestation(sessionId: number, membreId: number, numero: string) {
     const url = `${BASE}/api/formations/sessions/${sessionId}/attestation/${membreId}`;
-    const a = document.createElement("a");
-    a.href = url;
-    a.setAttribute("download", `attestation-${numero}.pdf`);
-    a.click();
+    try {
+      const resp = await fetch(url, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!resp.ok) throw new Error(`Erreur ${resp.status}`);
+      const blob = await resp.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `attestation-${numero}.pdf`;
+      a.click();
+      URL.revokeObjectURL(href);
+    } catch {
+      toast({ title: "Erreur lors du téléchargement de l'attestation", variant: "destructive" });
+    }
   }
 
   const genAllMut = useMutation({
