@@ -25,6 +25,9 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       scope: base,
       base,
       manifest: {
@@ -72,52 +75,14 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
-        importScripts: ["sw-push.js"],
-        navigateFallback: `${base}index.html`,
-        navigateFallbackDenylist: [/^\/api\//],
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],
+        globIgnores: ["**/hero/**"],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        cleanupOutdatedCaches: true,
-        runtimeCaching: [
-          {
-            // Exclure les endpoints PDF/binaires du cache SW (carte-membre, recus)
-            urlPattern: ({ url }: { url: URL }) =>
-              url.pathname.startsWith("/api/portail/") &&
-              !url.pathname.includes("carte-membre") &&
-              !url.pathname.includes("/recus/"),
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-portail-v1",
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24,
-              },
-              networkTimeoutSeconds: 5,
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\//,
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "google-fonts-stylesheets",
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\//,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "google-fonts-webfonts",
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365,
-              },
-            },
-          },
-        ],
       },
       devOptions: {
-        enabled: false,
+        enabled: true,
+        type: "module",
       },
     }),
     ...(process.env.NODE_ENV !== "production" &&
