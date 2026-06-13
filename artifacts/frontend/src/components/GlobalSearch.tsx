@@ -97,6 +97,21 @@ function formatFcfa(n: number): string {
   return n.toLocaleString("fr-FR") + " FCFA";
 }
 
+const HISTORY_KEY = "coop_search_history";
+const HISTORY_MAX = 5;
+
+function loadHistory(): string[] {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]") as string[]; }
+  catch { return []; }
+}
+
+function saveToHistory(q: string) {
+  const trimmed = q.trim();
+  if (!trimmed || trimmed.length < 2) return;
+  const prev = loadHistory().filter((h) => h !== trimmed);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify([trimmed, ...prev].slice(0, HISTORY_MAX)));
+}
+
 export default function GlobalSearch() {
   const [, navigate] = useLocation();
   const { utilisateur } = useAuth();
@@ -106,6 +121,7 @@ export default function GlobalSearch() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [history, setHistory] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -139,7 +155,9 @@ export default function GlobalSearch() {
     for (const l of (results?.livraisons ?? [])) items.push(() => { navigate("/membres"); });
     for (const l of (results?.lots ?? [])) items.push(() => { navigate("/tracabilite"); });
     return items;
-  }, [menuMatches, results, navigate]);
+  // navigate is stable from wouter
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuMatches, results]);
 
   // Reset focus when results change
   useEffect(() => { setFocusedIndex(-1); }, [flatItems]);
@@ -150,6 +168,19 @@ export default function GlobalSearch() {
     const el = listRef.current.querySelector<HTMLElement>(`[data-idx="${focusedIndex}"]`);
     el?.scrollIntoView({ block: "nearest" });
   }, [focusedIndex]);
+
+  // Charger l'historique à l'ouverture
+  useEffect(() => {
+    if (open) setHistory(loadHistory());
+  }, [open]);
+
+  const doNavigate = useCallback((action: () => void) => {
+    saveToHistory(query);
+    setHistory(loadHistory());
+    action();
+    close();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -169,10 +200,10 @@ export default function GlobalSearch() {
       setFocusedIndex((i) => (i <= 0 ? flatItems.length - 1 : i - 1));
     } else if (e.key === "Enter" && focusedIndex >= 0) {
       e.preventDefault();
-      flatItems[focusedIndex]?.();
-      close();
+      const action = flatItems[focusedIndex];
+      if (action) doNavigate(action);
     }
-  }, [flatItems, focusedIndex, close]);
+  }, [flatItems, focusedIndex, doNavigate]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -278,10 +309,39 @@ export default function GlobalSearch() {
                 <div className="px-4 py-6 text-center text-sm text-gray-400">Aucun résultat pour « {query} »</div>
               )}
 
-              {/* Panneau d'aide — query vide */}
+              {/* Panneau d'aide + historique — query vide */}
               {query.length < 2 && (
-                <div className="px-4 py-5">
-                  <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">Vous pouvez rechercher…</p>
+                <div className="px-4 py-4">
+                  {/* Historique */}
+                  {history.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Recherches récentes</p>
+                        <button
+                          onClick={() => { localStorage.removeItem(HISTORY_KEY); setHistory([]); }}
+                          className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          Effacer
+                        </button>
+                      </div>
+                      {history.map((h) => (
+                        <button
+                          key={h}
+                          onClick={() => setQuery(h)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 text-left group transition-colors"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <Search size={11} className="text-gray-400" />
+                          </div>
+                          <span className="flex-1 text-sm text-gray-700 truncate">{h}</span>
+                          <ChevronRight size={12} className="text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
+                        </button>
+                      ))}
+                      <div className="border-t border-gray-100 mt-3 mb-3" />
+                    </div>
+                  )}
+                  {/* Hints */}
+                  <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wide">Vous pouvez rechercher…</p>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { icon: <LayoutGrid size={12} className="text-purple-700" />, bg: "bg-purple-100", label: "Menus", sub: "ex. Avances, Budget" },
@@ -316,7 +376,7 @@ export default function GlobalSearch() {
                       <button
                         key={m.href + m.label}
                         data-idx={idx}
-                        onClick={() => { navigate(m.href); close(); }}
+                        onClick={() => doNavigate(() => navigate(m.href))}
                         onMouseEnter={() => setFocusedIndex(idx)}
                         className={`px-4 py-2.5 ${itemCls(idx)}`}
                       >
@@ -346,7 +406,7 @@ export default function GlobalSearch() {
                       <button
                         key={m.id}
                         data-idx={idx}
-                        onClick={() => { navigate(`/membres/${m.id}`); close(); }}
+                        onClick={() => doNavigate(() => navigate(`/membres/${m.id}`))}
                         onMouseEnter={() => setFocusedIndex(idx)}
                         className={`px-4 py-3 ${itemCls(idx)}`}
                       >
@@ -385,7 +445,7 @@ export default function GlobalSearch() {
                       <button
                         key={a.id}
                         data-idx={idx}
-                        onClick={() => { navigate(`/membres/${a.membreId}`); close(); }}
+                        onClick={() => doNavigate(() => navigate(`/membres/${a.membreId}`))}
                         onMouseEnter={() => setFocusedIndex(idx)}
                         className={`px-4 py-3 ${itemCls(idx)}`}
                       >
@@ -424,7 +484,7 @@ export default function GlobalSearch() {
                       <button
                         key={l.id}
                         data-idx={idx}
-                        onClick={() => { navigate("/membres"); close(); }}
+                        onClick={() => doNavigate(() => navigate("/membres"))}
                         onMouseEnter={() => setFocusedIndex(idx)}
                         className={`px-4 py-3 ${itemCls(idx)}`}
                       >
@@ -458,7 +518,7 @@ export default function GlobalSearch() {
                       <button
                         key={l.id}
                         data-idx={idx}
-                        onClick={() => { navigate("/tracabilite"); close(); }}
+                        onClick={() => doNavigate(() => navigate("/tracabilite"))}
                         onMouseEnter={() => setFocusedIndex(idx)}
                         className={`px-4 py-3 ${itemCls(idx)}`}
                       >
