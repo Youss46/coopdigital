@@ -598,7 +598,7 @@ function OngletSessions() {
 
 // ─── Onglet Inscriptions ──────────────────────────────────────────────────────
 
-type MembreMinimal = { id: number; nom: string; prenoms: string | null; code_membre: string };
+type MembreMinimal = { id: number; nom: string; prenoms: string | null; code_membre: string; statut?: string };
 
 function OngletInscriptions() {
   const [selectedSession, setSelectedSession] = useState<number | "">("");
@@ -792,6 +792,15 @@ function OngletInscriptions() {
                                   className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 flex items-center gap-2">
                                   <span className="font-medium text-gray-900">{m.prenoms ? `${m.prenoms} ${m.nom}` : m.nom}</span>
                                   <span className="text-xs text-gray-400">{m.code_membre}</span>
+                                  {m.statut && m.statut !== "actif" && (
+                                    <span className={`ml-auto text-xs px-1.5 py-0.5 rounded-full ${
+                                      m.statut === "inactif"   ? "bg-gray-100 text-gray-500" :
+                                      m.statut === "suspendu"  ? "bg-red-100 text-red-600"   :
+                                                                  "bg-yellow-100 text-yellow-700"
+                                    }`}>
+                                      {m.statut}
+                                    </span>
+                                  )}
                                 </button>
                               );
                             })
