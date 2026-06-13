@@ -92,16 +92,16 @@ function CarteKpi({
     success: "bg-emerald-100 text-emerald-700",
   };
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4">
-      <div className="rounded-lg p-2.5 flex-shrink-0" style={{ backgroundColor: couleur + "18" }}>
-        <Icone size={22} style={{ color: couleur }} />
+    <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-5 flex items-start gap-2 sm:gap-4">
+      <div className="rounded-lg p-1.5 sm:p-2.5 flex-shrink-0" style={{ backgroundColor: couleur + "18" }}>
+        <Icone size={18} style={{ color: couleur }} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-gray-500 font-medium">{titre}</p>
-        <p className="text-2xl font-bold text-gray-900 mt-0.5 truncate">{valeur}</p>
-        {sousTitre && <p className="text-xs text-gray-400 mt-0.5">{sousTitre}</p>}
+        <p className="text-xs sm:text-sm text-gray-500 font-medium leading-snug">{titre}</p>
+        <p className="text-lg sm:text-2xl font-bold text-gray-900 mt-0.5 truncate">{valeur}</p>
+        {sousTitre && <p className="text-xs text-gray-400 mt-0.5 truncate">{sousTitre}</p>}
         {badge && (
-          <span className={`inline-block mt-1.5 text-xs font-semibold px-2 py-0.5 rounded-full ${badgeClasses[badge.type]}`}>
+          <span className={`inline-block mt-1 text-xs font-semibold px-1.5 sm:px-2 py-0.5 rounded-full ${badgeClasses[badge.type]}`}>
             {badge.texte}
           </span>
         )}
@@ -231,7 +231,7 @@ export default function DashboardDelegue() {
   const prenom = utilisateur?.prenom ?? utilisateur?.nom ?? "Délégué";
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
       {/* En-tête */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -261,13 +261,13 @@ export default function DashboardDelegue() {
 
       {/* KPI */}
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-gray-100 rounded-xl h-28 animate-pulse" />
+            <div key={i} className="bg-gray-100 rounded-xl h-24 sm:h-28 animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
           <CarteKpi
             titre="Membres actifs"
             valeur={String(data?.membresActifs ?? 0)}
