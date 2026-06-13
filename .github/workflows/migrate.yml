@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Vérifier couverture migrations (schema vs SQL)
+        run: pnpm --filter @workspace/scripts run check-schema-coverage
+
       - name: Run drizzle-kit push (Railway)
         working-directory: lib/db
         env:
