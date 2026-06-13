@@ -7,6 +7,13 @@ export async function tenantGuard(req: Request, res: Response, next: NextFunctio
     return;
   }
 
+  // Le PCA a accès en lecture seule quelle que soit l'état de la licence
+  // (il doit pouvoir voir le dashboard pour décider de renouveler)
+  if (req.user.role === "pca") {
+    next();
+    return;
+  }
+
   try {
     const check = await verifierLicenceActive(req.user.cooperativeId);
 
