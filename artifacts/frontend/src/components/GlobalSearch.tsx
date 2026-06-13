@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
-import { Search, Users, Package, TrendingDown, X, MapPin, Phone, QrCode, Wheat } from "lucide-react";
+import { Search, Users, Package, TrendingDown, X, MapPin, Phone, QrCode, Wheat, LayoutGrid, ChevronRight } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 type SearchResults = {
   membres: { id: number; nom: string; prenoms: string; telephone: string; village: string | null; statut: string }[];
@@ -20,6 +21,62 @@ type SearchResults = {
     membreTelephone: string;
   }[];
 };
+
+type MenuItem = { label: string; href: string; roles: string[]; category: string };
+
+const ALL_MENUS: MenuItem[] = [
+  { label: "Vue PCA",                   href: "/dashboard/pca",          roles: ["pca"],                                                               category: "Tableau de bord" },
+  { label: "Tableau de bord",           href: "/dashboard",              roles: ["pca","directeur","comptable","magasinier","responsable_tracabilite","auditeur"], category: "Tableau de bord" },
+  { label: "Tableau de bord délégué",   href: "/dashboard-delegue",      roles: ["delegue"],                                                           category: "Tableau de bord" },
+  { label: "Mes missions",              href: "/missions",               roles: ["agent_terrain"],                                                     category: "Terrain" },
+  { label: "Membres",                   href: "/membres",                roles: ["pca","directeur","comptable","responsable_tracabilite","delegue","auditeur"], category: "Membres" },
+  { label: "Cartes membres",            href: "/cartes-membres",         roles: ["pca","directeur","comptable","delegue","auditeur"],                   category: "Membres" },
+  { label: "Scoring Producteurs",       href: "/scoring",                roles: ["pca","directeur","comptable","auditeur"],                            category: "Membres" },
+  { label: "Campagnes",                 href: "/campagnes",              roles: ["pca","directeur","comptable","magasinier","delegue","auditeur"],      category: "Collecte" },
+  { label: "Livraisons",                href: "/livraisons/nouvelle",    roles: ["pca","directeur","delegue","comptable","auditeur"],                   category: "Collecte" },
+  { label: "Transport",                 href: "/transport",              roles: ["pca","directeur","comptable","auditeur","magasinier"],                category: "Collecte" },
+  { label: "Expéditions port",          href: "/expeditions",            roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],   category: "Collecte" },
+  { label: "Traçabilité",               href: "/tracabilite",            roles: ["pca","directeur","responsable_tracabilite","auditeur"],               category: "Traçabilité" },
+  { label: "Parcelles & EUDR",          href: "/parcelles",              roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],   category: "Traçabilité" },
+  { label: "Missions terrain",          href: "/missions",               roles: ["responsable_tracabilite"],                                           category: "Traçabilité" },
+  { label: "Stocks",                    href: "/stocks",                 roles: ["pca","directeur","magasinier","comptable","auditeur"],                category: "Stocks" },
+  { label: "Stocks refoulés",           href: "/refus",                  roles: ["pca","directeur","magasinier","comptable","auditeur"],                category: "Stocks" },
+  { label: "Avances",                   href: "/avances",                roles: ["pca","directeur","comptable","delegue","auditeur"],                   category: "Finance membre" },
+  { label: "Intrants",                  href: "/intrants",               roles: ["pca","directeur","comptable","delegue","auditeur","magasinier"],      category: "Finance membre" },
+  { label: "Règlements",                href: "/reglements",             roles: ["pca","directeur","comptable","delegue","auditeur"],                   category: "Finance membre" },
+  { label: "Fournisseurs",              href: "/fournisseurs",           roles: ["pca","directeur","comptable","delegue","auditeur"],                   category: "Commerce" },
+  { label: "Exportateurs",              href: "/exportateurs",           roles: ["pca","directeur","comptable","auditeur"],                            category: "Commerce" },
+  { label: "Créances",                  href: "/creances",               roles: ["pca","directeur","comptable","auditeur"],                            category: "Commerce" },
+  { label: "Suivi des Prix",            href: "/prix",                   roles: ["pca","directeur","comptable","auditeur"],                            category: "Commerce" },
+  { label: "Tableau de bord financier", href: "/finances/tableau-bord",  roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
+  { label: "Budget",                    href: "/budget",                 roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
+  { label: "Emprunts",                  href: "/emprunts",               roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
+  { label: "Subventions",               href: "/subventions",            roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
+  { label: "Dons",                      href: "/dons",                   roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
+  { label: "Caisse",                    href: "/caisse",                 roles: ["pca","directeur","comptable","auditeur","delegue"],                   category: "Finances" },
+  { label: "Banque",                    href: "/banque",                 roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
+  { label: "Fiscalité",                 href: "/fiscalite",              roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
+  { label: "Réconciliation",            href: "/reconciliation",         roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
+  { label: "Investissements",           href: "/investissements",        roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
+  { label: "Comptabilité",              href: "/comptabilite",           roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
+  { label: "Salaires",                  href: "/salaires",               roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
+  { label: "Formations",                href: "/formations",             roles: ["pca","directeur","comptable","auditeur","delegue"],                   category: "RH & Social" },
+  { label: "Formations RSE",            href: "/formations-rse",         roles: ["pca","directeur","comptable","auditeur"],                            category: "RH & Social" },
+  { label: "Équipements",               href: "/equipements",            roles: ["pca","directeur","comptable","auditeur"],                            category: "RH & Social" },
+  { label: "Prévisions",                href: "/previsions",             roles: ["pca","directeur","comptable","auditeur"],                            category: "Pilotage" },
+  { label: "Reporting",                 href: "/reporting",              roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],   category: "Pilotage" },
+  { label: "Anomalies",                 href: "/anomalies",              roles: ["pca","directeur","comptable","auditeur"],                            category: "Pilotage" },
+  { label: "Journal d'audit",           href: "/audit",                  roles: ["pca","directeur","auditeur"],                                        category: "Pilotage" },
+  { label: "Gouvernance",               href: "/gouvernance",            roles: ["pca","directeur","secretaire","auditeur"],                           category: "Organisation" },
+  { label: "Communication",             href: "/communication",          roles: ["pca","directeur"],                                                   category: "Organisation" },
+  { label: "Délégués Localité",         href: "/delegues",               roles: ["pca","directeur","comptable","auditeur"],                            category: "Organisation" },
+  { label: "Administration",            href: "/administration/comptes", roles: ["pca","directeur"],                                                   category: "Organisation" },
+  { label: "Paramètres",                href: "/parametres",             roles: ["pca","directeur"],                                                   category: "Organisation" },
+];
+
+function normalize(s: string) {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -42,6 +99,7 @@ function formatFcfa(n: number): string {
 
 export default function GlobalSearch() {
   const [, navigate] = useLocation();
+  const { utilisateur } = useAuth();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults | null>(null);
@@ -56,10 +114,19 @@ export default function GlobalSearch() {
     setLoading(true);
     setError("");
     customFetch<SearchResults>(`/api/search?q=${encodeURIComponent(debouncedQ)}`)
-      .then((data) => setResults(data))
-      .catch((e) => { setResults(null); setError(e?.message ?? "Erreur réseau"); })
+      .then((data: SearchResults) => setResults(data))
+      .catch((e: unknown) => { setResults(null); setError((e as Error)?.message ?? "Erreur réseau"); })
       .finally(() => setLoading(false));
   }, [debouncedQ]);
+
+  const menuMatches = useMemo(() => {
+    if (query.length < 2) return [];
+    const q = normalize(query);
+    const role = utilisateur?.role ?? "";
+    return ALL_MENUS.filter(
+      (m) => normalize(m.label).includes(q) && (m.roles.length === 0 || m.roles.includes(role))
+    ).slice(0, 6);
+  }, [query, utilisateur?.role]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -90,11 +157,13 @@ export default function GlobalSearch() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open, close]);
 
-  const total =
+  const apiTotal =
     (results?.membres?.length ?? 0) +
     (results?.lots?.length ?? 0) +
     (results?.livraisons?.length ?? 0) +
     (results?.avances?.length ?? 0);
+
+  const hasAnyResult = menuMatches.length > 0 || apiTotal > 0;
 
   return (
     <>
@@ -118,7 +187,7 @@ export default function GlobalSearch() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Nom, téléphone, village, avance…"
+                placeholder="Nom, menu, téléphone, village, avance…"
                 className="flex-1 text-sm outline-none text-gray-900 placeholder-gray-400"
                 autoComplete="off"
               />
@@ -131,7 +200,7 @@ export default function GlobalSearch() {
             </div>
 
             <div className="max-h-[28rem] overflow-y-auto">
-              {loading && (
+              {loading && menuMatches.length === 0 && (
                 <div className="px-4 py-6 text-center text-sm text-gray-400">Recherche…</div>
               )}
 
@@ -139,14 +208,23 @@ export default function GlobalSearch() {
                 <div className="px-4 py-4 text-center text-sm text-red-500">{error}</div>
               )}
 
-              {!loading && !error && query.length >= 2 && results !== null && total === 0 && (
+              {!loading && !error && query.length >= 2 && results !== null && !hasAnyResult && (
                 <div className="px-4 py-6 text-center text-sm text-gray-400">Aucun résultat pour « {query} »</div>
               )}
 
-              {!loading && !error && query.length < 2 && (
+              {query.length < 2 && (
                 <div className="px-4 py-5">
                   <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">Vous pouvez rechercher…</p>
                   <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
+                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                        <LayoutGrid size={12} className="text-purple-700" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700">Menus</p>
+                        <p className="text-xs text-gray-400 mt-0.5">ex. Avances, Budget</p>
+                      </div>
+                    </div>
                     <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
                       <div className="mt-0.5 w-6 h-6 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
                         <Users size={12} className="text-green-700" />
@@ -192,17 +270,33 @@ export default function GlobalSearch() {
                         <p className="text-xs text-gray-400 mt-0.5">par nom du membre</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
-                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <QrCode size={12} className="text-blue-700" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-700">Lots</p>
-                        <p className="text-xs text-gray-400 mt-0.5">par code QR lot</p>
-                      </div>
-                    </div>
                   </div>
                   <p className="text-xs text-gray-300 mt-3 text-center">Tapez au moins 2 caractères</p>
+                </div>
+              )}
+
+              {/* Menus — résultats instantanés */}
+              {menuMatches.length > 0 && (
+                <div>
+                  <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
+                    <LayoutGrid size={11} /> Navigation
+                  </div>
+                  {menuMatches.map((m) => (
+                    <button
+                      key={m.href + m.label}
+                      onClick={() => { navigate(m.href); close(); }}
+                      className="w-full text-left px-4 py-2.5 hover:bg-purple-50 flex items-center gap-3 border-b border-gray-50 transition-colors"
+                    >
+                      <div className="w-7 h-7 rounded-lg flex-shrink-0 bg-purple-100 flex items-center justify-center">
+                        <LayoutGrid size={13} className="text-purple-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{m.label}</p>
+                        <p className="text-xs text-gray-400">{m.category}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
+                    </button>
+                  ))}
                 </div>
               )}
 
@@ -309,7 +403,7 @@ export default function GlobalSearch() {
               {results && (results.lots?.length ?? 0) > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
-                    <Package size={11} /> Lots
+                    <QrCode size={11} /> Lots
                   </div>
                   {results.lots.map((l) => (
                     <button
@@ -318,7 +412,7 @@ export default function GlobalSearch() {
                       className="w-full text-left px-4 py-3 hover:bg-green-50 flex items-center gap-3 border-b border-gray-50 transition-colors"
                     >
                       <div className="w-8 h-8 rounded-full flex-shrink-0 bg-blue-100 flex items-center justify-center">
-                        <Package size={14} className="text-blue-600" />
+                        <QrCode size={14} className="text-blue-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 font-mono truncate text-xs">{l.qrCodeLot}</p>
