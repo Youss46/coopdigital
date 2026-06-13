@@ -294,15 +294,15 @@ export default function PcaDashboardPage() {
         <KpiCard
           icon={<DollarSign className="w-5 h-5 text-green-700" />}
           label="CA ventes campagne"
-          value={fmt(s.financier.ca_campagne_fcfa)}
+          value={fmtFull(s.financier.ca_campagne_fcfa)}
           unit="FCFA"
-          sub={`Marge : ${fmt(s.financier.marge_nette_fcfa)} FCFA (${s.financier.marge_pct}%)`}
+          sub={`Marge : ${fmtFull(s.financier.marge_nette_fcfa)} FCFA (${s.financier.marge_pct}%)`}
           subColor="text-green-600"
         />
         <KpiCard
           icon={<TrendingUp className="w-5 h-5 text-green-700" />}
           label="Marge nette"
-          value={fmt(s.financier.marge_nette_fcfa)}
+          value={fmtFull(s.financier.marge_nette_fcfa)}
           unit="FCFA"
           sub={`${s.financier.marge_kg_fcfa.toLocaleString("fr-FR")} FCFA/T`}
           subColor="text-green-600"
@@ -310,7 +310,7 @@ export default function PcaDashboardPage() {
         <KpiCard
           icon={<Wallet className="w-5 h-5 text-blue-600" />}
           label="Trésorerie disponible"
-          value={fmt(Math.abs(s.financier.tresorerie_disponible_fcfa))}
+          value={fmtFull(Math.abs(s.financier.tresorerie_disponible_fcfa))}
           unit="FCFA"
           sub={s.financier.tresorerie_disponible_fcfa >= 0 ? "✅ Solde positif" : "⚠️ Solde négatif"}
           subColor={s.financier.tresorerie_disponible_fcfa >= 0 ? "text-green-600" : "text-red-600"}
@@ -318,7 +318,7 @@ export default function PcaDashboardPage() {
         <KpiCard
           icon={<FileText className="w-5 h-5 text-orange-500" />}
           label="Créances exportateurs"
-          value={fmt(s.financier.creances_exportateurs_fcfa)}
+          value={fmtFull(s.financier.creances_exportateurs_fcfa)}
           unit="FCFA"
           sub={s.financier.creances_en_retard > 0
             ? `⚠️ ${s.financier.creances_en_retard} en retard`
@@ -332,7 +332,7 @@ export default function PcaDashboardPage() {
         <KpiCard
           icon={<Users className="w-5 h-5 text-purple-600" />}
           label="Avances en cours"
-          value={fmt(s.financier.avances_en_cours_fcfa)}
+          value={fmtFull(s.financier.avances_en_cours_fcfa)}
           unit="FCFA"
           sub={`${fmtFull(s.membres.nb_actifs)} membres actifs — ${s.membres.taux_remboursement_avances_pct}% remboursé`}
           subColor="text-gray-500"
