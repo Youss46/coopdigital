@@ -19,7 +19,11 @@ function PushSetup() {
 
   useEffect(() => {
     if (!isSupported || !loggedIn) return;
-    if ("Notification" in window && Notification.permission === "default") {
+    if (!("Notification" in window)) return;
+    // Subscribe (or silently re-subscribe) whenever permission is not explicitly denied.
+    // - "default" → prompts the user once
+    // - "granted" → silently creates/re-syncs the subscription without any prompt
+    if (Notification.permission !== "denied") {
       subscribe();
     }
   }, [loggedIn, isSupported, subscribe]);
