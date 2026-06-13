@@ -162,6 +162,13 @@
       "when": 1750007000000,
       "tag": "0022_expedition_lots_lot_id",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1781348700000,
+      "tag": "0023_fix_schema_drift",
+      "breakpoints": true
     }
   ]
 }
