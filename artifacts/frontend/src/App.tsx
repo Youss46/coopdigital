@@ -6,6 +6,7 @@ import { usePushSubscription } from "@/hooks/usePushSubscription";
 import SplashScreen from "@/components/SplashScreen";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
+import DashboardDelegue from "@/pages/DashboardDelegue";
 import Membres from "@/pages/Membres";
 import MissionsPage from "@/pages/MissionsPage";
 import MissionDetailPage from "@/pages/MissionDetailPage";
@@ -84,7 +85,7 @@ function AppRoutes() {
   usePushSubscription(estConnecte);
   const accueil =
     utilisateur?.role === "agent_terrain" ? "/missions" :
-    utilisateur?.role === "delegue"       ? "/membres"  :
+    utilisateur?.role === "delegue"       ? "/dashboard-delegue" :
     "/dashboard";
   return (
     <Switch>
@@ -95,6 +96,9 @@ function AppRoutes() {
       </Route>
       <Route path="/dashboard">
         <ProtectedRoute component={Dashboard} />
+      </Route>
+      <Route path="/dashboard-delegue">
+        <ProtectedRoute component={DashboardDelegue} />
       </Route>
       <Route path="/membres/:id">
         <ProtectedRoute component={MembreFiche} />

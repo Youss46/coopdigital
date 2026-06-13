@@ -70,6 +70,12 @@ const navItems = [
     icon: LayoutDashboard,
     roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
   },
+  {
+    href: "/dashboard-delegue",
+    label: "Tableau de bord",
+    icon: LayoutDashboard,
+    roles: ["delegue"],
+  },
 
   // ── Agent terrain ─────────────────────────────────────────────────────────
   {
