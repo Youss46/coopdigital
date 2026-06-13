@@ -734,20 +734,28 @@ function OngletInscriptions() {
                       <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                         {membreResults
                           .filter((m) => !membresSelectes.some((s) => s.id === m.id))
-                          .filter((m) => !inscrits.some((i) => i.membre_id === m.id))
-                          .map((m) => (
-                            <button key={m.id} type="button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                setMembresSelectes((prev) => [...prev, m]);
-                                setMembreSearch("");
-                                setShowMembreResults(false);
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 flex items-center gap-2">
-                              <span className="font-medium text-gray-900">{m.prenoms ? `${m.prenoms} ${m.nom}` : m.nom}</span>
-                              <span className="text-xs text-gray-400">{m.code_membre}</span>
-                            </button>
-                          ))}
+                          .map((m) => {
+                            const dejaInscrit = inscrits.some((i) => i.membre_id === m.id);
+                            return dejaInscrit ? (
+                              <div key={m.id} className="w-full px-3 py-2 text-sm flex items-center gap-2 opacity-50 cursor-not-allowed">
+                                <span className="font-medium text-gray-500">{m.prenoms ? `${m.prenoms} ${m.nom}` : m.nom}</span>
+                                <span className="text-xs text-gray-400">{m.code_membre}</span>
+                                <span className="ml-auto text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Déjà inscrit</span>
+                              </div>
+                            ) : (
+                              <button key={m.id} type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setMembresSelectes((prev) => [...prev, m]);
+                                  setMembreSearch("");
+                                  setShowMembreResults(false);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 flex items-center gap-2">
+                                <span className="font-medium text-gray-900">{m.prenoms ? `${m.prenoms} ${m.nom}` : m.nom}</span>
+                                <span className="text-xs text-gray-400">{m.code_membre}</span>
+                              </button>
+                            );
+                          })}
                       </div>
                     )}
                   </div>
