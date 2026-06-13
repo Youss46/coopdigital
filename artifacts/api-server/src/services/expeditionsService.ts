@@ -356,7 +356,7 @@ export async function createExpedition(cooperativeId: number, userId: number, in
     telephoneChauffeur,
     transporteur:       input.transporteur ?? null,
     numeroBonTransport: input.numeroBonTransport ?? null,
-    dateDepart:         input.dateDepart ? new Date(input.dateDepart).toISOString() : null,
+    dateDepart:         input.dateDepart ? new Date(input.dateDepart) : null,
     lieuDepart:         input.lieuDepart ?? "Magasin central",
     poidsChargeKg:      input.poidsChargeKg ? String(input.poidsChargeKg) : null,
     nombreSacs:         input.nombreSacs ?? null,
@@ -366,7 +366,7 @@ export async function createExpedition(cooperativeId: number, userId: number, in
     exportateurId:      input.exportateurId ?? null,
     exportateurNom:     input.exportateurNom ?? null,
     numeroContratExport: input.numeroContratExport ?? null,
-    heureEstimeeArrivee: input.heureEstimeeArrivee ? new Date(input.heureEstimeeArrivee).toISOString() : null,
+    heureEstimeeArrivee: input.heureEstimeeArrivee ? new Date(input.heureEstimeeArrivee) : null,
     certificatPhytoNumero:         input.certificatPhytoNumero ?? null,
     certificatPhytoDateEmission:   input.certificatPhytoDateEmission ?? null,
     certificatPhytoDateExpiration: input.certificatPhytoDateExpiration ?? null,
@@ -438,14 +438,14 @@ export async function changerStatut(
 
   const updateValues: Partial<typeof expeditionsTable.$inferInsert> = {
     statut: nouveauStatut as typeof expeditionsTable.$inferSelect["statut"],
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date(),
   };
 
   if (nouveauStatut === "en_transit") {
-    updateValues.dateDepart = updateValues.dateDepart ?? new Date().toISOString();
+    updateValues.dateDepart = updateValues.dateDepart ?? new Date();
   }
   if (nouveauStatut === "arrive_port") {
-    updateValues.dateArriveePort = new Date().toISOString();
+    updateValues.dateArriveePort = new Date();
     // Notification arrivée port (fire-and-forget)
     void notifExpeditionArriveePort(
       cooperativeId,
@@ -536,10 +536,10 @@ export async function confirmerReception(
     motifEcart:         (input.motifEcart as typeof expeditionsTable.$inferSelect["motifEcart"]) ?? null,
     numeroRecepissePort: input.numeroRecepissePort,
     nomReceptionnaire:  input.nomReceptionnaire,
-    dateArriveePort:    input.dateArriveePort ? new Date(input.dateArriveePort).toISOString() : new Date().toISOString(),
+    dateArriveePort:    input.dateArriveePort ? new Date(input.dateArriveePort) : new Date(),
     statutReception:    nouveauStatut === "receptionne" ? "accepte" : "litige",
     provisionLitige,
-    updatedAt:          new Date().toISOString(),
+    updatedAt:          new Date(),
   }).where(eq(expeditionsTable.id, expeditionId));
 
   await db.insert(expeditionHistoriqueTable).values({

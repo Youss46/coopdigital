@@ -331,7 +331,7 @@ export async function exportAuditPDF(
   const timestamp   = new Date().toISOString();
 
   const contenu = entries
-    .map((e) => `${e.createdAt.toISOString()}|${e.action}|${e.module}|${e.userId}|${e.description ?? ""}`)
+    .map((e) => `${e.created_at}|${e.action}|${e.module}|${e.user_id}|${e.description ?? ""}`)
     .join("\n");
   const hashInput = `${contenu}|${timestamp}|${cooperativeId}`;
   const hash      = crypto.createHash("sha256").update(hashInput).digest("hex");
@@ -389,8 +389,8 @@ export async function exportAuditPDF(
 
       x = 40;
       const rowData = [
-        e.createdAt.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }),
-        e.userNom ?? `User #${e.userId ?? "?"}`,
+        new Date(e.created_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }),
+        e.user_nom ?? `User #${e.user_id ?? "?"}`,
         e.action,
         e.module,
         (e.description ?? "").slice(0, 80),

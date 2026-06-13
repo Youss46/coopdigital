@@ -127,16 +127,16 @@ export async function getModifications(req: Request, res: Response): Promise<voi
 
     // Filtre uniquement UPDATE pour les avant/après
     const modifications = entries
-      .filter((e) => e.action === "UPDATE" && (e.valeursAvant || e.valeursApres))
+      .filter((e) => e.action === "UPDATE" && (e.valeurs_avant || e.valeurs_apres))
       .map((e) => ({
         id:             e.id,
-        userId:         e.userId,
-        userNom:        e.userNom,
-        userRole:       e.userRole,
-        createdAt:      e.createdAt,
-        champsModifies: e.champsModifies,
-        valeursAvant:   e.valeursAvant,
-        valeursApres:   e.valeursApres,
+        userId:         e.user_id,
+        userNom:        e.user_nom,
+        userRole:       e.user_role,
+        createdAt:      e.created_at,
+        champsModifies: e.champs_modifies,
+        valeursAvant:   e.valeurs_avant,
+        valeursApres:   e.valeurs_apres,
       }));
 
     res.json({ modifications });
