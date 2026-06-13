@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Search, Users, Package, TrendingDown, X } from "lucide-react";
+import { Search, Users, Package, TrendingDown, X, MapPin, Phone, QrCode, Wheat } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
 
 type SearchResults = {
@@ -144,7 +144,66 @@ export default function GlobalSearch() {
               )}
 
               {!loading && !error && query.length < 2 && (
-                <div className="px-4 py-6 text-center text-sm text-gray-400">Tapez au moins 2 caractères pour rechercher</div>
+                <div className="px-4 py-5">
+                  <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">Vous pouvez rechercher…</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
+                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                        <Users size={12} className="text-green-700" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700">Membres</p>
+                        <p className="text-xs text-gray-400 mt-0.5">nom, prénoms</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
+                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <Phone size={12} className="text-blue-700" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700">Téléphone</p>
+                        <p className="text-xs text-gray-400 mt-0.5">ex. 0701020304</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
+                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                        <MapPin size={12} className="text-amber-700" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700">Village</p>
+                        <p className="text-xs text-gray-400 mt-0.5">ex. Méagui, Gueyo</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
+                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                        <TrendingDown size={12} className="text-orange-700" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700">Avances</p>
+                        <p className="text-xs text-gray-400 mt-0.5">par nom du membre</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
+                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                        <Wheat size={12} className="text-amber-700" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700">Livraisons</p>
+                        <p className="text-xs text-gray-400 mt-0.5">par nom du membre</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
+                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <QrCode size={12} className="text-blue-700" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700">Lots</p>
+                        <p className="text-xs text-gray-400 mt-0.5">par code QR lot</p>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-300 mt-3 text-center">Tapez au moins 2 caractères</p>
+                </div>
               )}
 
               {/* Membres */}
