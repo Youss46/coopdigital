@@ -137,11 +137,8 @@ export default function NouvelleExpeditionPage() {
 
   const toggleDoc = (key: string) => setDocsValides(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const phytoValide = Boolean(phytoNumero && phytoDateEmission);
-  const docsManquants = [
-    ...DOCS_REQUIS.filter(d => !docsValides[d.key]).map(d => d.label),
-    ...(!phytoValide ? ["Certificat phytosanitaire (N° + date requis)"] : []),
-  ];
+  const phytoRenseigne = Boolean(phytoNumero && phytoDateEmission);
+  const docsManquants = DOCS_REQUIS.filter(d => !docsValides[d.key]).map(d => d.label);
 
   const handleSubmit = () => {
     if (!dateDepart)                             { toast({ title: "Date de départ requise", variant: "destructive" }); return; }
@@ -333,17 +330,17 @@ export default function NouvelleExpeditionPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Leaf className="h-4 w-4 text-green-600" />
-            Certificat phytosanitaire *
-            {phytoValide
-              ? <span className="ml-auto text-xs text-green-600 font-normal flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Valide</span>
-              : <span className="ml-auto text-xs text-orange-600 font-normal">Obligatoire pour l'export</span>
+            Certificat phytosanitaire
+            {phytoRenseigne
+              ? <span className="ml-auto text-xs text-green-600 font-normal flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Renseigné</span>
+              : <span className="ml-auto text-xs text-gray-400 font-normal">Optionnel</span>
             }
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Numéro du certificat *</Label>
+              <Label>Numéro du certificat</Label>
               <Input
                 value={phytoNumero}
                 onChange={e => setPhytoNumero(e.target.value)}
@@ -357,7 +354,7 @@ export default function NouvelleExpeditionPage() {
               <p className="text-xs text-gray-400 mt-1">Direction de la Protection des Végétaux et du Contrôle</p>
             </div>
             <div>
-              <Label>Date d'émission *</Label>
+              <Label>Date d'émission</Label>
               <Input type="date" value={phytoDateEmission} onChange={e => setPhytoDateEmission(e.target.value)} />
             </div>
             <div>
