@@ -32,13 +32,8 @@ jobs:
       - name: Vérifier couverture migrations (schema vs SQL)
         run: pnpm --filter @workspace/scripts run check-schema-coverage
 
-      - name: Initialiser tracking Drizzle (baseline 0000-0018 si DB vierge)
-        env:
-          DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
-        run: pnpm --filter @workspace/scripts run db-baseline
-
-      - name: Appliquer les migrations en attente (0019 → latest)
+      - name: Appliquer les migrations Railway (baseline + migrate)
         working-directory: lib/db
         env:
           DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
-        run: pnpm run migrate
+        run: pnpm run ci-migrate
