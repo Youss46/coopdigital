@@ -169,6 +169,13 @@
       "when": 1781348700000,
       "tag": "0023_fix_schema_drift",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1781436000000,
+      "tag": "0024_missing_tables",
+      "breakpoints": true
     }
   ]
 }
