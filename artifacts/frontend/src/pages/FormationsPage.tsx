@@ -692,7 +692,23 @@ function OngletInscriptions() {
           {/* Actions inscription */}
           {canInscrire && session && session.statut !== "termine" && (
             <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-              <p className="text-sm font-medium text-gray-700">Inscrire des membres</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-gray-700">Inscrire des membres</p>
+                {session.nb_places != null && (() => {
+                  const deja = parseInt(session.nb_inscrits || "0");
+                  const restantes = session.nb_places - deja - membresSelectes.length;
+                  const couleur = restantes <= 0
+                    ? "bg-red-100 text-red-700"
+                    : restantes <= 5
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-green-100 text-green-700";
+                  return (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${couleur}`}>
+                      {restantes <= 0 ? "Complet" : `${restantes} place${restantes > 1 ? "s" : ""} restante${restantes > 1 ? "s" : ""}`}
+                    </span>
+                  );
+                })()}
+              </div>
               <div className="flex gap-2">
                 {(["individuel", "zone", "tous"] as const).map((m) => (
                   <button key={m} onClick={() => setMode(m)}
@@ -727,7 +743,8 @@ function OngletInscriptions() {
                         onChange={(e) => { setMembreSearch(e.target.value); setShowMembreResults(true); }}
                         onFocus={() => setShowMembreResults(true)}
                         placeholder="Rechercher un membre par nom…"
-                        className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                        disabled={session.nb_places != null && (session.nb_places - parseInt(session.nb_inscrits || "0") - membresSelectes.length) <= 0}
+                        className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </div>
                     {showMembreResults && membreSearch.trim().length >= 2 && membreResults.length > 0 && (
