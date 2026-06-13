@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
-import { api, type Livraison, type Avance, type PartsSociales, type Score } from "@/lib/api";
+import { api, type Livraison, type Avance, type PartsSociales, type Score, type PortailNotification } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { Loader2, TrendingUp, LogOut, Bell, BellOff, BellRing } from "lucide-react";
+import { Loader2, TrendingUp, LogOut, Bell, BellOff, BellRing, X, CheckCheck } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
@@ -33,13 +33,32 @@ export default function DashboardPage() {
   const [score, setScore] = useState<Score>(null);
   const [loading, setLoading] = useState(true);
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
+  const [notifs, setNotifs] = useState<PortailNotification[]>([]);
+  const [showNotifs, setShowNotifs] = useState(false);
   const { isSupported, permission, subscribed, subscribe } = usePushNotifications(!!profil);
+
+  const nonLues = notifs.filter((n) => !n.lu).length;
+
+  const chargerNotifs = useCallback(() => {
+    api.notifications().then(setNotifs).catch(() => {});
+  }, []);
 
   useEffect(() => {
     Promise.all([api.livraisons(), api.avances(), api.partsSociales(), api.score()])
       .then(([l, a, p, s]) => { setLivraisons(l); setAvances(a); setParts(p); setScore(s); })
       .finally(() => setLoading(false));
-  }, []);
+    chargerNotifs();
+  }, [chargerNotifs]);
+
+  const marquerLu = async (id: number) => {
+    await api.marquerLu(id).catch(() => {});
+    setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, lu: true } : n));
+  };
+
+  const toutMarquerLu = async () => {
+    await api.marquerToutLu().catch(() => {});
+    setNotifs((prev) => prev.map((n) => ({ ...n, lu: true })));
+  };
 
   const avanceEnCours = avances.find(a => a.statut === "en_cours");
   const intrantsDus = 0;
@@ -65,21 +84,32 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="bg-green-700 px-5 pt-8 pb-8 relative">
         <div className="absolute top-4 right-4 flex items-center gap-2">
-          {/* Cloche notifications push */}
+          {/* Cloche notifications in-app */}
+          <button
+            onClick={() => setShowNotifs(true)}
+            className="relative p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
+            title="Notifications"
+          >
+            <Bell className="w-5 h-5 text-white/80" />
+            {nonLues > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center">
+                {nonLues > 9 ? "9+" : nonLues}
+              </span>
+            )}
+          </button>
+          {/* Cloche push web */}
           {isSupported && (
             <button
               onClick={() => { if (permission !== "denied") subscribe(); }}
               className={`p-2 rounded-xl transition-colors ${
-                permission === "granted" && subscribed
-                  ? "bg-white/20"
-                  : "bg-white/10 hover:bg-white/20"
+                permission === "granted" && subscribed ? "bg-white/20" : "bg-white/10 hover:bg-white/20"
               }`}
               title={
                 permission === "granted" && subscribed
-                  ? "Notifications activées"
+                  ? "Notifications push activées"
                   : permission === "denied"
-                  ? "Notifications bloquées (autorisez dans les réglages)"
-                  : "Activer les notifications"
+                  ? "Notifications bloquées"
+                  : "Activer les notifications push"
               }
             >
               {permission === "denied" ? (
@@ -87,7 +117,7 @@ export default function DashboardPage() {
               ) : permission === "granted" && subscribed ? (
                 <BellRing className="w-5 h-5 text-yellow-300" />
               ) : (
-                <Bell className="w-5 h-5 text-white/70" />
+                <Bell className="w-5 h-5 text-white/40" />
               )}
             </button>
           )}
@@ -261,6 +291,69 @@ export default function DashboardPage() {
       </div>
 
       <BottomNav />
+
+      {/* Panneau notifications in-app */}
+      {showNotifs && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40" onClick={() => setShowNotifs(false)}>
+          <div
+            className="bg-white rounded-t-3xl max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-lg font-bold text-gray-900">
+                Notifications
+                {nonLues > 0 && (
+                  <span className="ml-2 text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">
+                    {nonLues} non lue{nonLues > 1 ? "s" : ""}
+                  </span>
+                )}
+              </h2>
+              <div className="flex items-center gap-2">
+                {nonLues > 0 && (
+                  <button
+                    onClick={toutMarquerLu}
+                    className="flex items-center gap-1 text-xs text-green-700 font-semibold px-2.5 py-1.5 bg-green-50 rounded-lg"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    Tout lire
+                  </button>
+                )}
+                <button onClick={() => setShowNotifs(false)} className="p-1.5 rounded-lg bg-gray-100">
+                  <X className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {notifs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <Bell className="w-10 h-10 mb-3 text-gray-300" />
+                  <p className="text-base font-medium">Aucune notification</p>
+                  <p className="text-sm mt-1">Vous verrez ici les convocations et rappels</p>
+                </div>
+              ) : (
+                notifs.map((n) => (
+                  <button
+                    key={n.id}
+                    onClick={() => { if (!n.lu) marquerLu(n.id); }}
+                    className={`w-full text-left px-5 py-4 border-b border-gray-50 transition-colors ${n.lu ? "bg-white" : "bg-green-50/50"}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${n.lu ? "bg-gray-300" : "bg-green-600"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold ${n.lu ? "text-gray-600" : "text-gray-900"}`}>{n.titre}</p>
+                        <p className="text-sm text-gray-500 mt-0.5 leading-snug">{n.message}</p>
+                        <p className="text-xs text-gray-400 mt-1.5">
+                          {new Date(n.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal confirmation déconnexion */}
       {confirmDeconnexion && (

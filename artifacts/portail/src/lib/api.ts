@@ -77,6 +77,19 @@ export type Score = {
   details: { volume: number; qualite: number; regularite: number; remboursement: number; fidelite: number; cotisation: number };
 } | null;
 
+export interface PortailNotification {
+  id: number;
+  membreId: number;
+  cooperativeId: number;
+  type: string;
+  titre: string;
+  message: string;
+  lien: string | null;
+  lu: boolean;
+  dateLu: string | null;
+  createdAt: string;
+}
+
 export const api = {
   connexion: (code_membre: string, telephone: string) =>
     req<ConnexionResult>("/connexion", {
@@ -96,6 +109,13 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ photoDataUrl }),
     }),
+
+  // ── Notifications in-app ────────────────────────────────────────────────────
+  notifications: () => req<PortailNotification[]>("/notifications"),
+  marquerLu: (id: number) =>
+    req<{ ok: boolean }>(`/notifications/${id}/lu`, { method: "PATCH" }),
+  marquerToutLu: () =>
+    req<{ ok: boolean }>("/notifications/tout-lu", { method: "PATCH" }),
 
   // ── Push notifications ──────────────────────────────────────────────────────
   pushVapidKey: () => req<{ vapidKey: string }>("/push/vapid-key"),

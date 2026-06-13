@@ -1,4 +1,4 @@
-import { db, programmesFormationTable, sessionsFormationTable, inscriptionsFormationTable, attestationsFormationTable, evaluationsFormationTable, membresTable } from "@workspace/db";
+import { db, programmesFormationTable, sessionsFormationTable, inscriptionsFormationTable, attestationsFormationTable, evaluationsFormationTable, membresTable, portailNotificationsTable } from "@workspace/db";
 import { eq, and, inArray, sql, desc, not } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
@@ -274,24 +274,51 @@ export async function enregistrerPresences(
 
 // ─── SMS Convocations ─────────────────────────────────────────────────────────
 
+async function creerNotifsPortailFormation(
+  cooperativeId: number,
+  membreIds: number[],
+  titre: string,
+  message: string,
+): Promise<void> {
+  if (membreIds.length === 0) return;
+  const rows = membreIds.map((membreId) => ({
+    membreId,
+    cooperativeId,
+    type: "formation",
+    titre,
+    message,
+    lien: "/",
+  }));
+  await db.insert(portailNotificationsTable).values(rows).onConflictDoNothing();
+}
+
 export async function envoyerConvocations(cooperativeId: number, sessionId: number) {
   const session = await getSession(cooperativeId, sessionId);
   if (!session) throw new Error("Session introuvable");
 
-  const coopNom  = await getCoopNom(cooperativeId);
   const inscrits = await getInscrits(cooperativeId, sessionId);
   const dateStr  = fmtDate(session.date_session);
   const heure    = (session.heure_debut ?? "07:00").slice(0, 5);
   const lieu     = session.lieu ?? "lieu à confirmer";
+  const tousIds  = inscrits.map((i) => i.membre_id);
 
-  // ── Push : tous les inscrits ayant une souscription portail ───────────────
-  const tousIds = inscrits.map((i) => i.membre_id);
+  // ── Notification in-app portail ───────────────────────────────────────────
+  if (tousIds.length > 0) {
+    await creerNotifsPortailFormation(
+      cooperativeId,
+      tousIds,
+      "Convocation — Formation",
+      `Vous êtes convoqué(e) à la formation « ${session.titre} » le ${dateStr} à ${heure} — ${lieu}.`,
+    ).catch((err) => logger.warn({ err }, "Notif portail convocation ignorée"));
+  }
+
+  // ── Push web : inscrits avec souscription portail ─────────────────────────
   if (tousIds.length > 0) {
     const { envoyerPushGroupePortail } = await import("./pushService.js");
     envoyerPushGroupePortail(tousIds, {
       title: "📚 Convocation — Formation",
       body:  `"${session.titre}" · le ${dateStr} à ${heure} — ${lieu}`,
-      url:   "/formations",
+      url:   "/",
     }).catch((err) => logger.warn({ err }, "Push portail convocation ignoré"));
   }
 
@@ -306,15 +333,25 @@ export async function envoyerRappels(cooperativeId: number, sessionId: number) {
   const inscrits = await getInscrits(cooperativeId, sessionId);
   const heure    = (session.heure_debut ?? "07:00").slice(0, 5);
   const lieu     = session.lieu ?? "lieu à confirmer";
+  const tousIds  = inscrits.map((i) => i.membre_id);
 
-  // ── Push : tous les inscrits ayant une souscription portail ───────────────
-  const tousIds = inscrits.map((i) => i.membre_id);
+  // ── Notification in-app portail ───────────────────────────────────────────
+  if (tousIds.length > 0) {
+    await creerNotifsPortailFormation(
+      cooperativeId,
+      tousIds,
+      "Rappel — Formation demain",
+      `Rappel : la formation « ${session.titre} » a lieu demain à ${heure} — ${lieu}.`,
+    ).catch((err) => logger.warn({ err }, "Notif portail rappel ignorée"));
+  }
+
+  // ── Push web : inscrits avec souscription portail ─────────────────────────
   if (tousIds.length > 0) {
     const { envoyerPushGroupePortail } = await import("./pushService.js");
     envoyerPushGroupePortail(tousIds, {
       title: "🔔 Rappel — Formation demain",
       body:  `"${session.titre}" · demain à ${heure} — ${lieu}`,
-      url:   "/formations",
+      url:   "/",
     }).catch((err) => logger.warn({ err }, "Push portail rappel ignoré"));
   }
 

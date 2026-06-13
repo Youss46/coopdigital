@@ -15,6 +15,9 @@ import {
   getVapidKeyPortailHandler,
   subscribePushPortailHandler,
   unsubscribePushPortailHandler,
+  getNotificationsPortailHandler,
+  marquerLuPortailHandler,
+  marquerToutLuPortailHandler,
 } from "../controllers/portailController";
 
 const router = Router();
@@ -31,6 +34,11 @@ router.get("/portail/score",           portailAuthMiddleware, getScoreHandler);
 router.get("/portail/recus/:livraison_id", portailAuthMiddleware, getRecuLivraisonHandler);
 router.get("/portail/carte-membre",    portailAuthMiddleware, getCarteMembreHandler);
 router.put("/portail/photo",           portailAuthMiddleware, savePhotoHandler);
+
+// ── Notifications in-app ──────────────────────────────────────────────────────
+router.get("/portail/notifications",              portailAuthMiddleware, getNotificationsPortailHandler);
+router.patch("/portail/notifications/tout-lu",    portailAuthMiddleware, marquerToutLuPortailHandler);
+router.patch("/portail/notifications/:id/lu",     portailAuthMiddleware, marquerLuPortailHandler);
 
 // ── Notifications push ────────────────────────────────────────────────────────
 router.get("/portail/push/vapid-key",           getVapidKeyPortailHandler);

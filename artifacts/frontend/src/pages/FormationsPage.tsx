@@ -625,7 +625,7 @@ function OngletInscriptions() {
   const { data: membreResults = [] } = useQuery({
     queryKey: ["membres-search-formation", membreSearch],
     queryFn: () =>
-      apiFetch<{ membres: MembreMinimal[] }>(`/api/membres?search=${encodeURIComponent(membreSearch)}&limit=8&statut=actif`)
+      apiFetch<{ membres: MembreMinimal[] }>(`/api/membres?search=${encodeURIComponent(membreSearch)}&limit=8&statut_membre=actif`)
         .then((r) => r.membres ?? []),
     enabled: membreSearch.trim().length >= 2,
   });

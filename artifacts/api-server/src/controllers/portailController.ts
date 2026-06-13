@@ -235,6 +235,69 @@ export async function verifierMembreHandler(req: Request, res: Response): Promis
   }
 }
 
+// ─── Notifications in-app portail ─────────────────────────────────────────────
+
+export async function getNotificationsPortailHandler(req: Request, res: Response): Promise<void> {
+  const membreId = req.membre?.membreId;
+  if (!membreId) { res.status(401).json({ erreur: "Non authentifié" }); return; }
+  try {
+    const { portailNotificationsTable } = await import("@workspace/db");
+    const { eq, desc } = await import("drizzle-orm");
+    const notifs = await db
+      .select()
+      .from(portailNotificationsTable)
+      .where(eq(portailNotificationsTable.membreId, membreId))
+      .orderBy(desc(portailNotificationsTable.createdAt))
+      .limit(30);
+    res.json(notifs);
+  } catch (err) {
+    req.log.error({ err }, "getNotificationsPortail");
+    res.status(500).json({ erreur: "Erreur serveur" });
+  }
+}
+
+export async function marquerLuPortailHandler(req: Request, res: Response): Promise<void> {
+  const membreId = req.membre?.membreId;
+  if (!membreId) { res.status(401).json({ erreur: "Non authentifié" }); return; }
+  const notifId = parseInt(String(req.params["id"] ?? "0"), 10);
+  if (!notifId) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    const { portailNotificationsTable } = await import("@workspace/db");
+    const { eq, and } = await import("drizzle-orm");
+    await db
+      .update(portailNotificationsTable)
+      .set({ lu: true, dateLu: new Date() })
+      .where(and(
+        eq(portailNotificationsTable.id, notifId),
+        eq(portailNotificationsTable.membreId, membreId),
+      ));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "marquerLuPortail");
+    res.status(500).json({ erreur: "Erreur serveur" });
+  }
+}
+
+export async function marquerToutLuPortailHandler(req: Request, res: Response): Promise<void> {
+  const membreId = req.membre?.membreId;
+  if (!membreId) { res.status(401).json({ erreur: "Non authentifié" }); return; }
+  try {
+    const { portailNotificationsTable } = await import("@workspace/db");
+    const { eq, and } = await import("drizzle-orm");
+    await db
+      .update(portailNotificationsTable)
+      .set({ lu: true, dateLu: new Date() })
+      .where(and(
+        eq(portailNotificationsTable.membreId, membreId),
+        eq(portailNotificationsTable.lu, false),
+      ));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "marquerToutLuPortail");
+    res.status(500).json({ erreur: "Erreur serveur" });
+  }
+}
+
 // ─── Push notifications portail ───────────────────────────────────────────────
 
 export function getVapidKeyPortailHandler(_req: Request, res: Response): void {
