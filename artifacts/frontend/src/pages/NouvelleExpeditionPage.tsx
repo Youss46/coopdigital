@@ -84,7 +84,7 @@ export default function NouvelleExpeditionPage() {
   const [port, setPort] = useState("Abidjan");
   const [portAutre, setPortAutre] = useState("");
   const [entrepotDestination, setEntrepotDestination] = useState("");
-  const [exportateurId, setExportateurId] = useState("");
+  const [exportateurId, setExportateurId] = useState("__libre__");
   const [exportateurNom, setExportateurNom] = useState("");
   const [numeroContrat, setNumeroContrat] = useState("");
   const [heureEstimeeArrivee, setHeureEstimeeArrivee] = useState("");
@@ -152,9 +152,10 @@ export default function NouvelleExpeditionPage() {
     const portFinal = port === "autre" ? portAutre : port;
     if (!portFinal) { toast({ title: "Port de destination requis", variant: "destructive" }); return; }
 
-    const exNom = exportateurId
-      ? exportateurs.find(e => String(e.id) === exportateurId)?.nom
-      : exportateurNom || undefined;
+    const isLibre = exportateurId === "__libre__";
+    const exNom = isLibre
+      ? exportateurNom || undefined
+      : exportateurs.find(e => String(e.id) === exportateurId)?.nom;
 
     mutation.mutate({
       typeVehicule,
@@ -172,7 +173,7 @@ export default function NouvelleExpeditionPage() {
       numeroLots:     numeroLots || undefined,
       port: portFinal,
       entrepotDestination: entrepotDestination || undefined,
-      exportateurId:  exportateurId ? parseInt(exportateurId, 10) : undefined,
+      exportateurId:  !isLibre ? parseInt(exportateurId, 10) : undefined,
       exportateurNom: exNom,
       numeroContratExport: numeroContrat || undefined,
       heureEstimeeArrivee: heureEstimeeArrivee || undefined,
@@ -439,13 +440,13 @@ export default function NouvelleExpeditionPage() {
               <Select value={exportateurId} onValueChange={setExportateurId}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner…" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Saisie libre</SelectItem>
+                  <SelectItem value="__libre__">Saisie libre</SelectItem>
                   {exportateurs.map(e => (
                     <SelectItem key={e.id} value={String(e.id)}>{e.nom}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {!exportateurId && (
+              {exportateurId === "__libre__" && (
                 <Input className="mt-2" value={exportateurNom} onChange={e => setExportateurNom(e.target.value)} placeholder="Nom exportateur" />
               )}
             </div>
