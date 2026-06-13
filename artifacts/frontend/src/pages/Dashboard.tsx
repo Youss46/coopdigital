@@ -4,6 +4,7 @@ import { useGetDashboard, useGetDashboardLivraisons, useGetDashboardAvancesRetar
 import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation, Settings } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Redirect } from "wouter";
+import { CarteKpi } from "@/components/CarteKpi";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -13,50 +14,8 @@ function formaterFCFA(montant: number) {
   return new Intl.NumberFormat("fr-FR").format(montant) + " FCFA";
 }
 
-function formaterFCFACourt(montant: number): string {
-  if (montant >= 1_000_000) return `${(montant / 1_000_000).toFixed(1).replace(/\.0$/, "")} M FCFA`;
-  if (montant >= 1_000)     return `${Math.round(montant / 1_000)} k FCFA`;
-  return `${montant} FCFA`;
-}
-
 function formaterDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
-}
-
-function CarteKpi({
-  titre,
-  valeur,
-  valeurMobile,
-  icone: Icone,
-  couleur,
-  sousTitre,
-}: {
-  titre: string;
-  valeur: string;
-  valeurMobile?: string;
-  icone: React.ElementType;
-  couleur: string;
-  sousTitre?: string;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-5 flex items-start gap-2 sm:gap-4">
-      <div className="rounded-lg p-2 sm:p-2.5 flex-shrink-0" style={{ backgroundColor: couleur + "15" }}>
-        <Icone size={18} style={{ color: couleur }} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs sm:text-sm text-gray-500 font-medium leading-snug">{titre}</p>
-        {valeurMobile ? (
-          <>
-            <p className="sm:hidden text-base font-bold text-gray-900 mt-0.5 leading-tight">{valeurMobile}</p>
-            <p className="hidden sm:block text-2xl font-bold text-gray-900 mt-0.5 leading-tight">{valeur}</p>
-          </>
-        ) : (
-          <p className="text-base sm:text-2xl font-bold text-gray-900 mt-0.5 leading-tight break-words">{valeur}</p>
-        )}
-        {sousTitre && <p className="text-xs text-gray-400 mt-0.5 leading-snug">{sousTitre}</p>}
-      </div>
-    </div>
-  );
 }
 
 interface StatsRT {
@@ -492,7 +451,7 @@ export default function Dashboard() {
             <CarteKpi
               titre="Avances en cours"
               valeur={formaterFCFA(kpi?.avancesEnCoursMontant ?? 0)}
-              valeurMobile={formaterFCFACourt(kpi?.avancesEnCoursMontant ?? 0)}
+              montantFcfa={kpi?.avancesEnCoursMontant ?? 0}
               icone={CreditCard2}
               couleur="#c4962a"
               sousTitre="Solde total dû"
@@ -507,7 +466,7 @@ export default function Dashboard() {
             <CarteKpi
               titre="Paiements ce mois"
               valeur={formaterFCFA(kpi?.paiementsMois ?? 0)}
-              valeurMobile={formaterFCFACourt(kpi?.paiementsMois ?? 0)}
+              montantFcfa={kpi?.paiementsMois ?? 0}
               icone={Banknote}
               couleur="#16a34a"
               sousTitre="Confirmés"

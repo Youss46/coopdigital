@@ -79,12 +79,24 @@ function VerifItem({ v }: { v: VerificationCloture }) {
   );
 }
 
-function KpiCard({ label, valeur, sous }: { label: string; valeur: string; sous?: string }) {
+function KpiCard({ label, valeur, sous, montantFcfa }: { label: string; valeur: string; sous?: string; montantFcfa?: number }) {
+  const valeurMobile = montantFcfa !== undefined
+    ? (montantFcfa >= 1_000_000 ? `${(montantFcfa / 1_000_000).toFixed(1).replace(/\.0$/, "")} M FCFA`
+      : montantFcfa >= 1_000 ? `${Math.round(montantFcfa / 1_000)} k FCFA`
+      : `${montantFcfa} FCFA`)
+    : undefined;
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <div className="text-xs font-medium text-gray-500 mb-1">{label}</div>
-      <div className="text-xl font-bold text-gray-900">{valeur}</div>
-      {sous && <div className="text-xs text-gray-400 mt-0.5">{sous}</div>}
+    <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 min-w-0">
+      <div className="text-xs font-medium text-gray-500 mb-1 leading-snug">{label}</div>
+      {valeurMobile ? (
+        <>
+          <div className="sm:hidden text-base font-bold text-gray-900 leading-tight">{valeurMobile}</div>
+          <div className="hidden sm:block text-xl font-bold text-gray-900">{valeur}</div>
+        </>
+      ) : (
+        <div className="text-base sm:text-xl font-bold text-gray-900 leading-tight break-words">{valeur}</div>
+      )}
+      {sous && <div className="text-xs text-gray-400 mt-0.5 leading-snug">{sous}</div>}
     </div>
   );
 }
@@ -94,8 +106,8 @@ function BilanDetail({ bilan }: { bilan: BilanCampagne }) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <KpiCard label="Tonnage collecté" valeur={`${fmt(bilan.tonnageTotalKg)} kg`} sous={`${fmt(bilan.nbLivraisons)} livraisons`} />
-        <KpiCard label="CA ventes" valeur={`${fmt(bilan.caVentesFcfa)} FCFA`} sous={`${fmt(bilan.nbExportateurs)} exportateurs`} />
-        <KpiCard label="Marge nette" valeur={`${fmt(bilan.margeNetteFcfa)} FCFA`} sous={`${fmt(bilan.margeKgFcfa)} FCFA/kg`} />
+        <KpiCard label="CA ventes" valeur={`${fmt(bilan.caVentesFcfa)} FCFA`} montantFcfa={Number(bilan.caVentesFcfa ?? 0)} sous={`${fmt(bilan.nbExportateurs)} exportateurs`} />
+        <KpiCard label="Marge nette" valeur={`${fmt(bilan.margeNetteFcfa)} FCFA`} montantFcfa={Number(bilan.margeNetteFcfa ?? 0)} sous={`${fmt(bilan.margeKgFcfa)} FCFA/kg`} />
         <KpiCard label="Membres actifs" valeur={String(bilan.nbMembresActifs ?? 0)} />
         <KpiCard label="Prix achat moy." valeur={`${fmt(bilan.prixAchatMoyenKgFcfa)} FCFA/kg`} />
         <KpiCard label="Prix vente moy." valeur={`${fmt(bilan.prixVenteMoyenKgFcfa)} FCFA/kg`} />
