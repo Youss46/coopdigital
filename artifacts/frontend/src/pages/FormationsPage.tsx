@@ -607,6 +607,7 @@ function OngletInscriptions() {
   const [membreSearch, setMembreSearch] = useState("");
   const [membresSelectes, setMembresSelectes] = useState<MembreMinimal[]>([]);
   const [showMembreResults, setShowMembreResults] = useState(false);
+  const [confirmNonActifs, setConfirmNonActifs] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
   const canInscrire = usePermission("formation", "inscrire");
@@ -815,24 +816,64 @@ function OngletInscriptions() {
                   placeholder="Nom de la section / zone"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               )}
-              <button
-                onClick={() => inscrireMut.mutate(
-                  mode === "tous" ? { tous: true } :
-                  mode === "zone" ? { section } :
-                  { membreIds: membresSelectes.map((m) => m.id) }
-                )}
-                disabled={
-                  inscrireMut.isPending ||
-                  (mode === "zone" && !section) ||
-                  (mode === "individuel" && membresSelectes.length === 0)
-                }
-                className="w-full py-2 bg-green-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
-                {inscrireMut.isPending ? "Inscription…" : (
-                  mode === "individuel" && membresSelectes.length > 0
-                    ? `Inscrire ${membresSelectes.length} membre${membresSelectes.length > 1 ? "s" : ""}`
-                    : "Inscrire"
-                )}
-              </button>
+              {(() => {
+                const nonActifs = mode === "individuel"
+                  ? membresSelectes.filter((m) => m.statut && m.statut !== "actif")
+                  : [];
+                const doInscrire = () => {
+                  setConfirmNonActifs(false);
+                  inscrireMut.mutate(
+                    mode === "tous" ? { tous: true } :
+                    mode === "zone" ? { section } :
+                    { membreIds: membresSelectes.map((m) => m.id) }
+                  );
+                };
+                return (
+                  <>
+                    {confirmNonActifs && nonActifs.length > 0 && (
+                      <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-2">
+                        <p className="text-sm font-semibold text-amber-800 flex items-center gap-1.5">
+                          <span>⚠️</span>
+                          {nonActifs.length === 1
+                            ? `${nonActifs[0].prenoms ? `${nonActifs[0].prenoms} ${nonActifs[0].nom}` : nonActifs[0].nom} est ${nonActifs[0].statut}`
+                            : `${nonActifs.length} membres sélectionnés ne sont pas actifs`
+                          }
+                        </p>
+                        <p className="text-xs text-amber-700">Voulez-vous quand même les inscrire à cette session ?</p>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => setConfirmNonActifs(false)}
+                            className="flex-1 py-1.5 border border-amber-300 rounded-lg text-xs text-amber-800 hover:bg-amber-100">
+                            Annuler
+                          </button>
+                          <button type="button" onClick={doInscrire} disabled={inscrireMut.isPending}
+                            className="flex-1 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 disabled:opacity-50">
+                            {inscrireMut.isPending ? "Inscription…" : "Confirmer quand même"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {!confirmNonActifs && (
+                      <button
+                        onClick={() => {
+                          if (nonActifs.length > 0) { setConfirmNonActifs(true); return; }
+                          doInscrire();
+                        }}
+                        disabled={
+                          inscrireMut.isPending ||
+                          (mode === "zone" && !section) ||
+                          (mode === "individuel" && membresSelectes.length === 0)
+                        }
+                        className="w-full py-2 bg-green-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                        {inscrireMut.isPending ? "Inscription…" : (
+                          mode === "individuel" && membresSelectes.length > 0
+                            ? `Inscrire ${membresSelectes.length} membre${membresSelectes.length > 1 ? "s" : ""}`
+                            : "Inscrire"
+                        )}
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
 
