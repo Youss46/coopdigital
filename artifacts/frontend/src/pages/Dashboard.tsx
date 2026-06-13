@@ -13,6 +13,12 @@ function formaterFCFA(montant: number) {
   return new Intl.NumberFormat("fr-FR").format(montant) + " FCFA";
 }
 
+function formaterFCFACourt(montant: number): string {
+  if (montant >= 1_000_000) return `${(montant / 1_000_000).toFixed(1).replace(/\.0$/, "")} M FCFA`;
+  if (montant >= 1_000)     return `${Math.round(montant / 1_000)} k FCFA`;
+  return `${montant} FCFA`;
+}
+
 function formaterDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
@@ -20,12 +26,14 @@ function formaterDate(dateStr: string) {
 function CarteKpi({
   titre,
   valeur,
+  valeurMobile,
   icone: Icone,
   couleur,
   sousTitre,
 }: {
   titre: string;
   valeur: string;
+  valeurMobile?: string;
   icone: React.ElementType;
   couleur: string;
   sousTitre?: string;
@@ -37,7 +45,14 @@ function CarteKpi({
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs sm:text-sm text-gray-500 font-medium leading-snug">{titre}</p>
-        <p className="text-base sm:text-2xl font-bold text-gray-900 mt-0.5 leading-tight break-words">{valeur}</p>
+        {valeurMobile ? (
+          <>
+            <p className="sm:hidden text-base font-bold text-gray-900 mt-0.5 leading-tight">{valeurMobile}</p>
+            <p className="hidden sm:block text-2xl font-bold text-gray-900 mt-0.5 leading-tight">{valeur}</p>
+          </>
+        ) : (
+          <p className="text-base sm:text-2xl font-bold text-gray-900 mt-0.5 leading-tight break-words">{valeur}</p>
+        )}
         {sousTitre && <p className="text-xs text-gray-400 mt-0.5 leading-snug">{sousTitre}</p>}
       </div>
     </div>
@@ -477,6 +492,7 @@ export default function Dashboard() {
             <CarteKpi
               titre="Avances en cours"
               valeur={formaterFCFA(kpi?.avancesEnCoursMontant ?? 0)}
+              valeurMobile={formaterFCFACourt(kpi?.avancesEnCoursMontant ?? 0)}
               icone={CreditCard2}
               couleur="#c4962a"
               sousTitre="Solde total dû"
@@ -491,6 +507,7 @@ export default function Dashboard() {
             <CarteKpi
               titre="Paiements ce mois"
               valeur={formaterFCFA(kpi?.paiementsMois ?? 0)}
+              valeurMobile={formaterFCFACourt(kpi?.paiementsMois ?? 0)}
               icone={Banknote}
               couleur="#16a34a"
               sousTitre="Confirmés"
