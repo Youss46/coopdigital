@@ -631,21 +631,38 @@ function OngletInscriptions() {
   });
 
   const inscrireMut = useMutation({
-    mutationFn: (opts: { tous?: boolean; section?: string; membreIds?: number[] }) =>
-      apiPost(`/api/formations/sessions/${selectedSession}/inscrire`, {
-        ...(opts.tous ? { tous: true } : {}),
-        ...(opts.section ? { section: opts.section } : {}),
-        ...(opts.membreIds?.length ? { membreIds: opts.membreIds } : {}),
-      }),
-    onSuccess: (d: unknown) => {
-      const r = d as { inscrits: number; dejaInscrits: number };
+    mutationFn: async (opts: { tous?: boolean; section?: string; membreIds?: number[] }) => {
+      const r = await fetch(`${BASE}/api/formations/sessions/${selectedSession}/inscrire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({
+          ...(opts.tous ? { tous: true } : {}),
+          ...(opts.section ? { section: opts.section } : {}),
+          ...(opts.membreIds?.length ? { membreIds: opts.membreIds } : {}),
+        }),
+      });
+      if (r.status === 422) {
+        const body = await r.json() as { erreur?: string; code?: string };
+        throw Object.assign(new Error(body.erreur ?? "Session complète"), { code: body.code });
+      }
+      if (!r.ok) throw new Error(`${r.status}`);
+      return r.json() as Promise<{ inscrits: number; dejaInscrits: number }>;
+    },
+    onSuccess: (r) => {
       toast({ title: `${r.inscrits} inscrit(s) ajouté(s)${r.dejaInscrits ? `, ${r.dejaInscrits} déjà inscrits` : ""}` });
       setMembresSelectes([]);
       setMembreSearch("");
       qc.invalidateQueries({ queryKey: ["formations", "inscrits", selectedSession] });
       qc.invalidateQueries({ queryKey: ["formations", "sessions"] });
     },
-    onError: () => toast({ title: "Erreur inscription", variant: "destructive" }),
+    onError: (err: unknown) => {
+      const e = err as { code?: string; message?: string };
+      if (e.code === "CAPACITE_DEPASSEE") {
+        toast({ title: "Session complète", description: e.message, variant: "destructive" });
+      } else {
+        toast({ title: "Erreur inscription", variant: "destructive" });
+      }
+    },
   });
 
   const desinscrireMut = useMutation({

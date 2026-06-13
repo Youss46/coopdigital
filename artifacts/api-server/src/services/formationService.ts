@@ -220,11 +220,35 @@ export async function inscrireMembres(
   const existingSet = new Set(existing.map((r) => r.membreId));
   const nouveaux = membreIds.filter((id) => !existingSet.has(id));
 
-  if (nouveaux.length > 0) {
-    await db.insert(inscriptionsFormationTable).values(
-      nouveaux.map((membreId) => ({ sessionId, membreId }))
-    );
+  if (nouveaux.length === 0) return { inscrits: 0, dejaInscrits: existingSet.size };
+
+  // ── Vérification capacité (nb_places) ────────────────────────────────────
+  const [sess] = await db.select({ nbPlaces: sessionsFormationTable.nbPlaces })
+    .from(sessionsFormationTable)
+    .where(eq(sessionsFormationTable.id, sessionId))
+    .limit(1);
+
+  if (sess?.nbPlaces != null) {
+    const [countRow] = await db.execute<{ count: string }>(sql`
+      SELECT COUNT(*)::text AS count FROM inscriptions_formation WHERE session_id = ${sessionId}
+    `).then((r) => r.rows);
+    const totalActuels = parseInt(countRow?.count ?? "0", 10);
+    const placesDisponibles = sess.nbPlaces - totalActuels;
+
+    if (placesDisponibles <= 0) {
+      throw Object.assign(
+        new Error("Session complète — aucune place disponible"),
+        { code: "CAPACITE_DEPASSEE", disponibles: 0 }
+      );
+    }
+    if (nouveaux.length > placesDisponibles) {
+      nouveaux.splice(placesDisponibles);
+    }
   }
+
+  await db.insert(inscriptionsFormationTable).values(
+    nouveaux.map((membreId) => ({ sessionId, membreId }))
+  );
 
   return { inscrits: nouveaux.length, dejaInscrits: existingSet.size };
 }

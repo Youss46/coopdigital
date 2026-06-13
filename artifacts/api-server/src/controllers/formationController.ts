@@ -88,7 +88,14 @@ export async function postInscrire(req: Request, res: Response): Promise<void> {
     const { membreIds, zone, section, tous } = req.body as { membreIds?: number[]; zone?: string; section?: string; tous?: boolean };
     const result = await svc.inscrireMembres(cooperativeId, id, { membreIds, zone, section, tous });
     res.json(result);
-  } catch (err) { req.log.error({ err }, "postInscrire"); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (err) {
+    const e = err as { code?: string; disponibles?: number; message?: string };
+    if (e.code === "CAPACITE_DEPASSEE") {
+      res.status(422).json({ erreur: e.message ?? "Session complète", code: "CAPACITE_DEPASSEE", disponibles: e.disponibles ?? 0 });
+      return;
+    }
+    req.log.error({ err }, "postInscrire"); res.status(500).json({ error: "Erreur serveur" });
+  }
 }
 
 export async function getInscrits(req: Request, res: Response): Promise<void> {
