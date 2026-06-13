@@ -33,7 +33,11 @@ export function usePushNotifications(enabled: boolean) {
       setPermission(perm);
       if (perm !== "granted") return;
 
-      const { vapidKey } = await portailApi.pushVapidKey();
+      // Utilise la clé baked au build (plus rapide) sinon appel API
+      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
+        || (await portailApi.pushVapidKey()).vapidKey;
+      if (!vapidKey) { console.warn("[Push] Clé VAPID manquante"); return; }
+
       const reg = await navigator.serviceWorker.ready;
 
       let sub = await reg.pushManager.getSubscription();
@@ -83,7 +87,6 @@ export function usePushNotifications(enabled: boolean) {
       .then((reg) => reg.pushManager.getSubscription())
       .then(async (sub) => {
         if (sub && Notification.permission === "granted") {
-          const { vapidKey } = await portailApi.pushVapidKey();
           // Sync subscription with server (idempotent)
           await portailApi.pushSubscribe({
             endpoint: sub.endpoint,
@@ -92,7 +95,6 @@ export function usePushNotifications(enabled: boolean) {
               auth:   serializeKey(sub.getKey("auth")),
             },
           }).catch(() => {});
-          void vapidKey;
           setSubscribed(true);
         }
       })

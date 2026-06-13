@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, unique, index } from "drizzle-orm/pg-core";
 import { membresTable } from "./membres";
 
 export const pushSubscriptionsPortailTable = pgTable("push_subscriptions_portail", {
@@ -8,6 +8,9 @@ export const pushSubscriptionsPortailTable = pgTable("push_subscriptions_portail
   p256dh:    text("p256dh").notNull(),
   auth:      text("auth").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-}, (t) => [unique().on(t.membreId, t.endpoint)]);
+}, (t) => [
+  unique().on(t.membreId, t.endpoint),
+  index("push_sub_portail_membre_idx").on(t.membreId),
+]);
 
 export type PushSubscriptionPortail = typeof pushSubscriptionsPortailTable.$inferSelect;

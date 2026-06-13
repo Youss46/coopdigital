@@ -197,6 +197,13 @@
       "when": 1781620000000,
       "tag": "0027_portail_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1781375367121,
+      "tag": "0028_supreme_stingray",
+      "breakpoints": true
     }
   ]
 }
