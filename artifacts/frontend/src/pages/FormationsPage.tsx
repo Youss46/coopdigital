@@ -734,6 +734,7 @@ function OngletInscriptions() {
                       <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                         {membreResults
                           .filter((m) => !membresSelectes.some((s) => s.id === m.id))
+                          .filter((m) => !inscrits.some((i) => i.membre_id === m.id))
                           .map((m) => (
                             <button key={m.id} type="button"
                               onMouseDown={(e) => {
