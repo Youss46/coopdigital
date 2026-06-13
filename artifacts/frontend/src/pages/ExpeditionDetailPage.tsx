@@ -10,10 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import {
-  ArrowLeft, Ship, Truck, MapPin, Package, CheckCircle2,
-  AlertTriangle, Clock, ChevronRight, FileText, Users,
+  ArrowLeft, Ship, MapPin, CheckCircle2,
+  ChevronRight, FileText, Users, Leaf, AlertCircle,
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -244,6 +243,64 @@ export default function ExpeditionDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Certificat phytosanitaire */}
+      {(() => {
+        const phytoNumero    = exp.certificatPhytoNumero ? String(exp.certificatPhytoNumero) : null;
+        const phytoOrganisme = exp.certificatPhytoOrganisme ? String(exp.certificatPhytoOrganisme) : "DPVC";
+        const phytoEmission  = exp.certificatPhytoDateEmission ? String(exp.certificatPhytoDateEmission) : null;
+        const phytoExpiration = exp.certificatPhytoDateExpiration ? String(exp.certificatPhytoDateExpiration) : null;
+        const estExpire      = phytoExpiration ? new Date(phytoExpiration) < new Date() : false;
+        return (
+          <Card className={phytoNumero ? (estExpire ? "border-red-300" : "border-green-300") : "border-orange-200"}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Leaf className={`h-4 w-4 ${phytoNumero ? (estExpire ? "text-red-600" : "text-green-600") : "text-orange-500"}`} />
+                Certificat phytosanitaire
+                {phytoNumero
+                  ? estExpire
+                    ? <span className="ml-auto text-xs text-red-600 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> Expiré</span>
+                    : <span className="ml-auto text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Valide</span>
+                  : <span className="ml-auto text-xs text-orange-600">Non renseigné</span>
+                }
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {phytoNumero ? (
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                  <div>
+                    <span className="text-gray-500 text-xs">Numéro</span>
+                    <div className="font-mono font-semibold">{phytoNumero}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-xs">Organisme émetteur</span>
+                    <div className="font-medium">{phytoOrganisme}</div>
+                  </div>
+                  {phytoEmission && (
+                    <div>
+                      <span className="text-gray-500 text-xs">Date d'émission</span>
+                      <div>{new Date(phytoEmission).toLocaleDateString("fr-FR")}</div>
+                    </div>
+                  )}
+                  {phytoExpiration && (
+                    <div>
+                      <span className="text-gray-500 text-xs">Date d'expiration</span>
+                      <div className={estExpire ? "text-red-600 font-semibold" : ""}>
+                        {new Date(phytoExpiration).toLocaleDateString("fr-FR")}
+                        {estExpire ? " ⚠️" : ""}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-orange-600 italic">
+                  Certificat phytosanitaire non encore renseigné — obligatoire pour l'export.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Lots EUDR */}
       {lots.length > 0 && (

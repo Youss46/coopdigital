@@ -7,6 +7,8 @@ import {
   changerStatut,
   confirmerReception,
   getRapportEudr,
+  getFlotteVehicules,
+  getFlotteChauffeurs,
 } from "../services/expeditionsService";
 
 export async function handleListExpeditions(req: Request, res: Response): Promise<void> {
@@ -96,6 +98,30 @@ export async function handleConfirmerReception(req: Request, res: Response): Pro
     req.log.error({ err }, "handleConfirmerReception");
     const msg = err instanceof Error ? err.message : "Erreur interne";
     res.status(400).json({ erreur: msg });
+  }
+}
+
+export async function handleGetFlotteVehicules(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const vehicules = await getFlotteVehicules(cooperativeId);
+    res.json(vehicules);
+  } catch (err) {
+    req.log.error({ err }, "handleGetFlotteVehicules");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleGetFlotteChauffeurs(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const chauffeurs = await getFlotteChauffeurs(cooperativeId);
+    res.json(chauffeurs);
+  } catch (err) {
+    req.log.error({ err }, "handleGetFlotteChauffeurs");
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 

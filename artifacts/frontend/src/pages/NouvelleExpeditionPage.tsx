@@ -9,8 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Ship, Plus, Trash2, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, Ship, Plus, Trash2, CheckCircle2, XCircle, Leaf } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -40,21 +39,21 @@ async function apiPost<T>(path: string, token: string | null, body: unknown): Pr
 
 interface LotLigne {
   key: string;
-  membreId?: number;
-  livraisonId?: number;
   poidsKg: string;
   nombreSacs: string;
   certificatEudr: string;
   parcelleOrigine: string;
 }
 
-interface Exportateur { id: number; nom: string; }
+interface Exportateur   { id: number; nom: string; }
+interface VehiculeFlotte { id: number; immatriculation: string; marque?: string; modele?: string; capaciteKg?: string; statut: string; }
+interface ChauffeurFlotte { id: number; nom: string; prenoms?: string; telephone?: string; }
 
+// Documents obligatoires hors certificat phyto (géré séparément)
 const DOCS_REQUIS = [
-  { key: "bon_livraison",            label: "Bon de livraison" },
-  { key: "bordereau_transport",      label: "Bordereau de transport" },
-  { key: "certificat_phytosanitaire", label: "Certificat phytosanitaire" },
-  { key: "document_eudr",            label: "Documents EUDR" },
+  { key: "bon_livraison",       label: "Bon de livraison" },
+  { key: "bordereau_transport", label: "Bordereau de transport" },
+  { key: "document_eudr",       label: "Documents EUDR" },
 ];
 
 export default function NouvelleExpeditionPage() {
@@ -62,17 +61,24 @@ export default function NouvelleExpeditionPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
+  // Véhicule
   const [typeVehicule, setTypeVehicule] = useState<"propre" | "location">("propre");
-  const [immatriculation, setImmatriculation] = useState("");
-  const [nomChauffeur, setNomChauffeur] = useState("");
-  const [telephoneChauffeur, setTelephoneChauffeur] = useState("");
+  const [vehiculeId, setVehiculeId] = useState("");
+  const [chauffeurId, setChauffeurId] = useState("");
+  const [immatriculationLibre, setImmatriculationLibre] = useState("");
+  const [nomChauffeurLibre, setNomChauffeurLibre] = useState("");
+  const [telephoneChauffeurLibre, setTelephoneChauffeurLibre] = useState("");
   const [transporteur, setTransporteur] = useState("");
   const [numeroBonTransport, setNumeroBonTransport] = useState("");
+
+  // Chargement
   const [dateDepart, setDateDepart] = useState("");
   const [lieuDepart, setLieuDepart] = useState("Magasin central");
   const [poidsCharge, setPoidsCharge] = useState("");
   const [nombreSacs, setNombreSacs] = useState("");
   const [numeroLots, setNumeroLots] = useState("");
+
+  // Destination
   const [port, setPort] = useState("Abidjan");
   const [portAutre, setPortAutre] = useState("");
   const [entrepotDestination, setEntrepotDestination] = useState("");
@@ -80,13 +86,36 @@ export default function NouvelleExpeditionPage() {
   const [exportateurNom, setExportateurNom] = useState("");
   const [numeroContrat, setNumeroContrat] = useState("");
   const [heureEstimeeArrivee, setHeureEstimeeArrivee] = useState("");
+
+  // Certificat phytosanitaire
+  const [phytoNumero, setPhytoNumero] = useState("");
+  const [phytoDateEmission, setPhytoDateEmission] = useState("");
+  const [phytoDateExpiration, setPhytoDateExpiration] = useState("");
+  const [phytoOrganisme, setPhytoOrganisme] = useState("DPVC");
+
+  // Documents et lots
   const [docsValides, setDocsValides] = useState<Record<string, boolean>>({});
   const [lots, setLots] = useState<LotLigne[]>([]);
 
+  // Requêtes flotte + exportateurs
+  const { data: vehiculesFlotte = [] } = useQuery<VehiculeFlotte[]>({
+    queryKey: ["expedition-vehicules"],
+    queryFn: () => apiFetch("/api/expeditions/flotte/vehicules", token),
+    enabled: typeVehicule === "propre",
+  });
+  const { data: chauffeursFlotte = [] } = useQuery<ChauffeurFlotte[]>({
+    queryKey: ["expedition-chauffeurs"],
+    queryFn: () => apiFetch("/api/expeditions/flotte/chauffeurs", token),
+    enabled: typeVehicule === "propre",
+  });
   const { data: exportateurs = [] } = useQuery<Exportateur[]>({
     queryKey: ["exportateurs-liste"],
     queryFn: () => apiFetch("/api/exportateurs", token),
   });
+
+  // Vehicule sélectionné → info affichée
+  const vehiculeSelectionne = vehiculesFlotte.find(v => String(v.id) === vehiculeId);
+  const chauffeurSelectionne = chauffeursFlotte.find(c => String(c.id) === chauffeurId);
 
   const mutation = useMutation({
     mutationFn: (body: unknown) => apiPost("/api/expeditions", token, body),
@@ -99,31 +128,28 @@ export default function NouvelleExpeditionPage() {
     },
   });
 
-  const ajouterLot = () => {
-    setLots(prev => [...prev, {
-      key: Date.now().toString(),
-      poidsKg: "", nombreSacs: "", certificatEudr: "", parcelleOrigine: "",
-    }]);
-  };
+  const ajouterLot = () =>
+    setLots(prev => [...prev, { key: Date.now().toString(), poidsKg: "", nombreSacs: "", certificatEudr: "", parcelleOrigine: "" }]);
 
-  const supprimerLot = (key: string) => setLots(prev => prev.filter(l => l.key !== key));
-
-  const mettreAJourLot = (key: string, field: keyof LotLigne, value: string) => {
+  const supprimerLot   = (key: string) => setLots(prev => prev.filter(l => l.key !== key));
+  const mettreAJourLot = (key: string, field: keyof LotLigne, value: string) =>
     setLots(prev => prev.map(l => l.key === key ? { ...l, [field]: value } : l));
-  };
 
   const toggleDoc = (key: string) => setDocsValides(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const docsManquants = DOCS_REQUIS.filter(d => !docsValides[d.key]);
+  const phytoValide = Boolean(phytoNumero && phytoDateEmission);
+  const docsManquants = [
+    ...DOCS_REQUIS.filter(d => !docsValides[d.key]).map(d => d.label),
+    ...(!phytoValide ? ["Certificat phytosanitaire (N° + date requis)"] : []),
+  ];
 
   const handleSubmit = () => {
-    if (!dateDepart) { toast({ title: "Date de départ requise", variant: "destructive" }); return; }
+    if (!dateDepart)                             { toast({ title: "Date de départ requise", variant: "destructive" }); return; }
     if (!poidsCharge || parseFloat(poidsCharge) <= 0) { toast({ title: "Poids chargé requis", variant: "destructive" }); return; }
     if (docsManquants.length > 0) {
-      toast({ title: "Documents manquants", description: docsManquants.map(d => d.label).join(", "), variant: "destructive" });
+      toast({ title: "Documents incomplets", description: docsManquants.join(", "), variant: "destructive" });
       return;
     }
-
     const portFinal = port === "autre" ? portAutre : port;
     if (!portFinal) { toast({ title: "Port de destination requis", variant: "destructive" }); return; }
 
@@ -133,11 +159,13 @@ export default function NouvelleExpeditionPage() {
 
     mutation.mutate({
       typeVehicule,
-      immatriculation:    typeVehicule === "propre" ? immatriculation : immatriculation,
-      nomChauffeur:       typeVehicule === "propre" ? nomChauffeur : undefined,
-      telephoneChauffeur: typeVehicule === "propre" ? telephoneChauffeur : undefined,
-      transporteur:       typeVehicule === "location" ? transporteur : undefined,
-      numeroBonTransport: typeVehicule === "location" ? numeroBonTransport : undefined,
+      vehiculeId:         vehiculeId ? parseInt(vehiculeId, 10) : undefined,
+      chauffeurId:        chauffeurId ? parseInt(chauffeurId, 10) : undefined,
+      immatriculation:    typeVehicule === "location" ? immatriculationLibre || undefined : undefined,
+      nomChauffeur:       typeVehicule === "location" ? nomChauffeurLibre || undefined : undefined,
+      telephoneChauffeur: typeVehicule === "location" ? telephoneChauffeurLibre || undefined : undefined,
+      transporteur:       typeVehicule === "location" ? transporteur || undefined : undefined,
+      numeroBonTransport: typeVehicule === "location" ? numeroBonTransport || undefined : undefined,
       dateDepart,
       lieuDepart,
       poidsChargeKg:  parseFloat(poidsCharge),
@@ -149,10 +177,12 @@ export default function NouvelleExpeditionPage() {
       exportateurNom: exNom,
       numeroContratExport: numeroContrat || undefined,
       heureEstimeeArrivee: heureEstimeeArrivee || undefined,
+      certificatPhytoNumero:         phytoNumero || undefined,
+      certificatPhytoDateEmission:   phytoDateEmission || undefined,
+      certificatPhytoDateExpiration: phytoDateExpiration || undefined,
+      certificatPhytoOrganisme:      phytoOrganisme || "DPVC",
       documents: DOCS_REQUIS.filter(d => docsValides[d.key]).map(d => ({ type: d.key, url: "", date: new Date().toISOString() })),
       lots: lots.filter(l => l.poidsKg).map(l => ({
-        membreId:       l.membreId,
-        livraisonId:    l.livraisonId,
         poidsKg:        parseFloat(l.poidsKg),
         nombreSacs:     l.nombreSacs ? parseInt(l.nombreSacs, 10) : undefined,
         certificatEudr: l.certificatEudr || undefined,
@@ -168,10 +198,8 @@ export default function NouvelleExpeditionPage() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/expeditions")} className="gap-1">
           <ArrowLeft className="h-4 w-4" /> Retour
         </Button>
-        <div className="flex items-center gap-2">
-          <Ship className="h-5 w-5 text-green-700" />
-          <h1 className="text-xl font-bold text-gray-900">Nouvelle expédition</h1>
-        </div>
+        <Ship className="h-5 w-5 text-green-700" />
+        <h1 className="text-xl font-bold text-gray-900">Nouvelle expédition</h1>
         <span className="ml-auto text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full font-mono">N° auto</span>
       </div>
 
@@ -181,46 +209,88 @@ export default function NouvelleExpeditionPage() {
           <CardTitle className="text-base">🚛 Véhicule</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <RadioGroup value={typeVehicule} onValueChange={(v) => setTypeVehicule(v as "propre" | "location")} className="flex gap-6">
+          <RadioGroup value={typeVehicule} onValueChange={(v) => { setTypeVehicule(v as "propre" | "location"); setVehiculeId(""); setChauffeurId(""); }} className="flex gap-6">
             <div className="flex items-center gap-2">
               <RadioGroupItem value="propre" id="propre" />
-              <Label htmlFor="propre">Camion propre</Label>
+              <Label htmlFor="propre">Camion propre (flotte coopérative)</Label>
             </div>
             <div className="flex items-center gap-2">
               <RadioGroupItem value="location" id="location" />
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location">Location / prestataire</Label>
             </div>
           </RadioGroup>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Immatriculation *</Label>
-              <Input value={immatriculation} onChange={e => setImmatriculation(e.target.value)} placeholder="CI-1234-AB" />
-            </div>
-            {typeVehicule === "propre" ? (
-              <>
+          {typeVehicule === "propre" ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Véhicule *</Label>
+                  <Select value={vehiculeId} onValueChange={setVehiculeId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={vehiculesFlotte.length === 0 ? "Aucun véhicule dans la flotte" : "Sélectionner…"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vehiculesFlotte.map(v => (
+                        <SelectItem key={v.id} value={String(v.id)}>
+                          {v.immatriculation}{v.marque ? ` — ${v.marque} ${v.modele ?? ""}` : ""}
+                          {v.statut !== "disponible" ? ` (${v.statut})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {vehiculeSelectionne?.capaciteKg && (
+                    <p className="text-xs text-gray-500 mt-1">Capacité : {parseFloat(vehiculeSelectionne.capaciteKg).toLocaleString("fr-FR")} kg</p>
+                  )}
+                </div>
                 <div>
                   <Label>Chauffeur *</Label>
-                  <Input value={nomChauffeur} onChange={e => setNomChauffeur(e.target.value)} placeholder="Nom complet" />
+                  <Select value={chauffeurId} onValueChange={setChauffeurId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={chauffeursFlotte.length === 0 ? "Aucun chauffeur actif" : "Sélectionner…"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {chauffeursFlotte.map(c => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.nom} {c.prenoms ?? ""}{c.telephone ? ` — ${c.telephone}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {chauffeurSelectionne?.telephone && (
+                    <p className="text-xs text-gray-500 mt-1">📞 {chauffeurSelectionne.telephone}</p>
+                  )}
                 </div>
-                <div>
-                  <Label>Téléphone chauffeur</Label>
-                  <Input value={telephoneChauffeur} onChange={e => setTelephoneChauffeur(e.target.value)} placeholder="+225 07 xx xx xx" />
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <Label>Société transporteur *</Label>
-                  <Input value={transporteur} onChange={e => setTransporteur(e.target.value)} placeholder="Nom société" />
-                </div>
-                <div>
-                  <Label>N° bon de transport *</Label>
-                  <Input value={numeroBonTransport} onChange={e => setNumeroBonTransport(e.target.value)} placeholder="BT-2025-..." />
-                </div>
-              </>
-            )}
-          </div>
+              </div>
+              {vehiculesFlotte.length === 0 && (
+                <p className="text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded px-3 py-2">
+                  ⚠️ Aucun véhicule trouvé dans la flotte. Ajoutez des véhicules dans le module Transport, ou utilisez "Location".
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Immatriculation *</Label>
+                <Input value={immatriculationLibre} onChange={e => setImmatriculationLibre(e.target.value)} placeholder="CI-1234-AB" />
+              </div>
+              <div>
+                <Label>Société transporteur *</Label>
+                <Input value={transporteur} onChange={e => setTransporteur(e.target.value)} placeholder="Nom société" />
+              </div>
+              <div>
+                <Label>N° bon de transport *</Label>
+                <Input value={numeroBonTransport} onChange={e => setNumeroBonTransport(e.target.value)} placeholder="BT-2025-..." />
+              </div>
+              <div>
+                <Label>Nom chauffeur</Label>
+                <Input value={nomChauffeurLibre} onChange={e => setNomChauffeurLibre(e.target.value)} placeholder="Nom complet" />
+              </div>
+              <div>
+                <Label>Téléphone chauffeur</Label>
+                <Input value={telephoneChauffeurLibre} onChange={e => setTelephoneChauffeurLibre(e.target.value)} placeholder="+225 07 xx xx xx" />
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -242,6 +312,9 @@ export default function NouvelleExpeditionPage() {
             <div>
               <Label>Poids chargé (kg) *</Label>
               <Input type="number" value={poidsCharge} onChange={e => setPoidsCharge(e.target.value)} placeholder="18500" />
+              {vehiculeSelectionne?.capaciteKg && poidsCharge && parseFloat(poidsCharge) > parseFloat(vehiculeSelectionne.capaciteKg) && (
+                <p className="text-xs text-orange-600 mt-1">⚠️ Dépasse la capacité ({parseFloat(vehiculeSelectionne.capaciteKg).toLocaleString("fr-FR")} kg)</p>
+              )}
             </div>
             <div>
               <Label>Nombre de sacs *</Label>
@@ -250,6 +323,49 @@ export default function NouvelleExpeditionPage() {
             <div className="col-span-2">
               <Label>N° de lots (référence)</Label>
               <Input value={numeroLots} onChange={e => setNumeroLots(e.target.value)} placeholder="LOT-001, LOT-002, ..." />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* CERTIFICAT PHYTOSANITAIRE */}
+      <Card className="border-green-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Leaf className="h-4 w-4 text-green-600" />
+            Certificat phytosanitaire *
+            {phytoValide
+              ? <span className="ml-auto text-xs text-green-600 font-normal flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Valide</span>
+              : <span className="ml-auto text-xs text-orange-600 font-normal">Obligatoire pour l'export</span>
+            }
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Numéro du certificat *</Label>
+              <Input
+                value={phytoNumero}
+                onChange={e => setPhytoNumero(e.target.value)}
+                placeholder="DPVC-2025-XXXXX"
+                className={phytoNumero ? "border-green-400" : ""}
+              />
+            </div>
+            <div>
+              <Label>Organisme émetteur</Label>
+              <Input value={phytoOrganisme} onChange={e => setPhytoOrganisme(e.target.value)} placeholder="DPVC" />
+              <p className="text-xs text-gray-400 mt-1">Direction de la Protection des Végétaux et du Contrôle</p>
+            </div>
+            <div>
+              <Label>Date d'émission *</Label>
+              <Input type="date" value={phytoDateEmission} onChange={e => setPhytoDateEmission(e.target.value)} />
+            </div>
+            <div>
+              <Label>Date d'expiration</Label>
+              <Input type="date" value={phytoDateExpiration} onChange={e => setPhytoDateExpiration(e.target.value)} />
+              {phytoDateExpiration && new Date(phytoDateExpiration) < new Date() && (
+                <p className="text-xs text-red-600 mt-1">⚠️ Certificat expiré !</p>
+              )}
             </div>
           </div>
         </CardContent>
@@ -304,9 +420,7 @@ export default function NouvelleExpeditionPage() {
             <div>
               <Label>Port *</Label>
               <Select value={port} onValueChange={setPort}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Abidjan">Abidjan</SelectItem>
                   <SelectItem value="San Pedro">San Pedro</SelectItem>
@@ -324,9 +438,7 @@ export default function NouvelleExpeditionPage() {
             <div>
               <Label>Exportateur</Label>
               <Select value={exportateurId} onValueChange={setExportateurId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner…" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Sélectionner…" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Saisie libre</SelectItem>
                   {exportateurs.map(e => (
@@ -353,7 +465,7 @@ export default function NouvelleExpeditionPage() {
       {/* DOCUMENTS */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">📎 Documents obligatoires</CardTitle>
+          <CardTitle className="text-base">📎 Documents complémentaires</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {DOCS_REQUIS.map(doc => (
@@ -371,14 +483,14 @@ export default function NouvelleExpeditionPage() {
           ))}
           {docsManquants.length > 0 && (
             <p className="text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded px-3 py-2">
-              ⚠️ Documents manquants : {docsManquants.map(d => d.label).join(", ")}
+              ⚠️ Manquants : {docsManquants.join(", ")}
             </p>
           )}
         </CardContent>
       </Card>
 
       {/* Actions */}
-      <div className="flex gap-3 justify-end">
+      <div className="flex gap-3 justify-end pb-8">
         <Button variant="outline" onClick={() => navigate("/expeditions")}>Annuler</Button>
         <Button
           className="bg-green-700 hover:bg-green-800 gap-2"

@@ -1,4 +1,4 @@
-import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable } from "@workspace/db";
+import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable } from "@workspace/db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { proposerEcriture } from "./comptabiliteService";
 import { notifExpeditionArriveePort, notifExpeditionLitige } from "./notificationService.js";
@@ -146,12 +146,55 @@ export async function getExpedition(cooperativeId: number, expeditionId: number)
   return { ...exp, lots, historique };
 }
 
-// ── Création ────────────────────────────────────────────────────────────────
+// ── Flotte disponible ────────────────────────────────────────────────────────
+
+export async function getFlotteVehicules(cooperativeId: number) {
+  return db
+    .select({
+      id:              vehiculesTable.id,
+      immatriculation: vehiculesTable.immatriculation,
+      marque:          vehiculesTable.marque,
+      modele:          vehiculesTable.modele,
+      capaciteKg:      vehiculesTable.capaciteKg,
+      statut:          vehiculesTable.statut,
+    })
+    .from(vehiculesTable)
+    .where(
+      and(
+        eq(vehiculesTable.cooperativeId, cooperativeId),
+        eq(vehiculesTable.proprietaire, "cooperative"),
+      )
+    )
+    .orderBy(vehiculesTable.immatriculation);
+}
+
+export async function getFlotteChauffeurs(cooperativeId: number) {
+  return db
+    .select({
+      id:        chauffeursTable.id,
+      nom:       chauffeursTable.nom,
+      prenoms:   chauffeursTable.prenoms,
+      telephone: chauffeursTable.telephone,
+      statut:    chauffeursTable.statut,
+    })
+    .from(chauffeursTable)
+    .where(
+      and(
+        eq(chauffeursTable.cooperativeId, cooperativeId),
+        eq(chauffeursTable.statut, "actif"),
+      )
+    )
+    .orderBy(chauffeursTable.nom);
+}
+
+// ── Création ─────────────────────────────────────────────────────────────────
 
 export interface CreateExpeditionInput {
   campagneId?: number;
   exerciceId?: number;
   typeVehicule: "propre" | "location";
+  vehiculeId?: number;
+  chauffeurId?: number;
   immatriculation?: string;
   nomChauffeur?: string;
   telephoneChauffeur?: string;
@@ -168,6 +211,11 @@ export interface CreateExpeditionInput {
   exportateurNom?: string;
   numeroContratExport?: string;
   heureEstimeeArrivee?: string;
+  // Certificat phytosanitaire
+  certificatPhytoNumero?: string;
+  certificatPhytoDateEmission?: string;
+  certificatPhytoDateExpiration?: string;
+  certificatPhytoOrganisme?: string;
   documents?: unknown[];
   lots?: Array<{
     membreId?: number;
@@ -182,15 +230,36 @@ export interface CreateExpeditionInput {
 export async function createExpedition(cooperativeId: number, userId: number, input: CreateExpeditionInput) {
   const numero = await genererNumeroExpedition(cooperativeId);
 
+  // Si camion propre avec vehiculeId, auto-résoudre immatriculation depuis flotte
+  let immatriculation = input.immatriculation ?? null;
+  let nomChauffeur    = input.nomChauffeur ?? null;
+  let telephoneChauffeur = input.telephoneChauffeur ?? null;
+
+  if (input.vehiculeId) {
+    const veh = await db.select({ immatriculation: vehiculesTable.immatriculation })
+      .from(vehiculesTable).where(eq(vehiculesTable.id, input.vehiculeId)).limit(1);
+    if (veh[0]) immatriculation = veh[0].immatriculation;
+  }
+  if (input.chauffeurId) {
+    const ch = await db.select({ nom: chauffeursTable.nom, prenoms: chauffeursTable.prenoms, telephone: chauffeursTable.telephone })
+      .from(chauffeursTable).where(eq(chauffeursTable.id, input.chauffeurId)).limit(1);
+    if (ch[0]) {
+      nomChauffeur       = `${ch[0].nom} ${ch[0].prenoms ?? ""}`.trim();
+      telephoneChauffeur = ch[0].telephone ?? null;
+    }
+  }
+
   const [exp] = await db.insert(expeditionsTable).values({
     cooperativeId,
     numeroExpedition:   numero,
     campagneId:         input.campagneId ?? null,
     exerciceId:         input.exerciceId ?? null,
     typeVehicule:       input.typeVehicule,
-    immatriculation:    input.immatriculation ?? null,
-    nomChauffeur:       input.nomChauffeur ?? null,
-    telephoneChauffeur: input.telephoneChauffeur ?? null,
+    vehiculeId:         input.vehiculeId ?? null,
+    chauffeurId:        input.chauffeurId ?? null,
+    immatriculation,
+    nomChauffeur,
+    telephoneChauffeur,
     transporteur:       input.transporteur ?? null,
     numeroBonTransport: input.numeroBonTransport ?? null,
     dateDepart:         input.dateDepart ? new Date(input.dateDepart).toISOString() : null,
@@ -204,6 +273,10 @@ export async function createExpedition(cooperativeId: number, userId: number, in
     exportateurNom:     input.exportateurNom ?? null,
     numeroContratExport: input.numeroContratExport ?? null,
     heureEstimeeArrivee: input.heureEstimeeArrivee ? new Date(input.heureEstimeeArrivee).toISOString() : null,
+    certificatPhytoNumero:         input.certificatPhytoNumero ?? null,
+    certificatPhytoDateEmission:   input.certificatPhytoDateEmission ?? null,
+    certificatPhytoDateExpiration: input.certificatPhytoDateExpiration ?? null,
+    certificatPhytoOrganisme:      input.certificatPhytoOrganisme ?? "DPVC",
     documents:          input.documents ?? [],
     statut:             "en_preparation",
     creePar:            userId,

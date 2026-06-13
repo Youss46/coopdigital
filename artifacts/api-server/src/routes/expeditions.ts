@@ -8,6 +8,8 @@ import {
   handleChangerStatut,
   handleConfirmerReception,
   handleRapportEudr,
+  handleGetFlotteVehicules,
+  handleGetFlotteChauffeurs,
 } from "../controllers/expeditionsController";
 
 const router = Router();
@@ -22,6 +24,18 @@ router.get(
   "/expeditions/stats",
   checkPermission("expeditions", "lire"),
   handleGetStats,
+);
+
+router.get(
+  "/expeditions/flotte/vehicules",
+  checkPermission("expeditions", "lire"),
+  handleGetFlotteVehicules,
+);
+
+router.get(
+  "/expeditions/flotte/chauffeurs",
+  checkPermission("expeditions", "lire"),
+  handleGetFlotteChauffeurs,
 );
 
 router.post(

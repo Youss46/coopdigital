@@ -1,12 +1,14 @@
 import {
   pgTable, pgEnum, serial, integer, varchar, numeric, text,
-  boolean, timestamp, jsonb,
+  boolean, timestamp, jsonb, date,
 } from "drizzle-orm/pg-core";
 import { cooperativesTable } from "./cooperatives";
 import { campagnesTable } from "./campagnes";
 import { membresTable } from "./membres";
 import { livraisonsTable } from "./livraisons";
 import { exportateursTable } from "./exportateurs";
+import { vehiculesTable } from "./transport";
+import { chauffeursTable } from "./transport";
 
 export const expeditionStatutEnum = pgEnum("expedition_statut", [
   "en_preparation",
@@ -38,7 +40,10 @@ export const expeditionsTable = pgTable("expeditions", {
   campagneId:           integer("campagne_id").references(() => campagnesTable.id),
   exerciceId:           integer("exercice_id"),
 
+  // Véhicule — lien flotte propre OU texte libre pour location
   typeVehicule:         expeditionTypeVehiculeEnum("type_vehicule").notNull(),
+  vehiculeId:           integer("vehicule_id").references(() => vehiculesTable.id),
+  chauffeurId:          integer("chauffeur_id").references(() => chauffeursTable.id),
   immatriculation:      varchar("immatriculation", { length: 50 }),
   nomChauffeur:         varchar("nom_chauffeur", { length: 200 }),
   telephoneChauffeur:   varchar("telephone_chauffeur", { length: 30 }),
@@ -60,6 +65,7 @@ export const expeditionsTable = pgTable("expeditions", {
   heureEstimeeArrivee:  timestamp("heure_estimee_arrivee", { withTimezone: true }),
   positionGpsActuelle:  jsonb("position_gps_actuelle"),
 
+  // Réception port
   dateArriveePort:      timestamp("date_arrivee_port", { withTimezone: true }),
   poidsRecuPortKg:      numeric("poids_recu_port_kg", { precision: 12, scale: 2 }),
   numeroRecepissePort:  varchar("numero_recepisse_port", { length: 100 }),
@@ -70,8 +76,13 @@ export const expeditionsTable = pgTable("expeditions", {
   motifEcart:           expeditionMotifEcartEnum("motif_ecart"),
   provisionLitige:      boolean("provision_litige").default(false),
 
-  documents:            jsonb("documents").default([]),
+  // Certificat phytosanitaire
+  certificatPhytoNumero:         varchar("certificat_phyto_numero", { length: 100 }),
+  certificatPhytoDateEmission:   date("certificat_phyto_date_emission", { mode: "string" }),
+  certificatPhytoDateExpiration: date("certificat_phyto_date_expiration", { mode: "string" }),
+  certificatPhytoOrganisme:      varchar("certificat_phyto_organisme", { length: 200 }).default("DPVC"),
 
+  documents:            jsonb("documents").default([]),
   statut:               expeditionStatutEnum("statut").notNull().default("en_preparation"),
 
   ecritureDepartId:     integer("ecriture_depart_id"),
