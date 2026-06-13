@@ -320,6 +320,6 @@ export async function drawFooter(
       `Page ${numeroPage} / ${totalPages}`,
       pageWidth - marginRight - 55,
       footerY,
-      { width: 55, align: "right" },
+      { width: 55, align: "right", lineBreak: false },
     );
 }
