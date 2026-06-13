@@ -2,9 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { api, type Livraison, type Avance, type PartsSociales, type Score, type PortailNotification } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { Loader2, TrendingUp, LogOut, Bell, BellOff, BellRing, X, CheckCheck } from "lucide-react";
+import { Loader2, TrendingUp, LogOut, Bell, X, CheckCheck } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const fmt = (n: number | string) => Number(n).toLocaleString("fr-FR");
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("fr-FR");
@@ -35,7 +34,6 @@ export default function DashboardPage() {
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
   const [notifs, setNotifs] = useState<PortailNotification[]>([]);
   const [showNotifs, setShowNotifs] = useState(false);
-  const { isSupported, permission, subscribed, subscribe } = usePushNotifications(!!profil);
 
   const nonLues = notifs.filter((n) => !n.lu).length;
 
@@ -97,30 +95,6 @@ export default function DashboardPage() {
               </span>
             )}
           </button>
-          {/* Cloche push web */}
-          {isSupported && (
-            <button
-              onClick={() => { if (permission !== "denied") subscribe(); }}
-              className={`p-2 rounded-xl transition-colors ${
-                permission === "granted" && subscribed ? "bg-white/20" : "bg-white/10 hover:bg-white/20"
-              }`}
-              title={
-                permission === "granted" && subscribed
-                  ? "Notifications push activées"
-                  : permission === "denied"
-                  ? "Notifications bloquées"
-                  : "Activer les notifications push"
-              }
-            >
-              {permission === "denied" ? (
-                <BellOff className="w-5 h-5 text-white/40" />
-              ) : permission === "granted" && subscribed ? (
-                <BellRing className="w-5 h-5 text-yellow-300" />
-              ) : (
-                <Bell className="w-5 h-5 text-white/40" />
-              )}
-            </button>
-          )}
           <button
             onClick={() => setConfirmDeconnexion(true)}
             className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
