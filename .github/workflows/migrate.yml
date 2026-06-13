@@ -32,8 +32,8 @@ jobs:
       - name: Vérifier couverture migrations (schema vs SQL)
         run: pnpm --filter @workspace/scripts run check-schema-coverage
 
-      - name: Run drizzle-kit push (Railway)
+      - name: Run drizzle-kit migrate (Railway)
         working-directory: lib/db
         env:
           DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
-        run: pnpm run push-force
+        run: pnpm run migrate
