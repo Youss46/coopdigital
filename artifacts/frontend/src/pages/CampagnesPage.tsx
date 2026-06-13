@@ -26,7 +26,7 @@ import {
   type ComparaisonBilanCampagne,
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 

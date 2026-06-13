@@ -62,6 +62,7 @@ _Ajouter ici les préférences explicites de l'utilisateur._
 - Le `codegen` doit être re-exécuté après chaque modification de `openapi.yaml`
 - `montantRembourse_fcfa` dans le schéma Drizzle utilise un underscore interne (colonne `montant_rembourse_fcfa`) — préférer l'import direct depuis `@workspace/db`
 - Le frontend utilise **wouter** (pas react-router-dom) pour le routing
+- `useAuth` est dans `@/contexts/AuthContext` (pas `@/hooks/useAuth` — ce chemin n'existe pas)
 - `UseQueryOptions` dans React Query v5 exige `queryKey` — utiliser les helpers `getGet*QueryKey()` générés par Orval quand on passe des options `enabled`
 - Seed admin : `admin@coopdigital.ci` / `Admin1234!`
 
