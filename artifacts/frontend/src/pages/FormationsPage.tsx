@@ -622,10 +622,10 @@ function OngletInscriptions() {
     enabled: !!selectedSession,
   });
 
-  const { data: membreResults = [] } = useQuery({
+  const { data: membreResults = [], isFetching: isFetchingMembres } = useQuery({
     queryKey: ["membres-search-formation", membreSearch],
     queryFn: () =>
-      apiFetch<{ membres: MembreMinimal[] }>(`/api/membres?search=${encodeURIComponent(membreSearch)}&limit=8&statut_membre=actif`)
+      apiFetch<{ membres: MembreMinimal[] }>(`/api/membres?search=${encodeURIComponent(membreSearch)}&limit=10`)
         .then((r) => r.membres ?? []),
     enabled: membreSearch.trim().length >= 2,
   });
@@ -764,32 +764,38 @@ function OngletInscriptions() {
                         className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </div>
-                    {showMembreResults && membreSearch.trim().length >= 2 && membreResults.length > 0 && (
+                    {showMembreResults && membreSearch.trim().length >= 2 && (
                       <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                        {membreResults
-                          .filter((m) => !membresSelectes.some((s) => s.id === m.id))
-                          .map((m) => {
-                            const dejaInscrit = inscrits.some((i) => i.membre_id === m.id);
-                            return dejaInscrit ? (
-                              <div key={m.id} className="w-full px-3 py-2 text-sm flex items-center gap-2 opacity-50 cursor-not-allowed">
-                                <span className="font-medium text-gray-500">{m.prenoms ? `${m.prenoms} ${m.nom}` : m.nom}</span>
-                                <span className="text-xs text-gray-400">{m.code_membre}</span>
-                                <span className="ml-auto text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Déjà inscrit</span>
-                              </div>
-                            ) : (
-                              <button key={m.id} type="button"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  setMembresSelectes((prev) => [...prev, m]);
-                                  setMembreSearch("");
-                                  setShowMembreResults(false);
-                                }}
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 flex items-center gap-2">
-                                <span className="font-medium text-gray-900">{m.prenoms ? `${m.prenoms} ${m.nom}` : m.nom}</span>
-                                <span className="text-xs text-gray-400">{m.code_membre}</span>
-                              </button>
-                            );
-                          })}
+                        {isFetchingMembres ? (
+                          <p className="px-3 py-3 text-sm text-gray-400 text-center">Recherche…</p>
+                        ) : membreResults.filter((m) => !membresSelectes.some((s) => s.id === m.id)).length === 0 ? (
+                          <p className="px-3 py-3 text-sm text-gray-400 text-center">Aucun membre trouvé pour « {membreSearch} »</p>
+                        ) : (
+                          membreResults
+                            .filter((m) => !membresSelectes.some((s) => s.id === m.id))
+                            .map((m) => {
+                              const dejaInscrit = inscrits.some((i) => i.membre_id === m.id);
+                              return dejaInscrit ? (
+                                <div key={m.id} className="w-full px-3 py-2 text-sm flex items-center gap-2 opacity-50 cursor-not-allowed">
+                                  <span className="font-medium text-gray-500">{m.prenoms ? `${m.prenoms} ${m.nom}` : m.nom}</span>
+                                  <span className="text-xs text-gray-400">{m.code_membre}</span>
+                                  <span className="ml-auto text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Déjà inscrit</span>
+                                </div>
+                              ) : (
+                                <button key={m.id} type="button"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setMembresSelectes((prev) => [...prev, m]);
+                                    setMembreSearch("");
+                                    setShowMembreResults(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 flex items-center gap-2">
+                                  <span className="font-medium text-gray-900">{m.prenoms ? `${m.prenoms} ${m.nom}` : m.nom}</span>
+                                  <span className="text-xs text-gray-400">{m.code_membre}</span>
+                                </button>
+                              );
+                            })
+                        )}
                       </div>
                     )}
                   </div>
