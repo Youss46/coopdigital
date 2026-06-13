@@ -7,6 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, count, sql, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { envoyerPushGroupe } from "./pushService.js";
 
 
 
@@ -40,7 +41,10 @@ export type NotifType =
   | "mission_validee"
   | "mission_rejetee"
   // ── Délégués ──────────────────────────────────────────
-  | "caisse_delegue";
+  | "caisse_delegue"
+  // ── Expéditions port ──────────────────────────────────
+  | "expedition_arrivee_port"
+  | "expedition_litige";
 
 export type NotifGravite = "info" | "attention" | "critique";
 
@@ -85,6 +89,9 @@ const PREF_COL: Record<NotifType, keyof typeof preferencesNotificationsTable.$in
   mission_rejetee:          "notifMessageRecu",
   // Délégués
   caisse_delegue:           "notifMessageRecu",
+  // Expéditions port
+  expedition_arrivee_port:  "notifMessageRecu",
+  expedition_litige:        "notifAnomalieCritique",
 };
 
 // ─── Créer des notifications pour une liste de users ──────────────────────────
@@ -210,6 +217,86 @@ export async function notifMessageRecu(cooperativeId: number, expediteur: string
     sourceModule: "communication",
     sourceId:     messageId,
   });
+}
+
+// ─── Helper interne : récupère les userIds par rôle ──────────────────────────
+
+async function getUsersParRole(cooperativeId: number, roles: string[]): Promise<number[]> {
+  const users = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.cooperativeId, cooperativeId),
+        eq(usersTable.actif, true),
+        inArray(usersTable.role, roles as UserRole[]),
+      ),
+    );
+  return users.map((u) => u.id);
+}
+
+// ─── Expéditions port ─────────────────────────────────────────────────────────
+
+export async function notifExpeditionArriveePort(
+  cooperativeId: number,
+  numeroExpedition: string,
+  port: string,
+  expeditionId: number,
+): Promise<void> {
+  const roles = ["pca", "directeur", "responsable_tracabilite"];
+  const payload: NotifPayload = {
+    type:         "expedition_arrivee_port",
+    gravite:      "info",
+    titre:        `Expédition arrivée — Port de ${port}`,
+    message:      `L'expédition ${numeroExpedition} est arrivée au port de ${port}. En attente de réception.`,
+    lien:         `/expeditions/${expeditionId}`,
+    lienLibelle:  "Voir l'expédition",
+    sourceModule: "expeditions",
+    sourceId:     expeditionId,
+  };
+  try {
+    const userIds = await getUsersParRole(cooperativeId, roles);
+    await creerNotification(cooperativeId, userIds, payload);
+    await envoyerPushGroupe(userIds, {
+      title: payload.titre,
+      body:  payload.message,
+      url:   payload.lien,
+    });
+  } catch (err) {
+    logger.error({ err }, "notifExpeditionArriveePort");
+  }
+}
+
+export async function notifExpeditionLitige(
+  cooperativeId: number,
+  numeroExpedition: string,
+  port: string,
+  ecartKg: number,
+  tauxPct: number,
+  expeditionId: number,
+): Promise<void> {
+  const roles = ["pca", "directeur", "comptable"];
+  const payload: NotifPayload = {
+    type:         "expedition_litige",
+    gravite:      "critique",
+    titre:        `⚠️ Litige expédition — ${numeroExpedition}`,
+    message:      `Écart de ${Math.abs(ecartKg).toFixed(1)} kg (${tauxPct.toFixed(2)}%) détecté à la réception du port de ${port}. Vérification requise.`,
+    lien:         `/expeditions/${expeditionId}`,
+    lienLibelle:  "Voir le litige",
+    sourceModule: "expeditions",
+    sourceId:     expeditionId,
+  };
+  try {
+    const userIds = await getUsersParRole(cooperativeId, roles);
+    await creerNotification(cooperativeId, userIds, payload);
+    await envoyerPushGroupe(userIds, {
+      title: payload.titre,
+      body:  payload.message,
+      url:   payload.lien,
+    });
+  } catch (err) {
+    logger.error({ err }, "notifExpeditionLitige");
+  }
 }
 
 export async function notifBulletinAttente(cooperativeId: number, nb: number): Promise<void> {

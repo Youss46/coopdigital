@@ -1,6 +1,7 @@
 import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable } from "@workspace/db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { proposerEcriture } from "./comptabiliteService";
+import { notifExpeditionArriveePort, notifExpeditionLitige } from "./notificationService.js";
 import { logger } from "../lib/logger";
 
 // ── Numérotation automatique EXP-AAAA-XXXX ──────────────────────────────────
@@ -278,6 +279,13 @@ export async function changerStatut(
   }
   if (nouveauStatut === "arrive_port") {
     updateValues.dateArriveePort = new Date().toISOString();
+    // Notification arrivée port (fire-and-forget)
+    void notifExpeditionArriveePort(
+      cooperativeId,
+      exp.numeroExpedition,
+      exp.port,
+      expeditionId,
+    );
   }
 
   await db.update(expeditionsTable).set(updateValues).where(eq(expeditionsTable.id, expeditionId));
@@ -449,6 +457,15 @@ export async function confirmerReception(
     } catch (err) {
       logger.error({ err }, "Erreur écriture litige");
     }
+    // Notification litige (fire-and-forget)
+    void notifExpeditionLitige(
+      cooperativeId,
+      exp.numeroExpedition,
+      exp.port,
+      ecart,
+      tauxEcart * 100,
+      expeditionId,
+    );
   }
 
   return {

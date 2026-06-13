@@ -24,3 +24,5 @@
 - [Caisse déléguée — alertes route ordering](caisse-delegue-route-order.md) — GET /delegues/alertes doit être déclaré AVANT GET /delegues/:agentId/caisse dans delegues.ts; sinon Express interprète "alertes" comme un agentId.
 - [Web Push notifications terrain](web-push-terrain.md) — SW lit `{titre,message,url}`; VAPID env vars shared; push PROD seulement; subscriptions 410/404 auto-supprimées.
 - [Carte membre — photo base64 + QR pdfkit](carte-membre-photo.md) — photo portail stockée en data URL (base64 JPEG compressé canvas, max 400px, ~2MB) dans membres.photo_url; generateCarteMembre parse data: prefix ou fetch URL externe; QR via qrcode.toBuffer() embedé dans PDFKit.
+- [Schema files via bash not write tool](schema-bash-creation.md) — write tool sometimes silently fails to create files in lib/db/src/schema/; always verify with `ls` after write; use bash heredoc as fallback.
+- [Notifications expéditions — pattern push+inapp](notif-expeditions-pattern.md) — notifierParRole = in-app only; pour push+inapp combiner getUsersParRole + creerNotification + envoyerPushGroupe; NotifType + PREF_COL doivent être mis à jour ensemble.
