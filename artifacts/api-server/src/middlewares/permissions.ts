@@ -298,12 +298,12 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE — GESTION DE CAISSE
   caisse: {
-    voir:             ["pca", "directeur", "comptable", "auditeur"],
-    ouvrir_session:   ["pca", "directeur", "comptable"],
+    voir:             ["pca", "directeur", "comptable", "auditeur", "delegue"],
+    ouvrir_session:   ["pca", "directeur", "comptable", "delegue"],
     enregistrer_mvt:  ["pca", "directeur", "comptable", "delegue"],
-    fermer_session:   ["pca", "directeur", "comptable"],
+    fermer_session:   ["pca", "directeur", "comptable", "delegue"],
     creer_caisse:     ["pca", "directeur"],
-    voir_alertes:     ["pca", "directeur", "comptable"],
+    voir_alertes:     ["pca", "directeur", "comptable", "delegue"],
   },
 
   // MODULE — RÉCONCILIATION BANCAIRE
