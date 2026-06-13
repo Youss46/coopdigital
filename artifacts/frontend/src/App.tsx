@@ -54,6 +54,9 @@ import DeleguesPage from "@/pages/DeleguesPage";
 import ChangerMotDePassePage from "@/pages/ChangerMotDePassePage";
 import FinancesTableauBordPage from "@/pages/FinancesTableauBordPage";
 import CartesMembres from "@/pages/CartesMembres";
+import ExpeditionsPage from "@/pages/ExpeditionsPage";
+import NouvelleExpeditionPage from "@/pages/NouvelleExpeditionPage";
+import ExpeditionDetailPage from "@/pages/ExpeditionDetailPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -229,6 +232,15 @@ function AppRoutes() {
       </Route>
       <Route path="/finances/tableau-bord">
         <ProtectedRoute component={FinancesTableauBordPage} />
+      </Route>
+      <Route path="/expeditions/nouvelle">
+        <ProtectedRoute component={NouvelleExpeditionPage} />
+      </Route>
+      <Route path="/expeditions/:id">
+        <ProtectedRoute component={ExpeditionDetailPage} />
+      </Route>
+      <Route path="/expeditions">
+        <ProtectedRoute component={ExpeditionsPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

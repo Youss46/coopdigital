@@ -350,6 +350,16 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_stats:            ["pca", "directeur", "comptable", "auditeur"],
   },
 
+  // MODULE — EXPÉDITIONS PORT
+  expeditions: {
+    lire:         ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    creer:        ["pca", "directeur"],
+    modifier:     ["pca", "directeur", "responsable_tracabilite"],
+    valider:      ["pca", "directeur", "comptable"],
+    litige:       ["pca", "directeur"],
+    rapport_eudr: ["pca", "directeur", "responsable_tracabilite", "auditeur"],
+  },
+
   // MODULE — PLANIFICATION DES COLLECTES
   planning_collecte: {
     voir:        ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],

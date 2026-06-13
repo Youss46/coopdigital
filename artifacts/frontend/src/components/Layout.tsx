@@ -46,6 +46,7 @@ import {
   TrendingUp as TrendingUpInvest,
   FolderKanban,
   Users2,
+  Ship,
 } from "lucide-react";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
@@ -116,6 +117,12 @@ const navItems = [
     label: "Transport",
     icon: Truck,
     roles: ["pca", "directeur", "comptable", "auditeur", "magasinier"],
+  },
+  {
+    href: "/expeditions",
+    label: "Expéditions port",
+    icon: Ship,
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
   },
 
   // ── Traçabilité & Conformité ──────────────────────────────────────────────
