@@ -3,10 +3,6 @@
   "outputDirectory": "dist/public",
   "framework": null,
   "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "$RAILWAY_API_URL/api/:path*"
-    },
     { "source": "/m15", "destination": "/m15/index.html" },
     { "source": "/m15/(.*)", "destination": "/m15/index.html" },
     { "source": "/portail", "destination": "/portail/index.html" },
