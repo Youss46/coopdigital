@@ -343,6 +343,7 @@ export async function getBilanPdf(req: Request, res: Response) {
     doc.switchToPage(i);
     await drawFooter(doc, cooperativeId, i + 1, bilanRange.count);
   }
+  doc.flushPages();
   doc.end();
   const bilanBuffer = await bilanEndPromise;
   res.send(bilanBuffer);

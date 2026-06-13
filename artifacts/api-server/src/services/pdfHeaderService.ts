@@ -219,7 +219,7 @@ export async function drawHeader(
       .text(options.titre_document!.toUpperCase(), titreX, titreY + 3, {
         width: titreBoxW - 8,
         align: "center",
-        lineBreak: true,
+        lineBreak: false,
       });
 
     if (options.reference) {
@@ -246,6 +246,7 @@ export async function drawHeader(
       .text(`Généré le ${dateGen}`, titreX - 8, titreY + 46, {
         width: titreBoxW,
         align: "center",
+        lineBreak: false,
       });
   }
 
@@ -266,6 +267,7 @@ export async function drawHeader(
       .text("Powered by CoopDigital — M15 Tech", marginLeft, 80, {
         width: contentWidth,
         align: "right",
+        lineBreak: false,
       });
   }
 

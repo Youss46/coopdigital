@@ -508,8 +508,8 @@ export async function generateBilanCampagne(cooperativeId: number, annee: number
     const bg = row.sect === "ACTIF" ? "#f0fdf4" : "#fff7ed";
     doc.rect(MARGIN, y, 420, 18).fill(bg);
     doc.fontSize(8).fillColor("black").font("Helvetica")
-      .text(`[${row.sect}] ${row.label}`, MARGIN + 4, y + 5, { width: 310 });
-    doc.text(formaterFCFA(Math.max(0, row.montant)), MARGIN + 320, y + 5, { width: 100, align: "right" });
+      .text(`[${row.sect}] ${row.label}`, MARGIN + 4, y + 5, { width: 310, lineBreak: false });
+    doc.text(formaterFCFA(Math.max(0, row.montant)), MARGIN + 320, y + 5, { width: 100, align: "right", lineBreak: false });
     y += 20;
   });
 
@@ -623,9 +623,12 @@ export async function generatePvAg(params: {
   doc.moveDown(0.4);
 
   const W = [30, 200, 100, 100, 100];
-  ligneTableau(doc, ["#","Nom et prénoms","Mode","Heure arrivée","Émargement"], W, MARGIN, doc.y, VERT);
+  const drawEmargementHeader = () => {
+    ligneTableau(doc, ["#","Nom et prénoms","Mode","Heure arrivée","Émargement"], W, MARGIN, doc.y, VERT);
+  };
+  drawEmargementHeader();
   let y = doc.y + 16;
-  presences.slice(0, 80).forEach((row, i) => {
+  for (const [i, row] of presences.slice(0, 80).entries()) {
     const bg = i % 2 === 0 ? "#f9fafb" : "white";
     doc.rect(MARGIN, y, W.reduce((a, b) => a + b, 0), 16).fill(bg);
     const nom = [row.m.prenoms, row.m.nom].filter(Boolean).join(" ");
@@ -634,14 +637,15 @@ export async function generatePvAg(params: {
     y += 16;
     if (y > 750) {
       doc.addPage();
-      // inline mini header for continuation (no await here due to sync context)
-      y = MARGIN;
+      await drawHeader(doc, cooperativeId, { titre_document: "Émargement (suite)" });
+      y = doc.y;
+      drawEmargementHeader();
+      y = doc.y + 16;
     }
-  });
+  }
 
   // ─── Signatures ───────────────────────────────────────────────────────────
-  doc.moveDown(3);
-  const sigY = Math.min(doc.y + 20, 730);
+  const sigY = Math.min(y + 20, 730);
   doc.fontSize(9).font("Helvetica-Bold").text("Président de séance", MARGIN, sigY, { width: 200, align: "center" });
   doc.text("Secrétaire de séance", PAGE_W - MARGIN - 200, sigY, { width: 200, align: "center" });
   doc.moveDown(0.3);
