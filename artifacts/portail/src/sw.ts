@@ -72,17 +72,25 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const notifData = event.notification.data as { url?: string } | null;
-  const url = notifData?.url ?? self.registration.scope;
+  const rawUrl = notifData?.url ?? self.registration.scope;
+
+  // Les URL relatives sont rejetées sur mobile (Android Chrome, iOS Safari PWA).
+  // On force une URL absolue en préfixant avec l'origine du SW.
+  const targetUrl = rawUrl.startsWith("http")
+    ? rawUrl
+    : self.location.origin + rawUrl;
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const client of list) {
         if (client.url.startsWith(self.registration.scope) && "focus" in client) {
-          (client as WindowClient).navigate(url);
-          return (client as WindowClient).focus();
+          // Attendre navigate() avant focus() pour éviter la race condition
+          return (client as WindowClient)
+            .navigate(targetUrl)
+            .then((c) => (c ?? (client as WindowClient)).focus());
         }
       }
-      return clients.openWindow(url);
+      return clients.openWindow(targetUrl);
     })
   );
 });
