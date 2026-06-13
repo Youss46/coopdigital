@@ -49,11 +49,13 @@ interface Exportateur   { id: number; nom: string; }
 interface VehiculeFlotte { id: number; immatriculation: string; marque?: string; modele?: string; capaciteKg?: string; statut: string; }
 interface ChauffeurFlotte { id: number; nom: string; prenoms?: string; telephone?: string; }
 
-// Documents obligatoires hors certificat phyto (géré séparément)
 const DOCS_REQUIS = [
   { key: "bon_livraison",       label: "Bon de livraison" },
   { key: "bordereau_transport", label: "Bordereau de transport" },
-  { key: "document_eudr",       label: "Documents EUDR" },
+];
+
+const DOCS_OPTIONNELS = [
+  { key: "document_eudr", label: "Documents EUDR" },
 ];
 
 export default function NouvelleExpeditionPage() {
@@ -178,7 +180,7 @@ export default function NouvelleExpeditionPage() {
       certificatPhytoDateEmission:   phytoDateEmission || undefined,
       certificatPhytoDateExpiration: phytoDateExpiration || undefined,
       certificatPhytoOrganisme:      phytoOrganisme || "DPVC",
-      documents: DOCS_REQUIS.filter(d => docsValides[d.key]).map(d => ({ type: d.key, url: "", date: new Date().toISOString() })),
+      documents: [...DOCS_REQUIS, ...DOCS_OPTIONNELS].filter(d => docsValides[d.key]).map(d => ({ type: d.key, url: "", date: new Date().toISOString() })),
       lots: lots.filter(l => l.poidsKg).map(l => ({
         poidsKg:        parseFloat(l.poidsKg),
         nombreSacs:     l.nombreSacs ? parseInt(l.nombreSacs, 10) : undefined,
@@ -462,9 +464,10 @@ export default function NouvelleExpeditionPage() {
       {/* DOCUMENTS */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">📎 Documents complémentaires</CardTitle>
+          <CardTitle className="text-base">📎 Documents</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Obligatoires</p>
           {DOCS_REQUIS.map(doc => (
             <div
               key={doc.key}
@@ -483,6 +486,20 @@ export default function NouvelleExpeditionPage() {
               ⚠️ Manquants : {docsManquants.join(", ")}
             </p>
           )}
+          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide pt-2">Optionnels</p>
+          {DOCS_OPTIONNELS.map(doc => (
+            <div
+              key={doc.key}
+              className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${docsValides[doc.key] ? "bg-green-50 border-green-300" : "bg-gray-50 border-gray-200 hover:bg-gray-100"}`}
+              onClick={() => toggleDoc(doc.key)}
+            >
+              <span className="text-sm font-medium">{doc.label}</span>
+              {docsValides[doc.key]
+                ? <CheckCircle2 className="h-5 w-5 text-green-600" />
+                : <XCircle className="h-5 w-5 text-gray-400" />
+              }
+            </div>
+          ))}
         </CardContent>
       </Card>
 
