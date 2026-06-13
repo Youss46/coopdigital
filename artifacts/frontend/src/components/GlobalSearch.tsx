@@ -105,8 +105,10 @@ export default function GlobalSearch() {
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const debouncedQ = useDebounce(query, 300);
 
   useEffect(() => {
@@ -128,12 +130,49 @@ export default function GlobalSearch() {
     ).slice(0, 6);
   }, [query, utilisateur?.role]);
 
+  // Flat list of all navigable items in render order, used for ↑↓ keyboard nav
+  const flatItems = useMemo<Array<() => void>>(() => {
+    const items: Array<() => void> = [];
+    for (const m of menuMatches) items.push(() => { navigate(m.href); });
+    for (const m of (results?.membres ?? [])) items.push(() => { navigate(`/membres/${m.id}`); });
+    for (const a of (results?.avances ?? [])) items.push(() => { navigate(`/membres/${a.membreId}`); });
+    for (const l of (results?.livraisons ?? [])) items.push(() => { navigate("/membres"); });
+    for (const l of (results?.lots ?? [])) items.push(() => { navigate("/tracabilite"); });
+    return items;
+  }, [menuMatches, results, navigate]);
+
+  // Reset focus when results change
+  useEffect(() => { setFocusedIndex(-1); }, [flatItems]);
+
+  // Scroll focused item into view
+  useEffect(() => {
+    if (focusedIndex < 0 || !listRef.current) return;
+    const el = listRef.current.querySelector<HTMLElement>(`[data-idx="${focusedIndex}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [focusedIndex]);
+
   const close = useCallback(() => {
     setOpen(false);
     setQuery("");
     setResults(null);
     setError("");
+    setFocusedIndex(-1);
   }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (flatItems.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setFocusedIndex((i) => (i + 1) % flatItems.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setFocusedIndex((i) => (i <= 0 ? flatItems.length - 1 : i - 1));
+    } else if (e.key === "Enter" && focusedIndex >= 0) {
+      e.preventDefault();
+      flatItems[focusedIndex]?.();
+      close();
+    }
+  }, [flatItems, focusedIndex, close]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -165,6 +204,15 @@ export default function GlobalSearch() {
 
   const hasAnyResult = menuMatches.length > 0 || apiTotal > 0;
 
+  // Build sequential index for each rendered item
+  let itemIdx = -1;
+  const nextIdx = () => { itemIdx += 1; return itemIdx; };
+
+  const itemCls = (idx: number) =>
+    `w-full text-left flex items-center gap-3 border-b border-gray-50 transition-colors ${
+      focusedIndex === idx ? "bg-indigo-50 ring-1 ring-inset ring-indigo-200" : "hover:bg-gray-50"
+    }`;
+
   return (
     <>
       <button
@@ -180,6 +228,8 @@ export default function GlobalSearch() {
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/40">
           <div ref={containerRef} className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+
+            {/* Barre de recherche */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
               <Search size={18} className="text-gray-400 flex-shrink-0" />
               <input
@@ -187,19 +237,35 @@ export default function GlobalSearch() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Nom, menu, téléphone, village, avance…"
                 className="flex-1 text-sm outline-none text-gray-900 placeholder-gray-400"
                 autoComplete="off"
               />
               {query && (
-                <button onClick={() => { setQuery(""); setResults(null); }} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => { setQuery(""); setResults(null); setFocusedIndex(-1); }} className="text-gray-400 hover:text-gray-600">
                   <X size={16} />
                 </button>
               )}
               <button onClick={close} className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 font-mono">Esc</button>
             </div>
 
-            <div className="max-h-[28rem] overflow-y-auto">
+            {/* Aide navigation clavier */}
+            {hasAnyResult && (
+              <div className="flex items-center gap-3 px-4 py-1.5 border-b border-gray-50 bg-gray-50/60">
+                <span className="flex items-center gap-1 text-xs text-gray-400">
+                  <kbd className="bg-white border border-gray-200 rounded px-1 py-0.5 font-mono text-[10px]">↑↓</kbd> naviguer
+                </span>
+                <span className="flex items-center gap-1 text-xs text-gray-400">
+                  <kbd className="bg-white border border-gray-200 rounded px-1 py-0.5 font-mono text-[10px]">↵</kbd> ouvrir
+                </span>
+                <span className="flex items-center gap-1 text-xs text-gray-400">
+                  <kbd className="bg-white border border-gray-200 rounded px-1 py-0.5 font-mono text-[10px]">Esc</kbd> fermer
+                </span>
+              </div>
+            )}
+
+            <div ref={listRef} className="max-h-[26rem] overflow-y-auto">
               {loading && menuMatches.length === 0 && (
                 <div className="px-4 py-6 text-center text-sm text-gray-400">Recherche…</div>
               )}
@@ -212,64 +278,27 @@ export default function GlobalSearch() {
                 <div className="px-4 py-6 text-center text-sm text-gray-400">Aucun résultat pour « {query} »</div>
               )}
 
+              {/* Panneau d'aide — query vide */}
               {query.length < 2 && (
                 <div className="px-4 py-5">
                   <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">Vous pouvez rechercher…</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
-                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                        <LayoutGrid size={12} className="text-purple-700" />
+                    {[
+                      { icon: <LayoutGrid size={12} className="text-purple-700" />, bg: "bg-purple-100", label: "Menus", sub: "ex. Avances, Budget" },
+                      { icon: <Users size={12} className="text-green-700" />, bg: "bg-green-100", label: "Membres", sub: "nom, prénoms" },
+                      { icon: <Phone size={12} className="text-blue-700" />, bg: "bg-blue-100", label: "Téléphone", sub: "ex. 0701020304" },
+                      { icon: <MapPin size={12} className="text-amber-700" />, bg: "bg-amber-100", label: "Village", sub: "ex. Méagui, Gueyo" },
+                      { icon: <TrendingDown size={12} className="text-orange-700" />, bg: "bg-orange-100", label: "Avances", sub: "par nom du membre" },
+                      { icon: <Wheat size={12} className="text-amber-700" />, bg: "bg-amber-100", label: "Livraisons", sub: "par nom du membre" },
+                    ].map(({ icon, bg, label, sub }) => (
+                      <div key={label} className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
+                        <div className={`mt-0.5 w-6 h-6 rounded-lg ${bg} flex items-center justify-center flex-shrink-0`}>{icon}</div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-700">{label}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-700">Menus</p>
-                        <p className="text-xs text-gray-400 mt-0.5">ex. Avances, Budget</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
-                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
-                        <Users size={12} className="text-green-700" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-700">Membres</p>
-                        <p className="text-xs text-gray-400 mt-0.5">nom, prénoms</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
-                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <Phone size={12} className="text-blue-700" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-700">Téléphone</p>
-                        <p className="text-xs text-gray-400 mt-0.5">ex. 0701020304</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
-                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                        <MapPin size={12} className="text-amber-700" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-700">Village</p>
-                        <p className="text-xs text-gray-400 mt-0.5">ex. Méagui, Gueyo</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
-                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                        <TrendingDown size={12} className="text-orange-700" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-700">Avances</p>
-                        <p className="text-xs text-gray-400 mt-0.5">par nom du membre</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
-                      <div className="mt-0.5 w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                        <Wheat size={12} className="text-amber-700" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-700">Livraisons</p>
-                        <p className="text-xs text-gray-400 mt-0.5">par nom du membre</p>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                   <p className="text-xs text-gray-300 mt-3 text-center">Tapez au moins 2 caractères</p>
                 </div>
@@ -281,22 +310,27 @@ export default function GlobalSearch() {
                   <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
                     <LayoutGrid size={11} /> Navigation
                   </div>
-                  {menuMatches.map((m) => (
-                    <button
-                      key={m.href + m.label}
-                      onClick={() => { navigate(m.href); close(); }}
-                      className="w-full text-left px-4 py-2.5 hover:bg-purple-50 flex items-center gap-3 border-b border-gray-50 transition-colors"
-                    >
-                      <div className="w-7 h-7 rounded-lg flex-shrink-0 bg-purple-100 flex items-center justify-center">
-                        <LayoutGrid size={13} className="text-purple-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{m.label}</p>
-                        <p className="text-xs text-gray-400">{m.category}</p>
-                      </div>
-                      <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
-                    </button>
-                  ))}
+                  {menuMatches.map((m) => {
+                    const idx = nextIdx();
+                    return (
+                      <button
+                        key={m.href + m.label}
+                        data-idx={idx}
+                        onClick={() => { navigate(m.href); close(); }}
+                        onMouseEnter={() => setFocusedIndex(idx)}
+                        className={`px-4 py-2.5 ${itemCls(idx)}`}
+                      >
+                        <div className="w-7 h-7 rounded-lg flex-shrink-0 bg-purple-100 flex items-center justify-center">
+                          <LayoutGrid size={13} className="text-purple-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">{m.label}</p>
+                          <p className="text-xs text-gray-400">{m.category}</p>
+                        </div>
+                        <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
@@ -306,30 +340,35 @@ export default function GlobalSearch() {
                   <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
                     <Users size={11} /> Membres
                   </div>
-                  {results.membres.map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => { navigate(`/membres/${m.id}`); close(); }}
-                      className="w-full text-left px-4 py-3 hover:bg-green-50 flex items-center gap-3 border-b border-gray-50 transition-colors"
-                    >
-                      <div
-                        className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white"
-                        style={{ backgroundColor: "#1a4731" }}
+                  {results.membres.map((m) => {
+                    const idx = nextIdx();
+                    return (
+                      <button
+                        key={m.id}
+                        data-idx={idx}
+                        onClick={() => { navigate(`/membres/${m.id}`); close(); }}
+                        onMouseEnter={() => setFocusedIndex(idx)}
+                        className={`px-4 py-3 ${itemCls(idx)}`}
                       >
-                        {m.nom[0]?.toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{m.nom} {m.prenoms}</p>
-                        <p className="text-xs text-gray-500">
-                          {m.telephone}
-                          {m.village ? ` · ${m.village}` : ""}
-                        </p>
-                      </div>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${m.statut === "actif" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {m.statut}
-                      </span>
-                    </button>
-                  ))}
+                        <div
+                          className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white"
+                          style={{ backgroundColor: "#1a4731" }}
+                        >
+                          {m.nom[0]?.toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{m.nom} {m.prenoms}</p>
+                          <p className="text-xs text-gray-500">
+                            {m.telephone}
+                            {m.village ? ` · ${m.village}` : ""}
+                          </p>
+                        </div>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${m.statut === "actif" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                          {m.statut}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
@@ -340,12 +379,15 @@ export default function GlobalSearch() {
                     <TrendingDown size={11} /> Avances
                   </div>
                   {results.avances.map((a) => {
+                    const idx = nextIdx();
                     const statut = AVANCE_STATUT_LABELS[a.statut] ?? { label: a.statut, cls: "bg-gray-100 text-gray-500" };
                     return (
                       <button
                         key={a.id}
+                        data-idx={idx}
                         onClick={() => { navigate(`/membres/${a.membreId}`); close(); }}
-                        className="w-full text-left px-4 py-3 hover:bg-green-50 flex items-center gap-3 border-b border-gray-50 transition-colors"
+                        onMouseEnter={() => setFocusedIndex(idx)}
+                        className={`px-4 py-3 ${itemCls(idx)}`}
                       >
                         <div className="w-8 h-8 rounded-full flex-shrink-0 bg-orange-100 flex items-center justify-center">
                           <TrendingDown size={14} className="text-orange-600" />
@@ -376,26 +418,31 @@ export default function GlobalSearch() {
                   <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
                     <Package size={11} /> Livraisons récentes
                   </div>
-                  {results.livraisons.map((l) => (
-                    <button
-                      key={l.id}
-                      onClick={() => { navigate("/membres"); close(); }}
-                      className="w-full text-left px-4 py-3 hover:bg-green-50 flex items-center gap-3 border-b border-gray-50 transition-colors"
-                    >
-                      <div className="w-8 h-8 rounded-full flex-shrink-0 bg-amber-100 flex items-center justify-center">
-                        <Package size={14} className="text-amber-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {l.membreNom} {l.membrePrenoms}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {parseFloat(l.poidsKg).toLocaleString("fr-FR")} kg · {new Date(l.dateLivraison + "T00:00:00").toLocaleDateString("fr-FR")}
-                        </p>
-                      </div>
-                      <span className="text-xs text-gray-400 flex-shrink-0">#{l.id}</span>
-                    </button>
-                  ))}
+                  {results.livraisons.map((l) => {
+                    const idx = nextIdx();
+                    return (
+                      <button
+                        key={l.id}
+                        data-idx={idx}
+                        onClick={() => { navigate("/membres"); close(); }}
+                        onMouseEnter={() => setFocusedIndex(idx)}
+                        className={`px-4 py-3 ${itemCls(idx)}`}
+                      >
+                        <div className="w-8 h-8 rounded-full flex-shrink-0 bg-amber-100 flex items-center justify-center">
+                          <Package size={14} className="text-amber-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {l.membreNom} {l.membrePrenoms}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {parseFloat(l.poidsKg).toLocaleString("fr-FR")} kg · {new Date(l.dateLivraison + "T00:00:00").toLocaleDateString("fr-FR")}
+                          </p>
+                        </div>
+                        <span className="text-xs text-gray-400 flex-shrink-0">#{l.id}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
@@ -405,30 +452,35 @@ export default function GlobalSearch() {
                   <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
                     <QrCode size={11} /> Lots
                   </div>
-                  {results.lots.map((l) => (
-                    <button
-                      key={l.id}
-                      onClick={() => { navigate("/tracabilite"); close(); }}
-                      className="w-full text-left px-4 py-3 hover:bg-green-50 flex items-center gap-3 border-b border-gray-50 transition-colors"
-                    >
-                      <div className="w-8 h-8 rounded-full flex-shrink-0 bg-blue-100 flex items-center justify-center">
-                        <QrCode size={14} className="text-blue-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 font-mono truncate text-xs">{l.qrCodeLot}</p>
-                        <p className="text-xs text-gray-500">
-                          {l.poidsTotalKg ? `${parseFloat(l.poidsTotalKg).toLocaleString("fr-FR")} kg · ` : ""}
-                          {new Date(l.dateCreation).toLocaleDateString("fr-FR")}
-                        </p>
-                      </div>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                        l.statut === "en_stock" ? "bg-blue-100 text-blue-700" :
-                        l.statut === "vendu" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                      }`}>
-                        {l.statut.replace("_", " ")}
-                      </span>
-                    </button>
-                  ))}
+                  {results.lots.map((l) => {
+                    const idx = nextIdx();
+                    return (
+                      <button
+                        key={l.id}
+                        data-idx={idx}
+                        onClick={() => { navigate("/tracabilite"); close(); }}
+                        onMouseEnter={() => setFocusedIndex(idx)}
+                        className={`px-4 py-3 ${itemCls(idx)}`}
+                      >
+                        <div className="w-8 h-8 rounded-full flex-shrink-0 bg-blue-100 flex items-center justify-center">
+                          <QrCode size={14} className="text-blue-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 font-mono truncate text-xs">{l.qrCodeLot}</p>
+                          <p className="text-xs text-gray-500">
+                            {l.poidsTotalKg ? `${parseFloat(l.poidsTotalKg).toLocaleString("fr-FR")} kg · ` : ""}
+                            {new Date(l.dateCreation).toLocaleDateString("fr-FR")}
+                          </p>
+                        </div>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                          l.statut === "en_stock" ? "bg-blue-100 text-blue-700" :
+                          l.statut === "vendu" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                        }`}>
+                          {l.statut.replace("_", " ")}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
