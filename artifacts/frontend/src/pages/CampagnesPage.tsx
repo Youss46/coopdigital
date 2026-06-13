@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import {
   CalendarDays, Plus, CheckCircle2, Clock, Loader2, AlertTriangle,
   XCircle, BarChart3, FileText, Download, RefreshCw,
@@ -176,12 +177,7 @@ export default function CampagnesPage() {
       });
       if (!r.ok) throw new Error(`Erreur ${r.status}`);
       const blob = await r.blob();
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = href;
-      a.download = `bilan-${libelle.replace(/\s+/g, "-").toLowerCase()}.pdf`;
-      a.click();
-      URL.revokeObjectURL(href);
+      openPdfViewer(URL.createObjectURL(blob), `bilan-${libelle.replace(/\s+/g, "-").toLowerCase()}.pdf`);
     } catch {
       // erreur silencieuse
     } finally {

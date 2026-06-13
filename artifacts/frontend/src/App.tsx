@@ -61,6 +61,7 @@ import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
 import { OfflineBanner, OnlineToast } from "@/components/OfflineIndicator";
+import PdfViewerModal from "@/components/PdfViewerModal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -260,6 +261,7 @@ function App() {
           <OnlineToast />
           <AppRoutes />
           <Toaster />
+          <PdfViewerModal />
         </AuthProvider>
       </WouterRouter>
     </QueryClientProvider>

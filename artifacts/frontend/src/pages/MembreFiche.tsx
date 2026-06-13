@@ -32,6 +32,8 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/contexts/AuthContext";
 
+import { openPdfViewer } from "@/lib/pdfViewer";
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const tokFn = () => localStorage.getItem("coop_token") ?? "";
 const BASE_FICHE = import.meta.env.VITE_API_URL ?? "";
@@ -42,14 +44,7 @@ async function downloadPdf(path: string, filename: string) {
   if (!res.ok) return;
   const blob = await res.blob();
   if (blob.size === 0) return;
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 200);
+  openPdfViewer(URL.createObjectURL(blob), filename);
 }
 
 // ── Composant formations d'un membre ─────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import { useLocation } from "wouter";
 import { useCreateMembre, type MembreInput } from "@workspace/api-client-react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -223,11 +224,7 @@ export default function Membres() {
       const res = await apiFetch(`/api/membres/export-pdf${params}`);
       if (!res.ok) throw new Error("Erreur export");
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = `membres-${statut || "tous"}-${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 200);
+      openPdfViewer(URL.createObjectURL(blob), `membres-${statut || "tous"}-${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch { toast({ title: "Impossible de générer le PDF", variant: "destructive" }); }
     finally { setExportPending(false); }
   }

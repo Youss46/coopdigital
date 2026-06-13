@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import { Wallet, Plus, RefreshCw, Lock, Unlock, Download, AlertTriangle, TrendingUp, TrendingDown, ChevronRight, X, CheckCircle2, Users, ArrowLeftRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -707,12 +708,7 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
       const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
       if (!r.ok) throw new Error(`Erreur ${r.status}`);
       const blob = await r.blob();
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = href;
-      a.download = `rapport-caisse-${date}.pdf`;
-      a.click();
-      URL.revokeObjectURL(href);
+      openPdfViewer(URL.createObjectURL(blob), `rapport-caisse-${date}.pdf`);
     } catch {
       // erreur silencieuse
     } finally {

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import { GitMerge, Upload, CheckCircle2, AlertTriangle, HelpCircle, X, Download, RefreshCw, Search, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -462,12 +463,9 @@ function Reconciliation() {
 
   const telechargerPdf = () => {
     if (!selectedId) return;
-    const a = document.createElement("a");
     fetch(`${BASE}/api/reconciliation/${selectedId}/rapport-pdf`, { headers: { Authorization: `Bearer ${tok()}` } })
       .then(r => r.blob()).then(blob => {
-        a.href = URL.createObjectURL(blob);
-        a.download = `reconciliation-${selectedId}.pdf`;
-        a.click();
+        openPdfViewer(URL.createObjectURL(blob), `reconciliation-${selectedId}.pdf`);
       });
   };
 

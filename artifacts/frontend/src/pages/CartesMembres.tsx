@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CreditCard, Download, Ban, CheckCircle2, Search,
@@ -234,17 +235,10 @@ export default function CartesMembres() {
                             onClick={(e) => {
                               e.preventDefault();
                               const url = `${BASE}/api/membres/${c.id}/carte-pdf`;
-                              const a = document.createElement("a");
-                              a.href = url;
-                              a.target = "_blank";
                               fetch(url, { headers: { Authorization: `Bearer ${token}` } })
                                 .then((r) => r.blob())
                                 .then((blob) => {
-                                  const burl = URL.createObjectURL(blob);
-                                  a.href = burl;
-                                  a.download = `carte-${code}.pdf`;
-                                  a.click();
-                                  URL.revokeObjectURL(burl);
+                                  openPdfViewer(URL.createObjectURL(blob), `carte-${code}.pdf`);
                                 });
                             }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-xs font-medium transition-colors"

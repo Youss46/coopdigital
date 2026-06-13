@@ -14,6 +14,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { PlusCircle, TrendingDown, Banknote, Clock, FileDown } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
+import { openPdfViewer } from "@/lib/pdfViewer";
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -21,6 +22,7 @@ function formaterFCFA(n: number) {
 function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
+
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
 async function downloadPdf(url: string, filename: string) {
@@ -29,14 +31,7 @@ async function downloadPdf(url: string, filename: string) {
   if (!res.ok) return;
   const blob = await res.blob();
   if (blob.size === 0) return;
-  const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 200);
+  openPdfViewer(URL.createObjectURL(blob), filename);
 }
 
 export default function Avances() {

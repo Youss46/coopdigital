@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import {
   useGetAuditJournal,
   useGetAuditStats,
@@ -233,14 +234,7 @@ function TabJournal({ peutExporter }: { peutExporter: boolean }) {
         ...(filtres.dateDebut ? { date_debut: filtres.dateDebut } : {}),
         ...(filtres.dateFin   ? { date_fin: filtres.dateFin }    : {}),
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `audit_coopdigital_${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      openPdfViewer(URL.createObjectURL(blob), `audit_coopdigital_${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch {
       alert("Erreur lors de la génération du PDF.");
     } finally {

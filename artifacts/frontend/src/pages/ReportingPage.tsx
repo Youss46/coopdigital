@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import { useQuery } from "@tanstack/react-query";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -359,12 +360,7 @@ function TabRapports() {
       });
       if (!resp.ok) throw new Error(`Erreur ${resp.status}`);
       const blob = await resp.blob();
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = href;
-      a.download = nomFichier;
-      a.click();
-      URL.revokeObjectURL(href);
+      openPdfViewer(URL.createObjectURL(blob), nomFichier);
     } catch (e) {
       alert("Échec du téléchargement : " + String(e));
     } finally {
@@ -545,12 +541,7 @@ function FicheMembre() {
         throw new Error(err.erreur);
       }
       const blob = await resp.blob();
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = href;
-      a.download = `fiche_membre_${selectionne.id}.pdf`;
-      a.click();
-      URL.revokeObjectURL(href);
+      openPdfViewer(URL.createObjectURL(blob), `fiche_membre_${selectionne.id}.pdf`);
     } catch (e) {
       alert("Échec : " + String(e));
     } finally {

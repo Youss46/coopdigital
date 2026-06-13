@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -237,14 +238,7 @@ export default function ParametresPage() {
       const r = await fetch(`${BASE}/api/config/export-pdf`, { headers: { Authorization: `Bearer ${token}` } });
       if (!r.ok) throw new Error("Erreur serveur");
       const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "parametres_coop.pdf";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      openPdfViewer(URL.createObjectURL(blob), "parametres_coop.pdf");
     } catch {
       toast({ title: "Erreur lors du téléchargement PDF", variant: "destructive" });
     } finally {

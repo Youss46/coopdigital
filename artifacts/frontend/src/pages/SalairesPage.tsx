@@ -35,6 +35,8 @@ import {
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
 
+import { openPdfViewer } from "@/lib/pdfViewer";
+
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
 async function downloadPdfBulletin(bulletinId: number) {
@@ -43,14 +45,7 @@ async function downloadPdfBulletin(bulletinId: number) {
   if (!res.ok) return;
   const blob = await res.blob();
   if (blob.size === 0) return;
-  const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = `bulletin_paie_${bulletinId}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 200);
+  openPdfViewer(URL.createObjectURL(blob), `bulletin_paie_${bulletinId}.pdf`);
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────

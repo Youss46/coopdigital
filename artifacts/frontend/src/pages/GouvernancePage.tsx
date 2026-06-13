@@ -30,6 +30,8 @@ import {
   ChevronDown, ChevronUp, Play, Square, Vote, Archive, Calendar, RefreshCw,
 } from "lucide-react";
 
+import { openPdfViewer } from "@/lib/pdfViewer";
+
 const VERT = "#1a4731";
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const getToken = () => localStorage.getItem("coop_token") ?? "";
@@ -39,12 +41,7 @@ async function downloadPvPdf(agId: number, libelle: string): Promise<void> {
   const resp = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });
   if (!resp.ok) throw new Error(`Erreur ${resp.status}`);
   const blob = await resp.blob();
-  const href = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = href;
-  a.download = `pv-ag-${libelle.replace(/\s+/g, "-").toLowerCase()}.pdf`;
-  a.click();
-  URL.revokeObjectURL(href);
+  openPdfViewer(URL.createObjectURL(blob), `pv-ag-${libelle.replace(/\s+/g, "-").toLowerCase()}.pdf`);
 }
 
 const DATE_FR = (d: string | null | undefined) => {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -526,12 +527,7 @@ export default function DonsPage() {
       const r = await fetch(`${BASE}/api/dons/rapport-pdf`, { headers: { Authorization: `Bearer ${tok()}` } });
       if (!r.ok) throw new Error(`Erreur ${r.status}`);
       const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `rapport-dons-${new Date().getFullYear()}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      openPdfViewer(URL.createObjectURL(blob), `rapport-dons-${new Date().getFullYear()}.pdf`);
     } catch {
       // erreur silencieuse
     } finally {

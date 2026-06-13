@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import { Calculator, AlertTriangle, CheckCircle2, Clock, Download, Plus, RefreshCw, X, Calendar } from "lucide-react";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useToast } from "@/hooks/use-toast";
@@ -504,11 +505,7 @@ function RapportAnnuel() {
       const r = await fetch(`${BASE}/api/fiscalite/rapport-pdf?annee=${annee}`, { headers: { Authorization: `Bearer ${tok()}` } });
       if (!r.ok) throw new Error(`Erreur ${r.status}`);
       const blob = await r.blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `rapport-fiscal-${annee}.pdf`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      openPdfViewer(URL.createObjectURL(blob), `rapport-fiscal-${annee}.pdf`);
     } catch {
       // erreur silencieuse
     } finally {

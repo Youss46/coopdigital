@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -870,12 +871,7 @@ function OngletAttestations() {
       });
       if (!resp.ok) throw new Error(`Erreur ${resp.status}`);
       const blob = await resp.blob();
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = href;
-      a.download = `attestation-${numero}.pdf`;
-      a.click();
-      URL.revokeObjectURL(href);
+      openPdfViewer(URL.createObjectURL(blob), `attestation-${numero}.pdf`);
     } catch {
       toast({ title: "Erreur lors du téléchargement de l'attestation", variant: "destructive" });
     } finally {
