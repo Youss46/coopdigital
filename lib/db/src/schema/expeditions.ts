@@ -9,6 +9,7 @@ import { livraisonsTable } from "./livraisons";
 import { exportateursTable } from "./exportateurs";
 import { vehiculesTable } from "./transport";
 import { chauffeursTable } from "./transport";
+import { lotsTable } from "./lots";
 
 export const expeditionStatutEnum = pgEnum("expedition_statut", [
   "en_preparation",
@@ -98,6 +99,7 @@ export const expeditionsTable = pgTable("expeditions", {
 export const expeditionLotsTable = pgTable("expedition_lots", {
   id:              serial("id").primaryKey(),
   expeditionId:    integer("expedition_id").notNull().references(() => expeditionsTable.id, { onDelete: "cascade" }),
+  lotId:           integer("lot_id").references(() => lotsTable.id),
   membreId:        integer("membre_id").references(() => membresTable.id),
   livraisonId:     integer("livraison_id").references(() => livraisonsTable.id),
   poidsKg:         numeric("poids_kg", { precision: 12, scale: 2 }),

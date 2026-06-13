@@ -10,6 +10,9 @@ import {
   handleRapportEudr,
   handleGetFlotteVehicules,
   handleGetFlotteChauffeurs,
+  handleGetLotsDisponibles,
+  handleRattacherLot,
+  handleDetacherLot,
 } from "../controllers/expeditionsController";
 
 const router = Router();
@@ -42,6 +45,24 @@ router.post(
   "/expeditions",
   checkPermission("expeditions", "creer"),
   handleCreateExpedition,
+);
+
+router.get(
+  "/expeditions/:id/lots-disponibles",
+  checkPermission("expeditions", "lire"),
+  handleGetLotsDisponibles,
+);
+
+router.post(
+  "/expeditions/:id/lots",
+  checkPermission("expeditions", "modifier"),
+  handleRattacherLot,
+);
+
+router.delete(
+  "/expeditions/:id/lots/:lotRowId",
+  checkPermission("expeditions", "modifier"),
+  handleDetacherLot,
 );
 
 router.get(

@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, Ship, MapPin, CheckCircle2,
   ChevronRight, FileText, Users, Leaf, AlertCircle,
+  Plus, Unlink, Link,
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -28,17 +29,38 @@ async function apiFetch<T>(path: string, token: string | null): Promise<T> {
 async function apiPut<T>(path: string, token: string | null, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({})) as { erreur?: string };
-    throw new Error(err.erreur ?? `HTTP ${res.status}`);
-  }
+  if (!res.ok) { const err = await res.json().catch(() => ({})) as { erreur?: string }; throw new Error(err.erreur ?? `HTTP ${res.status}`); }
   return res.json() as Promise<T>;
+}
+
+async function apiPost<T>(path: string, token: string | null, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) { const err = await res.json().catch(() => ({})) as { erreur?: string }; throw new Error(err.erreur ?? `HTTP ${res.status}`); }
+  return res.json() as Promise<T>;
+}
+
+async function apiDelete(path: string, token: string | null): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) { const err = await res.json().catch(() => ({})) as { erreur?: string }; throw new Error(err.erreur ?? `HTTP ${res.status}`); }
+}
+
+interface LotDisponible {
+  id: number;
+  statut: string;
+  poidsTotalKg: string;
+  entrepot?: string;
+  dateCreation: string;
+  qrCodeLot: string;
 }
 
 const STATUT_CONFIG: Record<string, { label: string; color: string; step: number }> = {
@@ -73,6 +95,7 @@ export default function ExpeditionDetailPage() {
   const qc = useQueryClient();
 
   const [showReception, setShowReception] = useState(false);
+  const [showLotsPanel, setShowLotsPanel] = useState(false);
   const [poidsRecu, setPoidsRecu] = useState("");
   const [recepisse, setRecepisse] = useState("");
   const [receptionnaire, setReceptionnaire] = useState("");
@@ -84,6 +107,32 @@ export default function ExpeditionDetailPage() {
     queryKey: ["expedition", id],
     queryFn: () => apiFetch(`/api/expeditions/${id}`, token),
     enabled: !!id,
+  });
+
+  const { data: lotsDisponibles = [], isLoading: lotsLoading } = useQuery<LotDisponible[]>({
+    queryKey: ["expedition-lots-dispo", id],
+    queryFn: () => apiFetch(`/api/expeditions/${id}/lots-disponibles`, token),
+    enabled: !!id && showLotsPanel,
+  });
+
+  const rattacherMutation = useMutation({
+    mutationFn: (lotId: number) => apiPost(`/api/expeditions/${id}/lots`, token, { lotId }),
+    onSuccess: () => {
+      toast({ title: "Lot rattaché" });
+      void qc.invalidateQueries({ queryKey: ["expedition", id] });
+      void qc.invalidateQueries({ queryKey: ["expedition-lots-dispo", id] });
+    },
+    onError: (err: Error) => toast({ title: "Erreur", description: err.message, variant: "destructive" }),
+  });
+
+  const detacherMutation = useMutation({
+    mutationFn: (lotRowId: number) => apiDelete(`/api/expeditions/${id}/lots/${lotRowId}`, token),
+    onSuccess: () => {
+      toast({ title: "Lot détaché" });
+      void qc.invalidateQueries({ queryKey: ["expedition", id] });
+      void qc.invalidateQueries({ queryKey: ["expedition-lots-dispo", id] });
+    },
+    onError: (err: Error) => toast({ title: "Erreur", description: err.message, variant: "destructive" }),
   });
 
   const statutMutation = useMutation({
@@ -302,32 +351,56 @@ export default function ExpeditionDetailPage() {
         );
       })()}
 
-      {/* Lots EUDR */}
-      {lots.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Users className="h-4 w-4 text-green-600" />
-              {lots.length} lot{lots.length !== 1 ? "s" : ""} — Traçabilité EUDR
-            </CardTitle>
-          </CardHeader>
+      {/* Lots cacao — traçabilité */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Users className="h-4 w-4 text-green-600" />
+            Lots cacao
+            <span className="text-gray-400 font-normal">
+              — {lots.length} lot{lots.length !== 1 ? "s" : ""} rattaché{lots.length !== 1 ? "s" : ""}
+            </span>
+            {["en_preparation", "charge"].includes(statut) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto gap-1 h-7 text-xs"
+                onClick={() => setShowLotsPanel(v => !v)}
+              >
+                {showLotsPanel ? <Unlink className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                {showLotsPanel ? "Fermer" : "Rattacher un lot"}
+              </Button>
+            )}
+          </CardTitle>
+        </CardHeader>
+
+        {/* Lots déjà rattachés */}
+        {lots.length > 0 && (
           <CardContent className="p-0">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b bg-gray-50 text-gray-500">
+                  <th className="px-3 py-2 text-left">Lot #</th>
                   <th className="px-3 py-2 text-left">Membre</th>
                   <th className="px-3 py-2 text-right">Poids (kg)</th>
-                  <th className="px-3 py-2 text-right">Sacs</th>
                   <th className="px-3 py-2 text-left">Cert. EUDR</th>
                   <th className="px-3 py-2 text-left">Parcelle</th>
+                  {["en_preparation", "charge"].includes(statut) && <th className="px-3 py-2" />}
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {lots.map((l, i) => (
                   <tr key={i} className="hover:bg-gray-50">
-                    <td className="px-3 py-2">{l.membreNom ? `${String(l.membreNom)} ${String(l.membrePrenoms ?? "")}` : "—"}</td>
-                    <td className="px-3 py-2 text-right font-medium">{l.poidsKg ? parseFloat(String(l.poidsKg)).toLocaleString("fr-FR") : "—"}</td>
-                    <td className="px-3 py-2 text-right">{String(l.nombreSacs ?? "—")}</td>
+                    <td className="px-3 py-2">
+                      {l.lotId
+                        ? <span className="font-mono text-blue-700 font-semibold">#{String(l.lotId)}</span>
+                        : <span className="text-gray-400 italic">Manuel</span>
+                      }
+                    </td>
+                    <td className="px-3 py-2">{l.membreNom ? `${String(l.membreNom)} ${String(l.membrePrenoms ?? "")}`.trim() : "—"}</td>
+                    <td className="px-3 py-2 text-right font-medium">
+                      {l.poidsKg ? parseFloat(String(l.poidsKg)).toLocaleString("fr-FR") : "—"}
+                    </td>
                     <td className="px-3 py-2">
                       {l.certificatEudr
                         ? <span className="text-green-600">✅ {String(l.certificatEudr)}</span>
@@ -335,13 +408,95 @@ export default function ExpeditionDetailPage() {
                       }
                     </td>
                     <td className="px-3 py-2 text-gray-500">{String(l.parcelleOrigine ?? "—")}</td>
+                    {["en_preparation", "charge"].includes(statut) && (
+                      <td className="px-3 py-2 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-red-400 hover:text-red-600"
+                          disabled={detacherMutation.isPending}
+                          onClick={() => detacherMutation.mutate(Number(l.id))}
+                          title="Détacher ce lot"
+                        >
+                          <Unlink className="h-3 w-3" />
+                        </Button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
           </CardContent>
-        </Card>
-      )}
+        )}
+
+        {lots.length === 0 && !showLotsPanel && (
+          <CardContent>
+            <p className="text-xs text-gray-400 italic text-center py-2">
+              Aucun lot rattaché. {["en_preparation", "charge"].includes(statut) ? "Utilisez \"Rattacher un lot\" pour lier des lots existants." : ""}
+            </p>
+          </CardContent>
+        )}
+
+        {/* Panel lots disponibles */}
+        {showLotsPanel && (
+          <CardContent className="border-t pt-4 space-y-3">
+            <p className="text-xs font-medium text-gray-600 flex items-center gap-2">
+              <Link className="h-3 w-3" /> Lots en stock disponibles
+            </p>
+            {lotsLoading ? (
+              <p className="text-xs text-gray-400">Chargement…</p>
+            ) : lotsDisponibles.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">
+                Aucun lot disponible (tous déjà rattachés ou aucun lot en stock/transit).
+              </p>
+            ) : (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b bg-green-50 text-gray-500">
+                    <th className="px-3 py-2 text-left">Lot #</th>
+                    <th className="px-3 py-2 text-right">Poids (kg)</th>
+                    <th className="px-3 py-2 text-left">Entrepôt</th>
+                    <th className="px-3 py-2 text-left">Statut</th>
+                    <th className="px-3 py-2 text-left">Date</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {lotsDisponibles.map(lot => (
+                    <tr key={lot.id} className="hover:bg-green-50">
+                      <td className="px-3 py-2 font-mono font-semibold text-blue-700">#{lot.id}</td>
+                      <td className="px-3 py-2 text-right font-medium">
+                        {parseFloat(lot.poidsTotalKg).toLocaleString("fr-FR")}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">{lot.entrepot ?? "—"}</td>
+                      <td className="px-3 py-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          lot.statut === "en_stock" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+                        }`}>
+                          {lot.statut === "en_stock" ? "En stock" : "Transit"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-400">
+                        {new Date(lot.dateCreation).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Button
+                          size="sm"
+                          className="h-6 text-xs bg-green-700 hover:bg-green-800 gap-1"
+                          disabled={rattacherMutation.isPending}
+                          onClick={() => rattacherMutation.mutate(lot.id)}
+                        >
+                          <Link className="h-3 w-3" /> Rattacher
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       {/* Documents */}
       <Card>

@@ -1,5 +1,5 @@
-import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable } from "@workspace/db";
-import { eq, and, desc, sql, count } from "drizzle-orm";
+import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable } from "@workspace/db";
+import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
 import { proposerEcriture } from "./comptabiliteService";
 import { notifExpeditionArriveePort, notifExpeditionLitige } from "./notificationService.js";
 import { logger } from "../lib/logger";
@@ -124,6 +124,7 @@ export async function getExpedition(cooperativeId: number, expeditionId: number)
   const lots = await db
     .select({
       id:              expeditionLotsTable.id,
+      lotId:           expeditionLotsTable.lotId,
       membreId:        expeditionLotsTable.membreId,
       livraisonId:     expeditionLotsTable.livraisonId,
       poidsKg:         expeditionLotsTable.poidsKg,
@@ -132,9 +133,12 @@ export async function getExpedition(cooperativeId: number, expeditionId: number)
       parcelleOrigine: expeditionLotsTable.parcelleOrigine,
       membreNom:       membresTable.nom,
       membrePrenoms:   membresTable.prenoms,
+      lotStatut:       lotsTable.statut,
+      lotEntrepot:     lotsTable.entrepot,
     })
     .from(expeditionLotsTable)
     .leftJoin(membresTable, eq(membresTable.id, expeditionLotsTable.membreId))
+    .leftJoin(lotsTable, eq(lotsTable.id, expeditionLotsTable.lotId))
     .where(eq(expeditionLotsTable.expeditionId, expeditionId));
 
   const historique = await db
@@ -144,6 +148,96 @@ export async function getExpedition(cooperativeId: number, expeditionId: number)
     .orderBy(desc(expeditionHistoriqueTable.dateChangement));
 
   return { ...exp, lots, historique };
+}
+
+// ── Lots disponibles pour rattachement ──────────────────────────────────────
+
+export async function getLotsDisponibles(cooperativeId: number, expeditionId: number) {
+  // Lots déjà rattachés à cette expédition
+  const deja = await db
+    .select({ lotId: expeditionLotsTable.lotId })
+    .from(expeditionLotsTable)
+    .where(
+      and(
+        eq(expeditionLotsTable.expeditionId, expeditionId),
+        sql`${expeditionLotsTable.lotId} IS NOT NULL`
+      )
+    );
+
+  const dejaIds = deja.map(r => r.lotId as number).filter(Boolean);
+
+  const query = db
+    .select({
+      id:            lotsTable.id,
+      statut:        lotsTable.statut,
+      poidsTotalKg:  lotsTable.poidsTotalKg,
+      entrepot:      lotsTable.entrepot,
+      dateCreation:  lotsTable.dateCreation,
+      qrCodeLot:     lotsTable.qrCodeLot,
+      campagneId:    lotsTable.campagneId,
+    })
+    .from(lotsTable)
+    .where(
+      and(
+        eq(lotsTable.cooperativeId, cooperativeId),
+        inArray(lotsTable.statut, ["en_stock", "transit"]),
+        ...(dejaIds.length > 0 ? [notInArray(lotsTable.id, dejaIds)] : [])
+      )
+    )
+    .orderBy(desc(lotsTable.dateCreation));
+
+  return query;
+}
+
+export async function rattacherLot(expeditionId: number, lotId: number, cooperativeId: number) {
+  // Vérifier que le lot appartient à la coopérative
+  const [lot] = await db
+    .select()
+    .from(lotsTable)
+    .where(and(eq(lotsTable.id, lotId), eq(lotsTable.cooperativeId, cooperativeId)))
+    .limit(1);
+
+  if (!lot) throw new Error("Lot introuvable ou accès refusé");
+
+  // Vérifier que le lot n'est pas déjà rattaché à cette expédition
+  const [existing] = await db
+    .select({ id: expeditionLotsTable.id })
+    .from(expeditionLotsTable)
+    .where(
+      and(
+        eq(expeditionLotsTable.expeditionId, expeditionId),
+        eq(expeditionLotsTable.lotId, lotId)
+      )
+    )
+    .limit(1);
+
+  if (existing) throw new Error("Lot déjà rattaché à cette expédition");
+
+  const [row] = await db
+    .insert(expeditionLotsTable)
+    .values({
+      expeditionId,
+      lotId,
+      poidsKg: lot.poidsTotalKg,
+    })
+    .returning();
+
+  return row;
+}
+
+export async function detacherLot(expeditionLotId: number, expeditionId: number) {
+  const [row] = await db
+    .delete(expeditionLotsTable)
+    .where(
+      and(
+        eq(expeditionLotsTable.id, expeditionLotId),
+        eq(expeditionLotsTable.expeditionId, expeditionId)
+      )
+    )
+    .returning();
+
+  if (!row) throw new Error("Ligne introuvable");
+  return row;
 }
 
 // ── Flotte disponible ────────────────────────────────────────────────────────

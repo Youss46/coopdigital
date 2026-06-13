@@ -155,6 +155,13 @@
       "when": 1750003600000,
       "tag": "0021_expeditions_phyto_fleet",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1750007000000,
+      "tag": "0022_expedition_lots_lot_id",
+      "breakpoints": true
     }
   ]
 }

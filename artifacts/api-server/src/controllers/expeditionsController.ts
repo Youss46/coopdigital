@@ -9,6 +9,9 @@ import {
   getRapportEudr,
   getFlotteVehicules,
   getFlotteChauffeurs,
+  getLotsDisponibles,
+  rattacherLot,
+  detacherLot,
 } from "../services/expeditionsService";
 
 export async function handleListExpeditions(req: Request, res: Response): Promise<void> {
@@ -96,6 +99,48 @@ export async function handleConfirmerReception(req: Request, res: Response): Pro
     res.json(result);
   } catch (err: unknown) {
     req.log.error({ err }, "handleConfirmerReception");
+    const msg = err instanceof Error ? err.message : "Erreur interne";
+    res.status(400).json({ erreur: msg });
+  }
+}
+
+export async function handleGetLotsDisponibles(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  const expeditionId = parseInt(String(req.params["id"]), 10);
+  if (isNaN(expeditionId)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    const lots = await getLotsDisponibles(cooperativeId, expeditionId);
+    res.json(lots);
+  } catch (err) {
+    req.log.error({ err }, "handleGetLotsDisponibles");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleRattacherLot(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  const expeditionId = parseInt(String(req.params["id"]), 10);
+  const { lotId } = req.body as { lotId?: number };
+  if (isNaN(expeditionId) || !lotId) { res.status(400).json({ erreur: "Données invalides" }); return; }
+  try {
+    const row = await rattacherLot(expeditionId, lotId, cooperativeId);
+    res.status(201).json(row);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur interne";
+    res.status(400).json({ erreur: msg });
+  }
+}
+
+export async function handleDetacherLot(req: Request, res: Response): Promise<void> {
+  const expeditionId = parseInt(String(req.params["id"]), 10);
+  const expeditionLotId = parseInt(String(req.params["lotRowId"]), 10);
+  if (isNaN(expeditionId) || isNaN(expeditionLotId)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    await detacherLot(expeditionLotId, expeditionId);
+    res.json({ ok: true });
+  } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur interne";
     res.status(400).json({ erreur: msg });
   }
