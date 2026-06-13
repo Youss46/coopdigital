@@ -31,14 +31,14 @@ function CarteKpi({
   sousTitre?: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4">
-      <div className="rounded-lg p-2.5 flex-shrink-0" style={{ backgroundColor: couleur + "15" }}>
-        <Icone size={22} style={{ color: couleur }} />
+    <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-5 flex items-start gap-2 sm:gap-4">
+      <div className="rounded-lg p-2 sm:p-2.5 flex-shrink-0" style={{ backgroundColor: couleur + "15" }}>
+        <Icone size={18} style={{ color: couleur }} />
       </div>
-      <div>
-        <p className="text-sm text-gray-500 font-medium">{titre}</p>
-        <p className="text-2xl font-bold text-gray-900 mt-0.5">{valeur}</p>
-        {sousTitre && <p className="text-xs text-gray-400 mt-0.5">{sousTitre}</p>}
+      <div className="min-w-0 flex-1">
+        <p className="text-xs sm:text-sm text-gray-500 font-medium leading-snug">{titre}</p>
+        <p className="text-base sm:text-2xl font-bold text-gray-900 mt-0.5 leading-tight break-words">{valeur}</p>
+        {sousTitre && <p className="text-xs text-gray-400 mt-0.5 leading-snug">{sousTitre}</p>}
       </div>
     </div>
   );
