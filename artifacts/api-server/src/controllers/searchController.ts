@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { db, membresTable, lotsTable, livraisonsTable } from "@workspace/db";
-import { eq, and, or, ilike, desc } from "drizzle-orm";
+import { eq, and, or, ilike, desc, sql } from "drizzle-orm";
 
 export async function globalSearch(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -52,7 +52,7 @@ export async function globalSearch(req: Request, res: Response): Promise<void> {
       .where(
         and(
           eq(lotsTable.cooperativeId, cooperativeId),
-          ilike(lotsTable.qrCodeLot, pattern),
+          sql`${lotsTable.qrCodeLot}::text ilike ${pattern}`,
         ),
       )
       .limit(5),

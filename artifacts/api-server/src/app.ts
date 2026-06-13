@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
@@ -49,5 +49,12 @@ app.get("/api/healthz", (_req, res) => {
 });
 
 app.use("/api", router);
+
+// Gestionnaire d'erreur global — retourne JSON au lieu du HTML par défaut d'Express
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+  logger.error({ err, url: req.url }, "Erreur non gérée");
+  res.status(500).json({ erreur: "Erreur interne du serveur" });
+});
 
 export default app;
