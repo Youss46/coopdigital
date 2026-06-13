@@ -82,7 +82,10 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 function AppRoutes() {
   const { estConnecte, utilisateur } = useAuth();
   usePushSubscription(estConnecte);
-  const accueil = utilisateur?.role === "agent_terrain" ? "/missions" : "/dashboard";
+  const accueil =
+    utilisateur?.role === "agent_terrain" ? "/missions" :
+    utilisateur?.role === "delegue"       ? "/membres"  :
+    "/dashboard";
   return (
     <Switch>
       <Route path="/login" component={Login} />
