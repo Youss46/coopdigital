@@ -596,6 +596,45 @@ function OngletSessions() {
   );
 }
 
+// ─── Export inscrits (bouton réutilisable) ────────────────────────────────────
+
+function ExportBtn({ sessionId, format }: { sessionId: number; format: "excel" | "pdf" }) {
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleExport = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("coop_token") ?? "";
+      const ext   = format === "excel" ? "xlsx" : "pdf";
+      const url   = `${BASE}/api/formations/sessions/${sessionId}/export/${format}`;
+      const res   = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error(await res.text());
+      const blob  = await res.blob();
+      const a     = document.createElement("a");
+      a.href      = URL.createObjectURL(blob);
+      a.download  = `inscrits_session_${sessionId}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      toast({ title: "Erreur lors de l'export", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleExport}
+      disabled={loading}
+      title={format === "excel" ? "Exporter Excel" : "Exporter PDF"}
+      className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors">
+      <Download className="w-3 h-3" />
+      {loading ? "…" : format === "excel" ? "Excel" : "PDF"}
+    </button>
+  );
+}
+
 // ─── Onglet Inscriptions ──────────────────────────────────────────────────────
 
 type MembreMinimal = { id: number; nom: string; prenoms: string | null; code_membre: string; statut?: string };
@@ -895,9 +934,17 @@ function OngletInscriptions() {
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   {inscrits.length} inscrits
                 </p>
-                <button onClick={() => refetchInscrits()} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3" />Actualiser
-                </button>
+                <div className="flex items-center gap-2">
+                  {inscrits.length > 0 && selectedSession && (
+                    <>
+                      <ExportBtn sessionId={Number(selectedSession)} format="excel" />
+                      <ExportBtn sessionId={Number(selectedSession)} format="pdf" />
+                    </>
+                  )}
+                  <button onClick={() => refetchInscrits()} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3" />Actualiser
+                  </button>
+                </div>
               </div>
               {inscrits.length === 0 ? (
                 <p className="text-center text-sm text-gray-400 py-8">Aucun inscrit</p>

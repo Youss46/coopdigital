@@ -206,3 +206,35 @@ export async function getStats(req: Request, res: Response): Promise<void> {
   }
   catch (err) { req.log.error({ err }, "getStats formations"); res.status(500).json({ error: "Erreur serveur" }); }
 }
+
+// ─── Export inscrits ──────────────────────────────────────────────────────────
+
+export async function getExportExcel(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+    const sessionId = parseInt(String(req.params["id"]), 10);
+    const buffer = await svc.exportInscritsExcel(cooperativeId, sessionId);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="inscrits_session_${sessionId}.xlsx"`);
+    res.send(buffer);
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === "NOT_FOUND") { res.status(404).json({ erreur: "Session introuvable" }); return; }
+    req.log.error({ err }, "getExportExcel"); res.status(500).json({ error: "Erreur serveur" });
+  }
+}
+
+export async function getExportPdf(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+    const sessionId = parseInt(String(req.params["id"]), 10);
+    const buffer = await svc.exportInscritsPdf(cooperativeId, sessionId);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="inscrits_session_${sessionId}.pdf"`);
+    res.send(buffer);
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === "NOT_FOUND") { res.status(404).json({ erreur: "Session introuvable" }); return; }
+    req.log.error({ err }, "getExportPdf"); res.status(500).json({ error: "Erreur serveur" });
+  }
+}

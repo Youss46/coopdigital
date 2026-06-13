@@ -40,4 +40,8 @@ router.post("/formations/sessions/:id/rappel",       checkPermission("formation"
 router.post("/formations/sessions/:id/attestations",           checkPermission("formation", "generer_attestation"), ctrl.postAttestations);
 router.get("/formations/sessions/:id/attestation/:membreId",   checkPermission("formation", "voir"),               ctrl.getAttestation);
 
+// ─── Exports inscrits ─────────────────────────────────────────────────────
+router.get("/formations/sessions/:id/export/excel",  checkPermission("formation", "voir"), ctrl.getExportExcel);
+router.get("/formations/sessions/:id/export/pdf",    checkPermission("formation", "voir"), ctrl.getExportPdf);
+
 export default router;

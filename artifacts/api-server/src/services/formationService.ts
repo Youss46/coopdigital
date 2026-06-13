@@ -2,6 +2,7 @@ import { db, programmesFormationTable, sessionsFormationTable, inscriptionsForma
 import { eq, and, inArray, sql, desc, not } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
+import * as XLSX from "xlsx";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 import { getConfig } from "./configService.js";
 
@@ -762,4 +763,160 @@ export async function getStats(cooperativeId: number) {
     parThematique:   thematiques.rows,
     topMembres:      topMembres.rows,
   };
+}
+
+// ─── Exports liste inscrits ───────────────────────────────────────────────────
+
+async function getSessionAndInscrits(cooperativeId: number, sessionId: number) {
+  const [sess] = await db.execute<{
+    titre: string; date_session: string; lieu: string | null;
+    formateur: string | null; thematique: string | null;
+  }>(sql`
+    SELECT titre, date_session, lieu, formateur, thematique
+    FROM sessions_formation
+    WHERE id = ${sessionId} AND cooperative_id = ${cooperativeId}
+    LIMIT 1
+  `).then((r) => r.rows);
+  if (!sess) throw Object.assign(new Error("Session introuvable"), { code: "NOT_FOUND" });
+
+  const inscrits = await getInscrits(cooperativeId, sessionId);
+  return { sess, inscrits };
+}
+
+export async function exportInscritsExcel(cooperativeId: number, sessionId: number): Promise<Buffer> {
+  const { sess, inscrits } = await getSessionAndInscrits(cooperativeId, sessionId);
+
+  const STATUT_LABELS: Record<string, string> = {
+    inscrit: "Inscrit", present: "Présent", absent: "Absent", excuse: "Excusé",
+  };
+
+  const rows = inscrits.map((m, i) => ({
+    "N°":               i + 1,
+    "Nom":              m.nom,
+    "Prénoms":          m.prenoms ?? "",
+    "Téléphone":        m.telephone,
+    "Village":          m.village ?? "",
+    "Section":          (m as { section?: string }).section ?? "",
+    "Statut présence":  STATUT_LABELS[m.statut] ?? m.statut,
+    "Convoqué":         m.sms_convocation_envoye ? "Oui" : "Non",
+    "Date inscription": m.date_inscription ? fmtDate(m.date_inscription) : "",
+    "Signature":        "",
+  }));
+
+  const wb = XLSX.utils.book_new();
+
+  // Onglet info session
+  const info = [
+    ["Session",    sess.titre],
+    ["Date",       fmtDate(sess.date_session)],
+    ["Lieu",       sess.lieu ?? "—"],
+    ["Formateur",  sess.formateur ?? "—"],
+    ["Nb inscrits", inscrits.length],
+  ];
+  const wsInfo = XLSX.utils.aoa_to_sheet(info);
+  XLSX.utils.book_append_sheet(wb, wsInfo, "Informations");
+
+  // Onglet inscrits
+  const ws = XLSX.utils.json_to_sheet(rows);
+  // Largeurs de colonnes
+  ws["!cols"] = [
+    { wch: 4 }, { wch: 20 }, { wch: 20 }, { wch: 14 },
+    { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 10 }, { wch: 18 }, { wch: 20 },
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, "Inscrits");
+
+  return Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
+}
+
+export async function exportInscritsPdf(cooperativeId: number, sessionId: number): Promise<Buffer> {
+  const { sess, inscrits } = await getSessionAndInscrits(cooperativeId, sessionId);
+
+  const MARGIN = 40;
+  const PAGE_W = 595.28;
+  const VERT   = "#1a4731";
+  const GRIS   = "#6b7280";
+
+  const doc = new PDFDocument({ size: "A4", margin: MARGIN, bufferPages: true });
+  const chunks: Buffer[] = [];
+  const endPromise = new Promise<Buffer>((resolve, reject) => {
+    doc.on("data",  (c: Buffer) => chunks.push(c));
+    doc.on("end",   () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
+
+  await drawHeader(doc, cooperativeId, { titre_document: "Liste des inscrits — Formation" });
+
+  let y = (doc as unknown as { y: number }).y + 10;
+
+  // ── Infos session ─────────────────────────────────────────────────────────
+  doc.fontSize(13).font("Helvetica-Bold").fillColor(VERT)
+     .text(sess.titre, MARGIN, y, { width: PAGE_W - MARGIN * 2 });
+  y = (doc as unknown as { y: number }).y + 4;
+
+  doc.fontSize(9).font("Helvetica").fillColor(GRIS);
+  const infos: string[] = [
+    `Date : ${fmtDate(sess.date_session)}`,
+    sess.lieu      ? `Lieu : ${sess.lieu}`           : "",
+    sess.formateur ? `Formateur : ${sess.formateur}` : "",
+  ].filter(Boolean);
+  doc.text(infos.join("   •   "), MARGIN, y, { width: PAGE_W - MARGIN * 2 });
+  y = (doc as unknown as { y: number }).y + 12;
+
+  // ── Tableau ───────────────────────────────────────────────────────────────
+  const COLS  = [28, 130, 110, 90, 85, 72, 40];
+  const HDRS  = ["N°", "Nom", "Prénoms", "Téléphone", "Village", "Statut", "Sign."];
+  const totalW = COLS.reduce((a, b) => a + b, 0);
+
+  const drawRow = (vals: string[], bg?: string) => {
+    if (bg) doc.rect(MARGIN, y, totalW, 15).fill(bg);
+    let x = MARGIN;
+    vals.forEach((v, i) => {
+      doc.fontSize(8).font(bg ? "Helvetica-Bold" : "Helvetica")
+         .fillColor(bg === VERT ? "white" : "#111")
+         .text(v, x + 3, y + 4, { width: (COLS[i] ?? 60) - 6, lineBreak: false });
+      x += COLS[i] ?? 60;
+    });
+    doc.rect(MARGIN, y, totalW, 15).stroke("#e5e7eb");
+    y += 15;
+    doc.fillColor("#111");
+  };
+
+  drawRow(HDRS, VERT);
+
+  const STATUT_LABELS: Record<string, string> = {
+    inscrit: "Inscrit", present: "Présent", absent: "Absent", excuse: "Excusé",
+  };
+
+  inscrits.forEach((m, i) => {
+    if (y > 780) {
+      doc.addPage();
+      y = MARGIN + 10;
+      drawRow(HDRS, VERT);
+    }
+    const bg = i % 2 === 0 ? "#f9fafb" : undefined;
+    if (bg) doc.rect(MARGIN, y, totalW, 15).fill(bg);
+    drawRow([
+      String(i + 1),
+      m.nom,
+      m.prenoms ?? "",
+      m.telephone,
+      m.village ?? "",
+      STATUT_LABELS[m.statut] ?? m.statut,
+      "",
+    ]);
+  });
+
+  y += 8;
+  doc.fontSize(8).font("Helvetica").fillColor(GRIS)
+     .text(`Total : ${inscrits.length} inscrit${inscrits.length > 1 ? "s" : ""}`, MARGIN, y);
+
+  // Footers
+  const range = doc.bufferedPageRange();
+  for (let i = 0; i < range.count; i++) {
+    doc.switchToPage(i);
+    await drawFooter(doc, cooperativeId, i + 1, range.count);
+  }
+  doc.flushPages();
+  doc.end();
+  return endPromise;
 }
