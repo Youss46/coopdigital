@@ -7,6 +7,11 @@ import {
   Package,
   LayoutDashboard,
   RefreshCw,
+  Wallet,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
@@ -30,6 +35,9 @@ function formaterDate(d: string) {
     year: "numeric",
   });
 }
+function formaterHeure(iso: string) {
+  return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
 
 interface DashboardData {
   membresActifs: number;
@@ -48,6 +56,19 @@ interface DashboardData {
     membreNom: string | null;
     membrePrenoms: string | null;
   }[];
+}
+
+interface CaisseRow {
+  id: number;
+  nom: string;
+  type_caisse: string;
+  solde_actuel_fcfa: string;
+  fond_caisse_minimum_fcfa: string;
+  actif: boolean;
+  session_id: number | null;
+  session_statut: string | null;
+  heure_ouverture: string | null;
+  solde_ouverture_fcfa: string | null;
 }
 
 function CarteKpi({
@@ -89,6 +110,108 @@ function CarteKpi({
   );
 }
 
+function WidgetCaisse({ caisses, onNavigate }: { caisses: CaisseRow[]; onNavigate: () => void }) {
+  if (!caisses.length) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
+        <div className="rounded-lg p-2.5 bg-gray-100">
+          <Wallet size={22} className="text-gray-400" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-500">Caisse</p>
+          <p className="text-sm text-gray-400">Aucune caisse assignée</p>
+        </div>
+      </div>
+    );
+  }
+
+  const caisse = caisses[0]!;
+  const solde = parseInt(caisse.solde_actuel_fcfa, 10);
+  const minimum = parseInt(caisse.fond_caisse_minimum_fcfa, 10);
+  const sessionOuverte = caisse.session_statut === "ouverte";
+  const soldeInsuffisant = solde < minimum;
+
+  return (
+    <div
+      className="bg-white rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:border-amber-300 transition group"
+      onClick={onNavigate}
+    >
+      <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <Wallet size={18} className="text-amber-600" />
+          <span className="font-semibold text-gray-800">{caisse.nom}</span>
+        </div>
+        <ChevronRight size={16} className="text-gray-400 group-hover:text-amber-500 transition" />
+      </div>
+
+      <div className="px-5 py-4 grid grid-cols-3 gap-4">
+        {/* Solde */}
+        <div>
+          <p className="text-xs text-gray-400 mb-0.5">Solde actuel</p>
+          <p className={`text-lg font-bold ${soldeInsuffisant ? "text-red-600" : "text-gray-900"}`}>
+            {formaterFCFA(solde)}
+          </p>
+          {soldeInsuffisant && (
+            <p className="text-xs text-red-500 mt-0.5">
+              En dessous du minimum ({formaterFCFA(minimum)})
+            </p>
+          )}
+        </div>
+
+        {/* Session */}
+        <div>
+          <p className="text-xs text-gray-400 mb-0.5">Session</p>
+          <div className="flex items-center gap-1.5">
+            {sessionOuverte ? (
+              <>
+                <CheckCircle2 size={15} className="text-emerald-500 flex-shrink-0" />
+                <span className="text-sm font-semibold text-emerald-700">Ouverte</span>
+              </>
+            ) : (
+              <>
+                <XCircle size={15} className="text-gray-400 flex-shrink-0" />
+                <span className="text-sm font-semibold text-gray-500">Fermée</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Heure d'ouverture */}
+        <div>
+          <p className="text-xs text-gray-400 mb-0.5">
+            {sessionOuverte ? "Ouverte à" : "Dernière ouverture"}
+          </p>
+          {caisse.heure_ouverture ? (
+            <div className="flex items-center gap-1.5">
+              <Clock size={14} className="text-gray-400 flex-shrink-0" />
+              <span className="text-sm font-medium text-gray-700">
+                {formaterHeure(caisse.heure_ouverture)}
+              </span>
+            </div>
+          ) : (
+            <span className="text-sm text-gray-400">—</span>
+          )}
+        </div>
+      </div>
+
+      {/* Barre de progression solde vs minimum */}
+      {minimum > 0 && (
+        <div className="px-5 pb-4">
+          <div className="w-full bg-gray-100 rounded-full h-1.5">
+            <div
+              className={`h-1.5 rounded-full transition-all ${soldeInsuffisant ? "bg-red-400" : "bg-emerald-400"}`}
+              style={{ width: `${Math.min(100, (solde / Math.max(minimum * 2, solde)) * 100)}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            Fond minimum : {formaterFCFA(minimum)}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardDelegue() {
   const { utilisateur } = useAuth();
   const [, navigate] = useLocation();
@@ -96,6 +219,12 @@ export default function DashboardDelegue() {
   const { data, isLoading, refetch, isFetching } = useQuery<DashboardData>({
     queryKey: ["dashboard-delegue"],
     queryFn: () => apiFetch("/api/dashboard/delegue"),
+    staleTime: 60_000,
+  });
+
+  const { data: caisses = [], isLoading: caisseLoading } = useQuery<CaisseRow[]>({
+    queryKey: ["caisse-delegue"],
+    queryFn: () => apiFetch("/api/caisse"),
     staleTime: 60_000,
   });
 
@@ -180,19 +309,28 @@ export default function DashboardDelegue() {
         </div>
       )}
 
-      {/* Tonnage campagne */}
-      {data?.campagne && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm text-amber-700 font-medium">Tonnage campagne {data.campagne.libelle}</p>
-            <p className="text-2xl font-bold text-amber-900 mt-0.5">{formaterKg(data.tonnageCampagne)}</p>
+      {/* Tonnage campagne + Widget caisse */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {data?.campagne && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-amber-700 font-medium">Tonnage campagne {data.campagne.libelle}</p>
+              <p className="text-2xl font-bold text-amber-900 mt-0.5">{formaterKg(data.tonnageCampagne)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-amber-700 font-medium">Livraisons</p>
+              <p className="text-2xl font-bold text-amber-900 mt-0.5">{data.nbLivraisonsCampagne}</p>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-amber-700 font-medium">Livraisons</p>
-            <p className="text-2xl font-bold text-amber-900 mt-0.5">{data.nbLivraisonsCampagne}</p>
-          </div>
-        </div>
-      )}
+        )}
+
+        {/* Widget caisse */}
+        {caisseLoading ? (
+          <div className="bg-gray-100 rounded-xl animate-pulse h-36" />
+        ) : (
+          <WidgetCaisse caisses={caisses} onNavigate={() => navigate("/caisse")} />
+        )}
+      </div>
 
       {/* Alerte retards */}
       {(data?.avancesEnRetardNb ?? 0) > 0 && (
