@@ -1,0 +1,54 @@
+Run pnpm run ci-migrate
+
+> @workspace/db@0.0.0 ci-migrate /home/runner/work/coopdigital/coopdigital/lib/db
+> tsx ./src/ci-migrate.ts
+
+ℹ️  Tracking déjà présent (1 migrations, dernier created_at=1780752130718)
+📂 Dossier migrations : /home/runner/work/coopdigital/coopdigital/lib/db/drizzle
+/home/runner/work/coopdigital/coopdigital/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73
+				throw new DrizzleQueryError(queryString, params, e as Error);
+				      ^
+
+
+DrizzleQueryError: Failed query: ALTER TABLE "users" ADD COLUMN "mot_de_passe_temporaire" boolean DEFAULT false NOT NULL;
+params: 
+    at NodePgPreparedQuery.queryWithCache (/home/runner/work/coopdigital/coopdigital/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async <anonymous> (/home/runner/work/coopdigital/coopdigital/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/src/pg-core/dialect.ts:102:7)
+    ... 3 lines matching cause stack trace ...
+    at async <anonymous> (/home/runner/work/coopdigital/coopdigital/lib/db/src/ci-migrate.ts:67:3) {
+  query: 'ALTER TABLE "users" ADD COLUMN "mot_de_passe_temporaire" boolean DEFAULT false NOT NULL;',
+  params: [],
+  cause: error: column "mot_de_passe_temporaire" of relation "users" already exists
+      at /home/runner/work/coopdigital/coopdigital/node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js:631:17
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async <anonymous> (/home/runner/work/coopdigital/coopdigital/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:149:14)
+      at async NodePgPreparedQuery.queryWithCache (/home/runner/work/coopdigital/coopdigital/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/src/pg-core/session.ts:71:12)
+      at async <anonymous> (/home/runner/work/coopdigital/coopdigital/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/src/pg-core/dialect.ts:102:7)
+      at async NodePgSession.transaction (/home/runner/work/coopdigital/coopdigital/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:259:19)
+      at async PgDialect.migrate (/home/runner/work/coopdigital/coopdigital/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/src/pg-core/dialect.ts:95:3)
+      at async migrate (/home/runner/work/coopdigital/coopdigital/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/src/node-postgres/migrator.ts:10:2)
+      at async <anonymous> (/home/runner/work/coopdigital/coopdigital/lib/db/src/ci-migrate.ts:67:3) {
+    length: 147,
+    severity: 'ERROR',
+    code: '42701',
+    detail: undefined,
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'tablecmds.c',
+    line: '7686',
+    routine: 'check_for_column_name_collision'
+  }
+}
+
+Node.js v20.20.2
+ ELIFECYCLE  Command failed with exit code 1.
+Error: Process completed with exit code 1.
