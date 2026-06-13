@@ -572,7 +572,7 @@ export default function ExpeditionDetailPage() {
             {(niveauAlerte === "a_justifier" || niveauAlerte === "litige") && (
               <div>
                 <Label>Motif de l'écart *</Label>
-                <Select value={motifEcart} onValueChange={setMotifEcart}>
+                <Select value={motifEcart || undefined} onValueChange={setMotifEcart}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner…" /></SelectTrigger>
                   <SelectContent>
                     {MOTIFS_ECART.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
