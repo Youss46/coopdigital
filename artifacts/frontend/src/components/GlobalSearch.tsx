@@ -1,12 +1,24 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Search, Users, Package, X } from "lucide-react";
+import { Search, Users, Package, TrendingDown, X } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
 
 type SearchResults = {
-  membres: { id: number; nom: string; prenoms: string; telephone: string; statut: string }[];
+  membres: { id: number; nom: string; prenoms: string; telephone: string; village: string | null; statut: string }[];
   lots: { id: number; qrCodeLot: string; statut: string; poidsTotalKg: string | null; dateCreation: string }[];
   livraisons: { id: number; poidsKg: string; dateLivraison: string; membreNom: string; membrePrenoms: string }[];
+  avances: {
+    id: number;
+    montantOctroyeFcfa: number;
+    montantRembourseFcfa: number;
+    statut: string;
+    dateOctroi: string;
+    motif: string | null;
+    membreId: number;
+    membreNom: string;
+    membrePrenoms: string;
+    membreTelephone: string;
+  }[];
 };
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -16,6 +28,16 @@ function useDebounce<T>(value: T, delay: number): T {
     return () => clearTimeout(t);
   }, [value, delay]);
   return debounced;
+}
+
+const AVANCE_STATUT_LABELS: Record<string, { label: string; cls: string }> = {
+  en_cours:  { label: "En cours",  cls: "bg-blue-100 text-blue-700" },
+  rembourse: { label: "Remboursé", cls: "bg-green-100 text-green-700" },
+  en_retard: { label: "En retard", cls: "bg-red-100 text-red-700" },
+};
+
+function formatFcfa(n: number): string {
+  return n.toLocaleString("fr-FR") + " FCFA";
 }
 
 export default function GlobalSearch() {
@@ -68,7 +90,11 @@ export default function GlobalSearch() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open, close]);
 
-  const total = (results?.membres?.length ?? 0) + (results?.lots?.length ?? 0) + (results?.livraisons?.length ?? 0);
+  const total =
+    (results?.membres?.length ?? 0) +
+    (results?.lots?.length ?? 0) +
+    (results?.livraisons?.length ?? 0) +
+    (results?.avances?.length ?? 0);
 
   return (
     <>
@@ -92,7 +118,7 @@ export default function GlobalSearch() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Rechercher un membre, un lot, une livraison…"
+                placeholder="Nom, téléphone, village, avance…"
                 className="flex-1 text-sm outline-none text-gray-900 placeholder-gray-400"
                 autoComplete="off"
               />
@@ -104,7 +130,7 @@ export default function GlobalSearch() {
               <button onClick={close} className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 font-mono">Esc</button>
             </div>
 
-            <div className="max-h-96 overflow-y-auto">
+            <div className="max-h-[28rem] overflow-y-auto">
               {loading && (
                 <div className="px-4 py-6 text-center text-sm text-gray-400">Recherche…</div>
               )}
@@ -121,6 +147,7 @@ export default function GlobalSearch() {
                 <div className="px-4 py-6 text-center text-sm text-gray-400">Tapez au moins 2 caractères pour rechercher</div>
               )}
 
+              {/* Membres */}
               {results && (results.membres?.length ?? 0) > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
@@ -140,7 +167,10 @@ export default function GlobalSearch() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{m.nom} {m.prenoms}</p>
-                        <p className="text-xs text-gray-500">{m.telephone}</p>
+                        <p className="text-xs text-gray-500">
+                          {m.telephone}
+                          {m.village ? ` · ${m.village}` : ""}
+                        </p>
                       </div>
                       <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${m.statut === "actif" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                         {m.statut}
@@ -150,6 +180,44 @@ export default function GlobalSearch() {
                 </div>
               )}
 
+              {/* Avances */}
+              {results && (results.avances?.length ?? 0) > 0 && (
+                <div>
+                  <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
+                    <TrendingDown size={11} /> Avances
+                  </div>
+                  {results.avances.map((a) => {
+                    const statut = AVANCE_STATUT_LABELS[a.statut] ?? { label: a.statut, cls: "bg-gray-100 text-gray-500" };
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => { navigate(`/membres/${a.membreId}`); close(); }}
+                        className="w-full text-left px-4 py-3 hover:bg-green-50 flex items-center gap-3 border-b border-gray-50 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full flex-shrink-0 bg-orange-100 flex items-center justify-center">
+                          <TrendingDown size={14} className="text-orange-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {a.membreNom} {a.membrePrenoms}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatFcfa(a.montantOctroyeFcfa)}
+                            {a.motif ? ` · ${a.motif}` : ""}
+                            {" · "}
+                            {new Date(a.dateOctroi + "T00:00:00").toLocaleDateString("fr-FR")}
+                          </p>
+                        </div>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${statut.cls}`}>
+                          {statut.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Livraisons */}
               {results && (results.livraisons?.length ?? 0) > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
@@ -178,6 +246,7 @@ export default function GlobalSearch() {
                 </div>
               )}
 
+              {/* Lots */}
               {results && (results.lots?.length ?? 0) > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 bg-gray-50 border-b border-gray-100">
@@ -193,10 +262,10 @@ export default function GlobalSearch() {
                         <Package size={14} className="text-blue-600" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 font-mono truncate">{l.qrCodeLot}</p>
+                        <p className="text-sm font-medium text-gray-900 font-mono truncate text-xs">{l.qrCodeLot}</p>
                         <p className="text-xs text-gray-500">
                           {l.poidsTotalKg ? `${parseFloat(l.poidsTotalKg).toLocaleString("fr-FR")} kg · ` : ""}
-                          {new Date(l.dateCreation + "T00:00:00").toLocaleDateString("fr-FR")}
+                          {new Date(l.dateCreation).toLocaleDateString("fr-FR")}
                         </p>
                       </div>
                       <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${
