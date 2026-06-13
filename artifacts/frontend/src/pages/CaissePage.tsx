@@ -370,6 +370,8 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
   onJournal: (id: number) => void;
 }) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const peutCreerCaisse = user?.role !== "delegue";
   const [modalMvt, setModalMvt] = useState<number | null>(null);
   const [modalFermer, setModalFermer] = useState<number | null>(null);
   const [modalCreer, setModalCreer] = useState(false);
@@ -483,10 +485,12 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
           <button onClick={refetch} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
             <RefreshCw size={14} /> Actualiser
           </button>
-          <button onClick={() => setModalCreer(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
-            <Plus size={14} /> Nouvelle caisse
-          </button>
+          {peutCreerCaisse && (
+            <button onClick={() => setModalCreer(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
+              <Plus size={14} /> Nouvelle caisse
+            </button>
+          )}
         </div>
       </div>
 
