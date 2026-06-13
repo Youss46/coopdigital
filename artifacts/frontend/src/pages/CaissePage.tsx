@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Wallet, Plus, RefreshCw, Lock, Unlock, Download, AlertTriangle, TrendingUp, TrendingDown, ChevronRight, X, CheckCircle2, Users } from "lucide-react";
+import { Wallet, Plus, RefreshCw, Lock, Unlock, Download, AlertTriangle, TrendingUp, TrendingDown, ChevronRight, X, CheckCircle2, Users, ArrowLeftRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -372,6 +372,7 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
   const [modalMvt, setModalMvt] = useState<number | null>(null);
   const [modalFermer, setModalFermer] = useState<number | null>(null);
   const [modalCreer, setModalCreer] = useState(false);
+  const [modalTransfert, setModalTransfert] = useState<number | null>(null);
 
   const ouvrirSession = async (id: number) => {
     try {
@@ -457,6 +458,10 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
                 className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
                 <Plus size={12} /> Mouvement
               </button>
+              <button onClick={() => setModalTransfert(c.id)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs hover:bg-purple-700">
+                <ArrowLeftRight size={12} /> Transfert
+              </button>
               <button onClick={() => setModalFermer(c.id)}
                 className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700">
                 <Lock size={12} /> Fermer
@@ -525,9 +530,126 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
       {modalFermer !== null && (
         <ModalFermeture caisseId={modalFermer} onClose={() => setModalFermer(null)} onDone={() => { setModalFermer(null); refetch(); }} />
       )}
+      {modalTransfert !== null && (
+        <ModalTransfert
+          sourceCaisseId={modalTransfert}
+          caisses={caisses ?? []}
+          onClose={() => setModalTransfert(null)}
+          onDone={() => { setModalTransfert(null); refetch(); }}
+        />
+      )}
       {modalCreer && (
         <ModalCreerCaisse onClose={() => setModalCreer(false)} onDone={() => { setModalCreer(false); refetch(); }} />
       )}
+    </div>
+  );
+}
+
+// ─── Modal Transfert inter-caisses ────────────────────────────────────────────
+
+function ModalTransfert({
+  sourceCaisseId, caisses, onClose, onDone,
+}: {
+  sourceCaisseId: number; caisses: Caisse[];
+  onClose: () => void; onDone: () => void;
+}) {
+  const { toast } = useToast();
+  const source = caisses.find(c => c.id === sourceCaisseId);
+  const destinations = caisses.filter(c => c.id !== sourceCaisseId);
+  const [destId, setDestId] = useState<string>(destinations[0]?.id.toString() ?? "");
+  const [montant, setMontant] = useState("");
+  const [libelle, setLibelle] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if (!destId) { toast({ title: "Destination requise", variant: "destructive" }); return; }
+    const mt = parseInt(montant);
+    if (!mt || mt <= 0) { toast({ title: "Montant invalide", variant: "destructive" }); return; }
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE}/api/caisse/${sourceCaisseId}/transfert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
+        body: JSON.stringify({ destCaisseId: parseInt(destId), montantFcfa: mt, libelle: libelle || undefined }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "Erreur");
+      const dest = caisses.find(c => c.id === parseInt(destId));
+      toast({
+        title: "Transfert effectué",
+        description: `${FCFA(mt)} transférés vers ${dest?.nom ?? "la caisse destination"}.`,
+      });
+      onDone();
+    } catch (e) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between p-5 border-b">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+              <ArrowLeftRight size={16} className="text-purple-600" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-800">Transfert inter-caisses</h2>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          {/* Résumé source */}
+          <div className="bg-purple-50 border border-purple-100 rounded-lg p-3">
+            <p className="text-xs text-purple-500 font-medium uppercase tracking-wide mb-1">Caisse source</p>
+            <p className="font-semibold text-gray-800">{source?.nom}</p>
+            <p className="text-sm text-gray-500">
+              Solde disponible : <span className="font-medium text-gray-800">{FCFA(parseFloat(source?.solde_actuel_fcfa ?? "0"))}</span>
+            </p>
+          </div>
+
+          {/* Destination */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Caisse destination *</label>
+            <select value={destId} onChange={e => setDestId(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white">
+              <option value="">— Sélectionner —</option>
+              {destinations.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.nom} {c.type_caisse === "centrale" ? "(centrale)" : c.responsable_nom ? `(${c.responsable_nom})` : "(déléguée)"}
+                  {" — "}{FCFA(parseFloat(c.solde_actuel_fcfa))}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Montant */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Montant (FCFA) *</label>
+            <MoneyInput value={montant} onChange={setMontant}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="0" />
+          </div>
+
+          {/* Libellé */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Libellé (optionnel)</label>
+            <input type="text" value={libelle} onChange={e => setLibelle(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Ex: Approvisionnement zone Nord" />
+          </div>
+
+          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            Les deux caisses doivent avoir une session ouverte. Le mouvement sera tracé dans chaque journal.
+          </p>
+        </div>
+        <div className="flex gap-3 p-5 pt-0">
+          <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Annuler</button>
+          <button onClick={submit} disabled={loading}
+            className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors">
+            {loading ? "Transfert en cours…" : "Confirmer le transfert"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

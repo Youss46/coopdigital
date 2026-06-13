@@ -238,6 +238,97 @@ export async function enregistrerMouvement(
   return { mouvement: mouvement!, alerte, soldeActuel: nouveauSolde };
 }
 
+// ─── Transfert inter-caisses ──────────────────────────────────────────────────
+
+export async function transfererFonds(
+  sourceCaisseId: number,
+  destCaisseId: number,
+  montant: number,
+  libelle: string | undefined,
+  userId: number | undefined,
+  cooperativeId: number
+): Promise<{ sourceNouveauSolde: number; destNouveauSolde: number }> {
+  if (sourceCaisseId === destCaisseId) throw new Error("La caisse source et destination doivent être différentes");
+  const mt = Math.round(montant);
+  if (mt <= 0) throw new Error("Le montant doit être positif");
+
+  // Récupérer les deux caisses et vérifier qu'elles appartiennent à la même coopérative
+  const [source, dest] = await Promise.all([getCaisse(sourceCaisseId), getCaisse(destCaisseId)]);
+  if (!source) throw new Error("Caisse source introuvable");
+  if (!dest)   throw new Error("Caisse destination introuvable");
+  if (source.cooperativeId !== cooperativeId || dest.cooperativeId !== cooperativeId) {
+    throw new Error("Les caisses doivent appartenir à la même coopérative");
+  }
+
+  // Sessions actives requises
+  const [sessionSrc, sessionDest] = await Promise.all([
+    getSessionActive(sourceCaisseId),
+    getSessionActive(destCaisseId),
+  ]);
+  if (!sessionSrc)  throw new Error(`Aucune session ouverte pour la caisse source "${source.nom}". Ouvrez d'abord une session.`);
+  if (!sessionDest) throw new Error(`Aucune session ouverte pour la caisse destination "${dest.nom}". Ouvrez d'abord une session.`);
+
+  // Vérifier le solde source
+  const soldeSrc = parseFloat(source.soldeActuelFcfa as string);
+  if (soldeSrc - mt < 0) {
+    throw new Error(`Solde insuffisant en caisse source. Disponible : ${soldeSrc.toLocaleString("fr-FR")} FCFA`);
+  }
+
+  const nouveauSoldeSrc  = soldeSrc - mt;
+  const soldeDest        = parseFloat(dest.soldeActuelFcfa as string);
+  const nouveauSoldeDest = soldeDest + mt;
+  const ref              = `TRF-${Date.now()}`;
+  const lib              = libelle || `Transfert vers ${dest.nom}`;
+  const libDest          = `Transfert depuis ${source.nom}${libelle ? ` — ${libelle}` : ""}`;
+  const dateAujourd      = today();
+
+  // Insérer les deux mouvements + mettre à jour les soldes
+  const [mvtSrc, mvtDest] = await Promise.all([
+    db.insert(mouvementsCaisseTable).values({
+      caisseId: sourceCaisseId, sessionId: sessionSrc.id,
+      cooperativeId, type: "sortie", motif: "transfert_interne",
+      montantFcfa: mt.toString(), libelle: lib,
+      referenceOperation: ref, soldeApresFcfa: nouveauSoldeSrc.toString(),
+      enregistrePar: userId ?? null,
+    }).returning(),
+    db.insert(mouvementsCaisseTable).values({
+      caisseId: destCaisseId, sessionId: sessionDest.id,
+      cooperativeId, type: "entree", motif: "transfert_interne",
+      montantFcfa: mt.toString(), libelle: libDest,
+      referenceOperation: ref, soldeApresFcfa: nouveauSoldeDest.toString(),
+      enregistrePar: userId ?? null,
+    }).returning(),
+  ]);
+
+  await Promise.all([
+    db.update(caissesTable).set({ soldeActuelFcfa: nouveauSoldeSrc.toString() }).where(eq(caissesTable.id, sourceCaisseId)),
+    db.update(caissesTable).set({ soldeActuelFcfa: nouveauSoldeDest.toString() }).where(eq(caissesTable.id, destCaisseId)),
+  ]);
+
+  // Écritures comptables OHADA — compte 585 (virements internes de fonds)
+  try {
+    await Promise.all([
+      db.insert(ecrituresComptablesTable).values({
+        cooperativeId, dateEcriture: dateAujourd,
+        libelle: lib, compteDebit: "585", compteCredit: "571",
+        montantFcfa: mt, source: "manuel" as const,
+        sourceId: mvtSrc[0]?.id ?? null, exercice: new Date().getFullYear(),
+      }),
+      db.insert(ecrituresComptablesTable).values({
+        cooperativeId, dateEcriture: dateAujourd,
+        libelle: libDest, compteDebit: "571", compteCredit: "585",
+        montantFcfa: mt, source: "manuel" as const,
+        sourceId: mvtDest[0]?.id ?? null, exercice: new Date().getFullYear(),
+      }),
+    ]);
+  } catch (err) {
+    logger.warn({ err }, "Écritures comptables transfert non enregistrées");
+  }
+
+  logger.info({ ref, sourceCaisseId, destCaisseId, montant: mt }, "Transfert inter-caisses effectué");
+  return { sourceNouveauSolde: nouveauSoldeSrc, destNouveauSolde: nouveauSoldeDest };
+}
+
 // ─── Fermeture session ────────────────────────────────────────────────────────
 
 export async function fermerSession(

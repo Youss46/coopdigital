@@ -98,6 +98,29 @@ export async function putFermer(req: Request, res: Response): Promise<void> {
   }
 }
 
+// ─── Transfert inter-caisses ──────────────────────────────────────────────────
+
+export async function postTransfert(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ error: "Coopérative non associée à ce compte" }); return; }
+  try {
+    const sourceCaisseId = parseInt(String(req.params["id"]), 10);
+    const { destCaisseId, montantFcfa, libelle } = req.body as {
+      destCaisseId: number; montantFcfa: number; libelle?: string;
+    };
+    if (!destCaisseId || !montantFcfa) {
+      res.status(400).json({ error: "destCaisseId et montantFcfa requis" }); return;
+    }
+    const userId = req.user?.id;
+    const result = await svc.transfererFonds(sourceCaisseId, destCaisseId, montantFcfa, libelle, userId, cooperativeId);
+    res.status(201).json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    req.log.error({ err }, "postTransfert");
+    res.status(400).json({ error: msg });
+  }
+}
+
 // ─── Journal ──────────────────────────────────────────────────────────────────
 
 export async function getJournal(req: Request, res: Response): Promise<void> {
@@ -147,9 +170,9 @@ export async function getSessions(req: Request, res: Response): Promise<void> {
   } catch (err) { req.log.error({ err }, "getSessions caisse"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
-// ─── Transfert ────────────────────────────────────────────────────────────────
+// ─── Transfert vers banque (dépôt) ────────────────────────────────────────────
 
-export async function postTransfert(req: Request, res: Response): Promise<void> {
+export async function postTransfertBanque(req: Request, res: Response): Promise<void> {
   try {
     const id     = parseInt(String(req.params["id"]), 10);
     const userId = (req as Request & { user?: { id: number } }).user?.id ?? 0;
@@ -158,7 +181,7 @@ export async function postTransfert(req: Request, res: Response): Promise<void> 
     res.json(await svc.transfertVersBanque(id, Math.round(montant), userId, libelle));
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur serveur";
-    req.log.error({ err }, "postTransfert");
+    req.log.error({ err }, "postTransfertBanque");
     res.status(400).json({ error: msg });
   }
 }
