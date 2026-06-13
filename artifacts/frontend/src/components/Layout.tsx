@@ -301,7 +301,7 @@ const navItems = [
     href: "/equipements",
     label: "Équipements",
     icon: Package,
-    roles: ["pca", "directeur", "comptable", "auditeur", "magasinier"],
+    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
 
   // ── Pilotage & Contrôle ───────────────────────────────────────────────────
@@ -315,7 +315,7 @@ const navItems = [
     href: "/reporting",
     label: "Reporting",
     icon: BarChart3,
-    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
   },
   {
     href: "/anomalies",
