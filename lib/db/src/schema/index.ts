@@ -47,3 +47,4 @@ export * from "./missions";
 export * from "./messages_mission";
 export * from "./pushSubscriptions";
 export * from "./pushSubscriptionsPortail";
+export * from "./banque";

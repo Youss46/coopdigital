@@ -288,6 +288,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_historique_entite: ["pca", "directeur", "comptable", "auditeur"],
   },
 
+  // MODULE — COMPTES BANCAIRES
+  banque: {
+    voir:             ["pca", "directeur", "comptable", "auditeur"],
+    creer:            ["pca", "directeur"],
+    enregistrer_mvt:  ["pca", "directeur", "comptable"],
+    rapprocher:       ["pca", "directeur", "comptable"],
+  },
+
   // MODULE — GESTION DE CAISSE
   caisse: {
     voir:             ["pca", "directeur", "comptable", "auditeur"],

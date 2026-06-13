@@ -236,6 +236,12 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "auditeur", "delegue"],
   },
   {
+    href: "/banque",
+    label: "Banque",
+    icon: Building2,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
     href: "/fiscalite",
     label: "Fiscalité",
     icon: Calculator,
