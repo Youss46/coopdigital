@@ -127,6 +127,13 @@
       "when": 1749986500000,
       "tag": "0017_campagne_tonnage_cible",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1749990000000,
+      "tag": "0018_caisse_type",
+      "breakpoints": true
     }
   ]
 }

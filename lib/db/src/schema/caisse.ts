@@ -5,6 +5,7 @@ export const caissesTable = pgTable("caisses", {
   id:                      serial("id").primaryKey(),
   cooperativeId:           integer("cooperative_id").notNull(),
   nom:                     varchar("nom", { length: 200 }).notNull(),
+  typeCaisse:              varchar("type_caisse", { length: 10 }).notNull().default("centrale"),
   responsableId:           integer("responsable_id"),
   soldeActuelFcfa:         numeric("solde_actuel_fcfa").notNull().default("0"),
   fondCaisseMinimumFcfa:   numeric("fond_caisse_minimum_fcfa").notNull().default("0"),

@@ -16,11 +16,11 @@ export async function postCaisse(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(403).json({ error: "Coopérative non associée à ce compte" }); return; }
   try {
-    const { nom, responsableId, soldeinitial, fondMinimum } = req.body as {
-      nom: string; responsableId?: number; soldeinitial?: number; fondMinimum?: number;
+    const { nom, typeCaisse, responsableId, soldeinitial, fondMinimum } = req.body as {
+      nom: string; typeCaisse?: "centrale" | "deleguee"; responsableId?: number; soldeinitial?: number; fondMinimum?: number;
     };
     if (!nom) { res.status(400).json({ error: "nom requis" }); return; }
-    res.status(201).json(await svc.creerCaisse({ nom, responsableId, soldeinitial, fondMinimum }, cooperativeId));
+    res.status(201).json(await svc.creerCaisse({ nom, typeCaisse, responsableId, soldeinitial, fondMinimum }, cooperativeId));
   } catch (err) { req.log.error({ err }, "postCaisse"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 

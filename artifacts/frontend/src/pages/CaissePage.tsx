@@ -29,7 +29,8 @@ const MOTIFS_SORTIE = [
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Caisse {
-  id: number; nom: string; responsable_id: number | null; responsable_nom: string | null;
+  id: number; nom: string; type_caisse: string;
+  responsable_id: number | null; responsable_nom: string | null;
   solde_actuel_fcfa: string; fond_caisse_minimum_fcfa: string; actif: boolean;
   session_id: number | null; session_statut: string | null;
   heure_ouverture: string | null; solde_ouverture_fcfa: string | null;
@@ -246,21 +247,43 @@ function ModalFermeture({ caisseId, onClose, onDone }: { caisseId: number; onClo
 
 // ─── Modal Nouvelle Caisse ────────────────────────────────────────────────────
 
+interface UserOption { id: number; nom: string; prenoms: string | null; }
+
 function ModalCreerCaisse({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const { toast } = useToast();
   const [nom, setNom] = useState("");
+  const [typeCaisse, setTypeCaisse] = useState<"centrale" | "deleguee">("centrale");
+  const [responsableId, setResponsableId] = useState<string>("");
   const [fondMin, setFondMin] = useState("");
   const [soldeInit, setSoldeInit] = useState("");
   const [loading, setLoading] = useState(false);
+  const [delegues, setDelegues] = useState<UserOption[]>([]);
+
+  useEffect(() => {
+    fetch(`${BASE}/api/delegues`, { headers: { Authorization: `Bearer ${tok()}` } })
+      .then(r => r.json())
+      .then((data: { id: number; nom: string; prenoms: string | null }[]) => setDelegues(data ?? []))
+      .catch(() => {});
+  }, []);
 
   const submit = async () => {
     if (!nom.trim()) { toast({ title: "Nom requis", variant: "destructive" }); return; }
+    if (typeCaisse === "deleguee" && !responsableId) {
+      toast({ title: "Responsable requis", description: "Sélectionnez un délégué responsable.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
+      const body: Record<string, unknown> = {
+        nom, typeCaisse,
+        fondMinimum: parseInt(fondMin) || 0,
+        soldeinitial: parseInt(soldeInit) || 0,
+      };
+      if (typeCaisse === "deleguee" && responsableId) body.responsableId = parseInt(responsableId);
       const r = await fetch(`${BASE}/api/caisse`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
-        body: JSON.stringify({ nom, fondMinimum: parseInt(fondMin) || 0, soldeinitial: parseInt(soldeInit) || 0 }),
+        body: JSON.stringify(body),
       });
       if (!r.ok) throw new Error((await r.json()).error ?? "Erreur");
       toast({ title: "Caisse créée", description: `"${nom}" a été créée avec succès.` });
@@ -278,12 +301,42 @@ function ModalCreerCaisse({ onClose, onDone }: { onClose: () => void; onDone: ()
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
         <div className="p-5 space-y-4">
+          {/* Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Type de caisse *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([["centrale", "Caisse centrale", "Gérée par la coopérative"], ["deleguee", "Caisse déléguée", "Gérée par un délégué"]] as const).map(([val, label, desc]) => (
+                <button key={val} type="button" onClick={() => setTypeCaisse(val)}
+                  className={`text-left p-3 rounded-lg border-2 transition-all ${typeCaisse === val ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
+                  <p className={`text-sm font-medium ${typeCaisse === val ? "text-green-700" : "text-gray-700"}`}>{label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Nom */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la caisse *</label>
             <input type="text" value={nom} onChange={e => setNom(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Ex: Caisse principale siège" />
+              placeholder={typeCaisse === "centrale" ? "Ex: Caisse principale siège" : "Ex: Caisse délégué Aboisso"} />
           </div>
+
+          {/* Responsable — uniquement pour caisse déléguée */}
+          {typeCaisse === "deleguee" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Délégué responsable *</label>
+              <select value={responsableId} onChange={e => setResponsableId(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+                <option value="">— Sélectionner un délégué —</option>
+                {delegues.map(d => (
+                  <option key={d.id} value={d.id}>{d.prenoms ? `${d.prenoms} ${d.nom}` : d.nom}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Solde initial (FCFA)</label>
             <MoneyInput value={soldeInit} onChange={(raw) => setSoldeInit(raw)}
@@ -340,9 +393,85 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
     </div>
   );
 
+  const centrales  = caisses?.filter(c => c.type_caisse === "centrale")  ?? [];
+  const deleguees  = caisses?.filter(c => c.type_caisse === "deleguee") ?? [];
+
+  const renderCaisseCard = (c: Caisse) => {
+    const solde   = parseFloat(c.solde_actuel_fcfa);
+    const min     = parseFloat(c.fond_caisse_minimum_fcfa);
+    const sousMin = min > 0 && solde < min;
+    const ouvert  = c.session_statut === "ouverte";
+
+    return (
+      <div key={c.id} className={`bg-white rounded-xl border-2 p-5 shadow-sm ${sousMin ? "border-red-200" : ouvert ? "border-green-200" : "border-gray-100"}`}>
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Wallet size={16} className="text-green-600" />
+              <h3 className="font-semibold text-gray-800">{c.nom}</h3>
+              {sousMin && <AlertTriangle size={14} className="text-red-500" />}
+            </div>
+            {c.responsable_nom && (
+              <p className="text-xs text-gray-400 mt-0.5">Responsable : {c.responsable_nom}</p>
+            )}
+          </div>
+          <span className={`text-xs font-medium px-2 py-1 rounded-full ${ouvert ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+            {ouvert ? "● OUVERTE" : "○ FERMÉE"}
+          </span>
+        </div>
+
+        <div className="mb-3">
+          <p className="text-2xl font-bold text-gray-900">{FCFA(solde)}</p>
+          {min > 0 && <p className="text-xs text-gray-400 mt-0.5">Fond minimum : {FCFA(min)}</p>}
+        </div>
+
+        {min > 0 && (
+          <div className="mb-3">
+            <div className="w-full bg-gray-100 rounded-full h-2">
+              <div className={`h-2 rounded-full transition-all ${sousMin ? "bg-red-500" : "bg-green-500"}`}
+                style={{ width: `${Math.max(2, Math.min(100, (solde / (min * 2)) * 100))}%` }} />
+            </div>
+            <p className={`text-xs mt-1 ${sousMin ? "text-red-600 font-medium" : "text-gray-400"}`}>
+              {sousMin ? `⚠️ Sous le minimum de ${FCFA(min - solde)}` : `${FCFA(solde - min)} au-dessus du minimum`}
+            </p>
+          </div>
+        )}
+
+        {ouvert && c.heure_ouverture && (
+          <p className="text-xs text-green-600 mb-3">Session ouverte depuis {c.heure_ouverture.slice(11, 16)}</p>
+        )}
+
+        <div className="flex gap-2 pt-2 border-t border-gray-50">
+          <button onClick={() => onJournal(c.id)}
+            className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50">
+            <ChevronRight size={12} /> Journal
+          </button>
+          {!ouvert ? (
+            <button onClick={() => ouvrirSession(c.id)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">
+              <Unlock size={12} /> Ouvrir
+            </button>
+          ) : (
+            <>
+              <button onClick={() => setModalMvt(c.id)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
+                <Plus size={12} /> Mouvement
+              </button>
+              <button onClick={() => setModalFermer(c.id)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700">
+                <Lock size={12} /> Fermer
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      {/* Barre d'actions */}
+      <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-gray-500">{caisses?.length ?? 0} caisse(s) enregistrée(s)</p>
         <div className="flex gap-2">
           <button onClick={refetch} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
@@ -362,89 +491,33 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {caisses?.map((c) => {
-          const solde = parseFloat(c.solde_actuel_fcfa);
-          const min   = parseFloat(c.fond_caisse_minimum_fcfa);
-          const pct   = min > 0 ? Math.min(100, Math.round(((solde - min) / min) * 100 + 100)) : 100;
-          const sousMin = min > 0 && solde < min;
-          const ouvert = c.session_statut === "ouverte";
+      {/* Section caisses centrales */}
+      {centrales.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-1 h-5 bg-blue-500 rounded-full" />
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Caisses centrales</h2>
+            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{centrales.length}</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {centrales.map(renderCaisseCard)}
+          </div>
+        </div>
+      )}
 
-          return (
-            <div key={c.id} className={`bg-white rounded-xl border-2 p-5 shadow-sm ${sousMin ? "border-red-200" : ouvert ? "border-green-200" : "border-gray-100"}`}>
-              {/* En-tête */}
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Wallet size={16} className="text-green-600" />
-                    <h3 className="font-semibold text-gray-800">{c.nom}</h3>
-                    {sousMin && <AlertTriangle size={14} className="text-red-500" />}
-                  </div>
-                  {c.responsable_nom && (
-                    <p className="text-xs text-gray-400 mt-0.5">Responsable : {c.responsable_nom}</p>
-                  )}
-                </div>
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${ouvert ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                  {ouvert ? "● OUVERTE" : "○ FERMÉE"}
-                </span>
-              </div>
-
-              {/* Solde */}
-              <div className="mb-3">
-                <p className="text-2xl font-bold text-gray-900">{FCFA(solde)}</p>
-                {min > 0 && (
-                  <p className="text-xs text-gray-400 mt-0.5">Fond minimum : {FCFA(min)}</p>
-                )}
-              </div>
-
-              {/* Barre progression */}
-              {min > 0 && (
-                <div className="mb-3">
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div className={`h-2 rounded-full transition-all ${sousMin ? "bg-red-500" : "bg-green-500"}`}
-                      style={{ width: `${Math.max(2, Math.min(100, (solde / (min * 2)) * 100))}%` }} />
-                  </div>
-                  <p className={`text-xs mt-1 ${sousMin ? "text-red-600 font-medium" : "text-gray-400"}`}>
-                    {sousMin ? `⚠️ Sous le minimum de ${FCFA(min - solde)}` : `${FCFA(solde - min)} au-dessus du minimum`}
-                  </p>
-                </div>
-              )}
-
-              {/* Infos session */}
-              {ouvert && c.heure_ouverture && (
-                <p className="text-xs text-green-600 mb-3">
-                  Session ouverte depuis {c.heure_ouverture.slice(11, 16)}
-                </p>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-2 pt-2 border-t border-gray-50">
-                <button onClick={() => onJournal(c.id)}
-                  className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50">
-                  <ChevronRight size={12} /> Journal
-                </button>
-                {!ouvert ? (
-                  <button onClick={() => ouvrirSession(c.id)}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">
-                    <Unlock size={12} /> Ouvrir
-                  </button>
-                ) : (
-                  <>
-                    <button onClick={() => setModalMvt(c.id)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
-                      <Plus size={12} /> Mouvement
-                    </button>
-                    <button onClick={() => setModalFermer(c.id)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700">
-                      <Lock size={12} /> Fermer
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* Section caisses déléguées */}
+      {deleguees.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-1 h-5 bg-orange-400 rounded-full" />
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Caisses déléguées</h2>
+            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{deleguees.length}</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {deleguees.map(renderCaisseCard)}
+          </div>
+        </div>
+      )}
 
       {modalMvt !== null && (
         <ModalMouvement caisseId={modalMvt} onClose={() => setModalMvt(null)} onDone={() => { setModalMvt(null); refetch(); }} />

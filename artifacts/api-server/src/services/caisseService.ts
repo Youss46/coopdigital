@@ -57,13 +57,14 @@ async function getCoopNom(cooperativeId: number): Promise<string> {
 
 export async function listCaisses(cooperativeId: number, responsableId?: number) {
   const result = await db.execute<{
-    id: number; nom: string; responsable_id: number | null; responsable_nom: string | null;
+    id: number; nom: string; type_caisse: string;
+    responsable_id: number | null; responsable_nom: string | null;
     solde_actuel_fcfa: string; fond_caisse_minimum_fcfa: string; actif: boolean;
     session_id: number | null; session_statut: string | null; heure_ouverture: string | null;
     solde_ouverture_fcfa: string | null;
   }>(sql`
     SELECT
-      c.id, c.nom, c.responsable_id, c.solde_actuel_fcfa, c.fond_caisse_minimum_fcfa, c.actif,
+      c.id, c.nom, c.type_caisse, c.responsable_id, c.solde_actuel_fcfa, c.fond_caisse_minimum_fcfa, c.actif,
       u.nom AS responsable_nom,
       s.id  AS session_id, s.statut AS session_statut,
       s.heure_ouverture::text, s.solde_ouverture_fcfa
@@ -73,18 +74,20 @@ export async function listCaisses(cooperativeId: number, responsableId?: number)
       ON s.caisse_id = c.id AND s.date_session = CURRENT_DATE AND s.statut = 'ouverte'
     WHERE c.cooperative_id = ${cooperativeId} AND c.actif = true
       ${responsableId !== undefined ? sql`AND c.responsable_id = ${responsableId}` : sql``}
-    ORDER BY c.nom
+    ORDER BY c.type_caisse, c.nom
   `);
   return result.rows;
 }
 
 export async function creerCaisse(data: {
-  nom: string; responsableId?: number;
+  nom: string; typeCaisse?: "centrale" | "deleguee"; responsableId?: number;
   soldeinitial?: number; fondMinimum?: number;
 }, cooperativeId: number) {
+  const typeCaisse = data.typeCaisse ?? (data.responsableId ? "deleguee" : "centrale");
   const [row] = await db.insert(caissesTable).values({
     cooperativeId,
     nom: data.nom,
+    typeCaisse,
     responsableId: data.responsableId ?? null,
     soldeActuelFcfa: (data.soldeinitial ?? 0).toString(),
     fondCaisseMinimumFcfa: (data.fondMinimum ?? 0).toString(),
