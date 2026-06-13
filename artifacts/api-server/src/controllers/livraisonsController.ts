@@ -6,6 +6,7 @@ import { checkLivraison, creerAnomalies } from "../services/anomalieService";
 import { CreateLivraisonBody } from "@workspace/api-zod";
 import { generateEcrituresLivraison } from "../services/comptabiliteService";
 import { getEncoursMembre, enregistrerRemboursementParLivraison } from "../services/intrantsService";
+import { envoyerPushGroupePortail } from "../services/pushService";
 
 export async function listLivraisons(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -262,6 +263,12 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
       montantNetFcfa: result.livraison.montantNetFcfa,
       dateLivraison: result.livraison.dateLivraison,
+    });
+
+    void envoyerPushGroupePortail([membreId], {
+      title: "Livraison enregistrée",
+      body: `${Number(result.livraison.poidsKg).toLocaleString("fr-FR")} kg — ${result.livraison.montantNetFcfa.toLocaleString("fr-FR")} FCFA net`,
+      url: "/portail/livraisons",
     });
 
     res.status(201).json(result);

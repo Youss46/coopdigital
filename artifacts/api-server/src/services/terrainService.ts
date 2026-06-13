@@ -8,6 +8,7 @@ import { and, eq, sql, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { logger } from "../lib/logger.js";
+import { envoyerPushGroupePortail } from "./pushService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -375,6 +376,12 @@ export async function enregistrerCollecte(
     .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
     .from(membresTable)
     .where(eq(membresTable.id, data.membreId));
+
+  void envoyerPushGroupePortail([data.membreId], {
+    title: "Livraison enregistrée",
+    body: `${poidsNet.toLocaleString("fr-FR")} kg — ${montantNet.toLocaleString("fr-FR")} FCFA net`,
+    url: "/portail/livraisons",
+  });
 
   return {
     livraisonId: livraison.id,
