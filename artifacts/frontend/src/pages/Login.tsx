@@ -67,6 +67,10 @@ export default function Login() {
   const mutation = useLogin({
     mutation: {
       onSuccess: (data) => {
+        if (data.utilisateur.role === "agent_terrain") {
+          setErreur("__AGENT_TERRAIN__");
+          return;
+        }
         login(data.token, {
           id: data.utilisateur.id,
           nom: data.utilisateur.nom,
@@ -241,12 +245,28 @@ export default function Login() {
             </p>
           </div>
 
-          {erreur && (
+          {erreur === "__AGENT_TERRAIN__" ? (
+            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm">
+              <div className="flex items-start gap-2 text-amber-800 mb-2">
+                <span className="text-base flex-shrink-0">🛰️</span>
+                <div>
+                  <p className="font-semibold mb-0.5">Espace non autorisé</p>
+                  <p className="text-amber-700">Les agents terrain ont leur propre interface. Connectez-vous avec votre numéro de téléphone et mot de passe temporaire.</p>
+                </div>
+              </div>
+              <a
+                href="/terrain/login"
+                className="flex items-center justify-center gap-2 w-full py-2 mt-2 bg-[#1a4731] text-white rounded-lg font-semibold text-sm hover:bg-[#0d2b1a] transition-colors"
+              >
+                Accéder à l'interface terrain →
+              </a>
+            </div>
+          ) : erreur ? (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-2">
               <span>⚠️</span>
               <span>{erreur}</span>
             </div>
-          )}
+          ) : null}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
