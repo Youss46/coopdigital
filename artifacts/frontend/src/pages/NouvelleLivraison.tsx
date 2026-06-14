@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect, useRef } from "react";
+import { useLocation, Link } from "wouter";
 import { MoneyInput } from "@/components/ui/money-input";
 import {
   useCreateLivraison,
@@ -17,7 +17,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetDashboardQueryKey, getGetDashboardLivraisonsQueryKey } from "@workspace/api-client-react";
-import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp, Sprout, AlertTriangle } from "lucide-react";
+import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp, Sprout, AlertTriangle, Tag } from "lucide-react";
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -38,6 +38,8 @@ export default function NouvelleLivraison() {
   const [sectionLivraison, setSectionLivraison] = useState("");
   const [entrepotId, setEntrepotId] = useState("");
   const [prixUnitaire, setPrixUnitaire] = useState("");
+  const [prixAutoRempli, setPrixAutoRempli] = useState(false);
+  const prixModifieParUtilisateur = useRef(false);
   const [modePaiement, setModePaiement] = useState<"orange_money" | "mtn_momo" | "especes" | "differe">("especes");
   const [datePaiementPrevue, setDatePaiementPrevue] = useState("");
   const [dateLivraison, setDateLivraison] = useState(new Date().toISOString().split("T")[0]!);
@@ -51,8 +53,10 @@ export default function NouvelleLivraison() {
   const { data: entrepotsData } = useGetEntrepots();
 
   useEffect(() => {
-    if (prixActuelData?.prixBordChampFcfa) {
-      setPrixUnitaire(String(prixActuelData.prixBordChampFcfa));
+    if (prixActuelData?.prixBordChampFcfa && !prixModifieParUtilisateur.current) {
+      const valeur = Math.round(Number(prixActuelData.prixBordChampFcfa));
+      setPrixUnitaire(String(valeur));
+      setPrixAutoRempli(true);
     }
   }, [prixActuelData?.prixBordChampFcfa]);
 
@@ -198,6 +202,14 @@ export default function NouvelleLivraison() {
               setSectionLivraison("");
               setTauxHumidite("");
               setBalanceId("");
+              prixModifieParUtilisateur.current = false;
+              if (prixActuelData?.prixBordChampFcfa) {
+                setPrixUnitaire(String(Math.round(Number(prixActuelData.prixBordChampFcfa))));
+                setPrixAutoRempli(true);
+              } else {
+                setPrixUnitaire("");
+                setPrixAutoRempli(false);
+              }
             }}
             className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
@@ -445,9 +457,27 @@ export default function NouvelleLivraison() {
               <MoneyInput
                 required
                 value={prixUnitaire}
-                onChange={(raw) => setPrixUnitaire(raw)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+                onChange={(raw) => {
+                  setPrixUnitaire(raw);
+                  prixModifieParUtilisateur.current = true;
+                  setPrixAutoRempli(false);
+                }}
+                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none ${prixAutoRempli ? "border-green-300 bg-green-50" : "border-gray-200"}`}
               />
+              {prixAutoRempli && prixActuelData && (
+                <p className="flex items-center gap-1 mt-1 text-xs text-green-700">
+                  <Tag size={10} className="shrink-0" />
+                  Depuis "Suivi des prix" · {new Date(prixActuelData.datePrix).toLocaleDateString("fr-FR")}
+                </p>
+              )}
+              {!prixActuelData && !prixUnitaire && (
+                <p className="mt-1 text-xs text-amber-600">
+                  Aucun prix défini —{" "}
+                  <Link href="/prix" className="underline font-medium">
+                    Définir dans Suivi des prix
+                  </Link>
+                </p>
+              )}
             </div>
           </div>
 
