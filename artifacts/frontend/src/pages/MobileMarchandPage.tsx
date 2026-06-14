@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Smartphone, Plus, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, X, ChevronRight } from "lucide-react";
+import { Smartphone, Plus, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, X, ChevronRight, ArrowRightLeft, Landmark } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -79,6 +79,7 @@ export default function MobileMarchandPage() {
   const [modalCreer, setModalCreer] = useState(false);
   const [modalEdit, setModalEdit] = useState<Compte | null>(null);
   const [modalMvt, setModalMvt] = useState<number | null>(null);
+  const [modalVirement, setModalVirement] = useState<number | null>(null);
 
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -155,10 +156,17 @@ export default function MobileMarchandPage() {
                     <p className="text-xs text-gray-500">{FCFA(c.solde_actuel_fcfa)}</p>
                   </div>
                   {peutMouvement && selected.id === c.id && (
-                    <button onClick={(e) => { e.stopPropagation(); setModalMvt(c.id); }}
-                      className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 whitespace-nowrap">
-                      <Plus size={11} /> Mouvement
-                    </button>
+                    <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => setModalVirement(c.id)}
+                        title="Virement depuis banque"
+                        className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700 whitespace-nowrap">
+                        <ArrowRightLeft size={11} /> Virer
+                      </button>
+                      <button onClick={() => setModalMvt(c.id)}
+                        className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 whitespace-nowrap">
+                        <Plus size={11} /> Mouvement
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -187,10 +195,16 @@ export default function MobileMarchandPage() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-gray-700">Journal des mouvements</h3>
                 {peutMouvement && (
-                  <button onClick={() => setModalMvt(selected.id)}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
-                    <Plus size={11} /> Mouvement
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={() => setModalVirement(selected.id)}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">
+                      <ArrowRightLeft size={11} /> Virement banque
+                    </button>
+                    <button onClick={() => setModalMvt(selected.id)}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
+                      <Plus size={11} /> Mouvement
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -264,6 +278,23 @@ export default function MobileMarchandPage() {
               if (updatedCompte) { setSelected(updatedCompte); await loadJournal(updatedCompte); }
             }
             toast({ title: "Mouvement enregistré" });
+          }}
+        />
+      )}
+      {modalVirement !== null && (
+        <ModalVirement
+          compteId={modalVirement}
+          compteName={comptes.find(c => c.id === modalVirement)?.nom ?? ""}
+          onClose={() => setModalVirement(null)}
+          onSave={async () => {
+            setModalVirement(null);
+            const updated = await apiFetch("/api/mobile-marchand");
+            setComptes(updated);
+            if (selected?.id === modalVirement) {
+              const updatedCompte = updated.find((c: Compte) => c.id === modalVirement);
+              if (updatedCompte) { setSelected(updatedCompte); await loadJournal(updatedCompte); }
+            }
+            toast({ title: "Virement effectué", description: "Le compte mobile a été approvisionné depuis la banque." });
           }}
         />
       )}
@@ -521,6 +552,159 @@ function ModalMouvement({ compteId: _, onClose, onSave }: {
               {saving ? "Enregistrement…" : "Enregistrer"}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ModalVirement ─────────────────────────────────────────────────────────────
+
+type CompteBancaire = { id: number; nom: string; banque: string; solde_actuel_fcfa: string };
+
+function ModalVirement({ compteId, compteName, onClose, onSave }: {
+  compteId: number;
+  compteName: string;
+  onClose: () => void;
+  onSave: () => Promise<void>;
+}) {
+  const [comptesBancaires, setComptesBancaires] = useState<CompteBancaire[]>([]);
+  const [loadingBanques, setLoadingBanques] = useState(true);
+  const [compteBancaireId, setCompteBancaireId] = useState<number | "">("");
+  const [montant, setMontant] = useState("");
+  const [libelle, setLibelle] = useState("");
+  const [reference, setReference] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch("/api/mobile-marchand/comptes-bancaires")
+      .then((data: CompteBancaire[]) => { setComptesBancaires(data); if (data.length === 1) setCompteBancaireId(data[0]!.id); })
+      .catch(() => setErr("Impossible de charger les comptes bancaires"))
+      .finally(() => setLoadingBanques(false));
+  }, []);
+
+  const soldeBanque = compteBancaireId !== ""
+    ? parseFloat(comptesBancaires.find(c => c.id === compteBancaireId)?.solde_actuel_fcfa ?? "0")
+    : null;
+
+  async function handleSubmit() {
+    if (!compteBancaireId) { setErr("Sélectionnez un compte bancaire"); return; }
+    const m = parseFloat(montant);
+    if (!m || m <= 0) { setErr("Montant invalide"); return; }
+    if (soldeBanque !== null && m > soldeBanque) {
+      setErr(`Solde bancaire insuffisant (${new Intl.NumberFormat("fr-FR").format(soldeBanque)} FCFA disponible)`); return;
+    }
+    setSaving(true); setErr(null);
+    try {
+      await apiPost(`/api/mobile-marchand/${compteId}/virement-banque`, {
+        compteBancaireId, montantFcfa: m,
+        libelle: libelle || undefined,
+        reference: reference || undefined,
+        dateOperation: date,
+      });
+      await onSave();
+    } catch (e) {
+      setErr((e as Error).message);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+              <ArrowRightLeft size={16} className="text-green-600" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900 text-sm">Virement depuis la banque</h2>
+              <p className="text-xs text-gray-400">→ {compteName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Compte source */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Compte bancaire source *</label>
+            {loadingBanques ? (
+              <div className="text-xs text-gray-400 py-2">Chargement des comptes…</div>
+            ) : comptesBancaires.length === 0 ? (
+              <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 rounded-lg p-3">
+                <AlertTriangle size={14} /> Aucun compte bancaire actif dans cette coopérative
+              </div>
+            ) : (
+              <select
+                value={compteBancaireId}
+                onChange={e => setCompteBancaireId(e.target.value === "" ? "" : parseInt(e.target.value, 10))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400">
+                <option value="">— Sélectionner un compte —</option>
+                {comptesBancaires.map(cb => (
+                  <option key={cb.id} value={cb.id}>
+                    {cb.nom} ({cb.banque}) — {new Intl.NumberFormat("fr-FR").format(parseFloat(cb.solde_actuel_fcfa))} FCFA
+                  </option>
+                ))}
+              </select>
+            )}
+            {soldeBanque !== null && (
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                <Landmark size={11} /> Solde disponible : <span className="font-semibold text-gray-700">{new Intl.NumberFormat("fr-FR").format(soldeBanque)} FCFA</span>
+              </p>
+            )}
+          </div>
+
+          {/* Montant */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA) *</label>
+            <input type="number" min="1" step="1" value={montant} onChange={e => setMontant(e.target.value)}
+              placeholder="Ex: 500000"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400" />
+          </div>
+
+          {/* Libellé */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Libellé <span className="text-gray-400">(opt.)</span></label>
+            <input type="text" value={libelle} onChange={e => setLibelle(e.target.value)}
+              placeholder="Ex: Approvisionnement campagne juin"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400" />
+          </div>
+
+          {/* Référence + Date sur la même ligne */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Référence <span className="text-gray-400">(opt.)</span></label>
+              <input type="text" value={reference} onChange={e => setReference(e.target.value)}
+                placeholder="Ex: BON-001"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Date opération</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400" />
+            </div>
+          </div>
+
+          {err && (
+            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              <AlertTriangle size={13} /> {err}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 pb-5">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Annuler
+          </button>
+          <button onClick={handleSubmit} disabled={saving || comptesBancaires.length === 0}
+            className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
+            <ArrowRightLeft size={14} />
+            {saving ? "Virement en cours…" : "Confirmer le virement"}
+          </button>
         </div>
       </div>
     </div>
