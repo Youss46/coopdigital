@@ -81,6 +81,7 @@ export default function BanquePage() {
   const [showMouvement,       setShowMouvement]       = useState(false);
   const [showRapprochement,   setShowRapprochement]   = useState(false);
   const [showVirementCaisse,  setShowVirementCaisse]  = useState(false);
+  const [showVirementMobile,  setShowVirementMobile]  = useState(false);
   const [editCompte,          setEditCompte]          = useState<Compte | null>(null);
 
   // Sélection rapprochement
@@ -197,6 +198,13 @@ export default function BanquePage() {
         <div className="flex gap-2">
           {selected && canEdit && (
             <>
+              <button
+                onClick={() => setShowVirementMobile(true)}
+                className="flex items-center gap-2 px-3 py-2 text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50"
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+                Virt. Mobile
+              </button>
               <button
                 onClick={() => setShowVirementCaisse(true)}
                 className="flex items-center gap-2 px-3 py-2 text-sm border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50"
@@ -439,6 +447,20 @@ export default function BanquePage() {
           onClose={() => setShowMouvement(false)}
           onSaved={() => { setShowMouvement(false); chargerJournal(selected.id); chargerComptes(); }}
           toast={toast}
+        />
+      )}
+
+      {/* ── Modal : Virement vers Mobile ── */}
+      {showVirementMobile && selected && (
+        <ModalVirementMobile
+          compte={selected}
+          onClose={() => setShowVirementMobile(false)}
+          onSaved={() => {
+            setShowVirementMobile(false);
+            chargerJournal(selected.id);
+            chargerComptes();
+            toast({ title: "Virement effectué", description: "Les soldes ont été mis à jour." });
+          }}
         />
       )}
 
@@ -938,6 +960,201 @@ function ModalVirementCaisse({ compte, onClose, onSaved }: {
           </button>
           <button onClick={handleSubmit} disabled={saving || caisses.length === 0}
             className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2">
+            <ArrowRightLeft size={14} />
+            {saving ? "Virement en cours…" : "Confirmer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal : Virement Banque ↔ Mobile Marchand ────────────────────────────────
+
+type CompteMobile = { id: number; nom: string; operateur: string; numero: string; solde_actuel_fcfa: string };
+
+function ModalVirementMobile({ compte, onClose, onSaved }: {
+  compte: Compte;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [mobiles,        setMobiles]        = useState<CompteMobile[]>([]);
+  const [loadingMobiles, setLoadingMobiles] = useState(true);
+  const [mobileId,       setMobileId]       = useState<number | "">("");
+  const [sens,           setSens]           = useState<"banque_vers_mobile" | "mobile_vers_banque">("banque_vers_mobile");
+  const [montant,        setMontant]        = useState("");
+  const [libelle,        setLibelle]        = useState("");
+  const [reference,      setReference]      = useState("");
+  const [date,           setDate]           = useState(new Date().toISOString().slice(0, 10));
+  const [saving,         setSaving]         = useState(false);
+  const [err,            setErr]            = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${BASE}/api/mobile-marchand`, { headers: { Authorization: `Bearer ${tok()}` } })
+      .then(r => r.json())
+      .then((data: CompteMobile[]) => { setMobiles(data); if (data.length === 1) setMobileId(data[0]!.id); })
+      .catch(() => setErr("Impossible de charger les comptes mobiles"))
+      .finally(() => setLoadingMobiles(false));
+  }, []);
+
+  const mobileSel   = mobileId !== "" ? mobiles.find(m => m.id === mobileId) : null;
+  const soldeBanque = parseFloat(compte.solde_actuel_fcfa);
+  const soldeMobile = mobileSel ? parseFloat(mobileSel.solde_actuel_fcfa) : null;
+  const sourceBalance = sens === "banque_vers_mobile" ? soldeBanque : soldeMobile;
+
+  async function handleSubmit() {
+    if (!mobileId) { setErr("Sélectionnez un compte mobile"); return; }
+    const m = parseInt(montant || "0", 10);
+    if (!m || m <= 0) { setErr("Montant invalide"); return; }
+    if (sourceBalance !== null && m > sourceBalance) {
+      const label = sens === "banque_vers_mobile" ? "bancaire" : "mobile";
+      setErr(`Solde ${label} insuffisant (${new Intl.NumberFormat("fr-FR").format(sourceBalance)} FCFA disponible)`);
+      return;
+    }
+    setSaving(true); setErr(null);
+    try {
+      const r = await fetch(`${BASE}/api/mobile-marchand/${mobileId}/virement-banque`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
+        body: JSON.stringify({
+          compteBancaireId: compte.id,
+          sens,
+          montantFcfa: m,
+          libelle:       libelle   || undefined,
+          reference:     reference || undefined,
+          dateOperation: date,
+        }),
+      });
+      if (!r.ok) throw new Error((await r.json()).erreur ?? "Erreur serveur");
+      onSaved();
+    } catch (e) {
+      setErr((e as Error).message);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+              <ArrowRightLeft size={16} className="text-green-600" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900 text-sm">Virement Banque ↔ Mobile</h2>
+              <p className="text-xs text-gray-400">{compte.nom}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Sens */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">Sens du virement *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["banque_vers_mobile", "mobile_vers_banque"] as const).map(s => (
+                <button key={s} onClick={() => setSens(s)}
+                  className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 text-xs font-medium transition-all ${
+                    sens === s ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 text-gray-600 hover:border-green-300"
+                  }`}>
+                  <Building2 size={16} className="text-green-500" />
+                  {s === "banque_vers_mobile"
+                    ? <><span>Banque → Mobile</span><span className="text-gray-400 font-normal">Approvisionner</span></>
+                    : <><span>Mobile → Banque</span><span className="text-gray-400 font-normal">Reverser</span></>
+                  }
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Solde source */}
+          <div className="rounded-lg bg-gray-50 px-4 py-2.5 flex items-center justify-between text-sm">
+            <span className="text-gray-500">
+              {sens === "banque_vers_mobile" ? "Solde disponible (banque)" : "Solde disponible (mobile)"}
+            </span>
+            <span className="font-bold text-gray-800">
+              {sens === "banque_vers_mobile"
+                ? FCFA(soldeBanque)
+                : soldeMobile !== null ? FCFA(soldeMobile) : "—"}
+            </span>
+          </div>
+
+          {/* Compte mobile */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Compte Mobile Marchand *</label>
+            {loadingMobiles ? (
+              <div className="text-xs text-gray-400 py-2">Chargement des comptes…</div>
+            ) : mobiles.length === 0 ? (
+              <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 rounded-lg p-3">
+                <AlertTriangle size={14} /> Aucun compte mobile marchand actif
+              </div>
+            ) : (
+              <select
+                value={mobileId}
+                onChange={e => setMobileId(e.target.value === "" ? "" : parseInt(e.target.value, 10))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400">
+                <option value="">— Sélectionner un compte —</option>
+                {mobiles.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.nom} ({m.operateur} · {m.numero}) — {FCFA(m.solde_actuel_fcfa)}
+                  </option>
+                ))}
+              </select>
+            )}
+            {mobileSel && sens === "banque_vers_mobile" && (
+              <p className="text-xs text-gray-400 mt-1">
+                Solde mobile après : <span className="font-semibold text-gray-700">{FCFA(parseFloat(mobileSel.solde_actuel_fcfa) + (parseInt(montant) || 0))}</span>
+              </p>
+            )}
+          </div>
+
+          {/* Montant */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA) *</label>
+            <MoneyInput value={montant} onChange={v => setMontant(v ?? "")}
+              placeholder="Ex: 500 000"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400" />
+          </div>
+
+          {/* Libellé */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Libellé <span className="text-gray-400">(opt.)</span></label>
+            <input type="text" value={libelle} onChange={e => setLibelle(e.target.value)}
+              placeholder="Ex: Approvisionnement opérateur"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400" />
+          </div>
+
+          {/* Référence + Date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Référence <span className="text-gray-400">(opt.)</span></label>
+              <input type="text" value={reference} onChange={e => setReference(e.target.value)}
+                placeholder="Ex: BON-001"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Date opération</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400" />
+            </div>
+          </div>
+
+          {err && (
+            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              <AlertTriangle size={13} /> {err}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 pb-5">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Annuler
+          </button>
+          <button onClick={handleSubmit} disabled={saving || mobiles.length === 0}
+            className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
             <ArrowRightLeft size={14} />
             {saving ? "Virement en cours…" : "Confirmer"}
           </button>

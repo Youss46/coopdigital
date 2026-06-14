@@ -1,4 +1,4 @@
-import { db, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, ecrituresComptablesTable } from "@workspace/db";
+import { db, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, ecrituresComptablesTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
