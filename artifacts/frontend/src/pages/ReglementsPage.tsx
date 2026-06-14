@@ -88,7 +88,14 @@ function ModalValidation({
 }) {
   const [ref, setRef] = useState("");
   const [telephone, setTelephone] = useState(paiement.telephone ?? "");
+  const [touched, setTouched] = useState(false);
   const isMobile = paiement.modePaiement === "orange_money" || paiement.modePaiement === "mtn_momo";
+  const refManquante = isMobile && !ref.trim();
+
+  function handleConfirm() {
+    if (refManquante) { setTouched(true); return; }
+    onConfirm(ref, telephone);
+  }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -154,15 +161,29 @@ function ModalValidation({
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Référence transaction <span className="text-gray-400">(optionnel)</span>
+              Référence transaction{" "}
+              {isMobile
+                ? <span className="text-red-500 font-semibold">*obligatoire</span>
+                : <span className="text-gray-400">(optionnel)</span>}
             </label>
             <input
               type="text"
               value={ref}
-              onChange={(e) => setRef(e.target.value)}
-              placeholder="Ex: OM-2025-00123"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
+              onChange={(e) => { setRef(e.target.value); setTouched(false); }}
+              placeholder={isMobile
+                ? (paiement.modePaiement === "orange_money" ? "Ex: OM-2025-00123" : "Ex: MTN-2025-00456")
+                : "Ex: REF-00123"}
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                touched && refManquante
+                  ? "border-red-400 focus:ring-red-400 bg-red-50"
+                  : "border-gray-200 focus:ring-green-400"
+              }`}
             />
+            {touched && refManquante && (
+              <p className="text-xs text-red-500 mt-1">
+                La référence de transaction est obligatoire pour un paiement mobile money.
+              </p>
+            )}
           </div>
 
           <div className="flex gap-2 pt-1">
@@ -173,7 +194,7 @@ function ModalValidation({
               Annuler
             </button>
             <button
-              onClick={() => onConfirm(ref, telephone)}
+              onClick={handleConfirm}
               disabled={loading}
               className="flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1.5"
               style={{ backgroundColor: "#1a4731" }}

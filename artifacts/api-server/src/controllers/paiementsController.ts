@@ -228,6 +228,14 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     }
 
     const mode = row.paiement.modePaiement;
+    const isMobileMoney = mode === "orange_money" || mode === "mtn_momo";
+
+    // Référence transaction obligatoire pour les paiements mobile money
+    if (isMobileMoney && !body.referenceTransaction?.trim()) {
+      res.status(400).json({ erreur: "La référence de transaction est obligatoire pour un paiement mobile money." });
+      return;
+    }
+
     const nouveauStatut = mode === "especes" ? "effectue" : "confirme";
     const isDelegueEspeces = req.user?.role === "delegue" && mode === "especes";
 
