@@ -228,7 +228,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     }
 
     const mode = row.paiement.modePaiement;
-    const nouveauStatut = mode === "especes" ? "effectue" : "en_cours";
+    const nouveauStatut = mode === "especes" ? "effectue" : "confirme";
     const isDelegueEspeces = req.user?.role === "delegue" && mode === "especes";
 
     // 1. Pré-vérifier la caisse avant la transaction pour éviter un état incohérent
@@ -247,7 +247,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       await tx
         .update(paiementsTable)
         .set({
-          statut: nouveauStatut as "effectue" | "en_cours",
+          statut: nouveauStatut as "effectue" | "confirme",
           validePar: userId ?? null,
           dateValidation: new Date(),
           referenceTransaction: body.referenceTransaction ?? row.paiement.referenceTransaction,
