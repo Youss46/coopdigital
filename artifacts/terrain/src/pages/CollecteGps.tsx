@@ -1,20 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { getMissionDetail, collecterParcelle } from "../lib/api";
 import { useOffline } from "../contexts/OfflineContext";
-import { useGpsTracker, polygonAreaHa } from "../hooks/useGpsTracker";
+import {
+  useGpsTracker,
+  polygonAreaHa,
+  polygonPerimeterM,
+  haversineDistance,
+} from "../hooks/useGpsTracker";
 import OfflineBanner from "../components/OfflineBanner";
 import type { MissionMembre } from "../lib/types";
 import type { GpsPoint } from "../lib/types";
 
 const MAX_PHOTOS = 3;
 const MIN_PHOTOS = 2;
-
+const STABILISATION_SEC = 3;
+const PRECISION_SEUIL = 10;
 const PROBLEME_TYPES = ["Accès difficile", "Conflit foncier", "Parcelle inexistante", "Membre absent", "Autre"];
+
+function fmtDist(m: number): string {
+  if (m >= 1000) return (m / 1000).toFixed(2).replace(".", ",") + " km";
+  return m.toFixed(1).replace(".", ",") + " m";
+}
+function fmtHa(ha: number): string {
+  return ha.toFixed(2).replace(".", ",") + " ha";
+}
 
 function PolygonSvg({ points, currentPos }: { points: GpsPoint[]; currentPos: GpsPoint | null }) {
   const W = 280;
-  const H = 200;
+  const H = 180;
   const allPts = [...points, ...(currentPos ? [currentPos] : [])];
 
   if (allPts.length === 0) {
@@ -50,13 +64,16 @@ function PolygonSvg({ points, currentPos }: { points: GpsPoint[]; currentPos: Gp
   return (
     <svg width={W} height={H} style={{ background: "#0f172a", borderRadius: 12, display: "block" }}>
       {svgPts.length >= 3 && (
-        <polygon points={polygonStr} fill="rgba(34,197,94,0.2)" stroke="#22c55e" strokeWidth="2" />
+        <polygon points={polygonStr} fill="rgba(34,197,94,0.18)" stroke="#22c55e" strokeWidth="2" />
       )}
       {svgPts.length >= 2 && svgPts.length < 3 && (
         <polyline points={polygonStr} fill="none" stroke="#22c55e" strokeWidth="2" strokeDasharray="5,4" />
       )}
       {svgPts.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={4} fill="#22c55e" stroke="#0f172a" strokeWidth={1.5} />
+        <g key={i}>
+          <circle cx={p.x} cy={p.y} r={5} fill="#22c55e" stroke="#0f172a" strokeWidth={1.5} />
+          <text x={p.x + 7} y={p.y + 4} fill="#22c55e" fontSize="9" fontWeight="bold">P{i + 1}</text>
+        </g>
       ))}
       {currSvg && (
         <>
@@ -64,12 +81,11 @@ function PolygonSvg({ points, currentPos }: { points: GpsPoint[]; currentPos: Gp
           <circle cx={currSvg.x} cy={currSvg.y} r={5} fill="#ef4444" stroke="#fff" strokeWidth={2} />
         </>
       )}
-      {svgPts.length === 0 && currSvg && (
-        <circle cx={currSvg.x} cy={currSvg.y} r={5} fill="#ef4444" stroke="#fff" strokeWidth={2} />
-      )}
     </svg>
   );
 }
+
+type CapturePhase = null | "stabilizing" | "accuracy_warning";
 
 export default function CollecteGps() {
   const params = useParams<{ id: string; membreId: string }>();
@@ -88,9 +104,25 @@ export default function CollecteGps() {
   const [submitted, setSubmitted] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const photosRef = useRef<HTMLDivElement>(null);
 
   const gps = useGpsTracker();
-  const areaHa = polygonAreaHa(gps.points);
+
+  const [gpsFinalized, setGpsFinalized] = useState(false);
+  const [showGpsRecap, setShowGpsRecap] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
+  const [capturePhase, setCapturePhase] = useState<CapturePhase>(null);
+  const [countdown, setCountdown] = useState(STABILISATION_SEC);
+  const [lastCapture, setLastCapture] = useState<{ idx: number; acc: number } | null>(null);
+  const [gpsErreurPoints, setGpsErreurPoints] = useState<string | null>(null);
+
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const currentPosRef = useRef<GpsPoint | null>(null);
+  const accuracyRef = useRef<number | null>(null);
+  const lastCaptureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { currentPosRef.current = gps.currentPos; }, [gps.currentPos]);
+  useEffect(() => { accuracyRef.current = gps.accuracy; }, [gps.accuracy]);
 
   useEffect(() => {
     getMissionDetail(missionId)
@@ -100,9 +132,85 @@ export default function CollecteGps() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-    return () => { gps.stopTracking(); };
+    gps.startTracking();
+    return () => {
+      gps.stopTracking();
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      if (lastCaptureTimerRef.current) clearTimeout(lastCaptureTimerRef.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missionId, membreId]);
+
+  const doCapture = useCallback((pos: GpsPoint) => {
+    const newIdx = gps.points.length + 1;
+    gps.addPoint(pos);
+    setCapturePhase(null);
+    setGpsErreurPoints(null);
+    setLastCapture({ idx: newIdx, acc: Math.round(pos.accuracy ?? 0) });
+    if (lastCaptureTimerRef.current) clearTimeout(lastCaptureTimerRef.current);
+    lastCaptureTimerRef.current = setTimeout(() => setLastCapture(null), 2500);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gps.points.length, gps.addPoint]);
+
+  const handleStartCapture = useCallback(() => {
+    if (capturePhase !== null) return;
+    if (!currentPosRef.current) return;
+    setCapturePhase("stabilizing");
+    setCountdown(STABILISATION_SEC);
+    let remaining = STABILISATION_SEC;
+    countdownRef.current = setInterval(() => {
+      remaining -= 1;
+      setCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(countdownRef.current!);
+        countdownRef.current = null;
+        const pos = currentPosRef.current;
+        const acc = accuracyRef.current;
+        if (!pos) { setCapturePhase(null); return; }
+        if (acc !== null && acc > PRECISION_SEUIL) {
+          setCapturePhase("accuracy_warning");
+        } else {
+          doCapture(pos);
+        }
+      }
+    }, 1000);
+  }, [capturePhase, doCapture]);
+
+  const handleCancelCapture = useCallback(() => {
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+    setCapturePhase(null);
+  }, []);
+
+  const handleCaptureAnyway = useCallback(() => {
+    const pos = currentPosRef.current;
+    if (!pos) { setCapturePhase(null); return; }
+    doCapture(pos);
+  }, [doCapture]);
+
+  const handleStop = useCallback(() => {
+    if (gps.points.length < 3) {
+      const manquants = 3 - gps.points.length;
+      setGpsErreurPoints(`Minimum 3 points requis. Ajoutez encore ${manquants} point${manquants > 1 ? "s" : ""}.`);
+      return;
+    }
+    setGpsErreurPoints(null);
+    setShowGpsRecap(true);
+  }, [gps.points.length]);
+
+  const handleRecapValidate = useCallback(() => {
+    setShowGpsRecap(false);
+    setGpsFinalized(true);
+    setTimeout(() => {
+      photosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 200);
+  }, []);
+
+  const handleRecapRecommencer = useCallback(() => {
+    gps.clearPoints();
+    setGpsFinalized(false);
+    setShowGpsRecap(false);
+    setGpsErreurPoints(null);
+  }, [gps]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -121,27 +229,19 @@ export default function CollecteGps() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       ctx.drawImage(img, 0, 0, w, h);
-      const b64 = canvas.toDataURL("image/jpeg", 0.75);
-      setPhotos((prev) => prev.length < MAX_PHOTOS ? [...prev, b64] : prev);
+      setPhotos((prev) => prev.length < MAX_PHOTOS ? [...prev, canvas.toDataURL("image/jpeg", 0.75)] : prev);
     };
     img.src = objectUrl;
     e.target.value = "";
   };
 
-  const canSubmit = gps.points.length >= 3 && photos.length >= MIN_PHOTOS;
-
   const handleSubmit = async () => {
-    if (gps.points.length < 3) {
-      setErreur("Tracez au moins 3 points GPS pour délimiter la parcelle");
-      return;
-    }
-    if (photos.length < MIN_PHOTOS) {
-      setErreur(`Ajoutez au moins ${MIN_PHOTOS} photos de la parcelle`);
-      return;
-    }
+    if (gps.points.length < 3) { setErreur("Tracez au moins 3 points GPS pour délimiter la parcelle"); return; }
+    if (photos.length < MIN_PHOTOS) { setErreur(`Ajoutez au moins ${MIN_PHOTOS} photos de la parcelle`); return; }
     setSubmitting(true);
     setErreur(null);
     try {
+      const areaHa = polygonAreaHa(gps.points);
       await collecterParcelle(missionId, membreId, {
         polygoneGps: gps.points,
         photos,
@@ -177,8 +277,128 @@ export default function CollecteGps() {
     );
   }
 
+  const areaHa = polygonAreaHa(gps.points);
+  const perimeterM = polygonPerimeterM(gps.points);
+  const declareeHa = membre?.superficieHa ? parseFloat(membre.superficieHa) : 0;
+  const ecartHa = areaHa > 0 && declareeHa > 0 ? areaHa - declareeHa : null;
+  const ecartPct = ecartHa !== null && declareeHa > 0 ? Math.abs(ecartHa) / declareeHa * 100 : 0;
+  const ecartColor = ecartPct < 20 ? "#22c55e" : ecartPct < 40 ? "#f59e0b" : "#ef4444";
+  const ecartIcon = ecartPct < 20 ? "✅" : ecartPct < 40 ? "⚠️" : "🔴";
+  const accuracyColor = gps.accuracy === null ? "#64748b" : gps.accuracy <= 5 ? "#22c55e" : gps.accuracy <= 10 ? "#22c55e" : gps.accuracy <= 30 ? "#f59e0b" : "#ef4444";
+  const avgAccuracy = gps.points.length > 0
+    ? gps.points.reduce((s, p) => s + (p.accuracy ?? 0), 0) / gps.points.length
+    : null;
+  const canSubmit = gps.points.length >= 3 && photos.length >= MIN_PHOTOS;
+
   return (
     <div className="t-app">
+      {/* Guide visuel modal */}
+      {showGuide && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", zIndex: 100, display: "flex", alignItems: "flex-end", padding: "0 0 0 0" }}>
+          <div style={{ background: "#1e293b", borderRadius: "18px 18px 0 0", padding: "24px 20px 36px", width: "100%", maxWidth: 480, margin: "0 auto" }}>
+            <div style={{ fontWeight: 800, fontSize: "1.1rem", marginBottom: 16, color: "#f1f5f9" }}>📍 Comment mapper une parcelle</div>
+            <ol style={{ paddingLeft: 20, color: "#cbd5e1", fontSize: ".9rem", lineHeight: 1.9, margin: "0 0 16px" }}>
+              <li>Allez à l'angle 1 de la parcelle</li>
+              <li>Arrêtez-vous complètement</li>
+              <li>Appuyez sur <strong style={{ color: "#22c55e" }}>[+ Point]</strong> et attendez la stabilisation</li>
+              <li>Répétez pour chaque angle</li>
+              <li>Appuyez sur <strong style={{ color: "#f59e0b" }}>[Arrêter]</strong> pour finaliser</li>
+            </ol>
+            <div style={{ background: "#0f172a", borderRadius: 10, padding: "10px 14px", fontSize: ".8rem", color: "#94a3b8", marginBottom: 20, lineHeight: 1.7 }}>
+              💡 <strong>Conseils :</strong> Minimum 4 angles · Téléphone sorti de la poche · Restez immobile à la capture · Précision idéale ≤ 5 m
+            </div>
+            <button
+              onClick={() => setShowGuide(false)}
+              className="t-btn t-btn--primary"
+              style={{ width: "100%", padding: "13px", fontSize: ".95rem" }}
+            >
+              J'ai compris ✅
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Recap modal */}
+      {showGpsRecap && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.8)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: "#1e293b", borderRadius: "18px 18px 0 0", padding: "20px 20px 36px", width: "100%", maxWidth: 480, margin: "0 auto", maxHeight: "85vh", overflowY: "auto" }}>
+            <div style={{ fontWeight: 800, fontSize: "1.05rem", marginBottom: 16, color: "#22c55e" }}>POLYGONE FINALISÉ ✅</div>
+            {membre && (
+              <div style={{ fontSize: ".85rem", color: "#94a3b8", marginBottom: 14, lineHeight: 1.8 }}>
+                <div><strong style={{ color: "#e2e8f0" }}>Membre :</strong> {membre.membreNom} {membre.membrePrenoms}</div>
+                <div><strong style={{ color: "#e2e8f0" }}>Village :</strong> {membre.membreVillage ?? "—"}</div>
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+              {[
+                ["Points capturés", `${gps.points.length}`],
+                ["Précision moy.", avgAccuracy ? `±${avgAccuracy.toFixed(1)} m` : "—"],
+                ["Périmètre", fmtDist(polygonPerimeterM(gps.points, true))],
+                ["Superficie calculée", areaHa > 0 ? fmtHa(areaHa) : "—"],
+                ...(declareeHa > 0 ? [
+                  ["Superficie déclarée", fmtHa(declareeHa)],
+                  ["Écart", ecartHa !== null ? `${ecartHa >= 0 ? "+" : ""}${fmtHa(ecartHa)} ${ecartIcon}` : "—"],
+                ] : []),
+              ].map(([label, value]) => (
+                <div key={label} style={{ background: "#0f172a", borderRadius: 8, padding: "8px 10px" }}>
+                  <div style={{ fontSize: ".7rem", color: "#64748b" }}>{label}</div>
+                  <div style={{ fontSize: ".9rem", fontWeight: 700, color: "#e2e8f0", marginTop: 2 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+            {ecartHa !== null && (
+              <div style={{ background: `${ecartColor}22`, border: `1px solid ${ecartColor}44`, borderRadius: 8, padding: "8px 12px", fontSize: ".8rem", color: ecartColor, marginBottom: 14 }}>
+                {ecartPct < 20 ? "Superficie conforme à la déclaration." : ecartPct < 40 ? "Écart important. Vérifiez que tous les angles sont bien capturés." : "Écart très important. Recommencez le mapping ou vérifiez les points."}
+              </div>
+            )}
+            <div style={{ fontSize: ".8rem", color: "#64748b", marginBottom: 8 }}>Détail des côtés :</div>
+            <div style={{ marginBottom: 18 }}>
+              {gps.points.map((pt, i) => {
+                const nextIdx = (i + 1) % gps.points.length;
+                const next = gps.points[nextIdx];
+                const dist = haversineDistance(pt.lat, pt.lon, next.lat, next.lon);
+                return (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: ".82rem", color: "#cbd5e1", padding: "4px 0", borderBottom: "1px solid #1e3a5f" }}>
+                    <span>P{i + 1} → P{nextIdx + 1}</span>
+                    <span style={{ color: "#94a3b8" }}>{fmtDist(dist)}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleRecapRecommencer} className="t-btn t-btn--ghost" style={{ flex: 1, padding: "12px" }}>
+                🗑 Recommencer
+              </button>
+              <button onClick={handleRecapValidate} className="t-btn t-btn--primary" style={{ flex: 2, padding: "12px" }}>
+                ✅ Valider → Photos
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Accuracy warning overlay */}
+      {capturePhase === "accuracy_warning" && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", zIndex: 90, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: "#1e293b", borderRadius: "18px 18px 0 0", padding: "24px 20px 36px", width: "100%", maxWidth: 480, margin: "0 auto" }}>
+            <div style={{ color: "#f59e0b", fontWeight: 700, fontSize: "1rem", marginBottom: 10 }}>
+              ⚠️ Précision faible (±{gps.accuracy?.toFixed(0)}m)
+            </div>
+            <div style={{ color: "#94a3b8", fontSize: ".88rem", marginBottom: 20, lineHeight: 1.7 }}>
+              La précision GPS est insuffisante pour ce point. Attendez que le signal s'améliore, ou capturez quand même.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleCancelCapture} className="t-btn t-btn--ghost" style={{ flex: 1, padding: "12px" }}>
+                Attendre
+              </button>
+              <button onClick={handleCaptureAnyway} className="t-btn" style={{ flex: 2, padding: "12px", background: "#f59e0b22", color: "#f59e0b", border: "1px solid #f59e0b44" }}>
+                Capturer quand même
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="t-header">
         <button
           onClick={() => { gps.stopTracking(); navigate(`/missions/${missionId}`); }}
@@ -192,86 +412,168 @@ export default function CollecteGps() {
           </div>
           <div className="t-header__sub">
             {membre?.membreVillage ?? "—"}
-            {membre?.superficieHa ? ` · ${parseFloat(membre.superficieHa).toFixed(2)} ha déclaré` : ""}
+            {declareeHa > 0 ? ` · Déclarée : ${fmtHa(declareeHa)}` : ""}
           </div>
         </div>
+        {gps.accuracy !== null && (
+          <span style={{ fontSize: ".75rem", color: accuracyColor, fontWeight: 600, whiteSpace: "nowrap" }}>
+            ±{gps.accuracy.toFixed(0)}m {gps.accuracy <= 10 ? "🟢" : gps.accuracy <= 30 ? "🟡" : "🔴"}
+          </span>
+        )}
+        <button
+          onClick={() => setShowGuide(true)}
+          style={{ background: "rgba(255,255,255,.1)", border: "none", borderRadius: 8, color: "#94a3b8", padding: "6px 10px", marginLeft: 8, cursor: "pointer", fontSize: ".85rem" }}
+        >
+          ?
+        </button>
       </header>
 
       <OfflineBanner />
 
       <main className="t-main">
         {/* GPS Section */}
-        <div className="t-card" style={{ marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div className="t-card__title">🛰️ Polygone GPS</div>
-            {gps.accuracy !== null && (
-              <span style={{ fontSize: ".72rem", color: gps.accuracy < 10 ? "#22c55e" : gps.accuracy < 30 ? "#f59e0b" : "#ef4444" }}>
-                ±{gps.accuracy.toFixed(0)} m
+        {!gpsFinalized ? (
+          <div className="t-card" style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div className="t-card__title">🛰️ Polygone GPS</div>
+              <span style={{ fontSize: ".72rem", color: "#64748b" }}>
+                {gps.points.length} point{gps.points.length !== 1 ? "s" : ""}
               </span>
-            )}
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-            <PolygonSvg points={gps.points} currentPos={gps.currentPos} />
-          </div>
-
-          {areaHa > 0 && (
-            <div style={{ textAlign: "center", fontSize: "1.1rem", fontWeight: 700, color: "#22c55e", marginBottom: 10 }}>
-              {areaHa.toFixed(4)} ha · {gps.points.length} points
             </div>
-          )}
 
-          {gps.error && (
-            <div style={{ color: "#ef4444", fontSize: ".82rem", marginBottom: 8, textAlign: "center" }}>{gps.error}</div>
-          )}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+              <PolygonSvg points={gps.points} currentPos={gps.currentPos} />
+            </div>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {!gps.isTracking ? (
+            {gps.error && (
+              <div style={{ color: "#ef4444", fontSize: ".82rem", marginBottom: 8, textAlign: "center" }}>{gps.error}</div>
+            )}
+
+            {/* Stats temps réel */}
+            {gps.points.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
+                <div style={{ background: "#0f172a", borderRadius: 8, padding: "7px 10px" }}>
+                  <div style={{ fontSize: ".65rem", color: "#64748b" }}>Points</div>
+                  <div style={{ fontSize: ".9rem", fontWeight: 700, color: "#e2e8f0" }}>{gps.points.length}</div>
+                </div>
+                <div style={{ background: "#0f172a", borderRadius: 8, padding: "7px 10px" }}>
+                  <div style={{ fontSize: ".65rem", color: "#64748b" }}>Périmètre</div>
+                  <div style={{ fontSize: ".9rem", fontWeight: 700, color: "#e2e8f0" }}>{perimeterM > 0 ? fmtDist(perimeterM) : "—"}</div>
+                </div>
+                {areaHa > 0 && (
+                  <div style={{ background: "#0f172a", borderRadius: 8, padding: "7px 10px" }}>
+                    <div style={{ fontSize: ".65rem", color: "#64748b" }}>Superficie estimée</div>
+                    <div style={{ fontSize: ".9rem", fontWeight: 700, color: "#22c55e" }}>{fmtHa(areaHa)}</div>
+                  </div>
+                )}
+                {declareeHa > 0 && areaHa > 0 && ecartHa !== null && (
+                  <div style={{ background: "#0f172a", borderRadius: 8, padding: "7px 10px" }}>
+                    <div style={{ fontSize: ".65rem", color: "#64748b" }}>Écart vs déclarée</div>
+                    <div style={{ fontSize: ".9rem", fontWeight: 700, color: ecartColor }}>
+                      {ecartHa >= 0 ? "+" : ""}{fmtHa(ecartHa)} {ecartIcon}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Liste des points */}
+            {gps.points.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: ".72rem", color: "#64748b", marginBottom: 6 }}>Liste des points :</div>
+                {gps.points.map((pt, i) => {
+                  const distFromPrev = i > 0
+                    ? haversineDistance(gps.points[i - 1].lat, gps.points[i - 1].lon, pt.lat, pt.lon)
+                    : null;
+                  return (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #1e3a5f", fontSize: ".8rem" }}>
+                      <span style={{ color: "#22c55e" }}>P{i + 1} ✅ ±{pt.accuracy?.toFixed(0) ?? "?"}m</span>
+                      {distFromPrev !== null && (
+                        <span style={{ color: "#64748b", fontSize: ".75rem" }}>← {fmtDist(distFromPrev)} depuis P{i}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Confirmation de capture */}
+            {lastCapture && (
+              <div style={{ background: "#22c55e22", border: "1px solid #22c55e44", borderRadius: 8, padding: "8px 12px", fontSize: ".82rem", color: "#22c55e", marginBottom: 10, textAlign: "center" }}>
+                ✅ Point {lastCapture.idx} ajouté — Précision ±{lastCapture.acc} m
+              </div>
+            )}
+
+            {/* Erreur points insuffisants */}
+            {gpsErreurPoints && (
+              <div style={{ background: "#ef444422", border: "1px solid #ef444444", borderRadius: 8, padding: "8px 12px", fontSize: ".82rem", color: "#ef4444", marginBottom: 10 }}>
+                {gpsErreurPoints}
+              </div>
+            )}
+
+            {/* Annuler dernier point */}
+            {gps.points.length > 0 && (
               <button
-                onClick={gps.startTracking}
-                className="t-btn t-btn--primary"
-                style={{ flex: 1, padding: "10px" }}
+                onClick={() => { gps.undoLastPoint(); setLastCapture(null); }}
+                className="t-btn t-btn--ghost"
+                style={{ width: "100%", padding: "9px", fontSize: ".82rem", marginBottom: 10 }}
               >
-                ▶ Démarrer GPS
-              </button>
-            ) : (
-              <button
-                onClick={gps.stopTracking}
-                className="t-btn"
-                style={{ flex: 1, padding: "10px", background: "#f59e0b", color: "#000" }}
-              >
-                ⏸ Arrêter
+                ⬅ Annuler dernier point
               </button>
             )}
-            <button
-              onClick={gps.addCurrentPoint}
-              disabled={!gps.currentPos}
-              className="t-btn"
-              style={{ flex: 1, padding: "10px", background: "#22c55e33", color: "#22c55e", opacity: gps.currentPos ? 1 : .4 }}
-            >
-              + Point
-            </button>
-            <button
-              onClick={gps.undoLastPoint}
-              disabled={gps.points.length === 0}
-              className="t-btn t-btn--ghost"
-              style={{ padding: "10px 14px", opacity: gps.points.length > 0 ? 1 : .4 }}
-            >
-              ↩
-            </button>
-            <button
-              onClick={gps.clearPoints}
-              disabled={gps.points.length === 0}
-              className="t-btn t-btn--ghost"
-              style={{ padding: "10px 14px", opacity: gps.points.length > 0 ? 1 : .4 }}
-            >
-              🗑
-            </button>
+
+            {/* Boutons principaux */}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={handleStop}
+                className="t-btn"
+                style={{ flex: 1, padding: "12px", background: "#f59e0b22", color: "#f59e0b", border: "1px solid #f59e0b44", fontWeight: 700 }}
+              >
+                ⏹ Arrêter
+              </button>
+
+              {capturePhase === "stabilizing" ? (
+                <button
+                  disabled
+                  className="t-btn"
+                  style={{ flex: 2, padding: "12px", background: "#1e3a5f", color: "#3b82f6", fontWeight: 700, cursor: "not-allowed" }}
+                >
+                  📍 Stabilisation… {countdown}s
+                </button>
+              ) : (
+                <button
+                  onClick={handleStartCapture}
+                  disabled={!gps.currentPos || capturePhase !== null}
+                  className="t-btn"
+                  style={{ flex: 2, padding: "12px", background: "#22c55e22", color: "#22c55e", border: "1px solid #22c55e44", fontWeight: 700, opacity: gps.currentPos ? 1 : 0.4 }}
+                >
+                  + Point 📍
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          /* GPS finalisé — résumé compact */
+          <div className="t-card" style={{ marginBottom: 12, border: "1px solid #22c55e44" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontWeight: 700, color: "#22c55e" }}>🛰️ Polygone validé ✅</div>
+              <button
+                onClick={() => setGpsFinalized(false)}
+                style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: ".8rem" }}
+              >
+                Modifier
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 16, fontSize: ".82rem", color: "#94a3b8" }}>
+              <span>{gps.points.length} points</span>
+              {areaHa > 0 && <span style={{ color: "#22c55e", fontWeight: 600 }}>{fmtHa(areaHa)}</span>}
+              {ecartHa !== null && <span style={{ color: ecartColor }}>{ecartHa >= 0 ? "+" : ""}{fmtHa(ecartHa)} {ecartIcon}</span>}
+            </div>
+          </div>
+        )}
 
         {/* Photos */}
-        <div className="t-card" style={{ marginBottom: 12 }}>
+        <div ref={photosRef} className="t-card" style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <div className="t-card__title">
               📷 Photos ({photos.length}/{MAX_PHOTOS})
@@ -300,7 +602,7 @@ export default function CollecteGps() {
           />
           {photos.length === 0 ? (
             <div
-              onClick={() => photos.length < MAX_PHOTOS && photoInputRef.current?.click()}
+              onClick={() => photoInputRef.current?.click()}
               style={{ border: "2px dashed #ef444466", borderRadius: 10, padding: "20px", textAlign: "center", color: "#ef4444", cursor: "pointer" }}
             >
               📷 Photographier la parcelle (min. {MIN_PHOTOS})
@@ -309,11 +611,7 @@ export default function CollecteGps() {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {photos.map((p, i) => (
                 <div key={i} style={{ position: "relative" }}>
-                  <img
-                    src={p}
-                    alt={`Photo ${i + 1}`}
-                    style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8 }}
-                  />
+                  <img src={p} alt={`Photo ${i + 1}`} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8 }} />
                   <button
                     onClick={() => setPhotos((prev) => prev.filter((_, idx) => idx !== i))}
                     style={{ position: "absolute", top: -6, right: -6, background: "#ef4444", color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: ".7rem", display: "flex", alignItems: "center", justifyContent: "center" }}
