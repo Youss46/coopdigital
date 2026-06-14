@@ -208,7 +208,7 @@ const navItems = [
     href: "/prix",
     label: "Suivi des Prix",
     icon: TrendingUp,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
   },
 
   // ── Finance Coopérative ───────────────────────────────────────────────────
