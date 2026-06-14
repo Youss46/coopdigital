@@ -160,6 +160,41 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
   catch (err) { req.log.error({ err }, "getAlertes"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
+// ─── Comptes bancaires disponibles ───────────────────────────────────────────
+
+export async function getComptesBancaires(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  try { res.json(await svc.getComptesBancairesCoop(cooperativeId)); }
+  catch (err) { req.log.error({ err }, "getComptesBancairesCaisse"); res.status(500).json({ error: "Erreur serveur" }); }
+}
+
+// ─── Virement Caisse → Banque ─────────────────────────────────────────────────
+
+export async function postVirementBanque(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  const caisseId = parseInt(String(req.params["id"]), 10);
+  const { compteBancaireId, montantFcfa, libelle, reference, dateOperation } = req.body as {
+    compteBancaireId?: number; montantFcfa?: number;
+    libelle?: string; reference?: string; dateOperation?: string;
+  };
+  if (!compteBancaireId || !montantFcfa || montantFcfa <= 0) {
+    res.status(400).json({ erreur: "compteBancaireId et montantFcfa (> 0) requis" }); return;
+  }
+  try {
+    const result = await svc.virementVersBanque(caisseId, cooperativeId, {
+      compteBancaireId, montantFcfa, libelle, reference, dateOperation,
+      userId: req.user?.id,
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    req.log.error({ err }, "postVirementBanqueCaisse");
+    res.status(400).json({ error: msg });
+  }
+}
+
 // ─── Historique sessions ──────────────────────────────────────────────────────
 
 export async function getSessions(req: Request, res: Response): Promise<void> {

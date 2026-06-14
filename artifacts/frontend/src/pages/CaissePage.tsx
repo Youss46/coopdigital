@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
-import { Wallet, Plus, RefreshCw, Lock, Unlock, Download, AlertTriangle, TrendingUp, TrendingDown, ChevronRight, X, CheckCircle2, Users, ArrowLeftRight } from "lucide-react";
+import { Wallet, Plus, RefreshCw, Lock, Unlock, Download, AlertTriangle, TrendingUp, TrendingDown, ChevronRight, X, CheckCircle2, Users, ArrowLeftRight, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -672,6 +672,7 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
   const [loading, setLoading] = useState(false);
   const [modalMvt, setModalMvt] = useState(false);
   const [modalFermer, setModalFermer] = useState(false);
+  const [modalVirementBanque, setModalVirementBanque] = useState(false);
 
   const charger = useCallback(async (id?: number | "", d?: string) => {
     const cid = id ?? caisseId;
@@ -757,6 +758,10 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
               <button onClick={() => setModalMvt(true)}
                 className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
                 <Plus size={14} /> Nouveau mouvement
+              </button>
+              <button onClick={() => setModalVirementBanque(true)}
+                className="flex items-center gap-1.5 px-3 py-2 border border-blue-300 text-blue-700 rounded-lg text-sm hover:bg-blue-50">
+                <Building2 size={14} /> Virt. Banque
               </button>
               <button onClick={() => setModalFermer(true)}
                 className="flex items-center gap-1.5 px-3 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">
@@ -853,6 +858,15 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
       )}
       {modalFermer && caisseId && (
         <ModalFermeture caisseId={caisseId as number} onClose={() => setModalFermer(false)} onDone={() => { setModalFermer(false); charger(); }} />
+      )}
+      {modalVirementBanque && caisseId && (
+        <ModalVirementBanque
+          caisseId={caisseId as number}
+          caisseName={caisseSelectionnee?.nom ?? ""}
+          soldeCaisse={caisseSelectionnee?.solde_actuel_fcfa ?? "0"}
+          onClose={() => setModalVirementBanque(false)}
+          onDone={() => { setModalVirementBanque(false); charger(); }}
+        />
       )}
     </div>
   );
@@ -1446,6 +1460,188 @@ export default function CaissePage() {
       {tab === "delegues" && !isDelegue && (
         <CaissesDelegueesTab caisses={caisses} />
       )}
+    </div>
+  );
+}
+
+// ─── Modal : Virement Caisse → Banque ─────────────────────────────────────────
+
+type CompteBancaireCaisse = { id: number; nom: string; banque: string; solde_actuel_fcfa: string };
+
+function ModalVirementBanque({ caisseId, caisseName, soldeCaisse, onClose, onDone }: {
+  caisseId: number;
+  caisseName: string;
+  soldeCaisse: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const { toast } = useToast();
+  const [comptes,        setComptes]        = useState<CompteBancaireCaisse[]>([]);
+  const [loadingComptes, setLoadingComptes] = useState(true);
+  const [compteId,       setCompteId]       = useState<number | "">("");
+  const [montant,        setMontant]        = useState("");
+  const [libelle,        setLibelle]        = useState("");
+  const [reference,      setReference]      = useState("");
+  const [date,           setDate]           = useState(new Date().toISOString().slice(0, 10));
+  const [saving,         setSaving]         = useState(false);
+  const [err,            setErr]            = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${BASE}/api/caisse/comptes-bancaires`, { headers: { Authorization: `Bearer ${tok()}` } })
+      .then(r => r.json())
+      .then((data: CompteBancaireCaisse[]) => {
+        setComptes(data);
+        if (data.length === 1) setCompteId(data[0]!.id);
+      })
+      .catch(() => setErr("Impossible de charger les comptes bancaires"))
+      .finally(() => setLoadingComptes(false));
+  }, []);
+
+  const compteSel    = compteId !== "" ? comptes.find(c => c.id === compteId) : null;
+  const soldeCaisseN = parseFloat(soldeCaisse);
+
+  async function handleSubmit() {
+    if (!compteId) { setErr("Sélectionnez un compte bancaire"); return; }
+    const m = parseInt(montant || "0", 10);
+    if (!m || m <= 0) { setErr("Montant invalide"); return; }
+    if (m > soldeCaisseN) {
+      setErr(`Solde insuffisant en caisse (${new Intl.NumberFormat("fr-FR").format(soldeCaisseN)} FCFA disponible)`);
+      return;
+    }
+    setSaving(true); setErr(null);
+    try {
+      const r = await fetch(`${BASE}/api/caisse/${caisseId}/virement-banque`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
+        body: JSON.stringify({
+          compteBancaireId: compteId,
+          montantFcfa:      m,
+          libelle:          libelle   || undefined,
+          reference:        reference || undefined,
+          dateOperation:    date,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? json.erreur ?? "Erreur serveur");
+      toast({ title: "Virement effectué", description: `${new Intl.NumberFormat("fr-FR").format(m)} FCFA déposés sur ${compteSel?.nom ?? "le compte"}.` });
+      onDone();
+    } catch (e) {
+      setErr((e as Error).message);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Building2 size={16} className="text-blue-600" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900 text-sm">Virement Caisse → Banque</h2>
+              <p className="text-xs text-gray-400">Depuis : {caisseName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Solde caisse */}
+          <div className="rounded-lg bg-gray-50 px-4 py-3 flex items-center justify-between text-sm">
+            <span className="text-gray-500">Solde disponible (caisse)</span>
+            <span className="font-bold text-gray-800">
+              {new Intl.NumberFormat("fr-FR").format(soldeCaisseN)} FCFA
+            </span>
+          </div>
+
+          {/* Compte cible */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Compte bancaire de destination *</label>
+            {loadingComptes ? (
+              <div className="text-xs text-gray-400 py-2">Chargement des comptes…</div>
+            ) : comptes.length === 0 ? (
+              <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 rounded-lg p-3">
+                <AlertTriangle size={14} /> Aucun compte bancaire actif dans cette coopérative
+              </div>
+            ) : (
+              <select
+                value={compteId}
+                onChange={e => setCompteId(e.target.value === "" ? "" : parseInt(e.target.value, 10))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400">
+                <option value="">— Sélectionner un compte —</option>
+                {comptes.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.nom} ({c.banque}) — {new Intl.NumberFormat("fr-FR").format(parseFloat(c.solde_actuel_fcfa))} FCFA
+                  </option>
+                ))}
+              </select>
+            )}
+            {compteSel && (
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                <Building2 size={11} /> Solde banque : <span className="font-semibold text-gray-700">{new Intl.NumberFormat("fr-FR").format(parseFloat(compteSel.solde_actuel_fcfa))} FCFA</span>
+              </p>
+            )}
+          </div>
+
+          {/* Montant */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA) *</label>
+            <MoneyInput value={montant} onChange={v => setMontant(v ?? "")}
+              placeholder="Ex: 1 000 000"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            {montant && parseInt(montant) > 0 && (
+              <p className="text-xs text-gray-400 mt-1">
+                Solde caisse après : <span className="font-semibold text-gray-700">
+                  {new Intl.NumberFormat("fr-FR").format(soldeCaisseN - parseInt(montant))} FCFA
+                </span>
+              </p>
+            )}
+          </div>
+
+          {/* Libellé */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Libellé <span className="text-gray-400">(opt.)</span></label>
+            <input type="text" value={libelle} onChange={e => setLibelle(e.target.value)}
+              placeholder="Ex: Dépôt recettes du mois"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          </div>
+
+          {/* Référence + Date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Référence <span className="text-gray-400">(opt.)</span></label>
+              <input type="text" value={reference} onChange={e => setReference(e.target.value)}
+                placeholder="Ex: BON-001"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Date opération</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            </div>
+          </div>
+
+          {err && (
+            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              <AlertTriangle size={13} /> {err}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 pb-5">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Annuler
+          </button>
+          <button onClick={handleSubmit} disabled={saving || comptes.length === 0}
+            className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
+            <Building2 size={14} />
+            {saving ? "Virement en cours…" : "Confirmer le dépôt"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

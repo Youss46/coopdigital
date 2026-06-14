@@ -1,4 +1,4 @@
-import { db, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, ecrituresComptablesTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable } from "@workspace/db";
+import { db, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, ecrituresComptablesTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, comptesBancairesTable, mouvementsBanqueTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
@@ -465,7 +465,7 @@ export async function listSessions(caisseId: number, opts?: { dateDebut?: string
   return result.rows;
 }
 
-// ─── Transfert caisse → banque ────────────────────────────────────────────────
+// ─── Transfert caisse → banque (legacy — sortie caisse sans màj compte) ───────
 
 export async function transfertVersBanque(
   caisseId: number,
@@ -481,6 +481,141 @@ export async function transfertVersBanque(
     userId,
   });
   return result;
+}
+
+// ─── Virement Caisse → Banque (atomique, avec màj solde bancaire) ─────────────
+
+export async function getComptesBancairesCoop(cooperativeId: number) {
+  return db
+    .select({
+      id:               comptesBancairesTable.id,
+      nom:              comptesBancairesTable.nom,
+      banque:           comptesBancairesTable.banque,
+      solde_actuel_fcfa: comptesBancairesTable.soldeActuelFcfa,
+    })
+    .from(comptesBancairesTable)
+    .where(and(
+      eq(comptesBancairesTable.cooperativeId, cooperativeId),
+      eq(comptesBancairesTable.actif, true),
+    ));
+}
+
+export async function virementVersBanque(
+  caisseId: number,
+  cooperativeId: number,
+  params: {
+    compteBancaireId: number;
+    montantFcfa: number;
+    libelle?: string;
+    reference?: string;
+    dateOperation?: string;
+    userId?: number | null;
+  }
+) {
+  const { compteBancaireId, montantFcfa, libelle, reference, dateOperation, userId } = params;
+  const mt = Math.round(montantFcfa);
+  if (mt <= 0) throw new Error("Le montant doit être positif");
+
+  const caisse = await getCaisse(caisseId);
+  if (!caisse) throw new Error("Caisse introuvable");
+  if (caisse.cooperativeId !== cooperativeId) throw new Error("Caisse non autorisée");
+
+  const session = await getSessionActive(caisseId);
+  if (!session) throw new Error(`Aucune session ouverte pour la caisse "${caisse.nom}". Ouvrez d'abord une session.`);
+
+  const [compteBancaire] = await db
+    .select()
+    .from(comptesBancairesTable)
+    .where(and(
+      eq(comptesBancairesTable.id, compteBancaireId),
+      eq(comptesBancairesTable.cooperativeId, cooperativeId),
+    ))
+    .limit(1);
+  if (!compteBancaire) throw new Error("Compte bancaire introuvable");
+
+  const soldeCaisse  = parseFloat(caisse.soldeActuelFcfa as string);
+  if (soldeCaisse < mt) {
+    throw new Error(`Solde insuffisant en caisse (${soldeCaisse.toLocaleString("fr-FR")} FCFA disponible)`);
+  }
+
+  const nvSoldeCaisse = soldeCaisse - mt;
+  const nvSoldeBanque = parseFloat(compteBancaire.soldeActuelFcfa as string) + mt;
+  const dateOp  = dateOperation ?? today();
+  const ref     = reference ?? `VIR-${Date.now()}`;
+  const lib     = libelle ?? `Dépôt en banque — ${compteBancaire.nom}`;
+
+  const result = await db.transaction(async (tx) => {
+    // 1. Sortie caisse
+    const [mvtCaisse] = await tx
+      .insert(mouvementsCaisseTable)
+      .values({
+        caisseId,
+        sessionId:        session.id,
+        cooperativeId,
+        type:             "sortie",
+        motif:            "depot_banque",
+        montantFcfa:      mt.toString(),
+        libelle:          lib,
+        referenceOperation: ref,
+        soldeApresFcfa:   nvSoldeCaisse.toString(),
+        enregistrePar:    userId ?? null,
+      })
+      .returning();
+
+    await tx
+      .update(caissesTable)
+      .set({ soldeActuelFcfa: nvSoldeCaisse.toString() })
+      .where(eq(caissesTable.id, caisseId));
+
+    // 2. Entrée banque
+    const [mvtBanque] = await tx
+      .insert(mouvementsBanqueTable)
+      .values({
+        compteId:       compteBancaireId,
+        cooperativeId,
+        type:           "credit",
+        motif:          "virement_entrant",
+        montantFcfa:    mt.toString(),
+        libelle:        `Dépôt depuis ${caisse.nom}${libelle ? ` — ${libelle}` : ""}`,
+        reference:      ref,
+        dateOperation:  dateOp,
+        soldeApresFcfa: nvSoldeBanque.toString(),
+        enregistrePar:  userId ?? null,
+      })
+      .returning();
+
+    await tx
+      .update(comptesBancairesTable)
+      .set({ soldeActuelFcfa: nvSoldeBanque.toString() })
+      .where(eq(comptesBancairesTable.id, compteBancaireId));
+
+    return { mvtCaisse: mvtCaisse!, mvtBanque: mvtBanque! };
+  });
+
+  // 3. Écriture OHADA : 521 Débit / 571 Crédit
+  try {
+    await db.insert(ecrituresComptablesTable).values({
+      cooperativeId,
+      dateEcriture:  dateOp,
+      libelle:       lib,
+      compteDebit:   "521",
+      compteCredit:  "571",
+      montantFcfa:   mt,
+      source:        "manuel" as const,
+      sourceId:      result.mvtBanque.id,
+      exercice:      new Date().getFullYear(),
+    });
+  } catch (err) {
+    logger.warn({ err }, "Écriture comptable virement caisse-banque non enregistrée");
+  }
+
+  return {
+    mouvement_caisse: result.mvtCaisse.id,
+    mouvement_banque: result.mvtBanque.id,
+    solde_caisse:     nvSoldeCaisse,
+    solde_banque:     nvSoldeBanque,
+    reference:        ref,
+  };
 }
 
 // ─── Rapport PDF journalier ───────────────────────────────────────────────────
