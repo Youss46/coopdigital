@@ -384,13 +384,17 @@ export default function ReglementsPage() {
   const { toast } = useToast();
 
   // Solde caisse délégué (visible seulement pour le rôle délégué)
-  const { data: caisseDelegue } = useQuery<{ caisse: { solde: number; plafond: number | null } }>({
+  // On passe par /api/caisse qui filtre automatiquement sur responsable_id pour le rôle délégué
+  const { data: caissesData } = useQuery<Array<{ solde_actuel_fcfa: string; fond_caisse_minimum_fcfa: string }>>({
     queryKey: ["caisse-delegue-solde", utilisateur?.id],
-    queryFn: () => apiFetch(`/api/delegues/${utilisateur!.id}/caisse`),
+    queryFn: () => apiFetch(`/api/caisse`),
     enabled: isDelegue && !!utilisateur?.id,
     refetchInterval: 30_000,
     staleTime: 15_000,
   });
+  const caisseDelegue = caissesData?.[0]
+    ? { caisse: { solde: parseFloat(caissesData[0].solde_actuel_fcfa), plafond: null } }
+    : undefined;
 
   // Stats
   const { data: stats } = useGetPaiementsStats({
