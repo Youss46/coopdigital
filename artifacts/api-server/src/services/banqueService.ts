@@ -37,11 +37,21 @@ async function getCompte(id: number) {
 // ─── CRUD Comptes ──────────────────────────────────────────────────────────────
 
 export async function listComptes(cooperativeId: number) {
-  return db
+  const rows = await db
     .select()
     .from(comptesBancairesTable)
     .where(and(eq(comptesBancairesTable.cooperativeId, cooperativeId), eq(comptesBancairesTable.actif, true)))
     .orderBy(comptesBancairesTable.nom);
+  return rows.map(r => ({
+    id:                     r.id,
+    nom:                    r.nom,
+    banque:                 r.banque,
+    numero_compte:          r.numeroCompte,
+    iban:                   r.iban,
+    solde_actuel_fcfa:      r.soldeActuelFcfa,
+    solde_mini_alerte_fcfa: r.soldeMiniAlerteFcfa,
+    actif:                  r.actif,
+  }));
 }
 
 export async function creerCompte(

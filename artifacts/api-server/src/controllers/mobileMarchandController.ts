@@ -17,7 +17,15 @@ export async function getComptes(req: Request, res: Response): Promise<void> {
       .from(comptesMobilesMarchandsTable)
       .where(and(eq(comptesMobilesMarchandsTable.cooperativeId, cid), eq(comptesMobilesMarchandsTable.actif, true)))
       .orderBy(comptesMobilesMarchandsTable.nom);
-    res.json(rows);
+    res.json(rows.map(r => ({
+      id:                    r.id,
+      nom:                   r.nom,
+      operateur:             r.operateur,
+      numero_marchand:       r.numeroMarchand,
+      solde_actuel_fcfa:     r.soldeActuelFcfa,
+      solde_mini_alerte_fcfa:r.soldeMiniAlerteFcfa,
+      actif:                 r.actif,
+    })));
   } catch (err) {
     req.log.error({ err }, "getComptesMobile");
     res.status(500).json({ erreur: "Erreur serveur" });
@@ -152,7 +160,17 @@ export async function getJournal(req: Request, res: Response): Promise<void> {
         eq(mouvementsMobileMarchandTable.cooperativeId, cid),
       ))
       .orderBy(desc(mouvementsMobileMarchandTable.dateOperation), desc(mouvementsMobileMarchandTable.createdAt));
-    res.json(rows);
+    res.json(rows.map(r => ({
+      id:              r.id,
+      type:            r.type,
+      motif:           r.motif,
+      montant_fcfa:    r.montantFcfa,
+      libelle:         r.libelle,
+      reference:       r.reference,
+      date_operation:  r.dateOperation,
+      solde_apres_fcfa:r.soldeApresFcfa,
+      created_at:      r.createdAt,
+    })));
   } catch (err) {
     req.log.error({ err }, "getJournalMobile");
     res.status(500).json({ erreur: "Erreur serveur" });
