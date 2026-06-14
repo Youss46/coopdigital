@@ -2,6 +2,7 @@ import { type Request, type Response } from "express";
 import { db, paiementsTable, membresTable, livraisonsTable, usersTable } from "@workspace/db";
 import { eq, desc, and, sql, gte, lt, lte } from "drizzle-orm";
 import { envoyerPushGroupePortail } from "../services/pushService";
+import { debiterCaisseDelegue } from "../services/delegueService.js";
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
 
@@ -222,6 +223,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
 
     const mode = row.paiement.modePaiement;
     const nouveauStatut = mode === "especes" ? "effectue" : "en_cours";
+    const isDelegueEspeces = req.user?.role === "delegue" && mode === "especes";
 
     await db.transaction(async (tx) => {
       // 1. Mettre à jour le paiement
@@ -241,6 +243,17 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         .set({ statutPaiement: "PAYÉ" })
         .where(eq(livraisonsTable.id, row.paiement.livraisonId));
     });
+
+    // 3. Débiter la caisse du délégué si paiement espèces (hors tx principale — throw annule le statut effectue si fonds insuffisants)
+    if (isDelegueEspeces && userId && req.user?.cooperativeId) {
+      await debiterCaisseDelegue(
+        userId,
+        req.user.cooperativeId,
+        row.paiement.montantFcfa,
+        id,
+        row.paiement.livraisonId,
+      );
+    }
 
     // 3. Notifier le producteur (best-effort)
     void envoyerPushGroupePortail([row.paiement.membreId], {

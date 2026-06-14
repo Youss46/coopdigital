@@ -60,8 +60,8 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   paiements: {
     lire:     ["pca", "directeur", "comptable", "delegue", "auditeur"],
     confirmer:["pca", "directeur", "delegue"],
-    valider:  ["pca", "directeur", "comptable"],
-    rejeter:  ["pca", "directeur", "comptable"],
+    valider:  ["pca", "directeur", "comptable", "delegue"],
+    rejeter:  ["pca", "directeur", "comptable", "delegue"],
     annuler:  ["pca", "directeur"],
   },
 

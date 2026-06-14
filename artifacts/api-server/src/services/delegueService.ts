@@ -36,6 +36,42 @@ export async function getOrCreateCaisse(agentId: number, cooperativeId: number) 
   return created!;
 }
 
+export async function debiterCaisseDelegue(
+  agentId: number,
+  cooperativeId: number,
+  montantFcfa: number,
+  paiementId: number,
+  livraisonId: number | null,
+): Promise<{ nouveauSolde: number }> {
+  const caisse = await getOrCreateCaisse(agentId, cooperativeId);
+  const soldeActuel = toNum(caisse.solde);
+
+  if (soldeActuel < montantFcfa) {
+    throw new Error(
+      `Fonds insuffisants — solde caisse : ${soldeActuel.toLocaleString("fr-FR")} FCFA, montant requis : ${montantFcfa.toLocaleString("fr-FR")} FCFA`,
+    );
+  }
+
+  const nouveauSolde = soldeActuel - montantFcfa;
+
+  await db.update(caissesDeleguesTable)
+    .set({ solde: String(nouveauSolde), updatedAt: new Date() })
+    .where(eq(caissesDeleguesTable.id, caisse.id));
+
+  await db.insert(mouvementsCaisseDelegueTable).values({
+    caisseDelegueId: caisse.id,
+    type: "sortie",
+    montantFcfa: String(-montantFcfa),
+    soldeApresFcfa: String(nouveauSolde),
+    livraisonId: livraisonId ?? null,
+    note: `Paiement producteur PAI-${paiementId}`,
+    createdById: agentId,
+  });
+
+  logger.info({ agentId, paiementId, montantFcfa, nouveauSolde }, "Caisse délégué débitée (paiement producteur)");
+  return { nouveauSolde };
+}
+
 export async function getCaisseDelegue(agentId: number, cooperativeId: number) {
   const caisse = await getOrCreateCaisse(agentId, cooperativeId);
 
