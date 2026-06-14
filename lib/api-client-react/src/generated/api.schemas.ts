@@ -1531,6 +1531,7 @@ export const CreateUserInputRole = {
   responsable_tracabilite: 'responsable_tracabilite',
   agent_terrain: 'agent_terrain',
   auditeur: 'auditeur',
+  delegue: 'delegue',
 } as const;
 
 export interface CreateUserInput {

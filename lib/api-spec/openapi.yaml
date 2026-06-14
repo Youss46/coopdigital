@@ -7742,7 +7742,7 @@ components:
           type: string
         role:
           type: string
-          enum: [pca, directeur, comptable, magasinier, responsable_tracabilite, agent_terrain, auditeur]
+          enum: [pca, directeur, comptable, magasinier, responsable_tracabilite, agent_terrain, auditeur, delegue]
         motDePasse:
           type: string
           minLength: 8
