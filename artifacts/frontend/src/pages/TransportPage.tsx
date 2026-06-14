@@ -547,6 +547,7 @@ function TabChauffeurs() {
               <Select value={form.categorie_permis} onValueChange={v => setForm(f => ({ ...f, categorie_permis: v }))}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="Tout catégorie">Tout catégorie</SelectItem>
                   <SelectItem value="B">B</SelectItem>
                   <SelectItem value="C">C</SelectItem>
                   <SelectItem value="D">D</SelectItem>
