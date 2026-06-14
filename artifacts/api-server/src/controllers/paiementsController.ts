@@ -2,7 +2,7 @@ import { type Request, type Response } from "express";
 import { db, paiementsTable, membresTable, livraisonsTable, usersTable } from "@workspace/db";
 import { eq, desc, and, sql, gte, lt, lte } from "drizzle-orm";
 import { envoyerPushGroupePortail } from "../services/pushService";
-import { debiterCaisseDelegue } from "../services/delegueService.js";
+import { verifierCaisseEspeces, debiterCaisseParResponsable } from "../services/caisseService.js";
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
 
@@ -123,6 +123,12 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
 
+    const statsConditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
+    // Un délégué ne voit que les stats des membres qui lui sont rattachés
+    if (req.user?.role === "delegue" && req.user?.id) {
+      statsConditions.push(eq(membresTable.delegueId, req.user.id));
+    }
+
     const rows = await db
       .select({
         statut: paiementsTable.statut,
@@ -133,7 +139,7 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
       })
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
-      .where(eq(membresTable.cooperativeId, cooperativeId));
+      .where(and(...statsConditions));
 
     let enAttente = { count: 0, montant_total: 0 };
     let valideAujourdhui = { count: 0, montant_total: 0 };
@@ -225,8 +231,19 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     const nouveauStatut = mode === "especes" ? "effectue" : "en_cours";
     const isDelegueEspeces = req.user?.role === "delegue" && mode === "especes";
 
+    // 1. Pré-vérifier la caisse avant la transaction pour éviter un état incohérent
+    //    (paiement marqué effectue mais caisse non débitée)
+    if (isDelegueEspeces && userId && cooperativeId) {
+      try {
+        await verifierCaisseEspeces(userId, cooperativeId, row.paiement.montantFcfa);
+      } catch (err) {
+        res.status(422).json({ erreur: (err as Error).message });
+        return;
+      }
+    }
+
     await db.transaction(async (tx) => {
-      // 1. Mettre à jour le paiement
+      // 2. Mettre à jour le paiement
       await tx
         .update(paiementsTable)
         .set({
@@ -237,25 +254,26 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         })
         .where(eq(paiementsTable.id, id));
 
-      // 2. Mettre à jour le statut paiement de la livraison
+      // 3. Mettre à jour le statut paiement de la livraison
       await tx
         .update(livraisonsTable)
         .set({ statutPaiement: "PAYÉ" })
         .where(eq(livraisonsTable.id, row.paiement.livraisonId));
     });
 
-    // 3. Débiter la caisse du délégué si paiement espèces (hors tx principale — throw annule le statut effectue si fonds insuffisants)
-    if (isDelegueEspeces && userId && req.user?.cooperativeId) {
-      await debiterCaisseDelegue(
+    // 4. Débiter la caisse principale du délégué si paiement espèces
+    //    (hors tx DB car enregistrerMouvement gère sa propre cohérence interne)
+    if (isDelegueEspeces && userId && cooperativeId) {
+      await debiterCaisseParResponsable(
         userId,
-        req.user.cooperativeId,
+        cooperativeId,
         row.paiement.montantFcfa,
         id,
         row.paiement.livraisonId,
       );
     }
 
-    // 3. Notifier le producteur (best-effort)
+    // 5. Notifier le producteur (best-effort)
     void envoyerPushGroupePortail([row.paiement.membreId], {
       title: "✅ Paiement validé",
       body: `${new Intl.NumberFormat("fr-FR").format(row.paiement.montantFcfa)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : "espèces"}`,

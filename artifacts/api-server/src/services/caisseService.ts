@@ -644,3 +644,78 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
   doc.end();
   return new Promise<Buffer>((resolve) => doc.on("end", () => resolve(Buffer.concat(chunks))));
 }
+
+// ─── Pré-vérification caisse délégué avant validation paiement espèces ─────────
+
+export async function verifierCaisseEspeces(
+  userId: number,
+  cooperativeId: number,
+  montantFcfa: number,
+): Promise<void> {
+  const [caisse] = await db
+    .select()
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, userId),
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!caisse) {
+    throw new Error("Aucune caisse ne vous est assignée. Contactez votre administrateur.");
+  }
+
+  const session = await getSessionActive(caisse.id);
+  if (!session) {
+    throw new Error("Aucune session de caisse ouverte. Ouvrez une session dans la page Caisse avant de valider des paiements en espèces.");
+  }
+
+  const solde = parseFloat(caisse.soldeActuelFcfa as string);
+  if (solde < Math.round(montantFcfa)) {
+    throw new Error(
+      `Solde caisse insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA, requis : ${Math.round(montantFcfa).toLocaleString("fr-FR")} FCFA`,
+    );
+  }
+}
+
+// ─── Débit caisse principale du délégué (paiement producteur web) ─────────────
+// Utilisé lors de la validation d'un règlement espèces depuis le portail web.
+// Différent de debiterCaisseDelegue (terrain) qui opère sur caisses_delegues.
+
+export async function debiterCaisseParResponsable(
+  userId: number,
+  cooperativeId: number,
+  montantFcfa: number,
+  paiementId: number,
+  livraisonId: number | null,
+): Promise<{ nouveauSolde: number; alerte?: string }> {
+  const [caisse] = await db
+    .select()
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, userId),
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!caisse) {
+    throw new Error("Aucune caisse ne vous est assignée. Contactez votre administrateur.");
+  }
+
+  const result = await enregistrerMouvement(caisse.id, {
+    type: "sortie",
+    motif: "paiement_producteur",
+    montantFcfa,
+    libelle: `Paiement producteur PAI-${paiementId}${livraisonId ? ` / LIV-${livraisonId}` : ""}`,
+    referenceOperation: `PAI-${paiementId}`,
+    userId,
+  });
+
+  logger.info(
+    { userId, paiementId, montantFcfa, nouveauSolde: result.soldeActuel },
+    "Caisse déléguée débitée (paiement producteur web)",
+  );
+  return { nouveauSolde: result.soldeActuel, alerte: result.alerte };
+}
