@@ -36,6 +36,107 @@ function toDateStr(d: Date | null | undefined): string | null | undefined {
   return d instanceof Date ? d.toISOString().split("T")[0] : String(d);
 }
 
+// ─── Mappers Drizzle (camelCase) → API snake_case ────────────────────────────
+
+type DrizzleVehicule = Awaited<ReturnType<typeof getVehicules>>[number];
+type DrizzleChauffeur = Awaited<ReturnType<typeof getChauffeurs>>[number];
+type DrizzleMission = Awaited<ReturnType<typeof getMissions>>[number];
+
+function mapVehicule(v: DrizzleVehicule) {
+  return {
+    id: v.id,
+    cooperative_id: v.cooperativeId,
+    immatriculation: v.immatriculation,
+    marque: v.marque,
+    modele: v.modele,
+    type: v.type,
+    capacite_kg: v.capaciteKg != null ? Number(v.capaciteKg) : null,
+    annee_fabrication: v.anneeFabrication,
+    date_acquisition: v.dateAcquisition,
+    valeur_acquisition_fcfa: v.valeurAcquisitionFcfa != null ? Number(v.valeurAcquisitionFcfa) : null,
+    proprietaire: v.proprietaire,
+    nom_prestataire: v.nomPrestataire,
+    statut: v.statut,
+    kilometrage_actuel: v.kilometrageActuel ?? 0,
+    prochain_entretien_km: v.prochainEntretienKm,
+    prochain_entretien_date: v.prochainEntretienDate,
+    assurance_expiration: v.assuranceExpiration,
+    visite_technique_expiration: v.visiteTechniqueExpiration,
+    photo_url: v.photoUrl,
+    created_at: v.createdAt instanceof Date ? v.createdAt.toISOString() : String(v.createdAt),
+    updated_at: v.updatedAt instanceof Date ? v.updatedAt.toISOString() : String(v.updatedAt),
+  };
+}
+
+function mapChauffeur(c: DrizzleChauffeur) {
+  return {
+    id: c.id,
+    cooperative_id: c.cooperativeId,
+    nom: c.nom,
+    prenoms: c.prenoms,
+    telephone: c.telephone,
+    numero_permis: c.numeroPermis,
+    categorie_permis: c.categoriePermis,
+    date_expiration_permis: c.dateExpirationPermis,
+    date_embauche: c.dateEmbauche,
+    statut: c.statut,
+    created_at: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
+  };
+}
+
+type DrizzleEntretien = Awaited<ReturnType<typeof getEntretiens>>[number];
+
+function mapEntretien(e: DrizzleEntretien) {
+  return {
+    id: e.id,
+    vehicule_id: e.vehiculeId,
+    type_entretien: e.typeEntretien,
+    date_entretien: e.dateEntretien,
+    kilometrage_entretien: e.kilometrageEntretien,
+    description: e.description,
+    cout_fcfa: e.coutFcfa != null ? Number(e.coutFcfa) : null,
+    garage: e.garage,
+    prochain_entretien_km: e.prochainEntretienKm,
+    prochain_entretien_date: e.prochainEntretienDate,
+    created_at: e.createdAt instanceof Date ? e.createdAt.toISOString() : String(e.createdAt),
+  };
+}
+
+function mapMission(m: DrizzleMission) {
+  return {
+    id: m.id,
+    cooperative_id: m.cooperativeId,
+    vehicule_id: m.vehiculeId,
+    chauffeur_id: m.chauffeurId,
+    campagne_id: m.campagneId,
+    type_mission: m.typeMission,
+    zone_collecte: m.zoneCollecte,
+    section: m.section,
+    vente_exportateur_id: m.venteExportateurId,
+    exportateur_destination: m.exportateurDestination,
+    lieu_depart: m.lieuDepart,
+    lieu_arrivee: m.lieuArrivee,
+    date_depart: m.dateDepart instanceof Date ? m.dateDepart.toISOString() : String(m.dateDepart),
+    date_arrivee_prevue: m.dateArriveePrevue instanceof Date ? m.dateArriveePrevue.toISOString() : (m.dateArriveePrevue ?? null),
+    date_arrivee_reelle: m.dateArriveeReelle instanceof Date ? m.dateArriveeReelle.toISOString() : (m.dateArriveeReelle ?? null),
+    poids_charge_kg: m.poidsChargeKg != null ? Number(m.poidsChargeKg) : 0,
+    nombre_sacs: m.nombreSacs ?? 0,
+    kilometrage_depart: m.kilometrageDepart,
+    kilometrage_arrivee: m.kilometrageArrivee,
+    distance_km: m.distanceKm,
+    cout_carburant_fcfa: m.coutCarburantFcfa != null ? Number(m.coutCarburantFcfa) : 0,
+    cout_chauffeur_fcfa: m.coutChauffeurFcfa != null ? Number(m.coutChauffeurFcfa) : 0,
+    cout_peage_fcfa: m.coutPeageFcfa != null ? Number(m.coutPeageFcfa) : 0,
+    cout_divers_fcfa: m.coutDiversFcfa != null ? Number(m.coutDiversFcfa) : 0,
+    cout_total_fcfa: m.coutTotalFcfa != null ? Number(m.coutTotalFcfa) : 0,
+    cout_par_kg_fcfa: m.coutParKgFcfa != null ? Number(m.coutParKgFcfa) : null,
+    statut: m.statut,
+    observations: m.observations,
+    created_at: m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt),
+    updated_at: m.updatedAt instanceof Date ? m.updatedAt.toISOString() : String(m.updatedAt),
+  };
+}
+
 // ─── VÉHICULES ────────────────────────────────────────────────────────────────
 
 export async function handleGetVehicules(req: Request, res: Response): Promise<void> {
@@ -43,7 +144,7 @@ export async function handleGetVehicules(req: Request, res: Response): Promise<v
     const cooperativeId = req.user?.cooperativeId;
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
     const list = await getVehicules(cooperativeId);
-    res.json({ vehicules: list });
+    res.json({ vehicules: list.map(mapVehicule) });
   } catch (err) {
     req.log.error({ err }, "Erreur getVehicules");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -79,7 +180,7 @@ export async function handleCreateVehicule(req: Request, res: Response): Promise
       photoUrl:                 d.photo_url     ?? null,
     });
 
-    res.status(201).json(vehicule);
+    res.status(201).json(mapVehicule(vehicule));
   } catch (err) {
     req.log.error({ err }, "Erreur createVehicule");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -115,7 +216,7 @@ export async function handleUpdateVehicule(req: Request, res: Response): Promise
     });
 
     if (!updated) { res.status(404).json({ erreur: "Véhicule introuvable" }); return; }
-    res.json(updated);
+    res.json(mapVehicule(updated));
   } catch (err) {
     req.log.error({ err }, "Erreur updateVehicule");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -178,7 +279,7 @@ export async function handleCreateEntretien(req: Request, res: Response): Promis
       });
     }
 
-    res.status(201).json(entretien);
+    res.status(201).json(mapEntretien(entretien));
   } catch (err) {
     req.log.error({ err }, "Erreur createEntretien");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -197,7 +298,7 @@ export async function handleGetEntretiens(req: Request, res: Response): Promise<
     if (!vehicule) { res.status(404).json({ erreur: "Véhicule introuvable" }); return; }
 
     const list = await getEntretiens(vehiculeId);
-    res.json({ entretiens: list });
+    res.json({ entretiens: list.map(mapEntretien) });
   } catch (err) {
     req.log.error({ err }, "Erreur getEntretiens");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -210,7 +311,8 @@ export async function handleGetChauffeurs(req: Request, res: Response): Promise<
   try {
     const cooperativeId = req.user?.cooperativeId;
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
-    res.json({ chauffeurs: await getChauffeurs(cooperativeId) });
+    const list = await getChauffeurs(cooperativeId);
+    res.json({ chauffeurs: list.map(mapChauffeur) });
   } catch (err) {
     req.log.error({ err }, "Erreur getChauffeurs");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -237,7 +339,7 @@ export async function handleCreateChauffeur(req: Request, res: Response): Promis
       statut:                d.statut                 ?? "actif",
     });
 
-    res.status(201).json(chauffeur);
+    res.status(201).json(mapChauffeur(chauffeur));
   } catch (err) {
     req.log.error({ err }, "Erreur createChauffeur");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -268,7 +370,7 @@ export async function handleUpdateChauffeur(req: Request, res: Response): Promis
     });
 
     if (!updated) { res.status(404).json({ erreur: "Chauffeur introuvable" }); return; }
-    res.json(updated);
+    res.json(mapChauffeur(updated));
   } catch (err) {
     req.log.error({ err }, "Erreur updateChauffeur");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -300,7 +402,7 @@ export async function handleGetMissions(req: Request, res: Response): Promise<vo
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
     const statut = typeof req.query["statut"] === "string" ? req.query["statut"] : undefined;
     const list = await getMissions(cooperativeId, statut);
-    res.json({ missions: list });
+    res.json({ missions: list.map(mapMission) });
   } catch (err) {
     req.log.error({ err }, "Erreur getMissions");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -333,7 +435,7 @@ export async function handleCreateMission(req: Request, res: Response): Promise<
       observations:           d.observations       ?? null,
     });
 
-    res.status(201).json(mission);
+    res.status(201).json(mapMission(mission));
   } catch (err) {
     req.log.error({ err }, "Erreur createMission");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -350,7 +452,7 @@ export async function handleDemarrerMission(req: Request, res: Response): Promis
 
     const updated = await demarrerMission(cooperativeId, id);
     if (!updated) { res.status(404).json({ erreur: "Mission introuvable ou statut invalide" }); return; }
-    res.json(updated);
+    res.json(mapMission(updated));
   } catch (err) {
     req.log.error({ err }, "Erreur demarrerMission");
     res.status(500).json({ erreur: "Erreur interne" });
@@ -381,6 +483,7 @@ export async function handleTerminerMission(req: Request, res: Response): Promis
     });
 
     if (!updated) { res.status(404).json({ erreur: "Mission introuvable ou statut invalide" }); return; }
+    const mappedMission = mapMission(updated);
 
     // Écritures comptables frais de mission transport
     const dateArrivee = new Date(d.date_arrivee_reelle).toISOString().slice(0, 10);
@@ -418,7 +521,7 @@ export async function handleTerminerMission(req: Request, res: Response): Promis
       });
     }
 
-    res.json(updated);
+    res.json(mappedMission);
   } catch (err) {
     req.log.error({ err }, "Erreur terminerMission");
     res.status(500).json({ erreur: "Erreur interne" });
