@@ -136,6 +136,7 @@ export async function saisirPrix(cooperativeId: number, data: {
       datePrix: data.datePrix,
       prixBordChampFcfa: String(data.prixBordChampFcfa),
       prixVenteExportFcfa: String(data.prixVenteExportFcfa),
+      margeBruteKgFcfa: String(data.prixVenteExportFcfa - data.prixBordChampFcfa),
       source: data.source ?? "manuel",
       saisiPar: data.saisiPar,
     })

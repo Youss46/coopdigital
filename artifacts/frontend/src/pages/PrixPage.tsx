@@ -243,7 +243,11 @@ function OngletTempsReel() {
 
   const prixActuel       = hp ? parseFloat(hp.prixBordChampFcfa) : null;
   const prixExportActuel = hp ? parseFloat(hp.prixVenteExportFcfa) : null;
-  const margeActuelle    = hp?.margeBruteKgFcfa ? parseFloat(hp.margeBruteKgFcfa) : null;
+  const margeActuelle    = hp?.margeBruteKgFcfa
+    ? parseFloat(hp.margeBruteKgFcfa)
+    : (prixActuel != null && prixExportActuel != null)
+      ? prixExportActuel - prixActuel
+      : null;
 
   const dateStr = hp
     ? (() => {
@@ -388,7 +392,9 @@ function OngletEvolution() {
       date: new Date(h.datePrix).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
       bordChamp:  Math.round(parseFloat(h.prixBordChampFcfa)),
       export:     Math.round(parseFloat(h.prixVenteExportFcfa)),
-      marge:      h.margeBruteKgFcfa ? Math.round(parseFloat(h.margeBruteKgFcfa)) : 0,
+      marge:      h.margeBruteKgFcfa
+        ? Math.round(parseFloat(h.margeBruteKgFcfa))
+        : Math.round(parseFloat(h.prixVenteExportFcfa) - parseFloat(h.prixBordChampFcfa)),
     }));
 
   const { data: tendance } = useGetPrixTendance();
