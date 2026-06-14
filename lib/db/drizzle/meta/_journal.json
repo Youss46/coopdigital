@@ -211,6 +211,20 @@
       "when": 1781712000000,
       "tag": "0029_fix_agent_terrain_role_constraint",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1781798400000,
+      "tag": "0030_comptes_mobiles_marchands",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1781884800000,
+      "tag": "0031_mouvements_mobile_marchand",
+      "breakpoints": true
     }
   ]
 }
