@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Smartphone, Plus, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, X, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -80,16 +80,16 @@ export default function MobileMarchandPage() {
   const [modalEdit, setModalEdit] = useState<Compte | null>(null);
   const [modalMvt, setModalMvt] = useState<number | null>(null);
 
-  const [loaded, setLoaded] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
 
   async function refetch() {
     setLoading(true);
-    try { setComptes(await apiFetch("/api/mobile-marchand")); setLoaded(true); }
-    catch (err) { toast({ title: "Erreur", description: (err as Error).message, variant: "destructive" }); }
+    try { setComptes(await apiFetch("/api/mobile-marchand")); setErreur(null); }
+    catch (err) { setErreur((err as Error).message); }
     finally { setLoading(false); }
   }
 
-  if (!loaded) { refetch(); }
+  useEffect(() => { refetch(); }, []);
 
   async function loadJournal(c: Compte) {
     setSelected(c);
@@ -122,7 +122,13 @@ export default function MobileMarchandPage() {
         </div>
       </div>
 
-      {comptes.length === 0 && !loading && (
+      {erreur && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+          {erreur}
+        </div>
+      )}
+
+      {!erreur && comptes.length === 0 && !loading && (
         <div className="text-center py-16 text-gray-400">
           <Smartphone size={48} className="mx-auto mb-3 opacity-30" />
           <p className="text-lg font-medium">Aucun compte mobile marchand</p>
