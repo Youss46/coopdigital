@@ -55,6 +55,7 @@ interface Mouvement {
   solde_apres_fcfa: string | null;
   rapproche: boolean;
   enregistre_par_nom: string | null;
+  created_at: string;
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
@@ -387,6 +388,7 @@ export default function BanquePage() {
                     <tr key={m.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                         <div>{DATE_FR(m.date_operation)}</div>
+                        <div className="text-xs text-gray-400 font-mono">{m.created_at?.slice(11, 16)}</div>
                         {m.date_valeur && m.date_valeur !== m.date_operation && (
                           <div className="text-xs text-gray-400">Valeur: {DATE_FR(m.date_valeur)}</div>
                         )}
@@ -508,7 +510,7 @@ export default function BanquePage() {
                             </span>
                           </div>
                           <div className="text-xs text-gray-400 mt-0.5">
-                            {DATE_FR(m.date_operation)}{m.reference ? ` · ${m.reference}` : ""}
+                            {DATE_FR(m.date_operation)} · {m.created_at?.slice(11, 16)}{m.reference ? ` · ${m.reference}` : ""}
                           </div>
                         </div>
                       </label>

@@ -233,7 +233,7 @@ export default function MobileMarchandPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-gray-800">{m.libelle ?? m.motif}</p>
-                      <p className="text-xs text-gray-400">{DATE_FR(m.date_operation)}{m.reference && ` · ${m.reference}`}</p>
+                      <p className="text-xs text-gray-400">{DATE_FR(m.date_operation)} · {m.created_at?.slice(11, 16)}{m.reference && ` · ${m.reference}`}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className={`text-sm font-semibold ${m.type === "credit" ? "text-green-600" : "text-red-500"}`}>
