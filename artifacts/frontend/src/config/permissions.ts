@@ -137,7 +137,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   prix: {
-    voir:         ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    voir:         ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
     saisir_prix:  ["pca", "directeur"],
     diffuser_sms: ["pca", "directeur"],
     voir_analyse: ["pca", "directeur", "comptable", "auditeur"],
