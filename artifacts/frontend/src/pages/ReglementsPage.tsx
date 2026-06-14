@@ -2,7 +2,8 @@ import { useState } from "react";
 import {
   CheckCircle2, Clock, XCircle, Loader2, CreditCard, Search,
   CheckCheck, AlertCircle, Banknote, Smartphone, ChevronDown,
-  Receipt, Package, User, Calendar, TrendingUp, X,
+  Receipt, Package, User, Calendar, TrendingUp, X, Wallet,
+  AlertTriangle,
 } from "lucide-react";
 import {
   useListPaiements,
@@ -15,9 +16,15 @@ import {
   getListPaiementsQueryKey,
   getGetPaiementsStatsQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+
+const BASE = import.meta.env.VITE_API_URL ?? "";
+const tok = () => localStorage.getItem("coop_token") ?? "";
+const apiFetch = (url: string) =>
+  fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } }).then((r) => r.json());
 
 // ─── Formatters ─────────────────────────────────────────────────────────────
 
@@ -365,6 +372,8 @@ type ModalState =
 export default function ReglementsPage() {
   const peutValider = usePermission("paiements", "valider");
   const peutRejeter = usePermission("paiements", "rejeter");
+  const { utilisateur } = useAuth();
+  const isDelegue = utilisateur?.role === "delegue";
 
   const [filtreStatut, setFiltreStatut] = useState<string>("en_attente");
   const [filtrePeriode, setFiltrePeriode] = useState<string>("");
@@ -373,6 +382,15 @@ export default function ReglementsPage() {
 
   const qc = useQueryClient();
   const { toast } = useToast();
+
+  // Solde caisse délégué (visible seulement pour le rôle délégué)
+  const { data: caisseDelegue } = useQuery<{ caisse: { solde: number; plafond: number | null } }>({
+    queryKey: ["caisse-delegue-solde", utilisateur?.id],
+    queryFn: () => apiFetch(`/api/delegues/${utilisateur!.id}/caisse`),
+    enabled: isDelegue && !!utilisateur?.id,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
 
   // Stats
   const { data: stats } = useGetPaiementsStats({
@@ -409,10 +427,15 @@ export default function ReglementsPage() {
         data: { referenceTransaction: ref || null, telephone: telephone || null },
       });
       invalidateAll();
+      // Rafraîchir le solde caisse délégué après validation espèces
+      if (isDelegue && modal.paiement.modePaiement === "especes") {
+        qc.invalidateQueries({ queryKey: ["caisse-delegue-solde", utilisateur?.id] });
+      }
       setModal(null);
       toast({ title: "Paiement validé", description: "Le producteur a été notifié." });
-    } catch {
-      toast({ title: "Erreur", description: "Impossible de valider le paiement", variant: "destructive" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Impossible de valider le paiement";
+      toast({ title: "Erreur", description: msg, variant: "destructive" });
     }
   }
 
@@ -458,6 +481,17 @@ export default function ReglementsPage() {
     { value: "month",  label: "Ce mois" },
   ];
 
+  // Calcul alerte solde : si le plus petit paiement en attente > solde
+  const paiementsEnAttente = (paiements ?? []).filter(
+    (p) => p.statut === "en_attente" && p.modePaiement === "especes",
+  );
+  const plusPetitMontant = paiementsEnAttente.length > 0
+    ? Math.min(...paiementsEnAttente.map((p) => p.montantNetFcfa ?? p.montantFcfa ?? 0))
+    : null;
+  const soldeCaisse = caisseDelegue?.caisse?.solde ?? null;
+  const alerteSolde = isDelegue && soldeCaisse !== null && plusPetitMontant !== null && soldeCaisse < plusPetitMontant;
+  const soldeSuffisant = isDelegue && soldeCaisse !== null && plusPetitMontant !== null && soldeCaisse >= plusPetitMontant;
+
   return (
     <div className="space-y-5">
       {/* ── En-tête ── */}
@@ -465,6 +499,58 @@ export default function ReglementsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Règlements</h1>
         <p className="text-gray-500 text-sm mt-0.5">Validation des paiements producteurs</p>
       </div>
+
+      {/* ── Carte solde caisse (délégué uniquement) ── */}
+      {isDelegue && (
+        <div
+          className={`rounded-xl border px-5 py-4 flex items-center gap-4 ${
+            alerteSolde
+              ? "bg-red-50 border-red-200"
+              : soldeSuffisant
+              ? "bg-green-50 border-green-200"
+              : "bg-white border-gray-200"
+          }`}
+        >
+          <div
+            className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+              alerteSolde ? "bg-red-100" : soldeSuffisant ? "bg-green-100" : "bg-gray-100"
+            }`}
+          >
+            <Wallet
+              size={18}
+              className={alerteSolde ? "text-red-600" : soldeSuffisant ? "text-green-700" : "text-gray-500"}
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-500 font-medium">Solde de votre caisse</p>
+            {soldeCaisse === null ? (
+              <p className="text-sm text-gray-400">Chargement…</p>
+            ) : (
+              <p className={`text-xl font-bold ${alerteSolde ? "text-red-700" : "text-gray-900"}`}>
+                {new Intl.NumberFormat("fr-FR").format(soldeCaisse)}{" "}
+                <span className="text-sm font-normal text-gray-500">FCFA</span>
+              </p>
+            )}
+            {caisseDelegue?.caisse?.plafond != null && (
+              <p className="text-xs text-gray-400 mt-0.5">
+                Plafond : {new Intl.NumberFormat("fr-FR").format(caisseDelegue.caisse.plafond)} FCFA
+              </p>
+            )}
+          </div>
+          {alerteSolde && (
+            <div className="flex items-center gap-1.5 text-red-600 text-xs font-medium flex-shrink-0">
+              <AlertTriangle size={14} />
+              <span>Fonds insuffisants</span>
+            </div>
+          )}
+          {soldeSuffisant && !alerteSolde && (
+            <div className="flex items-center gap-1.5 text-green-700 text-xs font-medium flex-shrink-0">
+              <CheckCircle2 size={14} />
+              <span>Fonds disponibles</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Bandeau stats ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
