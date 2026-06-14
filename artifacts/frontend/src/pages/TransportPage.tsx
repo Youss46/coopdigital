@@ -289,7 +289,7 @@ function TabFlotte() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Kilométrage</span>
-                    <span>{v.kilometrage_actuel.toLocaleString("fr-FR")} km</span>
+                    <span>{(v.kilometrage_actuel ?? 0).toLocaleString("fr-FR")} km</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-500">Assurance</span>
