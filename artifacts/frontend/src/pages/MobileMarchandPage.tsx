@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Smartphone, Plus, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, X, ChevronRight, ArrowRightLeft, Landmark, Wallet, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { MoneyInput } from "@/components/ui/money-input";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok  = () => localStorage.getItem("coop_token") ?? "";
@@ -458,14 +459,14 @@ function ModalCompte({ compte, onClose, onSave }: {
           {!compte && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Solde initial (FCFA)</label>
-              <input type="number" min="0" value={soldeInitial} onChange={e => setSoldeInitial(e.target.value)}
+              <MoneyInput value={soldeInitial} onChange={v => setSoldeInitial(v)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
             </div>
           )}
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Solde minimum alerte (FCFA)</label>
-            <input type="number" min="0" value={soldeMini} onChange={e => setSoldeMini(e.target.value)}
+            <MoneyInput value={soldeMini} onChange={v => setSoldeMini(v)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
           </div>
 
@@ -544,7 +545,7 @@ function ModalMouvement({ compteId: _, onClose, onSave }: {
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA)</label>
-            <input type="number" min="1" value={montant} onChange={e => setMontant(e.target.value)}
+            <MoneyInput value={montant} onChange={v => setMontant(v)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
           </div>
 
@@ -688,8 +689,8 @@ function ModalVirement({ compteId, compteName, onClose, onSave }: {
           {/* Montant */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA) *</label>
-            <input type="number" min="1" step="1" value={montant} onChange={e => setMontant(e.target.value)}
-              placeholder="Ex: 500000"
+            <MoneyInput value={montant} onChange={v => setMontant(v)}
+              placeholder="Ex: 500 000"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400" />
           </div>
 
@@ -885,8 +886,8 @@ function ModalVirementCaisse({ compteId, compteName, soldeMobile, onClose, onSav
           {/* Montant */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA) *</label>
-            <input type="number" min="1" step="1" value={montant} onChange={e => setMontant(e.target.value)}
-              placeholder="Ex: 200000"
+            <MoneyInput value={montant} onChange={v => setMontant(v)}
+              placeholder="Ex: 200 000"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400" />
           </div>
 
