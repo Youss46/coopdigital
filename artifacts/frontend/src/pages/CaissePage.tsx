@@ -424,8 +424,8 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
           </span>
         </div>
 
-        <div className="mb-3">
-          <p className="text-2xl font-bold text-gray-900">{FCFA(solde)}</p>
+        <div className="mb-3 min-w-0">
+          <p className="text-2xl font-bold text-gray-900 truncate">{FCFA(solde)}</p>
           {min > 0 && <p className="text-xs text-gray-400 mt-0.5">Fond minimum : {FCFA(min)}</p>}
         </div>
 
@@ -435,8 +435,10 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
               <div className={`h-2 rounded-full transition-all ${sousMin ? "bg-red-500" : "bg-green-500"}`}
                 style={{ width: `${Math.max(2, Math.min(100, (solde / (min * 2)) * 100))}%` }} />
             </div>
-            <p className={`text-xs mt-1 ${sousMin ? "text-red-600 font-medium" : "text-gray-400"}`}>
-              {sousMin ? `⚠️ Sous le minimum de ${FCFA(min - solde)}` : `${FCFA(solde - min)} au-dessus du minimum`}
+            <p className={`text-xs mt-1 leading-tight ${sousMin ? "text-red-600 font-medium" : "text-gray-400"}`}>
+              {sousMin
+                ? `⚠️ Sous le minimum (${FCFA(min - solde)})`
+                : `${FCFA(solde - min)} au-dessus du min.`}
             </p>
           </div>
         )}
@@ -445,28 +447,28 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
           <p className="text-xs text-green-600 mb-3">Session ouverte depuis {c.heure_ouverture.slice(11, 16)}</p>
         )}
 
-        <div className="flex gap-2 pt-2 border-t border-gray-50">
+        <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-50">
           <button onClick={() => onJournal(c.id)}
-            className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50">
+            className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 whitespace-nowrap">
             <ChevronRight size={12} /> Journal
           </button>
           {!ouvert ? (
             <button onClick={() => ouvrirSession(c.id)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">
+              className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700 whitespace-nowrap">
               <Unlock size={12} /> Ouvrir
             </button>
           ) : (
             <>
               <button onClick={() => setModalMvt(c.id)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 whitespace-nowrap">
                 <Plus size={12} /> Mouvement
               </button>
               <button onClick={() => setModalTransfert(c.id)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs hover:bg-purple-700">
+                className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs hover:bg-purple-700 whitespace-nowrap">
                 <ArrowLeftRight size={12} /> Transfert
               </button>
               <button onClick={() => setModalFermer(c.id)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700">
+                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700 whitespace-nowrap">
                 <Lock size={12} /> Fermer
               </button>
             </>
