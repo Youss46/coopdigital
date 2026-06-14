@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Smartphone, Plus, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, X, ChevronRight, ArrowRightLeft, Landmark } from "lucide-react";
+import { Smartphone, Plus, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, X, ChevronRight, ArrowRightLeft, Landmark, Wallet, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -80,6 +80,7 @@ export default function MobileMarchandPage() {
   const [modalEdit, setModalEdit] = useState<Compte | null>(null);
   const [modalMvt, setModalMvt] = useState<number | null>(null);
   const [modalVirement, setModalVirement] = useState<number | null>(null);
+  const [modalVirementCaisse, setModalVirementCaisse] = useState<number | null>(null);
 
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -160,7 +161,12 @@ export default function MobileMarchandPage() {
                       <button onClick={() => setModalVirement(c.id)}
                         title="Virement depuis banque"
                         className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700 whitespace-nowrap">
-                        <ArrowRightLeft size={11} /> Virer
+                        <Landmark size={11} /> Banque
+                      </button>
+                      <button onClick={() => setModalVirementCaisse(c.id)}
+                        title="Virement caisse"
+                        className="flex items-center gap-1 px-2 py-1 bg-amber-500 text-white rounded-lg text-xs hover:bg-amber-600 whitespace-nowrap">
+                        <Wallet size={11} /> Caisse
                       </button>
                       <button onClick={() => setModalMvt(c.id)}
                         className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 whitespace-nowrap">
@@ -195,13 +201,17 @@ export default function MobileMarchandPage() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-gray-700">Journal des mouvements</h3>
                 {peutMouvement && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5 flex-wrap justify-end">
                     <button onClick={() => setModalVirement(selected.id)}
-                      className="flex items-center gap-1 px-2.5 py-1 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">
-                      <ArrowRightLeft size={11} /> Virement banque
+                      className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700 whitespace-nowrap">
+                      <Landmark size={11} /> Virt. banque
+                    </button>
+                    <button onClick={() => setModalVirementCaisse(selected.id)}
+                      className="flex items-center gap-1 px-2 py-1 bg-amber-500 text-white rounded-lg text-xs hover:bg-amber-600 whitespace-nowrap">
+                      <Wallet size={11} /> Virt. caisse
                     </button>
                     <button onClick={() => setModalMvt(selected.id)}
-                      className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
+                      className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 whitespace-nowrap">
                       <Plus size={11} /> Mouvement
                     </button>
                   </div>
@@ -295,6 +305,24 @@ export default function MobileMarchandPage() {
               if (updatedCompte) { setSelected(updatedCompte); await loadJournal(updatedCompte); }
             }
             toast({ title: "Virement effectué", description: "Le compte mobile a été approvisionné depuis la banque." });
+          }}
+        />
+      )}
+      {modalVirementCaisse !== null && (
+        <ModalVirementCaisse
+          compteId={modalVirementCaisse}
+          compteName={comptes.find(c => c.id === modalVirementCaisse)?.nom ?? ""}
+          soldeMobile={comptes.find(c => c.id === modalVirementCaisse)?.solde_actuel_fcfa ?? "0"}
+          onClose={() => setModalVirementCaisse(null)}
+          onSave={async () => {
+            setModalVirementCaisse(null);
+            const updated = await apiFetch("/api/mobile-marchand");
+            setComptes(updated);
+            if (selected?.id === modalVirementCaisse) {
+              const updatedCompte = updated.find((c: Compte) => c.id === modalVirementCaisse);
+              if (updatedCompte) { setSelected(updatedCompte); await loadJournal(updatedCompte); }
+            }
+            toast({ title: "Virement effectué", description: "Les soldes ont été mis à jour." });
           }}
         />
       )}
@@ -704,6 +732,204 @@ function ModalVirement({ compteId, compteName, onClose, onSave }: {
             className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
             <ArrowRightLeft size={14} />
             {saving ? "Virement en cours…" : "Confirmer le virement"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ModalVirementCaisse ───────────────────────────────────────────────────────
+
+type CaisseDisponible = {
+  id: number; nom: string; type_caisse: string;
+  solde_actuel_fcfa: string; session_ouverte: boolean; session_id: number | null;
+};
+
+function ModalVirementCaisse({ compteId, compteName, soldeMobile, onClose, onSave }: {
+  compteId: number;
+  compteName: string;
+  soldeMobile: string;
+  onClose: () => void;
+  onSave: () => Promise<void>;
+}) {
+  const [caisses, setCaisses] = useState<CaisseDisponible[]>([]);
+  const [loadingCaisses, setLoadingCaisses] = useState(true);
+  const [caisseId, setCaisseId] = useState<number | "">("");
+  const [sens, setSens] = useState<"caisse_vers_mobile" | "mobile_vers_caisse">("caisse_vers_mobile");
+  const [montant, setMontant] = useState("");
+  const [libelle, setLibelle] = useState("");
+  const [reference, setReference] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch("/api/mobile-marchand/caisses")
+      .then((data: CaisseDisponible[]) => {
+        setCaisses(data);
+        const first = data.find(c => c.session_ouverte) ?? data[0];
+        if (first) setCaisseId(first.id);
+      })
+      .catch(() => setErr("Impossible de charger les caisses"))
+      .finally(() => setLoadingCaisses(false));
+  }, []);
+
+  const caisseSel = caisses.find(c => c.id === caisseId);
+  const soldeCaisse = caisseSel ? parseFloat(caisseSel.solde_actuel_fcfa) : null;
+  const soldeMobileNum = parseFloat(soldeMobile);
+
+  const sourceBalance = sens === "caisse_vers_mobile" ? soldeCaisse : soldeMobileNum;
+  const sourceLabel   = sens === "caisse_vers_mobile" ? caisseSel?.nom ?? "Caisse" : compteName;
+
+  async function handleSubmit() {
+    if (!caisseId) { setErr("Sélectionnez une caisse"); return; }
+    const m = parseFloat(montant);
+    if (!m || m <= 0) { setErr("Montant invalide"); return; }
+    if (sourceBalance !== null && m > sourceBalance) {
+      setErr(`Solde insuffisant sur ${sourceLabel} (${new Intl.NumberFormat("fr-FR").format(sourceBalance)} FCFA disponible)`);
+      return;
+    }
+    if (sens === "caisse_vers_mobile" && caisseSel && !caisseSel.session_ouverte) {
+      setErr(`La caisse "${caisseSel.nom}" n'a pas de session ouverte aujourd'hui. Ouvrez-la depuis la page Caisse.`);
+      return;
+    }
+    setSaving(true); setErr(null);
+    try {
+      await apiPost(`/api/mobile-marchand/${compteId}/virement-caisse`, {
+        caisseId, sens, montantFcfa: m,
+        libelle: libelle || undefined,
+        reference: reference || undefined,
+        dateOperation: date,
+      });
+      await onSave();
+    } catch (e) {
+      setErr((e as Error).message);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+              <Wallet size={16} className="text-amber-600" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900 text-sm">Virement Caisse ↔ Mobile</h2>
+              <p className="text-xs text-gray-400">{compteName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Sens du virement */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">Sens du virement *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["caisse_vers_mobile", "mobile_vers_caisse"] as const).map(s => (
+                <button key={s} onClick={() => setSens(s)}
+                  className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 text-xs font-medium transition-all ${
+                    sens === s ? "border-amber-500 bg-amber-50 text-amber-700" : "border-gray-200 text-gray-600 hover:border-amber-300"
+                  }`}>
+                  {s === "caisse_vers_mobile"
+                    ? <><Wallet size={16} className="text-amber-500" /><span>Caisse → Mobile</span><span className="text-gray-400 font-normal">Approvisionner</span></>
+                    : <><ArrowRightLeft size={16} className="text-amber-500" /><span>Mobile → Caisse</span><span className="text-gray-400 font-normal">Reverser</span></>
+                  }
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Caisse */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Caisse *</label>
+            {loadingCaisses ? (
+              <div className="text-xs text-gray-400 py-2">Chargement…</div>
+            ) : caisses.length === 0 ? (
+              <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 rounded-lg p-3">
+                <AlertTriangle size={14} /> Aucune caisse active dans cette coopérative
+              </div>
+            ) : (
+              <select value={caisseId} onChange={e => setCaisseId(e.target.value === "" ? "" : parseInt(e.target.value, 10))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400">
+                <option value="">— Sélectionner une caisse —</option>
+                {caisses.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.nom} ({c.type_caisse}) — {new Intl.NumberFormat("fr-FR").format(parseFloat(c.solde_actuel_fcfa))} FCFA
+                    {c.session_ouverte ? " ✓ session ouverte" : " ⚠ pas de session"}
+                  </option>
+                ))}
+              </select>
+            )}
+            {caisseSel && (
+              <p className={`text-xs mt-1 flex items-center gap-1 ${caisseSel.session_ouverte ? "text-green-600" : "text-amber-600"}`}>
+                {caisseSel.session_ouverte
+                  ? <><CheckCircle size={11} /> Session ouverte — solde : <span className="font-semibold">{new Intl.NumberFormat("fr-FR").format(parseFloat(caisseSel.solde_actuel_fcfa))} FCFA</span></>
+                  : <><AlertTriangle size={11} /> Aucune session ouverte — virement bloqué</>
+                }
+              </p>
+            )}
+            {sens === "mobile_vers_caisse" && (
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                <Smartphone size={11} /> Solde mobile : <span className="font-semibold text-gray-700">{new Intl.NumberFormat("fr-FR").format(soldeMobileNum)} FCFA</span>
+              </p>
+            )}
+          </div>
+
+          {/* Montant */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA) *</label>
+            <input type="number" min="1" step="1" value={montant} onChange={e => setMontant(e.target.value)}
+              placeholder="Ex: 200000"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400" />
+          </div>
+
+          {/* Libellé */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Libellé <span className="text-gray-400">(opt.)</span></label>
+            <input type="text" value={libelle} onChange={e => setLibelle(e.target.value)}
+              placeholder="Ex: Campagne principale juin"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400" />
+          </div>
+
+          {/* Référence + Date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Référence <span className="text-gray-400">(opt.)</span></label>
+              <input type="text" value={reference} onChange={e => setReference(e.target.value)}
+                placeholder="Ex: BON-002"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400" />
+            </div>
+          </div>
+
+          {err && (
+            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              <AlertTriangle size={13} /> {err}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 pb-5">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Annuler
+          </button>
+          <button onClick={handleSubmit}
+            disabled={saving || caisses.length === 0 || (sens === "caisse_vers_mobile" && !!caisseSel && !caisseSel.session_ouverte)}
+            className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-2">
+            <ArrowRightLeft size={14} />
+            {saving ? "Virement en cours…" : "Confirmer"}
           </button>
         </div>
       </div>

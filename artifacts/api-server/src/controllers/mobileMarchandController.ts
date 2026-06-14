@@ -3,9 +3,10 @@ import {
   db,
   comptesMobilesMarchandsTable, mouvementsMobileMarchandTable,
   comptesBancairesTable, mouvementsBanqueTable,
+  caissesTable, sessionsCaisseTable, mouvementsCaisseTable,
   ecrituresComptablesTable,
 } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
 function coopId(req: Request): number | null {
@@ -329,6 +330,195 @@ export async function postVirementBanque(req: Request, res: Response): Promise<v
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "postVirementBanque");
+    res.status(400).json({ erreur: msg });
+  }
+}
+
+// ─── Caisses disponibles (pour le modal de virement caisse) ───────────────────
+
+export async function getCaissesCentrales(req: Request, res: Response): Promise<void> {
+  const cid = coopId(req);
+  if (!cid) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const rows = await db.execute<{
+      id: number; nom: string; type_caisse: string;
+      solde_actuel_fcfa: string;
+      session_id: number | null; session_statut: string | null;
+    }>(sql`
+      SELECT c.id, c.nom, c.type_caisse, c.solde_actuel_fcfa,
+             s.id   AS session_id,
+             s.statut AS session_statut
+      FROM   caisses c
+      LEFT JOIN sessions_caisse s
+             ON s.caisse_id = c.id
+            AND s.date_session = CURRENT_DATE
+            AND s.statut = 'ouverte'
+      WHERE  c.cooperative_id = ${cid}
+        AND  c.actif = TRUE
+      ORDER BY c.type_caisse DESC, c.nom
+    `);
+    res.json(rows.rows.map(r => ({
+      id:               r.id,
+      nom:              r.nom,
+      type_caisse:      r.type_caisse,
+      solde_actuel_fcfa:r.solde_actuel_fcfa,
+      session_ouverte:  r.session_id !== null,
+      session_id:       r.session_id ?? null,
+    })));
+  } catch (err) {
+    req.log.error({ err }, "getCaissesCentrales");
+    res.status(500).json({ erreur: "Erreur serveur" });
+  }
+}
+
+// ─── Virement caisse ↔ mobile marchand ────────────────────────────────────────
+
+export async function postVirementCaisse(req: Request, res: Response): Promise<void> {
+  const cid = coopId(req);
+  if (!cid) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+
+  const mobileId = parseInt(String(req.params["id"]), 10);
+  const { caisseId, sens, montantFcfa, libelle, reference, dateOperation } = req.body as {
+    caisseId?: number;
+    sens?: "caisse_vers_mobile" | "mobile_vers_caisse";
+    montantFcfa?: number;
+    libelle?: string; reference?: string; dateOperation?: string;
+  };
+
+  if (!caisseId || !sens || !montantFcfa || montantFcfa <= 0) {
+    res.status(400).json({ erreur: "caisseId, sens et montantFcfa (> 0) requis" }); return;
+  }
+  if (sens !== "caisse_vers_mobile" && sens !== "mobile_vers_caisse") {
+    res.status(400).json({ erreur: "sens invalide" }); return;
+  }
+
+  try {
+    // 1. Vérifier les comptes
+    const [compteMobile] = await db
+      .select().from(comptesMobilesMarchandsTable)
+      .where(and(eq(comptesMobilesMarchandsTable.id, mobileId), eq(comptesMobilesMarchandsTable.cooperativeId, cid)))
+      .limit(1);
+    if (!compteMobile) { res.status(404).json({ erreur: "Compte mobile introuvable" }); return; }
+
+    const [caisse] = await db
+      .select().from(caissesTable)
+      .where(and(eq(caissesTable.id, caisseId), eq(caissesTable.cooperativeId, cid)))
+      .limit(1);
+    if (!caisse) { res.status(404).json({ erreur: "Caisse introuvable" }); return; }
+
+    // 2. Session active requise sur la caisse
+    const sessionRows = await db.execute<{ id: number; statut: string }>(sql`
+      SELECT id, statut FROM sessions_caisse
+      WHERE caisse_id = ${caisseId} AND date_session = CURRENT_DATE AND statut = 'ouverte'
+      LIMIT 1
+    `);
+    const session = sessionRows.rows[0] ?? null;
+    if (!session) {
+      res.status(400).json({ erreur: `Aucune session ouverte sur la caisse "${caisse.nom}". Ouvrez d'abord une session depuis la page Caisse.` });
+      return;
+    }
+
+    // 3. Vérifier le solde source
+    const soldeCaisse  = parseFloat(String(caisse.soldeActuelFcfa));
+    const soldeMobile  = parseFloat(String(compteMobile.soldeActuelFcfa));
+
+    if (sens === "caisse_vers_mobile" && soldeCaisse < montantFcfa) {
+      res.status(400).json({ erreur: `Solde insuffisant en caisse (${new Intl.NumberFormat("fr-FR").format(soldeCaisse)} FCFA disponible)` }); return;
+    }
+    if (sens === "mobile_vers_caisse" && soldeMobile < montantFcfa) {
+      res.status(400).json({ erreur: `Solde mobile insuffisant (${new Intl.NumberFormat("fr-FR").format(soldeMobile)} FCFA disponible)` }); return;
+    }
+
+    const dateOp = dateOperation ?? new Date().toISOString().slice(0, 10);
+    const ref    = reference ?? `VIR-${Date.now()}`;
+    const userId = req.user?.id ?? null;
+
+    const nvSoldeCaisse = sens === "caisse_vers_mobile" ? soldeCaisse - montantFcfa : soldeCaisse + montantFcfa;
+    const nvSoldeMobile = sens === "caisse_vers_mobile" ? soldeMobile + montantFcfa : soldeMobile - montantFcfa;
+
+    const typeCaisse  = sens === "caisse_vers_mobile" ? "sortie" : "entree";
+    const typeMobile  = sens === "caisse_vers_mobile" ? "credit" : "debit";
+    const libCaisse   = sens === "caisse_vers_mobile"
+      ? `Virement vers ${compteMobile.nom}${libelle ? ` — ${libelle}` : ""}`
+      : `Versement depuis ${compteMobile.nom}${libelle ? ` — ${libelle}` : ""}`;
+    const libMobile   = sens === "caisse_vers_mobile"
+      ? `Virement depuis caisse ${caisse.nom}${libelle ? ` — ${libelle}` : ""}`
+      : `Reversement vers caisse ${caisse.nom}${libelle ? ` — ${libelle}` : ""}`;
+
+    // 4. Transaction atomique
+    const result = await db.transaction(async (tx) => {
+      const [mvtCaisse] = await tx
+        .insert(mouvementsCaisseTable)
+        .values({
+          caisseId:           caisseId,
+          sessionId:          session.id,
+          cooperativeId:      cid,
+          type:               typeCaisse,
+          motif:              "virement_mobile",
+          montantFcfa:        montantFcfa.toString(),
+          libelle:            libCaisse,
+          referenceOperation: ref,
+          soldeApresFcfa:     nvSoldeCaisse.toString(),
+          enregistrePar:      userId,
+        })
+        .returning();
+
+      await tx.update(caissesTable)
+        .set({ soldeActuelFcfa: nvSoldeCaisse.toString() })
+        .where(eq(caissesTable.id, caisseId));
+
+      const [mvtMobile] = await tx
+        .insert(mouvementsMobileMarchandTable)
+        .values({
+          compteId:       mobileId,
+          cooperativeId:  cid,
+          type:           typeMobile,
+          motif:          sens === "caisse_vers_mobile" ? "virement_entrant" : "virement_sortant",
+          montantFcfa:    montantFcfa.toString(),
+          libelle:        libMobile,
+          reference:      ref,
+          dateOperation:  dateOp,
+          soldeApresFcfa: nvSoldeMobile.toString(),
+          enregistrePar:  userId,
+        })
+        .returning();
+
+      await tx.update(comptesMobilesMarchandsTable)
+        .set({ soldeActuelFcfa: nvSoldeMobile.toString() })
+        .where(eq(comptesMobilesMarchandsTable.id, mobileId));
+
+      return { mvtCaisse: mvtCaisse!, mvtMobile: mvtMobile! };
+    });
+
+    // 5. Écriture comptable OHADA
+    // caisse_vers_mobile : 572 Débit / 571 Crédit
+    // mobile_vers_caisse : 571 Débit / 572 Crédit
+    try {
+      await db.insert(ecrituresComptablesTable).values({
+        cooperativeId: cid,
+        dateEcriture:  dateOp,
+        libelle:       libelle ?? (sens === "caisse_vers_mobile" ? `Appro mobile depuis ${caisse.nom}` : `Reversement caisse depuis ${compteMobile.nom}`),
+        compteDebit:   sens === "caisse_vers_mobile" ? "572" : "571",
+        compteCredit:  sens === "caisse_vers_mobile" ? "571" : "572",
+        montantFcfa:   montantFcfa,
+        source:        "manuel" as const,
+        sourceId:      result.mvtMobile.id,
+        exercice:      new Date().getFullYear(),
+      });
+    } catch (err) {
+      logger.warn({ err }, "Écriture comptable virement caisse-mobile non enregistrée");
+    }
+
+    res.status(201).json({
+      mouvement_caisse: result.mvtCaisse.id,
+      mouvement_mobile: result.mvtMobile.id,
+      solde_caisse:     nvSoldeCaisse,
+      solde_mobile:     nvSoldeMobile,
+      reference:        ref,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    req.log.error({ err }, "postVirementCaisse");
     res.status(400).json({ erreur: msg });
   }
 }
