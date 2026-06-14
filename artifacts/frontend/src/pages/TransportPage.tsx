@@ -497,7 +497,7 @@ function TabChauffeurs() {
                   <TableCell className="font-medium">{c.nom} {c.prenoms ?? ""}</TableCell>
                   <TableCell>{c.telephone ?? "—"}</TableCell>
                   <TableCell>{c.numero_permis ?? "—"}</TableCell>
-                  <TableCell>{c.categorie_permis ?? "—"}</TableCell>
+                  <TableCell>{c.categorie_permis === "tous" ? "Tout catégorie" : (c.categorie_permis ?? "—")}</TableCell>
                   <TableCell>
                     {days != null && days <= 30
                       ? <span className="text-red-600 font-medium flex items-center gap-1"><AlertTriangle className="h-3 w-3" />{formatDate(c.date_expiration_permis)} ({days}j)</span>
@@ -547,7 +547,7 @@ function TabChauffeurs() {
               <Select value={form.categorie_permis} onValueChange={v => setForm(f => ({ ...f, categorie_permis: v }))}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Tout catégorie">Tout catégorie</SelectItem>
+                  <SelectItem value="tous">Tout catégorie</SelectItem>
                   <SelectItem value="B">B</SelectItem>
                   <SelectItem value="C">C</SelectItem>
                   <SelectItem value="D">D</SelectItem>

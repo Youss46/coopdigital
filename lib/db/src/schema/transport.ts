@@ -34,7 +34,7 @@ export const chauffeursTable = pgTable("chauffeurs", {
   prenoms:                varchar("prenoms", { length: 200 }),
   telephone:              varchar("telephone", { length: 30 }),
   numeroPermis:           varchar("numero_permis", { length: 100 }),
-  categoriePermis:        varchar("categorie_permis", { length: 10 }),
+  categoriePermis:        varchar("categorie_permis", { length: 50 }),
   dateExpirationPermis:   date("date_expiration_permis", { mode: "string" }),
   dateEmbauche:           date("date_embauche", { mode: "string" }),
   statut:                 varchar("statut", { length: 10 }).notNull().default("actif"),
