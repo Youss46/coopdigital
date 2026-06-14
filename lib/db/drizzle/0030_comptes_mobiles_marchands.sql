@@ -1,4 +1,8 @@
-CREATE TYPE IF NOT EXISTS "public"."operateur_mobile" AS ENUM('wave', 'orange_money', 'mtn_momo');
+DO $$ BEGIN
+ CREATE TYPE "public"."operateur_mobile" AS ENUM('wave', 'orange_money', 'mtn_momo');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "comptes_mobiles_marchands" (
 	"id" serial PRIMARY KEY NOT NULL,
