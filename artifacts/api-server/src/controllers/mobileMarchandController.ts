@@ -207,124 +207,141 @@ export async function getComptesBancaires(req: Request, res: Response): Promise<
   }
 }
 
-// ─── Virement banque → mobile marchand ────────────────────────────────────────
+// ─── Virement banque ↔ mobile marchand ───────────────────────────────────────
 
 export async function postVirementBanque(req: Request, res: Response): Promise<void> {
   const cid = coopId(req);
   if (!cid) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
 
   const compteId = parseInt(String(req.params["id"]), 10);
-  const { compteBancaireId, montantFcfa, libelle, reference, dateOperation } = req.body as {
-    compteBancaireId?: number; montantFcfa?: number;
+  const { compteBancaireId, sens, montantFcfa, libelle, reference, dateOperation } = req.body as {
+    compteBancaireId?: number;
+    sens?: "banque_vers_mobile" | "mobile_vers_banque";
+    montantFcfa?: number;
     libelle?: string; reference?: string; dateOperation?: string;
   };
+
+  const direction: "banque_vers_mobile" | "mobile_vers_banque" = sens ?? "banque_vers_mobile";
 
   if (!compteBancaireId || !montantFcfa || montantFcfa <= 0) {
     res.status(400).json({ erreur: "compteBancaireId et montantFcfa (> 0) requis" }); return;
   }
+  if (direction !== "banque_vers_mobile" && direction !== "mobile_vers_banque") {
+    res.status(400).json({ erreur: "sens invalide" }); return;
+  }
 
   try {
-    // Vérifier les deux comptes appartiennent à la même coopérative
     const [compteMobile] = await db
-      .select()
-      .from(comptesMobilesMarchandsTable)
+      .select().from(comptesMobilesMarchandsTable)
       .where(and(eq(comptesMobilesMarchandsTable.id, compteId), eq(comptesMobilesMarchandsTable.cooperativeId, cid)))
       .limit(1);
     if (!compteMobile) { res.status(404).json({ erreur: "Compte mobile introuvable" }); return; }
 
     const [compteBancaire] = await db
-      .select()
-      .from(comptesBancairesTable)
+      .select().from(comptesBancairesTable)
       .where(and(eq(comptesBancairesTable.id, compteBancaireId), eq(comptesBancairesTable.cooperativeId, cid)))
       .limit(1);
     if (!compteBancaire) { res.status(404).json({ erreur: "Compte bancaire introuvable" }); return; }
 
-    const soldeBanque = parseFloat(String(compteBancaire.soldeActuelFcfa));
-    if (soldeBanque < montantFcfa) {
-      res.status(400).json({
-        erreur: `Solde bancaire insuffisant (${new Intl.NumberFormat("fr-FR").format(soldeBanque)} FCFA disponible)`,
-      }); return;
+    const soldeBanque  = parseFloat(String(compteBancaire.soldeActuelFcfa));
+    const soldeMobile  = parseFloat(String(compteMobile.soldeActuelFcfa));
+
+    if (direction === "banque_vers_mobile" && soldeBanque < montantFcfa) {
+      res.status(400).json({ erreur: `Solde bancaire insuffisant (${new Intl.NumberFormat("fr-FR").format(soldeBanque)} FCFA disponible)` }); return;
+    }
+    if (direction === "mobile_vers_banque" && soldeMobile < montantFcfa) {
+      res.status(400).json({ erreur: `Solde mobile insuffisant (${new Intl.NumberFormat("fr-FR").format(soldeMobile)} FCFA disponible)` }); return;
     }
 
     const today = new Date().toISOString().slice(0, 10);
     const dateOp = dateOperation ?? today;
-    const ref = reference ?? `VIR-${Date.now()}`;
-    const lib = libelle ?? `Virement vers ${compteMobile.nom}`;
+    const ref    = reference ?? `VIR-${Date.now()}`;
     const userId = req.user?.id ?? null;
 
-    const nouveauSoldeBanque  = soldeBanque - montantFcfa;
-    const nouveauSoldeMobile  = parseFloat(String(compteMobile.soldeActuelFcfa)) + montantFcfa;
+    const nvSoldeBanque  = direction === "banque_vers_mobile" ? soldeBanque - montantFcfa : soldeBanque + montantFcfa;
+    const nvSoldeMobile  = direction === "banque_vers_mobile" ? soldeMobile + montantFcfa : soldeMobile - montantFcfa;
+
+    const typeBanque  = direction === "banque_vers_mobile" ? "debit"  : "credit";
+    const typeMobile  = direction === "banque_vers_mobile" ? "credit" : "debit";
+    const motifBanque = direction === "banque_vers_mobile" ? "virement_sortant" : "virement_entrant";
+    const motifMobile = direction === "banque_vers_mobile" ? "virement_entrant" : "virement_sortant";
+    const libBanque   = direction === "banque_vers_mobile"
+      ? `Approvisionnement ${compteMobile.nom}${libelle ? ` — ${libelle}` : ""}`
+      : `Reversement depuis ${compteMobile.nom}${libelle ? ` — ${libelle}` : ""}`;
+    const libMobile   = direction === "banque_vers_mobile"
+      ? `Virement depuis ${compteBancaire.nom}${libelle ? ` — ${libelle}` : ""}`
+      : `Reversement vers ${compteBancaire.nom}${libelle ? ` — ${libelle}` : ""}`;
 
     const result = await db.transaction(async (tx) => {
-      // 1. Débiter la banque
       const [mvtBanque] = await tx
         .insert(mouvementsBanqueTable)
         .values({
           compteId:       compteBancaireId,
           cooperativeId:  cid,
-          type:           "debit",
-          motif:          "virement_sortant",
+          type:           typeBanque,
+          motif:          motifBanque,
           montantFcfa:    montantFcfa.toString(),
-          libelle:        `Approvisionnement ${compteMobile.nom}${libelle ? ` — ${libelle}` : ""}`,
+          libelle:        libBanque,
           reference:      ref,
           dateOperation:  dateOp,
-          soldeApresFcfa: nouveauSoldeBanque.toString(),
+          soldeApresFcfa: nvSoldeBanque.toString(),
           enregistrePar:  userId,
         })
         .returning();
 
-      await tx
-        .update(comptesBancairesTable)
-        .set({ soldeActuelFcfa: nouveauSoldeBanque.toString() })
+      await tx.update(comptesBancairesTable)
+        .set({ soldeActuelFcfa: nvSoldeBanque.toString() })
         .where(eq(comptesBancairesTable.id, compteBancaireId));
 
-      // 2. Créditer le compte mobile
       const [mvtMobile] = await tx
         .insert(mouvementsMobileMarchandTable)
         .values({
           compteId:       compteId,
           cooperativeId:  cid,
-          type:           "credit",
-          motif:          "virement_entrant",
+          type:           typeMobile,
+          motif:          motifMobile,
           montantFcfa:    montantFcfa.toString(),
-          libelle:        `Virement depuis ${compteBancaire.nom}${libelle ? ` — ${libelle}` : ""}`,
+          libelle:        libMobile,
           reference:      ref,
           dateOperation:  dateOp,
-          soldeApresFcfa: nouveauSoldeMobile.toString(),
+          soldeApresFcfa: nvSoldeMobile.toString(),
           enregistrePar:  userId,
         })
         .returning();
 
-      await tx
-        .update(comptesMobilesMarchandsTable)
-        .set({ soldeActuelFcfa: nouveauSoldeMobile.toString() })
+      await tx.update(comptesMobilesMarchandsTable)
+        .set({ soldeActuelFcfa: nvSoldeMobile.toString() })
         .where(eq(comptesMobilesMarchandsTable.id, compteId));
 
       return { mvtBanque: mvtBanque!, mvtMobile: mvtMobile! };
     });
 
-    // 3. Écriture comptable OHADA : 572 (mobile) débit / 521 (banque) crédit
+    // Écriture comptable OHADA
+    // banque_vers_mobile : 572 Débit / 521 Crédit
+    // mobile_vers_banque : 521 Débit / 572 Crédit
     try {
       await db.insert(ecrituresComptablesTable).values({
         cooperativeId: cid,
         dateEcriture:  dateOp,
-        libelle:       lib,
-        compteDebit:   "572",
-        compteCredit:  "521",
+        libelle:       libelle ?? (direction === "banque_vers_mobile"
+          ? `Appro mobile depuis ${compteBancaire.nom}`
+          : `Reversement banque depuis ${compteMobile.nom}`),
+        compteDebit:   direction === "banque_vers_mobile" ? "572" : "521",
+        compteCredit:  direction === "banque_vers_mobile" ? "521" : "572",
         montantFcfa:   montantFcfa,
         source:        "manuel" as const,
         sourceId:      result.mvtMobile.id,
         exercice:      new Date().getFullYear(),
       });
     } catch (err) {
-      logger.warn({ err }, "Écriture comptable virement mobile non enregistrée");
+      logger.warn({ err }, "Écriture comptable virement mobile-banque non enregistrée");
     }
 
     res.status(201).json({
       mouvement_banque:  result.mvtBanque.id,
       mouvement_mobile:  result.mvtMobile.id,
-      solde_banque:      nouveauSoldeBanque,
-      solde_mobile:      nouveauSoldeMobile,
+      solde_banque:      nvSoldeBanque,
+      solde_mobile:      nvSoldeMobile,
       reference:         ref,
     });
   } catch (err) {

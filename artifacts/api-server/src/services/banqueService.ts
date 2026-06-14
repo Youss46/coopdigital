@@ -1,4 +1,4 @@
-import { db, comptesBancairesTable, mouvementsBanqueTable, ecrituresComptablesTable } from "@workspace/db";
+import { db, comptesBancairesTable, mouvementsBanqueTable, ecrituresComptablesTable, caissesTable, mouvementsCaisseTable } from "@workspace/db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
@@ -245,6 +245,152 @@ export async function rapprocherMouvements(
   `);
 
   return { count: result.rowCount ?? mouvementIds.length };
+}
+
+// ─── Caisses disponibles ──────────────────────────────────────────────────────
+
+export async function getCaissesCentrales(cooperativeId: number) {
+  const result = await db.execute<{
+    id: number; nom: string; type_caisse: string;
+    solde_actuel_fcfa: string;
+    session_id: number | null; session_statut: string | null;
+  }>(sql`
+    SELECT c.id, c.nom, c.type_caisse, c.solde_actuel_fcfa,
+           s.id   AS session_id,
+           s.statut AS session_statut
+    FROM   caisses c
+    LEFT JOIN sessions_caisse s
+           ON s.caisse_id = c.id
+          AND s.date_session = CURRENT_DATE
+          AND s.statut = 'ouverte'
+    WHERE  c.cooperative_id = ${cooperativeId}
+      AND  c.actif = TRUE
+    ORDER BY c.type_caisse DESC, c.nom
+  `);
+  return result.rows.map(r => ({
+    id:               r.id,
+    nom:              r.nom,
+    type_caisse:      r.type_caisse,
+    solde_actuel_fcfa:r.solde_actuel_fcfa,
+    session_ouverte:  r.session_id !== null,
+    session_id:       r.session_id ?? null,
+  }));
+}
+
+// ─── Virement Banque → Caisse ──────────────────────────────────────────────────
+
+export async function virementVersCaisse(
+  compteBancaireId: number,
+  cooperativeId: number,
+  data: {
+    caisseId: number;
+    montantFcfa: number;
+    libelle?: string;
+    reference?: string;
+    dateOperation?: string;
+    userId?: number;
+  }
+) {
+  const [compteBancaire] = await db
+    .select().from(comptesBancairesTable)
+    .where(and(eq(comptesBancairesTable.id, compteBancaireId), eq(comptesBancairesTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!compteBancaire) throw new Error("Compte bancaire introuvable");
+
+  const [caisse] = await db
+    .select().from(caissesTable)
+    .where(and(eq(caissesTable.id, data.caisseId), eq(caissesTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!caisse) throw new Error("Caisse introuvable");
+
+  const sessionRows = await db.execute<{ id: number }>(sql`
+    SELECT id FROM sessions_caisse
+    WHERE caisse_id = ${data.caisseId} AND date_session = CURRENT_DATE AND statut = 'ouverte'
+    LIMIT 1
+  `);
+  const session = sessionRows.rows[0] ?? null;
+  if (!session) throw new Error(`Aucune session ouverte sur la caisse "${caisse.nom}". Ouvrez d'abord une session depuis la page Caisse.`);
+
+  const soldeBanque = parseFloat(String(compteBancaire.soldeActuelFcfa));
+  if (soldeBanque < data.montantFcfa) {
+    throw new Error(`Solde bancaire insuffisant (${new Intl.NumberFormat("fr-FR").format(soldeBanque)} FCFA disponible)`);
+  }
+
+  const dateOp = data.dateOperation ?? today();
+  const ref    = data.reference ?? `VIR-${Date.now()}`;
+  const userId = data.userId ?? null;
+
+  const nvSoldeBanque  = soldeBanque - data.montantFcfa;
+  const nvSoldeCaisse  = parseFloat(String(caisse.soldeActuelFcfa)) + data.montantFcfa;
+
+  const result = await db.transaction(async (tx) => {
+    const [mvtBanque] = await tx
+      .insert(mouvementsBanqueTable)
+      .values({
+        compteId:       compteBancaireId,
+        cooperativeId,
+        type:           "debit",
+        motif:          "virement_sortant",
+        montantFcfa:    data.montantFcfa.toString(),
+        libelle:        `Virement vers caisse ${caisse.nom}${data.libelle ? ` — ${data.libelle}` : ""}`,
+        reference:      ref,
+        dateOperation:  dateOp,
+        soldeApresFcfa: nvSoldeBanque.toString(),
+        enregistrePar:  userId,
+      })
+      .returning();
+
+    await tx.update(comptesBancairesTable)
+      .set({ soldeActuelFcfa: nvSoldeBanque.toString() })
+      .where(eq(comptesBancairesTable.id, compteBancaireId));
+
+    const [mvtCaisse] = await tx
+      .insert(mouvementsCaisseTable)
+      .values({
+        caisseId:           data.caisseId,
+        sessionId:          session.id,
+        cooperativeId,
+        type:               "entree",
+        motif:              "virement_banque",
+        montantFcfa:        data.montantFcfa.toString(),
+        libelle:            `Virement depuis banque ${compteBancaire.nom}${data.libelle ? ` — ${data.libelle}` : ""}`,
+        referenceOperation: ref,
+        soldeApresFcfa:     nvSoldeCaisse.toString(),
+        enregistrePar:      userId,
+      })
+      .returning();
+
+    await tx.update(caissesTable)
+      .set({ soldeActuelFcfa: nvSoldeCaisse.toString() })
+      .where(eq(caissesTable.id, data.caisseId));
+
+    return { mvtBanque: mvtBanque!, mvtCaisse: mvtCaisse! };
+  });
+
+  // Écriture comptable OHADA : 571 (Caisse) Débit / 521 (Banque) Crédit
+  try {
+    await db.insert(ecrituresComptablesTable).values({
+      cooperativeId,
+      dateEcriture:  dateOp,
+      libelle:       data.libelle ?? `Virement banque vers caisse ${caisse.nom}`,
+      compteDebit:   "571",
+      compteCredit:  "521",
+      montantFcfa:   data.montantFcfa,
+      source:        "manuel" as const,
+      sourceId:      result.mvtCaisse.id,
+      exercice:      new Date().getFullYear(),
+    });
+  } catch (err) {
+    logger.warn({ err }, "Écriture comptable virement banque→caisse non enregistrée");
+  }
+
+  return {
+    mouvement_banque:  result.mvtBanque.id,
+    mouvement_caisse:  result.mvtCaisse.id,
+    solde_banque:      nvSoldeBanque,
+    solde_caisse:      nvSoldeCaisse,
+    reference:         ref,
+  };
 }
 
 // ─── Alertes solde ────────────────────────────────────────────────────────────

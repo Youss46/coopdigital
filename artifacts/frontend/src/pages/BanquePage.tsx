@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import {
   Building2, Plus, RefreshCw, AlertTriangle, TrendingUp, TrendingDown,
-  CheckCircle2, ChevronRight, X, Check, Filter,
+  CheckCircle2, ChevronRight, X, Check, Filter, Wallet, ArrowRightLeft,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -80,6 +80,7 @@ export default function BanquePage() {
   const [showCreerCompte,     setShowCreerCompte]     = useState(false);
   const [showMouvement,       setShowMouvement]       = useState(false);
   const [showRapprochement,   setShowRapprochement]   = useState(false);
+  const [showVirementCaisse,  setShowVirementCaisse]  = useState(false);
   const [editCompte,          setEditCompte]          = useState<Compte | null>(null);
 
   // Sélection rapprochement
@@ -196,6 +197,13 @@ export default function BanquePage() {
         <div className="flex gap-2">
           {selected && canEdit && (
             <>
+              <button
+                onClick={() => setShowVirementCaisse(true)}
+                className="flex items-center gap-2 px-3 py-2 text-sm border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50"
+              >
+                <Wallet className="h-4 w-4" />
+                Virt. Caisse
+              </button>
               <button
                 onClick={() => setShowRapprochement(true)}
                 className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -431,6 +439,15 @@ export default function BanquePage() {
           onClose={() => setShowMouvement(false)}
           onSaved={() => { setShowMouvement(false); chargerJournal(selected.id); chargerComptes(); }}
           toast={toast}
+        />
+      )}
+
+      {/* ── Modal : Virement vers Caisse ── */}
+      {showVirementCaisse && selected && (
+        <ModalVirementCaisse
+          compte={selected}
+          onClose={() => setShowVirementCaisse(false)}
+          onSaved={() => { setShowVirementCaisse(false); chargerJournal(selected.id); chargerComptes(); toast({ title: "Virement effectué", description: "Le solde a été mis à jour." }); }}
         />
       )}
 
@@ -764,6 +781,167 @@ function ModalMouvement({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal : Virement Banque → Caisse ─────────────────────────────────────────
+
+type CaisseItem = { id: number; nom: string; code: string; solde_actuel_fcfa: string };
+
+function ModalVirementCaisse({ compte, onClose, onSaved }: {
+  compte: Compte;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [caisses,        setCaisses]        = useState<CaisseItem[]>([]);
+  const [loadingCaisses, setLoadingCaisses] = useState(true);
+  const [caisseId,       setCaisseId]       = useState<number | "">("");
+  const [montant,        setMontant]        = useState("");
+  const [libelle,        setLibelle]        = useState("");
+  const [reference,      setReference]      = useState("");
+  const [date,           setDate]           = useState(new Date().toISOString().slice(0, 10));
+  const [saving,         setSaving]         = useState(false);
+  const [err,            setErr]            = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${BASE}/api/banque/caisses`, { headers: { Authorization: `Bearer ${tok()}` } })
+      .then(r => r.json())
+      .then((data: CaisseItem[]) => { setCaisses(data); if (data.length === 1) setCaisseId(data[0]!.id); })
+      .catch(() => setErr("Impossible de charger les caisses"))
+      .finally(() => setLoadingCaisses(false));
+  }, []);
+
+  const caisseSel  = caisseId !== "" ? caisses.find(c => c.id === caisseId) : null;
+  const soldeBanque = parseFloat(compte.solde_actuel_fcfa);
+
+  async function handleSubmit() {
+    if (!caisseId) { setErr("Sélectionnez une caisse"); return; }
+    const m = parseInt(montant || "0", 10);
+    if (!m || m <= 0) { setErr("Montant invalide"); return; }
+    if (m > soldeBanque) {
+      setErr(`Solde bancaire insuffisant (${new Intl.NumberFormat("fr-FR").format(soldeBanque)} FCFA disponible)`); return;
+    }
+    setSaving(true); setErr(null);
+    try {
+      const r = await fetch(`${BASE}/api/banque/${compte.id}/virement-caisse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
+        body: JSON.stringify({
+          caisseId, montantFcfa: m,
+          libelle:       libelle    || undefined,
+          reference:     reference  || undefined,
+          dateOperation: date,
+        }),
+      });
+      if (!r.ok) throw new Error((await r.json()).erreur ?? "Erreur serveur");
+      onSaved();
+    } catch (e) {
+      setErr((e as Error).message);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+              <ArrowRightLeft size={16} className="text-amber-600" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900 text-sm">Virement Banque → Caisse</h2>
+              <p className="text-xs text-gray-400">Depuis : {compte.nom}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Solde source */}
+          <div className="rounded-lg bg-gray-50 px-4 py-3 flex items-center justify-between text-sm">
+            <span className="text-gray-500">Solde disponible (banque)</span>
+            <span className="font-bold text-gray-800">{FCFA(soldeBanque)}</span>
+          </div>
+
+          {/* Caisse cible */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Caisse de destination *</label>
+            {loadingCaisses ? (
+              <div className="text-xs text-gray-400 py-2">Chargement des caisses…</div>
+            ) : caisses.length === 0 ? (
+              <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 rounded-lg p-3">
+                <AlertTriangle size={14} /> Aucune caisse active dans cette coopérative
+              </div>
+            ) : (
+              <select
+                value={caisseId}
+                onChange={e => setCaisseId(e.target.value === "" ? "" : parseInt(e.target.value, 10))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400">
+                <option value="">— Sélectionner une caisse —</option>
+                {caisses.map(c => (
+                  <option key={c.id} value={c.id}>{c.nom} ({c.code}) — {FCFA(c.solde_actuel_fcfa)}</option>
+                ))}
+              </select>
+            )}
+            {caisseSel && (
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                <Wallet size={11} /> Solde caisse : <span className="font-semibold text-gray-700">{FCFA(caisseSel.solde_actuel_fcfa)}</span>
+              </p>
+            )}
+          </div>
+
+          {/* Montant */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA) *</label>
+            <MoneyInput value={montant} onChange={v => setMontant(v ?? "")}
+              placeholder="Ex: 1 000 000"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400" />
+          </div>
+
+          {/* Libellé */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Libellé <span className="text-gray-400">(opt.)</span></label>
+            <input type="text" value={libelle} onChange={e => setLibelle(e.target.value)}
+              placeholder="Ex: Alimentation caisse principale"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400" />
+          </div>
+
+          {/* Référence + Date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Référence <span className="text-gray-400">(opt.)</span></label>
+              <input type="text" value={reference} onChange={e => setReference(e.target.value)}
+                placeholder="Ex: BON-001"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Date opération</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400" />
+            </div>
+          </div>
+
+          {err && (
+            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              <AlertTriangle size={13} /> {err}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 pb-5">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Annuler
+          </button>
+          <button onClick={handleSubmit} disabled={saving || caisses.length === 0}
+            className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2">
+            <ArrowRightLeft size={14} />
+            {saving ? "Virement en cours…" : "Confirmer"}
+          </button>
+        </div>
       </div>
     </div>
   );

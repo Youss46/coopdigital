@@ -102,6 +102,41 @@ export async function postRapprocher(req: Request, res: Response): Promise<void>
   } catch (err) { req.log.error({ err }, "postRapprocherBanque"); res.status(500).json({ erreur: "Erreur serveur" }); }
 }
 
+// ─── Caisses disponibles ──────────────────────────────────────────────────────
+
+export async function getCaisses(req: Request, res: Response): Promise<void> {
+  const cid = coopId(req);
+  if (!cid) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  try { res.json(await svc.getCaissesCentrales(cid)); }
+  catch (err) { req.log.error({ err }, "getCaissesBanque"); res.status(500).json({ erreur: "Erreur serveur" }); }
+}
+
+// ─── Virement Banque → Caisse ─────────────────────────────────────────────────
+
+export async function postVirementCaisse(req: Request, res: Response): Promise<void> {
+  const cid = coopId(req);
+  if (!cid) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  const compteId = parseInt(String(req.params["id"]), 10);
+  const { caisseId, montantFcfa, libelle, reference, dateOperation } = req.body as {
+    caisseId?: number; montantFcfa?: number;
+    libelle?: string; reference?: string; dateOperation?: string;
+  };
+  if (!caisseId || !montantFcfa || montantFcfa <= 0) {
+    res.status(400).json({ erreur: "caisseId et montantFcfa (> 0) requis" }); return;
+  }
+  try {
+    const result = await svc.virementVersCaisse(compteId, cid, {
+      caisseId, montantFcfa, libelle, reference, dateOperation,
+      userId: req.user?.id,
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    req.log.error({ err }, "postVirementCaisseBanque");
+    res.status(400).json({ erreur: msg });
+  }
+}
+
 // ─── Alertes ──────────────────────────────────────────────────────────────────
 
 export async function getAlertes(req: Request, res: Response): Promise<void> {

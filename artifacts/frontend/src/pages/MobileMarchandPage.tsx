@@ -296,6 +296,7 @@ export default function MobileMarchandPage() {
         <ModalVirement
           compteId={modalVirement}
           compteName={comptes.find(c => c.id === modalVirement)?.nom ?? ""}
+          soldeMobile={comptes.find(c => c.id === modalVirement)?.solde_actuel_fcfa ?? "0"}
           onClose={() => setModalVirement(null)}
           onSave={async () => {
             setModalVirement(null);
@@ -305,7 +306,7 @@ export default function MobileMarchandPage() {
               const updatedCompte = updated.find((c: Compte) => c.id === modalVirement);
               if (updatedCompte) { setSelected(updatedCompte); await loadJournal(updatedCompte); }
             }
-            toast({ title: "Virement effectué", description: "Le compte mobile a été approvisionné depuis la banque." });
+            toast({ title: "Virement effectué", description: "Les soldes ont été mis à jour." });
           }}
         />
       )}
@@ -591,15 +592,17 @@ function ModalMouvement({ compteId: _, onClose, onSave }: {
 
 type CompteBancaire = { id: number; nom: string; banque: string; solde_actuel_fcfa: string };
 
-function ModalVirement({ compteId, compteName, onClose, onSave }: {
+function ModalVirement({ compteId, compteName, soldeMobile, onClose, onSave }: {
   compteId: number;
   compteName: string;
+  soldeMobile: string;
   onClose: () => void;
   onSave: () => Promise<void>;
 }) {
   const [comptesBancaires, setComptesBancaires] = useState<CompteBancaire[]>([]);
   const [loadingBanques, setLoadingBanques] = useState(true);
   const [compteBancaireId, setCompteBancaireId] = useState<number | "">("");
+  const [sens, setSens] = useState<"banque_vers_mobile" | "mobile_vers_banque">("banque_vers_mobile");
   const [montant, setMontant] = useState("");
   const [libelle, setLibelle] = useState("");
   const [reference, setReference] = useState("");
@@ -614,21 +617,23 @@ function ModalVirement({ compteId, compteName, onClose, onSave }: {
       .finally(() => setLoadingBanques(false));
   }, []);
 
-  const soldeBanque = compteBancaireId !== ""
-    ? parseFloat(comptesBancaires.find(c => c.id === compteBancaireId)?.solde_actuel_fcfa ?? "0")
-    : null;
+  const compteSel = compteBancaireId !== "" ? comptesBancaires.find(c => c.id === compteBancaireId) : null;
+  const soldeBanque = compteSel ? parseFloat(compteSel.solde_actuel_fcfa) : null;
+  const soldeMobileNum = parseFloat(soldeMobile);
+  const sourceBalance = sens === "banque_vers_mobile" ? soldeBanque : soldeMobileNum;
 
   async function handleSubmit() {
     if (!compteBancaireId) { setErr("Sélectionnez un compte bancaire"); return; }
     const m = parseFloat(montant);
     if (!m || m <= 0) { setErr("Montant invalide"); return; }
-    if (soldeBanque !== null && m > soldeBanque) {
-      setErr(`Solde bancaire insuffisant (${new Intl.NumberFormat("fr-FR").format(soldeBanque)} FCFA disponible)`); return;
+    if (sourceBalance !== null && m > sourceBalance) {
+      const label = sens === "banque_vers_mobile" ? "bancaire" : "mobile";
+      setErr(`Solde ${label} insuffisant (${new Intl.NumberFormat("fr-FR").format(sourceBalance)} FCFA disponible)`); return;
     }
     setSaving(true); setErr(null);
     try {
       await apiPost(`/api/mobile-marchand/${compteId}/virement-banque`, {
-        compteBancaireId, montantFcfa: m,
+        compteBancaireId, sens, montantFcfa: m,
         libelle: libelle || undefined,
         reference: reference || undefined,
         dateOperation: date,
@@ -649,17 +654,35 @@ function ModalVirement({ compteId, compteName, onClose, onSave }: {
               <ArrowRightLeft size={16} className="text-green-600" />
             </div>
             <div>
-              <h2 className="font-semibold text-gray-900 text-sm">Virement depuis la banque</h2>
-              <p className="text-xs text-gray-400">→ {compteName}</p>
+              <h2 className="font-semibold text-gray-900 text-sm">Virement Banque ↔ Mobile</h2>
+              <p className="text-xs text-gray-400">{compteName}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
 
         <div className="px-6 py-5 space-y-4">
-          {/* Compte source */}
+          {/* Sens du virement */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Compte bancaire source *</label>
+            <label className="block text-xs font-medium text-gray-600 mb-2">Sens du virement *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["banque_vers_mobile", "mobile_vers_banque"] as const).map(s => (
+                <button key={s} onClick={() => setSens(s)}
+                  className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 text-xs font-medium transition-all ${
+                    sens === s ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 text-gray-600 hover:border-green-300"
+                  }`}>
+                  {s === "banque_vers_mobile"
+                    ? <><Landmark size={16} className="text-green-500" /><span>Banque → Mobile</span><span className="text-gray-400 font-normal">Approvisionner</span></>
+                    : <><ArrowRightLeft size={16} className="text-green-500" /><span>Mobile → Banque</span><span className="text-gray-400 font-normal">Reverser</span></>
+                  }
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Compte bancaire */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Compte bancaire *</label>
             {loadingBanques ? (
               <div className="text-xs text-gray-400 py-2">Chargement des comptes…</div>
             ) : comptesBancaires.length === 0 ? (
@@ -681,7 +704,12 @@ function ModalVirement({ compteId, compteName, onClose, onSave }: {
             )}
             {soldeBanque !== null && (
               <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                <Landmark size={11} /> Solde disponible : <span className="font-semibold text-gray-700">{new Intl.NumberFormat("fr-FR").format(soldeBanque)} FCFA</span>
+                <Landmark size={11} /> Solde banque : <span className="font-semibold text-gray-700">{new Intl.NumberFormat("fr-FR").format(soldeBanque)} FCFA</span>
+              </p>
+            )}
+            {sens === "mobile_vers_banque" && (
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                <Smartphone size={11} /> Solde mobile : <span className="font-semibold text-gray-700">{new Intl.NumberFormat("fr-FR").format(soldeMobileNum)} FCFA</span>
               </p>
             )}
           </div>
@@ -732,7 +760,7 @@ function ModalVirement({ compteId, compteName, onClose, onSave }: {
           <button onClick={handleSubmit} disabled={saving || comptesBancaires.length === 0}
             className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
             <ArrowRightLeft size={14} />
-            {saving ? "Virement en cours…" : "Confirmer le virement"}
+            {saving ? "Virement en cours…" : "Confirmer"}
           </button>
         </div>
       </div>
