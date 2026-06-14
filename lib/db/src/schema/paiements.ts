@@ -10,6 +10,7 @@ export const modePaiementEnum = pgEnum("mode_paiement", [
   "orange_money",
   "mtn_momo",
   "especes",
+  "wave",
 ]);
 
 export const paiementStatutEnum = pgEnum("paiement_statut", [

@@ -10,8 +10,8 @@ import { useAuth } from "@/contexts/AuthContext";
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok  = () => localStorage.getItem("coop_token") ?? "";
 
-const FCFA = (n: number | string) =>
-  new Intl.NumberFormat("fr-FR").format(typeof n === "string" ? parseFloat(n) || 0 : n) + " FCFA";
+const FCFA = (n: number | string | null | undefined) =>
+  new Intl.NumberFormat("fr-FR").format(typeof n === "string" ? parseFloat(n) || 0 : (n ?? 0)) + " FCFA";
 
 const DATE_FR = (d: string) =>
   new Date(d + "T00:00:00").toLocaleDateString("fr-FR");

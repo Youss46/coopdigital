@@ -296,6 +296,13 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     rapprocher:       ["pca", "directeur", "comptable"],
   },
 
+  // MODULE — COMPTES MOBILES MARCHANDS
+  mobile_marchand: {
+    voir:            ["pca", "directeur", "comptable", "auditeur"],
+    creer:           ["pca", "directeur"],
+    enregistrer_mvt: ["pca", "directeur", "comptable"],
+  },
+
   // MODULE — GESTION DE CAISSE
   caisse: {
     voir:             ["pca", "directeur", "comptable", "auditeur", "delegue"],

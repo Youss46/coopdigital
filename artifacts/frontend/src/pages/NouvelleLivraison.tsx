@@ -40,7 +40,7 @@ export default function NouvelleLivraison() {
   const [prixUnitaire, setPrixUnitaire] = useState("");
   const [prixAutoRempli, setPrixAutoRempli] = useState(false);
   const prixModifieParUtilisateur = useRef(false);
-  const [modePaiement, setModePaiement] = useState<"orange_money" | "mtn_momo" | "especes" | "differe">("especes");
+  const [modePaiement, setModePaiement] = useState<"orange_money" | "mtn_momo" | "especes" | "wave" | "differe">("especes");
   const [datePaiementPrevue, setDatePaiementPrevue] = useState("");
   const [dateLivraison, setDateLivraison] = useState(new Date().toISOString().split("T")[0]!);
   const [showOptions, setShowOptions] = useState(false);
@@ -522,12 +522,13 @@ export default function NouvelleLivraison() {
                   <label className="block text-xs font-medium text-gray-600 mb-1">Mode de paiement</label>
                   <select
                     value={modePaiement}
-                    onChange={(e) => setModePaiement(e.target.value as "orange_money" | "mtn_momo" | "especes" | "differe")}
+                    onChange={(e) => setModePaiement(e.target.value as "orange_money" | "mtn_momo" | "especes" | "wave" | "differe")}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
                   >
                     <option value="especes">Espèces</option>
                     <option value="orange_money">Orange Money</option>
                     <option value="mtn_momo">MTN MoMo</option>
+                    <option value="wave">Wave</option>
                     <option value="differe">Paiement différé</option>
                   </select>
                 </div>

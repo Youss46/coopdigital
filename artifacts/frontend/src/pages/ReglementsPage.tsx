@@ -53,6 +53,7 @@ const MODE_CONFIG: Record<string, { label: string; cls: string; icon: React.Reac
   orange_money: { label: "Orange Money", cls: "bg-orange-100 text-orange-700", icon: <Smartphone size={11} /> },
   mtn_momo:     { label: "MTN MoMo",     cls: "bg-yellow-100 text-yellow-700", icon: <Smartphone size={11} /> },
   especes:      { label: "Espèces",      cls: "bg-gray-100 text-gray-600",     icon: <Banknote size={11} /> },
+  wave:         { label: "Wave",         cls: "bg-blue-100 text-blue-700",     icon: <Smartphone size={11} /> },
 };
 
 function StatutBadge({ statut }: { statut: string }) {
@@ -89,7 +90,7 @@ function ModalValidation({
   const [ref, setRef] = useState("");
   const [telephone, setTelephone] = useState(paiement.telephone ?? "");
   const [touched, setTouched] = useState(false);
-  const isMobile = paiement.modePaiement === "orange_money" || paiement.modePaiement === "mtn_momo";
+  const isMobile = paiement.modePaiement === "orange_money" || paiement.modePaiement === "mtn_momo" || paiement.modePaiement === "wave";
   const refManquante = isMobile && !ref.trim();
 
   function handleConfirm() {
@@ -171,7 +172,9 @@ function ModalValidation({
               value={ref}
               onChange={(e) => { setRef(e.target.value); setTouched(false); }}
               placeholder={isMobile
-                ? (paiement.modePaiement === "orange_money" ? "Ex: OM-2025-00123" : "Ex: MTN-2025-00456")
+                ? paiement.modePaiement === "orange_money" ? "Ex: OM-2025-00123"
+                  : paiement.modePaiement === "mtn_momo" ? "Ex: MTN-2025-00456"
+                  : "Ex: WAVE-2025-00789"
                 : "Ex: REF-00123"}
               className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
                 touched && refManquante

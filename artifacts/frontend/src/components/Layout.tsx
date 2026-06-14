@@ -41,6 +41,7 @@ import {
   Navigation,
   GraduationCap,
   Wallet,
+  Smartphone,
   Calculator,
   GitMerge,
   TrendingUp as TrendingUpInvest,
@@ -258,6 +259,12 @@ const navItems = [
     href: "/banque",
     label: "Banque",
     icon: Building2,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/mobile-marchand",
+    label: "Mobile Marchands",
+    icon: Smartphone,
     roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
