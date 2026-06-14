@@ -50,7 +50,11 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .select({ total: sql<number>`coalesce(sum(montant_fcfa),0)::int` })
         .from(paiementsTable)
         .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(paiementsTable.statut, "confirme"), gte(paiementsTable.createdAt, debutMois))),
+        .where(and(
+          eq(membresTable.cooperativeId, cooperativeId),
+          sql`${paiementsTable.statut} IN ('confirme','effectue','en_cours')`,
+          gte(paiementsTable.createdAt, debutMois),
+        )),
       db
         .select({ total: sql<number>`coalesce(sum(solde_du_fcfa),0)::int` })
         .from(ventesExportateursTable)

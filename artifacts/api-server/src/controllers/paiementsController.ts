@@ -161,7 +161,7 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
       if (r.statut === "rejete") {
         rejete.count++;
       }
-      if (r.statut === "effectue" && r.dateValidation) {
+      if ((r.statut === "effectue" || r.statut === "confirme" || r.statut === "en_cours") && r.dateValidation) {
         const dv = new Date(r.dateValidation);
         if (dv >= monthStart && dv <= monthEnd) {
           effectueCeMois.montant_total += r.montantFcfa;
