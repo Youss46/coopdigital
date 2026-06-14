@@ -13,6 +13,7 @@ import MissionDetailPage from "@/pages/MissionDetailPage";
 import MembreFiche from "@/pages/MembreFiche";
 import Avances from "@/pages/Avances";
 import NouvelleLivraison from "@/pages/NouvelleLivraison";
+import LivraisonsPage from "@/pages/LivraisonsPage";
 import TracabilitePage from "@/pages/TracabilitePage";
 import ParcellePage from "@/pages/ParcellePage";
 import StocksPage from "@/pages/StocksPage";
@@ -117,6 +118,9 @@ function AppRoutes() {
       </Route>
       <Route path="/livraisons/nouvelle">
         <ProtectedRoute component={NouvelleLivraison} />
+      </Route>
+      <Route path="/livraisons">
+        <ProtectedRoute component={LivraisonsPage} />
       </Route>
       <Route path="/tracabilite">
         <ProtectedRoute component={TracabilitePage} />

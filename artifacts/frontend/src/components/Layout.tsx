@@ -113,10 +113,16 @@ const navItems = [
     roles: ["pca", "directeur", "comptable", "magasinier", "delegue", "auditeur"],
   },
   {
+    href: "/livraisons",
+    label: "Livraisons",
+    icon: Package,
+    roles: ["delegue"],
+  },
+  {
     href: "/livraisons/nouvelle",
     label: "Livraisons",
     icon: Package,
-    roles: ["pca", "directeur", "delegue", "comptable", "auditeur"],
+    roles: ["pca", "directeur", "comptable", "auditeur"],
   },
   {
     href: "/transport",
