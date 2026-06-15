@@ -12,6 +12,7 @@ import {
   creerEntrepotHandler,
   modifierEntrepotHandler,
   getMouvementsEntrepotHandler,
+  ajusterStockHandler,
   listTransfertsHandler,
   confirmerArriveeHandler,
   signalerLitigeHandler,
@@ -38,6 +39,7 @@ router.get("/entrepots",                     authMiddleware, listEntrepotsHandle
 router.post("/entrepots",                    authMiddleware, creerEntrepotHandler);
 router.put("/entrepots/:id",                 authMiddleware, modifierEntrepotHandler);
 router.get("/entrepots/:id/mouvements",      authMiddleware, getMouvementsEntrepotHandler);
+router.post("/entrepots/:id/ajustement",     authMiddleware, ajusterStockHandler);
 
 router.get("/transferts",                    authMiddleware, listTransfertsHandler);
 router.put("/transferts/:id/arrivee",        authMiddleware, confirmerArriveeHandler);

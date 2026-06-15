@@ -82,6 +82,38 @@ export async function modifierEntrepotHandler(req: Request, res: Response): Prom
   }
 }
 
+export async function ajusterStockHandler(req: Request, res: Response): Promise<void> {
+  const coop = coopId(req);
+  if (!coop) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
+  const id = Number(req.params["id"]);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  const { type, motif, poidsKg, notes } = req.body as Record<string, unknown>;
+  if (!type || !motif || !poidsKg) {
+    res.status(400).json({ erreur: "type, motif et poidsKg sont requis" });
+    return;
+  }
+  if (!["entree", "sortie"].includes(String(type))) {
+    res.status(400).json({ erreur: "type doit être 'entree' ou 'sortie'" });
+    return;
+  }
+  if (!["ajustement", "perte"].includes(String(motif))) {
+    res.status(400).json({ erreur: "motif doit être 'ajustement' ou 'perte'" });
+    return;
+  }
+  try {
+    const result = await svc.ajusterStock(id, coop, req.user!.id, {
+      type: String(type) as "entree" | "sortie",
+      motif: String(motif) as "ajustement" | "perte",
+      poidsKg: Number(poidsKg),
+      notes: notes ? String(notes) : undefined,
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    req.log.error({ err }, "ajusterStock");
+    res.status(400).json({ erreur: (err as Error).message });
+  }
+}
+
 export async function getMouvementsEntrepotHandler(req: Request, res: Response): Promise<void> {
   const coop = coopId(req);
   if (!coop) { res.status(403).json({ erreur: "Coopérative requise" }); return; }

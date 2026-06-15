@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Warehouse, Package, TrendingDown, TrendingUp, AlertTriangle,
   Plus, CheckCircle2, XCircle, Clock, Truck, ArrowRight, BarChart3,
-  RefreshCw, Eye, Pencil, Power, PowerOff,
+  RefreshCw, Eye, Pencil, Power, PowerOff, SlidersHorizontal, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 
@@ -138,6 +138,13 @@ export default function EntrepotsPage() {
   });
   const [showDetail, setShowDetail] = useState<Entrepot | null>(null);
   const [detailOnglet, setDetailOnglet] = useState<"mouvements" | "transferts">("mouvements");
+  const [showAjustForm, setShowAjustForm] = useState(false);
+  const [formAjust, setFormAjust] = useState({
+    type: "entree" as "entree" | "sortie",
+    motif: "ajustement" as "ajustement" | "perte",
+    poidsKg: "",
+    notes: "",
+  });
 
   const { data: deleguesListe = [], isLoading: loadDelegues } = useQuery<DelegueListe[]>({
     queryKey: ["delegues-liste-entrepots"],
@@ -175,6 +182,19 @@ export default function EntrepotsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transferts"] });
       toast({ title: "Litige signalé" });
+    },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  const mutAjuster = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: object }) =>
+      apiFetch(`/entrepots/${id}/ajustement`, { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["entrepot-mouvements", showDetail?.id] });
+      qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
+      setShowAjustForm(false);
+      setFormAjust({ type: "entree", motif: "ajustement", poidsKg: "", notes: "" });
+      toast({ title: "Ajustement enregistré" });
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
@@ -575,7 +595,92 @@ export default function EntrepotsPage() {
             <div className="flex-1 overflow-y-auto px-6 py-4">
 
               {detailOnglet === "mouvements" && (
-                loadMouvements ? (
+                <>
+                {/* ── Bouton / formulaire ajustement ── */}
+                {peutModifier && (
+                  <div className="mb-4">
+                    <button
+                      onClick={() => setShowAjustForm((v) => !v)}
+                      className="flex items-center gap-2 text-sm font-medium text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 px-3 py-2 rounded-lg w-full transition-colors">
+                      <SlidersHorizontal className="w-4 h-4" />
+                      Ajustement manuel de stock
+                      {showAjustForm ? <ChevronUp className="w-4 h-4 ml-auto" /> : <ChevronDown className="w-4 h-4 ml-auto" />}
+                    </button>
+
+                    {showAjustForm && (
+                      <div className="mt-2 border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-3">
+                        {/* Type entrée / sortie */}
+                        <div className="flex gap-2">
+                          {(["entree", "sortie"] as const).map((t) => (
+                            <button key={t} onClick={() => setFormAjust((f) => ({ ...f, type: t }))}
+                              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                                formAjust.type === t
+                                  ? t === "entree" ? "bg-green-600 text-white border-green-600" : "bg-red-500 text-white border-red-500"
+                                  : "border-gray-200 text-gray-600 hover:bg-white"
+                              }`}>
+                              {t === "entree" ? "↑ Entrée" : "↓ Sortie"}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Motif */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Motif</label>
+                          <select value={formAjust.motif}
+                            onChange={(e) => setFormAjust((f) => ({ ...f, motif: e.target.value as "ajustement" | "perte" }))}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500 bg-white">
+                            <option value="ajustement">Ajustement (correction inventaire)</option>
+                            <option value="perte">Perte (avarie, vol…)</option>
+                          </select>
+                        </div>
+
+                        {/* Poids */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Poids (kg) *</label>
+                          <input type="number" min="0.1" step="0.1" placeholder="ex: 250"
+                            value={formAjust.poidsKg}
+                            onChange={(e) => setFormAjust((f) => ({ ...f, poidsKg: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500 bg-white" />
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optionnel)</label>
+                          <input type="text" placeholder="Raison, contexte…"
+                            value={formAjust.notes}
+                            onChange={(e) => setFormAjust((f) => ({ ...f, notes: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500 bg-white" />
+                        </div>
+
+                        <div className="flex gap-2 pt-1">
+                          <button onClick={() => { setShowAjustForm(false); setFormAjust({ type: "entree", motif: "ajustement", poidsKg: "", notes: "" }); }}
+                            className="flex-1 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-white">
+                            Annuler
+                          </button>
+                          <button
+                            disabled={!formAjust.poidsKg || Number(formAjust.poidsKg) <= 0 || mutAjuster.isPending}
+                            onClick={() => mutAjuster.mutate({
+                              id: showDetail!.id,
+                              body: {
+                                type: formAjust.type,
+                                motif: formAjust.motif,
+                                poidsKg: parseFloat(formAjust.poidsKg),
+                                notes: formAjust.notes || undefined,
+                              },
+                            })}
+                            className={`flex-1 py-1.5 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-colors ${
+                              formAjust.type === "entree" ? "bg-green-600 hover:bg-green-700" : "bg-red-500 hover:bg-red-600"
+                            }`}>
+                            {mutAjuster.isPending ? "Enregistrement…" : `Confirmer ${formAjust.type === "entree" ? "l'entrée" : "la sortie"}`}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Liste des mouvements ── */}
+                {loadMouvements ? (
                   <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Chargement…</div>
                 ) : mouvements.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-32 text-gray-400 text-sm gap-2">
@@ -618,6 +723,8 @@ export default function EntrepotsPage() {
                     })}
                   </div>
                 )
+                }
+                </>
               )}
 
               {detailOnglet === "transferts" && (() => {

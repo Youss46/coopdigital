@@ -161,6 +161,35 @@ export async function modifierEntrepot(
   return updated;
 }
 
+// ─── Ajustement manuel ───────────────────────────────────────────────────────
+
+export async function ajusterStock(
+  entrepotId: number,
+  cooperativeId: number,
+  par: number,
+  opts: {
+    type: "entree" | "sortie";
+    motif: "ajustement" | "perte";
+    poidsKg: number;
+    notes?: string;
+  },
+) {
+  const [entrepot] = await db
+    .select({ id: entrepotsDeleguesTable.id })
+    .from(entrepotsDeleguesTable)
+    .where(
+      and(
+        eq(entrepotsDeleguesTable.id, entrepotId),
+        eq(entrepotsDeleguesTable.cooperativeId, cooperativeId),
+      ),
+    )
+    .limit(1);
+  if (!entrepot) throw new Error("Entrepôt non trouvé");
+  return enregistrerMouvement(entrepotId, opts.type, opts.motif, opts.poidsKg, par, {
+    notes: opts.notes,
+  });
+}
+
 // ─── Mouvements ──────────────────────────────────────────────────────────────
 
 export async function getMouvements(
