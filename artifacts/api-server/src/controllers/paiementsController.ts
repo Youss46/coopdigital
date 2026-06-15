@@ -1,8 +1,9 @@
 import { type Request, type Response } from "express";
 import { db, paiementsTable, membresTable, livraisonsTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable } from "@workspace/db";
-import { eq, desc, and, sql, gte, lt, lte } from "drizzle-orm";
-import { envoyerPushGroupePortail } from "../services/pushService";
+import { eq, desc, and, sql, gte, lt, lte, inArray } from "drizzle-orm";
+import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
 import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvement } from "../services/caisseService.js";
+import { notifierParRole } from "../services/notificationService.js";
 import { logger } from "../lib/logger.js";
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
@@ -78,6 +79,49 @@ async function debiterCompteMobileMarchandPaiement(
   }
 }
 
+// ─── Helper : notification solde Caisse Centrale sous seuil ─────────────────
+
+async function notifierCaisseCentraleSousSeuil(
+  cooperativeId: number,
+  caisseId: number,
+  caisseNom: string,
+  soldeActuel: number,
+  paiementId: number,
+): Promise<void> {
+  const soldeFormate = new Intl.NumberFormat("fr-FR").format(soldeActuel);
+  try {
+    // In-app : Directeur + PCA
+    await notifierParRole(cooperativeId, ["directeur", "pca"], {
+      type:         "anomalie_critique",
+      titre:        "⚠️ Caisse Centrale sous le seuil minimum",
+      message:      `Le solde de la ${caisseNom} est tombé à ${soldeFormate} FCFA suite au paiement #${paiementId}. Pensez à approvisionner la caisse.`,
+      gravite:      "critique",
+      sourceModule: "caisse",
+      sourceId:     caisseId,
+    });
+    // Push : mêmes rôles
+    const destinataires = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.cooperativeId, cooperativeId),
+          eq(usersTable.actif, true),
+          inArray(usersTable.role, ["directeur", "pca"] as any[]),
+        ),
+      );
+    if (destinataires.length > 0) {
+      void envoyerPushGroupe(destinataires.map((u) => u.id), {
+        title: "⚠️ Caisse Centrale — seuil minimum atteint",
+        body:  `Solde : ${soldeFormate} FCFA — ${caisseNom}`,
+        url:   "/caisse",
+      });
+    }
+  } catch (err) {
+    logger.warn({ err, cooperativeId, caisseId }, "Notification solde Caisse Centrale non envoyée");
+  }
+}
+
 // ─── Helper : débit automatique Caisse Centrale ─────────────────────────────
 
 async function debiterCaisseCentralePaiement(
@@ -104,13 +148,24 @@ async function debiterCaisseCentralePaiement(
       return;
     }
 
-    await enregistrerMouvement(caisse.id, {
+    const result = await enregistrerMouvement(caisse.id, {
       type: "sortie",
       motif: "paiement_producteur",
       montantFcfa,
       libelle: `Paiement producteur — règlement #${paiementId}`,
       userId: userId ?? undefined,
     });
+
+    // Notifier si le solde passe sous le fond minimum configuré
+    if (result.alerte) {
+      void notifierCaisseCentraleSousSeuil(
+        cooperativeId,
+        caisse.id,
+        caisse.nom,
+        result.soldeActuel,
+        paiementId,
+      );
+    }
   } catch (err) {
     logger.warn({ err, paiementId }, "Débit automatique caisse centrale non effectué — session peut-être fermée");
   }
