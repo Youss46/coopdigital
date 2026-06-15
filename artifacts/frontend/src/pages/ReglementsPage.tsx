@@ -3,7 +3,7 @@ import {
   CheckCircle2, Clock, XCircle, Loader2, CreditCard, Search,
   CheckCheck, AlertCircle, Banknote, Smartphone, ChevronDown,
   Receipt, Package, User, Calendar, TrendingUp, X, Wallet,
-  AlertTriangle,
+  AlertTriangle, Lock,
 } from "lucide-react";
 import {
   useListPaiements,
@@ -672,6 +672,7 @@ export default function ReglementsPage() {
               paiement={p}
               peutValider={peutValider}
               peutRejeter={peutRejeter}
+              isDelegue={isDelegue}
               onValider={() => setModal({ type: "valider", paiement: p })}
               onRejeter={() => setModal({ type: "rejeter", paiement: p })}
               onRecu={() => setModal({ type: "recu", paiement: p })}
@@ -735,10 +736,13 @@ function StatCard({
 
 // ─── PaiementRow ─────────────────────────────────────────────────────────────
 
+const MODES_MOBILE_MARCHAND = new Set(["orange_money", "mtn_momo", "wave"]);
+
 function PaiementRow({
   paiement: p,
   peutValider,
   peutRejeter,
+  isDelegue,
   onValider,
   onRejeter,
   onRecu,
@@ -746,6 +750,7 @@ function PaiementRow({
   paiement: PaiementListItem;
   peutValider: boolean;
   peutRejeter: boolean;
+  isDelegue: boolean;
   onValider: () => void;
   onRejeter: () => void;
   onRecu: () => void;
@@ -755,6 +760,8 @@ function PaiementRow({
   const showActions = p.statut === "en_attente";
   const showRecu = p.statut === "confirme" || p.statut === "effectue" || p.statut === "en_cours";
   const showRejet = p.statut === "rejete";
+  const isMobileMarchand = MODES_MOBILE_MARCHAND.has(p.modePaiement);
+  const delegueBloque = isDelegue && isMobileMarchand;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
@@ -789,13 +796,20 @@ function PaiementRow({
           {showRejet && p.motifRejet && (
             <p className="text-xs text-red-500 italic mt-1">Motif : {p.motifRejet}</p>
           )}
+          {/* Info restriction délégué Mobile Marchand */}
+          {showActions && delegueBloque && (
+            <div className="flex items-center gap-1.5 mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+              <Lock size={11} className="flex-shrink-0" />
+              <span>Validation réservée au Directeur, Comptable ou PCA</span>
+            </div>
+          )}
         </div>
 
         {/* Montant net + actions */}
         <div className="text-right flex flex-col items-end gap-2 shrink-0">
           <span className="font-bold text-gray-900">{fmt(montantNet)}</span>
           <div className="flex items-center gap-1.5">
-            {showActions && peutValider && (
+            {showActions && peutValider && !delegueBloque && (
               <button
                 onClick={onValider}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white"

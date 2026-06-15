@@ -1,8 +1,9 @@
 import { type Request, type Response } from "express";
-import { db, paiementsTable, membresTable, livraisonsTable, usersTable } from "@workspace/db";
+import { db, paiementsTable, membresTable, livraisonsTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable } from "@workspace/db";
 import { eq, desc, and, sql, gte, lt, lte } from "drizzle-orm";
 import { envoyerPushGroupePortail } from "../services/pushService";
 import { verifierCaisseEspeces, debiterCaisseParResponsable } from "../services/caisseService.js";
+import { logger } from "../lib/logger.js";
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,65 @@ function startOfMonth(d: Date) {
 }
 function endOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+// ─── Helper : débit automatique compte Mobile Marchand ──────────────────────
+
+async function debiterCompteMobileMarchandPaiement(
+  cooperativeId: number,
+  operateur: string,
+  montantFcfa: number,
+  paiementId: number,
+  validePar: number | null | undefined,
+  referenceTransaction: string | null | undefined,
+): Promise<void> {
+  try {
+    const [compte] = await db
+      .select()
+      .from(comptesMobilesMarchandsTable)
+      .where(
+        and(
+          eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
+          eq(comptesMobilesMarchandsTable.operateur, operateur as "wave" | "orange_money" | "mtn_momo"),
+          eq(comptesMobilesMarchandsTable.actif, true),
+        ),
+      )
+      .limit(1);
+
+    if (!compte) {
+      logger.warn({ cooperativeId, operateur, paiementId }, "Aucun compte Mobile Marchand actif trouvé pour débit automatique");
+      return;
+    }
+
+    const soldeActuel = parseFloat(compte.soldeActuelFcfa);
+    if (soldeActuel < montantFcfa) {
+      logger.warn({ cooperativeId, operateur, paiementId, soldeActuel, montantFcfa }, "Solde Mobile Marchand insuffisant pour débit automatique — débit quand même enregistré");
+    }
+
+    const newSolde = soldeActuel - montantFcfa;
+    const today = new Date().toISOString().slice(0, 10);
+
+    await db.transaction(async (tx) => {
+      await tx.insert(mouvementsMobileMarchandTable).values({
+        compteId:       compte.id,
+        cooperativeId,
+        type:           "debit",
+        motif:          "paiement_producteur",
+        montantFcfa:    montantFcfa.toString(),
+        libelle:        `Paiement producteur — règlement #${paiementId}`,
+        reference:      referenceTransaction ?? null,
+        dateOperation:  today,
+        soldeApresFcfa: newSolde.toString(),
+        enregistrePar:  validePar ?? null,
+      });
+      await tx
+        .update(comptesMobilesMarchandsTable)
+        .set({ soldeActuelFcfa: newSolde.toString() })
+        .where(eq(comptesMobilesMarchandsTable.id, compte.id));
+    });
+  } catch (err) {
+    logger.warn({ err, paiementId }, "Débit automatique compte Mobile Marchand non effectué");
+  }
 }
 
 // ─── Sélection enrichie partagée ────────────────────────────────────────────
@@ -228,10 +288,19 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     }
 
     const mode = row.paiement.modePaiement;
-    const isMobileMoney = mode === "orange_money" || mode === "mtn_momo";
+    const isMobileMarchand = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
 
-    // Référence transaction obligatoire pour les paiements mobile money
-    if (isMobileMoney && !body.referenceTransaction?.trim()) {
+    // Un délégué ne peut valider que les paiements en espèces
+    if (req.user?.role === "delegue" && isMobileMarchand) {
+      res.status(403).json({
+        erreur: "Accès refusé",
+        message: "Les paiements via compte Mobile Marchand ne peuvent être validés que par un Directeur, Comptable ou PCA.",
+      });
+      return;
+    }
+
+    // Référence transaction obligatoire pour les paiements mobile marchand
+    if (isMobileMarchand && !body.referenceTransaction?.trim()) {
       res.status(400).json({ erreur: "La référence de transaction est obligatoire pour un paiement mobile money." });
       return;
     }
@@ -281,7 +350,19 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       );
     }
 
-    // 5. Notifier le producteur (best-effort)
+    // 5. Débiter automatiquement le compte Mobile Marchand si paiement mobile
+    if (isMobileMarchand && cooperativeId) {
+      await debiterCompteMobileMarchandPaiement(
+        cooperativeId,
+        mode,
+        row.paiement.montantFcfa,
+        id,
+        userId,
+        body.referenceTransaction ?? row.paiement.referenceTransaction,
+      );
+    }
+
+    // 6. Notifier le producteur (best-effort)
     void envoyerPushGroupePortail([row.paiement.membreId], {
       title: "✅ Paiement validé",
       body: `${new Intl.NumberFormat("fr-FR").format(row.paiement.montantFcfa)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : "espèces"}`,
