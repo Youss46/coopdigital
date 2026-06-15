@@ -17,6 +17,7 @@ import {
   confirmerArriveeHandler,
   signalerLitigeHandler,
   listDeleguesEntrepotsHandler,
+  creerTransfertAdminHandler,
 } from "../controllers/entrepotDelegueController.js";
 
 const router = Router();
@@ -40,6 +41,7 @@ router.post("/entrepots",                    authMiddleware, creerEntrepotHandle
 router.put("/entrepots/:id",                 authMiddleware, modifierEntrepotHandler);
 router.get("/entrepots/:id/mouvements",      authMiddleware, getMouvementsEntrepotHandler);
 router.post("/entrepots/:id/ajustement",     authMiddleware, ajusterStockHandler);
+router.post("/entrepots/:id/transfert",      authMiddleware, creerTransfertAdminHandler);
 
 router.get("/transferts",                    authMiddleware, listTransfertsHandler);
 router.put("/transferts/:id/arrivee",        authMiddleware, confirmerArriveeHandler);

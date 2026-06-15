@@ -145,6 +145,14 @@ export default function EntrepotsPage() {
     poidsKg: "",
     notes: "",
   });
+  const [showTransfert, setShowTransfert] = useState<Entrepot | null>(null);
+  const [formTransfert, setFormTransfert] = useState({
+    poidsKg: "",
+    typeVehicule: "",
+    immatriculation: "",
+    nomChauffeur: "",
+    notes: "",
+  });
 
   const { data: deleguesListe = [], isLoading: loadDelegues } = useQuery<DelegueListe[]>({
     queryKey: ["delegues-liste-entrepots"],
@@ -225,6 +233,19 @@ export default function EntrepotsPage() {
       setShowEditer(false);
       setEntrepotEdite(null);
       toast({ title: "Entrepôt mis à jour" });
+    },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  const mutTransfert = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: object }) =>
+      apiFetch(`/entrepots/${id}/transfert`, { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
+      qc.invalidateQueries({ queryKey: ["transferts"] });
+      setShowTransfert(null);
+      setFormTransfert({ poidsKg: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "" });
+      toast({ title: "Transfert lancé", description: "Le stock est en transit vers le magasin central." });
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
@@ -351,6 +372,19 @@ export default function EntrepotsPage() {
                       </span>
                       {e.stockMisAJourLe && <span>MàJ {fmtDate(e.stockMisAJourLe)}</span>}
                     </div>
+
+                    {peutModifier && e.actif && parseFloat(e.stockActuelKg) > 0 && (
+                      <button
+                        onClick={() => {
+                          setShowTransfert(e);
+                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "" });
+                        }}
+                        className="mt-3 w-full flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors">
+                        <Truck className="w-3.5 h-3.5" />
+                        Transférer vers le central
+                        <ArrowRight className="w-3.5 h-3.5 ml-auto" />
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -461,6 +495,136 @@ export default function EntrepotsPage() {
                     </table>
                   </div>
                 )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal transfert vers le central */}
+      {showTransfert && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 overflow-y-auto max-h-[90vh]">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-green-700" />
+                  Transférer vers le central
+                </h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  <span className="font-medium text-gray-700">{showTransfert.nom}</span>
+                  {showTransfert.zoneNom && <span> · {showTransfert.zoneNom}</span>}
+                  {" — "}Stock disponible : <strong className="text-gray-800">{kg(showTransfert.stockActuelKg)}</strong>
+                </p>
+              </div>
+              <button onClick={() => setShowTransfert(null)} className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 text-xl font-light leading-none">✕</button>
+            </div>
+
+            <div className="space-y-3">
+              {/* Poids */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Poids à transférer (kg) *
+                </label>
+                <input
+                  type="number" min="1" step="1"
+                  max={parseFloat(showTransfert.stockActuelKg)}
+                  placeholder={`max ${Math.floor(parseFloat(showTransfert.stockActuelKg))} kg`}
+                  value={formTransfert.poidsKg}
+                  onChange={(e) => setFormTransfert(f => ({ ...f, poidsKg: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+                {formTransfert.poidsKg && (() => {
+                  const max = parseFloat(showTransfert.stockActuelKg);
+                  const v = parseFloat(formTransfert.poidsKg);
+                  if (v > max) return <p className="text-xs text-red-600 mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Dépasse le stock disponible ({kg(max)})</p>;
+                  if (v <= 0) return <p className="text-xs text-red-600 mt-1">Doit être supérieur à 0</p>;
+                  const reste = max - v;
+                  return <p className="text-xs text-gray-500 mt-1">Stock restant après transfert : <span className="font-medium text-gray-700">{kg(reste)}</span></p>;
+                })()}
+              </div>
+
+              {/* Infos véhicule */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Immatriculation</label>
+                  <input type="text" placeholder="ex: AA 1234 CI"
+                    value={formTransfert.immatriculation}
+                    onChange={(e) => setFormTransfert(f => ({ ...f, immatriculation: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Type de véhicule</label>
+                  <select value={formTransfert.typeVehicule}
+                    onChange={(e) => setFormTransfert(f => ({ ...f, typeVehicule: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    <option value="">— Non précisé —</option>
+                    <option value="camion">Camion</option>
+                    <option value="pickup">Pick-up</option>
+                    <option value="moto">Moto</option>
+                    <option value="autre">Autre</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nom du chauffeur</label>
+                <input type="text" placeholder="ex: Kouadio Paul"
+                  value={formTransfert.nomChauffeur}
+                  onChange={(e) => setFormTransfert(f => ({ ...f, nomChauffeur: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optionnel)</label>
+                <textarea rows={2} placeholder="Remarques, instructions…"
+                  value={formTransfert.notes}
+                  onChange={(e) => setFormTransfert(f => ({ ...f, notes: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 resize-none" />
+              </div>
+
+              {/* Résumé */}
+              {formTransfert.poidsKg && parseFloat(formTransfert.poidsKg) > 0 && parseFloat(formTransfert.poidsKg) <= parseFloat(showTransfert.stockActuelKg) && (
+                <div className="bg-green-50 border border-green-100 rounded-xl p-3 flex items-center gap-3 text-sm">
+                  <div className="shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <Truck className="w-4 h-4 text-green-700" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-green-800">{kg(formTransfert.poidsKg)} en transit</p>
+                    <p className="text-xs text-green-600 mt-0.5">
+                      {showTransfert.nom} <ArrowRight className="w-3 h-3 inline" /> Magasin central
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setShowTransfert(null)}
+                className="flex-1 border border-gray-200 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50">
+                Annuler
+              </button>
+              <button
+                disabled={
+                  !formTransfert.poidsKg ||
+                  parseFloat(formTransfert.poidsKg) <= 0 ||
+                  parseFloat(formTransfert.poidsKg) > parseFloat(showTransfert.stockActuelKg) ||
+                  mutTransfert.isPending
+                }
+                onClick={() => mutTransfert.mutate({
+                  id: showTransfert.id,
+                  body: {
+                    poidsKg: parseFloat(formTransfert.poidsKg),
+                    typeVehicule: formTransfert.typeVehicule || undefined,
+                    immatriculation: formTransfert.immatriculation || undefined,
+                    nomChauffeur: formTransfert.nomChauffeur || undefined,
+                    notes: formTransfert.notes || undefined,
+                  },
+                })}
+                className="flex-1 bg-green-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2">
+                {mutTransfert.isPending
+                  ? "Lancement…"
+                  : <><Truck className="w-4 h-4" /> Lancer le transfert</>}
+              </button>
+            </div>
           </div>
         </div>
       )}

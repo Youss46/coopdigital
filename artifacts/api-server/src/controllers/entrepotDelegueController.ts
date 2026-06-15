@@ -177,6 +177,34 @@ export async function signalerLitigeHandler(req: Request, res: Response): Promis
   }
 }
 
+export async function creerTransfertAdminHandler(req: Request, res: Response): Promise<void> {
+  const coop = coopId(req);
+  if (!coop) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
+  const id = Number(req.params["id"]);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  const { poidsKg, typeVehicule, immatriculation, nomChauffeur, telephoneChauffeur, transporteur, notes } =
+    req.body as Record<string, unknown>;
+  if (!poidsKg || Number(poidsKg) <= 0) {
+    res.status(400).json({ erreur: "poidsKg est requis et doit être positif" });
+    return;
+  }
+  try {
+    const t = await svc.creerTransfertAdmin(id, coop, req.user!.id, {
+      poidsKg: Number(poidsKg),
+      typeVehicule: typeVehicule ? String(typeVehicule) : undefined,
+      immatriculation: immatriculation ? String(immatriculation) : undefined,
+      nomChauffeur: nomChauffeur ? String(nomChauffeur) : undefined,
+      telephoneChauffeur: telephoneChauffeur ? String(telephoneChauffeur) : undefined,
+      transporteur: transporteur ? String(transporteur) : undefined,
+      notes: notes ? String(notes) : undefined,
+    });
+    res.status(201).json(t);
+  } catch (err) {
+    req.log.error({ err }, "creerTransfertAdmin");
+    res.status(400).json({ erreur: (err as Error).message });
+  }
+}
+
 // ─── Vue délégué (terrain JWT) ────────────────────────────────────────────────
 
 export async function getMonEntrepotHandler(req: Request, res: Response): Promise<void> {

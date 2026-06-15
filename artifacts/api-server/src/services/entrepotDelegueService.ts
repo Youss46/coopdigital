@@ -625,6 +625,106 @@ export async function getStatsConsolideesDirection(cooperativeId: number) {
   };
 }
 
+// ─── Transfert initié par l'admin (direction) ────────────────────────────────
+
+/**
+ * Crée un transfert côté admin et confirme immédiatement le départ
+ * en une seule opération atomique.
+ * Statut final : "en_cours" (prêt pour confirmation d'arrivée).
+ */
+export async function creerTransfertAdmin(
+  entrepotId: number,
+  cooperativeId: number,
+  adminId: number,
+  data: {
+    poidsKg: number;
+    typeVehicule?: string;
+    immatriculation?: string;
+    nomChauffeur?: string;
+    telephoneChauffeur?: string;
+    transporteur?: string;
+    datePrevue?: Date;
+    campagneId?: number;
+    notes?: string;
+  },
+) {
+  const [entrepot] = await db
+    .select()
+    .from(entrepotsDeleguesTable)
+    .where(
+      and(
+        eq(entrepotsDeleguesTable.id, entrepotId),
+        eq(entrepotsDeleguesTable.cooperativeId, cooperativeId),
+        eq(entrepotsDeleguesTable.actif, true),
+      ),
+    )
+    .limit(1);
+  if (!entrepot) throw new Error("Entrepôt introuvable ou inactif");
+
+  const stock = toNum(entrepot.stockActuelKg);
+  if (stock <= 0) throw new Error("Stock vide — aucun transfert possible");
+  if (data.poidsKg > stock) {
+    throw new Error(`Stock insuffisant — disponible : ${stock.toLocaleString("fr-FR")} kg`);
+  }
+
+  const numero = await genererNumeroTransfert(cooperativeId);
+
+  // 1. Créer le transfert
+  const [transfert] = await db
+    .insert(transfertsStockTable)
+    .values({
+      numeroTransfert: numero,
+      entrepotSourceId: entrepotId,
+      delegueId: entrepot.delegueId,
+      cooperativeId,
+      campagneId: data.campagneId ?? null,
+      poidsDepart_kg: String(data.poidsKg),
+      typeVehicule: data.typeVehicule ?? null,
+      immatriculation: data.immatriculation ?? null,
+      nomChauffeur: data.nomChauffeur ?? null,
+      telephoneChauffeur: data.telephoneChauffeur ?? null,
+      transporteur: data.transporteur ?? null,
+      datePrevue: data.datePrevue ?? null,
+      notes: data.notes ?? null,
+      statut: "planifie",
+    })
+    .returning();
+
+  // 2. Confirmer immédiatement le départ (mouvement sortie + statut en_cours)
+  const { mouvement } = await enregistrerMouvement(
+    entrepotId,
+    "sortie",
+    "transfert_central",
+    data.poidsKg,
+    adminId,
+    { transfertId: transfert!.id, notes: `Départ transfert ${numero} (admin)` },
+  );
+
+  const [updated] = await db
+    .update(transfertsStockTable)
+    .set({
+      statut: "en_cours",
+      dateDepart: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(transfertsStockTable.id, transfert!.id))
+    .returning();
+
+  await notifierParRole(cooperativeId, ["directeur", "pca"], {
+    type: "transfert_planifie",
+    titre: `🚛 Transfert en transit — ${numero}`,
+    message: `${data.poidsKg.toLocaleString("fr-FR")} kg expédiés depuis ${entrepot.nom} vers le magasin central.`,
+    lien: "/entrepots",
+    lienLibelle: "Voir les transferts",
+    gravite: "info",
+    sourceModule: "entrepots",
+    sourceId: transfert!.id,
+  });
+
+  logger.info({ transfertId: transfert!.id, numero, adminId, entrepotId, poidsKg: data.poidsKg, mouvId: mouvement.id }, "Transfert admin créé + départ confirmé");
+  return updated!;
+}
+
 // ─── Entrée stock suite à livraison membre ───────────────────────────────────
 
 /**
