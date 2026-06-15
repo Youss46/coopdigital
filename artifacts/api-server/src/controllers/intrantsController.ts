@@ -519,6 +519,21 @@ export async function remboursementManuel(req: Request, res: Response): Promise<
     });
 
     res.status(201).json(result);
+
+    // Écriture comptable — fire-and-forget
+    const cooperativeId = req.user?.cooperativeId;
+    if (cooperativeId && result) {
+      const compteDebit = modeVal === "especes" ? "571" : "521";
+      proposerEcriture(cooperativeId, {
+        source: "intrant",
+        sourceId: result.id,
+        libelle: `Remboursement intrant – membre #${result.membreId}`,
+        compteDebit,
+        compteCredit: "4091",
+        montantFcfa: parseFloat(String(result.montantFcfa ?? 0)),
+        date: dateStr,
+      }).catch((err: unknown) => req.log.error({ err }, "Erreur écriture remboursement intrant"));
+    }
   } catch (err: unknown) {
     if (err instanceof Error && err.message === "Distribution introuvable") {
       res.status(404).json({ erreur: "Distribution introuvable" });

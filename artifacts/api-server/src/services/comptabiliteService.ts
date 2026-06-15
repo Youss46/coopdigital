@@ -14,7 +14,8 @@ export type SourceEcriture =
   | "livraison" | "paiement" | "avance" | "vente"
   | "encaissement" | "salaire" | "stock" | "don"
   // Sources granulaires (contrôle par module)
-  | "emprunt" | "transport" | "investissement" | "maintenance" | "intrant";
+  | "emprunt" | "transport" | "investissement" | "maintenance" | "intrant"
+  | "amortissement";
 
 interface ProposerEcriturePayload {
   source: SourceEcriture;
@@ -42,6 +43,7 @@ const AUTO_KEY_MAP: Record<SourceEcriture, keyof typeof configComptableTable.$in
   investissement:"autoInvestissements",
   maintenance:   "autoMaintenances",
   intrant:       "autoIntrants",
+  amortissement: "autoMaintenances",
 };
 
 // Mapping vers les valeurs d'enum PostgreSQL existantes
@@ -60,6 +62,7 @@ const DB_SOURCE_MAP: Record<SourceEcriture, "livraison" | "vente" | "avance" | "
   investissement:"paiement",
   maintenance:   "paiement",
   intrant:       "stock",
+  amortissement: "paiement",
 };
 
 async function getConfigComptable(cooperativeId: number) {

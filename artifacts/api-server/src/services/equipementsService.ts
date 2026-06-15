@@ -6,6 +6,7 @@ import {
 } from "@workspace/db";
 import { eq, and, lte, lt, isNotNull, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { proposerEcriture } from "./comptabiliteService.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -364,8 +365,23 @@ export async function getEquipementsAmortis(cooperativeId: number) {
 
 export async function genererDotationsMensuelles(cooperativeId: number, mois: number, annee: number) {
   const equips = await db
-    .select()
+    .select({
+      id: equipementsTable.id,
+      cooperativeId: equipementsTable.cooperativeId,
+      categorieId: equipementsTable.categorieId,
+      designation: equipementsTable.designation,
+      valeurAcquisitionFcfa: equipementsTable.valeurAcquisitionFcfa,
+      valeurResiduelleFcfa: equipementsTable.valeurResiduelleFcfa,
+      valeurNetteComptableFcfa: equipementsTable.valeurNetteComptableFcfa,
+      cumulAmortissementFcfa: equipementsTable.cumulAmortissementFcfa,
+      dureeAmortissementAns: equipementsTable.dureeAmortissementAns,
+      methodeAmortissement: equipementsTable.methodeAmortissement,
+      dateMiseService: equipementsTable.dateMiseService,
+      statut: equipementsTable.statut,
+      compteAmortissement: categoriesEquipementsTable.compteAmortissement,
+    })
     .from(equipementsTable)
+    .leftJoin(categoriesEquipementsTable, eq(equipementsTable.categorieId, categoriesEquipementsTable.id))
     .where(and(
       eq(equipementsTable.cooperativeId, cooperativeId),
       eq(equipementsTable.statut, "actif"),
@@ -426,6 +442,17 @@ export async function genererDotationsMensuelles(cooperativeId: number, mois: nu
           updatedAt: new Date(),
         })
         .where(eq(equipementsTable.id, eq_.id));
+    });
+
+    // Écriture comptable — 681 / compte amortissement de la catégorie
+    await proposerEcriture(cooperativeId, {
+      source: "amortissement",
+      sourceId: eq_.id,
+      libelle: `Dotation amortissement ${String(mois).padStart(2, "0")}/${annee} – ${eq_.designation}`,
+      compteDebit: "681",
+      compteCredit: eq_.compteAmortissement ?? "284",
+      montantFcfa: dotation,
+      date: `${annee}-${String(mois).padStart(2, "0")}-01`,
     });
 
     nb++;
