@@ -338,7 +338,11 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
 
-  const fmtFCFA = (n: number) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+  // U+202F (espace insécable étroit) produit par fr-FR n'a pas de glyphe dans
+  // Helvetica (PDFKit) → rendu en "/" sur certains lecteurs PDF. On le remplace
+  // par une espace ASCII ordinaire, idem que formaterFCFA() dans pdfService.ts.
+  const fmtFCFA = (n: number) =>
+    new Intl.NumberFormat("fr-FR").format(n).replace(/[\u202F\u00A0]/g, " ") + " FCFA";
   const fmtDate = (d: string) => new Date(d).toLocaleDateString("fr-FR");
   const codeMembre = computeCodeMembre(liv.numeroMembre ?? 0, liv.dateAdhesion ?? "2025-01-01");
 
@@ -374,7 +378,7 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
     ["Date de livraison", fmtDate(liv.dateLivraison)],
     ["Référence", liv.codeAchat ?? `LIV-${liv.id}`],
     ["Produit", liv.produit ?? "Cacao"],
-    ["Poids net (kg)", `${Number(liv.poidsKg).toLocaleString("fr-FR")} kg`],
+    ["Poids net (kg)", `${Number(liv.poidsKg).toLocaleString("fr-FR").replace(/[\u202F\u00A0]/g, " ")} kg`],
     ["Prix unitaire", fmtFCFA(liv.prixUnitaireFcfa) + "/kg"],
     ["Montant brut", fmtFCFA(liv.montantBrutFcfa)],
     ["Avance déduite", fmtFCFA(liv.avanceDeduiteFcfa)],
