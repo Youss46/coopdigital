@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, Search, Plus, Loader2, ChevronRight, Calendar,
   Scale, Banknote, TrendingDown, ArrowDownCircle, FileDown,
 } from "lucide-react";
+
+const ROLES_CREER = ["pca", "directeur", "delegue"];
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -48,6 +51,8 @@ function fmtDate(d: string | null | undefined) {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function LivraisonsPage() {
+  const { utilisateur } = useAuth();
+  const peutCreer = ROLES_CREER.includes(utilisateur?.role ?? "");
   const [recherche, setRecherche] = useState("");
 
   const { data: livraisons = [], isLoading } = useQuery<Livraison[]>({
@@ -75,15 +80,17 @@ export default function LivraisonsPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Livraisons</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Historique des pesées de vos membres</p>
+          <p className="text-gray-500 text-sm mt-0.5">Historique des pesées de cacao</p>
         </div>
-        <Link href="/livraisons/nouvelle">
-          <a className="flex items-center gap-2 text-sm font-medium text-white px-4 py-2.5 rounded-xl"
-             style={{ backgroundColor: "#1a4731" }}>
-            <Plus size={15} />
-            Nouvelle
-          </a>
-        </Link>
+        {peutCreer && (
+          <Link href="/livraisons/nouvelle">
+            <a className="flex items-center gap-2 text-sm font-medium text-white px-4 py-2.5 rounded-xl"
+               style={{ backgroundColor: "#1a4731" }}>
+              <Plus size={15} />
+              Nouvelle livraison
+            </a>
+          </Link>
+        )}
       </div>
 
       {/* KPIs résumé */}
@@ -135,7 +142,7 @@ export default function LivraisonsPage() {
           <p className="text-gray-400 text-sm">
             {recherche ? "Aucun résultat pour cette recherche" : "Aucune livraison enregistrée"}
           </p>
-          {!recherche && (
+          {!recherche && peutCreer && (
             <Link href="/livraisons/nouvelle">
               <a className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-white px-4 py-2 rounded-lg"
                  style={{ backgroundColor: "#1a4731" }}>
