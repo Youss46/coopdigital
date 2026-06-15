@@ -126,7 +126,7 @@ export async function getMessagesRecus(req: Request, res: Response): Promise<voi
   if (!cooperativeId || !userId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
 
   try {
-    const ciblesValides = ["tous", userRole, "direction"];
+    const ciblesValides = ["tous", userRole];
 
     if (userRole && ["pca", "directeur", "comptable"].includes(userRole)) {
       ciblesValides.push("direction");

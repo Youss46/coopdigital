@@ -84,7 +84,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
 
   // ── Organisation ─────────────────────────────────────────────────────────────
   { href: "/gouvernance",            label: "Gouvernance",               roles: ["pca","directeur","secretaire","auditeur"],                                   category: "Organisation" },
-  { href: "/communication",          label: "Communication",             roles: ["pca","directeur"],                                                           category: "Organisation" },
+  { href: "/communication",          label: "Communication",             roles: ["pca","directeur","comptable","magasinier","responsable_tracabilite","delegue","auditeur","agent_terrain"], category: "Organisation" },
   { href: "/delegues",               label: "Délégués Localité",         roles: ["pca","directeur","comptable","auditeur"],                                    category: "Organisation" },
   { href: "/administration/comptes", label: "Administration",            roles: ["pca","directeur"],                                                           category: "Organisation" },
   { href: "/parametres",             label: "Paramètres",                roles: ["pca","directeur"],                                                           category: "Organisation" },
