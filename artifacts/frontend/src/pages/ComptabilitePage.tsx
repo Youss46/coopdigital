@@ -68,6 +68,10 @@ const MODULE_CONFIG = [
   { key: "autoEmprunts",        label: "Emprunts & remboursements",   groupe: "Financier & exceptionnel" },
   { key: "autoInvestissements", label: "Investissements",             groupe: "Financier & exceptionnel" },
   { key: "autoDons",            label: "Dons & subventions reçus",    groupe: "Financier & exceptionnel" },
+  { key: "autoSubventions",     label: "Réception de subventions",    groupe: "Financier & exceptionnel" },
+  { key: "autoCaisse",          label: "Mouvements de caisse",        groupe: "Trésorerie" },
+  { key: "autoBanque",          label: "Mouvements bancaires",        groupe: "Trésorerie" },
+  { key: "autoMobileMarchand",  label: "Virements Mobile Marchand",   groupe: "Trésorerie" },
 ] as const;
 
 type ModuleKey = typeof MODULE_CONFIG[number]["key"];
