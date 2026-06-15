@@ -267,6 +267,12 @@ export async function updateConfigComptable(req: Request, res: Response): Promis
       autoEncaissements?: boolean;
       autoSalaires?: boolean;
       autoStocks?: boolean;
+      autoIntrants?: boolean;
+      autoTransport?: boolean;
+      autoMaintenances?: boolean;
+      autoEmprunts?: boolean;
+      autoInvestissements?: boolean;
+      autoDons?: boolean;
     };
 
     const [updated] = await db

@@ -55,13 +55,19 @@ const STATUT_BADGE: Record<string, { label: string; bg: string; text: string }> 
 };
 
 const MODULE_CONFIG = [
-  { key: "autoLivraisons",   label: "Livraisons producteurs" },
-  { key: "autoPaiements",    label: "Paiements producteurs" },
-  { key: "autoAvances",      label: "Avances producteurs" },
-  { key: "autoVentesExport", label: "Ventes exportateurs" },
-  { key: "autoEncaissements",label: "Encaissements exportateurs" },
-  { key: "autoSalaires",     label: "Salaires & paie" },
-  { key: "autoStocks",       label: "Mouvements de stocks" },
+  { key: "autoLivraisons",      label: "Livraisons producteurs",      groupe: "Opérations principales" },
+  { key: "autoPaiements",       label: "Paiements producteurs",       groupe: "Opérations principales" },
+  { key: "autoAvances",         label: "Avances producteurs",         groupe: "Opérations principales" },
+  { key: "autoVentesExport",    label: "Ventes exportateurs",         groupe: "Opérations principales" },
+  { key: "autoEncaissements",   label: "Encaissements exportateurs",  groupe: "Opérations principales" },
+  { key: "autoSalaires",        label: "Salaires & paie",             groupe: "Charges & exploitation" },
+  { key: "autoStocks",          label: "Mouvements de stocks",        groupe: "Charges & exploitation" },
+  { key: "autoIntrants",        label: "Achats intrants",             groupe: "Charges & exploitation" },
+  { key: "autoTransport",       label: "Frais de transport",          groupe: "Charges & exploitation" },
+  { key: "autoMaintenances",    label: "Maintenances & réparations",  groupe: "Charges & exploitation" },
+  { key: "autoEmprunts",        label: "Emprunts & remboursements",   groupe: "Financier & exceptionnel" },
+  { key: "autoInvestissements", label: "Investissements",             groupe: "Financier & exceptionnel" },
+  { key: "autoDons",            label: "Dons & subventions reçus",    groupe: "Financier & exceptionnel" },
 ] as const;
 
 type ModuleKey = typeof MODULE_CONFIG[number]["key"];
@@ -130,43 +136,49 @@ function OngletConfiguration() {
         </p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 py-3">Module</th>
-              <th className="text-center text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 py-3">Mode actuel</th>
-              <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 py-3">Automatique</th>
-            </tr>
-          </thead>
-          <tbody>
-            {MODULE_CONFIG.map(({ key, label }) => {
-              const isAuto = getValue(key);
-              return (
-                <tr key={key} className="border-b border-gray-50 hover:bg-gray-50/50">
-                  <td className="px-5 py-3.5">
-                    <span className="text-sm font-medium text-gray-900">{label}</span>
-                  </td>
-                  <td className="px-5 py-3.5 text-center">
-                    <span
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                      style={{
-                        backgroundColor: isAuto ? "#dcfce7" : "#f3f4f6",
-                        color: isAuto ? "#166534" : "#374151",
-                      }}
-                    >
-                      {isAuto ? "Automatique" : "Manuel"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <Toggle checked={isAuto} onChange={(v) => handleToggle(key, v)} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {(() => {
+        const groupes = [...new Set(MODULE_CONFIG.map((m) => m.groupe))];
+        return groupes.map((groupe) => {
+          const modules = MODULE_CONFIG.filter((m) => m.groupe === groupe);
+          const nbAuto = modules.filter(({ key }) => getValue(key)).length;
+          return (
+            <div key={groupe} className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-3">
+              <div className="flex items-center justify-between px-5 py-2.5 bg-gray-50 border-b border-gray-100">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{groupe}</span>
+                <span className="text-xs text-gray-400">{nbAuto}/{modules.length} automatique{nbAuto > 1 ? "s" : ""}</span>
+              </div>
+              <table className="w-full">
+                <tbody>
+                  {modules.map(({ key, label }) => {
+                    const isAuto = getValue(key);
+                    return (
+                      <tr key={key} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
+                        <td className="px-5 py-3.5">
+                          <span className="text-sm font-medium text-gray-900">{label}</span>
+                        </td>
+                        <td className="px-5 py-3.5 text-center w-32">
+                          <span
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                            style={{
+                              backgroundColor: isAuto ? "#dcfce7" : "#f3f4f6",
+                              color: isAuto ? "#166534" : "#374151",
+                            }}
+                          >
+                            {isAuto ? "Automatique" : "Manuel"}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-right w-20">
+                          <Toggle checked={isAuto} onChange={(v) => handleToggle(key, v)} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+        });
+      })()}
 
       <div
         className="flex gap-3 rounded-xl border p-4 mb-6"
