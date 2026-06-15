@@ -629,8 +629,36 @@ function OngletEnAttente() {
 function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
   const [page, setPage] = useState(1);
   const [filtreSource, setFiltreSource] = useState(defaultSource);
+  const [exporting, setExporting] = useState(false);
   const LIMIT = 50;
   const annee = new Date().getFullYear();
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ exercice: String(annee) });
+      if (filtreSource) params.set("source", filtreSource);
+      const url = `${import.meta.env.VITE_API_URL ?? ""}/api/comptabilite/journal/export?${params.toString()}`;
+      const r = await fetch(url, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("coop_token") ?? ""}` },
+      });
+      if (!r.ok) throw new Error("Erreur lors de l'export");
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      const cd = r.headers.get("Content-Disposition") ?? "";
+      const match = cd.match(/filename="([^"]+)"/);
+      a.download = match?.[1] ?? `journal-${annee}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      alert("Impossible de télécharger le fichier CSV.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data, isLoading } = useGetJournalComptable({ exercice: annee, page, limit: LIMIT });
   const ecritures = (data as { ecritures?: unknown[]; total?: number } | undefined);
@@ -657,6 +685,15 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
     <div>
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <p className="text-sm text-gray-500 mr-auto">{total} écriture{total > 1 ? "s" : ""} — exercice {annee}</p>
+
+        <button
+          onClick={() => { void handleExport(); }}
+          disabled={exporting}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+        >
+          <Download size={14} />
+          {exporting ? "Export…" : filtreSource ? `Exporter (${SOURCE_LABELS[filtreSource] ?? filtreSource})` : "Exporter CSV"}
+        </button>
 
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-gray-400" />

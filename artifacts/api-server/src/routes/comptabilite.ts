@@ -5,6 +5,7 @@ import {
   getGrandLivre,
   getBalance,
   getJournalComptable,
+  exportJournalCsv,
   createEcritureManuelle,
   getMargeCollecte,
   getTresorerie,
@@ -40,7 +41,8 @@ router.use(authMiddleware);
 // ─── Grand livre / Balance / Journal ──────────────────────────────────────────
 router.get("/comptabilite/grand-livre",   checkPermission("comptabilite", "voir_grand_livre"),        getGrandLivre);
 router.get("/comptabilite/balance",       checkPermission("comptabilite", "voir_balance"),            getBalance);
-router.get("/comptabilite/journal",       checkPermission("comptabilite", "lire"),                    getJournalComptable);
+router.get("/comptabilite/journal",        checkPermission("comptabilite", "lire"), getJournalComptable);
+router.get("/comptabilite/journal/export", checkPermission("comptabilite", "lire"), exportJournalCsv);
 router.post("/comptabilite/ecriture",     checkPermission("comptabilite", "saisir_ecriture_manuelle"), createEcritureManuelle);
 router.get("/comptabilite/marge-collecte",checkPermission("comptabilite", "lire"),                    getMargeCollecte);
 router.get("/comptabilite/tresorerie",    checkPermission("comptabilite", "lire"),                    getTresorerie);

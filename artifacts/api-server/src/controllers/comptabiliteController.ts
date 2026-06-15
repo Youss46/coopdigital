@@ -176,6 +176,73 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
   }
 }
 
+export async function exportJournalCsv(req: Request, res: Response): Promise<void> {
+  try {
+    const exercice = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : exerciceCourant();
+    const source = req.query["source"] as string | undefined;
+    const dateDebut = req.query["date_debut"] as string | undefined;
+    const dateFin = req.query["date_fin"] as string | undefined;
+
+    const conditions = [
+      eq(ecrituresComptablesTable.cooperativeId, coopId(req)),
+      eq(ecrituresComptablesTable.exercice, exercice),
+    ];
+    if (source) conditions.push(eq(ecrituresComptablesTable.source, source as "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock"));
+    if (dateDebut) conditions.push(gte(ecrituresComptablesTable.dateEcriture, dateDebut));
+    if (dateFin) conditions.push(lte(ecrituresComptablesTable.dateEcriture, dateFin));
+
+    const ecritures = await db
+      .select()
+      .from(ecrituresComptablesTable)
+      .where(and(...conditions))
+      .orderBy(asc(ecrituresComptablesTable.dateEcriture), asc(ecrituresComptablesTable.id));
+
+    const SOURCE_LABELS: Record<string, string> = {
+      livraison: "Livraisons prod.",
+      paiement: "Paiements prod.",
+      avance: "Avances prod.",
+      vente: "Ventes export.",
+      encaissement: "Encaissements",
+      salaire: "Salaires",
+      stock: "Stocks",
+      manuel: "Manuel",
+    };
+
+    const csvEscape = (v: string | number | null | undefined): string => {
+      if (v === null || v === undefined) return "";
+      const s = String(v);
+      if (s.includes(";") || s.includes('"') || s.includes("\n")) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
+    const header = ["Date", "N° Pièce", "Libellé", "Compte Débit", "Compte Crédit", "Montant FCFA", "Source"].join(";");
+    const rows = ecritures.map((e) =>
+      [
+        csvEscape(e.dateEcriture),
+        csvEscape(e.numeroPiece),
+        csvEscape(e.libelle),
+        csvEscape(e.compteDebit),
+        csvEscape(e.compteCredit),
+        csvEscape(e.montantFcfa),
+        csvEscape(SOURCE_LABELS[e.source] ?? e.source),
+      ].join(";")
+    );
+
+    const csv = [header, ...rows].join("\n");
+    const filename = `journal-${exercice}${source ? `-${source}` : ""}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send("\uFEFF" + csv); // BOM UTF-8 pour Excel
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur exportJournalCsv");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 export async function getMargeCollecte(req: Request, res: Response): Promise<void> {
   try {
     const exercice = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : exerciceCourant();
