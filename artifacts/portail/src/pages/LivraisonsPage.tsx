@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { api, type Livraison } from "@/lib/api";
+import { api, getToken, type Livraison } from "@/lib/api";
 import { Loader2, ArrowLeft, Download, Package } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
@@ -11,10 +11,39 @@ export default function LivraisonsPage() {
   const [, setLoc] = useLocation();
   const [livraisons, setLivraisons] = useState<Livraison[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   useEffect(() => {
     api.livraisons().then(setLivraisons).finally(() => setLoading(false));
   }, []);
+
+  async function telechargerRecu(livraison: Livraison) {
+    if (downloadingId !== null) return;
+    setDownloadingId(livraison.id);
+    try {
+      const token = getToken();
+      const res = await fetch(api.recuPdfUrl(livraison.id), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { erreur?: string }).erreur ?? `Erreur ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `recu-${livraison.codeAchat ?? `LIV-${livraison.id}`}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert((err as Error).message ?? "Impossible de télécharger le reçu");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   const totalKg = livraisons.reduce((s, l) => s + Number(l.poidsKg), 0);
   const totalNet = livraisons.reduce((s, l) => s + l.montantNetFcfa, 0);
@@ -61,14 +90,16 @@ export default function LivraisonsPage() {
                       <div className="text-xs text-green-600 font-medium mt-1">{l.campagneLibelle}</div>
                     )}
                   </div>
-                  <a
-                    href={api.recuPdfUrl(l.id)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-2xl px-4 py-2 text-sm font-medium text-gray-700"
+                  <button
+                    onClick={() => telechargerRecu(l)}
+                    disabled={downloadingId === l.id}
+                    className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-60 rounded-2xl px-4 py-2 text-sm font-medium text-gray-700"
                   >
-                    <Download className="w-4 h-4" /> Reçu
-                  </a>
+                    {downloadingId === l.id
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Download className="w-4 h-4" />}
+                    Reçu
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

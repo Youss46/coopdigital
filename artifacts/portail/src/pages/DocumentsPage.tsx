@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { api, type Livraison, type Profil } from "@/lib/api";
+import { api, getToken, type Livraison, type Profil } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
   Loader2, ArrowLeft, Download, FileText, CreditCard,
@@ -39,6 +39,7 @@ export default function DocumentsPage() {
   const { profil, login } = useAuth() as { profil: Profil | null; loading: boolean; login: (p: Profil) => void; logout: () => void };
   const [livraisons, setLivraisons] = useState<Livraison[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   // Photo upload state
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +77,34 @@ export default function DocumentsPage() {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+
+  async function telechargerRecu(livraison: Livraison) {
+    if (downloadingId !== null) return;
+    setDownloadingId(livraison.id);
+    try {
+      const token = getToken();
+      const res = await fetch(api.recuPdfUrl(livraison.id), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { erreur?: string }).erreur ?? `Erreur ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `recu-${livraison.codeAchat ?? `LIV-${livraison.id}`}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert((err as Error).message ?? "Impossible de télécharger le reçu");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   const token = localStorage.getItem("portail_token") ?? "";
   const carteUrl = api.carteMembreUrl();
@@ -271,15 +300,16 @@ export default function DocumentsPage() {
                     </div>
                     {l.codeAchat && <div className="text-xs text-gray-400 font-mono">{l.codeAchat}</div>}
                   </div>
-                  <a
-                    href={api.recuPdfUrl(l.id)}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    onClick={() => telechargerRecu(l)}
+                    disabled={downloadingId === l.id}
                     className="flex items-center gap-2 bg-white border border-gray-200 hover:bg-gray-50
-                      rounded-2xl px-4 py-2.5 text-sm font-medium text-gray-700 shrink-0 ml-3"
+                      disabled:opacity-60 rounded-2xl px-4 py-2.5 text-sm font-medium text-gray-700 shrink-0 ml-3"
                   >
-                    <Download className="w-4 h-4" />
-                  </a>
+                    {downloadingId === l.id
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Download className="w-4 h-4" />}
+                  </button>
                 </div>
               ))}
             </div>
