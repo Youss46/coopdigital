@@ -227,40 +227,45 @@ export async function getUserActions(cooperativeId: number, userId: number, limi
 
 /** Statistiques du journal */
 export async function getStats(cooperativeId: number) {
-  const now      = new Date();
-  const debutJour = new Date(now); debutJour.setHours(0, 0, 0, 0);
-  const debutSemaine = new Date(now); debutSemaine.setDate(now.getDate() - 7);
-  const debut30j = new Date(now); debut30j.setDate(now.getDate() - 30);
+  const now           = new Date();
+  const debutJour     = new Date(now); debutJour.setHours(0, 0, 0, 0);
+  const debutSemaine  = new Date(now); debutSemaine.setDate(now.getDate() - 7);
+  const debut30j      = new Date(now); debut30j.setDate(now.getDate() - 30);
 
   const [aujourd, semaine, parModule, parUser, sensibles, evolution] = await Promise.all([
+    // KPI : actions aujourd'hui
     db.select({ count: sql<string>`COUNT(*)` })
       .from(auditTrailTable)
       .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debutJour))),
 
+    // KPI : actions 7 derniers jours
     db.select({ count: sql<string>`COUNT(*)` })
       .from(auditTrailTable)
       .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debutSemaine))),
 
+    // Graphique : all-time par module (pas de filtre de date → toutes les données disponibles)
     db.select({ module: auditTrailTable.module, nb: sql<string>`COUNT(*)` })
       .from(auditTrailTable)
-      .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debut30j)))
+      .where(eq(auditTrailTable.cooperativeId, cooperativeId))
       .groupBy(auditTrailTable.module)
       .orderBy(desc(sql`COUNT(*)`))
       .limit(10),
 
+    // Graphique : all-time utilisateurs les plus actifs
     db.select({
-        userId: auditTrailTable.userId,
-        userNom: sql<string>`COALESCE(TRIM(${usersTable.prenoms} || ' ' || ${usersTable.nom}), ${auditTrailTable.userNom})`,
+        userId:   auditTrailTable.userId,
+        userNom:  sql<string>`COALESCE(NULLIF(TRIM(COALESCE(${usersTable.prenoms},'') || ' ' || COALESCE(${usersTable.nom},'')), ''), ${auditTrailTable.userNom}, 'Utilisateur #' || COALESCE(${auditTrailTable.userId}::TEXT, '?'))`,
         userRole: auditTrailTable.userRole,
-        nb: sql<string>`COUNT(*)`,
+        nb:       sql<string>`COUNT(*)`,
       })
       .from(auditTrailTable)
       .leftJoin(usersTable, eq(usersTable.id, auditTrailTable.userId))
-      .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debut30j)))
-      .groupBy(auditTrailTable.userId, usersTable.nom, usersTable.prenoms, auditTrailTable.userRole)
+      .where(eq(auditTrailTable.cooperativeId, cooperativeId))
+      .groupBy(auditTrailTable.userId, usersTable.nom, usersTable.prenoms, auditTrailTable.userRole, auditTrailTable.userNom)
       .orderBy(desc(sql`COUNT(*)`))
       .limit(10),
 
+    // Liste : modifications critiques (30 derniers jours)
     db.select()
       .from(auditTrailTable)
       .where(
@@ -273,27 +278,24 @@ export async function getStats(cooperativeId: number) {
       .orderBy(desc(auditTrailTable.createdAt))
       .limit(30),
 
+    // Graphique évolution : tendance journalière sur 30 jours
     db.select({
-        jour: sql<string>`DATE_TRUNC('day', ${auditTrailTable.createdAt})::DATE::TEXT`,
-        heure: sql<string>`DATE_TRUNC('hour', ${auditTrailTable.createdAt})::TEXT`,
-        nb: sql<string>`COUNT(*)`,
+        heure: sql<string>`DATE_TRUNC('day', ${auditTrailTable.createdAt})::DATE::TEXT`,
+        nb:    sql<string>`COUNT(*)`,
       })
       .from(auditTrailTable)
-      .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debutSemaine)))
-      .groupBy(
-        sql`DATE_TRUNC('day', ${auditTrailTable.createdAt})`,
-        sql`DATE_TRUNC('hour', ${auditTrailTable.createdAt})`,
-      )
-      .orderBy(sql`DATE_TRUNC('hour', ${auditTrailTable.createdAt})`),
+      .where(and(eq(auditTrailTable.cooperativeId, cooperativeId), gte(auditTrailTable.createdAt, debut30j)))
+      .groupBy(sql`DATE_TRUNC('day', ${auditTrailTable.createdAt})`)
+      .orderBy(sql`DATE_TRUNC('day', ${auditTrailTable.createdAt})`),
   ]);
 
   return {
-    nb_actions_aujourd_hui: parseInt(aujourd[0]?.count ?? "0"),
-    nb_actions_semaine:     parseInt(semaine[0]?.count ?? "0"),
-    actions_par_module:     parModule.map((r) => ({ module: r.module, nb: parseInt(r.nb) })),
-    actions_par_user:       parUser.map((r) => ({ userId: r.userId, nom: r.userNom, role: r.userRole, nb: parseInt(r.nb) })),
+    nb_actions_aujourd_hui:  parseInt(aujourd[0]?.count ?? "0"),
+    nb_actions_semaine:      parseInt(semaine[0]?.count ?? "0"),
+    actions_par_module:      parModule.map((r) => ({ module: r.module, nb: parseInt(r.nb) })),
+    actions_par_user:        parUser.map((r) => ({ userId: r.userId, nom: r.userNom, role: r.userRole, nb: parseInt(r.nb) })),
     modifications_critiques: sensibles,
-    evolution_horaire:      evolution.map((r) => ({ heure: r.heure, nb: parseInt(r.nb) })),
+    evolution_horaire:       evolution.map((r) => ({ heure: r.heure, nb: parseInt(r.nb) })),
   };
 }
 

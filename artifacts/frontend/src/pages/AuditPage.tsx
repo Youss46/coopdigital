@@ -139,7 +139,7 @@ function TabDashboard() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-gray-800 text-sm mb-4">Évolution horaire</h3>
+          <h3 className="font-semibold text-gray-800 text-sm mb-4">Évolution journalière (30 jours)</h3>
           {evolution.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-6">Aucune donnée</p>
           ) : (
