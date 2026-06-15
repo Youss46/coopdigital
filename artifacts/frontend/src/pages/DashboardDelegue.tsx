@@ -56,6 +56,7 @@ interface DashboardData {
     poidsKg: string;
     montantNetFcfa: number;
     dateLivraison: string;
+    nombreSacs: number | null;
     membreNom: string | null;
     membrePrenoms: string | null;
   }[];
@@ -355,7 +356,10 @@ export default function DashboardDelegue() {
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className="text-sm font-semibold text-gray-800">{formaterFCFA(l.montantNetFcfa)}</p>
-                  <p className="text-xs text-gray-400">{parseFloat(l.poidsKg).toFixed(1)} kg</p>
+                  <p className="text-xs text-gray-400">
+                    {parseFloat(l.poidsKg).toFixed(1)} kg
+                    {l.nombreSacs ? ` · ${l.nombreSacs} sacs` : ""}
+                  </p>
                 </div>
               </div>
             ))}

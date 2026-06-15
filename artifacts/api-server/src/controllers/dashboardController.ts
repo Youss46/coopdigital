@@ -104,6 +104,7 @@ export async function getDashboardLivraisons(req: Request, res: Response): Promi
         dateLivraison: livraisonsTable.dateLivraison,
         agentId: livraisonsTable.agentId,
         createdAt: livraisonsTable.createdAt,
+        nombreSacs: livraisonsTable.nombreSacs,
         membreNom: membresTable.nom,
         membrePrenoms: membresTable.prenoms,
       })
@@ -341,6 +342,7 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
           poidsKg: livraisonsTable.poidsKg,
           montantNetFcfa: livraisonsTable.montantNetFcfa,
           dateLivraison: livraisonsTable.dateLivraison,
+          nombreSacs: livraisonsTable.nombreSacs,
           membreNom: membresTable.nom,
           membrePrenoms: membresTable.prenoms,
         })

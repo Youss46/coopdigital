@@ -496,7 +496,10 @@ export default function Dashboard() {
                     <p className="text-sm font-medium text-gray-900">
                       {l.membreNom} {l.membrePrenoms}
                     </p>
-                    <p className="text-xs text-gray-400">{formaterDate(l.dateLivraison)} · {Number(l.poidsKg).toFixed(1)} kg</p>
+                    <p className="text-xs text-gray-400">
+                      {formaterDate(l.dateLivraison)} · {Number(l.poidsKg).toFixed(1)} kg
+                      {(l as typeof l & { nombreSacs?: number | null }).nombreSacs ? ` · ${(l as typeof l & { nombreSacs?: number | null }).nombreSacs} sacs` : ""}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-gray-900">{formaterFCFA(l.montantNetFcfa)}</p>
