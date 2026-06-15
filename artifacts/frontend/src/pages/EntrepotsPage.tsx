@@ -125,6 +125,7 @@ export default function EntrepotsPage() {
   const peutGerer = usePermission("stocks", "creer_entrepot");
   const peutModifier = usePermission("stocks", "modifier_entrepot");
   const [onglet, setOnglet] = useState<"stocks" | "transferts">("stocks");
+  const [filtreStatut, setFiltreStatut] = useState<"tous" | "confirme" | "litige" | "arrive">("tous");
   const [showArrivee, setShowArrivee] = useState<Transfert | null>(null);
   const [formArrivee, setFormArrivee] = useState({ poidsArrivee_kg: "", motifEcart: "", notes: "" });
   const [showCreer, setShowCreer] = useState(false);
@@ -267,7 +268,13 @@ export default function EntrepotsPage() {
 
   const entrepots = stats?.entrepots ?? [];
   const enCours = transferts.filter((t) => ["planifie", "en_cours"].includes(t.statut));
-  const historique = transferts.filter((t) => ["arrive", "confirme", "litige"].includes(t.statut));
+  const historiqueTous = transferts.filter((t) => ["arrive", "confirme", "litige"].includes(t.statut));
+  const historique = filtreStatut === "tous" ? historiqueTous : historiqueTous.filter((t) => t.statut === filtreStatut);
+  const comptesStatut = {
+    confirme: historiqueTous.filter((t) => t.statut === "confirme").length,
+    litige: historiqueTous.filter((t) => t.statut === "litige").length,
+    arrive: historiqueTous.filter((t) => t.statut === "arrive").length,
+  };
 
   return (
     <div className="space-y-6">
@@ -444,14 +451,65 @@ export default function EntrepotsPage() {
 
           {/* Historique */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Historique</h3>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <h3 className="text-sm font-semibold text-gray-700">
+                Historique
+                {filtreStatut !== "tous" && (
+                  <span className="ml-2 text-xs font-normal text-gray-400">
+                    ({historique.length} / {historiqueTous.length})
+                  </span>
+                )}
+              </h3>
+              {historiqueTous.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {(
+                    [
+                      { key: "tous", label: "Tous", count: historiqueTous.length, color: "gray" },
+                      { key: "confirme", label: "Confirmés", count: comptesStatut.confirme, color: "green" },
+                      { key: "arrive", label: "Arrivés", count: comptesStatut.arrive, color: "blue" },
+                      { key: "litige", label: "Litiges", count: comptesStatut.litige, color: "red" },
+                    ] as const
+                  ).map(({ key, label, count, color }) => {
+                    if (key !== "tous" && count === 0) return null;
+                    const actif = filtreStatut === key;
+                    const colorMap = {
+                      gray: actif ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400",
+                      green: actif ? "bg-green-700 text-white border-green-700" : "bg-white text-green-700 border-green-200 hover:border-green-400",
+                      blue: actif ? "bg-blue-600 text-white border-blue-600" : "bg-white text-blue-600 border-blue-200 hover:border-blue-400",
+                      red: actif ? "bg-red-600 text-white border-red-600" : "bg-white text-red-600 border-red-200 hover:border-red-400",
+                    };
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setFiltreStatut(key)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${colorMap[color]}`}
+                      >
+                        {label}
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${actif ? "bg-white/20" : "bg-gray-100"}`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             {loadTrans
               ? <div className="bg-white rounded-xl border h-32 animate-pulse" />
-              : historique.length === 0 && enCours.length === 0
+              : historiqueTous.length === 0 && enCours.length === 0
                 ? (
                   <div className="text-center py-16 text-gray-400">
                     <Truck className="w-10 h-10 mx-auto mb-2 opacity-30" />
                     <p className="font-medium">Aucun transfert pour l'instant</p>
+                  </div>
+                )
+                : historique.length === 0
+                ? (
+                  <div className="text-center py-10 text-gray-400 bg-white rounded-xl border border-gray-100">
+                    <p className="text-sm">Aucun transfert avec ce statut</p>
+                    <button onClick={() => setFiltreStatut("tous")} className="mt-2 text-xs text-green-700 hover:underline">
+                      Voir tous les transferts
+                    </button>
                   </div>
                 )
                 : (
