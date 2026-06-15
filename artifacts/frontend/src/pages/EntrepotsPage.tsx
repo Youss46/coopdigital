@@ -41,6 +41,7 @@ interface Entrepot {
   actif: boolean; delegueId: number;
   delegueNom: string | null; deleguePrenoms: string | null;
   adresse: string | null;
+  nombreSacsTotal?: number | null;
 }
 interface Stats {
   entrepots: Entrepot[];
@@ -371,6 +372,11 @@ export default function EntrepotsPage() {
 
                     <div className="mb-3">
                       <JaugeStock stock={e.stockActuelKg} capacite={e.capaciteMaxKg} seuil={e.seuilAlerteKg} />
+                      {e.nombreSacsTotal != null && e.nombreSacsTotal > 0 && (
+                        <p className="text-xs text-gray-500 mt-1.5">
+                          <span className="font-semibold text-gray-700">{e.nombreSacsTotal}</span> sacs
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-50">
@@ -829,9 +835,12 @@ export default function EntrepotsPage() {
               <div className="mt-3">
                 <JaugeStock stock={showDetail.stockActuelKg} capacite={showDetail.capaciteMaxKg} seuil={showDetail.seuilAlerteKg} />
               </div>
-              <div className="flex gap-3 mt-2 text-xs text-gray-500">
+              <div className="flex gap-3 mt-2 text-xs text-gray-500 flex-wrap">
                 <span>Stock : <span className="font-semibold text-gray-800">{kg(showDetail.stockActuelKg)}</span></span>
                 {showDetail.capaciteMaxKg && <span>Capacité : <span className="font-semibold text-gray-800">{kg(showDetail.capaciteMaxKg)}</span></span>}
+                {showDetail.nombreSacsTotal != null && showDetail.nombreSacsTotal > 0 && (
+                  <span>Sacs : <span className="font-semibold text-gray-800">{showDetail.nombreSacsTotal}</span></span>
+                )}
                 {showDetail.adresse && <span className="truncate">{showDetail.adresse}</span>}
               </div>
             </div>

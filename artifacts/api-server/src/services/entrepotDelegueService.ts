@@ -49,6 +49,14 @@ export async function listEntrepots(cooperativeId: number) {
       delegueId:     entrepotsDeleguesTable.delegueId,
       delegueNom:    usersTable.nom,
       deleguePrenoms: usersTable.prenoms,
+      nombreSacsTotal: sql<number>`(
+        SELECT COALESCE(SUM(l.nombre_sacs), 0)::integer
+        FROM entrepot_mouvements em
+        JOIN livraisons l ON l.id = em.livraison_id
+        WHERE em.entrepot_id = entrepots_delegues.id
+          AND em.type_mouvement = 'entree'
+          AND em.livraison_id IS NOT NULL
+      )`,
     })
     .from(entrepotsDeleguesTable)
     .leftJoin(usersTable, eq(usersTable.id, entrepotsDeleguesTable.delegueId))
