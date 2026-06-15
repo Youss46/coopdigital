@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -118,6 +119,7 @@ interface DelegueListe {
 }
 
 export default function EntrepotsPage() {
+  const [, setLocation] = useLocation();
   const qc = useQueryClient();
   const { toast } = useToast();
   const peutGerer = usePermission("stocks", "creer_entrepot");
@@ -492,27 +494,27 @@ export default function EntrepotsPage() {
                               <td className="px-4 py-3 text-center">
                                 <StatutBadge statut={t.statut} />
                                 {t.statut === "confirme" && (
-                                  <a
-                                    href={lienStock}
-                                    className="mt-1.5 flex items-center justify-center gap-1 text-xs text-green-700 hover:text-green-900 hover:underline"
+                                  <button
+                                    onClick={() => setLocation(lienStock)}
+                                    className="mt-1.5 flex items-center justify-center gap-1 text-xs text-green-700 hover:text-green-900 hover:underline w-full"
                                     title="Voir l'entrée dans le stock central"
                                   >
                                     <CheckCircle2 className="w-3 h-3" />
                                     Entrée créée
-                                  </a>
+                                  </button>
                                 )}
                               </td>
                               <td className="px-4 py-3 text-center hidden lg:table-cell">
                                 {t.statut === "confirme" ? (
-                                  <a
-                                    href={lienStock}
+                                  <button
+                                    onClick={() => setLocation(lienStock)}
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
                                     title="Voir le mouvement correspondant dans la page Stocks"
                                   >
                                     <CheckCircle2 className="w-3.5 h-3.5" />
                                     Voir dans Stocks
                                     <ArrowRight className="w-3 h-3" />
-                                  </a>
+                                  </button>
                                 ) : t.statut === "litige" ? (
                                   <span className="text-xs text-gray-400 italic">Non créée (litige)</span>
                                 ) : (
