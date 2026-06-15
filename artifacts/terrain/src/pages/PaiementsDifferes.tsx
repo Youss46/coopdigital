@@ -1,10 +1,34 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { getCaisse, getPaiementsDifferes, regulariserPaiement } from "../lib/api";
+import { getCaisse, getPaiementsDifferes, regulariserPaiement, telechargerRecuLivraison } from "../lib/api";
 import BottomNav from "../components/BottomNav";
 import type { CaisseDelegue, PaiementDiffere } from "../lib/types";
 
 type ModePaiement = "especes" | "orange_money" | "mtn_momo";
+
+function RecuBtnDiffere({ livraisonId }: { livraisonId: number }) {
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  async function handleDownload() {
+    setLoading(true); setErr("");
+    try { await telechargerRecuLivraison(livraisonId); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setLoading(false); }
+  }
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        className="t-btn t-btn--ghost"
+        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: ".85rem" }}
+        onClick={handleDownload}
+        disabled={loading}
+      >
+        {loading ? "⏳ Génération…" : "📄 Télécharger le reçu"}
+      </button>
+      {err && <div style={{ color: "var(--t-danger)", fontSize: ".78rem", textAlign: "center", marginTop: 4 }}>{err}</div>}
+    </div>
+  );
+}
 
 export default function PaiementsDifferesPage() {
   const [, setLocation] = useLocation();
@@ -16,6 +40,7 @@ export default function PaiementsDifferesPage() {
   const [paying, setPaying] = useState(false);
   const [erreur, setErreur] = useState("");
   const [succes, setSucces] = useState("");
+  const [dernierLivraisonId, setDernierLivraisonId] = useState<number | null>(null);
 
   async function load() {
     setLoading(true);
@@ -35,6 +60,7 @@ export default function PaiementsDifferesPage() {
     setErreur("");
     try {
       const res = await regulariserPaiement(selected.livraisonId, mode);
+      setDernierLivraisonId(selected.livraisonId);
       setSucces(`Paiement de ${selected.montantRestant.toLocaleString("fr-FR")} FCFA effectué. Solde caisse : ${res.solde.toLocaleString("fr-FR")} FCFA`);
       setSelected(null);
       await load();
@@ -79,8 +105,13 @@ export default function PaiementsDifferesPage() {
             </div>
 
             {succes && (
-              <div style={{ margin: "12px 16px 0", background: "var(--t-success-bg)", color: "var(--t-success)", borderRadius: "var(--t-radius)", padding: "12px 14px", fontSize: ".9rem", fontWeight: 600 }}>
-                ✅ {succes}
+              <div style={{ margin: "12px 16px 0" }}>
+                <div style={{ background: "var(--t-success-bg)", color: "var(--t-success)", borderRadius: "var(--t-radius)", padding: "12px 14px", fontSize: ".9rem", fontWeight: 600 }}>
+                  ✅ {succes}
+                </div>
+                {dernierLivraisonId && (
+                  <RecuBtnDiffere livraisonId={dernierLivraisonId} />
+                )}
               </div>
             )}
 

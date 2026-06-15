@@ -3,7 +3,7 @@ import {
   CheckCircle2, Clock, XCircle, Loader2, CreditCard, Search,
   CheckCheck, AlertCircle, Banknote, Smartphone, ChevronDown,
   Receipt, Package, User, Calendar, TrendingUp, X, Wallet,
-  AlertTriangle, Lock,
+  AlertTriangle, Lock, FileDown,
 } from "lucide-react";
 import {
   useListPaiements,
@@ -320,6 +320,27 @@ function ModalRejet({
 // ─── Modal Reçu ──────────────────────────────────────────────────────────────
 
 function ModalRecu({ paiement, onClose }: { paiement: PaiementListItem; onClose: () => void }) {
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownloadPdf() {
+    setDownloading(true);
+    try {
+      const res = await fetch(`${BASE}/api/rapports/recu/paiement/${paiement.id}`, {
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `recu_paiement_${paiement.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    } catch {}
+    finally { setDownloading(false); }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
@@ -373,12 +394,29 @@ function ModalRecu({ paiement, onClose }: { paiement: PaiementListItem; onClose:
             <StatutBadge statut={paiement.statut} />
           </div>
 
-          <button
-            onClick={onClose}
-            className="w-full py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Fermer
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Fermer
+            </button>
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white flex items-center justify-center gap-1.5 disabled:opacity-50"
+              style={{ backgroundColor: "#1a4731" }}
+            >
+              {downloading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <>
+                  <FileDown size={14} />
+                  PDF
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

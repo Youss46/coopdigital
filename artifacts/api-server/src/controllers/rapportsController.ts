@@ -102,6 +102,24 @@ export async function getRecuLivraison(req: Request, res: Response): Promise<voi
   }
 }
 
+export async function getTerrainRecuLivraison(req: Request, res: Response): Promise<void> {
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  const cooperativeId = req.agent?.cooperativeId;
+  if (!id) { res.status(400).json({ erreur: "ID livraison invalide" }); return; }
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const buffer = await generateRecuLivraison(id, cooperativeId);
+    sendPdf(res, buffer, `recu_livraison_${id}.pdf`);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getTerrainRecuLivraison");
+    if (err instanceof Error && err.message.includes("introuvable")) {
+      res.status(404).json({ erreur: err.message });
+    } else {
+      res.status(500).json({ erreur: "Erreur génération PDF" });
+    }
+  }
+}
+
 export async function getRecuPaiement(req: Request, res: Response): Promise<void> {
   const id = parseInt(String(req.params["id"] ?? "0"));
   const cooperativeId = req.user?.cooperativeId;

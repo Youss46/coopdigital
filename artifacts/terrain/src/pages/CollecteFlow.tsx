@@ -4,11 +4,35 @@ import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNav from "../components/BottomNav";
 import { useOffline } from "../contexts/OfflineContext";
-import { enregistrerCollecte, getPrix } from "../lib/api";
+import { enregistrerCollecte, getPrix, telechargerRecuLivraison } from "../lib/api";
 import { getCachedPrix, cachePrix } from "../lib/idb";
 import type { Fournisseur, CollecteResult, PrixActuel } from "../lib/types";
 
 type Step = 1 | 2 | 3 | 4;
+
+function RecuButton({ livraisonId }: { livraisonId: number }) {
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  async function handleDownload() {
+    setLoading(true); setErr("");
+    try { await telechargerRecuLivraison(livraisonId); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setLoading(false); }
+  }
+  return (
+    <div style={{ width: "100%", maxWidth: 320 }}>
+      <button
+        className="t-btn t-btn--ghost"
+        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+        onClick={handleDownload}
+        disabled={loading}
+      >
+        {loading ? "⏳ Génération…" : "📄 Télécharger le reçu"}
+      </button>
+      {err && <div style={{ color: "var(--t-danger)", fontSize: ".78rem", textAlign: "center", marginTop: 4 }}>{err}</div>}
+    </div>
+  );
+}
 type ModePaiement = "especes" | "orange_money" | "mtn_momo";
 
 export default function CollecteFlow() {
@@ -384,6 +408,10 @@ export default function CollecteFlow() {
                   </div>
                 )}
               </div>
+            )}
+
+            {result?.livraisonId && isOnline && (
+              <RecuButton livraisonId={result.livraisonId} />
             )}
 
             <button className="t-btn t-btn--primary" style={{ width: "100%", maxWidth: 320 }} onClick={reset}>

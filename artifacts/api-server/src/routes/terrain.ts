@@ -15,6 +15,7 @@ import {
   postRapportHandler,
   changePasswordHandler,
 } from "../controllers/terrainController.js";
+import { getTerrainRecuLivraison } from "../controllers/rapportsController.js";
 import {
   getMissionsHandler,
   getMissionDetailHandler,
@@ -56,6 +57,9 @@ router.post("/terrain/messages/:missionId", terrainAuthMiddleware, sendMessageHa
 router.get("/terrain/agent/stats", terrainAuthMiddleware, getStatsAgentHandler);
 router.get("/terrain/agent/historique", terrainAuthMiddleware, getHistoriqueAgentHandler);
 router.get("/terrain/historique", terrainAuthMiddleware, getHistoriqueAgentHandler);
+
+// Reçus PDF (délégué)
+router.get("/terrain/recu/livraison/:id", terrainAuthMiddleware, delegueOnly, getTerrainRecuLivraison);
 
 // Push notifications
 router.get("/terrain/push/vapid-key", getVapidPublicKey);

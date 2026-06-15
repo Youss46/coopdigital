@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
   Package, Search, Plus, Loader2, ChevronRight, Calendar,
-  Scale, Banknote, TrendingDown, ArrowDownCircle,
+  Scale, Banknote, TrendingDown, ArrowDownCircle, FileDown,
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -158,8 +158,24 @@ export default function LivraisonsPage() {
 
 // ─── LivraisonRow ─────────────────────────────────────────────────────────────
 
+async function downloadRecuLivraison(id: number) {
+  const res = await fetch(`${BASE}/api/rapports/recu/livraison/${id}`, {
+    headers: { Authorization: `Bearer ${tok()}` },
+  });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `recu_livraison_${id}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+}
+
 function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
   const [ouvert, setOuvert] = useState(false);
+  const [downloadingRecu, setDownloadingRecu] = useState(false);
   const poids = parseFloat(l.poidsKg ?? "0");
 
   return (
@@ -232,6 +248,22 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
               valueCls="font-bold text-green-700"
             />
           </div>
+          <button
+            onClick={async () => {
+              setDownloadingRecu(true);
+              await downloadRecuLivraison(l.id);
+              setDownloadingRecu(false);
+            }}
+            disabled={downloadingRecu}
+            className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50"
+            style={{ backgroundColor: "#1a4731" }}
+          >
+            {downloadingRecu ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <><FileDown size={12} /> Télécharger le reçu PDF</>
+            )}
+          </button>
         </div>
       )}
     </div>

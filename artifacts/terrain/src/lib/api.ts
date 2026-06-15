@@ -150,6 +150,25 @@ export async function getStatsAgent(): Promise<StatsAgent> {
   return apiGet<StatsAgent>("/agent/stats");
 }
 
+export async function telechargerRecuLivraison(livraisonId: number): Promise<void> {
+  const token = getToken();
+  const res = await fetch(`${BASE}/recu/livraison/${livraisonId}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `recu_livraison_${livraisonId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+}
+
 export async function getHistoriqueAgent(): Promise<MissionTerrain[]> {
   return apiGet<MissionTerrain[]>("/agent/historique");
 }
