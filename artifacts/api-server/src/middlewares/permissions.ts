@@ -180,8 +180,8 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE M07 — COMMUNICATION
   communication: {
-    lire_historique:    ["pca", "directeur", "comptable"],
-    envoyer_sms:        ["pca", "directeur"],
+    lire_historique:    ["pca", "directeur", "comptable", "delegue", "magasinier", "responsable_tracabilite", "auditeur", "agent_terrain"],
+    envoyer_sms:        ["pca", "directeur", "delegue"],
     envoyer_whatsapp:   ["pca", "directeur"],
     configurer_alertes: ["pca", "directeur"],
   },
