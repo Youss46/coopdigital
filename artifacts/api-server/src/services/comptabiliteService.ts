@@ -9,6 +9,7 @@
 import { db, ecrituresComptablesTable, configComptableTable, ecrituresEnAttenteTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { assignerNumeroPiece } from "../lib/numeroPiece";
 
 export type SourceEcriture =
   | "livraison" | "paiement" | "avance" | "vente"
@@ -102,7 +103,7 @@ export async function proposerEcriture(
 
     if (modeAuto) {
       const exercice = new Date(payload.date).getFullYear();
-      await db.insert(ecrituresComptablesTable).values({
+      const [inserted] = await db.insert(ecrituresComptablesTable).values({
         cooperativeId,
         dateEcriture: payload.date,
         numeroPiece: payload.numeroPiece ?? null,
@@ -113,7 +114,10 @@ export async function proposerEcriture(
         source: DB_SOURCE_MAP[payload.source],
         sourceId: payload.sourceId ?? null,
         exercice,
-      });
+      }).returning({ id: ecrituresComptablesTable.id });
+      if (inserted && !payload.numeroPiece) {
+        await assignerNumeroPiece(inserted.id, DB_SOURCE_MAP[payload.source], exercice);
+      }
       return { mode: "automatique", statut: "enregistree" };
     }
 

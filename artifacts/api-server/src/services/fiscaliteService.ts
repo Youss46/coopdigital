@@ -7,6 +7,7 @@ import {
   lignesBulletinTable,
 } from "@workspace/db";
 import { eq, and, sql, gte, lte, or, inArray } from "drizzle-orm";
+import { assignerNumeroPiece } from "../lib/numeroPiece.js";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
@@ -282,7 +283,8 @@ export async function enregistrerPaiement(cooperativeId: number, id: number, dat
   const obl = oblResult[0];
   if (obl) {
     try {
-      await db.insert(ecrituresComptablesTable).values({
+      const exo = new Date(data.datePaiement ?? today).getFullYear();
+      const [fscInserted] = await db.insert(ecrituresComptablesTable).values({
         cooperativeId: cooperativeId,
         dateEcriture:  data.datePaiement ?? today,
         libelle:       `Paiement ${obl.libelle} — ${decl.periode}`,
@@ -291,8 +293,9 @@ export async function enregistrerPaiement(cooperativeId: number, id: number, dat
         montantFcfa:   Math.round(data.montantPaye),
         source:        "manuel" as "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock",
         sourceId:      id,
-        exercice:      new Date(data.datePaiement ?? today).getFullYear(),
-      });
+        exercice:      exo,
+      }).returning({ id: ecrituresComptablesTable.id });
+      if (fscInserted) await assignerNumeroPiece(fscInserted.id, "manuel", exo);
     } catch (err) { logger.warn({ err }, "Écriture comptable fiscalite"); }
   }
 

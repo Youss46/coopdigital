@@ -3,6 +3,7 @@ import { checkEcriture, creerAnomalies } from "../services/anomalieService";
 import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable } from "@workspace/db";
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
+import { assignerNumeroPiece, assignerNumerosPieces, buildNumeroPiece } from "../lib/numeroPiece";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -172,6 +173,11 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
       sourceId: null,
       exercice,
     }).returning();
+
+    if (ecriture && !numeroPiece) {
+      await assignerNumeroPiece(ecriture.id, "manuel", exercice);
+      ecriture.numeroPiece = buildNumeroPiece("manuel", exercice, ecriture.id);
+    }
 
     if (anomaliesAttention.length > 0) {
       void creerAnomalies(coopId(req), anomaliesAttention, "comptabilite", { entiteId: ecriture!.id, entiteType: "ecriture" });
@@ -466,17 +472,19 @@ export async function validerEcritureEnAttente(req: Request, res: Response): Pro
       stock: "stock",
     };
 
-    await db.insert(ecrituresComptablesTable).values({
+    const srcVal = sourceMap[ecriture.source] ?? "manuel";
+    const [inserted] = await db.insert(ecrituresComptablesTable).values({
       cooperativeId: coopId(req),
       dateEcriture: ecriture.dateProposee,
       libelle: modifie ? `${libelle} [modifiée]` : libelle,
       compteDebit,
       compteCredit,
       montantFcfa,
-      source: sourceMap[ecriture.source] ?? "manuel",
+      source: srcVal,
       sourceId: ecriture.sourceId,
       exercice,
-    });
+    }).returning({ id: ecrituresComptablesTable.id });
+    if (inserted) await assignerNumeroPiece(inserted.id, srcVal, exercice);
 
     const [updated] = await db
       .update(ecrituresEnAttenteTable)
@@ -553,7 +561,7 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
       vente: "vente", encaissement: "encaissement", salaire: "salaire", stock: "stock",
     };
 
-    await db.insert(ecrituresComptablesTable).values(
+    const insertedAll = await db.insert(ecrituresComptablesTable).values(
       enAttente.map((e) => ({
         cooperativeId: coopId(req),
         dateEcriture: e.dateProposee,
@@ -565,7 +573,8 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
         sourceId: e.sourceId,
         exercice: new Date(e.dateProposee).getFullYear(),
       }))
-    );
+    ).returning({ id: ecrituresComptablesTable.id, source: ecrituresComptablesTable.source, exercice: ecrituresComptablesTable.exercice });
+    await assignerNumerosPieces(insertedAll.map((r) => ({ id: r.id, source: r.source, exercice: r.exercice })));
 
     const ids = enAttente.map((e) => e.id);
     await db
