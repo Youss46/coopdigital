@@ -185,3 +185,46 @@ export const avancesPersonnelTable = pgTable("avances_personnel", {
 });
 
 export type AvancePersonnel = typeof avancesPersonnelTable.$inferSelect;
+
+// ─── Table config_paie ────────────────────────────────────────────────────────
+// Taux légaux configurables par coopérative (CNPS, ITS, taxe apprentissage, FPC)
+// Taux stockés ×100 (ex: 320 = 3,20%)
+
+export const configPaieTable = pgTable("config_paie", {
+  id: serial("id").primaryKey(),
+  cooperativeId: integer("cooperative_id")
+    .notNull()
+    .unique()
+    .references(() => cooperativesTable.id),
+
+  // CNPS salariale (retenue sur le salarié)
+  cnpsSalarialeActif: boolean("cnps_salariale_actif").notNull().default(true),
+  cnpsSalarialeTaux: integer("cnps_salariale_taux").notNull().default(320),     // 3,20%
+  cnpsPlafondAnnuel: integer("cnps_plafond_annuel").notNull().default(1647315),
+
+  // CNPS patronale retraite (charge employeur)
+  cnpsPatronaleActif: boolean("cnps_patronale_actif").notNull().default(true),
+  cnpsPatronaleTaux: integer("cnps_patronale_taux").notNull().default(770),      // 7,70%
+
+  // CNPS AT/MP – accident de travail (charge employeur)
+  cnpsAtmpActif: boolean("cnps_atmp_actif").notNull().default(true),
+  cnpsAtmpTaux: integer("cnps_atmp_taux").notNull().default(200),                // 2,00%
+
+  // ITS – Impôt sur Traitement et Salaires (barème progressif fixe)
+  itsActif: boolean("its_actif").notNull().default(true),
+
+  // Taxe d'apprentissage (charge employeur)
+  taxeApprentissageActif: boolean("taxe_apprentissage_actif").notNull().default(true),
+  taxeApprentissageTaux: integer("taxe_apprentissage_taux").notNull().default(50),  // 0,50%
+
+  // FPC – Formation professionnelle continue (charge employeur)
+  fpcActif: boolean("fpc_actif").notNull().default(true),
+  fpcTaux: integer("fpc_taux").notNull().default(120),                           // 1,20%
+
+  // Prime d'ancienneté
+  ancienneteActif: boolean("anciennete_actif").notNull().default(true),
+
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ConfigPaie = typeof configPaieTable.$inferSelect;

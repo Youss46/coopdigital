@@ -21,6 +21,8 @@ import {
   rembourserAvance,
   getRapportMensuel,
   getHistoriqueMasse,
+  getConfigPaie,
+  updateConfigPaie,
 } from "../controllers/salairesController";
 
 const router: IRouter = Router();
@@ -119,6 +121,10 @@ router.put(
   checkPermission("salaires", "gerer_avances"),
   rembourserAvance,
 );
+
+// ─── Config paie ─────────────────────────────────────────────────────────────
+router.get("/salaires/config-paie",  checkPermission("salaires", "lire"),              getConfigPaie);
+router.put("/salaires/config-paie",  checkPermission("salaires", "modifier_personnel"), updateConfigPaie);
 
 // ─── Rapports ────────────────────────────────────────────────────────────────
 router.get(

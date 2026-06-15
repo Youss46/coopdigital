@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { MoneyInput } from "@/components/ui/money-input";
 import {
-  Users, FileText, BarChart2, CreditCard,
+  Users, FileText, BarChart2, CreditCard, Settings,
   Plus, RefreshCw, CheckCircle, Banknote,
   Loader2, ChevronDown, TrendingUp, Building2,
-  UserCheck, AlertCircle, FileDown,
+  UserCheck, AlertCircle, FileDown, Save, Info,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -91,13 +92,14 @@ function toDate(d: Date | string | null | undefined): Date | null {
 
 // ─── Onglets ─────────────────────────────────────────────────────────────────
 
-type Tab = "personnel" | "paie" | "masse" | "avances";
+type Tab = "personnel" | "paie" | "masse" | "avances" | "config";
 
 const TABS: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: "personnel", label: "Personnel", icon: Users },
   { id: "paie", label: "Génération de la paie", icon: FileText },
   { id: "masse", label: "Masse salariale", icon: BarChart2 },
   { id: "avances", label: "Avances personnel", icon: CreditCard },
+  { id: "config", label: "Configuration paie", icon: Settings },
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -157,6 +159,7 @@ export default function SalairesPage() {
       {activeTab === "paie" && <TabPaie />}
       {activeTab === "masse" && <TabMasse />}
       {activeTab === "avances" && <TabAvances />}
+      {activeTab === "config" && <TabConfigPaie />}
     </div>
   );
 }
@@ -1411,6 +1414,257 @@ function AvanceModal({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  TAB CONFIG PAIE
+// ══════════════════════════════════════════════════════════════════════════════
+
+type ConfigPaie = {
+  cnpsSalarialeActif: boolean; cnpsSalarialeTaux: number; cnpsPlafondAnnuel: number;
+  cnpsPatronaleActif: boolean; cnpsPatronaleTaux: number;
+  cnpsAtmpActif: boolean;      cnpsAtmpTaux: number;
+  itsActif: boolean;
+  taxeApprentissageActif: boolean; taxeApprentissageTaux: number;
+  fpcActif: boolean;               fpcTaux: number;
+  ancienneteActif: boolean;
+};
+
+const CONFIG_DEFAULTS: ConfigPaie = {
+  cnpsSalarialeActif: true, cnpsSalarialeTaux: 320, cnpsPlafondAnnuel: 1647315,
+  cnpsPatronaleActif: true, cnpsPatronaleTaux: 770,
+  cnpsAtmpActif: true,      cnpsAtmpTaux: 200,
+  itsActif: true,
+  taxeApprentissageActif: true, taxeApprentissageTaux: 50,
+  fpcActif: true, fpcTaux: 120,
+  ancienneteActif: true,
+};
+
+async function apiFetchSalaires<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem("coop_token") ?? "";
+  const r = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options?.headers ?? {}) },
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<T>;
+}
+
+function TauxInput({ label, value, onChange, disabled }: { label: string; value: number; onChange: (v: number) => void; disabled?: boolean }) {
+  const pct = (value / 100).toFixed(2);
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="number"
+        step="0.01"
+        min="0"
+        max="100"
+        value={pct}
+        disabled={disabled}
+        onChange={(e) => onChange(Math.round(parseFloat(e.target.value || "0") * 100))}
+        className="w-24 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-400"
+      />
+      <span className="text-sm text-gray-500">{label}</span>
+    </div>
+  );
+}
+
+function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-40 ${checked ? "bg-green-600" : "bg-gray-200"}`}
+    >
+      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${checked ? "translate-x-4" : "translate-x-0"}`} />
+    </button>
+  );
+}
+
+function ConfigSection({ title, badge, children }: { title: string; badge?: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-100">
+        <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+        {badge && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">{badge}</span>}
+      </div>
+      <div className="divide-y divide-gray-50">{children}</div>
+    </div>
+  );
+}
+
+function ConfigRow({ label, desc, actif, onToggle, saving, children }: {
+  label: string; desc?: string; actif: boolean; onToggle: (v: boolean) => void; saving?: boolean; children?: React.ReactNode;
+}) {
+  return (
+    <div className={`flex items-start gap-4 px-5 py-4 ${!actif ? "opacity-60" : ""}`}>
+      <Toggle checked={actif} onChange={onToggle} disabled={saving} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-900">{label}</p>
+        {desc && <p className="text-xs text-gray-400 mt-0.5">{desc}</p>}
+      </div>
+      {children && actif && <div className="shrink-0">{children}</div>}
+    </div>
+  );
+}
+
+function TabConfigPaie() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const canEdit = usePermission("salaires", "modifier_personnel");
+
+  const { data: remote, isLoading } = useQuery<ConfigPaie>({
+    queryKey: ["config-paie"],
+    queryFn: () => apiFetchSalaires<ConfigPaie>("/api/salaires/config-paie"),
+  });
+
+  const [form, setForm] = useState<ConfigPaie>(CONFIG_DEFAULTS);
+  const [initialized, setInitialized] = useState(false);
+
+  if (remote && !initialized) { setForm(remote); setInitialized(true); }
+
+  const mut = useMutation({
+    mutationFn: (data: ConfigPaie) =>
+      apiFetchSalaires("/api/salaires/config-paie", { method: "PUT", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["config-paie"] });
+      toast({ title: "Configuration enregistrée" });
+    },
+    onError: () => toast({ title: "Erreur", description: "Impossible d'enregistrer", variant: "destructive" }),
+  });
+
+  const set = <K extends keyof ConfigPaie>(k: K, v: ConfigPaie[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  if (isLoading) {
+    return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-green-600" /></div>;
+  }
+
+  return (
+    <div className="space-y-5 max-w-2xl">
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Configuration des cotisations</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Ces taux s&apos;appliquent à chaque génération de bulletin. Les valeurs par défaut sont conformes au droit ivoirien (OHADA).
+          </p>
+        </div>
+        {canEdit && (
+          <button
+            onClick={() => mut.mutate(form)}
+            disabled={mut.isPending}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-60"
+          >
+            {mut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Enregistrer
+          </button>
+        )}
+      </div>
+
+      {/* CNPS salariale */}
+      <ConfigSection title="CNPS — Part salariale" badge="Retenue sur employé">
+        <ConfigRow
+          label="CNPS retraite — part salariale"
+          desc="Déduite du brut, plafonnée annuellement"
+          actif={form.cnpsSalarialeActif}
+          onToggle={(v) => set("cnpsSalarialeActif", v)}
+          saving={mut.isPending || !canEdit}
+        >
+          <TauxInput label="% du brut" value={form.cnpsSalarialeTaux} onChange={(v) => set("cnpsSalarialeTaux", v)} disabled={mut.isPending || !canEdit} />
+        </ConfigRow>
+        {form.cnpsSalarialeActif && (
+          <div className="px-5 pb-4 flex items-center gap-3">
+            <span className="text-xs text-gray-500">Plafond annuel :</span>
+            <input
+              type="number"
+              value={form.cnpsPlafondAnnuel}
+              onChange={(e) => set("cnpsPlafondAnnuel", parseInt(e.target.value || "0"))}
+              disabled={mut.isPending || !canEdit}
+              className="w-40 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-400"
+            />
+            <span className="text-xs text-gray-500">FCFA / an</span>
+          </div>
+        )}
+      </ConfigSection>
+
+      {/* CNPS patronale */}
+      <ConfigSection title="CNPS — Part patronale" badge="Charge employeur">
+        <ConfigRow
+          label="CNPS retraite — part patronale"
+          desc="Calculée sur le brut, non déduite du net salarié"
+          actif={form.cnpsPatronaleActif}
+          onToggle={(v) => set("cnpsPatronaleActif", v)}
+          saving={mut.isPending || !canEdit}
+        >
+          <TauxInput label="% du brut" value={form.cnpsPatronaleTaux} onChange={(v) => set("cnpsPatronaleTaux", v)} disabled={mut.isPending || !canEdit} />
+        </ConfigRow>
+        <ConfigRow
+          label="CNPS AT/MP — Accidents du travail"
+          desc="Charge patronale, non déduite du net salarié"
+          actif={form.cnpsAtmpActif}
+          onToggle={(v) => set("cnpsAtmpActif", v)}
+          saving={mut.isPending || !canEdit}
+        >
+          <TauxInput label="% du brut" value={form.cnpsAtmpTaux} onChange={(v) => set("cnpsAtmpTaux", v)} disabled={mut.isPending || !canEdit} />
+        </ConfigRow>
+      </ConfigSection>
+
+      {/* ITS */}
+      <ConfigSection title="ITS — Impôt sur Traitement et Salaires" badge="Retenue sur employé">
+        <ConfigRow
+          label="Impôt sur salaire (ITS)"
+          desc="Barème progressif annuel : 0 % → 10 % → 15 % → 20 % → 25 %"
+          actif={form.itsActif}
+          onToggle={(v) => set("itsActif", v)}
+          saving={mut.isPending || !canEdit}
+        />
+        <div className="px-5 pb-3">
+          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <Info className="h-3.5 w-3.5" />
+            Le barème est fixé par la loi ivoirienne et ne peut pas être modifié ici.
+          </div>
+        </div>
+      </ConfigSection>
+
+      {/* Taxe apprentissage + FPC */}
+      <ConfigSection title="Taxes de formation" badge="Charges employeur">
+        <ConfigRow
+          label="Taxe d'apprentissage"
+          desc="Calculée sur le brut, charge exclusivement patronale"
+          actif={form.taxeApprentissageActif}
+          onToggle={(v) => set("taxeApprentissageActif", v)}
+          saving={mut.isPending || !canEdit}
+        >
+          <TauxInput label="% du brut" value={form.taxeApprentissageTaux} onChange={(v) => set("taxeApprentissageTaux", v)} disabled={mut.isPending || !canEdit} />
+        </ConfigRow>
+        <ConfigRow
+          label="FPC — Formation Professionnelle Continue"
+          desc="Calculée sur le brut, charge exclusivement patronale"
+          actif={form.fpcActif}
+          onToggle={(v) => set("fpcActif", v)}
+          saving={mut.isPending || !canEdit}
+        >
+          <TauxInput label="% du brut" value={form.fpcTaux} onChange={(v) => set("fpcTaux", v)} disabled={mut.isPending || !canEdit} />
+        </ConfigRow>
+      </ConfigSection>
+
+      {/* Prime ancienneté */}
+      <ConfigSection title="Prime d'ancienneté">
+        <ConfigRow
+          label="Prime d'ancienneté automatique"
+          desc="&lt; 2 ans : 0 % · 2–5 ans : 3 % · 5–10 ans : 5 % · &gt; 10 ans : 8 % (sur salaire de base)"
+          actif={form.ancienneteActif}
+          onToggle={(v) => set("ancienneteActif", v)}
+          saving={mut.isPending || !canEdit}
+        />
+      </ConfigSection>
+
+      <p className="text-xs text-gray-400">
+        Ces paramètres s&apos;appliquent aux prochains bulletins générés. Les bulletins déjà existants ne sont pas recalculés.
+      </p>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
   bulletinsPaieTable,
   lignesBulletinTable,
   avancesPersonnelTable,
+  configPaieTable,
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { generateBulletin, generateMasse } from "../services/paieService";
@@ -779,6 +780,74 @@ export async function getHistoriqueMasse(
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "getHistoriqueMasse");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  CONFIG PAIE
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Valeurs légales par défaut (Côte d'Ivoire / OHADA)
+const CONFIG_PAIE_DEFAULTS = {
+  cnpsSalarialeActif: true, cnpsSalarialeTaux: 320, cnpsPlafondAnnuel: 1647315,
+  cnpsPatronaleActif: true, cnpsPatronaleTaux: 770,
+  cnpsAtmpActif: true,      cnpsAtmpTaux: 200,
+  itsActif: true,
+  taxeApprentissageActif: true, taxeApprentissageTaux: 50,
+  fpcActif: true,               fpcTaux: 120,
+  ancienneteActif: true,
+};
+
+export async function getConfigPaie(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+    const [row] = await db.select().from(configPaieTable)
+      .where(eq(configPaieTable.cooperativeId, coop)).limit(1);
+    res.json(row ?? { ...CONFIG_PAIE_DEFAULTS, cooperativeId: coop });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "getConfigPaie");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function updateConfigPaie(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+    const body = req.body as Partial<typeof CONFIG_PAIE_DEFAULTS>;
+
+    const [existing] = await db.select({ id: configPaieTable.id })
+      .from(configPaieTable).where(eq(configPaieTable.cooperativeId, coop)).limit(1);
+
+    const data = {
+      cnpsSalarialeActif:      body.cnpsSalarialeActif      ?? true,
+      cnpsSalarialeTaux:       body.cnpsSalarialeTaux        ?? 320,
+      cnpsPlafondAnnuel:       body.cnpsPlafondAnnuel        ?? 1647315,
+      cnpsPatronaleActif:      body.cnpsPatronaleActif       ?? true,
+      cnpsPatronaleTaux:       body.cnpsPatronaleTaux        ?? 770,
+      cnpsAtmpActif:           body.cnpsAtmpActif            ?? true,
+      cnpsAtmpTaux:            body.cnpsAtmpTaux             ?? 200,
+      itsActif:                body.itsActif                 ?? true,
+      taxeApprentissageActif:  body.taxeApprentissageActif   ?? true,
+      taxeApprentissageTaux:   body.taxeApprentissageTaux    ?? 50,
+      fpcActif:                body.fpcActif                 ?? true,
+      fpcTaux:                 body.fpcTaux                  ?? 120,
+      ancienneteActif:         body.ancienneteActif          ?? true,
+      updatedAt:               new Date(),
+    };
+
+    let row;
+    if (existing) {
+      [row] = await db.update(configPaieTable).set(data)
+        .where(eq(configPaieTable.cooperativeId, coop)).returning();
+    } else {
+      [row] = await db.insert(configPaieTable).values({ cooperativeId: coop, ...data }).returning();
+    }
+    res.json(row);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "updateConfigPaie");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

@@ -25,16 +25,44 @@ import {
   bulletinsPaieTable,
   lignesBulletinTable,
   avancesPersonnelTable,
+  configPaieTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
+// ─── Config paie (chargée depuis la DB, avec valeurs par défaut légales CI) ──
 
-const CNPS_SALARIALE_RATE = 320;      // 3,20 × 100
-const CNPS_PATRONALE_RATE = 970;      // 9,70 × 100
-const TAXE_APPRENTISSAGE_RATE = 50;   // 0,50 × 100
-const FPC_RATE = 120;                 // 1,20 × 100
-const CNPS_PLAFOND_ANNUEL = 1_647_315;
+const DEFAULT_CONFIG = {
+  cnpsSalarialeActif: true, cnpsSalarialeTaux: 320, cnpsPlafondAnnuel: 1_647_315,
+  cnpsPatronaleActif: true, cnpsPatronaleTaux: 770,
+  cnpsAtmpActif: true,      cnpsAtmpTaux: 200,
+  itsActif: true,
+  taxeApprentissageActif: true, taxeApprentissageTaux: 50,
+  fpcActif: true,               fpcTaux: 120,
+  ancienneteActif: true,
+};
+
+type PaieConfig = typeof DEFAULT_CONFIG;
+
+async function loadConfigPaie(cooperativeId: number, dbInst = defaultDb): Promise<PaieConfig> {
+  const [row] = await dbInst.select().from(configPaieTable)
+    .where(eq(configPaieTable.cooperativeId, cooperativeId)).limit(1);
+  if (!row) return DEFAULT_CONFIG;
+  return {
+    cnpsSalarialeActif:     row.cnpsSalarialeActif,
+    cnpsSalarialeTaux:      row.cnpsSalarialeTaux,
+    cnpsPlafondAnnuel:      row.cnpsPlafondAnnuel,
+    cnpsPatronaleActif:     row.cnpsPatronaleActif,
+    cnpsPatronaleTaux:      row.cnpsPatronaleTaux,
+    cnpsAtmpActif:          row.cnpsAtmpActif,
+    cnpsAtmpTaux:           row.cnpsAtmpTaux,
+    itsActif:               row.itsActif,
+    taxeApprentissageActif: row.taxeApprentissageActif,
+    taxeApprentissageTaux:  row.taxeApprentissageTaux,
+    fpcActif:               row.fpcActif,
+    fpcTaux:                row.fpcTaux,
+    ancienneteActif:        row.ancienneteActif,
+  };
+}
 
 const NOMS_MOIS = [
   "", "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
@@ -85,6 +113,9 @@ export async function generateBulletin(
   cooperativeId: number,
   dbInst = defaultDb,
 ): Promise<number> {
+  // 0. Charger la configuration des taux
+  const cfg = await loadConfigPaie(cooperativeId, dbInst);
+
   // 1. Personnel
   const [emp] = await dbInst
     .select()
@@ -121,11 +152,10 @@ export async function generateBulletin(
     .from(composantesSalaireTable)
     .where(eq(composantesSalaireTable.cooperativeId, cooperativeId));
 
-  // 4. Calcul ancienneté
-  const primeAnciennete = calculerPrimeAnciennete(
-    emp.dateEmbauche,
-    emp.salaireBaseFcfa,
-  );
+  // 4. Calcul ancienneté (si activée dans la config)
+  const primeAnciennete = cfg.ancienneteActif
+    ? calculerPrimeAnciennete(emp.dateEmbauche, emp.salaireBaseFcfa)
+    : 0;
 
   // 5. Lignes avantages personnalisés
   const lignesAvantages: { libelle: string; montant: number }[] = [];
@@ -181,23 +211,31 @@ export async function generateBulletin(
     lignesAvantages.reduce((s, l) => s + l.montant, 0);
   const brut = emp.salaireBaseFcfa + totalAvantages;
 
-  // CNPS salariale
-  const coupeCnpsAnnuel = Math.min(brut * 12, CNPS_PLAFOND_ANNUEL);
-  const cnpsSal = Math.round((coupeCnpsAnnuel * CNPS_SALARIALE_RATE) / 100 / 12 / 100);
+  // CNPS salariale (retenue employé)
+  let cnpsSal = 0;
+  if (cfg.cnpsSalarialeActif) {
+    const coupeCnpsAnnuel = Math.min(brut * 12, cfg.cnpsPlafondAnnuel);
+    cnpsSal = Math.round((coupeCnpsAnnuel * cfg.cnpsSalarialeTaux) / 100 / 12 / 100);
+    const taux = (cfg.cnpsSalarialeTaux / 100).toFixed(2).replace(".", ",");
+    lignesRetenues.push({ libelle: `CNPS part salariale (${taux} %)`, montant: cnpsSal });
+  }
 
   // ITS
-  const its = calculerITS(brut * 12);
-
-  lignesRetenues.push({ libelle: "CNPS part salariale (3,20 %)", montant: cnpsSal });
-  lignesRetenues.push({ libelle: "Impôt sur salaire (ITS)", montant: its });
+  let its = 0;
+  if (cfg.itsActif) {
+    its = calculerITS(brut * 12);
+    lignesRetenues.push({ libelle: "Impôt sur salaire (ITS)", montant: its });
+  }
 
   const totalRetenues = lignesRetenues.reduce((s, l) => s + l.montant, 0);
   const net = Math.max(0, brut - totalRetenues);
 
   // 8. Charges patronales (info employeur uniquement)
-  const cnpsPat = Math.round((brut * CNPS_PATRONALE_RATE) / 10000);
-  const taxeApp = Math.round((brut * TAXE_APPRENTISSAGE_RATE) / 10000);
-  const fpc = Math.round((brut * FPC_RATE) / 10000);
+  const cnpsPat = cfg.cnpsPatronaleActif
+    ? Math.round((brut * cfg.cnpsPatronaleTaux) / 10000) + (cfg.cnpsAtmpActif ? Math.round((brut * cfg.cnpsAtmpTaux) / 10000) : 0)
+    : (cfg.cnpsAtmpActif ? Math.round((brut * cfg.cnpsAtmpTaux) / 10000) : 0);
+  const taxeApp = cfg.taxeApprentissageActif ? Math.round((brut * cfg.taxeApprentissageTaux) / 10000) : 0;
+  const fpc     = cfg.fpcActif ? Math.round((brut * cfg.fpcTaux) / 10000) : 0;
   const coutTotalEmployeur =
     net + totalRetenues + cnpsPat + taxeApp + fpc;
 
