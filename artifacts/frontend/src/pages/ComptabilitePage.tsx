@@ -626,21 +626,60 @@ function OngletEnAttente() {
 }
 
 // ─── Onglet Journal ───────────────────────────────────────────────────────────
-function OngletJournal() {
+function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
   const [page, setPage] = useState(1);
+  const [filtreSource, setFiltreSource] = useState(defaultSource);
   const LIMIT = 50;
   const annee = new Date().getFullYear();
 
   const { data, isLoading } = useGetJournalComptable({ exercice: annee, page, limit: LIMIT });
   const ecritures = (data as { ecritures?: unknown[]; total?: number } | undefined);
-  const list = ecritures?.ecritures ?? [];
+  const allList = (ecritures?.ecritures ?? []) as Array<{
+    id: number;
+    dateEcriture: string;
+    numeroPiece?: string | null;
+    libelle: string;
+    compteDebit: string;
+    compteCredit: string;
+    montantFcfa: number;
+    source: string;
+  }>;
+  const list = filtreSource ? allList.filter((e) => e.source === filtreSource) : allList;
   const total = ecritures?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
+  const handleSourceChange = (v: string) => {
+    setFiltreSource(v);
+    setPage(1);
+  };
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
-        <p className="text-sm text-gray-500">{total} écriture{total > 1 ? "s" : ""} — exercice {annee}</p>
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <p className="text-sm text-gray-500 mr-auto">{total} écriture{total > 1 ? "s" : ""} — exercice {annee}</p>
+
+        <div className="flex items-center gap-2">
+          <Filter size={14} className="text-gray-400" />
+          <select
+            value={filtreSource}
+            onChange={(e) => handleSourceChange(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+          >
+            <option value="">Toutes les sources</option>
+            {Object.entries(SOURCE_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+          {filtreSource && (
+            <button
+              onClick={() => handleSourceChange("")}
+              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 px-2 py-1 rounded border border-gray-200 hover:bg-gray-50"
+            >
+              <X size={12} /> Effacer
+            </button>
+          )}
+        </div>
+
         <div className="flex items-center gap-2">
           <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
             <ChevronLeft size={16} />
@@ -652,12 +691,27 @@ function OngletJournal() {
         </div>
       </div>
 
+      {filtreSource && (
+        <div
+          className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-lg text-sm font-medium"
+          style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534" }}
+        >
+          <Filter size={14} />
+          Filtré par source : <strong>{SOURCE_LABELS[filtreSource] ?? filtreSource}</strong>
+          {!isLoading && <span className="ml-1 text-green-600">— {list.length} résultat{list.length > 1 ? "s" : ""} sur cette page</span>}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-green-600 border-t-transparent" /></div>
-      ) : (list as unknown[]).length === 0 ? (
+      ) : list.length === 0 ? (
         <div className="text-center py-16">
           <BookOpen className="mx-auto mb-3 text-gray-300" size={40} />
-          <p className="text-gray-500 text-sm">Aucune écriture pour l'exercice {annee}</p>
+          <p className="text-gray-500 text-sm">
+            {filtreSource
+              ? `Aucune écriture "${SOURCE_LABELS[filtreSource] ?? filtreSource}" sur cette page`
+              : `Aucune écriture pour l'exercice ${annee}`}
+          </p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -671,32 +725,44 @@ function OngletJournal() {
                 </tr>
               </thead>
               <tbody>
-                {(list as Array<{
-                  id: number;
-                  dateEcriture: string;
-                  numeroPiece?: string | null;
-                  libelle: string;
-                  compteDebit: string;
-                  compteCredit: string;
-                  montantFcfa: number;
-                  source: string;
-                }>).map((e) => (
-                  <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                      {new Date(e.dateEcriture).toLocaleDateString("fr-FR")}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.numeroPiece ?? "—"}</td>
-                    <td className="px-4 py-3 text-gray-900 max-w-[220px] truncate" title={e.libelle}>{e.libelle}</td>
-                    <td className="px-4 py-3 font-mono text-gray-700">{e.compteDebit}</td>
-                    <td className="px-4 py-3 font-mono text-gray-700">{e.compteCredit}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{FCFA(e.montantFcfa)}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {SOURCE_LABELS[e.source] ?? e.source}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {list.map((e) => {
+                  const isManuel = e.source === "manuel";
+                  return (
+                    <tr
+                      key={e.id}
+                      className="border-b border-gray-50 hover:bg-gray-50/50"
+                      style={isManuel && filtreSource === "manuel" ? { backgroundColor: "#fffbeb" } : undefined}
+                    >
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                        {new Date(e.dateEcriture).toLocaleDateString("fr-FR")}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.numeroPiece ?? "—"}</td>
+                      <td className="px-4 py-3 text-gray-900 max-w-[220px] truncate" title={e.libelle}>
+                        {e.libelle}
+                        {isManuel && (
+                          <span className="ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: "#fef3c7", color: "#92400e" }}>
+                            Manuel
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-gray-700">{e.compteDebit}</td>
+                      <td className="px-4 py-3 font-mono text-gray-700">{e.compteCredit}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{FCFA(e.montantFcfa)}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full"
+                          style={
+                            isManuel
+                              ? { backgroundColor: "#fef3c7", color: "#92400e" }
+                              : { backgroundColor: "#f3f4f6", color: "#6b7280" }
+                          }
+                        >
+                          {SOURCE_LABELS[e.source] ?? e.source}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -2393,6 +2459,7 @@ type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable"
 export default function ComptabilitePage() {
   const [onglet, setOnglet] = useState<Onglet>("en_attente");
   const [showSaisie, setShowSaisie] = useState(false);
+  const [journalDefaultSource, setJournalDefaultSource] = useState("");
 
   const peutVoirConfig  = usePermission("comptabilite", "voir_config");
   const peutVoirAttente = usePermission("comptabilite", "voir_ecritures_attente");
@@ -2440,7 +2507,7 @@ export default function ComptabilitePage() {
         {tabs.map(({ id, label, icon: Icon, badge }) => (
           <button
             key={id}
-            onClick={() => setOnglet(id)}
+            onClick={() => { setOnglet(id); if (id !== "journal") setJournalDefaultSource(""); }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors relative ${
               onglet === id ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}
@@ -2467,7 +2534,7 @@ export default function ComptabilitePage() {
       )}
 
       {onglet === "en_attente"    && <OngletEnAttente />}
-      {onglet === "journal"       && <OngletJournal />}
+      {onglet === "journal"       && <OngletJournal defaultSource={journalDefaultSource} />}
       {onglet === "grand_livre"   && peutGrandLivre && <OngletGrandLivre />}
       {onglet === "balance"       && peutBalance    && <OngletBalance />}
       {onglet === "flux"          && <OngletFluxTresorerie />}
@@ -2480,6 +2547,7 @@ export default function ComptabilitePage() {
           onClose={() => setShowSaisie(false)}
           onSuccess={() => {
             setShowSaisie(false);
+            setJournalDefaultSource("manuel");
             setOnglet("journal");
           }}
         />
