@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Warehouse, Package, TrendingDown, TrendingUp, AlertTriangle,
   Plus, CheckCircle2, XCircle, Clock, Truck, ArrowRight, BarChart3,
-  RefreshCw, Eye,
+  RefreshCw, Eye, Pencil, Power, PowerOff,
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 
@@ -108,12 +108,19 @@ export default function EntrepotsPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const peutGerer = usePermission("stocks", "creer_entrepot");
+  const peutModifier = usePermission("stocks", "modifier_entrepot");
   const [onglet, setOnglet] = useState<"stocks" | "transferts">("stocks");
   const [showArrivee, setShowArrivee] = useState<Transfert | null>(null);
   const [formArrivee, setFormArrivee] = useState({ poidsArrivee_kg: "", motifEcart: "", notes: "" });
   const [showCreer, setShowCreer] = useState(false);
   const [formCreer, setFormCreer] = useState({
     delegueId: "", nom: "", zoneNom: "", zoneType: "village",
+    capaciteMaxKg: "", seuilAlerteKg: "", adresse: "",
+  });
+  const [showEditer, setShowEditer] = useState(false);
+  const [entrepotEdite, setEntrepotEdite] = useState<Entrepot | null>(null);
+  const [formEditer, setFormEditer] = useState({
+    nom: "", zoneNom: "", zoneType: "village",
     capaciteMaxKg: "", seuilAlerteKg: "", adresse: "",
   });
 
@@ -167,6 +174,31 @@ export default function EntrepotsPage() {
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
+
+  const mutEditer = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: object }) =>
+      apiFetch(`/entrepots/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
+      setShowEditer(false);
+      setEntrepotEdite(null);
+      toast({ title: "Entrepôt mis à jour" });
+    },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  function ouvrirEditer(e: Entrepot) {
+    setEntrepotEdite(e);
+    setFormEditer({
+      nom: e.nom,
+      zoneNom: e.zoneNom ?? "",
+      zoneType: e.zoneType ?? "village",
+      capaciteMaxKg: e.capaciteMaxKg ?? "",
+      seuilAlerteKg: e.seuilAlerteKg ?? "",
+      adresse: e.adresse ?? "",
+    });
+    setShowEditer(true);
+  }
 
   const entrepots = stats?.entrepots ?? [];
   const enCours = transferts.filter((t) => ["planifie", "en_cours"].includes(t.statut));
@@ -238,15 +270,25 @@ export default function EntrepotsPage() {
                 const p = pct(e.stockActuelKg, e.capaciteMaxKg);
                 const alerte = e.seuilAlerteKg && parseFloat(e.stockActuelKg) > parseFloat(e.seuilAlerteKg);
                 return (
-                  <div key={e.id} className={`bg-white rounded-xl border p-5 shadow-sm ${alerte ? "border-orange-300" : "border-gray-100"}`}>
+                  <div key={e.id} className={`bg-white rounded-xl border p-5 shadow-sm ${alerte ? "border-orange-300" : "border-gray-100"} ${!e.actif ? "opacity-60" : ""}`}>
                     <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{e.nom}</h3>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 truncate">{e.nom}</h3>
                         {e.zoneNom && <p className="text-xs text-gray-500">{e.zoneNom} · {e.zoneType ?? ""}</p>}
                       </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${e.actif ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {e.actif ? "Actif" : "Inactif"}
-                      </span>
+                      <div className="flex items-center gap-2 ml-2 shrink-0">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${e.actif ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                          {e.actif ? "Actif" : "Inactif"}
+                        </span>
+                        {peutModifier && (
+                          <button
+                            onClick={() => ouvrirEditer(e)}
+                            title="Modifier cet entrepôt"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-green-700 hover:bg-green-50 transition-colors">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="mb-3">
@@ -450,6 +492,117 @@ export default function EntrepotsPage() {
                 })}
                 className="flex-1 bg-green-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50">
                 {mutArrivee.isPending ? "En cours…" : "Confirmer la réception"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal éditer entrepôt */}
+      {showEditer && entrepotEdite && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 overflow-y-auto max-h-[90vh]">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Modifier l'entrepôt</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Délégué : <span className="font-medium text-gray-700">{entrepotEdite.delegueNom} {entrepotEdite.deleguePrenoms}</span>
+                </p>
+              </div>
+              {/* Toggle actif / inactif */}
+              <button
+                onClick={() => mutEditer.mutate({ id: entrepotEdite.id, body: { actif: !entrepotEdite.actif } })}
+                disabled={mutEditer.isPending}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 ${
+                  entrepotEdite.actif
+                    ? "border-red-200 text-red-600 hover:bg-red-50"
+                    : "border-green-200 text-green-700 hover:bg-green-50"
+                }`}>
+                {entrepotEdite.actif
+                  ? <><PowerOff className="w-3.5 h-3.5" /> Désactiver</>
+                  : <><Power className="w-3.5 h-3.5" /> Réactiver</>}
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {/* Nom */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nom de l'entrepôt *</label>
+                <input type="text" placeholder="ex: Point collecte Broukro"
+                  value={formEditer.nom}
+                  onChange={(e) => setFormEditer(f => ({ ...f, nom: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+              </div>
+
+              {/* Zone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Zone / Village</label>
+                <input type="text" placeholder="ex: Broukro"
+                  value={formEditer.zoneNom}
+                  onChange={(e) => setFormEditer(f => ({ ...f, zoneNom: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+              </div>
+
+              {/* Type zone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type de zone</label>
+                <select value={formEditer.zoneType}
+                  onChange={(e) => setFormEditer(f => ({ ...f, zoneType: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                  <option value="village">Village</option>
+                  <option value="section">Section</option>
+                  <option value="groupement">Groupement</option>
+                </select>
+              </div>
+
+              {/* Capacité & seuil */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Capacité max (kg)</label>
+                  <input type="number" placeholder="ex: 15000"
+                    value={formEditer.capaciteMaxKg}
+                    onChange={(e) => setFormEditer(f => ({ ...f, capaciteMaxKg: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Seuil d'alerte (kg)</label>
+                  <input type="number" placeholder="ex: 12000"
+                    value={formEditer.seuilAlerteKg}
+                    onChange={(e) => setFormEditer(f => ({ ...f, seuilAlerteKg: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                </div>
+              </div>
+
+              {/* Adresse */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
+                <input type="text" placeholder="Adresse physique de l'entrepôt"
+                  value={formEditer.adresse}
+                  onChange={(e) => setFormEditer(f => ({ ...f, adresse: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => { setShowEditer(false); setEntrepotEdite(null); }}
+                className="flex-1 border border-gray-200 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50">
+                Annuler
+              </button>
+              <button
+                disabled={!formEditer.nom || mutEditer.isPending}
+                onClick={() => mutEditer.mutate({
+                  id: entrepotEdite.id,
+                  body: {
+                    nom: formEditer.nom,
+                    zoneNom: formEditer.zoneNom || undefined,
+                    zoneType: formEditer.zoneType || undefined,
+                    capaciteMaxKg: formEditer.capaciteMaxKg ? parseFloat(formEditer.capaciteMaxKg) : undefined,
+                    seuilAlerteKg: formEditer.seuilAlerteKg ? parseFloat(formEditer.seuilAlerteKg) : undefined,
+                    adresse: formEditer.adresse || undefined,
+                  },
+                })}
+                className="flex-1 bg-green-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50">
+                {mutEditer.isPending ? "Enregistrement…" : "Enregistrer"}
               </button>
             </div>
           </div>
