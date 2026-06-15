@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Users,
@@ -12,6 +13,7 @@ import {
   CheckCircle2,
   XCircle,
   ChevronRight,
+  CalendarDays,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
@@ -75,6 +77,25 @@ interface CaisseRow {
   solde_ouverture_fcfa: string | null;
 }
 
+type Preset = "mois" | "mois_prec" | "campagne" | "perso";
+
+function getPeriodeParams(preset: Preset, persoDebut: string, persoFin: string): { dateDebut?: string; dateFin?: string; label: string } {
+  const today = new Date();
+  const fmt = (d: Date) => d.toISOString().split("T")[0]!;
+  if (preset === "mois") {
+    const debut = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { dateDebut: fmt(debut), dateFin: fmt(today), label: "Ce mois" };
+  }
+  if (preset === "mois_prec") {
+    const debut = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const fin   = new Date(today.getFullYear(), today.getMonth(), 0);
+    return { dateDebut: fmt(debut), dateFin: fmt(fin), label: "Mois précédent" };
+  }
+  if (preset === "campagne") {
+    return { dateDebut: undefined, dateFin: undefined, label: "Toute la campagne" };
+  }
+  return { dateDebut: persoDebut || undefined, dateFin: persoFin || undefined, label: "Période perso." };
+}
 
 function WidgetCaisse({ caisses, onNavigate }: { caisses: CaisseRow[]; onNavigate: () => void }) {
   if (!caisses.length) {
@@ -111,7 +132,6 @@ function WidgetCaisse({ caisses, onNavigate }: { caisses: CaisseRow[]; onNavigat
       </div>
 
       <div className="px-5 py-4 grid grid-cols-3 gap-4">
-        {/* Solde */}
         <div>
           <p className="text-xs text-gray-400 mb-0.5">Solde actuel</p>
           <p className={`text-lg font-bold ${soldeInsuffisant ? "text-red-600" : "text-gray-900"}`}>
@@ -124,7 +144,6 @@ function WidgetCaisse({ caisses, onNavigate }: { caisses: CaisseRow[]; onNavigat
           )}
         </div>
 
-        {/* Session */}
         <div>
           <p className="text-xs text-gray-400 mb-0.5">Session</p>
           <div className="flex items-center gap-1.5">
@@ -142,7 +161,6 @@ function WidgetCaisse({ caisses, onNavigate }: { caisses: CaisseRow[]; onNavigat
           </div>
         </div>
 
-        {/* Heure d'ouverture */}
         <div>
           <p className="text-xs text-gray-400 mb-0.5">
             {sessionOuverte ? "Ouverte à" : "Dernière ouverture"}
@@ -160,7 +178,6 @@ function WidgetCaisse({ caisses, onNavigate }: { caisses: CaisseRow[]; onNavigat
         </div>
       </div>
 
-      {/* Barre de progression solde vs minimum */}
       {minimum > 0 && (
         <div className="px-5 pb-4">
           <div className="w-full bg-gray-100 rounded-full h-1.5">
@@ -182,9 +199,27 @@ export default function DashboardDelegue() {
   const { utilisateur } = useAuth();
   const [, navigate] = useLocation();
 
+  const [preset, setPreset] = useState<Preset>("mois");
+  const [persoDebut, setPersoDebut] = useState("");
+  const [persoFin, setPersoFin]   = useState("");
+  const [showPerso, setShowPerso] = useState(false);
+
+  const { dateDebut, dateFin, label: periodeLabel } = useMemo(
+    () => getPeriodeParams(preset, persoDebut, persoFin),
+    [preset, persoDebut, persoFin],
+  );
+
+  const buildUrl = () => {
+    const params = new URLSearchParams();
+    if (dateDebut) params.set("dateDebut", dateDebut);
+    if (dateFin)   params.set("dateFin",   dateFin);
+    const qs = params.toString();
+    return `/api/dashboard/delegue${qs ? `?${qs}` : ""}`;
+  };
+
   const { data, isLoading, refetch, isFetching } = useQuery<DashboardData>({
-    queryKey: ["dashboard-delegue"],
-    queryFn: () => apiFetch("/api/dashboard/delegue"),
+    queryKey: ["dashboard-delegue", dateDebut, dateFin],
+    queryFn: () => apiFetch(buildUrl()),
     staleTime: 60_000,
   });
 
@@ -196,10 +231,17 @@ export default function DashboardDelegue() {
 
   const prenom = utilisateur?.prenom ?? utilisateur?.nom ?? "Délégué";
 
+  const presets: { key: Preset; label: string }[] = [
+    { key: "mois",      label: "Ce mois" },
+    { key: "mois_prec", label: "Mois précédent" },
+    { key: "campagne",  label: "Toute la campagne" },
+    { key: "perso",     label: "Période perso." },
+  ];
+
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
       {/* En-tête */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="bg-amber-100 rounded-xl p-2.5">
             <LayoutDashboard size={22} className="text-amber-600" />
@@ -215,14 +257,51 @@ export default function DashboardDelegue() {
             )}
           </div>
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-3 py-1.5 transition"
-        >
-          <RefreshCw size={14} className={isFetching ? "animate-spin" : ""} />
-          Actualiser
-        </button>
+
+        {/* Sélecteur de période + Actualiser */}
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {presets.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => { setPreset(p.key); setShowPerso(p.key === "perso"); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                  preset === p.key
+                    ? "bg-amber-600 text-white border-amber-600"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {p.key === "perso" && <CalendarDays size={11} />}
+                {p.label}
+              </button>
+            ))}
+            <button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 bg-white rounded-lg px-3 py-1.5 transition"
+            >
+              <RefreshCw size={12} className={isFetching ? "animate-spin" : ""} />
+              Actualiser
+            </button>
+          </div>
+          {showPerso && (
+            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+              <input
+                type="date"
+                value={persoDebut}
+                onChange={(e) => setPersoDebut(e.target.value)}
+                className="text-xs border-0 outline-none text-gray-700"
+              />
+              <span className="text-gray-400 text-xs">→</span>
+              <input
+                type="date"
+                value={persoFin}
+                onChange={(e) => setPersoFin(e.target.value)}
+                className="text-xs border-0 outline-none text-gray-700"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* KPI */}
@@ -254,14 +333,14 @@ export default function DashboardDelegue() {
             }
           />
           <CarteKpi
-            titre="Tonnage du mois"
+            titre={`Tonnage · ${periodeLabel}`}
             valeur={formaterKg(data?.tonnageMois ?? 0)}
             icone={Package}
             couleur="#6366f1"
             sousTitre={
               (data?.nombreSacsMois ?? 0) > 0
-                ? `${data!.nombreSacsMois} sacs ce mois`
-                : "ce mois-ci"
+                ? `${data!.nombreSacsMois} sacs`
+                : periodeLabel
             }
           />
           <CarteKpi
@@ -298,7 +377,6 @@ export default function DashboardDelegue() {
           </div>
         )}
 
-        {/* Widget caisse */}
         {caisseLoading ? (
           <div className="bg-gray-100 rounded-xl animate-pulse h-36" />
         ) : (

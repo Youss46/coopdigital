@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { db, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable } from "@workspace/db";
-import { eq, sql, desc, gte, and, isNull } from "drizzle-orm";
+import { eq, sql, desc, gte, lte, and, isNull } from "drizzle-orm";
 
 export async function getDashboard(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -279,10 +279,12 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
   }
 
   try {
-    const debutMois = new Date();
-    debutMois.setDate(1);
-    debutMois.setHours(0, 0, 0, 0);
+    const today = new Date();
+    const debutMois = new Date(today.getFullYear(), today.getMonth(), 1);
     const debutMoisStr = debutMois.toISOString().split("T")[0]!;
+
+    const dateDebut = typeof req.query.dateDebut === "string" && req.query.dateDebut ? req.query.dateDebut : debutMoisStr;
+    const dateFin   = typeof req.query.dateFin   === "string" && req.query.dateFin   ? req.query.dateFin   : null;
 
     const [campagneActive] = await db
       .select({ id: campagnesTable.id, libelle: campagnesTable.libelle, anneeDebut: campagnesTable.anneeDebut, anneeFin: campagnesTable.anneeFin, tonnageCibleKg: campagnesTable.tonnageCibleKg })
@@ -344,7 +346,11 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
       db.select({ tonnage: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
         .from(livraisonsTable)
         .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-        .where(and(membresCond, gte(livraisonsTable.dateLivraison, debutMoisStr))),
+        .where(and(
+          membresCond,
+          gte(livraisonsTable.dateLivraison, dateDebut),
+          ...(dateFin ? [lte(livraisonsTable.dateLivraison, dateFin)] : []),
+        )),
 
       campagneId
         ? db.select({ count: sql<number>`count(*)::int` })
@@ -371,7 +377,11 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
       db.select({ sacs: sql<number>`coalesce(sum(nombre_sacs),0)::int` })
         .from(livraisonsTable)
         .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-        .where(and(membresCond, gte(livraisonsTable.dateLivraison, debutMoisStr))),
+        .where(and(
+          membresCond,
+          gte(livraisonsTable.dateLivraison, dateDebut),
+          ...(dateFin ? [lte(livraisonsTable.dateLivraison, dateFin)] : []),
+        )),
 
       campagneId
         ? db.select({ sacs: sql<number>`coalesce(sum(nombre_sacs),0)::int` })
