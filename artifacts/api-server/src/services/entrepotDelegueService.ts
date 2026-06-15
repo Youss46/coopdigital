@@ -49,6 +49,7 @@ export async function listEntrepots(cooperativeId: number) {
       delegueId:     entrepotsDeleguesTable.delegueId,
       delegueNom:    usersTable.nom,
       deleguePrenoms: usersTable.prenoms,
+      capaciteSacs:  entrepotsDeleguesTable.capaciteSacs,
       nombreSacsTotal: sql<number>`(
         SELECT COALESCE(SUM(l.nombre_sacs), 0)::integer
         FROM entrepot_mouvements em
@@ -110,6 +111,7 @@ export async function creerEntrepot(
     zoneType?: string;
     capaciteMaxKg?: number;
     seuilAlerteKg?: number;
+    capaciteSacs?: number;
     adresse?: string;
     gpsLat?: number;
     gpsLng?: number;
@@ -124,6 +126,7 @@ export async function creerEntrepot(
       actif: true,
       capaciteMaxKg: data.capaciteMaxKg != null ? String(data.capaciteMaxKg) : null,
       seuilAlerteKg: data.seuilAlerteKg != null ? String(data.seuilAlerteKg) : null,
+      capaciteSacs: data.capaciteSacs != null ? data.capaciteSacs : null,
       gpsLat: data.gpsLat != null ? String(data.gpsLat) : null,
       gpsLng: data.gpsLng != null ? String(data.gpsLng) : null,
     })
@@ -140,6 +143,7 @@ export async function modifierEntrepot(
     zoneType: string;
     capaciteMaxKg: number;
     seuilAlerteKg: number;
+    capaciteSacs: number;
     adresse: string;
     gpsLat: number;
     gpsLng: number;
@@ -153,6 +157,7 @@ export async function modifierEntrepot(
   if (data.zoneType !== undefined) payload.zoneType = data.zoneType;
   if (data.capaciteMaxKg !== undefined) payload.capaciteMaxKg = String(data.capaciteMaxKg);
   if (data.seuilAlerteKg !== undefined) payload.seuilAlerteKg = String(data.seuilAlerteKg);
+  if (data.capaciteSacs !== undefined) payload.capaciteSacs = data.capaciteSacs;
   if (data.adresse !== undefined) payload.adresse = data.adresse;
   if (data.gpsLat !== undefined) payload.gpsLat = String(data.gpsLat);
   if (data.gpsLng !== undefined) payload.gpsLng = String(data.gpsLng);

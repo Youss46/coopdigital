@@ -41,6 +41,7 @@ interface Entrepot {
   actif: boolean; delegueId: number;
   delegueNom: string | null; deleguePrenoms: string | null;
   adresse: string | null;
+  capaciteSacs?: number | null;
   nombreSacsTotal?: number | null;
 }
 interface Stats {
@@ -132,13 +133,13 @@ export default function EntrepotsPage() {
   const [showCreer, setShowCreer] = useState(false);
   const [formCreer, setFormCreer] = useState({
     delegueId: "", nom: "", zoneNom: "", zoneType: "village",
-    capaciteMaxKg: "", seuilAlerteKg: "", adresse: "",
+    capaciteMaxKg: "", seuilAlerteKg: "", capaciteSacs: "", adresse: "",
   });
   const [showEditer, setShowEditer] = useState(false);
   const [entrepotEdite, setEntrepotEdite] = useState<Entrepot | null>(null);
   const [formEditer, setFormEditer] = useState({
     nom: "", zoneNom: "", zoneType: "village",
-    capaciteMaxKg: "", seuilAlerteKg: "", adresse: "",
+    capaciteMaxKg: "", seuilAlerteKg: "", capaciteSacs: "", adresse: "",
   });
   const [showDetail, setShowDetail] = useState<Entrepot | null>(null);
   const [detailOnglet, setDetailOnglet] = useState<"mouvements" | "transferts">("mouvements");
@@ -223,7 +224,7 @@ export default function EntrepotsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
       setShowCreer(false);
-      setFormCreer({ delegueId: "", nom: "", zoneNom: "", zoneType: "village", capaciteMaxKg: "", seuilAlerteKg: "", adresse: "" });
+      setFormCreer({ delegueId: "", nom: "", zoneNom: "", zoneType: "village", capaciteMaxKg: "", seuilAlerteKg: "", capaciteSacs: "", adresse: "" });
       toast({ title: "Entrepôt créé" });
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -262,6 +263,7 @@ export default function EntrepotsPage() {
       zoneType: e.zoneType ?? "village",
       capaciteMaxKg: e.capaciteMaxKg ?? "",
       seuilAlerteKg: e.seuilAlerteKg ?? "",
+      capaciteSacs: e.capaciteSacs != null ? String(e.capaciteSacs) : "",
       adresse: e.adresse ?? "",
     });
     setShowEditer(true);
@@ -838,8 +840,9 @@ export default function EntrepotsPage() {
               <div className="flex gap-3 mt-2 text-xs text-gray-500 flex-wrap">
                 <span>Stock : <span className="font-semibold text-gray-800">{kg(showDetail.stockActuelKg)}</span></span>
                 {showDetail.capaciteMaxKg && <span>Capacité : <span className="font-semibold text-gray-800">{kg(showDetail.capaciteMaxKg)}</span></span>}
+                {showDetail.capaciteSacs != null && <span>Capacité sacs : <span className="font-semibold text-gray-800">{showDetail.capaciteSacs} sacs</span></span>}
                 {showDetail.nombreSacsTotal != null && showDetail.nombreSacsTotal > 0 && (
-                  <span>Sacs : <span className="font-semibold text-gray-800">{showDetail.nombreSacsTotal}</span></span>
+                  <span>Sacs stockés : <span className="font-semibold text-gray-800">{showDetail.nombreSacsTotal}</span></span>
                 )}
                 {showDetail.adresse && <span className="truncate">{showDetail.adresse}</span>}
               </div>
@@ -1139,6 +1142,15 @@ export default function EntrepotsPage() {
                 </div>
               </div>
 
+              {/* Capacité en sacs */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Capacité (nombre de sacs)</label>
+                <input type="number" min="0" placeholder="ex: 500"
+                  value={formEditer.capaciteSacs}
+                  onChange={(e) => setFormEditer(f => ({ ...f, capaciteSacs: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+              </div>
+
               {/* Adresse */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
@@ -1164,6 +1176,7 @@ export default function EntrepotsPage() {
                     zoneType: formEditer.zoneType || undefined,
                     capaciteMaxKg: formEditer.capaciteMaxKg ? parseFloat(formEditer.capaciteMaxKg) : undefined,
                     seuilAlerteKg: formEditer.seuilAlerteKg ? parseFloat(formEditer.seuilAlerteKg) : undefined,
+                    capaciteSacs: formEditer.capaciteSacs ? parseInt(formEditer.capaciteSacs) : undefined,
                     adresse: formEditer.adresse || undefined,
                   },
                 })}
@@ -1264,6 +1277,15 @@ export default function EntrepotsPage() {
                 </div>
               </div>
 
+              {/* Capacité en sacs */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Capacité (nombre de sacs)</label>
+                <input type="number" min="0" placeholder="ex: 500"
+                  value={formCreer.capaciteSacs}
+                  onChange={(e) => setFormCreer(f => ({ ...f, capaciteSacs: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+              </div>
+
               {/* Adresse */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
@@ -1287,6 +1309,7 @@ export default function EntrepotsPage() {
                   zoneType: formCreer.zoneType || undefined,
                   capaciteMaxKg: formCreer.capaciteMaxKg ? parseFloat(formCreer.capaciteMaxKg) : undefined,
                   seuilAlerteKg: formCreer.seuilAlerteKg ? parseFloat(formCreer.seuilAlerteKg) : undefined,
+                  capaciteSacs: formCreer.capaciteSacs ? parseInt(formCreer.capaciteSacs) : undefined,
                   adresse: formCreer.adresse || undefined,
                 })}
                 className="flex-1 bg-green-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50">

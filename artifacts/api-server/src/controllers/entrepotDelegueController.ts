@@ -45,7 +45,7 @@ export async function listEntrepotsHandler(req: Request, res: Response): Promise
 export async function creerEntrepotHandler(req: Request, res: Response): Promise<void> {
   const coop = coopId(req);
   if (!coop) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
-  const { delegueId, nom, zoneNom, zoneType, capaciteMaxKg, seuilAlerteKg, adresse, gpsLat, gpsLng } =
+  const { delegueId, nom, zoneNom, zoneType, capaciteMaxKg, seuilAlerteKg, capaciteSacs, adresse, gpsLat, gpsLng } =
     req.body as Record<string, unknown>;
   if (!delegueId || !nom) { res.status(400).json({ erreur: "delegueId et nom sont requis" }); return; }
   try {
@@ -56,6 +56,7 @@ export async function creerEntrepotHandler(req: Request, res: Response): Promise
       zoneType: zoneType ? String(zoneType) : undefined,
       capaciteMaxKg: capaciteMaxKg ? Number(capaciteMaxKg) : undefined,
       seuilAlerteKg: seuilAlerteKg ? Number(seuilAlerteKg) : undefined,
+      capaciteSacs: capaciteSacs ? Number(capaciteSacs) : undefined,
       adresse: adresse ? String(adresse) : undefined,
       gpsLat: gpsLat ? Number(gpsLat) : undefined,
       gpsLng: gpsLng ? Number(gpsLng) : undefined,

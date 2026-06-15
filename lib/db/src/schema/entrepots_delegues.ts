@@ -45,6 +45,7 @@ export const entrepotsDeleguesTable = pgTable("entrepots_delegues", {
 
   capaciteMaxKg:     numeric("capacite_max_kg", { precision: 12, scale: 2 }),
   seuilAlerteKg:     numeric("seuil_alerte_kg", { precision: 12, scale: 2 }),
+  capaciteSacs:      integer("capacite_sacs"),
 
   stockActuelKg:     numeric("stock_actuel_kg", { precision: 12, scale: 2 }).default("0"),
   stockMisAJourLe:   timestamp("stock_mis_a_jour_le", { withTimezone: true }),
