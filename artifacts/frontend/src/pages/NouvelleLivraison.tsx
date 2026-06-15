@@ -29,7 +29,7 @@ async function apiFetch<T>(path: string): Promise<T> {
 
 interface EntrepotDelegue { id: number; nom: string; zoneNom: string | null; actif: boolean; }
 import { getGetDashboardQueryKey, getGetDashboardLivraisonsQueryKey } from "@workspace/api-client-react";
-import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp, Sprout, AlertTriangle, Tag } from "lucide-react";
+import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp, Sprout, AlertTriangle, Tag, ArrowLeft } from "lucide-react";
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -260,6 +260,13 @@ export default function NouvelleLivraison() {
   return (
     <div className="max-w-xl mx-auto space-y-5">
       <div>
+        <button
+          onClick={() => navigate("/livraisons")}
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-3 transition-colors"
+        >
+          <ArrowLeft size={15} />
+          Retour aux livraisons
+        </button>
         <h1 className="text-2xl font-bold text-gray-900">Nouvelle livraison</h1>
         <p className="text-gray-500 text-sm mt-0.5">Enregistrer une livraison de cacao</p>
       </div>
