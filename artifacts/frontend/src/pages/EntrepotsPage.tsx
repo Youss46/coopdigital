@@ -52,8 +52,21 @@ interface Transfert {
   poidsDepart_kg: string | null; poidsArrivee_kg: string | null; ecartKg: string | null;
   motifEcart: string | null; dateDepart: string | null; dateArrivee: string | null;
   datePrevue: string | null; typeVehicule: string | null; immatriculation: string | null;
-  nomChauffeur: string | null; entrepotNom: string | null; zoneNom: string | null;
-  delegueNom: string | null; deleguePrenoms: string | null; notes: string | null;
+  nomChauffeur: string | null; entrepotNom: string | null; entrepotId: number | null;
+  zoneNom: string | null; delegueNom: string | null; deleguePrenoms: string | null; notes: string | null;
+}
+interface Mouvement {
+  id: number;
+  typeMouvement: "entree" | "sortie";
+  motif: "livraison_membre" | "transfert_central" | "ajustement" | "perte";
+  poidsKg: string;
+  stockAvantKg: string;
+  stockApresKg: string;
+  livraisonId: number | null;
+  transfertId: number | null;
+  dateMouvement: string;
+  notes: string | null;
+  enregistreParNom: string | null;
 }
 
 const STATUT_LABEL: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -123,6 +136,8 @@ export default function EntrepotsPage() {
     nom: "", zoneNom: "", zoneType: "village",
     capaciteMaxKg: "", seuilAlerteKg: "", adresse: "",
   });
+  const [showDetail, setShowDetail] = useState<Entrepot | null>(null);
+  const [detailOnglet, setDetailOnglet] = useState<"mouvements" | "transferts">("mouvements");
 
   const { data: deleguesListe = [], isLoading: loadDelegues } = useQuery<DelegueListe[]>({
     queryKey: ["delegues-liste-entrepots"],
@@ -162,6 +177,13 @@ export default function EntrepotsPage() {
       toast({ title: "Litige signalé" });
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  const { data: mouvements = [], isFetching: loadMouvements } = useQuery<Mouvement[]>({
+    queryKey: ["entrepot-mouvements", showDetail?.id],
+    queryFn: () => apiFetch(`/entrepots/${showDetail!.id}/mouvements?limit=50`),
+    enabled: !!showDetail,
+    staleTime: 30_000,
   });
 
   const mutCreer = useMutation({
@@ -280,6 +302,12 @@ export default function EntrepotsPage() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${e.actif ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                           {e.actif ? "Actif" : "Inactif"}
                         </span>
+                        <button
+                          onClick={() => { setShowDetail(e); setDetailOnglet("mouvements"); }}
+                          title="Voir le détail"
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
                         {peutModifier && (
                           <button
                             onClick={() => ouvrirEditer(e)}
@@ -496,6 +524,142 @@ export default function EntrepotsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Drawer détail entrepôt */}
+      {showDetail && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowDetail(null)} />
+          <div className="fixed inset-y-0 right-0 w-full max-w-xl bg-white z-50 shadow-2xl flex flex-col">
+            {/* En-tête */}
+            <div className="px-6 pt-5 pb-4 border-b border-gray-100">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h2 className="text-lg font-bold text-gray-900 truncate">{showDetail.nom}</h2>
+                    <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${showDetail.actif ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      {showDetail.actif ? "Actif" : "Inactif"}
+                    </span>
+                  </div>
+                  {showDetail.zoneNom && (
+                    <p className="text-sm text-gray-500">{showDetail.zoneNom} · {showDetail.zoneType}</p>
+                  )}
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    Délégué : <span className="font-medium text-gray-700">{showDetail.delegueNom} {showDetail.deleguePrenoms}</span>
+                  </p>
+                </div>
+                <button onClick={() => setShowDetail(null)} className="shrink-0 p-2 rounded-lg text-gray-400 hover:bg-gray-100 text-xl font-light leading-none">✕</button>
+              </div>
+              {/* Mini jauge */}
+              <div className="mt-3">
+                <JaugeStock stock={showDetail.stockActuelKg} capacite={showDetail.capaciteMaxKg} seuil={showDetail.seuilAlerteKg} />
+              </div>
+              <div className="flex gap-3 mt-2 text-xs text-gray-500">
+                <span>Stock : <span className="font-semibold text-gray-800">{kg(showDetail.stockActuelKg)}</span></span>
+                {showDetail.capaciteMaxKg && <span>Capacité : <span className="font-semibold text-gray-800">{kg(showDetail.capaciteMaxKg)}</span></span>}
+                {showDetail.adresse && <span className="truncate">{showDetail.adresse}</span>}
+              </div>
+            </div>
+
+            {/* Onglets */}
+            <div className="flex border-b border-gray-100 px-6">
+              {(["mouvements", "transferts"] as const).map((tab) => (
+                <button key={tab} onClick={() => setDetailOnglet(tab)}
+                  className={`py-3 px-1 mr-5 text-sm font-medium border-b-2 transition-colors ${detailOnglet === tab ? "border-green-600 text-green-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+                  {tab === "mouvements" ? "Mouvements de stock" : "Transferts"}
+                </button>
+              ))}
+            </div>
+
+            {/* Corps scrollable */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+
+              {detailOnglet === "mouvements" && (
+                loadMouvements ? (
+                  <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Chargement…</div>
+                ) : mouvements.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-32 text-gray-400 text-sm gap-2">
+                    <BarChart3 className="w-8 h-8 opacity-30" />
+                    <p>Aucun mouvement enregistré</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {mouvements.map((m) => {
+                      const isEntree = m.typeMouvement === "entree";
+                      const MOTIF: Record<string, string> = {
+                        livraison_membre: "Livraison membre",
+                        transfert_central: "Transfert central",
+                        ajustement: "Ajustement",
+                        perte: "Perte",
+                      };
+                      return (
+                        <div key={m.id} className="flex items-start gap-3 bg-gray-50 rounded-xl p-3">
+                          <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 ${isEntree ? "bg-green-100" : "bg-red-100"}`}>
+                            {isEntree
+                              ? <TrendingUp className="w-4 h-4 text-green-700" />
+                              : <TrendingDown className="w-4 h-4 text-red-600" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`text-sm font-semibold ${isEntree ? "text-green-700" : "text-red-600"}`}>
+                                {isEntree ? "+" : "−"}{kg(m.poidsKg)}
+                              </span>
+                              <span className="text-xs text-gray-400 shrink-0">{fmtDate(m.dateMouvement)}</span>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-0.5">{MOTIF[m.motif] ?? m.motif}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {kg(m.stockAvantKg)} → <span className="font-medium text-gray-600">{kg(m.stockApresKg)}</span>
+                              {m.enregistreParNom && <> · {m.enregistreParNom}</>}
+                            </p>
+                            {m.notes && <p className="text-xs text-gray-400 italic mt-0.5">{m.notes}</p>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+
+              {detailOnglet === "transferts" && (() => {
+                const trEntrepot = transferts.filter((t) => t.entrepotId === showDetail.id);
+                return trEntrepot.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-32 text-gray-400 text-sm gap-2">
+                    <Truck className="w-8 h-8 opacity-30" />
+                    <p>Aucun transfert pour cet entrepôt</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {trEntrepot.map((t) => {
+                      const s = STATUT_LABEL[t.statut];
+                      return (
+                        <div key={t.id} className="bg-gray-50 rounded-xl p-3">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-sm font-semibold text-gray-800">{t.numeroTransfert}</span>
+                            {s && (
+                              <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${s.color}`}>
+                                {s.icon} {s.label}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
+                            {t.poidsDepart_kg && <span>Départ : <span className="font-medium text-gray-700">{kg(t.poidsDepart_kg)}</span></span>}
+                            {t.poidsArrivee_kg && <span>Arrivée : <span className="font-medium text-gray-700">{kg(t.poidsArrivee_kg)}</span></span>}
+                            {t.ecartKg && parseFloat(t.ecartKg) !== 0 && (
+                              <span className="text-orange-600 font-medium">Écart : {kg(t.ecartKg)}</span>
+                            )}
+                          </div>
+                          {t.nomChauffeur && <p className="text-xs text-gray-400 mt-0.5">Chauffeur : {t.nomChauffeur} {t.immatriculation ? `· ${t.immatriculation}` : ""}</p>}
+                          <p className="text-xs text-gray-400 mt-0.5">{fmtDate(t.dateDepart ?? t.datePrevue)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+            </div>
+          </div>
+        </>
       )}
 
       {/* Modal éditer entrepôt */}
