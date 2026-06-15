@@ -235,11 +235,32 @@ export async function listDelegues(cooperativeId: number) {
     .orderBy(usersTable.nom);
 
   const result = await Promise.all(agents.map(async (a) => {
-    const [caisse] = await db
-      .select({ solde: caissesDeleguesTable.solde, id: caissesDeleguesTable.id })
-      .from(caissesDeleguesTable)
-      .where(eq(caissesDeleguesTable.userId, a.id))
+    // Source de vérité : caissesTable (page Caisse) via responsable_id
+    const [caissePrincipale] = await db
+      .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
+      .from(caissesTable)
+      .where(and(
+        eq(caissesTable.responsableId, a.id),
+        eq(caissesTable.cooperativeId, cooperativeId),
+        eq(caissesTable.actif, true),
+      ))
       .limit(1);
+
+    // Repli sur caissesDeleguesTable (système terrain) si pas de caisse principale
+    let soldeCaisse = 0;
+    let caisseId: number | null = null;
+    if (caissePrincipale) {
+      soldeCaisse = toNum(caissePrincipale.solde);
+      caisseId = caissePrincipale.id;
+    } else {
+      const [caisseTerrain] = await db
+        .select({ id: caissesDeleguesTable.id, solde: caissesDeleguesTable.solde })
+        .from(caissesDeleguesTable)
+        .where(eq(caissesDeleguesTable.userId, a.id))
+        .limit(1);
+      soldeCaisse = toNum(caisseTerrain?.solde ?? "0");
+      caisseId = caisseTerrain?.id ?? null;
+    }
 
     const [differes] = await db
       .select({ nb: sql<number>`COUNT(*)`, total: sql<string>`COALESCE(SUM(${livraisonsTable.montantRestant}), 0)` })
@@ -262,8 +283,8 @@ export async function listDelegues(cooperativeId: number) {
       section: a.section ?? null,
       actif: a.actif,
       caisse: {
-        id: caisse?.id ?? null,
-        solde: caisse ? toNum(caisse.solde) : 0,
+        id: caisseId,
+        solde: soldeCaisse,
       },
       paiementsDifferes: {
         nb: Number(differes?.nb ?? 0),
@@ -277,25 +298,61 @@ export async function listDelegues(cooperativeId: number) {
 }
 
 export async function getDetailCaisse(agentId: number, cooperativeId: number) {
-  const caisse = await getOrCreateCaisse(agentId, cooperativeId);
   const [agent] = await db
     .select({ nom: usersTable.nom, prenoms: usersTable.prenoms, section: usersTable.section })
     .from(usersTable)
     .where(eq(usersTable.id, agentId));
 
-  const mouvements = await db
-    .select()
-    .from(mouvementsCaisseDelegueTable)
-    .where(eq(mouvementsCaisseDelegueTable.caisseDelegueId, caisse.id))
-    .orderBy(desc(mouvementsCaisseDelegueTable.createdAt))
-    .limit(50);
+  // Source de vérité : caissesTable (page Caisse) via responsable_id
+  const [caissePrincipale] = await db
+    .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, agentId),
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
 
-  const differes = await getPaiementsDifferes(agentId, cooperativeId);
+  type MouvementMapped = {
+    id: number; type: string; montantFcfa: number; soldeApresFcfa: number;
+    note: string | null; livraisonId: number | null; createdAt: Date;
+  };
 
-  return {
-    agent: { id: agentId, nom: agent?.nom, prenoms: agent?.prenoms, section: agent?.section ?? null },
-    caisse: { id: caisse.id, solde: toNum(caisse.solde), plafond: caisse.plafond ? toNum(caisse.plafond) : null },
-    mouvements: mouvements.map((m) => ({
+  let mappedMouvements: MouvementMapped[];
+  let caisseId: number;
+  let soldeCaisse: number;
+
+  if (caissePrincipale) {
+    caisseId = caissePrincipale.id;
+    soldeCaisse = toNum(caissePrincipale.solde);
+    const rows = await db
+      .select()
+      .from(mouvementsCaisseTable)
+      .where(eq(mouvementsCaisseTable.caisseId, caissePrincipale.id))
+      .orderBy(desc(mouvementsCaisseTable.createdAt))
+      .limit(50);
+    mappedMouvements = rows.map((m) => ({
+      id: m.id,
+      type: m.type,
+      montantFcfa: toNum(m.montantFcfa),
+      soldeApresFcfa: toNum(m.soldeApresFcfa ?? "0"),
+      note: m.libelle ?? m.motif ?? null,
+      livraisonId: null,
+      createdAt: m.createdAt,
+    }));
+  } else {
+    // Repli terrain
+    const caisseFallback = await getOrCreateCaisse(agentId, cooperativeId);
+    caisseId = caisseFallback.id;
+    soldeCaisse = toNum(caisseFallback.solde);
+    const rows = await db
+      .select()
+      .from(mouvementsCaisseDelegueTable)
+      .where(eq(mouvementsCaisseDelegueTable.caisseDelegueId, caisseFallback.id))
+      .orderBy(desc(mouvementsCaisseDelegueTable.createdAt))
+      .limit(50);
+    mappedMouvements = rows.map((m) => ({
       id: m.id,
       type: m.type,
       montantFcfa: toNum(m.montantFcfa),
@@ -303,7 +360,15 @@ export async function getDetailCaisse(agentId: number, cooperativeId: number) {
       note: m.note,
       livraisonId: m.livraisonId,
       createdAt: m.createdAt,
-    })),
+    }));
+  }
+
+  const differes = await getPaiementsDifferes(agentId, cooperativeId);
+
+  return {
+    agent: { id: agentId, nom: agent?.nom, prenoms: agent?.prenoms, section: agent?.section ?? null },
+    caisse: { id: caisseId, solde: soldeCaisse, plafond: null as number | null },
+    mouvements: mappedMouvements,
     paiementsDifferes: differes,
   };
 }
