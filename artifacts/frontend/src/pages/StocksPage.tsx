@@ -129,6 +129,9 @@ export default function StocksPage() {
   const sortiesTotal = mouvements
     .filter((m) => m.type === "sortie")
     .reduce((s, m) => s + parseFloat(m.poidsKg), 0);
+  const sacsTotalNets =
+    mouvements.filter((m) => m.type === "entree").reduce((s, m) => s + (m.nombreSacs ?? 0), 0) -
+    mouvements.filter((m) => m.type === "sortie").reduce((s, m) => s + (m.nombreSacs ?? 0), 0);
 
   const handleSubmitMouvement = () => {
     if (!form.entrepotId || !form.poidsKg) return;
@@ -205,10 +208,10 @@ export default function StocksPage() {
       {/* Cartes KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: "Stock total", val: formaterPoids(stockTotal), icon: Warehouse, color: "#1a4731" },
-          { label: "Entrées (historique)", val: formaterPoids(entreesTotal), icon: TrendingUp, color: "#22c55e" },
-          { label: "Sorties (historique)", val: formaterPoids(sortiesTotal), icon: TrendingDown, color: "#ef4444" },
-        ].map(({ label, val, icon: Icon, color }) => (
+          { label: "Stock total", val: formaterPoids(stockTotal), icon: Warehouse, color: "#1a4731", sub: sacsTotalNets > 0 ? `${sacsTotalNets} sac${sacsTotalNets > 1 ? "s" : ""}` : null },
+          { label: "Entrées (historique)", val: formaterPoids(entreesTotal), icon: TrendingUp, color: "#22c55e", sub: null },
+          { label: "Sorties (historique)", val: formaterPoids(sortiesTotal), icon: TrendingDown, color: "#ef4444", sub: null },
+        ].map(({ label, val, icon: Icon, color, sub }) => (
           <div key={label} className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4">
             <div className="rounded-lg p-2.5" style={{ backgroundColor: color + "15" }}>
               <Icon size={20} style={{ color }} />
@@ -216,6 +219,7 @@ export default function StocksPage() {
             <div>
               <p className="text-sm text-gray-500 font-medium">{label}</p>
               <p className="text-xl font-bold text-gray-900 mt-0.5">{val}</p>
+              {sub && <p className="text-sm text-gray-500 mt-0.5">{sub}</p>}
             </div>
           </div>
         ))}
