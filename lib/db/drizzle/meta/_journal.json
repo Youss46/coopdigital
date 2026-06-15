@@ -239,6 +239,13 @@
       "when": 1782057600000,
       "tag": "0033_add_wave_to_mode_paiement",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1782144000000,
+      "tag": "0034_membres_numero_membre",
+      "breakpoints": true
     }
   ]
 }

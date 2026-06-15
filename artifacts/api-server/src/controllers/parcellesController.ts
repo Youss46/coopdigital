@@ -58,6 +58,7 @@ export async function listParcelles(req: Request, res: Response): Promise<void> 
         membrePrenoms:      membresTable.prenoms,
         telephone:          membresTable.telephone,
         membreDbId:         membresTable.id,
+        numeroMembre:       membresTable.numeroMembre,
         dateAdhesion:       membresTable.dateAdhesion,
         membreSuperficieHa: membresTable.superficieHa,
       })
@@ -82,7 +83,7 @@ export async function listParcelles(req: Request, res: Response): Promise<void> 
         ...r.parcelle,
         membre_nom:         `${r.membreNom} ${r.membrePrenoms}`,
         telephone:          r.telephone,
-        codeMembre:         computeCodeMembre(r.membreDbId, r.dateAdhesion ?? "2025-01-01"),
+        codeMembre:         computeCodeMembre(r.numeroMembre, r.dateAdhesion ?? "2025-01-01"),
         membreSuperficieHa: r.membreSuperficieHa,
       })),
       total: count,

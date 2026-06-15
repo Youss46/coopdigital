@@ -1310,6 +1310,7 @@ export async function generateEtatPartsSociales(membreId: number, cooperativeId:
 export async function generateListeMembres(
   membres: Array<{
     id: number;
+    numeroMembre: number;
     nom: string;
     prenoms: string;
     sexe?: string | null;
@@ -1378,7 +1379,7 @@ export async function generateListeMembres(
     const rowY = doc.y;
     if (i % 2 === 0) doc.rect(50, rowY, doc.page.width - 100, rowH).fill("#f9fafb");
     const ty   = rowY + 5;
-    const code = computeCodeMembre(m.id, m.dateAdhesion);
+    const code = computeCodeMembre(m.numeroMembre, m.dateAdhesion);
     const civilite = m.sexe === "M" ? "M." : m.sexe === "F" ? "Mme" : "";
     doc.fillColor(NOIR_L).fontSize(8).font("Helvetica");
     doc.text(`${civilite ? civilite + " " : ""}${m.nom} ${m.prenoms}`, cols.nom, ty, { width: 145, lineBreak: false });

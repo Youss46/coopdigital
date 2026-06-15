@@ -77,6 +77,10 @@ export const membresTable = pgTable("membres", {
   certification: varchar("certification", { length: 50 }),
   documentsJoints: jsonb("documents_joints"),
 
+  // ── Numéro de membre (séquence par coopérative, isolation multi-tenants) ─────
+  // N'utilise PAS l'id global ; calculé comme MAX(numero_membre)+1 par cooperative_id.
+  numeroMembre: integer("numero_membre").notNull().default(1),
+
   // ── Carte de membre ─────────────────────────────────────────────────────────
   carteStatut:      varchar("carte_statut", { length: 20 }).default("non_emise"),
   // 'non_emise' | 'active' | 'suspendue'

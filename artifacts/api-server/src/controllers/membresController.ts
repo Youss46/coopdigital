@@ -46,8 +46,8 @@ async function autoCreateFournisseurMembre(
   }
 }
 
-function enrichMembre<T extends { id: number; dateAdhesion: string }>(m: T) {
-  return { ...m, codeMembre: computeCodeMembre(m.id, m.dateAdhesion) };
+function enrichMembre<T extends { id: number; numeroMembre: number; dateAdhesion: string }>(m: T) {
+  return { ...m, codeMembre: computeCodeMembre(m.numeroMembre, m.dateAdhesion) };
 }
 
 // ── Délégués disponibles ──────────────────────────────────────────────────────
@@ -347,10 +347,17 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
 
     const body = req.body as Record<string, unknown>;
 
+    // Calcul du numéro de membre par coopérative (isolation multi-tenants)
+    const [{ nextNumero }] = await db
+      .select({ nextNumero: sql<number>`COALESCE(MAX(numero_membre), 0) + 1` })
+      .from(membresTable)
+      .where(eq(membresTable.cooperativeId, cooperativeId));
+
     const [membre] = await db
       .insert(membresTable)
       .values({
         cooperativeId,
+        numeroMembre: nextNumero,
         nom: data.nom,
         prenoms: data.prenoms,
         telephone: data.telephone,
@@ -994,7 +1001,7 @@ export async function getMembreCartePdf(req: Request, res: Response): Promise<vo
 
     const { generateCarteMembre } = await import("../services/portailService");
     const pdf = await generateCarteMembre(id);
-    const code = `MBR-${new Date(membre.dateAdhesion).getFullYear()}-${String(membre.id).padStart(4, "0")}`;
+    const code = `MBR-${new Date(membre.dateAdhesion).getFullYear()}-${String(membre.numeroMembre).padStart(4, "0")}`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="carte-${code}.pdf"`);
     res.send(pdf);

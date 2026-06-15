@@ -20,17 +20,21 @@ const DEFAULT_LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
 
 
 // ─── Code membre ─────────────────────────────────────────────────────────────
+// Le numéro utilisé est numero_membre (séquence par coopérative), PAS l'id global.
+// Cela garantit l'isolation multi-tenants : chaque coop numérote ses membres depuis 1.
 
-export function computeCodeMembre(id: number, dateAdhesion: string): string {
+export function computeCodeMembre(numeroMembre: number, dateAdhesion: string): string {
   const year = new Date(dateAdhesion).getFullYear();
-  return `MBR-${year}-${String(id).padStart(4, "0")}`;
+  return `MBR-${year}-${String(numeroMembre).padStart(4, "0")}`;
 }
 
-export function parseCodeMembre(code: string): number | null {
-  const parts = code.trim().toUpperCase().split("-");
-  if (parts.length !== 3 || parts[0] !== "MBR") return null;
-  const id = parseInt(parts[2] ?? "", 10);
-  return isNaN(id) ? null : id;
+export function parseCodeMembre(code: string): { year: number; numero: number } | null {
+  const m = code.trim().toUpperCase().match(/^MBR-(\d{4})-(\d+)$/);
+  if (!m) return null;
+  const year = parseInt(m[1]!, 10);
+  const numero = parseInt(m[2]!, 10);
+  if (isNaN(year) || isNaN(numero)) return null;
+  return { year, numero };
 }
 
 // ─── Rate limiting (in-memory, 5/h par téléphone) ────────────────────────────
@@ -63,25 +67,26 @@ export async function authentifierMembre(
   codeMembre: string,
   telephone: string
 ): Promise<typeof membresTable.$inferSelect> {
-  const membreId = parseCodeMembre(codeMembre);
-  if (!membreId) throw new Error("Format de code membre invalide (ex: MBR-2025-0001)");
+  const parsed = parseCodeMembre(codeMembre);
+  if (!parsed) throw new Error("Format de code membre invalide (ex: MBR-2025-0001)");
 
-  const [membre] = await db
+  // Chercher par (numero_membre, année d'adhésion) — peut retourner plusieurs coops
+  const candidats = await db
     .select()
     .from(membresTable)
-    .where(eq(membresTable.id, membreId));
+    .where(
+      and(
+        eq(membresTable.numeroMembre, parsed.numero),
+        sql`EXTRACT(YEAR FROM ${membresTable.dateAdhesion}::date) = ${parsed.year}`
+      )
+    );
 
-  if (!membre) throw new Error("Membre introuvable");
+  if (candidats.length === 0) throw new Error("Membre introuvable");
 
+  // Vérification du téléphone comme second facteur (isole le bon tenant)
   const telCanon = (t: string) => t.replace(/[\s\-().+]/g, "");
-  if (telCanon(membre.telephone) !== telCanon(telephone)) {
-    throw new Error("Code membre ou téléphone incorrect");
-  }
-
-  const computed = computeCodeMembre(membre.id, membre.dateAdhesion);
-  if (computed.toUpperCase() !== codeMembre.trim().toUpperCase()) {
-    throw new Error("Code membre incorrect");
-  }
+  const membre = candidats.find(m => telCanon(m.telephone) === telCanon(telephone));
+  if (!membre) throw new Error("Code membre ou téléphone incorrect");
 
   return membre;
 }
@@ -94,6 +99,7 @@ export async function getProfilMembre(membreId: number) {
   const [membre] = await db
     .select({
       id:            membresTable.id,
+      numeroMembre:  membresTable.numeroMembre,
       nom:           membresTable.nom,
       prenoms:       membresTable.prenoms,
       telephone:     membresTable.telephone,
@@ -128,7 +134,7 @@ export async function getProfilMembre(membreId: number) {
 
   return {
     id: membre.id,
-    codeMembre: computeCodeMembre(membre.id, membre.dateAdhesion),
+    codeMembre: computeCodeMembre(membre.numeroMembre, membre.dateAdhesion),
     nom: membre.nom,
     prenoms: membre.prenoms,
     telephone: membre.telephone,
@@ -316,6 +322,7 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
       dateAdhesion: membresTable.dateAdhesion,
+      numeroMembre: membresTable.numeroMembre,
     })
     .from(livraisonsTable)
     .leftJoin(campagnesTable, eq(livraisonsTable.campagneId, campagnesTable.id))
@@ -333,7 +340,7 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
 
   const fmtFCFA = (n: number) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
   const fmtDate = (d: string) => new Date(d).toLocaleDateString("fr-FR");
-  const codeMembre = computeCodeMembre(liv.membreId, liv.dateAdhesion ?? "2025-01-01");
+  const codeMembre = computeCodeMembre(liv.numeroMembre ?? 0, liv.dateAdhesion ?? "2025-01-01");
 
   const VERT = coopConfig?.couleurPrimaire || "#1a4731";
   const W = 419.53;
@@ -406,17 +413,26 @@ export async function verifierMembrePublic(codeMembre: string): Promise<{
   statut: string; village: string | null; superficieHa: string | null;
   dateAdhesion: string; codeMembre: string;
 } | null> {
-  // Extraire l'id depuis le format MBR-AAAA-NNNN
-  const match = codeMembre.match(/^MBR-\d{4}-(\d+)$/);
-  if (!match) return null;
-  const id = parseInt(match[1]!, 10);
+  const parsed = parseCodeMembre(codeMembre);
+  if (!parsed) return null;
 
-  const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, id));
+  // Chercher par (numero_membre, année d'adhésion)
+  const candidats = await db
+    .select()
+    .from(membresTable)
+    .where(
+      and(
+        eq(membresTable.numeroMembre, parsed.numero),
+        sql`EXTRACT(YEAR FROM ${membresTable.dateAdhesion}::date) = ${parsed.year}`
+      )
+    );
+  if (candidats.length === 0) return null;
+
+  // En cas de doublons inter-coops, prendre celui dont le code calculé correspond
+  const membre = candidats.find(
+    m => computeCodeMembre(m.numeroMembre, m.dateAdhesion).toUpperCase() === codeMembre.toUpperCase()
+  );
   if (!membre) return null;
-
-  // Vérifier que le code calculé correspond bien
-  const codeCalcule = computeCodeMembre(membre.id, membre.dateAdhesion);
-  if (codeCalcule !== codeMembre) return null;
 
   const [coop] = await db
     .select({ nom: sql<string>`nom`, ville: sql<string>`ville` })
@@ -448,8 +464,8 @@ export async function generateCarteMembre(membreId: number): Promise<Buffer> {
     .where(sql`id = ${membre.cooperativeId}`)
     .limit(1);
 
-  const codeMembre = computeCodeMembre(membre.id, membre.dateAdhesion);
-  const carteNo = membre.carteNumero ?? `C-${new Date().getFullYear()}-${String(membre.id).padStart(6, "0")}`;
+  const codeMembre = computeCodeMembre(membre.numeroMembre, membre.dateAdhesion);
+  const carteNo = membre.carteNumero ?? `C-${new Date().getFullYear()}-${String(membre.numeroMembre).padStart(6, "0")}`;
 
   // ── QR code (PNG buffer) ─────────────────────────────────────────────────
   // PORTAIL_BASE_URL doit être défini en production (ex: https://mon-domaine.ci)
