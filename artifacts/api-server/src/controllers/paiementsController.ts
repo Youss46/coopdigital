@@ -1,8 +1,8 @@
 import { type Request, type Response } from "express";
-import { db, paiementsTable, membresTable, livraisonsTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable } from "@workspace/db";
+import { db, paiementsTable, membresTable, livraisonsTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable } from "@workspace/db";
 import { eq, desc, and, sql, gte, lt, lte } from "drizzle-orm";
 import { envoyerPushGroupePortail } from "../services/pushService";
-import { verifierCaisseEspeces, debiterCaisseParResponsable } from "../services/caisseService.js";
+import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvement } from "../services/caisseService.js";
 import { logger } from "../lib/logger.js";
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
@@ -75,6 +75,44 @@ async function debiterCompteMobileMarchandPaiement(
     });
   } catch (err) {
     logger.warn({ err, paiementId }, "Débit automatique compte Mobile Marchand non effectué");
+  }
+}
+
+// ─── Helper : débit automatique Caisse Centrale ─────────────────────────────
+
+async function debiterCaisseCentralePaiement(
+  cooperativeId: number,
+  montantFcfa: number,
+  paiementId: number,
+  userId: number | null | undefined,
+): Promise<void> {
+  try {
+    const [caisse] = await db
+      .select()
+      .from(caissesTable)
+      .where(
+        and(
+          eq(caissesTable.cooperativeId, cooperativeId),
+          eq(caissesTable.typeCaisse, "centrale"),
+          eq(caissesTable.actif, true),
+        ),
+      )
+      .limit(1);
+
+    if (!caisse) {
+      logger.warn({ cooperativeId, paiementId }, "Aucune caisse centrale active trouvée pour débit automatique");
+      return;
+    }
+
+    await enregistrerMouvement(caisse.id, {
+      type: "sortie",
+      motif: "paiement_producteur",
+      montantFcfa,
+      libelle: `Paiement producteur — règlement #${paiementId}`,
+      userId: userId ?? undefined,
+    });
+  } catch (err) {
+    logger.warn({ err, paiementId }, "Débit automatique caisse centrale non effectué — session peut-être fermée");
   }
 }
 
@@ -268,6 +306,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         telephone: membresTable.telephone,
         nom: membresTable.nom,
         prenoms: membresTable.prenoms,
+        membreDelegueId: membresTable.delegueId,
       })
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
@@ -362,7 +401,20 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       );
     }
 
-    // 6. Notifier le producteur (best-effort)
+    // 6. Débiter la Caisse Centrale si paiement espèces par un rôle non-délégué
+    //    pour un membre rattaché à la base centrale (delegueId IS NULL)
+    const isNonDelegueEspeces = req.user?.role !== "delegue" && mode === "especes";
+    const isMembreBaseCentrale = !row.membreDelegueId;
+    if (isNonDelegueEspeces && isMembreBaseCentrale && cooperativeId) {
+      await debiterCaisseCentralePaiement(
+        cooperativeId,
+        row.paiement.montantFcfa,
+        id,
+        userId,
+      );
+    }
+
+    // 7. Notifier le producteur (best-effort)
     void envoyerPushGroupePortail([row.paiement.membreId], {
       title: "✅ Paiement validé",
       body: `${new Intl.NumberFormat("fr-FR").format(row.paiement.montantFcfa)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : "espèces"}`,
