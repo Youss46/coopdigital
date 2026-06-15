@@ -15,6 +15,7 @@ import {
   listTransfertsHandler,
   confirmerArriveeHandler,
   signalerLitigeHandler,
+  listDeleguesEntrepotsHandler,
 } from "../controllers/entrepotDelegueController.js";
 
 const router = Router();
@@ -32,6 +33,7 @@ router.put("/terrain/entrepot/transferts/:id/depart", terrainAuthMiddleware, del
 // Ont leur propre authMiddleware (routeur enregistré avant le guard global)
 
 router.get("/entrepots/stats",               authMiddleware, getStatsHandler);
+router.get("/entrepots/delegues-liste",      authMiddleware, listDeleguesEntrepotsHandler);
 router.get("/entrepots",                     authMiddleware, listEntrepotsHandler);
 router.post("/entrepots",                    authMiddleware, creerEntrepotHandler);
 router.put("/entrepots/:id",                 authMiddleware, modifierEntrepotHandler);

@@ -5,6 +5,19 @@ function coopId(req: Request): number | null {
   return req.user?.cooperativeId ?? null;
 }
 
+// ─── Liste délégués pour dropdown création entrepôt ──────────────────────────
+
+export async function listDeleguesEntrepotsHandler(req: Request, res: Response): Promise<void> {
+  const coop = coopId(req);
+  if (!coop) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
+  try {
+    res.json(await svc.listDeleguesCooperative(coop));
+  } catch (err) {
+    req.log.error({ err }, "listDeleguesCooperative");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 // ─── Vue direction ────────────────────────────────────────────────────────────
 
 export async function getStatsHandler(req: Request, res: Response): Promise<void> {

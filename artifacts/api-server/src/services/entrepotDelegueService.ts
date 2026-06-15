@@ -56,6 +56,26 @@ export async function listEntrepots(cooperativeId: number) {
   return rows;
 }
 
+export async function listDeleguesCooperative(cooperativeId: number) {
+  return db
+    .select({
+      id:       usersTable.id,
+      nom:      usersTable.nom,
+      prenoms:  usersTable.prenoms,
+      telephone: usersTable.telephone,
+      zoneNom: usersTable.zoneNom,
+    })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.cooperativeId, cooperativeId),
+        eq(usersTable.role, "delegue"),
+        eq(usersTable.actif, true),
+      ),
+    )
+    .orderBy(usersTable.nom);
+}
+
 export async function getEntrepotDuDelegue(delegueId: number, cooperativeId: number) {
   const [row] = await db
     .select()

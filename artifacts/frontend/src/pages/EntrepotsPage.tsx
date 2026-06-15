@@ -96,10 +96,18 @@ function JaugeStock({ stock, capacite, seuil }: { stock: string; capacite: strin
   );
 }
 
+interface DelegueListe {
+  id: number;
+  nom: string;
+  prenoms: string | null;
+  telephone: string | null;
+  zoneNom: string | null;
+}
+
 export default function EntrepotsPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const peutGerer = usePermission("entrepots", "creer");
+  const peutGerer = usePermission("stocks", "creer_entrepot");
   const [onglet, setOnglet] = useState<"stocks" | "transferts">("stocks");
   const [showArrivee, setShowArrivee] = useState<Transfert | null>(null);
   const [formArrivee, setFormArrivee] = useState({ poidsArrivee_kg: "", motifEcart: "", notes: "" });
@@ -107,6 +115,12 @@ export default function EntrepotsPage() {
   const [formCreer, setFormCreer] = useState({
     delegueId: "", nom: "", zoneNom: "", zoneType: "village",
     capaciteMaxKg: "", seuilAlerteKg: "", adresse: "",
+  });
+
+  const { data: deleguesListe = [], isLoading: loadDelegues } = useQuery<DelegueListe[]>({
+    queryKey: ["delegues-liste-entrepots"],
+    queryFn: () => apiFetch("/entrepots/delegues-liste"),
+    enabled: showCreer,
   });
 
   const { data: stats, isLoading } = useQuery<Stats>({
@@ -448,31 +462,96 @@ export default function EntrepotsPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 overflow-y-auto max-h-[90vh]">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Nouvel entrepôt délégué</h2>
             <div className="space-y-3">
-              {[
-                { key: "delegueId", label: "ID Délégué *", type: "number", placeholder: "ex: 42" },
-                { key: "nom", label: "Nom de l'entrepôt *", type: "text", placeholder: "ex: Point collecte Broukro" },
-                { key: "zoneNom", label: "Zone / Village", type: "text", placeholder: "ex: Broukro" },
-                { key: "capaciteMaxKg", label: "Capacité max (kg)", type: "number", placeholder: "ex: 15000" },
-                { key: "seuilAlerteKg", label: "Seuil d'alerte (kg)", type: "number", placeholder: "ex: 12000" },
-                { key: "adresse", label: "Adresse", type: "text", placeholder: "Adresse physique" },
-              ].map(({ key, label, type, placeholder }) => (
-                <div key={key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                  <input type={type} placeholder={placeholder}
-                    value={formCreer[key as keyof typeof formCreer]}
-                    onChange={(e) => setFormCreer(f => ({ ...f, [key]: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500" />
-                </div>
-              ))}
+              {/* Dropdown délégué */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Délégué de localité *</label>
+                {loadDelegues ? (
+                  <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400 bg-gray-50 animate-pulse">
+                    Chargement des délégués…
+                  </div>
+                ) : deleguesListe.length === 0 ? (
+                  <div className="w-full border border-orange-200 rounded-lg px-3 py-2 text-sm text-orange-600 bg-orange-50">
+                    Aucun délégué actif trouvé dans cette coopérative.
+                  </div>
+                ) : (
+                  <select
+                    value={formCreer.delegueId}
+                    onChange={(e) => {
+                      const d = deleguesListe.find(x => String(x.id) === e.target.value);
+                      setFormCreer(f => ({
+                        ...f,
+                        delegueId: e.target.value,
+                        zoneNom: f.zoneNom || (d?.zoneNom ?? ""),
+                      }));
+                    }}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    <option value="">— Sélectionner un délégué —</option>
+                    {deleguesListe.map((d) => (
+                      <option key={d.id} value={String(d.id)}>
+                        {d.nom} {d.prenoms ?? ""}
+                        {d.zoneNom ? ` — ${d.zoneNom}` : ""}
+                        {d.telephone ? ` (${d.telephone})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Nom entrepôt */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nom de l'entrepôt *</label>
+                <input type="text" placeholder="ex: Point collecte Broukro"
+                  value={formCreer.nom}
+                  onChange={(e) => setFormCreer(f => ({ ...f, nom: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+              </div>
+
+              {/* Zone / Village */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Zone / Village</label>
+                <input type="text" placeholder="ex: Broukro"
+                  value={formCreer.zoneNom}
+                  onChange={(e) => setFormCreer(f => ({ ...f, zoneNom: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+              </div>
+
+              {/* Type de zone */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type de zone</label>
                 <select value={formCreer.zoneType}
                   onChange={(e) => setFormCreer(f => ({ ...f, zoneType: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500">
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500">
                   <option value="village">Village</option>
                   <option value="section">Section</option>
                   <option value="groupement">Groupement</option>
                 </select>
+              </div>
+
+              {/* Capacité & seuil */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Capacité max (kg)</label>
+                  <input type="number" placeholder="ex: 15000"
+                    value={formCreer.capaciteMaxKg}
+                    onChange={(e) => setFormCreer(f => ({ ...f, capaciteMaxKg: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Seuil d'alerte (kg)</label>
+                  <input type="number" placeholder="ex: 12000"
+                    value={formCreer.seuilAlerteKg}
+                    onChange={(e) => setFormCreer(f => ({ ...f, seuilAlerteKg: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                </div>
+              </div>
+
+              {/* Adresse */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
+                <input type="text" placeholder="Adresse physique de l'entrepôt"
+                  value={formCreer.adresse}
+                  onChange={(e) => setFormCreer(f => ({ ...f, adresse: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
               </div>
             </div>
             <div className="flex gap-3 mt-5">
