@@ -39,6 +39,18 @@ INSERT INTO livraisons (membre_id, poids_kg, prix_unitaire_fcfa, montant_brut_fc
   (4, 60.00, 900, 54000, 0, 54000, '2024-11-08', 1)
 ON CONFLICT DO NOTHING;
 
+-- Catégories d'équipements par défaut
+INSERT INTO categories_equipements (cooperative_id, libelle, duree_amortissement_ans, methode_amortissement, compte_immobilisation, compte_amortissement) VALUES
+  (1, 'Véhicules et engins',           5,  'lineaire',   '2445', '2845'),
+  (1, 'Matériel agricole',             10, 'lineaire',   '2441', '2841'),
+  (1, 'Matériel informatique',         3,  'degressif',  '2448', '2848'),
+  (1, 'Matériel de pesage',            7,  'lineaire',   '2443', '2843'),
+  (1, 'Matériel de bureau',            5,  'lineaire',   '2444', '2844'),
+  (1, 'Groupes électrogènes',          8,  'lineaire',   '2442', '2842'),
+  (1, 'Bâtiments et infrastructures',  20, 'lineaire',   '231',  '281'),
+  (1, 'Motos et deux-roues',           4,  'lineaire',   '2446', '2846')
+ON CONFLICT DO NOTHING;
+
 -- Paiements liés aux livraisons
 INSERT INTO paiements (livraison_id, membre_id, montant_fcfa, mode_paiement, statut) VALUES
   (1, 1, 58450, 'orange_money', 'confirme'),

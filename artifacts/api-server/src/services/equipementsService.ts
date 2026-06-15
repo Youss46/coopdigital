@@ -99,7 +99,37 @@ export function genererTableauAmortissement(equipement: {
 
 // ─── CRUD Catégories ──────────────────────────────────────────────────────────
 
+const CATEGORIES_PAR_DEFAUT: Array<{
+  libelle: string;
+  dureeAmortissementAns: number;
+  methodeAmortissement: string;
+  compteImmobilisation: string;
+  compteAmortissement: string;
+}> = [
+  { libelle: "Bâtiments et infrastructures", dureeAmortissementAns: 20, methodeAmortissement: "lineaire",  compteImmobilisation: "231",  compteAmortissement: "281"  },
+  { libelle: "Groupes électrogènes",          dureeAmortissementAns: 8,  methodeAmortissement: "lineaire",  compteImmobilisation: "2442", compteAmortissement: "2842" },
+  { libelle: "Matériel agricole",             dureeAmortissementAns: 10, methodeAmortissement: "lineaire",  compteImmobilisation: "2441", compteAmortissement: "2841" },
+  { libelle: "Matériel de bureau",            dureeAmortissementAns: 5,  methodeAmortissement: "lineaire",  compteImmobilisation: "2444", compteAmortissement: "2844" },
+  { libelle: "Matériel de pesage",            dureeAmortissementAns: 7,  methodeAmortissement: "lineaire",  compteImmobilisation: "2443", compteAmortissement: "2843" },
+  { libelle: "Matériel informatique",         dureeAmortissementAns: 3,  methodeAmortissement: "degressif", compteImmobilisation: "2448", compteAmortissement: "2848" },
+  { libelle: "Motos et deux-roues",           dureeAmortissementAns: 4,  methodeAmortissement: "lineaire",  compteImmobilisation: "2446", compteAmortissement: "2846" },
+  { libelle: "Véhicules et engins",           dureeAmortissementAns: 5,  methodeAmortissement: "lineaire",  compteImmobilisation: "2445", compteAmortissement: "2845" },
+];
+
 export async function listerCategories(cooperativeId: number) {
+  const existing = await db
+    .select()
+    .from(categoriesEquipementsTable)
+    .where(eq(categoriesEquipementsTable.cooperativeId, cooperativeId))
+    .orderBy(categoriesEquipementsTable.libelle);
+
+  if (existing.length > 0) return existing;
+
+  // Aucune catégorie pour cette coopérative → seed automatique des catégories par défaut
+  await db.insert(categoriesEquipementsTable).values(
+    CATEGORIES_PAR_DEFAUT.map((c) => ({ cooperativeId, ...c }))
+  );
+
   return db
     .select()
     .from(categoriesEquipementsTable)

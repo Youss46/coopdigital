@@ -253,6 +253,13 @@
       "when": 1782144060000,
       "tag": "0035_membres_numero_membre_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1782144120000,
+      "tag": "0036_seed_categories_equipements",
+      "breakpoints": true
     }
   ]
 }
