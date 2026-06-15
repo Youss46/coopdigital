@@ -323,6 +323,12 @@ export default function StocksPage() {
                         )}
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">{e.ville}</p>
+                      {(e as typeof e & { nombreSacsTotal?: number }).nombreSacsTotal != null &&
+                        (e as typeof e & { nombreSacsTotal?: number }).nombreSacsTotal! > 0 && (
+                        <p className="text-xs text-gray-600 mt-1 font-medium">
+                          {(e as typeof e & { nombreSacsTotal?: number }).nombreSacsTotal} sacs
+                        </p>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-gray-900">{formaterPoids(e.stockActuelKg)}</p>
@@ -361,6 +367,7 @@ export default function StocksPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Type</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Entrepôt</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Poids</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500">Sacs</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">Motif</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">Date</th>
                   </tr>
@@ -368,7 +375,7 @@ export default function StocksPage() {
                 <tbody>
                   {mouvements.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                      <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                         Aucun mouvement enregistré
                       </td>
                     </tr>
@@ -377,6 +384,7 @@ export default function StocksPage() {
                       const estSurbrillance = filtreTransfert
                         ? (m.motif ?? "").includes(filtreTransfert)
                         : false;
+                      const nombreSacs = (m as typeof m & { nombreSacs?: number | null }).nombreSacs;
                       return (
                         <tr
                           key={m.id}
@@ -402,6 +410,16 @@ export default function StocksPage() {
                           </td>
                           <td className="px-4 py-3 text-gray-700">{m.entrepotNom ?? "—"}</td>
                           <td className="px-4 py-3 font-semibold text-gray-900">{formaterPoids(m.poidsKg)}</td>
+                          <td className="px-4 py-3">
+                            {nombreSacs != null ? (
+                              <span className="inline-flex items-center gap-1 text-sm font-semibold text-gray-900">
+                                {nombreSacs}
+                                <span className="text-xs font-normal text-gray-400">sacs</span>
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 hidden sm:table-cell">
                             {estSurbrillance ? (
                               <span className="text-green-700 font-medium">{m.motif ?? "—"}</span>

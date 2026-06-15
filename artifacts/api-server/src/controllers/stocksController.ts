@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 import { checkStock, creerAnomalies } from "../services/anomalieService";
 import { db, entrepotsTable, mouvementsStockTable, usersTable, livraisonsTable, lotLivraisonsTable, membresTable } from "@workspace/db";
-import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { EntreeStockBody, SortieStockBody } from "@workspace/api-zod";
 import { proposerEcriture } from "../services/comptabiliteService";
 
@@ -28,31 +28,48 @@ export async function getEntrepots(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const entrepots = await db
-      .select({
-        id: entrepotsTable.id,
-        cooperativeId: entrepotsTable.cooperativeId,
-        nom: entrepotsTable.nom,
-        ville: entrepotsTable.ville,
-        capaciteKg: entrepotsTable.capaciteKg,
-        seuilAlerteKg: entrepotsTable.seuilAlerteKg,
-        createdAt: entrepotsTable.createdAt,
-        stockActuelKg: sql<number>`
-          coalesce(
-            sum(case when ${mouvementsStockTable.type} in ('entree', 'retour_refus')
-                then ${mouvementsStockTable.poidsKg}::numeric
-                else -${mouvementsStockTable.poidsKg}::numeric end),
-            0
-          )::float
-        `,
-      })
-      .from(entrepotsTable)
-      .leftJoin(mouvementsStockTable, eq(mouvementsStockTable.entrepotId, entrepotsTable.id))
-      .where(eq(entrepotsTable.cooperativeId, cooperativeId))
-      .groupBy(entrepotsTable.id)
-      .orderBy(entrepotsTable.nom);
+    const rows = await db.execute<{
+      id: number;
+      cooperativeId: number;
+      nom: string;
+      ville: string;
+      capaciteKg: string;
+      seuilAlerteKg: string | null;
+      createdAt: Date;
+      stockActuelKg: number;
+      nombreSacsTotal: number;
+    }>(sql`
+      SELECT
+        e.id,
+        e.cooperative_id AS "cooperativeId",
+        e.nom,
+        e.ville,
+        e.capacite_kg    AS "capaciteKg",
+        e.seuil_alerte_kg AS "seuilAlerteKg",
+        e.created_at     AS "createdAt",
+        COALESCE(
+          SUM(CASE WHEN ms.type IN ('entree', 'retour_refus')
+              THEN ms.poids_kg::numeric
+              ELSE -ms.poids_kg::numeric END),
+          0
+        )::float AS "stockActuelKg",
+        COALESCE((
+          SELECT SUM(l.nombre_sacs)
+          FROM mouvements_stock ms2
+          JOIN livraisons l
+            ON ms2.motif ~ '^Livraison #[0-9]+$'
+           AND l.id = CAST(REGEXP_REPLACE(ms2.motif, '^Livraison #', '') AS INTEGER)
+          WHERE ms2.entrepot_id = e.id
+            AND ms2.type IN ('entree', 'retour_refus')
+        ), 0)::integer AS "nombreSacsTotal"
+      FROM entrepots e
+      LEFT JOIN mouvements_stock ms ON ms.entrepot_id = e.id
+      WHERE e.cooperative_id = ${cooperativeId}
+      GROUP BY e.id
+      ORDER BY e.nom
+    `);
 
-    const result = entrepots.map((e) => ({
+    const result = rows.rows.map((e) => ({
       ...e,
       pourcentageRemplissage: Math.round((e.stockActuelKg / parseFloat(e.capaciteKg)) * 100),
       enAlerte: e.seuilAlerteKg !== null && e.stockActuelKg <= parseFloat(e.seuilAlerteKg),
@@ -77,30 +94,58 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
     const dateDebut = req.query["date_debut"] as string | undefined;
     const dateFin = req.query["date_fin"] as string | undefined;
 
-    const conditions: ReturnType<typeof eq>[] = [eq(entrepotsTable.cooperativeId, cooperativeId)];
-    if (entrepotId) conditions.push(eq(mouvementsStockTable.entrepotId, entrepotId));
-    if (dateDebut) conditions.push(gte(mouvementsStockTable.createdAt, new Date(dateDebut)));
-    if (dateFin) conditions.push(lte(mouvementsStockTable.createdAt, new Date(dateFin + "T23:59:59Z")));
+    const entrepotCondition = entrepotId
+      ? sql`${entrepotsTable.cooperativeId} = ${cooperativeId} AND ${mouvementsStockTable.entrepotId} = ${entrepotId}`
+      : sql`${entrepotsTable.cooperativeId} = ${cooperativeId}`;
 
-    const rows = await db
-      .select({
-        id: mouvementsStockTable.id,
-        entrepotId: mouvementsStockTable.entrepotId,
-        entrepotNom: entrepotsTable.nom,
-        lotId: mouvementsStockTable.lotId,
-        type: mouvementsStockTable.type,
-        poidsKg: mouvementsStockTable.poidsKg,
-        motif: mouvementsStockTable.motif,
-        agentId: mouvementsStockTable.agentId,
-        createdAt: mouvementsStockTable.createdAt,
-      })
-      .from(mouvementsStockTable)
-      .leftJoin(entrepotsTable, eq(entrepotsTable.id, mouvementsStockTable.entrepotId))
-      .where(and(...conditions))
-      .orderBy(desc(mouvementsStockTable.createdAt))
-      .limit(200);
+    const dateDebutCondition = dateDebut
+      ? sql`AND ${mouvementsStockTable.createdAt} >= ${new Date(dateDebut)}`
+      : sql``;
+    const dateFinCondition = dateFin
+      ? sql`AND ${mouvementsStockTable.createdAt} <= ${new Date(dateFin + "T23:59:59Z")}`
+      : sql``;
 
-    res.json(rows);
+    const rows = await db.execute<{
+      id: number;
+      entrepotId: number;
+      entrepotNom: string | null;
+      lotId: number | null;
+      type: string;
+      poidsKg: string;
+      motif: string | null;
+      agentId: number | null;
+      createdAt: Date;
+      nombreSacs: number | null;
+    }>(sql`
+      SELECT
+        ms.id,
+        ms.entrepot_id AS "entrepotId",
+        e.nom           AS "entrepotNom",
+        ms.lot_id       AS "lotId",
+        ms.type,
+        ms.poids_kg     AS "poidsKg",
+        ms.motif,
+        ms.agent_id     AS "agentId",
+        ms.created_at   AS "createdAt",
+        CASE
+          WHEN ms.motif ~ '^Livraison #[0-9]+$'
+          THEN (
+            SELECT l.nombre_sacs
+            FROM livraisons l
+            WHERE l.id = CAST(REGEXP_REPLACE(ms.motif, '^Livraison #', '') AS INTEGER)
+          )
+          ELSE NULL
+        END AS "nombreSacs"
+      FROM mouvements_stock ms
+      LEFT JOIN entrepots e ON e.id = ms.entrepot_id
+      WHERE ${entrepotCondition}
+      ${dateDebutCondition}
+      ${dateFinCondition}
+      ORDER BY ms.created_at DESC
+      LIMIT 200
+    `);
+
+    res.json(rows.rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getMouvements");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
