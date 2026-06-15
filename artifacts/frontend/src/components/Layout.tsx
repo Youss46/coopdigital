@@ -166,6 +166,18 @@ const navItems = [
     roles: ["pca", "directeur", "magasinier", "comptable", "auditeur"],
   },
   {
+    href: "/entrepots",
+    label: "Entrepôts délégués",
+    icon: Warehouse,
+    roles: ["pca", "directeur", "comptable", "auditeur"],
+  },
+  {
+    href: "/mon-entrepot",
+    label: "Mon entrepôt",
+    icon: Warehouse,
+    roles: ["delegue"],
+  },
+  {
     href: "/refus",
     label: "Stocks refoulés",
     icon: PackageX,

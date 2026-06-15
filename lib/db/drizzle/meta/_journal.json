@@ -225,6 +225,13 @@
       "when": 1781884800000,
       "tag": "0031_mouvements_mobile_marchand",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1781971200000,
+      "tag": "0032_entrepots_delegues",
+      "breakpoints": true
     }
   ]
 }

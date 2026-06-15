@@ -60,6 +60,7 @@ import searchRouter from "./search";
 import missionsRouter from "./missions";
 import financesRouter from "./finances";
 import expeditionsRouter from "./expeditions";
+import entrepotsDeleguesRouter from "./entrepots_delegues";
 
 const router: IRouter = Router();
 
@@ -70,6 +71,7 @@ router.use(authRouter);
 router.use(portailRouter);
 router.use(terrainRouter);
 router.use(deleguesRouter);
+router.use(entrepotsDeleguesRouter);
 router.use(m15Router);
 router.use(saasRouter);
 

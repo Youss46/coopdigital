@@ -60,6 +60,8 @@ import CartesMembres from "@/pages/CartesMembres";
 import ExpeditionsPage from "@/pages/ExpeditionsPage";
 import NouvelleExpeditionPage from "@/pages/NouvelleExpeditionPage";
 import ExpeditionDetailPage from "@/pages/ExpeditionDetailPage";
+import EntrepotsPage from "@/pages/EntrepotsPage";
+import MonEntrepotPage from "@/pages/MonEntrepotPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -257,6 +259,12 @@ function AppRoutes() {
       </Route>
       <Route path="/expeditions">
         <ProtectedRoute component={ExpeditionsPage} />
+      </Route>
+      <Route path="/entrepots">
+        <ProtectedRoute component={EntrepotsPage} />
+      </Route>
+      <Route path="/mon-entrepot">
+        <ProtectedRoute component={MonEntrepotPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

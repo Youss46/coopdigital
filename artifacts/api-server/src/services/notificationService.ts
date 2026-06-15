@@ -44,7 +44,11 @@ export type NotifType =
   | "caisse_delegue"
   // ── Expéditions port ──────────────────────────────────
   | "expedition_arrivee_port"
-  | "expedition_litige";
+  | "expedition_litige"
+  // ── Entrepôts délégués ────────────────────────────────────────────────
+  | "transfert_planifie"
+  | "transfert_confirme"
+  | "transfert_litige";
 
 export type NotifGravite = "info" | "attention" | "critique";
 
@@ -92,6 +96,10 @@ const PREF_COL: Record<NotifType, keyof typeof preferencesNotificationsTable.$in
   // Expéditions port
   expedition_arrivee_port:  "notifMessageRecu",
   expedition_litige:        "notifAnomalieCritique",
+  // Entrepôts délégués
+  transfert_planifie:       "notifMessageRecu",
+  transfert_confirme:       "notifMessageRecu",
+  transfert_litige:         "notifAnomalieCritique",
 };
 
 // ─── Créer des notifications pour une liste de users ──────────────────────────

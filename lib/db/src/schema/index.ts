@@ -51,3 +51,4 @@ export * from "./banque";
 export * from "./mobile_marchand";
 export * from "./portailNotifications";
 export * from "./expeditions";
+export * from "./entrepots_delegues";
