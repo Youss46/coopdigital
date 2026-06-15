@@ -461,7 +461,11 @@ export default function Dashboard() {
               valeur={`${((kpi?.tonnageMois ?? 0) / 1000).toFixed(2)} T`}
               icone={Package}
               couleur="#2563eb"
-              sousTitre="Cacao collecté"
+              sousTitre={
+                (kpi as typeof kpi & { nombreSacsMois?: number })?.nombreSacsMois
+                  ? `${(kpi as typeof kpi & { nombreSacsMois?: number }).nombreSacsMois} sacs collectés`
+                  : "Cacao collecté"
+              }
             />
             <CarteKpi
               titre="Paiements ce mois"

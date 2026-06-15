@@ -23,6 +23,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       [tonnageRow],
       [paiementsRow],
       [creancesRow],
+      [sacsRow],
     ] = await Promise.all([
       db
         .select({ count: sql<number>`count(*)::int` })
@@ -60,6 +61,11 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .from(ventesExportateursTable)
         .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))
         .where(and(eq(exportateursTable.cooperativeId, cooperativeId), sql`${ventesExportateursTable.statut} != 'regle'`)),
+      db
+        .select({ sacs: sql<number>`coalesce(sum(nombre_sacs),0)::int` })
+        .from(livraisonsTable)
+        .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), gte(livraisonsTable.dateLivraison, debutMoisStr))),
     ]);
 
     res.json({
@@ -68,6 +74,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       membresFemmes: membresFemmesRow?.count ?? 0,
       avancesEnCoursMontant: avancesRow?.total ?? 0,
       tonnageMois: tonnageRow?.tonnage ?? 0,
+      nombreSacsMois: sacsRow?.sacs ?? 0,
       paiementsMois: paiementsRow?.total ?? 0,
       creancesExportateurs: creancesRow?.total ?? 0,
     });
@@ -283,6 +290,8 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
       [tonnageMoisRow],
       [livraisonsCampagneRow],
       dernieresLivraisons,
+      [sacsMoisRow],
+      [sacsCampagneRow],
     ] = await Promise.all([
       db.select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
@@ -340,6 +349,18 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
         .where(membresCond)
         .orderBy(desc(livraisonsTable.createdAt))
         .limit(5),
+
+      db.select({ sacs: sql<number>`coalesce(sum(nombre_sacs),0)::int` })
+        .from(livraisonsTable)
+        .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .where(and(membresCond, gte(livraisonsTable.dateLivraison, debutMoisStr))),
+
+      campagneId
+        ? db.select({ sacs: sql<number>`coalesce(sum(nombre_sacs),0)::int` })
+            .from(livraisonsTable)
+            .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+            .where(and(membresCond, eq(livraisonsTable.campagneId, campagneId)))
+        : Promise.resolve([{ sacs: 0 }]),
     ]);
 
     const montantOctroye = avancesOctroye?.total ?? 0;
@@ -353,6 +374,8 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
       tauxRemboursement,
       tonnageCampagne: tonnageCampagneRow?.tonnage ?? 0,
       tonnageMois: tonnageMoisRow?.tonnage ?? 0,
+      nombreSacsMois: sacsMoisRow?.sacs ?? 0,
+      nombreSacsCampagne: sacsCampagneRow?.sacs ?? 0,
       nbLivraisonsCampagne: livraisonsCampagneRow?.count ?? 0,
       campagne: campagneActive ?? null,
       dernieresLivraisons,

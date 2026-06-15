@@ -47,6 +47,8 @@ interface DashboardData {
   tauxRemboursement: number;
   tonnageCampagne: number;
   tonnageMois: number;
+  nombreSacsMois: number;
+  nombreSacsCampagne: number;
   nbLivraisonsCampagne: number;
   campagne: { id: number; libelle: string; anneeDebut: number; anneeFin: number } | null;
   dernieresLivraisons: {
@@ -255,7 +257,11 @@ export default function DashboardDelegue() {
             valeur={formaterKg(data?.tonnageMois ?? 0)}
             icone={Package}
             couleur="#6366f1"
-            sousTitre="ce mois-ci"
+            sousTitre={
+              (data?.nombreSacsMois ?? 0) > 0
+                ? `${data!.nombreSacsMois} sacs ce mois`
+                : "ce mois-ci"
+            }
           />
           <CarteKpi
             titre="Taux remboursement"
@@ -280,6 +286,9 @@ export default function DashboardDelegue() {
             <div>
               <p className="text-sm text-amber-700 font-medium">Tonnage campagne {data.campagne.libelle}</p>
               <p className="text-2xl font-bold text-amber-900 mt-0.5">{formaterKg(data.tonnageCampagne)}</p>
+              {(data.nombreSacsCampagne ?? 0) > 0 && (
+                <p className="text-xs text-amber-600 mt-0.5">{data.nombreSacsCampagne} sacs</p>
+              )}
             </div>
             <div className="text-right">
               <p className="text-sm text-amber-700 font-medium">Livraisons</p>
