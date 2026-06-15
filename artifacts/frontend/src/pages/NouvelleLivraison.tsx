@@ -15,7 +15,19 @@ import {
   getGetAvancesQueryKey,
   getGetEncoursIntrantsMembreQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+
+const _API = import.meta.env.VITE_API_URL ?? "";
+async function apiFetch<T>(path: string): Promise<T> {
+  const token = localStorage.getItem("coop_token");
+  const res = await fetch(`${_API}/api${path}`, {
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error((b as { erreur?: string }).erreur ?? `Erreur ${res.status}`); }
+  return res.json() as Promise<T>;
+}
+
+interface EntrepotDelegue { id: number; nom: string; zoneNom: string | null; actif: boolean; }
 import { getGetDashboardQueryKey, getGetDashboardLivraisonsQueryKey } from "@workspace/api-client-react";
 import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp, Sprout, AlertTriangle, Tag } from "lucide-react";
 
@@ -36,7 +48,8 @@ export default function NouvelleLivraison() {
   const [nombreSacs, setNombreSacs] = useState("");
   const [retenueKg, setRetenueKg] = useState("");
   const [sectionLivraison, setSectionLivraison] = useState("");
-  const [entrepotId, setEntrepotId] = useState("");
+  // Format : "central_<id>" | "delegue_<id>" | ""
+  const [entrepotSelection, setEntrepotSelection] = useState("");
   const [prixUnitaire, setPrixUnitaire] = useState("");
   const [prixAutoRempli, setPrixAutoRempli] = useState(false);
   const prixModifieParUtilisateur = useRef(false);
@@ -50,7 +63,14 @@ export default function NouvelleLivraison() {
   const { data: balancesData } = useGetBalances();
   const { data: configPesee } = useGetConfigPesee();
   const { data: prixActuelData } = useGetPrixActuel();
-  const { data: entrepotsData } = useGetEntrepots();
+  const { data: entrepotsCentralData } = useGetEntrepots();
+  const { data: entrepotsDeleguesData } = useQuery<EntrepotDelegue[]>({
+    queryKey: ["entrepots-delegues-list"],
+    queryFn: () => apiFetch<EntrepotDelegue[]>("/entrepots"),
+  });
+  const entrepotsCentral = entrepotsCentralData ?? [];
+  const entrepotsDelegues = (entrepotsDeleguesData ?? []).filter((e) => e.actif);
+  const hasEntrepots = entrepotsCentral.length > 0 || entrepotsDelegues.length > 0;
 
   useEffect(() => {
     if (prixActuelData?.prixBordChampFcfa && !prixModifieParUtilisateur.current) {
@@ -132,6 +152,15 @@ export default function NouvelleLivraison() {
     e.preventDefault();
     if (!membreSelectionne || poidsNet <= 0 || prix <= 0) return;
     // La double pesée est obligatoire si poids > seuil — mais on laisse quand même soumettre (avertissement visible)
+    // Résoudre le choix d'entrepôt : "central_5" ou "delegue_3"
+    let resolvedEntrepotId: number | null = null;
+    let resolvedEntrepotDelegueId: number | null = null;
+    if (entrepotSelection.startsWith("central_")) {
+      resolvedEntrepotId = parseInt(entrepotSelection.slice("central_".length));
+    } else if (entrepotSelection.startsWith("delegue_")) {
+      resolvedEntrepotDelegueId = parseInt(entrepotSelection.slice("delegue_".length));
+    }
+
     mutation.mutate({
       data: {
         membreId: membreSelectionne.id,
@@ -143,7 +172,8 @@ export default function NouvelleLivraison() {
         nombreSacs: nombreSacs ? parseInt(nombreSacs) : null,
         retenueKg: retenueTotal > 0 ? retenueTotal : null,
         sectionLivraison: sectionLivraison || null,
-        entrepotId: entrepotId ? parseInt(entrepotId) : null,
+        entrepotId: resolvedEntrepotId,
+        entrepotDelegueId: resolvedEntrepotDelegueId,
         ...(modePaiement === "differe" && datePaiementPrevue ? { datePaiementPrevue } : {}),
       },
     });
@@ -500,23 +530,42 @@ export default function NouvelleLivraison() {
             {showOptions ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
             {showOptions ? "Masquer les options" : "Options supplémentaires"}
           </button>
+          {/* Sélecteur entrepôt — toujours visible si des entrepôts existent */}
+          {hasEntrepots && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Entrepôt de réception <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={entrepotSelection}
+                onChange={(e) => setEntrepotSelection(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+                required
+              >
+                <option value="">— Choisir un entrepôt —</option>
+                {entrepotsCentral.length > 0 && (
+                  <optgroup label="Magasins centraux">
+                    {entrepotsCentral.map((e) => (
+                      <option key={`central_${e.id}`} value={`central_${e.id}`}>{e.nom} — {e.ville}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {entrepotsDelegues.length > 0 && (
+                  <optgroup label="Entrepôts délégués">
+                    {entrepotsDelegues.map((e) => (
+                      <option key={`delegue_${e.id}`} value={`delegue_${e.id}`}>
+                        {e.nom}{e.zoneNom ? ` — ${e.zoneNom}` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          )}
+
           {showOptions && (
             <div className="space-y-3 pt-1">
-              {(entrepotsData ?? []).length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Entrepôt de réception</label>
-                  <select
-                    value={entrepotId}
-                    onChange={(e) => setEntrepotId(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
-                  >
-                    <option value="">— Par défaut (premier créé) —</option>
-                    {(entrepotsData ?? []).map((e) => (
-                      <option key={e.id} value={e.id}>{e.nom} — {e.ville}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* section options — entrepôt maintenant toujours visible ci-dessus */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Mode de paiement</label>

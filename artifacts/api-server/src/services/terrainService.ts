@@ -384,8 +384,8 @@ export async function enregistrerCollecte(
     url: "/portail/livraisons",
   });
 
-  // Entrée stock entrepôt délégué (fire-and-forget — non bloquant)
-  void entrerStockSiDelegue(agentId, cooperativeId, poidsNet, livraison.id);
+  // Entrée stock entrepôt délégué — poids BRUT (fire-and-forget — non bloquant)
+  void entrerStockSiDelegue(agentId, cooperativeId, data.poidsBrutKg, livraison.id);
 
   return {
     livraisonId: livraison.id,

@@ -426,13 +426,14 @@ export const CreateLivraisonBody = zod.object({
   "poidsKg": zod.number(),
   "prixUnitaireFcfa": zod.number(),
   "dateLivraison": zod.string(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes', 'differe']).optional(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes', 'wave', 'differe']).optional(),
   "campagneId": zod.number().nullish(),
   "nombreSacs": zod.number().nullish(),
   "retenueKg": zod.number().nullish(),
   "sectionLivraison": zod.string().nullish(),
   "datePaiementPrevue": zod.string().nullish(),
-  "entrepotId": zod.number().nullish()
+  "entrepotId": zod.number().nullish(),
+  "entrepotDelegueId": zod.number().nullish()
 })
 
 

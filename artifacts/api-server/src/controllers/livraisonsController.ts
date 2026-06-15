@@ -7,7 +7,7 @@ import { CreateLivraisonBody } from "@workspace/api-zod";
 import { generateEcrituresLivraison } from "../services/comptabiliteService";
 import { getEncoursMembre, enregistrerRemboursementParLivraison } from "../services/intrantsService";
 import { envoyerPushGroupePortail } from "../services/pushService";
-import { entrerStockSiDelegue } from "../services/entrepotDelegueService";
+import { entrerStockSiDelegue, entrerStockLivraison } from "../services/entrepotDelegueService";
 
 export async function listLivraisons(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -71,7 +71,11 @@ export async function createLivraison(req: Request, res: Response): Promise<void
 
   const { membreId, poidsKg, prixUnitaireFcfa, dateLivraison, modePaiement,
           campagneId, nombreSacs, retenueKg, sectionLivraison, entrepotId,
-          datePaiementPrevue } = parse.data;
+          entrepotDelegueId, datePaiementPrevue } = parse.data;
+
+  // poidsKg envoyé par le frontend = poids NET (après retenue)
+  // poidsBrut = net + retenue → c'est ce qui entre physiquement dans le stock
+  const poidsBrut = poidsKg + (retenueKg ?? 0);
 
   const estDiffere = modePaiement === "differe";
 
@@ -220,27 +224,29 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         await enregistrerRemboursementParLivraison(tx, cooperativeId, membreId, intrantsDeduits, dateStr);
       }
 
-      // Créer un mouvement de stock "entrée" dans l'entrepôt choisi (ou le premier par défaut)
-      const entrepotCondition = entrepotId
-        ? and(eq(entrepotsTable.id, entrepotId), eq(entrepotsTable.cooperativeId, cooperativeId))
-        : eq(entrepotsTable.cooperativeId, cooperativeId);
-      const [entrepot] = await tx
-        .select({ id: entrepotsTable.id })
-        .from(entrepotsTable)
-        .where(entrepotCondition)
-        .orderBy(entrepotsTable.id)
-        .limit(1);
+      // ── Entrée stock : entrepôt central (magasin) ─────────────────────────
+      // Si entrepotDelegueId est renseigné, on ne touche pas au stock central
+      if (!entrepotDelegueId) {
+        const entrepotCondition = entrepotId
+          ? and(eq(entrepotsTable.id, entrepotId), eq(entrepotsTable.cooperativeId, cooperativeId))
+          : eq(entrepotsTable.cooperativeId, cooperativeId);
+        const [entrepotCentral] = await tx
+          .select({ id: entrepotsTable.id })
+          .from(entrepotsTable)
+          .where(entrepotCondition)
+          .orderBy(entrepotsTable.id)
+          .limit(1);
 
-      if (entrepot) {
-        const poidsNet = retenueKg != null ? poidsKg - retenueKg : poidsKg;
-        await tx.insert(mouvementsStockTable).values({
-          entrepotId: entrepot.id,
-          lotId: null,
-          type: "entree",
-          poidsKg: String(Math.max(0, poidsNet)),
-          motif: `Livraison #${livraison!.id}`,
-          agentId: req.user?.id ?? null,
-        });
+        if (entrepotCentral) {
+          await tx.insert(mouvementsStockTable).values({
+            entrepotId: entrepotCentral.id,
+            lotId: null,
+            type: "entree",
+            poidsKg: String(poidsBrut),           // poids BRUT
+            motif: `Livraison #${livraison!.id}`,
+            agentId: req.user?.id ?? null,
+          });
+        }
       }
 
       return {
@@ -272,13 +278,25 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       url: "/portail/livraisons",
     });
 
-    // Entrée stock entrepôt délégué si l'agent de saisie a un entrepôt (fire-and-forget)
-    void entrerStockSiDelegue(
-      result.livraison.agentId,
-      cooperativeId,
-      Number(result.livraison.poidsKg) - (retenueKg ?? 0),
-      result.livraison.id,
-    );
+    // ── Entrée stock entrepôt délégué (choix explicite ou auto via agentId) ──
+    if (entrepotDelegueId) {
+      // Entrepôt délégué choisi explicitement par l'utilisateur
+      void entrerStockLivraison(
+        entrepotDelegueId,
+        cooperativeId,
+        poidsBrut,                                // poids BRUT
+        result.livraison.id,
+        req.user!.id,
+      );
+    } else {
+      // Fallback auto : si l'agent de saisie est un délégué avec un entrepôt
+      void entrerStockSiDelegue(
+        result.livraison.agentId,
+        cooperativeId,
+        poidsBrut,                                // poids BRUT
+        result.livraison.id,
+      );
+    }
 
     res.status(201).json(result);
   } catch (err) {

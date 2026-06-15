@@ -904,6 +904,7 @@ export const LivraisonInputModePaiement = {
   orange_money: 'orange_money',
   mtn_momo: 'mtn_momo',
   especes: 'especes',
+  wave: 'wave',
   differe: 'differe',
 } as const;
 
@@ -919,6 +920,7 @@ export interface LivraisonInput {
   sectionLivraison?: string | null;
   datePaiementPrevue?: string | null;
   entrepotId?: number | null;
+  entrepotDelegueId?: number | null;
 }
 
 export interface ValiderPaiementInput {
