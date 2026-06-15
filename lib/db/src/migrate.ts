@@ -3,6 +3,25 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 
 /**
+ * Patch de rattrapage : applique des colonnes manquantes de façon idempotente,
+ * avant que le runner Drizzle tente ses migrations.
+ */
+async function applyHotfixes(client: pg.Client): Promise<void> {
+  const hotfixes = [
+    `ALTER TABLE entrepots_delegues ADD COLUMN IF NOT EXISTS capacite_sacs integer`,
+    `ALTER TABLE entrepots ADD COLUMN IF NOT EXISTS capacite_sacs integer`,
+  ];
+
+  for (const sql of hotfixes) {
+    try {
+      await client.query(sql);
+    } catch (_) {
+      // table n'existe pas encore — ignoré, les migrations créeront la table avec la colonne
+    }
+  }
+}
+
+/**
  * Applique toutes les migrations SQL en attente depuis `migrationsFolder`.
  * Idempotent : chaque migration n'est exécutée qu'une seule fois
  * (suivi dans la table `__drizzle_migrations`).
@@ -18,6 +37,7 @@ export async function runMigrations(migrationsFolder: string): Promise<void> {
   await client.connect();
 
   try {
+    await applyHotfixes(client);
     const db = drizzle(client);
     await migrate(db, { migrationsFolder });
   } finally {
