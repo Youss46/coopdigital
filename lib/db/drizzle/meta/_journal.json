@@ -267,6 +267,13 @@
       "when": 1782144180000,
       "tag": "0037_entrepots_capacite_sacs",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1782144240000,
+      "tag": "0038_mouvements_stock_nombre_sacs",
+      "breakpoints": true
     }
   ]
 }

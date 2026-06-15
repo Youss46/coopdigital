@@ -120,23 +120,26 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
     }>(sql`
       SELECT
         ms.id,
-        ms.entrepot_id AS "entrepotId",
-        e.nom           AS "entrepotNom",
-        ms.lot_id       AS "lotId",
+        ms.entrepot_id  AS "entrepotId",
+        e.nom            AS "entrepotNom",
+        ms.lot_id        AS "lotId",
         ms.type,
-        ms.poids_kg     AS "poidsKg",
+        ms.poids_kg      AS "poidsKg",
         ms.motif,
-        ms.agent_id     AS "agentId",
-        ms.created_at   AS "createdAt",
-        CASE
-          WHEN ms.motif ~ '^Livraison #[0-9]+$'
-          THEN (
-            SELECT l.nombre_sacs
-            FROM livraisons l
-            WHERE l.id = CAST(REGEXP_REPLACE(ms.motif, '^Livraison #', '') AS INTEGER)
-          )
-          ELSE NULL
-        END AS "nombreSacs"
+        ms.agent_id      AS "agentId",
+        ms.created_at    AS "createdAt",
+        COALESCE(
+          ms.nombre_sacs,
+          CASE
+            WHEN ms.motif ~ '^Livraison #[0-9]+$'
+            THEN (
+              SELECT l.nombre_sacs
+              FROM livraisons l
+              WHERE l.id = CAST(REGEXP_REPLACE(ms.motif, '^Livraison #', '') AS INTEGER)
+            )
+            ELSE NULL
+          END
+        ) AS "nombreSacs"
       FROM mouvements_stock ms
       LEFT JOIN entrepots e ON e.id = ms.entrepot_id
       WHERE ${entrepotCondition}
@@ -180,6 +183,7 @@ export async function entreeStock(req: Request, res: Response): Promise<void> {
         lotId: parse.data.lotId ?? null,
         type: "entree",
         poidsKg: String(parse.data.poidsKg),
+        ...(parse.data.nombreSacs != null ? { nombreSacs: parse.data.nombreSacs } : {}),
         prixUnitaireFcfa: pu != null ? String(pu) : null,
         motif: parse.data.motif ?? null,
         agentId,
@@ -194,6 +198,7 @@ export async function entreeStock(req: Request, res: Response): Promise<void> {
         lotId: mouvementsStockTable.lotId,
         type: mouvementsStockTable.type,
         poidsKg: mouvementsStockTable.poidsKg,
+        nombreSacs: mouvementsStockTable.nombreSacs,
         prixUnitaireFcfa: mouvementsStockTable.prixUnitaireFcfa,
         motif: mouvementsStockTable.motif,
         agentId: mouvementsStockTable.agentId,
@@ -283,6 +288,7 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
         lotId: parse.data.lotId ?? null,
         type: "sortie",
         poidsKg: String(parse.data.poidsKg),
+        ...(parse.data.nombreSacs != null ? { nombreSacs: parse.data.nombreSacs } : {}),
         prixUnitaireFcfa: pu2 != null ? String(pu2) : null,
         motif: parse.data.motif ?? null,
         agentId,
@@ -297,6 +303,7 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
         lotId: mouvementsStockTable.lotId,
         type: mouvementsStockTable.type,
         poidsKg: mouvementsStockTable.poidsKg,
+        nombreSacs: mouvementsStockTable.nombreSacs,
         prixUnitaireFcfa: mouvementsStockTable.prixUnitaireFcfa,
         motif: mouvementsStockTable.motif,
         agentId: mouvementsStockTable.agentId,

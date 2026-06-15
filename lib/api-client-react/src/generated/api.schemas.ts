@@ -1187,6 +1187,8 @@ export interface MouvementStock {
   type: MouvementStockType;
   poidsKg: string;
   /** @nullable */
+  nombreSacs?: number | null;
+  /** @nullable */
   prixUnitaireFcfa?: number | null;
   /** @nullable */
   motif?: string | null;
@@ -1199,6 +1201,7 @@ export interface MouvementInput {
   entrepotId: number;
   lotId?: number;
   poidsKg: number;
+  nombreSacs?: number;
   prixUnitaireFcfa?: number;
   motif?: string;
 }

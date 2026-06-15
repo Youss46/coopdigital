@@ -64,7 +64,7 @@ export default function StocksPage() {
       setFiltreTransfert(q);
     }
   }, [search]);
-  const [form, setForm] = useState({ entrepotId: "", poidsKg: "", motif: "" });
+  const [form, setForm] = useState({ entrepotId: "", poidsKg: "", nombreSacs: "", motif: "" });
   const [modalEntrepot, setModalEntrepot] = useState(false);
   const [formEntrepot, setFormEntrepot] = useState({ nom: "", ville: "", capaciteKg: "", capaciteSacs: "", seuilAlerteKg: "" });
   const [errEntrepot, setErrEntrepot] = useState("");
@@ -105,7 +105,7 @@ export default function StocksPage() {
         queryClient.invalidateQueries({ queryKey: getGetMouvementsStockQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetStockAlertesQueryKey() });
         setModalMouvement(null);
-        setForm({ entrepotId: "", poidsKg: "", motif: "" });
+        setForm({ entrepotId: "", poidsKg: "", nombreSacs: "", motif: "" });
       },
     },
   });
@@ -117,7 +117,7 @@ export default function StocksPage() {
         queryClient.invalidateQueries({ queryKey: getGetMouvementsStockQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetStockAlertesQueryKey() });
         setModalMouvement(null);
-        setForm({ entrepotId: "", poidsKg: "", motif: "" });
+        setForm({ entrepotId: "", poidsKg: "", nombreSacs: "", motif: "" });
       },
     },
   });
@@ -135,6 +135,7 @@ export default function StocksPage() {
     const data = {
       entrepotId: parseInt(form.entrepotId),
       poidsKg: parseFloat(form.poidsKg),
+      nombreSacs: form.nombreSacs ? parseInt(form.nombreSacs) : undefined,
       motif: form.motif || undefined,
     };
     if (modalMouvement === "entree") mutEntree.mutate({ data });
@@ -481,6 +482,18 @@ export default function StocksPage() {
                   onChange={(e) => setForm((f) => ({ ...f, poidsKg: e.target.value }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
                   placeholder="ex. 1500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Quantité (nombre de sacs)</label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={form.nombreSacs}
+                  onChange={(e) => setForm((f) => ({ ...f, nombreSacs: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                  placeholder="ex. 50"
                 />
               </div>
               <div>

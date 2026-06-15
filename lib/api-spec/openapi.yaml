@@ -7175,6 +7175,8 @@ components:
           enum: [entree, sortie]
         poidsKg:
           type: string
+        nombreSacs:
+          type: ["integer", "null"]
         prixUnitaireFcfa:
           type: ["number", "null"]
         motif:
@@ -7194,6 +7196,8 @@ components:
           type: integer
         poidsKg:
           type: number
+        nombreSacs:
+          type: integer
         prixUnitaireFcfa:
           type: number
         motif:

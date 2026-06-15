@@ -10,6 +10,7 @@ async function applyHotfixes(client: pg.Client): Promise<void> {
   const hotfixes = [
     `ALTER TABLE entrepots_delegues ADD COLUMN IF NOT EXISTS capacite_sacs integer`,
     `ALTER TABLE entrepots ADD COLUMN IF NOT EXISTS capacite_sacs integer`,
+    `ALTER TABLE mouvements_stock ADD COLUMN IF NOT EXISTS nombre_sacs integer`,
   ];
 
   for (const sql of hotfixes) {

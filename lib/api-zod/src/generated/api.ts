@@ -762,6 +762,7 @@ export const GetMouvementsStockResponseItem = zod.object({
   "lotId": zod.number().nullish(),
   "type": zod.enum(['entree', 'sortie']),
   "poidsKg": zod.string(),
+  "nombreSacs": zod.number().nullish(),
   "prixUnitaireFcfa": zod.number().nullish(),
   "motif": zod.string().nullish(),
   "agentId": zod.number().nullish(),
@@ -777,6 +778,7 @@ export const EntreeStockBody = zod.object({
   "entrepotId": zod.number(),
   "lotId": zod.number().optional(),
   "poidsKg": zod.number(),
+  "nombreSacs": zod.number().optional(),
   "prixUnitaireFcfa": zod.number().optional(),
   "motif": zod.string().optional()
 })
@@ -789,6 +791,7 @@ export const SortieStockBody = zod.object({
   "entrepotId": zod.number(),
   "lotId": zod.number().optional(),
   "poidsKg": zod.number(),
+  "nombreSacs": zod.number().optional(),
   "prixUnitaireFcfa": zod.number().optional(),
   "motif": zod.string().optional()
 })
