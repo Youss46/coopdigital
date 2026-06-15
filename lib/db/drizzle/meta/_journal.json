@@ -232,6 +232,13 @@
       "when": 1781971200000,
       "tag": "0032_entrepots_delegues",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1782057600000,
+      "tag": "0033_add_wave_to_mode_paiement",
+      "breakpoints": true
     }
   ]
 }

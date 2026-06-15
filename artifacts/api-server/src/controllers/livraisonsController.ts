@@ -194,7 +194,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
           montantFcfa: montantNet,
           modePaiement: estDiffere
             ? "especes"
-            : ((modePaiement as "orange_money" | "mtn_momo" | "especes") ?? "especes"),
+            : ((modePaiement as "orange_money" | "mtn_momo" | "especes" | "wave") ?? "especes"),
           statut: "en_attente",
         })
         .returning();
