@@ -238,12 +238,12 @@ function TabFlotte() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-start gap-2">
         <div>
           <h2 className="text-lg font-semibold">Flotte de véhicules</h2>
           <p className="text-sm text-gray-500">{vehicules.length} véhicule{vehicules.length !== 1 ? "s" : ""} enregistré{vehicules.length !== 1 ? "s" : ""}</p>
         </div>
-        <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />Ajouter un véhicule</Button>
+        <Button onClick={openCreate} size="sm"><Plus className="h-4 w-4 mr-1.5" />Ajouter un véhicule</Button>
       </div>
 
       {alertesV.length > 0 && (
@@ -465,15 +465,15 @@ function TabChauffeurs() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-start gap-2">
         <div>
           <h2 className="text-lg font-semibold">Chauffeurs</h2>
           <p className="text-sm text-gray-500">{chauffeurs.length} chauffeur{chauffeurs.length !== 1 ? "s" : ""}</p>
         </div>
-        <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />Ajouter un chauffeur</Button>
+        <Button onClick={openCreate} size="sm"><Plus className="h-4 w-4 mr-1.5" />Ajouter un chauffeur</Button>
       </div>
 
-      <div className="rounded-lg border">
+      <div className="rounded-lg border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -687,17 +687,17 @@ function TabMissions() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-start gap-2">
         <div>
           <h2 className="text-lg font-semibold">Missions de transport</h2>
           <p className="text-sm text-gray-500">{missions.length} mission{missions.length !== 1 ? "s" : ""}</p>
         </div>
-        <Button onClick={() => { setForm(missionVide); setShowForm(true); }}>
-          <Plus className="h-4 w-4 mr-2" />Planifier une mission
+        <Button onClick={() => { setForm(missionVide); setShowForm(true); }} size="sm">
+          <Plus className="h-4 w-4 mr-1.5" />Planifier une mission
         </Button>
       </div>
 
-      <div className="rounded-lg border">
+      <div className="rounded-lg border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -945,7 +945,7 @@ function TabRapports() {
 
       <div>
         <h3 className="font-medium mb-3">Dernières missions terminées</h3>
-        <div className="rounded-lg border">
+        <div className="rounded-lg border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -993,17 +993,21 @@ export default function TransportPage() {
 
       <Tabs defaultValue="flotte">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="flotte" className="flex items-center gap-2">
-            <Truck className="h-4 w-4" />Flotte
+          <TabsTrigger value="flotte" className="flex items-center gap-1.5">
+            <Truck className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Flotte</span>
           </TabsTrigger>
-          <TabsTrigger value="chauffeurs" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />Chauffeurs
+          <TabsTrigger value="chauffeurs" className="flex items-center gap-1.5">
+            <Users className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Chauffeurs</span>
           </TabsTrigger>
-          <TabsTrigger value="missions" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />Missions
+          <TabsTrigger value="missions" className="flex items-center gap-1.5">
+            <MapPin className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Missions</span>
           </TabsTrigger>
-          <TabsTrigger value="rapports" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />Coûts & Rapports
+          <TabsTrigger value="rapports" className="flex items-center gap-1.5">
+            <BarChart3 className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Coûts</span>
           </TabsTrigger>
         </TabsList>
 

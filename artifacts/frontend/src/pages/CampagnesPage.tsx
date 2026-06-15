@@ -275,9 +275,9 @@ export default function CampagnesPage() {
   const peutConfirmer = verifs != null && bloquants.length === 0;
 
   const allTabs = [
-    { id: "campagnes" as Tab, label: "Campagnes", icon: CalendarDays },
-    { id: "cloture" as Tab, label: "Clôture", icon: XCircle, disabled: !active },
-    { id: "bilans" as Tab, label: "Bilans & comparaisons", icon: BarChart3 },
+    { id: "campagnes" as Tab, label: "Campagnes", labelMobile: "Camp.", icon: CalendarDays },
+    { id: "cloture" as Tab,   label: "Clôture",   labelMobile: "Clôture", icon: XCircle, disabled: !active },
+    { id: "bilans" as Tab,    label: "Bilans & comparaisons", labelMobile: "Bilans", icon: BarChart3 },
   ];
   const tabs = isDelegue ? allTabs.filter(t => t.id !== "cloture") : allTabs;
 
@@ -308,11 +308,13 @@ export default function CampagnesPage() {
             key={t.id}
             disabled={t.disabled}
             onClick={() => setTab(t.id)}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+            className={`flex-1 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors
               ${tab === t.id ? "bg-white text-green-700 shadow-sm" : "text-gray-600 hover:text-gray-900"}
               ${t.disabled ? "opacity-40 cursor-not-allowed" : ""}`}
           >
-            <t.icon className="w-4 h-4" /> {t.label}
+            <t.icon className="w-4 h-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">{t.label}</span>
+            <span className="sm:hidden truncate">{t.labelMobile}</span>
           </button>
         ))}
       </div>
