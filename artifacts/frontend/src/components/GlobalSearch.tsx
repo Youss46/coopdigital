@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Search, Users, Package, TrendingDown, X, MapPin, Phone, QrCode, Wheat, LayoutGrid, ChevronRight } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { NAV_ITEMS } from "@/config/navigation";
 
 type SearchResults = {
   membres: { id: number; nom: string; prenoms: string; telephone: string; village: string | null; statut: string }[];
@@ -21,61 +22,6 @@ type SearchResults = {
     membreTelephone: string;
   }[];
 };
-
-type MenuItem = { label: string; href: string; roles: string[]; category: string };
-
-const ALL_MENUS: MenuItem[] = [
-  { label: "Vue PCA",                   href: "/dashboard/pca",          roles: ["pca"],                                                               category: "Tableau de bord" },
-  { label: "Tableau de bord",           href: "/dashboard",              roles: ["pca","directeur","comptable","magasinier","responsable_tracabilite","auditeur"], category: "Tableau de bord" },
-  { label: "Tableau de bord délégué",   href: "/dashboard-delegue",      roles: ["delegue"],                                                           category: "Tableau de bord" },
-  { label: "Mes missions",              href: "/missions",               roles: ["agent_terrain"],                                                     category: "Terrain" },
-  { label: "Membres",                   href: "/membres",                roles: ["pca","directeur","comptable","responsable_tracabilite","delegue","auditeur"], category: "Membres" },
-  { label: "Cartes membres",            href: "/cartes-membres",         roles: ["pca","directeur","comptable","delegue","auditeur"],                   category: "Membres" },
-  { label: "Scoring Producteurs",       href: "/scoring",                roles: ["pca","directeur","comptable","auditeur"],                            category: "Membres" },
-  { label: "Campagnes",                 href: "/campagnes",              roles: ["pca","directeur","comptable","magasinier","delegue","auditeur"],      category: "Collecte" },
-  { label: "Livraisons",                href: "/livraisons/nouvelle",    roles: ["pca","directeur","delegue","comptable","auditeur"],                   category: "Collecte" },
-  { label: "Transport",                 href: "/transport",              roles: ["pca","directeur","comptable","auditeur","magasinier"],                category: "Collecte" },
-  { label: "Expéditions port",          href: "/expeditions",            roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],   category: "Collecte" },
-  { label: "Traçabilité",               href: "/tracabilite",            roles: ["pca","directeur","responsable_tracabilite","auditeur"],               category: "Traçabilité" },
-  { label: "Parcelles & EUDR",          href: "/parcelles",              roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],   category: "Traçabilité" },
-  { label: "Missions terrain",          href: "/missions",               roles: ["responsable_tracabilite"],                                           category: "Traçabilité" },
-  { label: "Stocks",                    href: "/stocks",                 roles: ["pca","directeur","magasinier","comptable","auditeur"],                category: "Stocks" },
-  { label: "Entrepôts délégués",        href: "/entrepots",              roles: ["pca","directeur","comptable","auditeur"],                             category: "Stocks" },
-  { label: "Mon entrepôt",              href: "/mon-entrepot",           roles: ["delegue"],                                                           category: "Stocks" },
-  { label: "Stocks refoulés",           href: "/refus",                  roles: ["pca","directeur","magasinier","comptable","auditeur"],                category: "Stocks" },
-  { label: "Avances",                   href: "/avances",                roles: ["pca","directeur","comptable","delegue","auditeur"],                   category: "Finance membre" },
-  { label: "Intrants",                  href: "/intrants",               roles: ["pca","directeur","comptable","delegue","auditeur","magasinier"],      category: "Finance membre" },
-  { label: "Règlements",                href: "/reglements",             roles: ["pca","directeur","comptable","delegue","auditeur"],                   category: "Finance membre" },
-  { label: "Fournisseurs",              href: "/fournisseurs",           roles: ["pca","directeur","comptable","delegue","auditeur"],                   category: "Commerce" },
-  { label: "Exportateurs",              href: "/exportateurs",           roles: ["pca","directeur","comptable","auditeur"],                            category: "Commerce" },
-  { label: "Créances",                  href: "/creances",               roles: ["pca","directeur","comptable","auditeur"],                            category: "Commerce" },
-  { label: "Suivi des Prix",            href: "/prix",                   roles: ["pca","directeur","comptable","auditeur"],                            category: "Commerce" },
-  { label: "Tableau de bord financier", href: "/finances/tableau-bord",  roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
-  { label: "Budget",                    href: "/budget",                 roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
-  { label: "Emprunts",                  href: "/emprunts",               roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
-  { label: "Subventions",               href: "/subventions",            roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
-  { label: "Dons",                      href: "/dons",                   roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
-  { label: "Caisse",                    href: "/caisse",                 roles: ["pca","directeur","comptable","auditeur","delegue"],                   category: "Finances" },
-  { label: "Banque",                    href: "/banque",                 roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
-  { label: "Mobile Marchands",          href: "/mobile-marchand",        roles: ["pca","directeur","comptable","auditeur"],                             category: "Finances" },
-  { label: "Fiscalité",                 href: "/fiscalite",              roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
-  { label: "Réconciliation",            href: "/reconciliation",         roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
-  { label: "Investissements",           href: "/investissements",        roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
-  { label: "Comptabilité",              href: "/comptabilite",           roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
-  { label: "Salaires",                  href: "/salaires",               roles: ["pca","directeur","comptable","auditeur"],                            category: "Finances" },
-  { label: "Formations",                href: "/formations",             roles: ["pca","directeur","comptable","auditeur","delegue"],                   category: "RH & Social" },
-  { label: "Formations RSE",            href: "/formations-rse",         roles: ["pca","directeur","comptable","auditeur"],                            category: "RH & Social" },
-  { label: "Équipements",               href: "/equipements",            roles: ["pca","directeur","comptable","auditeur"],                            category: "RH & Social" },
-  { label: "Prévisions",                href: "/previsions",             roles: ["pca","directeur","comptable","auditeur"],                            category: "Pilotage" },
-  { label: "Reporting",                 href: "/reporting",              roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],   category: "Pilotage" },
-  { label: "Anomalies",                 href: "/anomalies",              roles: ["pca","directeur","comptable","auditeur"],                            category: "Pilotage" },
-  { label: "Journal d'audit",           href: "/audit",                  roles: ["pca","directeur","auditeur"],                                        category: "Pilotage" },
-  { label: "Gouvernance",               href: "/gouvernance",            roles: ["pca","directeur","secretaire","auditeur"],                           category: "Organisation" },
-  { label: "Communication",             href: "/communication",          roles: ["pca","directeur"],                                                   category: "Organisation" },
-  { label: "Délégués Localité",         href: "/delegues",               roles: ["pca","directeur","comptable","auditeur"],                            category: "Organisation" },
-  { label: "Administration",            href: "/administration/comptes", roles: ["pca","directeur"],                                                   category: "Organisation" },
-  { label: "Paramètres",                href: "/parametres",             roles: ["pca","directeur"],                                                   category: "Organisation" },
-];
 
 function normalize(s: string) {
   return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -144,7 +90,7 @@ export default function GlobalSearch() {
     if (query.length < 2) return [];
     const q = normalize(query);
     const role = utilisateur?.role ?? "";
-    return ALL_MENUS.filter(
+    return NAV_ITEMS.filter(
       (m) => normalize(m.label).includes(q) && (m.roles.length === 0 || m.roles.includes(role))
     ).slice(0, 6);
   }, [query, utilisateur?.role]);

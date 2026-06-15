@@ -44,11 +44,11 @@ import {
   Smartphone,
   Calculator,
   GitMerge,
-  TrendingUp as TrendingUpInvest,
   FolderKanban,
   Users2,
   Ship,
 } from "lucide-react";
+import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
 import HelpPanel from "./HelpPanel";
@@ -57,339 +57,68 @@ import GlobalSearch from "./GlobalSearch";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
-const navItems = [
-  // ── Dashboards ────────────────────────────────────────────────────────────
-  {
-    href: "/dashboard/pca",
-    label: "Vue PCA",
-    icon: TrendingUp,
-    roles: ["pca"],
-  },
-  {
-    href: "/dashboard",
-    label: "Tableau de bord",
-    icon: LayoutDashboard,
-    roles: ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
-  },
-  {
-    href: "/dashboard-delegue",
-    label: "Tableau de bord",
-    icon: LayoutDashboard,
-    roles: ["delegue"],
-  },
-
-  // ── Agent terrain ─────────────────────────────────────────────────────────
-  {
-    href: "/missions",
-    label: "Mes missions",
-    icon: Navigation,
-    roles: ["agent_terrain"],
-  },
-
-  // ── Membres & Terrain ─────────────────────────────────────────────────────
-  {
-    href: "/membres",
-    label: "Membres",
-    icon: Users,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
-  },
-  {
-    href: "/cartes-membres",
-    label: "Cartes membres",
-    icon: CreditCard,
-    roles: ["pca", "directeur", "comptable", "delegue", "auditeur"],
-  },
-  {
-    href: "/scoring",
-    label: "Scoring Producteurs",
-    icon: Award,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-
-  // ── Campagnes & Collecte ──────────────────────────────────────────────────
-  {
-    href: "/campagnes",
-    label: "Campagnes",
-    icon: CalendarDays,
-    roles: ["pca", "directeur", "comptable", "magasinier", "delegue", "auditeur"],
-  },
-  {
-    href: "/livraisons",
-    label: "Livraisons",
-    icon: Package,
-    roles: ["delegue"],
-  },
-  {
-    href: "/livraisons/nouvelle",
-    label: "Livraisons",
-    icon: Package,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/transport",
-    label: "Transport",
-    icon: Truck,
-    roles: ["pca", "directeur", "comptable", "auditeur", "magasinier"],
-  },
-  {
-    href: "/expeditions",
-    label: "Expéditions port",
-    icon: Ship,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
-  },
-
-  // ── Traçabilité & Conformité ──────────────────────────────────────────────
-  {
-    href: "/tracabilite",
-    label: "Traçabilité",
-    icon: QrCode,
-    roles: ["pca", "directeur", "responsable_tracabilite", "auditeur"],
-  },
-  {
-    href: "/parcelles",
-    label: "Parcelles & EUDR",
-    icon: MapPinned,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
-    showEudrAlerteBadge: true,
-  },
-  {
-    href: "/missions",
-    label: "Missions terrain",
-    icon: MapPin,
-    roles: ["responsable_tracabilite"],
-  },
-  // ── Stocks ────────────────────────────────────────────────────────────────
-  {
-    href: "/stocks",
-    label: "Stocks",
-    icon: Warehouse,
-    roles: ["pca", "directeur", "magasinier", "comptable", "auditeur"],
-  },
-  {
-    href: "/entrepots",
-    label: "Entrepôts délégués",
-    icon: Warehouse,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/mon-entrepot",
-    label: "Mon entrepôt",
-    icon: Warehouse,
-    roles: ["delegue"],
-  },
-  {
-    href: "/refus",
-    label: "Stocks refoulés",
-    icon: PackageX,
-    roles: ["pca", "directeur", "magasinier", "comptable", "auditeur"],
-  },
-
-  // ── Finance Membre ────────────────────────────────────────────────────────
-  {
-    href: "/avances",
-    label: "Avances",
-    icon: CreditCard,
-    roles: ["pca", "directeur", "comptable", "delegue", "auditeur"],
-  },
-  {
-    href: "/intrants",
-    label: "Intrants",
-    icon: Leaf,
-    roles: ["pca", "directeur", "comptable", "delegue", "auditeur", "magasinier"],
-  },
-  {
-    href: "/reglements",
-    label: "Règlements",
-    icon: CheckCircle2,
-    roles: ["pca", "directeur", "comptable", "delegue", "auditeur"],
-  },
-
-  // ── Commerce & Partenaires ────────────────────────────────────────────────
-  {
-    href: "/fournisseurs",
-    label: "Fournisseurs",
-    icon: UserCheck,
-    roles: ["pca", "directeur", "comptable", "delegue", "auditeur"],
-  },
-  {
-    href: "/exportateurs",
-    label: "Exportateurs",
-    icon: Building2,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/creances",
-    label: "Créances",
-    icon: Receipt,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/prix",
-    label: "Suivi des Prix",
-    icon: TrendingUp,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
-  },
-
-  // ── Finance Coopérative ───────────────────────────────────────────────────
-  {
-    href: "/finances/tableau-bord",
-    label: "Tableau de bord financier",
-    icon: BarChart3,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/budget",
-    label: "Budget",
-    icon: Target,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/emprunts",
-    label: "Emprunts",
-    icon: Landmark,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/subventions",
-    label: "Subventions",
-    icon: HandCoins,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/dons",
-    label: "Dons",
-    icon: Gift,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/caisse",
-    label: "Caisse",
-    icon: Wallet,
-    roles: ["pca", "directeur", "comptable", "auditeur", "delegue"],
-  },
-  {
-    href: "/banque",
-    label: "Banque",
-    icon: Building2,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/mobile-marchand",
-    label: "Mobile Marchands",
-    icon: Smartphone,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/fiscalite",
-    label: "Fiscalité",
-    icon: Calculator,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/reconciliation",
-    label: "Réconciliation",
-    icon: GitMerge,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/investissements",
-    label: "Investissements",
-    icon: FolderKanban,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/comptabilite",
-    label: "Comptabilité",
-    icon: BookOpen,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-    showBadge: true,
-  },
-  {
-    href: "/salaires",
-    label: "Salaires",
-    icon: Banknote,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/formations",
-    label: "Formations",
-    icon: GraduationCap,
-    roles: ["pca", "directeur", "comptable", "auditeur", "delegue"],
-  },
-  {
-    href: "/formations-rse",
-    label: "Formations RSE",
-    icon: GraduationCap,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/equipements",
-    label: "Équipements",
-    icon: Package,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-
-  // ── Pilotage & Contrôle ───────────────────────────────────────────────────
-  {
-    href: "/previsions",
-    label: "Prévisions",
-    icon: TrendingUp,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/reporting",
-    label: "Reporting",
-    icon: BarChart3,
-    roles: ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
-  },
-  {
-    href: "/anomalies",
-    label: "Anomalies",
-    icon: ShieldAlert,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-    showAnomaliesBadge: true,
-  },
-  {
-    href: "/audit",
-    label: "Journal d'audit",
-    icon: ScrollText,
-    roles: ["pca", "directeur", "auditeur"],
-  },
-
-  // ── Organisation ──────────────────────────────────────────────────────────
-  {
-    href: "/gouvernance",
-    label: "Gouvernance",
-    icon: Gavel,
-    roles: ["pca", "directeur", "secretaire", "auditeur"],
-  },
-  {
-    href: "/communication",
-    label: "Communication",
-    icon: MessageSquare,
-    roles: ["pca", "directeur"],
-  },
-  {
-    href: "/delegues",
-    label: "Délégués Localité",
-    icon: Users2,
-    roles: ["pca", "directeur", "comptable", "auditeur"],
-  },
-  {
-    href: "/administration/comptes",
-    label: "Administration",
-    icon: ShieldCheck,
-    roles: ["pca", "directeur"],
-  },
-  {
-    href: "/parametres",
-    label: "Paramètres",
-    icon: Settings,
-    roles: ["pca", "directeur"],
-  },
+// ── Icônes — même ordre que NAV_ITEMS dans src/config/navigation.ts ──────────
+// Pour ajouter un module : éditer navigation.ts en premier, puis ajouter l'icône ici.
+const NAV_ICON_LIST: React.ElementType[] = [
+  TrendingUp,     // /dashboard/pca
+  LayoutDashboard,// /dashboard
+  LayoutDashboard,// /dashboard-delegue
+  Navigation,     // /missions (agent_terrain)
+  Users,          // /membres
+  CreditCard,     // /cartes-membres
+  Award,          // /scoring
+  CalendarDays,   // /campagnes
+  Package,        // /livraisons (delegue)
+  Package,        // /livraisons/nouvelle
+  Truck,          // /transport
+  Ship,           // /expeditions
+  QrCode,         // /tracabilite
+  MapPinned,      // /parcelles
+  MapPin,         // /missions (responsable_tracabilite)
+  Warehouse,      // /stocks
+  Warehouse,      // /entrepots
+  Warehouse,      // /mon-entrepot
+  PackageX,       // /refus
+  CreditCard,     // /avances
+  Leaf,           // /intrants
+  CheckCircle2,   // /reglements
+  UserCheck,      // /fournisseurs
+  Building2,      // /exportateurs
+  Receipt,        // /creances
+  TrendingUp,     // /prix
+  BarChart3,      // /finances/tableau-bord
+  Target,         // /budget
+  Landmark,       // /emprunts
+  HandCoins,      // /subventions
+  Gift,           // /dons
+  Wallet,         // /caisse
+  Building2,      // /banque
+  Smartphone,     // /mobile-marchand
+  Calculator,     // /fiscalite
+  GitMerge,       // /reconciliation
+  FolderKanban,   // /investissements
+  BookOpen,       // /comptabilite
+  Banknote,       // /salaires
+  GraduationCap,  // /formations
+  GraduationCap,  // /formations-rse
+  Package,        // /equipements
+  TrendingUp,     // /previsions
+  BarChart3,      // /reporting
+  ShieldAlert,    // /anomalies
+  ScrollText,     // /audit
+  Gavel,          // /gouvernance
+  MessageSquare,  // /communication
+  Users2,         // /delegues
+  ShieldCheck,    // /administration/comptes
+  Settings,       // /parametres
 ];
 
-type NavItem = { href: string; label: string; icon: React.ElementType; roles?: string[]; showBadge?: boolean; showAnomaliesBadge?: boolean; showEudrAlerteBadge?: boolean };
+type NavItem = NavItemConfig & { icon: React.ElementType };
+
+const navItems: NavItem[] = NAV_ITEMS.map((item, i) => ({
+  ...item,
+  icon: NAV_ICON_LIST[i] ?? LayoutDashboard,
+}));
 
 const BADGE_ROLES = ["pca", "directeur", "comptable"];
 const ANOMALIE_BADGE_ROLES = ["pca", "directeur", "comptable", "auditeur"];
