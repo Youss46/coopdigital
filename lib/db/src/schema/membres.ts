@@ -1,6 +1,7 @@
 import {
   pgTable, serial, text, integer, numeric,
   timestamp, date, uuid, pgEnum, varchar, boolean, jsonb,
+  unique,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -100,7 +101,9 @@ export const membresTable = pgTable("membres", {
 
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  unique("membres_cooperative_id_numero_membre_unique").on(t.cooperativeId, t.numeroMembre),
+]);
 
 export const insertMembreSchema = createInsertSchema(membresTable).omit({
   id: true,
