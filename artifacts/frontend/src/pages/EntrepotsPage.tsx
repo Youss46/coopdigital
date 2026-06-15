@@ -746,14 +746,26 @@ export default function EntrepotsPage() {
             </div>
 
             {/* Onglets */}
-            <div className="flex border-b border-gray-100 px-6">
-              {(["mouvements", "transferts"] as const).map((tab) => (
-                <button key={tab} onClick={() => setDetailOnglet(tab)}
-                  className={`py-3 px-1 mr-5 text-sm font-medium border-b-2 transition-colors ${detailOnglet === tab ? "border-green-600 text-green-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
-                  {tab === "mouvements" ? "Mouvements de stock" : "Transferts"}
-                </button>
-              ))}
-            </div>
+            {(() => {
+              const pendingCount = transferts.filter(
+                (t) => t.entrepotId === showDetail.id && t.statut === "en_cours"
+              ).length;
+              return (
+                <div className="flex border-b border-gray-100 px-6">
+                  {(["mouvements", "transferts"] as const).map((tab) => (
+                    <button key={tab} onClick={() => setDetailOnglet(tab)}
+                      className={`py-3 px-1 mr-5 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${detailOnglet === tab ? "border-green-600 text-green-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+                      {tab === "mouvements" ? "Mouvements de stock" : "Transferts"}
+                      {tab === "transferts" && pendingCount > 0 && (
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                          {pendingCount}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
 
             {/* Corps scrollable */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
