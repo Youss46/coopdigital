@@ -20,7 +20,6 @@ import {
   getGetConfigComptableQueryKey,
   getCountEcrituresEnAttenteQueryKey,
   getListEcrituresEnAttenteQueryKey,
-  getGetJournalComptableQueryKey,
   getGetDevisesTauxQueryKey,
   getGetDevisesTauxHistoriqueDeviseQueryKey,
 } from "@workspace/api-client-react";
@@ -629,15 +628,43 @@ function OngletEnAttente() {
 function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
   const [page, setPage] = useState(1);
   const [filtreSource, setFiltreSource] = useState(defaultSource);
+  const [filtreDebut, setFiltreDebut] = useState("");
+  const [filtreFin, setFiltreFin] = useState("");
   const [exporting, setExporting] = useState(false);
   const LIMIT = 50;
   const annee = new Date().getFullYear();
+
+  const buildParams = () => {
+    const p: Record<string, string> = { exercice: String(annee), page: String(page), limit: String(LIMIT) };
+    if (filtreSource) p["source"] = filtreSource;
+    if (filtreDebut) p["date_debut"] = filtreDebut;
+    if (filtreFin) p["date_fin"] = filtreFin;
+    return p;
+  };
+
+  const { data, isLoading } = useQuery<{ ecritures: Array<{ id: number; dateEcriture: string; numeroPiece?: string | null; libelle: string; compteDebit: string; compteCredit: string; montantFcfa: number; source: string; }>; total: number; page: number; limit: number }>({
+    queryKey: ["journal-comptable", annee, page, filtreSource, filtreDebut, filtreFin],
+    queryFn: () => apiFetch(`/api/comptabilite/journal?${new URLSearchParams(buildParams()).toString()}`),
+  });
+
+  const list = data?.ecritures ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+
+  const handleSourceChange = (v: string) => { setFiltreSource(v); setPage(1); };
+  const handleDebutChange = (v: string) => { setFiltreDebut(v); setPage(1); };
+  const handleFinChange   = (v: string) => { setFiltreFin(v);   setPage(1); };
+  const hasFilters = !!(filtreSource || filtreDebut || filtreFin);
+
+  const resetFiltres = () => { setFiltreSource(""); setFiltreDebut(""); setFiltreFin(""); setPage(1); };
 
   const handleExport = async () => {
     setExporting(true);
     try {
       const params = new URLSearchParams({ exercice: String(annee) });
       if (filtreSource) params.set("source", filtreSource);
+      if (filtreDebut) params.set("date_debut", filtreDebut);
+      if (filtreFin) params.set("date_fin", filtreFin);
       const url = `${import.meta.env.VITE_API_URL ?? ""}/api/comptabilite/journal/export?${params.toString()}`;
       const r = await fetch(url, {
         headers: { Authorization: `Bearer ${localStorage.getItem("coop_token") ?? ""}` },
@@ -660,31 +687,59 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
     }
   };
 
-  const { data, isLoading } = useGetJournalComptable({ exercice: annee, page, limit: LIMIT });
-  const ecritures = (data as { ecritures?: unknown[]; total?: number } | undefined);
-  const allList = (ecritures?.ecritures ?? []) as Array<{
-    id: number;
-    dateEcriture: string;
-    numeroPiece?: string | null;
-    libelle: string;
-    compteDebit: string;
-    compteCredit: string;
-    montantFcfa: number;
-    source: string;
-  }>;
-  const list = filtreSource ? allList.filter((e) => e.source === filtreSource) : allList;
-  const total = ecritures?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
-
-  const handleSourceChange = (v: string) => {
-    setFiltreSource(v);
-    setPage(1);
-  };
-
   return (
     <div>
+      {/* Ligne de filtres */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <Filter size={14} className="text-gray-400 shrink-0" />
+
+        {/* Source */}
+        <select
+          value={filtreSource}
+          onChange={(e) => handleSourceChange(e.target.value)}
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+        >
+          <option value="">Toutes les sources</option>
+          {Object.entries(SOURCE_LABELS).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+
+        {/* Date début */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-400 shrink-0">Du</span>
+          <input
+            type="date"
+            value={filtreDebut}
+            onChange={(e) => handleDebutChange(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+          />
+        </div>
+
+        {/* Date fin */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-400 shrink-0">Au</span>
+          <input
+            type="date"
+            value={filtreFin}
+            onChange={(e) => handleFinChange(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+          />
+        </div>
+
+        {hasFilters && (
+          <button
+            onClick={resetFiltres}
+            className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 px-2 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
+          >
+            <X size={12} /> Réinitialiser
+          </button>
+        )}
+      </div>
+
+      {/* Ligne résumé + export + pagination */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
-        <p className="text-sm text-gray-500 mr-auto">{total} écriture{total > 1 ? "s" : ""} — exercice {annee}</p>
+        <p className="text-sm text-gray-500 mr-auto">{total} écriture{total !== 1 ? "s" : ""} — exercice {annee}</p>
 
         <button
           onClick={() => { void handleExport(); }}
@@ -692,30 +747,8 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
         >
           <Download size={14} />
-          {exporting ? "Export…" : filtreSource ? `Exporter (${SOURCE_LABELS[filtreSource] ?? filtreSource})` : "Exporter CSV"}
+          {exporting ? "Export…" : hasFilters ? "Exporter la sélection" : "Exporter CSV"}
         </button>
-
-        <div className="flex items-center gap-2">
-          <Filter size={14} className="text-gray-400" />
-          <select
-            value={filtreSource}
-            onChange={(e) => handleSourceChange(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-          >
-            <option value="">Toutes les sources</option>
-            {Object.entries(SOURCE_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
-          {filtreSource && (
-            <button
-              onClick={() => handleSourceChange("")}
-              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 px-2 py-1 rounded border border-gray-200 hover:bg-gray-50"
-            >
-              <X size={12} /> Effacer
-            </button>
-          )}
-        </div>
 
         <div className="flex items-center gap-2">
           <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
@@ -728,14 +761,19 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
         </div>
       </div>
 
-      {filtreSource && (
+      {hasFilters && !isLoading && (
         <div
-          className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-lg text-sm font-medium"
+          className="flex flex-wrap items-center gap-2 mb-4 px-4 py-2.5 rounded-lg text-sm font-medium"
           style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534" }}
         >
           <Filter size={14} />
-          Filtré par source : <strong>{SOURCE_LABELS[filtreSource] ?? filtreSource}</strong>
-          {!isLoading && <span className="ml-1 text-green-600">— {list.length} résultat{list.length > 1 ? "s" : ""} sur cette page</span>}
+          <span>
+            {filtreSource && <><strong>{SOURCE_LABELS[filtreSource] ?? filtreSource}</strong>{(filtreDebut || filtreFin) ? " · " : ""}</>}
+            {filtreDebut && <>à partir du <strong>{new Date(filtreDebut).toLocaleDateString("fr-FR")}</strong></>}
+            {filtreDebut && filtreFin && " "}
+            {filtreFin && <>jusqu&apos;au <strong>{new Date(filtreFin).toLocaleDateString("fr-FR")}</strong></>}
+          </span>
+          <span className="text-green-600">— {total} écriture{total !== 1 ? "s" : ""} au total</span>
         </div>
       )}
 
@@ -745,8 +783,8 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
         <div className="text-center py-16">
           <BookOpen className="mx-auto mb-3 text-gray-300" size={40} />
           <p className="text-gray-500 text-sm">
-            {filtreSource
-              ? `Aucune écriture "${SOURCE_LABELS[filtreSource] ?? filtreSource}" sur cette page`
+            {hasFilters
+              ? "Aucune écriture ne correspond à ces filtres"
               : `Aucune écriture pour l'exercice ${annee}`}
           </p>
         </div>
@@ -2297,7 +2335,7 @@ function ModalSaisieManuelle({ onClose, onSuccess }: { onClose: () => void; onSu
       });
       toast({ title: "Écriture enregistrée" });
       void qc.invalidateQueries({ queryKey: ["grand-livre"] });
-      void qc.invalidateQueries({ queryKey: getGetJournalComptableQueryKey() });
+      void qc.invalidateQueries({ queryKey: ["journal-comptable"] });
       onSuccess();
     } catch (err) {
       toast({ title: "Erreur", description: (err as Error).message, variant: "destructive" });

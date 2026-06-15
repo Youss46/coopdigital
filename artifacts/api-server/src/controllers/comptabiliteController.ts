@@ -104,11 +104,19 @@ export async function getJournalComptable(req: Request, res: Response): Promise<
     const page = Math.max(1, parseInt(String(req.query["page"] ?? "1")));
     const limit = Math.min(200, parseInt(String(req.query["limit"] ?? "50")));
     const offset = (page - 1) * limit;
+    const source = req.query["source"] as string | undefined;
+    const dateDebut = req.query["date_debut"] as string | undefined;
+    const dateFin = req.query["date_fin"] as string | undefined;
 
-    const where = and(
+    const conditions = [
       eq(ecrituresComptablesTable.cooperativeId, coopId(req)),
-      eq(ecrituresComptablesTable.exercice, exercice)
-    );
+      eq(ecrituresComptablesTable.exercice, exercice),
+    ];
+    if (source) conditions.push(eq(ecrituresComptablesTable.source, source as "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock"));
+    if (dateDebut) conditions.push(gte(ecrituresComptablesTable.dateEcriture, dateDebut));
+    if (dateFin) conditions.push(lte(ecrituresComptablesTable.dateEcriture, dateFin));
+
+    const where = and(...conditions);
 
     const [ecritures, [{ count }]] = await Promise.all([
       db.select().from(ecrituresComptablesTable)
