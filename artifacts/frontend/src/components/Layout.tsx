@@ -155,6 +155,20 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
     ? (conformiteNav?.par_section ?? []).filter(s => s.pct < storedWarning).length
     : 0;
 
+  const { data: messagesNonLus } = useQuery({
+    queryKey: ["messages-non-lus"],
+    queryFn: async () => {
+      const token = localStorage.getItem("coop_token") ?? "";
+      const r = await fetch(`${BASE}/api/communication/messages/non-lus`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) return { count: 0 };
+      return r.json() as Promise<{ count: number }>;
+    },
+    enabled: !!utilisateur,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+  const nbMessagesNonLus = messagesNonLus?.count ?? 0;
+
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#1a4731" }}>
       {/* Logo + close button */}
@@ -183,11 +197,12 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {(navItems as NavItem[])
           .filter(({ roles }) => !roles || roles.includes(utilisateur?.role ?? ""))
-          .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge, showEudrAlerteBadge: hasEudrAlerteBadge }) => {
+          .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge, showEudrAlerteBadge: hasEudrAlerteBadge, showMessagesBadge: hasMessagesBadge }) => {
             const isActive = location === href || location.startsWith(href + "/");
             const badgeCount = hasAnomaliesBadge && showAnomaliesBadge ? nbCritiques
               : hasBadge && showBadge ? nbEnAttente
               : hasEudrAlerteBadge && showEudrAlerteBadge ? nbSectionsAlerte
+              : hasMessagesBadge ? nbMessagesNonLus
               : 0;
             return (
               <Link
