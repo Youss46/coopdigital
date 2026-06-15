@@ -133,7 +133,7 @@ export default function EntrepotsPage() {
   const [showCreer, setShowCreer] = useState(false);
   const [formCreer, setFormCreer] = useState({
     delegueId: "", nom: "", zoneNom: "", zoneType: "village",
-    capaciteMaxKg: "", seuilAlerteKg: "", adresse: "",
+    capaciteMaxKg: "", seuilAlerteKg: "", capaciteSacs: "", adresse: "",
   });
   const [showEditer, setShowEditer] = useState(false);
   const [entrepotEdite, setEntrepotEdite] = useState<Entrepot | null>(null);
@@ -1277,6 +1277,15 @@ export default function EntrepotsPage() {
                 </div>
               </div>
 
+              {/* Capacité en sacs */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Capacité (nombre de sacs)</label>
+                <input type="number" placeholder="ex: 500"
+                  value={formCreer.capaciteSacs}
+                  onChange={(e) => setFormCreer(f => ({ ...f, capaciteSacs: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+              </div>
+
               {/* Adresse */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
@@ -1300,6 +1309,7 @@ export default function EntrepotsPage() {
                   zoneType: formCreer.zoneType || undefined,
                   capaciteMaxKg: formCreer.capaciteMaxKg ? parseFloat(formCreer.capaciteMaxKg) : undefined,
                   seuilAlerteKg: formCreer.seuilAlerteKg ? parseFloat(formCreer.seuilAlerteKg) : undefined,
+                  capaciteSacs: formCreer.capaciteSacs ? parseInt(formCreer.capaciteSacs) : undefined,
                   adresse: formCreer.adresse || undefined,
                 })}
                 className="flex-1 bg-green-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50">

@@ -120,15 +120,19 @@ export async function creerEntrepot(
   const [created] = await db
     .insert(entrepotsDeleguesTable)
     .values({
-      ...data,
+      delegueId: data.delegueId,
+      nom: data.nom,
       cooperativeId,
       stockActuelKg: "0",
       actif: true,
-      capaciteMaxKg: data.capaciteMaxKg != null ? String(data.capaciteMaxKg) : null,
-      seuilAlerteKg: data.seuilAlerteKg != null ? String(data.seuilAlerteKg) : null,
-      capaciteSacs: data.capaciteSacs != null ? data.capaciteSacs : null,
-      gpsLat: data.gpsLat != null ? String(data.gpsLat) : null,
-      gpsLng: data.gpsLng != null ? String(data.gpsLng) : null,
+      zoneNom: data.zoneNom ?? undefined,
+      zoneType: data.zoneType ?? undefined,
+      capaciteMaxKg: data.capaciteMaxKg != null ? String(data.capaciteMaxKg) : undefined,
+      seuilAlerteKg: data.seuilAlerteKg != null ? String(data.seuilAlerteKg) : undefined,
+      ...(data.capaciteSacs != null ? { capaciteSacs: data.capaciteSacs } : {}),
+      adresse: data.adresse ?? undefined,
+      gpsLat: data.gpsLat != null ? String(data.gpsLat) : undefined,
+      gpsLng: data.gpsLng != null ? String(data.gpsLng) : undefined,
     })
     .returning();
   return created!;
