@@ -4,14 +4,30 @@ import { api, setToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Loader2, AlertCircle } from "lucide-react";
 
+// Formate une valeur brute en MBR-YYYY-NNNN avec tirets automatiques
+function formatCodeMembre(raw: string): string {
+  const clean = raw.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+  if (!clean) return "";
+  const withMbr = clean.startsWith("MBR") ? clean : "MBR" + clean;
+  const limited = withMbr.slice(0, 11); // MBR(3) + année(4) + numéro(4)
+  let result = limited.slice(0, 3);
+  if (limited.length > 3) result += "-" + limited.slice(3, 7);
+  if (limited.length > 7) result += "-" + limited.slice(7, 11);
+  return result;
+}
+
 export default function ConnexionPage() {
   const [, setLoc] = useLocation();
   const { login } = useAuth();
   const urlCode = new URLSearchParams(window.location.search).get("code") ?? "";
-  const [code, setCode] = useState(urlCode);
+  const [code, setCode] = useState(() => formatCodeMembre(urlCode));
   const [tel, setTel] = useState("");
   const [loading, setLoading] = useState(false);
   const [erreur, setErreur] = useState("");
+
+  function handleCodeChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setCode(formatCodeMembre(e.target.value));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,8 +81,12 @@ export default function ConnexionPage() {
                   focus:outline-none focus:border-green-500 transition-colors bg-gray-50"
                 placeholder="MBR-2025-0001"
                 value={code}
-                onChange={e => setCode(e.target.value)}
+                onChange={handleCodeChange}
+                inputMode="text"
                 autoCapitalize="characters"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck={false}
                 required
               />
             </div>
