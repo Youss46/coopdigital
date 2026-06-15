@@ -420,6 +420,22 @@ export default function ReglementsPage() {
     ? { caisse: { solde: parseFloat(caissesData[0].solde_actuel_fcfa), plafond: null } }
     : undefined;
 
+  // Session Caisse Centrale (visible pour les rôles non-délégué — Directeur, PCA, Comptable)
+  const { data: caissesNonDelegueData } = useQuery<Array<{
+    type_caisse: string; nom: string;
+    session_id: number | null; session_statut: string | null;
+  }>>({
+    queryKey: ["caisse-centrale-session"],
+    queryFn: () => apiFetch(`/api/caisse`),
+    enabled: !isDelegue && peutValider,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+  const caisseCentrale = caissesNonDelegueData?.find((c) => c.type_caisse === "centrale");
+  const sessionCentraleOuverte = caisseCentrale
+    ? caisseCentrale.session_statut === "ouverte"
+    : null;
+
   // Stats
   const { data: stats } = useGetPaiementsStats({
     query: { queryKey: getGetPaiementsStatsQueryKey(), refetchInterval: 30_000 },
@@ -458,6 +474,10 @@ export default function ReglementsPage() {
       // Rafraîchir le solde caisse délégué après validation espèces
       if (isDelegue && modal.paiement.modePaiement === "especes") {
         qc.invalidateQueries({ queryKey: ["caisse-delegue-solde", utilisateur?.id] });
+      }
+      // Rafraîchir le statut session Caisse Centrale après validation
+      if (!isDelegue && modal.paiement.modePaiement === "especes") {
+        qc.invalidateQueries({ queryKey: ["caisse-centrale-session"] });
       }
       setModal(null);
       toast({ title: "Paiement validé", description: "Le producteur a été notifié." });
@@ -577,6 +597,25 @@ export default function ReglementsPage() {
               <span>Fonds disponibles</span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Alerte session Caisse Centrale fermée (non-délégué) ── */}
+      {!isDelegue && peutValider && caisseCentrale && sessionCentraleOuverte === false && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3.5">
+          <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+            <AlertTriangle size={16} className="text-amber-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">
+              Session Caisse Centrale non ouverte
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              La <strong>{caisseCentrale.nom}</strong> n'a pas de session ouverte aujourd'hui.
+              Les paiements en espèces pourront être validés, mais le débit automatique de la caisse ne sera pas effectué.
+              Ouvrez la session depuis le module <strong>Caisse</strong> pour activer le débit automatique.
+            </p>
+          </div>
         </div>
       )}
 
