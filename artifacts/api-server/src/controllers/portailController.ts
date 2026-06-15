@@ -223,7 +223,9 @@ export async function savePhotoHandler(req: Request, res: Response): Promise<voi
 
 // ─── GET /portail/verifier/:code — public, sans auth ─────────────────────────
 export async function verifierMembreHandler(req: Request, res: Response): Promise<void> {
-  const code = String(req.params["code"] ?? "").trim().toUpperCase();
+  // Ne pas forcer en majuscules : les UUID (nouveaux QR) sont en minuscules en DB.
+  // La fonction verifierMembrePublic gère les deux formats (UUID et MBR-YYYY-NNNN).
+  const code = String(req.params["code"] ?? "").trim();
   if (!code) { res.status(400).json({ erreur: "Code membre requis" }); return; }
   try {
     const data = await verifierMembrePublic(code);

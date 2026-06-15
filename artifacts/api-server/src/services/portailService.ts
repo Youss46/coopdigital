@@ -408,30 +408,46 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
 // ─── PDF carte membre ─────────────────────────────────────────────────────────
 
 // ─── Vérification publique d'une carte (sans auth) ───────────────────────────
-export async function verifierMembrePublic(codeMembre: string): Promise<{
+// Accepte :
+//   • un UUID (qrCodeToken) — format des nouveaux QR codes générés depuis ce fix
+//   • un codeMembre (MBR-YYYY-NNNN) — rétrocompatibilité QR codes anciens,
+//     mais UNIQUEMENT si la coop est identifiable sans ambiguïté (1 seul résultat)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function verifierMembrePublic(code: string): Promise<{
   nom: string; prenoms: string; coopNom: string; coopVille: string;
   statut: string; village: string | null; superficieHa: string | null;
   dateAdhesion: string; codeMembre: string;
 } | null> {
-  const parsed = parseCodeMembre(codeMembre);
-  if (!parsed) return null;
+  let membre: typeof membresTable.$inferSelect | undefined;
 
-  // Chercher par (numero_membre, année d'adhésion)
-  const candidats = await db
-    .select()
-    .from(membresTable)
-    .where(
-      and(
-        eq(membresTable.numeroMembre, parsed.numero),
-        sql`EXTRACT(YEAR FROM ${membresTable.dateAdhesion}::date) = ${parsed.year}`
-      )
-    );
-  if (candidats.length === 0) return null;
+  if (UUID_RE.test(code)) {
+    // Nouveau format : lookup par token UUID — toujours unique globalement
+    const [found] = await db
+      .select()
+      .from(membresTable)
+      .where(eq(membresTable.qrCodeToken, code.toLowerCase()))
+      .limit(1);
+    membre = found;
+  } else {
+    // Ancien format (rétrocompatibilité) : MBR-YYYY-NNNN
+    const parsed = parseCodeMembre(code);
+    if (!parsed) return null;
 
-  // En cas de doublons inter-coops, prendre celui dont le code calculé correspond
-  const membre = candidats.find(
-    m => computeCodeMembre(m.numeroMembre, m.dateAdhesion).toUpperCase() === codeMembre.toUpperCase()
-  );
+    const candidats = await db
+      .select()
+      .from(membresTable)
+      .where(
+        and(
+          eq(membresTable.numeroMembre, parsed.numero),
+          sql`EXTRACT(YEAR FROM ${membresTable.dateAdhesion}::date) = ${parsed.year}`
+        )
+      );
+    // Sécurité : ne retourner un résultat que s'il n'y a aucune ambiguïté inter-coops
+    if (candidats.length !== 1) return null;
+    membre = candidats[0];
+  }
+
   if (!membre) return null;
 
   const [coop] = await db
@@ -449,7 +465,7 @@ export async function verifierMembrePublic(codeMembre: string): Promise<{
     village: membre.village ?? null,
     superficieHa: membre.superficieHa ?? null,
     dateAdhesion: membre.dateAdhesion,
-    codeMembre,
+    codeMembre: computeCodeMembre(membre.numeroMembre, membre.dateAdhesion),
   };
 }
 
@@ -474,9 +490,12 @@ export async function generateCarteMembre(membreId: number): Promise<Buffer> {
     (process.env.REPLIT_DOMAINS
       ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]?.trim()}`
       : null);
+  // Utiliser le qrCodeToken (UUID unique global) pour éviter toute ambiguïté
+  // inter-coopératives. Les codes MBR-YYYY-NNNN sont séquentiels par coop
+  // et peuvent se répéter entre tenants.
   const verifyUrl = portailBase
-    ? `${portailBase}/portail/verifier/${codeMembre}`
-    : `https://coopdigital.app/portail/verifier/${codeMembre}`;
+    ? `${portailBase}/portail/verifier/${membre.qrCodeToken}`
+    : `https://coopdigital.app/portail/verifier/${membre.qrCodeToken}`;
   const qrBuffer: Buffer = await QRCode.toBuffer(verifyUrl, {
     type: "png",
     width: 120,
