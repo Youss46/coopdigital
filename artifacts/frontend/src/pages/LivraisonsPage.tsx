@@ -5,9 +5,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, Search, Plus, Loader2, ChevronRight, Calendar,
   Scale, Banknote, TrendingDown, ArrowDownCircle, FileDown,
+  Warehouse, ChevronDown, MapPin, User,
 } from "lucide-react";
 
 const ROLES_CREER = ["pca", "directeur", "delegue"];
+const ROLES_VOIR_DELEGUES = ["pca", "directeur", "magasinier", "comptable", "auditeur"];
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -15,6 +17,19 @@ const apiFetch = (url: string) =>
   fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } }).then((r) => r.json());
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+interface EntrepotDelegue {
+  id: number;
+  nom: string;
+  zoneNom: string | null;
+  zoneType: string | null;
+  stockActuelKg: string | null;
+  capaciteMaxKg: string | null;
+  seuilAlerteKg: string | null;
+  actif: boolean;
+  delegueNom: string | null;
+  deleguePrenoms: string | null;
+}
 
 interface Livraison {
   id: number;
@@ -53,13 +68,23 @@ function fmtDate(d: string | null | undefined) {
 export default function LivraisonsPage() {
   const { utilisateur } = useAuth();
   const peutCreer = ROLES_CREER.includes(utilisateur?.role ?? "");
+  const voitDelegues = ROLES_VOIR_DELEGUES.includes(utilisateur?.role ?? "");
   const [recherche, setRecherche] = useState("");
+  const [deleguesOuvert, setDeleguesOuvert] = useState(true);
 
   const { data: livraisons = [], isLoading } = useQuery<Livraison[]>({
     queryKey: ["livraisons-liste"],
     queryFn: () => apiFetch("/api/livraisons?limit=100"),
     staleTime: 30_000,
     refetchInterval: 60_000,
+  });
+
+  const { data: entrepotsDelegues = [] } = useQuery<EntrepotDelegue[]>({
+    queryKey: ["entrepots-delegues-liste"],
+    queryFn: () => apiFetch("/api/entrepots"),
+    enabled: voitDelegues,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   });
 
   const filtres = livraisons.filter((l) => {
@@ -157,6 +182,78 @@ export default function LivraisonsPage() {
           {filtres.map((l) => (
             <LivraisonRow key={l.id} livraison={l} />
           ))}
+        </div>
+      )}
+
+      {/* ─── Entrepôts délégués ─────────────────────────────────────────── */}
+      {voitDelegues && entrepotsDelegues.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setDeleguesOuvert((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50 transition"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                <Warehouse size={14} className="text-amber-600" />
+              </div>
+              <span className="text-sm font-semibold text-gray-800">
+                Entrepôts délégués
+              </span>
+              <span className="text-xs bg-amber-100 text-amber-700 font-medium px-2 py-0.5 rounded-full">
+                {entrepotsDelegues.length}
+              </span>
+            </div>
+            <ChevronDown
+              size={15}
+              className={`text-gray-400 transition-transform ${deleguesOuvert ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {deleguesOuvert && (
+            <div className="border-t border-gray-100 divide-y divide-gray-50">
+              {entrepotsDelegues.map((e) => {
+                const stock = parseFloat(e.stockActuelKg ?? "0");
+                const capacite = parseFloat(e.capaciteMaxKg ?? "0");
+                const seuil = parseFloat(e.seuilAlerteKg ?? "0");
+                const pct = capacite > 0 ? Math.round((stock / capacite) * 100) : 0;
+                const alerteStock = seuil > 0 && stock >= seuil;
+                return (
+                  <div key={e.id} className="px-4 py-3 flex items-center gap-3">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        alerteStock ? "bg-orange-100" : "bg-green-50"
+                      }`}
+                    >
+                      <Warehouse size={14} className={alerteStock ? "text-orange-500" : "text-green-600"} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{e.nom}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {e.zoneNom && (
+                          <span className="text-xs text-gray-400 flex items-center gap-1">
+                            <MapPin size={9} /> {e.zoneNom}
+                          </span>
+                        )}
+                        {(e.delegueNom || e.deleguePrenoms) && (
+                          <span className="text-xs text-gray-400 flex items-center gap-1">
+                            <User size={9} /> {e.deleguePrenoms} {e.delegueNom}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className={`text-sm font-bold ${alerteStock ? "text-orange-600" : "text-gray-900"}`}>
+                        {stock.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} kg
+                      </p>
+                      {capacite > 0 && (
+                        <p className="text-xs text-gray-400 mt-0.5">{pct}% capacité</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

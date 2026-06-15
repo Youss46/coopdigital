@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Ship, Plus, Truck, AlertTriangle, CheckCircle2, Clock,
-  Package, MapPin, Filter, RefreshCw,
+  Package, MapPin, Filter, RefreshCw, Warehouse, ArrowRight,
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -19,6 +19,18 @@ async function apiFetch<T>(path: string, token: string | null): Promise<T> {
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json() as Promise<T>;
+}
+
+interface EntrepotDelegue {
+  id: number;
+  nom: string;
+  zoneNom: string | null;
+  stockActuelKg: string | null;
+  capaciteMaxKg: string | null;
+  seuilAlerteKg: string | null;
+  actif: boolean;
+  delegueNom: string | null;
+  deleguePrenoms: string | null;
 }
 
 interface ExpeditionRow {
@@ -55,7 +67,7 @@ const STATUT_CONFIG: Record<string, { label: string; color: string; icon: React.
 };
 
 export default function ExpeditionsPage() {
-  const { token } = useAuth();
+  const { token, utilisateur } = useAuth();
   const [filtreStatut, setFiltreStatut] = useState("tous");
   const [filtrePort, setFiltrePort] = useState("tous");
   const [filtreType, setFiltreType] = useState("tous");
@@ -67,6 +79,8 @@ export default function ExpeditionsPage() {
 
   const queryString = params.toString();
 
+  const voitDelegues = ["pca", "directeur", "magasinier", "comptable", "auditeur"].includes(utilisateur?.role ?? "");
+
   const { data: expeditions = [], isLoading, refetch } = useQuery<ExpeditionRow[]>({
     queryKey: ["expeditions", filtreStatut, filtrePort, filtreType],
     queryFn: () => apiFetch(`/api/expeditions${queryString ? `?${queryString}` : ""}`, token),
@@ -75,6 +89,13 @@ export default function ExpeditionsPage() {
   const { data: stats } = useQuery<Stats>({
     queryKey: ["expeditions-stats"],
     queryFn: () => apiFetch("/api/expeditions/stats", token),
+  });
+
+  const { data: entrepotsDelegues = [] } = useQuery<EntrepotDelegue[]>({
+    queryKey: ["entrepots-delegues-expeditions"],
+    queryFn: () => apiFetch("/api/entrepots", token),
+    enabled: voitDelegues,
+    staleTime: 60_000,
   });
 
   const formatPoids = (kg?: string) => {
@@ -148,6 +169,71 @@ export default function ExpeditionsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ─── Entrepôts délégués — stocks disponibles ─────────────────────── */}
+      {voitDelegues && entrepotsDelegues.filter((e) => parseFloat(e.stockActuelKg ?? "0") > 0).length > 0 && (
+        <Card className="border-amber-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
+              <Warehouse className="h-4 w-4 text-amber-600" />
+              Stocks en entrepôts délégués
+              <span className="ml-auto text-xs font-normal text-amber-600">
+                En attente de transfert vers le magasin central
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-amber-50">
+              {entrepotsDelegues
+                .filter((e) => parseFloat(e.stockActuelKg ?? "0") > 0)
+                .map((e) => {
+                  const stock = parseFloat(e.stockActuelKg ?? "0");
+                  const capacite = parseFloat(e.capaciteMaxKg ?? "0");
+                  const seuil = parseFloat(e.seuilAlerteKg ?? "0");
+                  const pct = capacite > 0 ? Math.round((stock / capacite) * 100) : 0;
+                  const haute = seuil > 0 && stock >= seuil;
+                  return (
+                    <div key={e.id} className="px-4 py-3 flex items-center gap-3">
+                      <div className={`p-1.5 rounded-lg ${haute ? "bg-orange-100" : "bg-amber-50"}`}>
+                        <Warehouse className={`h-4 w-4 ${haute ? "text-orange-500" : "text-amber-600"}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{e.nom}</p>
+                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                          {e.zoneNom && <><MapPin className="h-3 w-3" />{e.zoneNom} · </>}
+                          {e.deleguePrenoms} {e.delegueNom}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className={`text-sm font-bold ${haute ? "text-orange-600" : "text-gray-900"}`}>
+                          {stock.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} kg
+                        </p>
+                        {capacite > 0 && (
+                          <p className="text-xs text-gray-400">{pct}% capacité</p>
+                        )}
+                      </div>
+                      {haute && (
+                        <div className="flex-shrink-0">
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
+                            <ArrowRight className="h-3 w-3" /> Transférer
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              <div className="px-4 py-2 bg-amber-50 flex items-center justify-between">
+                <span className="text-xs text-amber-700 font-medium">Total disponible</span>
+                <span className="text-sm font-bold text-amber-800">
+                  {entrepotsDelegues
+                    .reduce((s, e) => s + parseFloat(e.stockActuelKg ?? "0"), 0)
+                    .toLocaleString("fr-FR", { maximumFractionDigits: 0 })} kg
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filtres */}
       <Card>
