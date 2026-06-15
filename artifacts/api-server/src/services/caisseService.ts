@@ -1,7 +1,8 @@
-import { db, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, ecrituresComptablesTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, comptesBancairesTable, mouvementsBanqueTable } from "@workspace/db";
+import { db, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, comptesBancairesTable, mouvementsBanqueTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
+import { proposerEcriture } from "./comptabiliteService.js";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 
 
@@ -208,24 +209,17 @@ export async function enregistrerMouvement(
     .set({ soldeActuelFcfa: nouveauSolde.toString() })
     .where(eq(caissesTable.id, caisseId));
 
-  // Écriture comptable — insertion directe (source "caisse" hors enum SourceEcriture)
-  try {
-    const comptes = comptesForMouvement(data.type, data.motif);
-    const exercice = new Date().getFullYear();
-    await db.insert(ecrituresComptablesTable).values({
-      cooperativeId: caisse.cooperativeId,
-      dateEcriture:  today(),
-      libelle:       data.libelle ?? `Caisse — ${data.motif}`,
-      compteDebit:   comptes.debit,
-      compteCredit:  comptes.credit,
-      montantFcfa:   montant,
-      source:        "manuel" as "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock",
-      sourceId:      mouvement?.id ?? null,
-      exercice,
-    });
-  } catch (err) {
-    logger.warn({ err }, "Écriture comptable caisse non enregistrée");
-  }
+  // Écriture comptable
+  const comptes = comptesForMouvement(data.type, data.motif);
+  proposerEcriture(caisse.cooperativeId, {
+    source:      "caisse",
+    sourceId:    mouvement?.id ?? undefined,
+    libelle:     data.libelle ?? `Caisse — ${data.motif}`,
+    compteDebit: comptes.debit,
+    compteCredit:comptes.credit,
+    montantFcfa: montant,
+    date:        today(),
+  }).catch((err) => logger.warn({ err }, "Écriture comptable caisse non enregistrée"));
 
   // Alerte fond minimum
   const fondMin = parseFloat(caisse.fondCaisseMinimumFcfa as string);
@@ -306,24 +300,18 @@ export async function transfererFonds(
   ]);
 
   // Écritures comptables OHADA — compte 585 (virements internes de fonds)
-  try {
-    await Promise.all([
-      db.insert(ecrituresComptablesTable).values({
-        cooperativeId, dateEcriture: dateAujourd,
-        libelle: lib, compteDebit: "585", compteCredit: "571",
-        montantFcfa: mt, source: "manuel" as const,
-        sourceId: mvtSrc[0]?.id ?? null, exercice: new Date().getFullYear(),
-      }),
-      db.insert(ecrituresComptablesTable).values({
-        cooperativeId, dateEcriture: dateAujourd,
-        libelle: libDest, compteDebit: "571", compteCredit: "585",
-        montantFcfa: mt, source: "manuel" as const,
-        sourceId: mvtDest[0]?.id ?? null, exercice: new Date().getFullYear(),
-      }),
-    ]);
-  } catch (err) {
-    logger.warn({ err }, "Écritures comptables transfert non enregistrées");
-  }
+  Promise.all([
+    proposerEcriture(cooperativeId, {
+      source: "caisse", sourceId: mvtSrc[0]?.id ?? undefined,
+      libelle: lib, compteDebit: "585", compteCredit: "571",
+      montantFcfa: mt, date: dateAujourd,
+    }),
+    proposerEcriture(cooperativeId, {
+      source: "caisse", sourceId: mvtDest[0]?.id ?? undefined,
+      libelle: libDest, compteDebit: "571", compteCredit: "585",
+      montantFcfa: mt, date: dateAujourd,
+    }),
+  ]).catch((err) => logger.warn({ err }, "Écritures comptables transfert non enregistrées"));
 
   logger.info({ ref, sourceCaisseId, destCaisseId, montant: mt }, "Transfert inter-caisses effectué");
   return { sourceNouveauSolde: nouveauSoldeSrc, destNouveauSolde: nouveauSoldeDest };
@@ -593,21 +581,13 @@ export async function virementVersBanque(
   });
 
   // 3. Écriture OHADA : 521 Débit / 571 Crédit
-  try {
-    await db.insert(ecrituresComptablesTable).values({
-      cooperativeId,
-      dateEcriture:  dateOp,
-      libelle:       lib,
-      compteDebit:   "521",
-      compteCredit:  "571",
-      montantFcfa:   mt,
-      source:        "manuel" as const,
-      sourceId:      result.mvtBanque.id,
-      exercice:      new Date().getFullYear(),
-    });
-  } catch (err) {
-    logger.warn({ err }, "Écriture comptable virement caisse-banque non enregistrée");
-  }
+  proposerEcriture(cooperativeId, {
+    source:      "caisse",
+    sourceId:    result.mvtBanque.id,
+    libelle:     lib,
+    compteDebit: "521", compteCredit: "571",
+    montantFcfa: mt, date: dateOp,
+  }).catch((err) => logger.warn({ err }, "Écriture comptable virement caisse-banque non enregistrée"));
 
   return {
     mouvement_caisse: result.mvtCaisse.id,

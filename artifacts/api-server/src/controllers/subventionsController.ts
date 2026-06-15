@@ -6,8 +6,8 @@ import {
   tranchesSubventionTable,
   lignesBudgetSubventionTable,
   rapportsBailleursTable,
-  ecrituresComptablesTable,
 } from "@workspace/db";
+import { proposerEcriture } from "../services/comptabiliteService.js";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
 
 class TenantError extends Error {
@@ -221,17 +221,14 @@ export async function enregistrerTranche(req: Request, res: Response): Promise<v
     .where(eq(subventionsTable.id, id));
 
   // Écriture comptable : Débit 521 (Banque) / Crédit 141 (Subventions reçues)
-  await db.insert(ecrituresComptablesTable).values({
-    cooperativeId: coopId(req),
-    libelle:       `Réception tranche subvention - ${sub.reference}`,
-    compteDebit:   "521",
-    compteCredit:  "141",
-    montantFcfa:   Math.round(montant),
-    dateEcriture:  new Date().toISOString().slice(0, 10),
-    exercice:      new Date().getFullYear(),
-    source:        "encaissement",
-    sourceId:      id,
-  });
+  proposerEcriture(coopId(req), {
+    source:      "subvention",
+    sourceId:    id,
+    libelle:     `Réception tranche subvention - ${sub.reference}`,
+    compteDebit: "521", compteCredit: "141",
+    montantFcfa: Math.round(montant),
+    date:        new Date().toISOString().slice(0, 10),
+  }).catch((err) => req.log.warn({ err }, "Écriture comptable subvention non enregistrée"));
 
   req.log.info({ subventionId: id, montant }, "Tranche subvention enregistrée");
   res.json({ ok: true, montantRecuFcfa: nouvelleRecus, montantSoldeFcfa: nouveauSolde });

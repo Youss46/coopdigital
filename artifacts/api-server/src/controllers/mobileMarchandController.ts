@@ -4,8 +4,8 @@ import {
   comptesMobilesMarchandsTable, mouvementsMobileMarchandTable,
   comptesBancairesTable, mouvementsBanqueTable,
   caissesTable, sessionsCaisseTable, mouvementsCaisseTable,
-  ecrituresComptablesTable,
 } from "@workspace/db";
+import { proposerEcriture } from "../services/comptabiliteService.js";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
@@ -319,23 +319,16 @@ export async function postVirementBanque(req: Request, res: Response): Promise<v
     // Écriture comptable OHADA
     // banque_vers_mobile : 572 Débit / 521 Crédit
     // mobile_vers_banque : 521 Débit / 572 Crédit
-    try {
-      await db.insert(ecrituresComptablesTable).values({
-        cooperativeId: cid,
-        dateEcriture:  dateOp,
-        libelle:       libelle ?? (direction === "banque_vers_mobile"
-          ? `Appro mobile depuis ${compteBancaire.nom}`
-          : `Reversement banque depuis ${compteMobile.nom}`),
-        compteDebit:   direction === "banque_vers_mobile" ? "572" : "521",
-        compteCredit:  direction === "banque_vers_mobile" ? "521" : "572",
-        montantFcfa:   montantFcfa,
-        source:        "manuel" as const,
-        sourceId:      result.mvtMobile.id,
-        exercice:      new Date().getFullYear(),
-      });
-    } catch (err) {
-      logger.warn({ err }, "Écriture comptable virement mobile-banque non enregistrée");
-    }
+    proposerEcriture(cid, {
+      source:      "mobile_marchand",
+      sourceId:    result.mvtMobile.id,
+      libelle:     libelle ?? (direction === "banque_vers_mobile"
+        ? `Appro mobile depuis ${compteBancaire.nom}`
+        : `Reversement banque depuis ${compteMobile.nom}`),
+      compteDebit:  direction === "banque_vers_mobile" ? "572" : "521",
+      compteCredit: direction === "banque_vers_mobile" ? "521" : "572",
+      montantFcfa:  montantFcfa, date: dateOp,
+    }).catch((err) => logger.warn({ err }, "Écriture comptable virement mobile-banque non enregistrée"));
 
     res.status(201).json({
       mouvement_banque:  result.mvtBanque.id,
@@ -510,21 +503,14 @@ export async function postVirementCaisse(req: Request, res: Response): Promise<v
     // 5. Écriture comptable OHADA
     // caisse_vers_mobile : 572 Débit / 571 Crédit
     // mobile_vers_caisse : 571 Débit / 572 Crédit
-    try {
-      await db.insert(ecrituresComptablesTable).values({
-        cooperativeId: cid,
-        dateEcriture:  dateOp,
-        libelle:       libelle ?? (sens === "caisse_vers_mobile" ? `Appro mobile depuis ${caisse.nom}` : `Reversement caisse depuis ${compteMobile.nom}`),
-        compteDebit:   sens === "caisse_vers_mobile" ? "572" : "571",
-        compteCredit:  sens === "caisse_vers_mobile" ? "571" : "572",
-        montantFcfa:   montantFcfa,
-        source:        "manuel" as const,
-        sourceId:      result.mvtMobile.id,
-        exercice:      new Date().getFullYear(),
-      });
-    } catch (err) {
-      logger.warn({ err }, "Écriture comptable virement caisse-mobile non enregistrée");
-    }
+    proposerEcriture(cid, {
+      source:      "mobile_marchand",
+      sourceId:    result.mvtMobile.id,
+      libelle:     libelle ?? (sens === "caisse_vers_mobile" ? `Appro mobile depuis ${caisse.nom}` : `Reversement caisse depuis ${compteMobile.nom}`),
+      compteDebit:  sens === "caisse_vers_mobile" ? "572" : "571",
+      compteCredit: sens === "caisse_vers_mobile" ? "571" : "572",
+      montantFcfa:  montantFcfa, date: dateOp,
+    }).catch((err) => logger.warn({ err }, "Écriture comptable virement caisse-mobile non enregistrée"));
 
     res.status(201).json({
       mouvement_caisse: result.mvtCaisse.id,

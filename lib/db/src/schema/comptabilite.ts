@@ -80,6 +80,10 @@ export const configComptableTable = pgTable("config_comptable", {
   autoInvestissements: boolean("auto_investissements").notNull().default(false),
   autoMaintenances:    boolean("auto_maintenances").notNull().default(false),
   autoIntrants:        boolean("auto_intrants").notNull().default(false),
+  autoCaisse:          boolean("auto_caisse").notNull().default(false),
+  autoBanque:          boolean("auto_banque").notNull().default(false),
+  autoSubventions:     boolean("auto_subventions").notNull().default(false),
+  autoMobileMarchand:  boolean("auto_mobile_marchand").notNull().default(false),
   modifiePar:          integer("modifie_par"),
   updatedAt:           timestamp("updated_at", { withTimezone: true }),
 });

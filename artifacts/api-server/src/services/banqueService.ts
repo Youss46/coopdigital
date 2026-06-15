@@ -1,6 +1,7 @@
-import { db, comptesBancairesTable, mouvementsBanqueTable, ecrituresComptablesTable, caissesTable, mouvementsCaisseTable } from "@workspace/db";
+import { db, comptesBancairesTable, mouvementsBanqueTable, caissesTable, mouvementsCaisseTable } from "@workspace/db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { proposerEcriture } from "./comptabiliteService.js";
 
 // ─── Mapping motif → comptes OHADA ────────────────────────────────────────────
 // Crédit banque (argent entrant) : Débit 521 / Crédit [compte source]
@@ -159,23 +160,16 @@ export async function enregistrerMouvement(
     .where(eq(comptesBancairesTable.id, compteId));
 
   // Écriture comptable OHADA 521
-  try {
-    const comptes  = comptesForMouvement(data.type, data.motif);
-    const exercice = new Date().getFullYear();
-    await db.insert(ecrituresComptablesTable).values({
-      cooperativeId,
-      dateEcriture: dateOp,
-      libelle:      data.libelle ?? `Banque — ${data.motif}`,
-      compteDebit:  comptes.debit,
-      compteCredit: comptes.credit,
-      montantFcfa:  montant,
-      source:       "manuel" as "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock",
-      sourceId:     mouvement?.id ?? null,
-      exercice,
-    });
-  } catch (err) {
-    logger.warn({ err }, "Écriture comptable banque non enregistrée");
-  }
+  const comptes = comptesForMouvement(data.type, data.motif);
+  proposerEcriture(cooperativeId, {
+    source:       "banque",
+    sourceId:     mouvement?.id ?? undefined,
+    libelle:      data.libelle ?? `Banque — ${data.motif}`,
+    compteDebit:  comptes.debit,
+    compteCredit: comptes.credit,
+    montantFcfa:  montant,
+    date:         dateOp,
+  }).catch((err) => logger.warn({ err }, "Écriture comptable banque non enregistrée"));
 
   const soldeMini = parseFloat(compte.soldeMiniAlerteFcfa as string);
   let alerte: string | undefined;
@@ -368,21 +362,13 @@ export async function virementVersCaisse(
   });
 
   // Écriture comptable OHADA : 571 (Caisse) Débit / 521 (Banque) Crédit
-  try {
-    await db.insert(ecrituresComptablesTable).values({
-      cooperativeId,
-      dateEcriture:  dateOp,
-      libelle:       data.libelle ?? `Virement banque vers caisse ${caisse.nom}`,
-      compteDebit:   "571",
-      compteCredit:  "521",
-      montantFcfa:   data.montantFcfa,
-      source:        "manuel" as const,
-      sourceId:      result.mvtCaisse.id,
-      exercice:      new Date().getFullYear(),
-    });
-  } catch (err) {
-    logger.warn({ err }, "Écriture comptable virement banque→caisse non enregistrée");
-  }
+  proposerEcriture(cooperativeId, {
+    source:      "banque",
+    sourceId:    result.mvtCaisse.id,
+    libelle:     data.libelle ?? `Virement banque vers caisse ${caisse.nom}`,
+    compteDebit: "571", compteCredit: "521",
+    montantFcfa: data.montantFcfa, date: dateOp,
+  }).catch((err) => logger.warn({ err }, "Écriture comptable virement banque→caisse non enregistrée"));
 
   return {
     mouvement_banque:  result.mvtBanque.id,
