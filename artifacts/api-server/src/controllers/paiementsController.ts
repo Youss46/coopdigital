@@ -74,8 +74,72 @@ async function debiterCompteMobileMarchandPaiement(
         .set({ soldeActuelFcfa: newSolde.toString() })
         .where(eq(comptesMobilesMarchandsTable.id, compte.id));
     });
+
+    // Notifier si le solde passe sous le seuil minimum configuré (soldeMiniAlerteFcfa > 0)
+    const seuilMini = parseFloat(compte.soldeMiniAlerteFcfa as string);
+    if (seuilMini > 0 && newSolde < seuilMini) {
+      void notifierCompteMobileSousSeuil(
+        cooperativeId,
+        compte.id,
+        compte.nom,
+        operateur,
+        newSolde,
+        paiementId,
+      );
+    }
   } catch (err) {
     logger.warn({ err, paiementId }, "Débit automatique compte Mobile Marchand non effectué");
+  }
+}
+
+// ─── Helper : notification compte Mobile Marchand sous seuil ────────────────
+
+const OPERATEUR_LABEL: Record<string, string> = {
+  orange_money: "Orange Money",
+  mtn_momo:     "MTN MoMo",
+  wave:         "Wave",
+};
+
+async function notifierCompteMobileSousSeuil(
+  cooperativeId: number,
+  compteId: number,
+  compteNom: string,
+  operateur: string,
+  soldeActuel: number,
+  paiementId: number,
+): Promise<void> {
+  const soldeFormate   = new Intl.NumberFormat("fr-FR").format(soldeActuel);
+  const operateurLabel = OPERATEUR_LABEL[operateur] ?? operateur;
+  try {
+    // In-app : Directeur + PCA
+    await notifierParRole(cooperativeId, ["directeur", "pca"], {
+      type:         "anomalie_critique",
+      titre:        `⚠️ Compte ${operateurLabel} sous le seuil minimum`,
+      message:      `Le solde du compte ${compteNom} (${operateurLabel}) est tombé à ${soldeFormate} FCFA suite au paiement #${paiementId}. Pensez à recharger le compte.`,
+      gravite:      "critique",
+      sourceModule: "caisse",
+      sourceId:     compteId,
+    });
+    // Push : mêmes rôles
+    const destinataires = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.cooperativeId, cooperativeId),
+          eq(usersTable.actif, true),
+          inArray(usersTable.role, ["directeur", "pca"] as any[]),
+        ),
+      );
+    if (destinataires.length > 0) {
+      void envoyerPushGroupe(destinataires.map((u) => u.id), {
+        title: `⚠️ ${operateurLabel} — seuil minimum atteint`,
+        body:  `Solde : ${soldeFormate} FCFA — ${compteNom}`,
+        url:   "/caisse",
+      });
+    }
+  } catch (err) {
+    logger.warn({ err, cooperativeId, compteId }, "Notification solde Mobile Marchand non envoyée");
   }
 }
 
