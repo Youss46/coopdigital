@@ -463,6 +463,7 @@ export default function EntrepotsPage() {
                           <th className="px-4 py-3 text-right">Arrivée</th>
                           <th className="px-4 py-3 text-right">Écart</th>
                           <th className="px-4 py-3 text-center">Statut</th>
+                          <th className="px-4 py-3 text-center hidden lg:table-cell">Stock central</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -470,6 +471,7 @@ export default function EntrepotsPage() {
                           const ecart = t.ecartKg ? parseFloat(t.ecartKg) : null;
                           const dep = t.poidsDepart_kg ? parseFloat(t.poidsDepart_kg) : null;
                           const pctEc = dep && ecart ? Math.abs(ecart / dep * 100) : null;
+                          const lienStock = `/stocks?tab=journal&q=${encodeURIComponent(t.numeroTransfert)}`;
                           return (
                             <tr key={t.id} className="hover:bg-gray-50">
                               <td className="px-4 py-3 font-mono font-medium text-gray-800">{t.numeroTransfert}</td>
@@ -487,7 +489,36 @@ export default function EntrepotsPage() {
                                   </span>
                                 ) : "—"}
                               </td>
-                              <td className="px-4 py-3 text-center"><StatutBadge statut={t.statut} /></td>
+                              <td className="px-4 py-3 text-center">
+                                <StatutBadge statut={t.statut} />
+                                {t.statut === "confirme" && (
+                                  <a
+                                    href={lienStock}
+                                    className="mt-1.5 flex items-center justify-center gap-1 text-xs text-green-700 hover:text-green-900 hover:underline"
+                                    title="Voir l'entrée dans le stock central"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Entrée créée
+                                  </a>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-center hidden lg:table-cell">
+                                {t.statut === "confirme" ? (
+                                  <a
+                                    href={lienStock}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                                    title="Voir le mouvement correspondant dans la page Stocks"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    Voir dans Stocks
+                                    <ArrowRight className="w-3 h-3" />
+                                  </a>
+                                ) : t.statut === "litige" ? (
+                                  <span className="text-xs text-gray-400 italic">Non créée (litige)</span>
+                                ) : (
+                                  <span className="text-xs text-gray-300">—</span>
+                                )}
+                              </td>
                             </tr>
                           );
                         })}

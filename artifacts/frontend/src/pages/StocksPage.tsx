@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useGetEntrepots,
   useGetMouvementsStock,
@@ -12,7 +12,7 @@ import {
   getGetStockAlertesQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle, PackageCheck, Clock, ArrowRight } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 
@@ -48,10 +48,22 @@ interface LotissementStats {
 export default function StocksPage() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const peutEntree = usePermission("stocks", "entree");
   const peutSortie = usePermission("stocks", "sortie");
   const [onglet, setOnglet] = useState<"entrepots" | "journal">("entrepots");
+  const [filtreTransfert, setFiltreTransfert] = useState<string>("");
   const [modalMouvement, setModalMouvement] = useState<"entree" | "sortie" | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const tab = params.get("tab");
+    const q = params.get("q") ?? "";
+    if (tab === "journal") {
+      setOnglet("journal");
+      setFiltreTransfert(q);
+    }
+  }, [search]);
   const [form, setForm] = useState({ entrepotId: "", poidsKg: "", motif: "" });
   const [modalEntrepot, setModalEntrepot] = useState(false);
   const [formEntrepot, setFormEntrepot] = useState({ nom: "", ville: "", capaciteKg: "", seuilAlerteKg: "" });
@@ -333,53 +345,80 @@ export default function StocksPage() {
 
       {/* Journal mouvements */}
       {onglet === "journal" && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Type</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Entrepôt</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Poids</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">Motif</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mouvements.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                      Aucun mouvement enregistré
-                    </td>
+        <div className="space-y-3">
+          {filtreTransfert && (
+            <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-800">
+              <TrendingUp size={14} className="shrink-0" />
+              <span>Entrée automatique pour le transfert <span className="font-mono font-semibold">{filtreTransfert}</span> mise en évidence</span>
+              <button onClick={() => setFiltreTransfert("")} className="ml-auto text-green-600 hover:text-green-800 font-medium text-xs">✕ Effacer</button>
+            </div>
+          )}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="text-left px-4 py-3 font-medium text-gray-500">Type</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500">Entrepôt</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500">Poids</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">Motif</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">Date</th>
                   </tr>
-                ) : (
-                  mouvements.map((m) => (
-                    <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <span
-                          className={`flex items-center gap-1.5 text-xs font-medium ${
-                            m.type === "entree" ? "text-green-700" : "text-red-600"
-                          }`}
-                        >
-                          {m.type === "entree" ? (
-                            <TrendingUp size={13} />
-                          ) : (
-                            <TrendingDown size={13} />
-                          )}
-                          {m.type === "entree" ? "Entrée" : "Sortie"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">{m.entrepotNom ?? "—"}</td>
-                      <td className="px-4 py-3 font-semibold text-gray-900">{formaterPoids(m.poidsKg)}</td>
-                      <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">{m.motif ?? "—"}</td>
-                      <td className="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">
-                        {formaterDate(m.createdAt)}
+                </thead>
+                <tbody>
+                  {mouvements.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                        Aucun mouvement enregistré
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    mouvements.map((m) => {
+                      const estSurbrillance = filtreTransfert
+                        ? (m.motif ?? "").includes(filtreTransfert)
+                        : false;
+                      return (
+                        <tr
+                          key={m.id}
+                          className={`border-b border-gray-50 transition-colors ${
+                            estSurbrillance
+                              ? "bg-green-50 border-l-4 border-l-green-500"
+                              : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <td className="px-4 py-3">
+                            <span
+                              className={`flex items-center gap-1.5 text-xs font-medium ${
+                                m.type === "entree" ? "text-green-700" : "text-red-600"
+                              }`}
+                            >
+                              {m.type === "entree" ? (
+                                <TrendingUp size={13} />
+                              ) : (
+                                <TrendingDown size={13} />
+                              )}
+                              {m.type === "entree" ? "Entrée" : "Sortie"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">{m.entrepotNom ?? "—"}</td>
+                          <td className="px-4 py-3 font-semibold text-gray-900">{formaterPoids(m.poidsKg)}</td>
+                          <td className="px-4 py-3 hidden sm:table-cell">
+                            {estSurbrillance ? (
+                              <span className="text-green-700 font-medium">{m.motif ?? "—"}</span>
+                            ) : (
+                              <span className="text-gray-500">{m.motif ?? "—"}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">
+                            {formaterDate(m.createdAt)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
