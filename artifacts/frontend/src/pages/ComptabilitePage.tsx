@@ -2478,7 +2478,10 @@ export default function ComptabilitePage() {
       {showSaisie && (
         <ModalSaisieManuelle
           onClose={() => setShowSaisie(false)}
-          onSuccess={() => setShowSaisie(false)}
+          onSuccess={() => {
+            setShowSaisie(false);
+            setOnglet("journal");
+          }}
         />
       )}
     </div>
