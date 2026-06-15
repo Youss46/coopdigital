@@ -423,6 +423,7 @@ export default function ReglementsPage() {
   // Session Caisse Centrale (visible pour les rôles non-délégué — Directeur, PCA, Comptable)
   const { data: caissesNonDelegueData } = useQuery<Array<{
     type_caisse: string; nom: string;
+    solde_actuel_fcfa: string;
     session_id: number | null; session_statut: string | null;
   }>>({
     queryKey: ["caisse-centrale-session"],
@@ -434,6 +435,9 @@ export default function ReglementsPage() {
   const caisseCentrale = caissesNonDelegueData?.find((c) => c.type_caisse === "centrale");
   const sessionCentraleOuverte = caisseCentrale
     ? caisseCentrale.session_statut === "ouverte"
+    : null;
+  const soldeCaisseCentrale = caisseCentrale
+    ? parseFloat(caisseCentrale.solde_actuel_fcfa)
     : null;
 
   // Stats
@@ -536,9 +540,19 @@ export default function ReglementsPage() {
   const plusPetitMontant = paiementsEnAttente.length > 0
     ? Math.min(...paiementsEnAttente.map((p) => p.montantNetFcfa ?? p.montantFcfa ?? 0))
     : null;
+  const totalEspecesEnAttente = paiementsEnAttente.reduce(
+    (acc, p) => acc + (p.montantNetFcfa ?? p.montantFcfa ?? 0), 0,
+  );
   const soldeCaisse = caisseDelegue?.caisse?.solde ?? null;
   const alerteSolde = isDelegue && soldeCaisse !== null && plusPetitMontant !== null && soldeCaisse < plusPetitMontant;
   const soldeSuffisant = isDelegue && soldeCaisse !== null && plusPetitMontant !== null && soldeCaisse >= plusPetitMontant;
+  // Alerte solde Caisse Centrale insuffisant (non-délégué)
+  const alerteSoldeCentrale = !isDelegue && sessionCentraleOuverte === true
+    && soldeCaisseCentrale !== null && plusPetitMontant !== null
+    && soldeCaisseCentrale < plusPetitMontant;
+  const soldeCentraleSuffisant = !isDelegue && sessionCentraleOuverte === true
+    && soldeCaisseCentrale !== null
+    && (plusPetitMontant === null || soldeCaisseCentrale >= plusPetitMontant);
 
   return (
     <div className="space-y-5">
@@ -600,7 +614,7 @@ export default function ReglementsPage() {
         </div>
       )}
 
-      {/* ── Alerte session Caisse Centrale fermée (non-délégué) ── */}
+      {/* ── Caisse Centrale : session fermée (alerte ambre) ── */}
       {!isDelegue && peutValider && caisseCentrale && sessionCentraleOuverte === false && (
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3.5">
           <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
@@ -616,6 +630,55 @@ export default function ReglementsPage() {
               Ouvrez la session depuis le module <strong>Caisse</strong> pour activer le débit automatique.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* ── Caisse Centrale : solde temps réel (session ouverte) ── */}
+      {!isDelegue && peutValider && caisseCentrale && sessionCentraleOuverte === true && (
+        <div
+          className={`rounded-xl border px-5 py-4 flex items-center gap-4 ${
+            alerteSoldeCentrale
+              ? "bg-red-50 border-red-200"
+              : soldeCentraleSuffisant
+              ? "bg-green-50 border-green-200"
+              : "bg-white border-gray-200"
+          }`}
+        >
+          <div
+            className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+              alerteSoldeCentrale ? "bg-red-100" : soldeCentraleSuffisant ? "bg-green-100" : "bg-gray-100"
+            }`}
+          >
+            <Wallet
+              size={18}
+              className={alerteSoldeCentrale ? "text-red-600" : soldeCentraleSuffisant ? "text-green-700" : "text-gray-500"}
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-500 font-medium">{caisseCentrale.nom} — solde disponible</p>
+            <p className={`text-xl font-bold ${alerteSoldeCentrale ? "text-red-700" : "text-gray-900"}`}>
+              {new Intl.NumberFormat("fr-FR").format(soldeCaisseCentrale ?? 0)}{" "}
+              <span className="text-sm font-normal text-gray-500">FCFA</span>
+            </p>
+            {paiementsEnAttente.length > 0 && (
+              <p className="text-xs text-gray-400 mt-0.5">
+                Total espèces en attente : {new Intl.NumberFormat("fr-FR").format(totalEspecesEnAttente)} FCFA
+                ({paiementsEnAttente.length} paiement{paiementsEnAttente.length > 1 ? "s" : ""})
+              </p>
+            )}
+          </div>
+          {alerteSoldeCentrale && (
+            <div className="flex items-center gap-1.5 text-red-600 text-xs font-medium flex-shrink-0">
+              <AlertTriangle size={14} />
+              <span>Fonds insuffisants</span>
+            </div>
+          )}
+          {soldeCentraleSuffisant && !alerteSoldeCentrale && paiementsEnAttente.length > 0 && (
+            <div className="flex items-center gap-1.5 text-green-700 text-xs font-medium flex-shrink-0">
+              <CheckCircle2 size={14} />
+              <span>Fonds disponibles</span>
+            </div>
+          )}
         </div>
       )}
 
