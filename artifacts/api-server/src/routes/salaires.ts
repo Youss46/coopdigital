@@ -9,6 +9,9 @@ import {
   archiverPersonnel,
   getPersonnelHistorique,
   listComposantes,
+  createComposante,
+  updateComposante,
+  deleteComposante,
   genererBulletins,
   listBulletins,
   getBulletinById,
@@ -62,11 +65,10 @@ router.delete(
 );
 
 // ─── Composantes ─────────────────────────────────────────────────────────────
-router.get(
-  "/salaires/composantes",
-  checkPermission("salaires", "lire"),
-  listComposantes,
-);
+router.get(   "/salaires/composantes",     checkPermission("salaires", "lire"),              listComposantes);
+router.post(  "/salaires/composantes",     checkPermission("salaires", "modifier_personnel"), createComposante);
+router.put(   "/salaires/composantes/:id", checkPermission("salaires", "modifier_personnel"), updateComposante);
+router.delete("/salaires/composantes/:id", checkPermission("salaires", "modifier_personnel"), deleteComposante);
 
 // ─── Bulletins ────────────────────────────────────────────────────────────────
 router.post(

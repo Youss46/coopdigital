@@ -4,7 +4,7 @@ import {
   Users, FileText, BarChart2, CreditCard, Settings,
   Plus, RefreshCw, CheckCircle, Banknote,
   Loader2, ChevronDown, TrendingUp, Building2,
-  UserCheck, AlertCircle, FileDown, Save, Info,
+  UserCheck, AlertCircle, FileDown, Save, Info, Pencil, Trash2,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -1665,6 +1665,221 @@ function TabConfigPaie() {
       <p className="text-xs text-gray-400">
         Ces paramètres s&apos;appliquent aux prochains bulletins générés. Les bulletins déjà existants ne sont pas recalculés.
       </p>
+
+      {/* Composantes personnalisées */}
+      <ComposantesEditor canEdit={canEdit} />
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  COMPOSANTES PERSONNALISÉES
+// ══════════════════════════════════════════════════════════════════════════════
+
+type Composante = {
+  id: number; libelle: string; type: "avantage" | "retenue";
+  calcul: "fixe" | "pourcentage"; valeur: number; obligatoire: boolean;
+};
+
+type ComposanteForm = Omit<Composante, "id" | "obligatoire">;
+
+const COMP_BLANK: ComposanteForm = { libelle: "", type: "avantage", calcul: "fixe", valeur: 0 };
+
+function valeurLabel(c: Pick<Composante, "calcul" | "valeur">) {
+  return c.calcul === "fixe"
+    ? `${c.valeur.toLocaleString("fr-FR")} FCFA`
+    : `${(c.valeur / 100).toFixed(2)} % du brut`;
+}
+
+function ComposantesEditor({ canEdit }: { canEdit: boolean }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [form, setForm] = useState<ComposanteForm>(COMP_BLANK);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  const { data: composantes = [], isLoading } = useQuery<Composante[]>({
+    queryKey: ["composantes"],
+    queryFn: () => apiFetchSalaires<Composante[]>("/api/salaires/composantes"),
+  });
+
+  const invalidate = () => void qc.invalidateQueries({ queryKey: ["composantes"] });
+
+  const saveMut = useMutation({
+    mutationFn: (data: ComposanteForm) =>
+      editId !== null
+        ? apiFetchSalaires(`/api/salaires/composantes/${editId}`, { method: "PUT", body: JSON.stringify(data) })
+        : apiFetchSalaires("/api/salaires/composantes", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      invalidate();
+      setShowForm(false); setEditId(null); setForm(COMP_BLANK);
+      toast({ title: editId !== null ? "Composante mise à jour" : "Composante ajoutée" });
+    },
+    onError: () => toast({ title: "Erreur", description: "Impossible d'enregistrer", variant: "destructive" }),
+  });
+
+  const delMut = useMutation({
+    mutationFn: (id: number) =>
+      apiFetchSalaires(`/api/salaires/composantes/${id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); setDeleteId(null); toast({ title: "Composante supprimée" }); },
+    onError: (err: Error) => toast({ title: "Erreur", description: err.message, variant: "destructive" }),
+  });
+
+  const startEdit = (c: Composante) => {
+    setEditId(c.id);
+    setForm({ libelle: c.libelle, type: c.type, calcul: c.calcul, valeur: c.valeur });
+    setShowForm(true);
+  };
+  const cancelForm = () => { setShowForm(false); setEditId(null); setForm(COMP_BLANK); };
+
+  const avantages = composantes.filter((c) => c.type === "avantage");
+  const retenues  = composantes.filter((c) => c.type === "retenue");
+
+  const typeColor = (t: "avantage" | "retenue") =>
+    t === "avantage" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700";
+
+  return (
+    <div className="space-y-4 pt-4 border-t border-gray-100">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">Composantes personnalisées</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Avantages et retenues propres à la coopérative, appliqués automatiquement sur chaque bulletin.
+          </p>
+        </div>
+        {canEdit && !showForm && (
+          <button
+            onClick={() => { setEditId(null); setForm(COMP_BLANK); setShowForm(true); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-700 border border-green-200 rounded-lg hover:bg-green-50"
+          >
+            <Plus className="h-4 w-4" /> Ajouter
+          </button>
+        )}
+      </div>
+
+      {/* Formulaire inline */}
+      {showForm && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-4">
+          <p className="text-sm font-medium text-gray-800">{editId !== null ? "Modifier la composante" : "Nouvelle composante"}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">Libellé *</label>
+              <input
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Ex : Prime de transport"
+                value={form.libelle}
+                onChange={(e) => setForm((f) => ({ ...f, libelle: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600">Type</label>
+              <select
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                value={form.type}
+                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as "avantage" | "retenue" }))}
+              >
+                <option value="avantage">Avantage (↑ net)</option>
+                <option value="retenue">Retenue (↓ net)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600">Mode de calcul</label>
+              <select
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                value={form.calcul}
+                onChange={(e) => setForm((f) => ({ ...f, calcul: e.target.value as "fixe" | "pourcentage" }))}
+              >
+                <option value="fixe">Montant fixe (FCFA)</option>
+                <option value="pourcentage">Pourcentage du brut</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">
+                {form.calcul === "fixe" ? "Montant (FCFA)" : "Taux (%)"}
+              </label>
+              <input
+                type="number"
+                step={form.calcul === "fixe" ? "1" : "0.01"}
+                min="0"
+                className="mt-1 w-40 border border-gray-200 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-500"
+                value={form.calcul === "fixe" ? form.valeur : (form.valeur / 100).toFixed(2)}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value || "0");
+                  setForm((f) => ({ ...f, valeur: form.calcul === "fixe" ? Math.round(v) : Math.round(v * 100) }));
+                }}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={() => saveMut.mutate(form)}
+              disabled={saveMut.isPending || !form.libelle.trim()}
+              className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              {saveMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {editId !== null ? "Mettre à jour" : "Enregistrer"}
+            </button>
+            <button onClick={cancelForm} className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700">Annuler</button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation suppression */}
+      {deleteId !== null && (() => {
+        const c = composantes.find((x) => x.id === deleteId);
+        return c ? (
+          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm">
+            <span className="flex-1 text-red-800">Supprimer <strong>{c.libelle}</strong> ?</span>
+            <button onClick={() => delMut.mutate(deleteId)} disabled={delMut.isPending}
+              className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">
+              {delMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin inline" /> : "Supprimer"}
+            </button>
+            <button onClick={() => setDeleteId(null)} className="px-3 py-1 text-gray-500 hover:text-gray-700">Annuler</button>
+          </div>
+        ) : null;
+      })()}
+
+      {isLoading && <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-green-600" /></div>}
+
+      {!isLoading && composantes.length === 0 && !showForm && (
+        <div className="text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-xl border border-dashed border-gray-200">
+          Aucune composante personnalisée. Cliquez sur &laquo;&nbsp;Ajouter&nbsp;&raquo; pour en créer une.
+        </div>
+      )}
+
+      {/* Listes */}
+      {[{ label: "Avantages", items: avantages }, { label: "Retenues", items: retenues }].map(({ label, items }) =>
+        items.length > 0 ? (
+          <div key={label}>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{label}</p>
+            <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-50">
+              {items.map((c) => (
+                <div key={c.id} className="flex items-center gap-3 px-4 py-3">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${typeColor(c.type)}`}>
+                    {c.type === "avantage" ? "+" : "−"}
+                  </span>
+                  <span className="flex-1 text-sm font-medium text-gray-900">{c.libelle}</span>
+                  <span className="text-sm text-gray-500">{valeurLabel(c)}</span>
+                  {c.obligatoire && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">obligatoire</span>
+                  )}
+                  {canEdit && !c.obligatoire && (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => startEdit(c)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => setDeleteId(c.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null
+      )}
     </div>
   );
 }

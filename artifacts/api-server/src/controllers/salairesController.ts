@@ -266,6 +266,72 @@ export async function listComposantes(
   }
 }
 
+export async function createComposante(req: Request, res: Response): Promise<void> {
+  try {
+    const { libelle, type, calcul, valeur, obligatoire } = req.body as {
+      libelle: string; type: "avantage" | "retenue"; calcul: "fixe" | "pourcentage";
+      valeur: number; obligatoire?: boolean;
+    };
+    if (!libelle?.trim()) { res.status(400).json({ erreur: "Libellé requis" }); return; }
+    if (!["avantage", "retenue"].includes(type)) { res.status(400).json({ erreur: "Type invalide" }); return; }
+    if (!["fixe", "pourcentage"].includes(calcul)) { res.status(400).json({ erreur: "Mode de calcul invalide" }); return; }
+
+    const [row] = await db.insert(composantesSalaireTable).values({
+      cooperativeId: coopId(req),
+      libelle: libelle.trim(),
+      type,
+      calcul,
+      valeur: Math.round(valeur ?? 0),
+      obligatoire: obligatoire ?? false,
+    }).returning();
+    res.status(201).json(row);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "createComposante");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function updateComposante(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseId(req.params["id"]);
+    const { libelle, type, calcul, valeur, obligatoire } = req.body as {
+      libelle: string; type: "avantage" | "retenue"; calcul: "fixe" | "pourcentage";
+      valeur: number; obligatoire?: boolean;
+    };
+    if (!libelle?.trim()) { res.status(400).json({ erreur: "Libellé requis" }); return; }
+
+    const [row] = await db.update(composantesSalaireTable)
+      .set({ libelle: libelle.trim(), type, calcul, valeur: Math.round(valeur ?? 0), obligatoire: obligatoire ?? false })
+      .where(and(eq(composantesSalaireTable.id, id), eq(composantesSalaireTable.cooperativeId, coopId(req))))
+      .returning();
+    if (!row) { res.status(404).json({ erreur: "Composante introuvable" }); return; }
+    res.json(row);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "updateComposante");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function deleteComposante(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseId(req.params["id"]);
+    const [row] = await db.select({ obligatoire: composantesSalaireTable.obligatoire })
+      .from(composantesSalaireTable)
+      .where(and(eq(composantesSalaireTable.id, id), eq(composantesSalaireTable.cooperativeId, coopId(req)))).limit(1);
+    if (!row) { res.status(404).json({ erreur: "Composante introuvable" }); return; }
+    if (row.obligatoire) { res.status(400).json({ erreur: "Cette composante est marquée obligatoire et ne peut pas être supprimée" }); return; }
+    await db.delete(composantesSalaireTable)
+      .where(and(eq(composantesSalaireTable.id, id), eq(composantesSalaireTable.cooperativeId, coopId(req))));
+    res.status(204).end();
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "deleteComposante");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 //  BULLETINS DE PAIE
 // ══════════════════════════════════════════════════════════════════════════════
