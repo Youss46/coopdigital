@@ -5,6 +5,8 @@ import {
   transfertsStockTable,
   usersTable,
   campagnesTable,
+  entrepotsTable,
+  mouvementsStockTable,
 } from "@workspace/db";
 import { and, eq, desc, sql, count, sum } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
@@ -550,6 +552,34 @@ export async function confirmerArrivee(
       sourceId: transfertId,
     });
   } else {
+    // ── Entrée automatique dans le stock de l'entrepôt central ───────────────
+    try {
+      const [entrepotCentral] = await db
+        .select({ id: entrepotsTable.id })
+        .from(entrepotsTable)
+        .where(eq(entrepotsTable.cooperativeId, cooperativeId))
+        .orderBy(entrepotsTable.id)
+        .limit(1);
+
+      if (entrepotCentral) {
+        await db.insert(mouvementsStockTable).values({
+          entrepotId: entrepotCentral.id,
+          type: "entree",
+          poidsKg: String(data.poidsArrivee_kg),
+          motif: `Transfert ${t.numeroTransfert} — réception depuis entrepôt délégué`,
+          agentId: confirmeParId,
+        });
+        logger.info(
+          { transfertId, entrepotCentralId: entrepotCentral.id, poidsArrivee_kg: data.poidsArrivee_kg },
+          "Entrée automatique créée dans l'entrepôt central",
+        );
+      } else {
+        logger.warn({ cooperativeId, transfertId }, "Aucun entrepôt central trouvé — entrée stock ignorée");
+      }
+    } catch (err) {
+      logger.error({ err, transfertId }, "Erreur création entrée automatique stock central (non bloquant)");
+    }
+
     await creerNotification(cooperativeId, {
       type: "transfert_confirme",
       titre: `✅ Transfert ${t.numeroTransfert} confirmé`,
