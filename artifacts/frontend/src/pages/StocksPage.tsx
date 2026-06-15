@@ -66,7 +66,7 @@ export default function StocksPage() {
   }, [search]);
   const [form, setForm] = useState({ entrepotId: "", poidsKg: "", motif: "" });
   const [modalEntrepot, setModalEntrepot] = useState(false);
-  const [formEntrepot, setFormEntrepot] = useState({ nom: "", ville: "", capaciteKg: "", seuilAlerteKg: "" });
+  const [formEntrepot, setFormEntrepot] = useState({ nom: "", ville: "", capaciteKg: "", capaciteSacs: "", seuilAlerteKg: "" });
   const [errEntrepot, setErrEntrepot] = useState("");
 
   const mutCreerEntrepot = useMutation({
@@ -74,12 +74,13 @@ export default function StocksPage() {
       nom: formEntrepot.nom,
       ville: formEntrepot.ville,
       capaciteKg: parseFloat(formEntrepot.capaciteKg),
+      capaciteSacs: formEntrepot.capaciteSacs ? parseInt(formEntrepot.capaciteSacs) : undefined,
       seuilAlerteKg: formEntrepot.seuilAlerteKg ? parseFloat(formEntrepot.seuilAlerteKg) : undefined,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
       setModalEntrepot(false);
-      setFormEntrepot({ nom: "", ville: "", capaciteKg: "", seuilAlerteKg: "" });
+      setFormEntrepot({ nom: "", ville: "", capaciteKg: "", capaciteSacs: "", seuilAlerteKg: "" });
       setErrEntrepot("");
     },
     onError: (e: Error) => setErrEntrepot(e.message),
@@ -333,6 +334,11 @@ export default function StocksPage() {
                     <div className="text-right">
                       <p className="text-lg font-bold text-gray-900">{formaterPoids(e.stockActuelKg)}</p>
                       <p className="text-xs text-gray-400">/ {formaterPoids(e.capaciteKg)}</p>
+                      {(e as typeof e & { capaciteSacs?: number | null }).capaciteSacs != null && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          / {(e as typeof e & { capaciteSacs?: number | null }).capaciteSacs} sacs max
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2">
@@ -539,12 +545,19 @@ export default function StocksPage() {
                     placeholder="ex. 50000" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Seuil alerte (kg)</label>
-                  <input type="number" value={formEntrepot.seuilAlerteKg}
-                    onChange={(e) => setFormEntrepot((f) => ({ ...f, seuilAlerteKg: e.target.value }))}
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Capacité (sacs)</label>
+                  <input type="number" value={formEntrepot.capaciteSacs}
+                    onChange={(e) => setFormEntrepot((f) => ({ ...f, capaciteSacs: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
-                    placeholder="ex. 5000" />
+                    placeholder="ex. 500" />
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Seuil alerte (kg)</label>
+                <input type="number" value={formEntrepot.seuilAlerteKg}
+                  onChange={(e) => setFormEntrepot((f) => ({ ...f, seuilAlerteKg: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                  placeholder="ex. 5000" />
               </div>
               {errEntrepot && <p className="text-xs text-red-600">{errEntrepot}</p>}
             </div>

@@ -38,15 +38,16 @@ export async function getEntrepots(req: Request, res: Response): Promise<void> {
       createdAt: Date;
       stockActuelKg: number;
       nombreSacsTotal: number;
-    }>(sql`
+    }  & { capaciteSacs: number | null }>(sql`
       SELECT
         e.id,
-        e.cooperative_id AS "cooperativeId",
+        e.cooperative_id  AS "cooperativeId",
         e.nom,
         e.ville,
-        e.capacite_kg    AS "capaciteKg",
+        e.capacite_kg     AS "capaciteKg",
+        e.capacite_sacs   AS "capaciteSacs",
         e.seuil_alerte_kg AS "seuilAlerteKg",
-        e.created_at     AS "createdAt",
+        e.created_at      AS "createdAt",
         COALESCE(
           SUM(CASE WHEN ms.type IN ('entree', 'retour_refus')
               THEN ms.poids_kg::numeric
@@ -339,10 +340,11 @@ export async function createEntrepot(req: Request, res: Response): Promise<void>
     return;
   }
 
-  const { nom, ville, capaciteKg, seuilAlerteKg } = req.body as {
+  const { nom, ville, capaciteKg, capaciteSacs, seuilAlerteKg } = req.body as {
     nom: string;
     ville: string;
     capaciteKg: number;
+    capaciteSacs?: number;
     seuilAlerteKg?: number;
   };
 
@@ -359,6 +361,7 @@ export async function createEntrepot(req: Request, res: Response): Promise<void>
         nom: nom.trim(),
         ville: ville.trim(),
         capaciteKg: String(capaciteKg),
+        capaciteSacs: capaciteSacs != null ? capaciteSacs : null,
         seuilAlerteKg: seuilAlerteKg != null ? String(seuilAlerteKg) : null,
       })
       .returning();

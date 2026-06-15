@@ -11,6 +11,7 @@ export const entrepotsTable = pgTable("entrepots", {
   nom: text("nom").notNull(),
   ville: text("ville").notNull(),
   capaciteKg: numeric("capacite_kg", { precision: 10, scale: 2 }).notNull(),
+  capaciteSacs: integer("capacite_sacs"),
   seuilAlerteKg: numeric("seuil_alerte_kg", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
