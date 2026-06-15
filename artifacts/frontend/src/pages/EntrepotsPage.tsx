@@ -169,7 +169,7 @@ export default function EntrepotsPage() {
   const { data: transferts = [], isLoading: loadTrans } = useQuery<Transfert[]>({
     queryKey: ["transferts"],
     queryFn: () => apiFetch("/transferts"),
-    enabled: onglet === "transferts",
+    enabled: onglet === "transferts" || !!showDetail,
   });
 
   const mutArrivee = useMutation({
@@ -893,6 +893,7 @@ export default function EntrepotsPage() {
 
               {detailOnglet === "transferts" && (() => {
                 const trEntrepot = transferts.filter((t) => t.entrepotId === showDetail.id);
+                const enCoursDrawer = trEntrepot.filter((t) => t.statut === "en_cours");
                 return trEntrepot.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-32 text-gray-400 text-sm gap-2">
                     <Truck className="w-8 h-8 opacity-30" />
@@ -900,10 +901,17 @@ export default function EntrepotsPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
+                    {/* Bandeau d'alerte si transfert en attente de confirmation */}
+                    {enCoursDrawer.length > 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2 text-xs text-amber-800 mb-1">
+                        <Truck className="w-3.5 h-3.5 shrink-0" />
+                        <span>{enCoursDrawer.length} transfert{enCoursDrawer.length > 1 ? "s" : ""} en transit — en attente de confirmation d'arrivée</span>
+                      </div>
+                    )}
                     {trEntrepot.map((t) => {
                       const s = STATUT_LABEL[t.statut];
                       return (
-                        <div key={t.id} className="bg-gray-50 rounded-xl p-3">
+                        <div key={t.id} className={`rounded-xl p-3 ${t.statut === "en_cours" ? "bg-amber-50 border border-amber-100" : "bg-gray-50"}`}>
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <span className="text-sm font-semibold text-gray-800">{t.numeroTransfert}</span>
                             {s && (
@@ -921,6 +929,17 @@ export default function EntrepotsPage() {
                           </div>
                           {t.nomChauffeur && <p className="text-xs text-gray-400 mt-0.5">Chauffeur : {t.nomChauffeur} {t.immatriculation ? `· ${t.immatriculation}` : ""}</p>}
                           <p className="text-xs text-gray-400 mt-0.5">{fmtDate(t.dateDepart ?? t.datePrevue)}</p>
+                          {t.statut === "en_cours" && (
+                            <button
+                              onClick={() => {
+                                setShowArrivee(t);
+                                setFormArrivee({ poidsArrivee_kg: "", motifEcart: "", notes: "" });
+                              }}
+                              className="mt-2 w-full flex items-center justify-center gap-1.5 bg-green-700 hover:bg-green-800 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Confirmer l'arrivée au central
+                            </button>
+                          )}
                         </div>
                       );
                     })}
