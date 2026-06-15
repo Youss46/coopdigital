@@ -461,6 +461,11 @@ export const GetLivraisonsNonLoteesResponse = zod.array(GetLivraisonsNonLoteesRe
 /**
  * @summary KPIs du tableau de bord
  */
+export const GetDashboardQueryParams = zod.object({
+  "dateDebut": zod.date().optional().describe('Début de la période (YYYY-MM-DD). Par défaut : 1er du mois en cours.'),
+  "dateFin": zod.date().optional().describe('Fin de la période (YYYY-MM-DD). Par défaut : aujourd\'hui.')
+})
+
 export const GetDashboardResponse = zod.object({
   "membresActifs": zod.number(),
   "membresHommes": zod.number().optional(),

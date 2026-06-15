@@ -4307,6 +4307,17 @@ membre_id?: number;
 limit?: number;
 };
 
+export type GetDashboardParams = {
+/**
+ * Début de la période (YYYY-MM-DD). Par défaut : 1er du mois en cours.
+ */
+dateDebut?: string;
+/**
+ * Fin de la période (YYYY-MM-DD). Par défaut : aujourd'hui.
+ */
+dateFin?: string;
+};
+
 export type GetLotsParams = {
 statut?: GetLotsStatut;
 };

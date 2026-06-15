@@ -10,10 +10,18 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
   }
 
   try {
+    // Période par défaut : mois en cours. Paramètres optionnels pour filtrer.
     const debutMois = new Date();
     debutMois.setDate(1);
     debutMois.setHours(0, 0, 0, 0);
     const debutMoisStr = debutMois.toISOString().split("T")[0]!;
+
+    const rawDebut = typeof req.query.dateDebut === "string" ? req.query.dateDebut : null;
+    const rawFin   = typeof req.query.dateFin   === "string" ? req.query.dateFin   : null;
+    const periodeDebut = rawDebut ?? debutMoisStr;
+    const periodeFin   = rawFin   ?? new Date().toISOString().split("T")[0]!;
+
+    const debutPaiements = new Date(periodeDebut + "T00:00:00.000Z");
 
     const [
       [membresActifsRow],
@@ -46,7 +54,11 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .select({ tonnage: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
         .from(livraisonsTable)
         .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), gte(livraisonsTable.dateLivraison, debutMoisStr))),
+        .where(and(
+          eq(membresTable.cooperativeId, cooperativeId),
+          gte(livraisonsTable.dateLivraison, periodeDebut),
+          sql`${livraisonsTable.dateLivraison} <= ${periodeFin}`,
+        )),
       db
         .select({ total: sql<number>`coalesce(sum(montant_fcfa),0)::int` })
         .from(paiementsTable)
@@ -54,7 +66,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .where(and(
           eq(membresTable.cooperativeId, cooperativeId),
           sql`${paiementsTable.statut} IN ('confirme','effectue','en_cours')`,
-          gte(paiementsTable.createdAt, debutMois),
+          gte(paiementsTable.createdAt, debutPaiements),
         )),
       db
         .select({ total: sql<number>`coalesce(sum(solde_du_fcfa),0)::int` })
@@ -65,7 +77,11 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .select({ sacs: sql<number>`coalesce(sum(nombre_sacs),0)::int` })
         .from(livraisonsTable)
         .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), gte(livraisonsTable.dateLivraison, debutMoisStr))),
+        .where(and(
+          eq(membresTable.cooperativeId, cooperativeId),
+          gte(livraisonsTable.dateLivraison, periodeDebut),
+          sql`${livraisonsTable.dateLivraison} <= ${periodeFin}`,
+        )),
     ]);
 
     res.json({

@@ -384,6 +384,15 @@ paths:
       operationId: getDashboard
       tags: [dashboard]
       summary: KPIs du tableau de bord
+      parameters:
+        - in: query
+          name: dateDebut
+          schema: { type: string, format: date }
+          description: "Début de la période (YYYY-MM-DD). Par défaut : 1er du mois en cours."
+        - in: query
+          name: dateFin
+          schema: { type: string, format: date }
+          description: "Fin de la période (YYYY-MM-DD). Par défaut : aujourd'hui."
       responses:
         "200":
           description: Indicateurs clés

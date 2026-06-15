@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useGetDashboard, useGetDashboardLivraisons, useGetDashboardAvancesRetard } from "@workspace/api-client-react";
-import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation, Settings } from "lucide-react";
+import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation, Settings, CalendarDays } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Redirect } from "wouter";
 import { CarteKpi } from "@/components/CarteKpi";
@@ -408,9 +408,39 @@ function DashboardRT() {
   );
 }
 
+type Preset = "mois" | "mois_prec" | "campagne" | "perso";
+
+function getPeriodeParams(preset: Preset, persoDebut: string, persoFin: string): { dateDebut?: string; dateFin?: string; label: string } {
+  const today = new Date();
+  const fmt = (d: Date) => d.toISOString().split("T")[0]!;
+  if (preset === "mois") {
+    const debut = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { dateDebut: fmt(debut), dateFin: fmt(today), label: "Ce mois" };
+  }
+  if (preset === "mois_prec") {
+    const debut = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const fin   = new Date(today.getFullYear(), today.getMonth(), 0);
+    return { dateDebut: fmt(debut), dateFin: fmt(fin), label: "Mois précédent" };
+  }
+  if (preset === "campagne") {
+    return { dateDebut: undefined, dateFin: undefined, label: "Toute la campagne" };
+  }
+  return { dateDebut: persoDebut || undefined, dateFin: persoFin || undefined, label: "Période perso." };
+}
+
 export default function Dashboard() {
   const { utilisateur } = useAuth();
-  const { data: kpi, isLoading: kpiChargement } = useGetDashboard();
+  const [preset, setPreset] = useState<Preset>("mois");
+  const [persoDebut, setPersoDebut] = useState("");
+  const [persoFin, setPersoFin]   = useState("");
+  const [showPerso, setShowPerso] = useState(false);
+
+  const { dateDebut, dateFin, label: periodeLabel } = useMemo(
+    () => getPeriodeParams(preset, persoDebut, persoFin),
+    [preset, persoDebut, persoFin],
+  );
+
+  const { data: kpi, isLoading: kpiChargement } = useGetDashboard({ dateDebut, dateFin });
   const { data: livraisons } = useGetDashboardLivraisons();
   const { data: avancesRetard } = useGetDashboardAvancesRetard();
 
@@ -422,11 +452,56 @@ export default function Dashboard() {
     return <Redirect to="/dashboard-delegue" />;
   }
 
+  const presets: { key: Preset; label: string }[] = [
+    { key: "mois",      label: "Ce mois" },
+    { key: "mois_prec", label: "Mois précédent" },
+    { key: "campagne",  label: "Toute la campagne" },
+    { key: "perso",     label: "Période personnalisée" },
+  ];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
-        <p className="text-gray-500 text-sm mt-1">Vue d'ensemble de la coopérative</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
+          <p className="text-gray-500 text-sm mt-1">Vue d'ensemble de la coopérative</p>
+        </div>
+        {/* Sélecteur de période */}
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            {presets.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => { setPreset(p.key); setShowPerso(p.key === "perso"); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                  preset === p.key
+                    ? "bg-green-700 text-white border-green-700"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {p.key === "perso" && <CalendarDays size={11} />}
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {showPerso && (
+            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+              <input
+                type="date"
+                value={persoDebut}
+                onChange={(e) => setPersoDebut(e.target.value)}
+                className="text-xs border-0 outline-none text-gray-700"
+              />
+              <span className="text-gray-400 text-xs">→</span>
+              <input
+                type="date"
+                value={persoFin}
+                onChange={(e) => setPersoFin(e.target.value)}
+                className="text-xs border-0 outline-none text-gray-700"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* KPIs */}
@@ -457,7 +532,7 @@ export default function Dashboard() {
               sousTitre="Solde total dû"
             />
             <CarteKpi
-              titre="Tonnage ce mois"
+              titre={`Tonnage — ${periodeLabel}`}
               valeur={`${((kpi?.tonnageMois ?? 0) / 1000).toFixed(2)} T`}
               icone={Package}
               couleur="#2563eb"
@@ -468,7 +543,7 @@ export default function Dashboard() {
               }
             />
             <CarteKpi
-              titre="Paiements ce mois"
+              titre={`Paiements — ${periodeLabel}`}
               valeur={formaterFCFA(kpi?.paiementsMois ?? 0)}
               montantFcfa={kpi?.paiementsMois ?? 0}
               icone={Banknote}
