@@ -7,6 +7,7 @@ import { CreateLivraisonBody } from "@workspace/api-zod";
 import { generateEcrituresLivraison } from "../services/comptabiliteService";
 import { getEncoursMembre, enregistrerRemboursementParLivraison } from "../services/intrantsService";
 import { envoyerPushGroupePortail } from "../services/pushService";
+import { entrerStockSiDelegue } from "../services/entrepotDelegueService";
 
 export async function listLivraisons(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -270,6 +271,14 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       body: `${Number(result.livraison.poidsKg).toLocaleString("fr-FR")} kg — ${result.livraison.montantNetFcfa.toLocaleString("fr-FR")} FCFA net`,
       url: "/portail/livraisons",
     });
+
+    // Entrée stock entrepôt délégué si l'agent de saisie a un entrepôt (fire-and-forget)
+    void entrerStockSiDelegue(
+      result.livraison.agentId,
+      cooperativeId,
+      Number(result.livraison.poidsKg) - (retenueKg ?? 0),
+      result.livraison.id,
+    );
 
     res.status(201).json(result);
   } catch (err) {

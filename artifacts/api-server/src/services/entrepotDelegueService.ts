@@ -578,6 +578,27 @@ export async function getStatsConsolideesDirection(cooperativeId: number) {
 
 // ─── Entrée stock suite à livraison membre ───────────────────────────────────
 
+/**
+ * Point d'entrée unique pour les deux chemins de création de livraison
+ * (terrain et desktop). Lookup l'entrepôt du délégué ; si inexistant, no-op silencieux.
+ * Toujours appeler en fire-and-forget (void) pour ne pas bloquer la transaction principale.
+ */
+export async function entrerStockSiDelegue(
+  agentId: number | null | undefined,
+  cooperativeId: number,
+  poidsNetKg: number,
+  livraisonId: number,
+) {
+  if (!agentId) return;
+  try {
+    const entrepot = await getEntrepotDuDelegue(agentId, cooperativeId);
+    if (!entrepot) return;
+    await entrerStockLivraison(entrepot.id, cooperativeId, poidsNetKg, livraisonId, agentId);
+  } catch (err) {
+    logger.warn({ err, agentId, livraisonId }, "entrerStockSiDelegue — stock entrepôt non mis à jour (non bloquant)");
+  }
+}
+
 export async function entrerStockLivraison(
   entrepotId: number,
   cooperativeId: number,

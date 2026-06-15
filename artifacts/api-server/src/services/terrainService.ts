@@ -9,6 +9,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { logger } from "../lib/logger.js";
 import { envoyerPushGroupePortail } from "./pushService.js";
+import { entrerStockSiDelegue } from "./entrepotDelegueService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -382,6 +383,9 @@ export async function enregistrerCollecte(
     body: `${poidsNet.toLocaleString("fr-FR")} kg — ${montantNet.toLocaleString("fr-FR")} FCFA net`,
     url: "/portail/livraisons",
   });
+
+  // Entrée stock entrepôt délégué (fire-and-forget — non bloquant)
+  void entrerStockSiDelegue(agentId, cooperativeId, poidsNet, livraison.id);
 
   return {
     livraisonId: livraison.id,
