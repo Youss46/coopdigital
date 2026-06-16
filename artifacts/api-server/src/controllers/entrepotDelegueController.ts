@@ -216,7 +216,8 @@ export async function getMonEntrepotHandler(req: Request, res: Response): Promis
   try {
     const entrepot = await svc.getEntrepotDuDelegue(agent.id, agent.cooperativeId);
     if (!entrepot) { res.status(404).json({ erreur: "Aucun entrepôt associé à ce délégué" }); return; }
-    res.json(entrepot);
+    const stockActuelSacs = await svc.getStockActuelSacs(entrepot.id);
+    res.json({ ...entrepot, stockActuelSacs });
   } catch (err) {
     req.log.error({ err }, "getMonEntrepot");
     res.status(500).json({ erreur: "Erreur interne" });

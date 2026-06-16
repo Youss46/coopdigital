@@ -102,6 +102,27 @@ export async function getEntrepotDuDelegue(delegueId: number, cooperativeId: num
   return row ?? null;
 }
 
+export async function getStockActuelSacs(entrepotId: number): Promise<number> {
+  const result = await db.execute<{ sacs: number }>(sql`
+    SELECT (
+      SELECT COALESCE(SUM(l.nombre_sacs), 0)::integer
+      FROM entrepot_mouvements em
+      JOIN livraisons l ON l.id = em.livraison_id
+      WHERE em.entrepot_id = ${entrepotId}
+        AND em.type_mouvement = 'entree'
+        AND em.livraison_id IS NOT NULL
+    ) - (
+      SELECT COALESCE(SUM(ts.nombre_sacs), 0)::integer
+      FROM transferts_stock ts
+      WHERE ts.entrepot_source_id = ${entrepotId}
+        AND ts.statut IN ('en_cours', 'arrive', 'confirme')
+        AND ts.nombre_sacs IS NOT NULL
+    ) AS sacs
+  `);
+  const raw = result.rows[0]?.sacs ?? 0;
+  return Math.max(0, Number(raw));
+}
+
 export async function creerEntrepot(
   cooperativeId: number,
   data: {

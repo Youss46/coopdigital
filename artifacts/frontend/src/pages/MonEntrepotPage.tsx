@@ -35,6 +35,7 @@ interface Entrepot {
   id: number; nom: string; zoneNom: string | null; zoneType: string | null;
   capaciteMaxKg: string | null; seuilAlerteKg: string | null;
   stockActuelKg: string; stockMisAJourLe: string | null; actif: boolean;
+  stockActuelSacs?: number | null; capaciteSacs?: number | null;
 }
 interface Mouvement {
   id: number; typeMouvement: "entree" | "sortie"; motif: string;
@@ -172,6 +173,17 @@ export default function MonEntrepotPage() {
             <p className="text-3xl font-bold text-gray-900 mt-0.5">{kg(entrepot.stockActuelKg)}</p>
             {entrepot.capaciteMaxKg && (
               <p className="text-sm text-gray-500 mt-0.5">sur {kg(entrepot.capaciteMaxKg)} de capacité</p>
+            )}
+            {(entrepot.stockActuelSacs ?? 0) > 0 && (
+              <p className="text-sm font-medium text-gray-700 mt-1">
+                <span className="inline-flex items-center gap-1">
+                  <Package className="w-3.5 h-3.5 text-gray-400" />
+                  {entrepot.stockActuelSacs} sac{(entrepot.stockActuelSacs ?? 0) > 1 ? "s" : ""}
+                  {entrepot.capaciteSacs ? (
+                    <span className="text-gray-400 font-normal"> / {entrepot.capaciteSacs} max</span>
+                  ) : null}
+                </span>
+              </p>
             )}
           </div>
           {entrepot.capaciteMaxKg && (
