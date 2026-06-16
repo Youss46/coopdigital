@@ -11,6 +11,7 @@ import {
 import { eq, and, desc, sql } from "drizzle-orm";
 import { generateBulletin, generateMasse } from "../services/paieService";
 import { generateEcrituresSalaire } from "../services/comptabiliteService";
+import { generateBulletinPaie } from "../services/pdfService";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -600,7 +601,22 @@ export async function getBulletinPdf(
   req: Request,
   res: Response,
 ): Promise<void> {
-  res.status(501).json({ erreur: "Export PDF disponible prochainement" });
+  try {
+    const id = parseId(req.params["id"]);
+    const cid = coopId(req);
+    const buffer = await generateBulletinPaie(id, cid);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="bulletin_paie_${id}.pdf"`);
+    res.setHeader("Content-Length", String(buffer.length));
+    res.end(buffer);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    if (err instanceof Error && err.message.includes("introuvable")) {
+      res.status(404).json({ erreur: err.message }); return;
+    }
+    req.log.error({ err }, "getBulletinPdf");
+    res.status(500).json({ erreur: "Erreur génération PDF" });
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

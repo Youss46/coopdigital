@@ -42,7 +42,7 @@ const BASE = import.meta.env.VITE_API_URL ?? "";
 
 async function downloadPdfBulletin(bulletinId: number) {
   const token = localStorage.getItem("coop_token") ?? "";
-  const res = await fetch(`${BASE}/api/rapports/recu/bulletin/${bulletinId}`, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(`${BASE}/api/salaires/bulletins/${bulletinId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) return;
   const blob = await res.blob();
   if (blob.size === 0) return;
