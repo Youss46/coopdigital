@@ -88,7 +88,7 @@ export default function MobileMarchandPage() {
   async function refetch() {
     setLoading(true);
     try { setComptes(await apiFetch("/api/mobile-marchand")); setErreur(null); }
-    catch (err) { setErreur((err as Error).message); }
+    catch (err) { if (!navigator.onLine) { setErreur(null); return; } setErreur((err as Error).message); }
     finally { setLoading(false); }
   }
 

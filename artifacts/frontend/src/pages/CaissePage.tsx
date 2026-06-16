@@ -89,8 +89,10 @@ function useFetch<T>(url: string | null, deps: unknown[] = []) {
       const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? r.statusText);
       setData(await r.json());
-    } catch (e) { setError(e instanceof Error ? e.message : "Erreur"); }
-    finally { setLoading(false); }
+    } catch (e) {
+      if (!navigator.onLine) return;
+      setError(e instanceof Error ? e.message : "Erreur");
+    } finally { setLoading(false); }
   }, [url, ...deps]);
 
   return { data, loading, error, refetch: fetch_ };
@@ -686,6 +688,7 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
       if (!r.ok) throw new Error(json.error ?? "Erreur");
       setJournal(json);
     } catch (e) {
+      if (!navigator.onLine) return;
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
     } finally { setLoading(false); }
   }, [caisseId, date]);
@@ -890,6 +893,7 @@ function HistoriqueSessions({ caisses }: { caisses: Caisse[] | null }) {
       if (!r.ok) throw new Error((await r.json()).error ?? "Erreur");
       setSessions(await r.json());
     } catch (e) {
+      if (!navigator.onLine) return;
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
     } finally { setLoading(false); }
   };

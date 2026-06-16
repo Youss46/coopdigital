@@ -221,8 +221,10 @@ function TableauBordFiscal() {
       if (!rAl.ok)  throw new Error((await rAl.json().catch(() => ({}))).error  ?? `Erreur ${rAl.status}`);
       setCalendrier(await rCal.json());
       setAlertes(await rAl.json());
-    } catch (e) { toast({ title: "Erreur chargement", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
-    finally { setLoading(false); }
+    } catch (e) {
+      if (!navigator.onLine) return;
+      toast({ title: "Erreur chargement", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+    } finally { setLoading(false); }
   }, [toast]);
 
   useEffect(() => { charger(); }, [charger]);
@@ -352,6 +354,7 @@ function Declarations() {
       if (!r.ok) throw new Error((await r.json()).error ?? "Erreur");
       setDeclarations(await r.json());
     } catch (e) {
+      if (!navigator.onLine) return;
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
     } finally { setLoading(false); }
   }, [filtreStatut, filtreType, toast]);
@@ -490,6 +493,7 @@ function RapportAnnuel() {
       if (!r.ok) throw new Error((await r.json()).error ?? "Erreur");
       setRapport(await r.json());
     } catch (e) {
+      if (!navigator.onLine) return;
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
     } finally { setLoading(false); }
   }, [annee, toast]);

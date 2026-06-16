@@ -103,6 +103,7 @@ export default function BanquePage() {
         if (fresh) setSelected(fresh);
       }
     } catch {
+      if (!navigator.onLine) return;
       toast({ title: "Erreur", description: "Impossible de charger les comptes bancaires", variant: "destructive" });
     } finally {
       setLoadingComptes(false);
@@ -127,6 +128,7 @@ export default function BanquePage() {
       if (!r.ok) throw new Error();
       setMouvements(await r.json());
     } catch {
+      if (!navigator.onLine) return;
       toast({ title: "Erreur", description: "Impossible de charger le journal", variant: "destructive" });
     } finally {
       setLoadingJournal(false);
