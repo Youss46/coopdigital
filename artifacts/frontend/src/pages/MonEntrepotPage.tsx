@@ -89,7 +89,7 @@ export default function MonEntrepotPage() {
   const { data: mouvements = [] } = useQuery<Mouvement[]>({
     queryKey: ["mes-mouvements"],
     queryFn: () => apiFetch("/terrain/entrepot/mouvements?limit=50"),
-    enabled: onglet === "mouvements" && !!entrepot,
+    enabled: !!entrepot,
   });
 
   const { data: transferts = [] } = useQuery<Transfert[]>({
