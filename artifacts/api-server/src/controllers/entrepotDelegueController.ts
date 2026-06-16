@@ -249,7 +249,7 @@ export async function creerTransfertHandler(req: Request, res: Response): Promis
   const agent = req.agent!;
   if (!agent.cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
   const {
-    entrepotId, poidsKg, typeVehicule, immatriculation, nomChauffeur,
+    entrepotId, poidsKg, nombreSacs, typeVehicule, immatriculation, nomChauffeur,
     telephoneChauffeur, transporteur, datePrevue, campagneId, notes,
   } = req.body as Record<string, unknown>;
   if (!entrepotId || !poidsKg) { res.status(400).json({ erreur: "entrepotId et poidsKg sont requis" }); return; }
@@ -257,6 +257,7 @@ export async function creerTransfertHandler(req: Request, res: Response): Promis
     const t = await svc.creerTransfert(agent.id, agent.cooperativeId, {
       entrepotId: Number(entrepotId),
       poidsKg: Number(poidsKg),
+      nombreSacs: nombreSacs ? Number(nombreSacs) : undefined,
       typeVehicule: typeVehicule ? String(typeVehicule) : undefined,
       immatriculation: immatriculation ? String(immatriculation) : undefined,
       nomChauffeur: nomChauffeur ? String(nomChauffeur) : undefined,

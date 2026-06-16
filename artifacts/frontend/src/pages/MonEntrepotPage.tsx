@@ -74,7 +74,7 @@ export default function MonEntrepotPage() {
   const [showTransfert, setShowTransfert] = useState(false);
   const [showDepart, setShowDepart] = useState<Transfert | null>(null);
   const [form, setForm] = useState({
-    poidsKg: "", typeVehicule: "propre", immatriculation: "",
+    poidsKg: "", nombreSacs: "", typeVehicule: "propre", immatriculation: "",
     nomChauffeur: "", telephoneChauffeur: "", datePrevue: "", notes: "",
   });
   const [formDepart, setFormDepart] = useState({ poidsDepart_kg: "", immatriculation: "", nomChauffeur: "" });
@@ -104,7 +104,7 @@ export default function MonEntrepotPage() {
       qc.invalidateQueries({ queryKey: ["mes-transferts"] });
       qc.invalidateQueries({ queryKey: ["mon-entrepot"] });
       setShowTransfert(false);
-      setForm({ poidsKg: "", typeVehicule: "propre", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", datePrevue: "", notes: "" });
+      setForm({ poidsKg: "", nombreSacs: "", typeVehicule: "propre", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", datePrevue: "", notes: "" });
       toast({ title: "Transfert soumis avec succès", description: "La direction a été notifiée." });
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -373,12 +373,21 @@ export default function MonEntrepotPage() {
               Stock disponible : <strong className="text-gray-800">{kg(entrepot.stockActuelKg)}</strong>
             </p>
             <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Poids à transférer (kg) *</label>
-                <input type="number" step="0.01" placeholder="0.00"
-                  value={form.poidsKg}
-                  onChange={(e) => setForm(f => ({ ...f, poidsKg: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Poids à transférer (kg) *</label>
+                  <input type="number" step="0.01" placeholder="0.00"
+                    value={form.poidsKg}
+                    onChange={(e) => setForm(f => ({ ...f, poidsKg: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de sacs</label>
+                  <input type="number" min="0" step="1" placeholder="0"
+                    value={form.nombreSacs}
+                    onChange={(e) => setForm(f => ({ ...f, nombreSacs: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type de transport</label>
@@ -430,6 +439,7 @@ export default function MonEntrepotPage() {
                 onClick={() => mutTransfert.mutate({
                   entrepotId: entrepot.id,
                   poidsKg: parseFloat(form.poidsKg),
+                  nombreSacs: form.nombreSacs ? parseInt(form.nombreSacs) : undefined,
                   typeVehicule: form.typeVehicule,
                   immatriculation: form.immatriculation || undefined,
                   nomChauffeur: form.nomChauffeur || undefined,

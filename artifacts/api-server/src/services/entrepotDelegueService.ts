@@ -407,6 +407,7 @@ export async function creerTransfert(
   data: {
     entrepotId: number;
     poidsKg: number;
+    nombreSacs?: number;
     typeVehicule?: string;
     immatriculation?: string;
     nomChauffeur?: string;
@@ -437,6 +438,7 @@ export async function creerTransfert(
       cooperativeId,
       campagneId: data.campagneId ?? null,
       poidsDepart_kg: String(data.poidsKg),
+      nombreSacs: data.nombreSacs ?? null,
       typeVehicule: data.typeVehicule ?? null,
       immatriculation: data.immatriculation ?? null,
       nomChauffeur: data.nomChauffeur ?? null,
