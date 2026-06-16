@@ -585,22 +585,27 @@ export async function payerBulletin(
 
     // Écriture comptable OHADA (async, non bloquant)
     void (async () => {
-      const [p] = await db
-        .select({ nom: personnelTable.nom, prenoms: personnelTable.prenoms })
-        .from(personnelTable)
-        .where(eq(personnelTable.id, b.personnelId))
-        .limit(1);
-      if (p && updated) {
-        const compteCredit = compteSourceType === "caisse" ? "571" : "521";
-        await generateEcrituresSalaire(cid, {
-          bulletinId: updated.id,
-          personnelNom: `${p.prenoms} ${p.nom}`,
-          salaireNetFcfa: updated.salaireNetFcfa,
-          salaireBrutFcfa: updated.salaireBrutFcfa,
-          cotisationsSalarieFcfa: updated.salaireBrutFcfa - updated.salaireNetFcfa,
-          datePaiement: new Date().toISOString().split("T")[0]!,
-          compteCredit,
-        });
+      try {
+        const [p] = await db
+          .select({ nom: personnelTable.nom, prenoms: personnelTable.prenoms })
+          .from(personnelTable)
+          .where(eq(personnelTable.id, b.personnelId))
+          .limit(1);
+        const personnelNom = p ? `${p.prenoms} ${p.nom}` : `Personnel #${b.personnelId}`;
+        if (updated) {
+          const compteCredit = compteSourceType === "caisse" ? "571" : compteSourceType === "mobile" ? "545" : "521";
+          await generateEcrituresSalaire(cid, {
+            bulletinId: updated.id,
+            personnelNom,
+            salaireNetFcfa: updated.salaireNetFcfa,
+            salaireBrutFcfa: updated.salaireBrutFcfa,
+            cotisationsSalarieFcfa: updated.salaireBrutFcfa - updated.salaireNetFcfa,
+            datePaiement: new Date().toISOString().split("T")[0]!,
+            compteCredit,
+          });
+        }
+      } catch (err) {
+        req.log.error({ err, bulletinId: id }, "Erreur génération écritures comptables salaire");
       }
     })();
 
