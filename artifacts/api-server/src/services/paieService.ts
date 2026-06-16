@@ -15,8 +15,10 @@
  *    2 400 001 – 8 000 000 → 28 %
  *    > 8 000 000          → 32 %
  *
- *  Prime d'ancienneté (sur salaire de base) :
- *    < 2 ans → 0 %   |  2–5 ans → 3 %  |  5–10 ans → 5 %  |  > 10 ans → 8 %
+ *  Prime d'ancienneté (Convention Collective Interprofessionnelle CI) :
+ *    Calculée sur le salaire de base de la catégorie professionnelle.
+ *    < 2 ans → 0 %  |  de 2 à 25 ans → taux = ancienneté en années entières %
+ *    Ex : 2 ans = 2 %, 5 ans = 5 %, 10 ans = 10 %, 25 ans+ → plafonné à 25 %
  */
 
 import { db as defaultDb } from "@workspace/db";
@@ -99,13 +101,14 @@ function calculerPrimeAnciennete(
   dateEmbaucheSt: string,
   salaireBase: number,
 ): number {
-  const annees =
+  const anneesExactes =
     (Date.now() - new Date(dateEmbaucheSt).getTime()) / (365.25 * 24 * 3600 * 1000);
-  let rate = 0;
-  if (annees >= 10) rate = 0.08;
-  else if (annees >= 5) rate = 0.05;
-  else if (annees >= 2) rate = 0.03;
-  return Math.round(salaireBase * rate);
+  const anneesEntieres = Math.floor(anneesExactes);
+  // Convention Collective Interprofessionnelle CI :
+  // taux = 1 % par année entière d'ancienneté, à partir de 2 ans, plafonné à 25 %
+  if (anneesEntieres < 2) return 0;
+  const tauxPourcent = Math.min(anneesEntieres, 25);
+  return Math.round(salaireBase * tauxPourcent / 100);
 }
 
 // ─── Génération d'un bulletin ────────────────────────────────────────────────
