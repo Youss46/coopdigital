@@ -593,7 +593,7 @@ export async function payerBulletin(
           .limit(1);
         const personnelNom = p ? `${p.prenoms} ${p.nom}` : `Personnel #${b.personnelId}`;
         if (updated) {
-          const compteCredit = compteSourceType === "caisse" ? "571" : compteSourceType === "mobile" ? "545" : "521";
+          const compteCredit = compteSourceType === "caisse" ? "571" : compteSourceType === "mobile" ? "554" : "521";
           await generateEcrituresSalaire(cid, {
             bulletinId: updated.id,
             personnelNom,
