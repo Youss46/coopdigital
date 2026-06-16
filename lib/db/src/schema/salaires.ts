@@ -224,6 +224,9 @@ export const configPaieTable = pgTable("config_paie", {
   // Prime d'ancienneté
   ancienneteActif: boolean("anciennete_actif").notNull().default(true),
 
+  // SMIG – Salaire Minimum Interprofessionnel Garanti (CI)
+  smigFcfa: integer("smig_fcfa").notNull().default(75_000),
+
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

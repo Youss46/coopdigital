@@ -42,6 +42,7 @@ const DEFAULT_CONFIG = {
   taxeApprentissageActif: true, taxeApprentissageTaux: 50,
   fpcActif: true,               fpcTaux: 120,
   ancienneteActif: true,
+  smigFcfa: 75_000,
 };
 
 type PaieConfig = typeof DEFAULT_CONFIG;
@@ -64,6 +65,7 @@ async function loadConfigPaie(cooperativeId: number, dbInst = defaultDb): Promis
     fpcActif:               row.fpcActif,
     fpcTaux:                row.fpcTaux,
     ancienneteActif:        row.ancienneteActif,
+    smigFcfa:               row.smigFcfa,
   };
 }
 
@@ -159,9 +161,12 @@ export async function generateBulletin(
     .from(composantesSalaireTable)
     .where(eq(composantesSalaireTable.cooperativeId, cooperativeId));
 
-  // 4. Calcul ancienneté (si activée dans la config)
+  // 4. Base effective : SMIG comme plancher légal
+  const baseEffective = Math.max(emp.salaireBaseFcfa, cfg.smigFcfa);
+
+  // 5. Calcul ancienneté (si activée dans la config)
   const primeAnciennete = cfg.ancienneteActif
-    ? calculerPrimeAnciennete(emp.dateEmbauche, emp.salaireBaseFcfa)
+    ? calculerPrimeAnciennete(emp.dateEmbauche, baseEffective)
     : 0;
 
   // 5. Lignes avantages personnalisés
@@ -182,7 +187,7 @@ export async function generateBulletin(
     const montant =
       c.calcul === "fixe"
         ? c.valeur
-        : Math.round((emp.salaireBaseFcfa * c.valeur) / 10000); // valeur = % × 100
+        : Math.round((baseEffective * c.valeur) / 10000); // valeur = % × 100
 
     if (c.type === "avantage") {
       lignesAvantages.push({ libelle: c.libelle, montant });
@@ -213,10 +218,10 @@ export async function generateBulletin(
     });
   }
 
-  // 7. Totaux
+  // 8. Totaux
   const totalAvantages =
     lignesAvantages.reduce((s, l) => s + l.montant, 0);
-  const brut = emp.salaireBaseFcfa + totalAvantages;
+  const brut = baseEffective + totalAvantages;
 
   // CNPS salariale (retenue employé)
   let cnpsSal = 0;
@@ -255,7 +260,7 @@ export async function generateBulletin(
       mois,
       annee,
       periode: `${NOMS_MOIS[mois] ?? mois} ${annee}`,
-      salaireBaseFcfa: emp.salaireBaseFcfa,
+      salaireBaseFcfa: baseEffective,
       totalAvantagesFcfa: totalAvantages,
       totalRetenuesFcfa: totalRetenues,
       salaireBrutFcfa: brut,

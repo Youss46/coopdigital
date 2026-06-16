@@ -879,6 +879,7 @@ const CONFIG_PAIE_DEFAULTS = {
   taxeApprentissageActif: true, taxeApprentissageTaux: 50,
   fpcActif: true,               fpcTaux: 120,
   ancienneteActif: true,
+  smigFcfa: 75_000,
 };
 
 export async function getConfigPaie(req: Request, res: Response): Promise<void> {
@@ -916,6 +917,7 @@ export async function updateConfigPaie(req: Request, res: Response): Promise<voi
       fpcActif:                body.fpcActif                 ?? true,
       fpcTaux:                 body.fpcTaux                  ?? 120,
       ancienneteActif:         body.ancienneteActif          ?? true,
+      smigFcfa:                body.smigFcfa !== undefined ? Number(body.smigFcfa) : 75_000,
       updatedAt:               new Date(),
     };
 

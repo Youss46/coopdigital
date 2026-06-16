@@ -1437,6 +1437,7 @@ type ConfigPaie = {
   taxeApprentissageActif: boolean; taxeApprentissageTaux: number;
   fpcActif: boolean;               fpcTaux: number;
   ancienneteActif: boolean;
+  smigFcfa: number;
 };
 
 const CONFIG_DEFAULTS: ConfigPaie = {
@@ -1447,6 +1448,7 @@ const CONFIG_DEFAULTS: ConfigPaie = {
   taxeApprentissageActif: true, taxeApprentissageTaux: 50,
   fpcActif: true, fpcTaux: 120,
   ancienneteActif: true,
+  smigFcfa: 75000,
 };
 
 async function apiFetchSalaires<T>(path: string, options?: RequestInit): Promise<T> {
@@ -1658,11 +1660,34 @@ function TabConfigPaie() {
         </ConfigRow>
       </ConfigSection>
 
+      {/* SMIG */}
+      <ConfigSection title="SMIG — Salaire Minimum Interprofessionnel Garanti" badge="Plancher légal">
+        <div className="px-5 py-4 space-y-3">
+          <p className="text-xs text-gray-500">
+            Si le salaire de base d&apos;un agent est inférieur au SMIG, le SMIG est automatiquement
+            utilisé comme base de calcul du bulletin (brut, cotisations, ancienneté).
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min="0"
+              step="1000"
+              value={form.smigFcfa}
+              onChange={(e) => set("smigFcfa", parseInt(e.target.value || "0"))}
+              disabled={mut.isPending || !canEdit}
+              className="w-40 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-400"
+            />
+            <span className="text-sm text-gray-500">FCFA / mois</span>
+            <span className="text-xs text-gray-400">(valeur légale CI : 75 000 FCFA)</span>
+          </div>
+        </div>
+      </ConfigSection>
+
       {/* Prime ancienneté */}
       <ConfigSection title="Prime d'ancienneté">
         <ConfigRow
           label="Prime d'ancienneté automatique"
-          desc="&lt; 2 ans : 0 % · 2–5 ans : 3 % · 5–10 ans : 5 % · &gt; 10 ans : 8 % (sur salaire de base)"
+          desc="Convention Collective CI · &lt; 2 ans : 0 % · à partir de 2 ans : 1 % par année entière · plafond : 25 % (sur salaire de base)"
           actif={form.ancienneteActif}
           onToggle={(v) => set("ancienneteActif", v)}
           saving={mut.isPending || !canEdit}
