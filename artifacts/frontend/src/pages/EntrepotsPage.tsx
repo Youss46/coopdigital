@@ -54,6 +54,7 @@ interface Stats {
 interface Transfert {
   id: number; numeroTransfert: string; statut: string;
   poidsDepart_kg: string | null; poidsArrivee_kg: string | null; ecartKg: string | null;
+  nombreSacs: number | null; nombreSacsArrivee: number | null;
   motifEcart: string | null; dateDepart: string | null; dateArrivee: string | null;
   datePrevue: string | null; typeVehicule: string | null; immatriculation: string | null;
   nomChauffeur: string | null; entrepotNom: string | null; entrepotId: number | null;
@@ -130,7 +131,7 @@ export default function EntrepotsPage() {
   const [onglet, setOnglet] = useState<"stocks" | "transferts">("stocks");
   const [filtreStatut, setFiltreStatut] = useState<"tous" | "confirme" | "litige" | "arrive">("tous");
   const [showArrivee, setShowArrivee] = useState<Transfert | null>(null);
-  const [formArrivee, setFormArrivee] = useState({ poidsArrivee_kg: "", motifEcart: "", notes: "" });
+  const [formArrivee, setFormArrivee] = useState({ poidsArrivee_kg: "", nombreSacsArrivee: "", motifEcart: "", notes: "" });
   const [showCreer, setShowCreer] = useState(false);
   const [formCreer, setFormCreer] = useState({
     delegueId: "", nom: "", zoneNom: "", zoneType: "village",
@@ -455,7 +456,7 @@ export default function EntrepotsPage() {
                       </div>
                       {t.statut === "en_cours" && (
                         <button
-                          onClick={() => { setShowArrivee(t); setFormArrivee({ poidsArrivee_kg: "", motifEcart: "", notes: "" }); }}
+                          onClick={() => { setShowArrivee(t); setFormArrivee({ poidsArrivee_kg: "", nombreSacsArrivee: t.nombreSacs != null ? String(t.nombreSacs) : "", motifEcart: "", notes: "" }); }}
                           className="flex items-center gap-1.5 bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-800 whitespace-nowrap">
                           <CheckCircle2 className="w-3.5 h-3.5" /> Confirmer arrivée
                         </button>
@@ -800,35 +801,52 @@ export default function EntrepotsPage() {
               {" — "}Poids départ : <strong>{kg(showArrivee.poidsDepart_kg)}</strong>
             </p>
             <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Poids reçu (kg) *</label>
-                <input type="number" step="0.01" placeholder="0.00"
-                  value={formArrivee.poidsArrivee_kg}
-                  onChange={(e) => {
-                    const dep = parseFloat(showArrivee.poidsDepart_kg ?? "0");
-                    const arr = parseFloat(e.target.value);
-                    setFormArrivee(f => ({ ...f, poidsArrivee_kg: e.target.value }));
-                    if (dep && arr) {
-                      const pctEc = Math.abs((dep - arr) / dep * 100);
-                      if (pctEc > 0.5) setFormArrivee(f => ({ ...f, poidsArrivee_kg: e.target.value }));
-                    }
-                  }}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
-                {formArrivee.poidsArrivee_kg && showArrivee.poidsDepart_kg && (() => {
-                  const dep = parseFloat(showArrivee.poidsDepart_kg ?? "0");
-                  const arr = parseFloat(formArrivee.poidsArrivee_kg);
-                  const ec = dep - arr;
-                  const p = dep ? Math.abs(ec / dep * 100) : 0;
-                  const isLitige = p > 0.5;
-                  return (
-                    <p className={`text-xs mt-1 flex items-center gap-1 ${isLitige ? "text-red-600" : "text-green-600"}`}>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Poids reçu (kg) *</label>
+                  <input type="number" step="0.01" placeholder="0.00"
+                    value={formArrivee.poidsArrivee_kg}
+                    onChange={(e) => setFormArrivee(f => ({ ...f, poidsArrivee_kg: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nombre de sacs reçus
+                    {showArrivee.nombreSacs != null && (
+                      <span className="text-gray-400 font-normal"> (expédié : {showArrivee.nombreSacs})</span>
+                    )}
+                  </label>
+                  <input type="number" min="0" step="1" placeholder="0"
+                    value={formArrivee.nombreSacsArrivee}
+                    onChange={(e) => setFormArrivee(f => ({ ...f, nombreSacsArrivee: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                </div>
+              </div>
+              {formArrivee.poidsArrivee_kg && showArrivee.poidsDepart_kg && (() => {
+                const dep = parseFloat(showArrivee.poidsDepart_kg ?? "0");
+                const arr = parseFloat(formArrivee.poidsArrivee_kg);
+                const ec = dep - arr;
+                const p = dep ? Math.abs(ec / dep * 100) : 0;
+                const isLitige = p > 0.5;
+                const sacsDep = showArrivee.nombreSacs;
+                const sacsArr = formArrivee.nombreSacsArrivee ? parseInt(formArrivee.nombreSacsArrivee) : null;
+                const ecartSacs = sacsDep != null && sacsArr != null ? sacsDep - sacsArr : null;
+                return (
+                  <div className={`rounded-lg px-3 py-2 text-xs flex flex-col gap-0.5 ${isLitige ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+                    <p className="flex items-center gap-1 font-medium">
                       {isLitige ? <AlertTriangle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
-                      Écart : {ec.toFixed(0)} kg ({p.toFixed(1)}%)
+                      Écart poids : {ec.toFixed(0)} kg ({p.toFixed(1)}%)
                       {isLitige ? " → Litige automatique" : " → OK"}
                     </p>
-                  );
-                })()}
-              </div>
+                    {ecartSacs !== null && ecartSacs !== 0 && (
+                      <p className="flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        Écart sacs : {ecartSacs > 0 ? `-${ecartSacs}` : `+${Math.abs(ecartSacs)}`} sac{Math.abs(ecartSacs) > 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Motif d'écart</label>
                 <select value={formArrivee.motifEcart}
@@ -859,6 +877,7 @@ export default function EntrepotsPage() {
                   id: showArrivee.id,
                   body: {
                     poidsArrivee_kg: parseFloat(formArrivee.poidsArrivee_kg),
+                    nombreSacsArrivee: formArrivee.nombreSacsArrivee ? parseInt(formArrivee.nombreSacsArrivee) : undefined,
                     motifEcart: formArrivee.motifEcart || undefined,
                     notes: formArrivee.notes || undefined,
                   },
@@ -1110,7 +1129,7 @@ export default function EntrepotsPage() {
                             <button
                               onClick={() => {
                                 setShowArrivee(t);
-                                setFormArrivee({ poidsArrivee_kg: "", motifEcart: "", notes: "" });
+                                setFormArrivee({ poidsArrivee_kg: "", nombreSacsArrivee: t.nombreSacs != null ? String(t.nombreSacs) : "", motifEcart: "", notes: "" });
                               }}
                               className="mt-2 w-full flex items-center justify-center gap-1.5 bg-green-700 hover:bg-green-800 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
                               <CheckCircle2 className="w-3.5 h-3.5" />

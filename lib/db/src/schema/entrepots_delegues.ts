@@ -96,6 +96,7 @@ export const transfertsStockTable = pgTable("transferts_stock", {
   transporteur:      varchar("transporteur", { length: 200 }),
 
   nombreSacs:        integer("nombre_sacs"),
+  nombreSacsArrivee: integer("nombre_sacs_arrivee"),
   poidsDepart_kg:    numeric("poids_depart_kg", { precision: 12, scale: 2 }),
   poidsArrivee_kg:   numeric("poids_arrivee_kg", { precision: 12, scale: 2 }),
   ecartKg:           numeric("ecart_kg", { precision: 12, scale: 2 }),

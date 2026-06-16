@@ -147,11 +147,12 @@ export async function confirmerArriveeHandler(req: Request, res: Response): Prom
   if (!coop) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
   const id = Number(req.params["id"]);
   if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
-  const { poidsArrivee_kg, motifEcart, notes } = req.body as Record<string, unknown>;
+  const { poidsArrivee_kg, nombreSacsArrivee, motifEcart, notes } = req.body as Record<string, unknown>;
   if (!poidsArrivee_kg) { res.status(400).json({ erreur: "Poids à l'arrivée requis" }); return; }
   try {
     const updated = await svc.confirmerArrivee(id, coop, req.user!.id, {
       poidsArrivee_kg: Number(poidsArrivee_kg),
+      nombreSacsArrivee: nombreSacsArrivee != null && nombreSacsArrivee !== "" ? Number(nombreSacsArrivee) : undefined,
       motifEcart: motifEcart ? String(motifEcart) : undefined,
       notes: notes ? String(notes) : undefined,
     });

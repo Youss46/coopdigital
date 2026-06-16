@@ -357,6 +357,8 @@ export async function listTransferts(
       poidsDepart_kg:   transfertsStockTable.poidsDepart_kg,
       poidsArrivee_kg:  transfertsStockTable.poidsArrivee_kg,
       ecartKg:          transfertsStockTable.ecartKg,
+      nombreSacs:       transfertsStockTable.nombreSacs,
+      nombreSacsArrivee: transfertsStockTable.nombreSacsArrivee,
       motifEcart:       transfertsStockTable.motifEcart,
       dateDepart:       transfertsStockTable.dateDepart,
       dateArrivee:      transfertsStockTable.dateArrivee,
@@ -522,7 +524,7 @@ export async function confirmerArrivee(
   transfertId: number,
   cooperativeId: number,
   confirmeParId: number,
-  data: { poidsArrivee_kg: number; motifEcart?: string; notes?: string },
+  data: { poidsArrivee_kg: number; nombreSacsArrivee?: number; motifEcart?: string; notes?: string },
 ) {
   const [t] = await db
     .select()
@@ -548,6 +550,7 @@ export async function confirmerArrivee(
     .set({
       statut: statutFinal,
       poidsArrivee_kg: String(data.poidsArrivee_kg),
+      nombreSacsArrivee: data.nombreSacsArrivee ?? null,
       ecartKg: String(ecartKg),
       motifEcart: (data.motifEcart as typeof t.motifEcart) ?? null,
       dateArrivee: new Date(),
