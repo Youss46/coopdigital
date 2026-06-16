@@ -133,6 +133,11 @@ export default function StocksPage() {
     mouvements.filter((m) => m.type === "entree").reduce((s, m) => s + (m.nombreSacs ?? 0), 0) -
     mouvements.filter((m) => m.type === "sortie").reduce((s, m) => s + (m.nombreSacs ?? 0), 0);
 
+  const sacsTotalStock = entrepots.reduce(
+    (s, e) => s + ((e as typeof e & { nombreSacsTotal?: number }).nombreSacsTotal ?? 0),
+    0,
+  );
+
   const handleSubmitMouvement = () => {
     if (!form.entrepotId || !form.poidsKg) return;
     const data = {
@@ -208,7 +213,7 @@ export default function StocksPage() {
       {/* Cartes KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: "Stock total", val: formaterPoids(stockTotal), icon: Warehouse, color: "#1a4731", sub: sacsTotalNets > 0 ? `${sacsTotalNets} sac${sacsTotalNets > 1 ? "s" : ""}` : null },
+          { label: "Stock total", val: formaterPoids(stockTotal), icon: Warehouse, color: "#1a4731", sub: sacsTotalStock > 0 ? `${sacsTotalStock} sac${sacsTotalStock > 1 ? "s" : ""}` : null },
           { label: "Entrées (historique)", val: formaterPoids(entreesTotal), icon: TrendingUp, color: "#22c55e", sub: null },
           { label: "Sorties (historique)", val: formaterPoids(sortiesTotal), icon: TrendingDown, color: "#ef4444", sub: null },
         ].map(({ label, val, icon: Icon, color, sub }) => (
