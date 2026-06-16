@@ -135,7 +135,7 @@ export async function proposerEcriture(
     return { mode: "manuel", statut: "en_attente" };
   } catch (err) {
     logger.error({ err, payload }, "Erreur proposerEcriture");
-    return { mode: "manuel", statut: "en_attente" };
+    throw err;
   }
 }
 
@@ -284,4 +284,49 @@ export async function generateEcrituresSalaire(cooperativeId: number, params: {
   }
 
   await Promise.all(promises);
+}
+
+/**
+ * Insère les écritures salaire directement dans le journal (sans passer par "en attente").
+ * Utilisé pour la réconciliation de paiements historiques.
+ */
+export async function insererEcrituresSalaireDirectes(cooperativeId: number, params: {
+  bulletinId: number;
+  personnelNom: string;
+  salaireNetFcfa: number;
+  salaireBrutFcfa: number;
+  cotisationsSalarieFcfa: number;
+  datePaiement: string;
+  compteCredit?: string;
+}) {
+  const { bulletinId, personnelNom, salaireNetFcfa, salaireBrutFcfa, cotisationsSalarieFcfa, datePaiement, compteCredit = "521" } = params;
+  const piece = `SAL-${bulletinId}`;
+  const exercice = new Date(datePaiement).getFullYear();
+
+  async function inserer(libelle: string, compteDebit: string, compteCredit: string, montantFcfa: number) {
+    const [inserted] = await db.insert(ecrituresComptablesTable).values({
+      cooperativeId,
+      dateEcriture: datePaiement,
+      numeroPiece: piece,
+      libelle,
+      compteDebit,
+      compteCredit,
+      montantFcfa: Math.round(montantFcfa),
+      source: "salaire",
+      sourceId: bulletinId,
+      exercice,
+    }).returning({ id: ecrituresComptablesTable.id });
+    if (inserted) {
+      await assignerNumeroPiece(inserted.id, "salaire", exercice);
+    }
+  }
+
+  const taches = [
+    inserer(`Charge de personnel – ${personnelNom}`, "661", "421", salaireBrutFcfa),
+    inserer(`Versement salaire net – ${personnelNom}`, "421", compteCredit, salaireNetFcfa),
+  ];
+  if (cotisationsSalarieFcfa > 0) {
+    taches.push(inserer(`Cotisations CNPS salarié – ${personnelNom}`, "431", "421", cotisationsSalarieFcfa));
+  }
+  await Promise.all(taches);
 }

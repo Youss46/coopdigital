@@ -14,7 +14,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql, inArray, notExists } from "drizzle-orm";
 import { generateBulletin, generateMasse } from "../services/paieService";
-import { generateEcrituresSalaire } from "../services/comptabiliteService";
+import { generateEcrituresSalaire, insererEcrituresSalaireDirectes } from "../services/comptabiliteService";
 import { generateBulletinPaie } from "../services/pdfService";
 import { debitCaisseForSalaire, listCaisses } from "../services/caisseService";
 import { debitBanqueForSalaire, listComptes as listComptessBanque } from "../services/banqueService";
@@ -1030,7 +1030,7 @@ export async function reconcilierEcrituresSalaires(req: Request, res: Response):
   try {
     const cid = coopId(req);
 
-    // Bulletins payés sans aucune écriture (ni journal ni en attente) portant leur sourceId
+    // Bulletins payés sans écriture dans le journal (on ignore "en attente" — on les nettoiera)
     const bulletinsPaye = await db
       .select({
         id: bulletinsPaieTable.id,
@@ -1054,20 +1054,11 @@ export async function reconcilierEcrituresSalaires(req: Request, res: Response):
                 eq(ecrituresComptablesTable.sourceId, bulletinsPaieTable.id),
               ))
           ),
-          notExists(
-            db.select({ x: sql`1` })
-              .from(ecrituresEnAttenteTable)
-              .where(and(
-                eq(ecrituresEnAttenteTable.cooperativeId, cid),
-                eq(ecrituresEnAttenteTable.source, "salaire"),
-                eq(ecrituresEnAttenteTable.sourceId, bulletinsPaieTable.id),
-              ))
-          ),
         )
       );
 
     if (bulletinsPaye.length === 0) {
-      res.json({ reconcilies: 0, message: "Aucun bulletin sans écriture trouvé" });
+      res.json({ reconcilies: 0, message: "Tous les bulletins payés ont déjà leurs écritures dans le journal" });
       return;
     }
 
@@ -1079,12 +1070,20 @@ export async function reconcilierEcrituresSalaires(req: Request, res: Response):
       .where(inArray(personnelTable.id, personnelIds));
     const personnelMap = Object.fromEntries(personnelRows.map(p => [p.id, p]));
 
-    // Générer les écritures manquantes
     let reconcilies = 0;
     const erreurs: { bulletinId: number; erreur: string }[] = [];
 
     for (const b of bulletinsPaye) {
       try {
+        // Supprimer les éventuelles écritures en_attente issues d'un précédent run raté
+        await db.delete(ecrituresEnAttenteTable).where(
+          and(
+            eq(ecrituresEnAttenteTable.cooperativeId, cid),
+            eq(ecrituresEnAttenteTable.source, "salaire"),
+            eq(ecrituresEnAttenteTable.sourceId, b.id),
+          )
+        );
+
         const p = personnelMap[b.personnelId];
         const personnelNom = p ? `${p.prenoms} ${p.nom}` : `Personnel #${b.personnelId}`;
         const compteCredit = b.compteSourceType === "caisse" ? "571" : b.compteSourceType === "mobile" ? "554" : "521";
@@ -1092,7 +1091,7 @@ export async function reconcilierEcrituresSalaires(req: Request, res: Response):
           ? new Date(b.datePaiement).toISOString().split("T")[0]!
           : new Date().toISOString().split("T")[0]!;
 
-        await generateEcrituresSalaire(cid, {
+        await insererEcrituresSalaireDirectes(cid, {
           bulletinId: b.id,
           personnelNom,
           salaireNetFcfa: b.salaireNetFcfa,
@@ -1112,7 +1111,7 @@ export async function reconcilierEcrituresSalaires(req: Request, res: Response):
       reconcilies,
       total: bulletinsPaye.length,
       erreurs: erreurs.length > 0 ? erreurs : undefined,
-      message: `${reconcilies} écriture(s) générée(s) sur ${bulletinsPaye.length} bulletin(s) sans écriture`,
+      message: `${reconcilies} écriture(s) enregistrée(s) dans le journal sur ${bulletinsPaye.length} bulletin(s) traité(s)`,
     });
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
