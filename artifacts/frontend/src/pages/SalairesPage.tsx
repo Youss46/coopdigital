@@ -35,6 +35,7 @@ import {
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/hooks/useConfirm";
 
 import { openPdfViewer } from "@/lib/pdfViewer";
 
@@ -170,6 +171,7 @@ export default function SalairesPage() {
 
 function TabPersonnel() {
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
   const [showCreate, setShowCreate] = useState(false);
   const [editPersonnel, setEditPersonnel] = useState<Personnel | null>(null);
   const [search, setSearch] = useState("");
@@ -189,7 +191,7 @@ function TabPersonnel() {
   const inactifs = filtered.filter((p: Personnel) => p.statut !== "actif");
 
   async function handleArchiver(id: number, nom: string) {
-    if (!confirm(`Archiver ${nom} ? Cette action est irréversible.`)) return;
+    if (!await confirm({ title: "Archiver ce membre", description: `Archiver ${nom} ? Cette action est irréversible.`, confirmLabel: "Archiver", variant: "destructive" })) return;
     try {
       await archiver.mutateAsync({ id });
       toast({ title: "Personnel archivé" });
@@ -204,6 +206,7 @@ function TabPersonnel() {
 
   return (
     <div className="space-y-4">
+      {ConfirmDialog}
       <div className="flex flex-col sm:flex-row gap-3 justify-between">
         <input
           className={INPUT_CLS + " sm:w-72"}
@@ -414,6 +417,7 @@ function PersonnelTable({
 
 function TabPaie() {
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
   const now = new Date();
   const [mois, setMois] = useState(now.getMonth() + 1);
   const [annee, setAnnee] = useState(now.getFullYear());
@@ -446,7 +450,7 @@ function TabPaie() {
   const supprimer = useDeleteBulletin();
 
   async function handleGenerer() {
-    if (!confirm(`Générer les bulletins de paie pour ${MOIS_NOMS[mois]} ${annee} ?`)) return;
+    if (!await confirm({ title: "Générer la paie", description: `Générer les bulletins de paie pour ${MOIS_NOMS[mois]} ${annee} ?`, confirmLabel: "Générer" })) return;
     setGenerating(true);
     try {
       const res = await generer.mutateAsync({ data: { mois, annee } });
@@ -483,7 +487,7 @@ function TabPaie() {
   }
 
   async function handleSupprimer(id: number) {
-    if (!confirm("Supprimer ce bulletin brouillon ?")) return;
+    if (!await confirm({ title: "Supprimer le bulletin", description: "Supprimer ce bulletin brouillon ? Cette action est irréversible.", confirmLabel: "Supprimer", variant: "destructive" })) return;
     try {
       await supprimer.mutateAsync({ id });
       toast({ title: "Bulletin supprimé" });
@@ -496,7 +500,7 @@ function TabPaie() {
   async function handleValiderTous() {
     const brouillons = (bulletins ?? [] as BulletinAvecPersonnel[]).filter((b: BulletinAvecPersonnel) => b.bulletin.statut === "brouillon");
     if (brouillons.length === 0) return;
-    if (!confirm(`Valider les ${brouillons.length} bulletins en brouillon ?`)) return;
+    if (!await confirm({ title: "Valider tous les bulletins", description: `Valider les ${brouillons.length} bulletin(s) en brouillon ? Ils ne pourront plus être modifiés.`, confirmLabel: "Valider tout" })) return;
     for (const b of brouillons) {
       try { await valider.mutateAsync({ id: b.bulletin.id }); } catch { /* skip */ }
     }
@@ -512,6 +516,7 @@ function TabPaie() {
 
   return (
     <div className="space-y-4">
+      {ConfirmDialog}
       {/* Sélecteur période */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <div className="flex flex-wrap items-end gap-4">
@@ -887,6 +892,7 @@ function TabMasse() {
 
 function TabAvances() {
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
   const [showCreate, setShowCreate] = useState(false);
   const canGerer = usePermission("salaires", "gerer_avances");
 
@@ -894,7 +900,7 @@ function TabAvances() {
   const rembourser = useRembourserAvancePersonnel();
 
   async function handleRembourser(id: number) {
-    if (!confirm("Marquer cette avance comme entièrement remboursée ?")) return;
+    if (!await confirm({ title: "Rembourser l'avance", description: "Marquer cette avance comme entièrement remboursée ?", confirmLabel: "Rembourser" })) return;
     try {
       await rembourser.mutateAsync({ id, data: {} });
       toast({ title: "Avance remboursée" });
@@ -914,6 +920,7 @@ function TabAvances() {
 
   return (
     <div className="space-y-4">
+      {ConfirmDialog}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
           <p className="text-xs text-gray-500 mb-1">Avances en cours</p>
