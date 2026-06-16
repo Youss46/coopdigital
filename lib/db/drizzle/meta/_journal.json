@@ -274,6 +274,13 @@
       "when": 1782144240000,
       "tag": "0038_mouvements_stock_nombre_sacs",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1782144300000,
+      "tag": "0039_config_paie",
+      "breakpoints": true
     }
   ]
 }
