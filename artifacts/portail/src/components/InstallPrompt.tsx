@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Download, X, Wifi, WifiOff, Share, Plus, Smartphone, RefreshCw, CheckCircle } from "lucide-react";
 import { useOffline } from "@/contexts/OfflineContext";
 
@@ -265,12 +265,24 @@ export function OfflineBanner() {
 
 export function OnlineToast() {
   const { syncStatus, syncResult } = useOffline();
-  const [show, setShow]            = useState(false);
+  const [show, setShow]             = useState(false);
   const [wasOffline, setWasOffline] = useState(!navigator.onLine);
+  const autoHideRef                 = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const onOnline  = () => { setWasOffline(false); setShow(true); };
-    const onOffline = () => setWasOffline(true);
+    const onOnline = () => {
+      setWasOffline(false);
+      if (wasOffline) {
+        setShow(true);
+        if (autoHideRef.current) clearTimeout(autoHideRef.current);
+        autoHideRef.current = setTimeout(() => setShow(false), 4000);
+      }
+    };
+    const onOffline = () => {
+      setWasOffline(true);
+      setShow(false);
+      if (autoHideRef.current) clearTimeout(autoHideRef.current);
+    };
     window.addEventListener("online",  onOnline);
     window.addEventListener("offline", onOffline);
     return () => {
@@ -282,8 +294,11 @@ export function OnlineToast() {
   useEffect(() => {
     if (syncStatus !== "done") return;
     setShow(true);
-    const t = setTimeout(() => setShow(false), 4000);
-    return () => clearTimeout(t);
+    if (autoHideRef.current) clearTimeout(autoHideRef.current);
+    autoHideRef.current = setTimeout(() => setShow(false), 4000);
+    return () => {
+      if (autoHideRef.current) clearTimeout(autoHideRef.current);
+    };
   }, [syncStatus]);
 
   if (!show) return null;
