@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Download, X, Wifi, WifiOff, Share, Plus, Smartphone } from "lucide-react";
+import { Download, X, Wifi, WifiOff, Share, Plus, Smartphone, RefreshCw, CheckCircle } from "lucide-react";
+import { useOffline } from "@/contexts/OfflineContext";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -230,48 +231,71 @@ export function InstallBanner() {
 // ─── Indicateur hors-ligne ────────────────────────────────────────────────────
 
 export function OfflineBanner() {
-  const [online, setOnline] = useState(() => navigator.onLine);
+  const { isOnline, pendingPhotoCount, syncStatus } = useOffline();
 
-  useEffect(() => {
-    const on  = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener("online",  on);
-    window.addEventListener("offline", off);
-    return () => {
-      window.removeEventListener("online",  on);
-      window.removeEventListener("offline", off);
-    };
-  }, []);
+  if (isOnline && syncStatus === "idle") return null;
 
-  if (online) return null;
+  if (!isOnline) {
+    return (
+      <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-sm font-medium px-4 py-2 flex items-center justify-center gap-2">
+        <WifiOff size={16} className="shrink-0" />
+        <span>
+          Hors connexion
+          {pendingPhotoCount > 0
+            ? " — photo en attente de synchronisation"
+            : " — données mises en cache affichées"}
+        </span>
+      </div>
+    );
+  }
 
-  return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-sm font-medium px-4 py-2 flex items-center justify-center gap-2">
-      <WifiOff size={16} />
-      <span>Hors connexion — données mises en cache affichées</span>
-    </div>
-  );
+  if (syncStatus === "syncing") {
+    return (
+      <div className="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white text-sm font-medium px-4 py-2 flex items-center justify-center gap-2">
+        <RefreshCw size={16} className="animate-spin shrink-0" />
+        Synchronisation de la photo…
+      </div>
+    );
+  }
+
+  return null;
 }
 
 // ─── Indicateur retour en ligne ───────────────────────────────────────────────
 
 export function OnlineToast() {
-  const [show, setShow] = useState(false);
+  const { syncStatus, syncResult } = useOffline();
+  const [show, setShow]            = useState(false);
+  const [wasOffline, setWasOffline] = useState(!navigator.onLine);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const on = () => {
-      setShow(true);
-      timer = setTimeout(() => setShow(false), 3000);
-    };
-    window.addEventListener("online", on);
+    const onOnline  = () => { setWasOffline(false); setShow(true); };
+    const onOffline = () => setWasOffline(true);
+    window.addEventListener("online",  onOnline);
+    window.addEventListener("offline", onOffline);
     return () => {
-      window.removeEventListener("online", on);
-      clearTimeout(timer);
+      window.removeEventListener("online",  onOnline);
+      window.removeEventListener("offline", onOffline);
     };
-  }, []);
+  }, [wasOffline]);
+
+  useEffect(() => {
+    if (syncStatus !== "done") return;
+    setShow(true);
+    const t = setTimeout(() => setShow(false), 4000);
+    return () => clearTimeout(t);
+  }, [syncStatus]);
 
   if (!show) return null;
+
+  if (syncStatus === "done" && syncResult?.succes) {
+    return (
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-full flex items-center gap-2 shadow-lg animate-in fade-in slide-in-from-top-2">
+        <CheckCircle size={16} />
+        Photo synchronisée
+      </div>
+    );
+  }
 
   return (
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-full flex items-center gap-2 shadow-lg animate-in fade-in slide-in-from-top-2">

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { api, getToken, type Livraison, type Profil } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { queuePhoto } from "@/lib/idb";
 import {
   Loader2, ArrowLeft, Download, FileText, CreditCard,
   Camera, CheckCircle2, AlertCircle, User,
@@ -45,6 +46,7 @@ export default function DocumentsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoSuccess, setPhotoSuccess] = useState(false);
+  const [photoOffline, setPhotoOffline] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [localPhotoUrl, setLocalPhotoUrl] = useState<string | null>(null);
 
@@ -62,9 +64,18 @@ export default function DocumentsPage() {
     if (!file) return;
     setPhotoError(null);
     setPhotoSuccess(false);
+    setPhotoOffline(false);
     setPhotoUploading(true);
     try {
       const dataUrl = await compressImage(file, 400, 0.78);
+      if (!navigator.onLine) {
+        await queuePhoto(crypto.randomUUID(), dataUrl);
+        setLocalPhotoUrl(dataUrl);
+        if (profil) login({ ...profil, photoUrl: dataUrl });
+        setPhotoOffline(true);
+        setTimeout(() => setPhotoOffline(false), 6000);
+        return;
+      }
       await api.uploadPhoto(dataUrl);
       setLocalPhotoUrl(dataUrl);
       setPhotoSuccess(true);
@@ -185,6 +196,12 @@ export default function DocumentsPage() {
               {photoSuccess && (
                 <div className="flex items-center gap-1.5 justify-center text-green-600 text-sm">
                   <CheckCircle2 className="w-4 h-4" /> Photo mise à jour !
+                </div>
+              )}
+              {photoOffline && (
+                <div className="flex items-center gap-1.5 justify-center text-amber-700 text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  Photo enregistrée localement — sera envoyée dès le retour en ligne
                 </div>
               )}
               {photoError && (

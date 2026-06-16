@@ -29,7 +29,8 @@ async function apiFetch<T>(path: string): Promise<T> {
 
 interface EntrepotDelegue { id: number; nom: string; zoneNom: string | null; actif: boolean; }
 import { getGetDashboardQueryKey, getGetDashboardLivraisonsQueryKey } from "@workspace/api-client-react";
-import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp, Sprout, AlertTriangle, Tag, ArrowLeft } from "lucide-react";
+import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp, Sprout, AlertTriangle, Tag, ArrowLeft, CloudOff } from "lucide-react";
+import { queueOp } from "@/lib/idb";
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -57,7 +58,7 @@ export default function NouvelleLivraison() {
   const [datePaiementPrevue, setDatePaiementPrevue] = useState("");
   const [dateLivraison, setDateLivraison] = useState(new Date().toISOString().split("T")[0]!);
   const [showOptions, setShowOptions] = useState(false);
-  const [succes, setSucces] = useState<{ montantNet: number; avanceDeduite: number; intrantsDeduits: number } | null>(null);
+  const [succes, setSucces] = useState<{ montantNet: number; avanceDeduite: number; intrantsDeduits: number; isHorsLigne?: boolean } | null>(null);
 
   const { data: campagneActive } = useGetCampagneActive();
   const { data: balancesData } = useGetBalances();
@@ -151,8 +152,6 @@ export default function NouvelleLivraison() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!membreSelectionne || poidsNet <= 0 || prix <= 0) return;
-    // La double pesée est obligatoire si poids > seuil — mais on laisse quand même soumettre (avertissement visible)
-    // Résoudre le choix d'entrepôt : "central_5" ou "delegue_3"
     let resolvedEntrepotId: number | null = null;
     let resolvedEntrepotDelegueId: number | null = null;
     if (entrepotSelection.startsWith("central_")) {
@@ -161,31 +160,47 @@ export default function NouvelleLivraison() {
       resolvedEntrepotDelegueId = parseInt(entrepotSelection.slice("delegue_".length));
     }
 
-    mutation.mutate({
-      data: {
-        membreId: membreSelectionne.id,
-        poidsKg: poidsNet,
-        prixUnitaireFcfa: prix,
-        dateLivraison,
-        modePaiement,
-        campagneId: campagneActive?.id ?? null,
-        nombreSacs: nombreSacs ? parseInt(nombreSacs) : null,
-        retenueKg: retenueTotal > 0 ? retenueTotal : null,
-        sectionLivraison: sectionLivraison || null,
-        entrepotId: resolvedEntrepotId,
-        entrepotDelegueId: resolvedEntrepotDelegueId,
-        ...(modePaiement === "differe" && datePaiementPrevue ? { datePaiementPrevue } : {}),
-      },
-    });
+    const payload = {
+      membreId: membreSelectionne.id,
+      poidsKg: poidsNet,
+      prixUnitaireFcfa: prix,
+      dateLivraison,
+      modePaiement,
+      campagneId: campagneActive?.id ?? null,
+      nombreSacs: nombreSacs ? parseInt(nombreSacs) : null,
+      retenueKg: retenueTotal > 0 ? retenueTotal : null,
+      sectionLivraison: sectionLivraison || null,
+      entrepotId: resolvedEntrepotId,
+      entrepotDelegueId: resolvedEntrepotDelegueId,
+      ...(modePaiement === "differe" && datePaiementPrevue ? { datePaiementPrevue } : {}),
+    };
+
+    if (!navigator.onLine) {
+      void queueOp({ localId: crypto.randomUUID(), type: "livraison", data: payload });
+      setSucces({ montantNet, avanceDeduite, intrantsDeduits, isHorsLigne: true });
+      return;
+    }
+
+    mutation.mutate({ data: payload });
   };
 
   if (succes) {
     return (
       <div className="max-w-md mx-auto mt-12 text-center space-y-4">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-          <CheckCircle className="text-green-600" size={36} />
+        <div className={`w-16 h-16 rounded-full ${succes.isHorsLigne ? "bg-amber-100" : "bg-green-100"} flex items-center justify-center mx-auto`}>
+          {succes.isHorsLigne
+            ? <CloudOff className="text-amber-600" size={36} />
+            : <CheckCircle className="text-green-600" size={36} />
+          }
         </div>
-        <h2 className="text-xl font-bold text-gray-900">Livraison enregistrée !</h2>
+        <h2 className="text-xl font-bold text-gray-900">
+          {succes.isHorsLigne ? "Livraison enregistrée hors ligne" : "Livraison enregistrée !"}
+        </h2>
+        {succes.isHorsLigne && (
+          <p className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5">
+            Sera synchronisée automatiquement dès le retour en ligne. Les montants indiqués sont des estimations calculées localement.
+          </p>
+        )}
         <div className="bg-white rounded-xl border border-gray-200 p-5 text-left space-y-3">
           <div className="flex justify-between">
             <span className="text-gray-500 text-sm">Producteur</span>

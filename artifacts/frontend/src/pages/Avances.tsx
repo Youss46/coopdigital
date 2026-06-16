@@ -12,9 +12,10 @@ import {
   getGetScoringResumeQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { PlusCircle, TrendingDown, Banknote, Clock, FileDown } from "lucide-react";
+import { PlusCircle, TrendingDown, Banknote, Clock, FileDown, CloudOff } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 import { openPdfViewer } from "@/lib/pdfViewer";
+import { queueOp } from "@/lib/idb";
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -42,6 +43,7 @@ export default function Avances() {
   const [filtreStatut, setFiltreStatut] = useState<"" | "en_cours" | "rembourse" | "en_retard">("");
   const [modalRemboursement, setModalRemboursement] = useState<{ id: number; solde: number; nom: string } | null>(null);
   const [montantRemboursement, setMontantRemboursement] = useState("");
+  const [notifHorsLigne, setNotifHorsLigne] = useState<string | null>(null);
 
   const { data: encours } = useGetAvancesEncours();
   const { data: avancesData, isLoading } = useGetAvances({ statut: filtreStatut || undefined });
@@ -87,15 +89,22 @@ export default function Avances() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.membreId || !form.montantOctroyeFcfa) return;
-    mutation.mutate({
-      data: {
-        membreId: parseInt(form.membreId),
-        montantOctroyeFcfa: parseInt(form.montantOctroyeFcfa),
-        dateOctroi: form.dateOctroi,
-        dateEcheance: form.dateEcheance || undefined,
-        motif: form.motif || undefined,
-      },
-    });
+    const payload = {
+      membreId: parseInt(form.membreId),
+      montantOctroyeFcfa: parseInt(form.montantOctroyeFcfa),
+      dateOctroi: form.dateOctroi,
+      dateEcheance: form.dateEcheance || undefined,
+      motif: form.motif || undefined,
+    };
+    if (!navigator.onLine) {
+      void queueOp({ localId: crypto.randomUUID(), type: "avance", data: payload });
+      setModalOuvert(false);
+      setForm({ membreId: "", montantOctroyeFcfa: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+      setNotifHorsLigne("Avance enregistrée hors ligne — sera synchronisée dès le retour en ligne");
+      setTimeout(() => setNotifHorsLigne(null), 6000);
+      return;
+    }
+    mutation.mutate({ data: payload });
   };
 
   const ouvrirRemboursement = (id: number, solde: number, nom: string) => {
@@ -107,6 +116,18 @@ export default function Avances() {
     if (!modalRemboursement) return;
     const montant = parseInt(montantRemboursement.replace(/\D/g, ""));
     if (isNaN(montant) || montant <= 0) return;
+    if (!navigator.onLine) {
+      void queueOp({
+        localId: crypto.randomUUID(),
+        type: "remboursement",
+        data: { avanceId: modalRemboursement.id, montantFcfa: Math.min(montant, modalRemboursement.solde) },
+      });
+      setModalRemboursement(null);
+      setMontantRemboursement("");
+      setNotifHorsLigne("Remboursement enregistré hors ligne — sera synchronisé dès le retour en ligne");
+      setTimeout(() => setNotifHorsLigne(null), 6000);
+      return;
+    }
     mutationRembourser.mutate(
       { id: modalRemboursement.id, data: { montantFcfa: Math.min(montant, modalRemboursement.solde) } },
       { onSuccess: () => { setModalRemboursement(null); setMontantRemboursement(""); } }
@@ -115,6 +136,12 @@ export default function Avances() {
 
   return (
     <div className="space-y-5">
+      {notifHorsLigne && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm">
+          <CloudOff size={16} className="shrink-0" />
+          {notifHorsLigne}
+        </div>
+      )}
       {/* En-tête */}
       <div className="flex items-center justify-between">
         <div>

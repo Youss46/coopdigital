@@ -66,6 +66,7 @@ import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
 import { OfflineBanner, OnlineToast } from "@/components/OfflineIndicator";
+import { OfflineProvider } from "@/contexts/OfflineContext";
 import PdfViewerModal from "@/components/PdfViewerModal";
 
 const queryClient = new QueryClient({
@@ -277,16 +278,18 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {!splashTermine && <SplashScreen onTermine={handleSplashTermine} />}
-      <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-        <AuthProvider>
-          <OfflineBanner />
-          <OnlineToast />
-          <AppRoutes />
-          <Toaster />
-          <PdfViewerModal />
-        </AuthProvider>
-      </WouterRouter>
+      <OfflineProvider>
+        {!splashTermine && <SplashScreen onTermine={handleSplashTermine} />}
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <AuthProvider>
+            <OfflineBanner />
+            <OnlineToast />
+            <AppRoutes />
+            <Toaster />
+            <PdfViewerModal />
+          </AuthProvider>
+        </WouterRouter>
+      </OfflineProvider>
     </QueryClientProvider>
   );
 }

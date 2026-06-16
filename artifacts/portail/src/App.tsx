@@ -1,5 +1,6 @@
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { OfflineProvider } from "@/contexts/OfflineContext";
 import ConnexionPage from "@/pages/ConnexionPage";
 import DashboardPage from "@/pages/DashboardPage";
 import LivraisonsPage from "@/pages/LivraisonsPage";
@@ -68,13 +69,15 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-        <OfflineBanner />
-        <OnlineToast />
-        <PushSetup />
-        <AppRoutes />
-        <InstallBanner />
-      </WouterRouter>
+      <OfflineProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <OfflineBanner />
+          <OnlineToast />
+          <PushSetup />
+          <AppRoutes />
+          <InstallBanner />
+        </WouterRouter>
+      </OfflineProvider>
     </AuthProvider>
   );
 }
