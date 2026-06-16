@@ -1183,6 +1183,7 @@ function CaissesDelegueesTab({ caisses }: { caisses: Caisse[] | null }) {
       if (!r.ok) throw new Error((await r.json()).erreur ?? "Erreur");
       setDelegues(await r.json());
     } catch (e) {
+      if (!navigator.onLine) return;
       toast({ title: "Erreur", description: (e as Error).message, variant: "destructive" });
     } finally { setLoading(false); }
   }, [toast]);
@@ -1196,6 +1197,7 @@ function CaissesDelegueesTab({ caisses }: { caisses: Caisse[] | null }) {
       if (!r.ok) throw new Error((await r.json()).erreur ?? "Erreur");
       setDetail(await r.json());
     } catch (e) {
+      if (!navigator.onLine) return;
       toast({ title: "Erreur", description: (e as Error).message, variant: "destructive" });
     }
   };
@@ -1404,6 +1406,7 @@ export default function CaissePage() {
       if (!r.ok) throw new Error((await r.json()).error ?? "Erreur");
       setCaisses(await r.json());
     } catch (e) {
+      if (!navigator.onLine) return;
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
     } finally { setLoading(false); }
   }, [toast]);
