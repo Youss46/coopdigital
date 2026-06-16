@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { Download, X, Wifi, WifiOff, Share, Plus, Smartphone, RefreshCw, CheckCircle } from "lucide-react";
 import { useOffline } from "@/contexts/OfflineContext";
 
@@ -232,6 +233,7 @@ export function InstallBanner() {
 
 export function OfflineBanner() {
   const { isOnline, pendingPhotoCount, syncStatus } = useOffline();
+  const [, setLoc] = useLocation();
 
   if (isOnline && syncStatus === "idle") return null;
 
@@ -241,9 +243,17 @@ export function OfflineBanner() {
         <WifiOff size={16} className="shrink-0" />
         <span>
           Hors connexion
-          {pendingPhotoCount > 0
-            ? " — photo en attente de synchronisation"
-            : " — données mises en cache affichées"}
+          {pendingPhotoCount > 0 ? (
+            <>
+              {" — "}
+              <button
+                onClick={() => setLoc("/ops-en-attente")}
+                className="underline underline-offset-2 font-bold"
+              >
+                {pendingPhotoCount} opération{pendingPhotoCount > 1 ? "s" : ""} en attente
+              </button>
+            </>
+          ) : " — données mises en cache affichées"}
         </span>
       </div>
     );

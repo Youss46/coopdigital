@@ -104,6 +104,49 @@ export async function markPhotoError(localId: string, erreur: string): Promise<v
   });
 }
 
+export async function getAllPhotos(): Promise<PendingPhoto[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_photos", "readonly", db);
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const list = (req.result as PendingPhoto[]).sort((a, b) => b.timestamp - a.timestamp);
+      resolve(list);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deletePhoto(localId: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_photos", "readwrite", db);
+    const req = store.delete(localId);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+export async function resetPhotoToRetry(localId: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_photos", "readwrite", db);
+    const getReq = store.get(localId);
+    getReq.onsuccess = () => {
+      const p = getReq.result as PendingPhoto;
+      if (p) {
+        p.status     = "pending";
+        p.errorMsg   = undefined;
+        p.tentatives = 0;
+        const putReq = store.put(p);
+        putReq.onsuccess = () => resolve();
+        putReq.onerror   = () => reject(putReq.error);
+      } else resolve();
+    };
+    getReq.onerror = () => reject(getReq.error);
+  });
+}
+
 export async function incrementPhotoTentatives(localId: string): Promise<number> {
   const db = await openDb();
   return new Promise((resolve, reject) => {

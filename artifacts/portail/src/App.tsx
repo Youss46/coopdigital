@@ -10,6 +10,7 @@ import DocumentsPage from "@/pages/DocumentsPage";
 import { InstallBanner, OfflineBanner, OnlineToast } from "@/components/InstallPrompt";
 import { Loader2 } from "lucide-react";
 import VerifierPage from "@/pages/VerifierPage";
+import OpsPendantesPage from "@/pages/OpsPendantesPage";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useEffect } from "react";
 
@@ -61,6 +62,7 @@ function AppRoutes() {
       <Route path="/avances" component={AvancesPage} />
       <Route path="/parts-sociales" component={PartsSocialesPage} />
       <Route path="/documents" component={DocumentsPage} />
+      <Route path="/ops-en-attente" component={OpsPendantesPage} />
       <Route><Redirect to="/" /></Route>
     </Switch>
   );
