@@ -12,6 +12,7 @@ export type NavItemConfig = {
   showAnomaliesBadge?: boolean;
   showEudrAlerteBadge?: boolean;
   showMessagesBadge?: boolean;
+  showPendingOpsBadge?: boolean;
 };
 
 export const NAV_ITEMS: NavItemConfig[] = [
@@ -88,4 +89,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/delegues",               label: "Délégués Localité",         roles: ["pca","directeur","comptable","auditeur"],                                    category: "Organisation" },
   { href: "/administration/comptes", label: "Administration",            roles: ["pca","directeur"],                                                           category: "Organisation" },
   { href: "/parametres",             label: "Paramètres",                roles: ["pca","directeur"],                                                           category: "Organisation" },
+
+  // ── Hors ligne ───────────────────────────────────────────────────────────────
+  { href: "/ops-en-attente", label: "Opérations hors ligne", roles: ["pca","directeur","comptable","delegue","auditeur","magasinier","responsable_tracabilite"], category: "Hors ligne", showPendingOpsBadge: true },
 ];

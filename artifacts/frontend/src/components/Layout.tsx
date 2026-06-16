@@ -47,8 +47,10 @@ import {
   FolderKanban,
   Users2,
   Ship,
+  WifiOff,
 } from "lucide-react";
 import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
+import { useOffline } from "@/contexts/OfflineContext";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import NotificationPanel from "./NotificationPanel";
 import HelpPanel from "./HelpPanel";
@@ -111,6 +113,7 @@ const NAV_ICON_LIST: React.ElementType[] = [
   Users2,         // /delegues
   ShieldCheck,    // /administration/comptes
   Settings,       // /parametres
+  WifiOff,        // /ops-en-attente
 ];
 
 type NavItem = NavItemConfig & { icon: React.ElementType };
@@ -127,6 +130,7 @@ const EUDR_ALERTE_ROLES = ["responsable_tracabilite"];
 function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout: () => void }) {
   const [location] = useLocation();
   const { utilisateur } = useAuth();
+  const { pendingCount } = useOffline();
 
   const showBadge = BADGE_ROLES.includes(utilisateur?.role ?? "");
   const showAnomaliesBadge = ANOMALIE_BADGE_ROLES.includes(utilisateur?.role ?? "");
@@ -197,12 +201,13 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {(navItems as NavItem[])
           .filter(({ roles }) => !roles || roles.includes(utilisateur?.role ?? ""))
-          .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge, showEudrAlerteBadge: hasEudrAlerteBadge, showMessagesBadge: hasMessagesBadge }) => {
+          .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge, showEudrAlerteBadge: hasEudrAlerteBadge, showMessagesBadge: hasMessagesBadge, showPendingOpsBadge: hasPendingOpsBadge }) => {
             const isActive = location === href || location.startsWith(href + "/");
             const badgeCount = hasAnomaliesBadge && showAnomaliesBadge ? nbCritiques
               : hasBadge && showBadge ? nbEnAttente
               : hasEudrAlerteBadge && showEudrAlerteBadge ? nbSectionsAlerte
               : hasMessagesBadge ? nbMessagesNonLus
+              : hasPendingOpsBadge ? pendingCount
               : 0;
             return (
               <Link

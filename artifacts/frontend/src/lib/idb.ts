@@ -153,6 +153,16 @@ export async function markOpError(localId: string, erreur: string): Promise<void
   });
 }
 
+export async function deleteOp(localId: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_ops", "readwrite", db);
+    const req = store.delete(localId);
+    req.onsuccess = () => resolve();
+    req.onerror  = () => reject(req.error);
+  });
+}
+
 export async function incrementTentatives(localId: string): Promise<number> {
   const db = await openDb();
   return new Promise((resolve, reject) => {

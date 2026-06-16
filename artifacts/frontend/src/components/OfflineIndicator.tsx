@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "wouter";
 import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertTriangle } from "lucide-react";
 import { useOffline } from "@/contexts/OfflineContext";
 
@@ -13,9 +14,11 @@ export function OfflineBanner() {
         <WifiOff size={15} className="shrink-0" />
         <span>
           Hors connexion
-          {pendingCount > 0 && (
-            <> — <strong>{pendingCount} opération{pendingCount > 1 ? "s" : ""}</strong> en attente</>
-          )}
+          {pendingCount > 0 ? (
+            <> — <strong>{pendingCount} opération{pendingCount > 1 ? "s" : ""}</strong> en attente
+              {" · "}<Link href="/ops-en-attente" className="underline underline-offset-2">Voir</Link>
+            </>
+          ) : " — données en cache affichées"}
         </span>
       </div>
     );

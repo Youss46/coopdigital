@@ -62,6 +62,7 @@ import NouvelleExpeditionPage from "@/pages/NouvelleExpeditionPage";
 import ExpeditionDetailPage from "@/pages/ExpeditionDetailPage";
 import EntrepotsPage from "@/pages/EntrepotsPage";
 import MonEntrepotPage from "@/pages/MonEntrepotPage";
+import PendingOpsPage from "@/pages/PendingOpsPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
@@ -266,6 +267,9 @@ function AppRoutes() {
       </Route>
       <Route path="/mon-entrepot">
         <ProtectedRoute component={MonEntrepotPage} />
+      </Route>
+      <Route path="/ops-en-attente">
+        <ProtectedRoute component={PendingOpsPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>
