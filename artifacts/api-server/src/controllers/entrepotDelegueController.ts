@@ -1,5 +1,6 @@
 import { type Request, type Response } from "express";
 import * as svc from "../services/entrepotDelegueService.js";
+import { generateRapportTransfert } from "../services/pdfService.js";
 
 function coopId(req: Request): number | null {
   return req.user?.cooperativeId ?? null;
@@ -292,5 +293,21 @@ export async function confirmerDepartHandler(req: Request, res: Response): Promi
   } catch (err) {
     req.log.error({ err }, "confirmerDepart");
     res.status(400).json({ erreur: (err as Error).message });
+  }
+}
+
+export async function getRapportTransfertPdfHandler(req: Request, res: Response): Promise<void> {
+  const coop = coopId(req);
+  if (!coop) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
+  const id = Number(req.params["id"]);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    const buf = await generateRapportTransfert(id, coop);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="transfert-${id}.pdf"`);
+    res.send(buf);
+  } catch (err) {
+    req.log.error({ err }, "getRapportTransfertPdf");
+    res.status(500).json({ erreur: (err as Error).message });
   }
 }

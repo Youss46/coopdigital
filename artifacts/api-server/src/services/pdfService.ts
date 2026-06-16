@@ -20,6 +20,10 @@ import {
   intrantsTable,
   liberationsPartsTable,
   configPartsSocialesTable,
+  transfertsStockTable,
+  entrepotsDeleguesTable,
+  usersTable,
+  cooperativesTable,
 } from "@workspace/db";
 import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
@@ -1394,6 +1398,211 @@ export async function generateListeMembres(
     doc.fillColor(NOIR_L);
     doc.y = rowY + rowH;
   }
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rapport de transfert (bon de livraison entrepôt délégué → central)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateRapportTransfert(transfertId: number, cooperativeId: number): Promise<Buffer> {
+  const [row] = await db
+    .select({
+      id:               transfertsStockTable.id,
+      numeroTransfert:  transfertsStockTable.numeroTransfert,
+      statut:           transfertsStockTable.statut,
+      poidsDepart_kg:   transfertsStockTable.poidsDepart_kg,
+      poidsArrivee_kg:  transfertsStockTable.poidsArrivee_kg,
+      ecartKg:          transfertsStockTable.ecartKg,
+      motifEcart:       transfertsStockTable.motifEcart,
+      nombreSacs:       transfertsStockTable.nombreSacs,
+      nombreSacsArrivee: transfertsStockTable.nombreSacsArrivee,
+      typeVehicule:     transfertsStockTable.typeVehicule,
+      immatriculation:  transfertsStockTable.immatriculation,
+      nomChauffeur:     transfertsStockTable.nomChauffeur,
+      telephoneChauffeur: transfertsStockTable.telephoneChauffeur,
+      dateDepart:       transfertsStockTable.dateDepart,
+      dateArrivee:      transfertsStockTable.dateArrivee,
+      datePrevue:       transfertsStockTable.datePrevue,
+      notes:            transfertsStockTable.notes,
+      entrepotNom:      entrepotsDeleguesTable.nom,
+      entrepotZone:     entrepotsDeleguesTable.zoneNom,
+      entrepotAdresse:  entrepotsDeleguesTable.adresse,
+      delegueNom:       usersTable.nom,
+      deleguePrenoms:   usersTable.prenoms,
+      delegueTel:       usersTable.telephone,
+    })
+    .from(transfertsStockTable)
+    .leftJoin(entrepotsDeleguesTable, eq(entrepotsDeleguesTable.id, transfertsStockTable.entrepotSourceId))
+    .leftJoin(usersTable, eq(usersTable.id, transfertsStockTable.delegueId))
+    .where(eq(transfertsStockTable.id, transfertId))
+    .limit(1);
+
+  if (!row) throw new Error("Transfert introuvable");
+  if (row.id === null) throw new Error("Transfert non trouvé");
+
+  const { doc, endPromise } = makePdfDoc();
+  await drawHeader(doc, cooperativeId, {
+    titre_document: "Bon de Transfert",
+    reference: row.numeroTransfert,
+  });
+
+  const W = PAGE_W - MARGIN * 2;
+  let y = doc.y + 4;
+
+  // ── Bandeau statut ────────────────────────────────────────────────────────
+  const STATUT_CFG: Record<string, { label: string; bg: string; fg: string }> = {
+    planifie:  { label: "PLANIFIÉ",   bg: "#dbeafe", fg: "#1d4ed8" },
+    en_cours:  { label: "EN TRANSIT", bg: "#fef3c7", fg: "#b45309" },
+    arrive:    { label: "ARRIVÉ",     bg: "#ede9fe", fg: "#6d28d9" },
+    confirme:  { label: "CONFIRMÉ",   bg: "#dcfce7", fg: "#15803d" },
+    litige:    { label: "LITIGE",     bg: "#fee2e2", fg: "#b91c1c" },
+  };
+  const sc = STATUT_CFG[row.statut ?? "planifie"] ?? STATUT_CFG["planifie"]!;
+  doc.rect(MARGIN, y, W, 20).fill(sc.bg);
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(sc.fg)
+    .text(`Statut : ${sc.label}`, MARGIN + 8, y + 6, { width: W - 16, lineBreak: false });
+  doc.fillColor("black");
+  y += 28;
+
+  // ── Bloc entrepôt / délégué ───────────────────────────────────────────────
+  const half = (W - 8) / 2;
+  doc.rect(MARGIN, y, half, 60).fill("#f0fdf4").stroke("#bbf7d0");
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica").text("ENTREPÔT SOURCE", MARGIN + 8, y + 5);
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text(row.entrepotNom ?? "—", MARGIN + 8, y + 14);
+  doc.fontSize(8).fillColor("black").font("Helvetica");
+  if (row.entrepotZone) doc.text(`Zone : ${row.entrepotZone}`, MARGIN + 8, y + 26);
+  if (row.entrepotAdresse) doc.text(row.entrepotAdresse, MARGIN + 8, y + 36, { width: half - 16, lineBreak: false });
+
+  const col2 = MARGIN + half + 8;
+  doc.rect(col2, y, half, 60).fill("#f0fdf4").stroke("#bbf7d0");
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica").text("DÉLÉGUÉ RESPONSABLE", col2 + 8, y + 5);
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold")
+    .text(`${row.deleguePrenoms ?? ""} ${row.delegueNom ?? "—"}`.trim(), col2 + 8, y + 14);
+  doc.fontSize(8).fillColor("black").font("Helvetica");
+  if (row.delegueTel) doc.text(`Tél : ${row.delegueTel}`, col2 + 8, y + 26);
+  y += 68;
+
+  // ── Section poids & sacs ──────────────────────────────────────────────────
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("QUANTITÉS", MARGIN, y);
+  y += 14;
+
+  const poidsRows: Array<[string, string, string, string]> = [
+    ["", "DÉPART (expédié)", "ARRIVÉE (reçu)", "ÉCART"],
+  ];
+  const dep_kg  = row.poidsDepart_kg  ? parseFloat(row.poidsDepart_kg).toFixed(2)  : "—";
+  const arr_kg  = row.poidsArrivee_kg ? parseFloat(row.poidsArrivee_kg).toFixed(2) : "—";
+  const ec_kg   = row.ecartKg         ? parseFloat(row.ecartKg).toFixed(2)         : "—";
+  const ec_num  = row.ecartKg         ? parseFloat(row.ecartKg)                    : null;
+  const dep_sac = row.nombreSacs      != null ? String(row.nombreSacs)             : "—";
+  const arr_sac = row.nombreSacsArrivee != null ? String(row.nombreSacsArrivee)    : "—";
+  const ec_sac  = row.nombreSacs != null && row.nombreSacsArrivee != null
+    ? String(row.nombreSacs - row.nombreSacsArrivee)
+    : "—";
+
+  const cws = [120, 120, 120, 135];
+  const cxs = [MARGIN, MARGIN + 120, MARGIN + 240, MARGIN + 360];
+
+  // En-tête tableau
+  doc.rect(MARGIN, y, W, 16).fill(VERT);
+  (["", "DÉPART (expédié)", "ARRIVÉE (reçu)", "ÉCART"] as string[]).forEach((h, i) => {
+    doc.fontSize(7).font("Helvetica-Bold").fillColor("white")
+      .text(h, (cxs[i] ?? MARGIN) + 4, y + 5, { width: (cws[i] ?? 100) - 8, lineBreak: false });
+  });
+  doc.fillColor("black");
+  y += 16;
+
+  const quantRows: Array<[string, string, string, string]> = [
+    ["Poids (kg)", `${dep_kg} kg`, `${arr_kg} kg`, `${ec_kg !== "—" ? `${ec_num! > 0 ? "-" : "+"}${Math.abs(ec_num ?? 0).toFixed(2)}` : "—"} kg`],
+    ["Nombre de sacs", dep_sac, arr_sac, ec_sac !== "—" ? `${parseInt(ec_sac) > 0 ? "-" : "+"}${Math.abs(parseInt(ec_sac))} sac${Math.abs(parseInt(ec_sac)) > 1 ? "s" : ""}` : "—"],
+  ];
+
+  for (const [ri, cols] of quantRows.entries()) {
+    const bg = ri % 2 === 0 ? "#f9fafb" : "white";
+    doc.rect(MARGIN, y, W, 18).fill(bg);
+    doc.rect(MARGIN, y, W, 18).stroke("#e5e7eb");
+    cols.forEach((cell, ci) => {
+      const isEcart = ci === 3 && cell !== "— kg" && cell !== "— sac" && cell !== "—";
+      const ecartBad = isEcart && (cell.startsWith("-"));
+      doc.fontSize(8)
+        .font(ci === 0 ? "Helvetica-Bold" : "Helvetica")
+        .fillColor(ecartBad ? "#b91c1c" : ci === 0 ? GRIS : "black")
+        .text(cell, (cxs[ci] ?? MARGIN) + 4, y + 5, { width: (cws[ci] ?? 100) - 8, lineBreak: false, align: ci > 0 ? "center" : "left" });
+    });
+    doc.fillColor("black");
+    y += 18;
+  }
+
+  // Motif écart si présent
+  if (row.motifEcart) {
+    y += 6;
+    doc.rect(MARGIN, y, W, 18).fill("#fef2f2");
+    doc.fontSize(8).font("Helvetica-Bold").fillColor("#b91c1c")
+      .text("Motif d'écart :", MARGIN + 8, y + 5, { width: 120, lineBreak: false });
+    doc.font("Helvetica").fillColor("black")
+      .text(row.motifEcart, MARGIN + 128, y + 5, { width: W - 136, lineBreak: false });
+    y += 24;
+  }
+
+  y += 12;
+
+  // ── Section transport ──────────────────────────────────────────────────────
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("TRANSPORT", MARGIN, y);
+  y += 14;
+
+  const transportRows: Array<[string, string]> = [
+    ["Type de véhicule", row.typeVehicule ?? "—"],
+    ["Immatriculation",  row.immatriculation ?? "—"],
+    ["Chauffeur",        row.nomChauffeur ?? "—"],
+    ["Téléphone",        row.telephoneChauffeur ?? "—"],
+  ];
+  for (const [ri, [label, val]] of transportRows.entries()) {
+    if (ri % 2 === 0) doc.rect(MARGIN, y, W, 16).fill("#f9fafb");
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica").text(label, MARGIN + 6, y + 4, { width: 150, lineBreak: false });
+    doc.fontSize(8).fillColor("black").font("Helvetica-Bold").text(val, MARGIN + 160, y + 4, { width: W - 166, lineBreak: false });
+    y += 16;
+  }
+  y += 12;
+
+  // ── Section dates ──────────────────────────────────────────────────────────
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("DATES", MARGIN, y);
+  y += 14;
+
+  const dateRows: Array<[string, string]> = [
+    ["Date prévue",  row.datePrevue  ? formaterDate(row.datePrevue)  : "—"],
+    ["Date départ",  row.dateDepart  ? formaterDate(row.dateDepart)  : "—"],
+    ["Date arrivée", row.dateArrivee ? formaterDate(row.dateArrivee) : "—"],
+  ];
+  for (const [ri, [label, val]] of dateRows.entries()) {
+    if (ri % 2 === 0) doc.rect(MARGIN, y, W, 16).fill("#f9fafb");
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica").text(label, MARGIN + 6, y + 4, { width: 150, lineBreak: false });
+    doc.fontSize(8).fillColor("black").font("Helvetica-Bold").text(val, MARGIN + 160, y + 4, { width: W - 166, lineBreak: false });
+    y += 16;
+  }
+
+  // ── Notes ─────────────────────────────────────────────────────────────────
+  if (row.notes) {
+    y += 12;
+    doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("OBSERVATIONS", MARGIN, y);
+    y += 12;
+    doc.rect(MARGIN, y, W, 40).fill("#f9fafb").stroke("#e5e7eb");
+    doc.fontSize(8).fillColor("black").font("Helvetica")
+      .text(row.notes, MARGIN + 8, y + 6, { width: W - 16 });
+    y += 48;
+  }
+
+  // ── Zone signatures ────────────────────────────────────────────────────────
+  y = Math.max(y + 20, 660);
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+    .text("Délégué expéditeur", MARGIN, y, { width: 160, align: "center" })
+    .text("Réceptionnaire (central)", MARGIN + 180, y, { width: 160, align: "center" })
+    .text("Directeur / PCA", MARGIN + 360, y, { width: 130, align: "center" });
+  y += 12;
+  doc.rect(MARGIN,       y, 160, 40).stroke("#d1d5db");
+  doc.rect(MARGIN + 180, y, 160, 40).stroke("#d1d5db");
+  doc.rect(MARGIN + 360, y, 130, 40).stroke("#d1d5db");
 
   await addFooters(doc, cooperativeId);
   doc.end();

@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Warehouse, Package, TrendingDown, TrendingUp, AlertTriangle,
   Plus, CheckCircle2, XCircle, Clock, Truck, ArrowRight, BarChart3,
-  RefreshCw, Eye, Pencil, Power, PowerOff, SlidersHorizontal, ChevronDown, ChevronUp,
+  RefreshCw, Eye, Pencil, Power, PowerOff, SlidersHorizontal, ChevronDown, ChevronUp, FileDown,
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 
@@ -17,6 +17,18 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}/api${path}`, { ...init, headers: { ...hdr(), ...(init?.headers ?? {}) } });
   if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error((b as { erreur?: string }).erreur ?? `Erreur ${res.status}`); }
   return res.json();
+}
+
+async function telechargerPdfTransfert(id: number, numero: string) {
+  const res = await fetch(`${API}/api/transferts/${id}/pdf`, { headers: { Authorization: `Bearer ${tok()}` } });
+  if (!res.ok) throw new Error("Erreur génération PDF");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `bon-transfert-${numero}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function kg(v: string | number | null | undefined) {
@@ -567,16 +579,25 @@ export default function EntrepotsPage() {
                                 ) : <p className="font-semibold text-gray-400">—</p>}
                               </div>
                             </div>
-                            {t.statut === "confirme" && (
+                            <div className="mt-3 flex gap-2">
                               <button
-                                onClick={() => setLocation(lienStock)}
-                                className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                                onClick={() => telechargerPdfTransfert(t.id, t.numeroTransfert).catch(() => {})}
+                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-600 text-xs font-medium hover:bg-gray-100 transition-colors"
+                                title="Télécharger le bon de transfert"
                               >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                Voir dans Stocks
-                                <ArrowRight className="w-3 h-3" />
+                                <FileDown className="w-3.5 h-3.5" />
+                                PDF
                               </button>
-                            )}
+                              {t.statut === "confirme" && (
+                                <button
+                                  onClick={() => setLocation(lienStock)}
+                                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  Voir dans Stocks
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -594,6 +615,7 @@ export default function EntrepotsPage() {
                             <th className="px-4 py-3 text-right">Écart</th>
                             <th className="px-4 py-3 text-center">Statut</th>
                             <th className="px-4 py-3 text-center hidden lg:table-cell">Stock central</th>
+                            <th className="px-3 py-3 text-center">PDF</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -648,6 +670,15 @@ export default function EntrepotsPage() {
                                   ) : (
                                     <span className="text-xs text-gray-300">—</span>
                                   )}
+                                </td>
+                                <td className="px-3 py-3 text-center">
+                                  <button
+                                    onClick={() => telechargerPdfTransfert(t.id, t.numeroTransfert).catch(() => {})}
+                                    title="Télécharger le bon de transfert PDF"
+                                    className="inline-flex items-center justify-center p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                                  >
+                                    <FileDown className="w-4 h-4" />
+                                  </button>
                                 </td>
                               </tr>
                             );
