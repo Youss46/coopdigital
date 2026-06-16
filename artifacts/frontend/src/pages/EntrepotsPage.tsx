@@ -47,6 +47,7 @@ interface Entrepot {
 interface Stats {
   entrepots: Entrepot[];
   stockTotalEntrepotsKg: number;
+  totalSacsEntrepots: number;
   transfertsEnCours: number;
   alertesCapacite: number;
 }
@@ -300,8 +301,17 @@ export default function EntrepotsPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <Package className="w-5 h-5 text-green-700" />
+            <span className="text-xs text-gray-400">Stock total entrepôts</span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{kg(stats?.stockTotalEntrepotsKg ?? 0)}</p>
+          {(stats?.totalSacsEntrepots ?? 0) > 0 && (
+            <p className="text-xs text-gray-400 mt-1">{stats!.totalSacsEntrepots} sacs</p>
+          )}
+        </div>
         {[
-          { label: "Stock total entrepôts", value: kg(stats?.stockTotalEntrepotsKg ?? 0), icon: <Package className="w-5 h-5 text-green-700" />, color: "green" },
           { label: "Entrepôts actifs", value: entrepots.filter(e => e.actif).length, icon: <Warehouse className="w-5 h-5 text-blue-600" />, color: "blue" },
           { label: "Transferts en cours", value: stats?.transfertsEnCours ?? 0, icon: <Truck className="w-5 h-5 text-amber-600" />, color: "amber" },
           { label: "Alertes capacité", value: stats?.alertesCapacite ?? 0, icon: <AlertTriangle className="w-5 h-5 text-red-500" />, color: "red" },

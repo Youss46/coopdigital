@@ -649,6 +649,11 @@ export async function getStatsConsolideesDirection(cooperativeId: number) {
     0,
   );
 
+  const totalSacsEntrepots = entrepots.reduce(
+    (acc, e) => acc + (Number(e.nombreSacsTotal) || 0),
+    0,
+  );
+
   const [enCours] = await db
     .select({ nb: count() })
     .from(transfertsStockTable)
@@ -667,6 +672,7 @@ export async function getStatsConsolideesDirection(cooperativeId: number) {
   return {
     entrepots,
     stockTotalEntrepotsKg: totalEntrepots,
+    totalSacsEntrepots,
     transfertsEnCours: Number(enCours?.nb ?? 0),
     alertesCapacite: alertes.length,
   };
