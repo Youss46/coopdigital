@@ -129,9 +129,13 @@ export default function StocksPage() {
   const sortiesTotal = mouvements
     .filter((m) => m.type === "sortie")
     .reduce((s, m) => s + parseFloat(m.poidsKg), 0);
-  const sacsTotalNets =
-    mouvements.filter((m) => m.type === "entree").reduce((s, m) => s + (m.nombreSacs ?? 0), 0) -
-    mouvements.filter((m) => m.type === "sortie").reduce((s, m) => s + (m.nombreSacs ?? 0), 0);
+  const sacsEntreesTotal = mouvements
+    .filter((m) => m.type === "entree")
+    .reduce((s, m) => s + (m.nombreSacs ?? 0), 0);
+  const sacsSortiesTotal = mouvements
+    .filter((m) => m.type === "sortie")
+    .reduce((s, m) => s + (m.nombreSacs ?? 0), 0);
+  const sacsTotalNets = sacsEntreesTotal - sacsSortiesTotal;
 
   const sacsTotalStock = entrepots.reduce(
     (s, e) => s + ((e as typeof e & { nombreSacsTotal?: number }).nombreSacsTotal ?? 0),
@@ -214,8 +218,8 @@ export default function StocksPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Stock total", val: formaterPoids(stockTotal), icon: Warehouse, color: "#1a4731", sub: sacsTotalStock > 0 ? `${sacsTotalStock} sac${sacsTotalStock > 1 ? "s" : ""}` : null },
-          { label: "Entrées (historique)", val: formaterPoids(entreesTotal), icon: TrendingUp, color: "#22c55e", sub: null },
-          { label: "Sorties (historique)", val: formaterPoids(sortiesTotal), icon: TrendingDown, color: "#ef4444", sub: null },
+          { label: "Entrées (historique)", val: formaterPoids(entreesTotal), icon: TrendingUp, color: "#22c55e", sub: sacsEntreesTotal > 0 ? `${sacsEntreesTotal} sac${sacsEntreesTotal > 1 ? "s" : ""}` : null },
+          { label: "Sorties (historique)", val: formaterPoids(sortiesTotal), icon: TrendingDown, color: "#ef4444", sub: sacsSortiesTotal > 0 ? `${sacsSortiesTotal} sac${sacsSortiesTotal > 1 ? "s" : ""}` : null },
         ].map(({ label, val, icon: Icon, color, sub }) => (
           <div key={label} className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4">
             <div className="rounded-lg p-2.5" style={{ backgroundColor: color + "15" }}>
