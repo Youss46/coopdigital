@@ -288,6 +288,13 @@
       "when": 1782144360000,
       "tag": "0040_transferts_stock_nombre_sacs",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1782144420000,
+      "tag": "0041_transferts_stock_nombre_sacs_arrivee",
+      "breakpoints": true
     }
   ]
 }
