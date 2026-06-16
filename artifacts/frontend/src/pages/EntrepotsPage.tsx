@@ -531,77 +531,129 @@ export default function EntrepotsPage() {
                   </div>
                 )
                 : (
-                  <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-                        <tr>
-                          <th className="px-4 py-3 text-left">N°</th>
-                          <th className="px-4 py-3 text-left">Entrepôt / Délégué</th>
-                          <th className="px-4 py-3 text-right">Départ</th>
-                          <th className="px-4 py-3 text-right">Arrivée</th>
-                          <th className="px-4 py-3 text-right">Écart</th>
-                          <th className="px-4 py-3 text-center">Statut</th>
-                          <th className="px-4 py-3 text-center hidden lg:table-cell">Stock central</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {historique.map((t) => {
-                          const ecart = t.ecartKg ? parseFloat(t.ecartKg) : null;
-                          const dep = t.poidsDepart_kg ? parseFloat(t.poidsDepart_kg) : null;
-                          const pctEc = dep && ecart ? Math.abs(ecart / dep * 100) : null;
-                          const lienStock = `/stocks?tab=journal&q=${encodeURIComponent(t.numeroTransfert)}`;
-                          return (
-                            <tr key={t.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 font-mono font-medium text-gray-800">{t.numeroTransfert}</td>
-                              <td className="px-4 py-3">
-                                <p className="font-medium text-gray-800">{t.entrepotNom}</p>
-                                <p className="text-xs text-gray-400">{t.delegueNom} {t.deleguePrenoms}</p>
-                              </td>
-                              <td className="px-4 py-3 text-right text-gray-700">{t.poidsDepart_kg ? kg(t.poidsDepart_kg) : "—"}</td>
-                              <td className="px-4 py-3 text-right text-gray-700">{t.poidsArrivee_kg ? kg(t.poidsArrivee_kg) : "—"}</td>
-                              <td className="px-4 py-3 text-right">
+                  <div className="space-y-2">
+                    {/* Affichage mobile : cartes */}
+                    <div className="sm:hidden space-y-2">
+                      {historique.map((t) => {
+                        const ecart = t.ecartKg ? parseFloat(t.ecartKg) : null;
+                        const dep = t.poidsDepart_kg ? parseFloat(t.poidsDepart_kg) : null;
+                        const pctEc = dep && ecart ? Math.abs(ecart / dep * 100) : null;
+                        const lienStock = `/stocks?tab=journal&q=${encodeURIComponent(t.numeroTransfert)}`;
+                        return (
+                          <div key={t.id} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <span className="font-mono font-semibold text-sm text-gray-800 break-all">{t.numeroTransfert}</span>
+                              <StatutBadge statut={t.statut} />
+                            </div>
+                            <p className="text-sm font-medium text-gray-800">{t.entrepotNom}</p>
+                            <p className="text-xs text-gray-400 mb-3">{t.delegueNom} {t.deleguePrenoms}</p>
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div className="bg-gray-50 rounded-lg p-2">
+                                <p className="text-gray-400 mb-0.5">Départ</p>
+                                <p className="font-semibold text-gray-800">{t.poidsDepart_kg ? kg(t.poidsDepart_kg) : "—"}</p>
+                              </div>
+                              <div className="bg-gray-50 rounded-lg p-2">
+                                <p className="text-gray-400 mb-0.5">Arrivée</p>
+                                <p className="font-semibold text-gray-800">{t.poidsArrivee_kg ? kg(t.poidsArrivee_kg) : "—"}</p>
+                              </div>
+                              <div className="bg-gray-50 rounded-lg p-2">
+                                <p className="text-gray-400 mb-0.5">Écart</p>
                                 {ecart !== null ? (
-                                  <span className={`text-xs font-medium ${Math.abs(ecart) > 0 ? "text-red-600" : "text-green-600"}`}>
+                                  <p className={`font-semibold ${Math.abs(ecart) > 0 ? "text-red-600" : "text-green-600"}`}>
                                     {ecart > 0 ? "-" : "+"}{kg(Math.abs(ecart))}
-                                    {pctEc !== null && ` (${pctEc.toFixed(1)}%)`}
-                                  </span>
-                                ) : "—"}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <StatutBadge statut={t.statut} />
-                                {t.statut === "confirme" && (
-                                  <button
-                                    onClick={() => setLocation(lienStock)}
-                                    className="mt-1.5 flex items-center justify-center gap-1 text-xs text-green-700 hover:text-green-900 hover:underline w-full"
-                                    title="Voir l'entrée dans le stock central"
-                                  >
-                                    <CheckCircle2 className="w-3 h-3" />
-                                    Entrée créée
-                                  </button>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-center hidden lg:table-cell">
-                                {t.statut === "confirme" ? (
-                                  <button
-                                    onClick={() => setLocation(lienStock)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
-                                    title="Voir le mouvement correspondant dans la page Stocks"
-                                  >
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                    Voir dans Stocks
-                                    <ArrowRight className="w-3 h-3" />
-                                  </button>
-                                ) : t.statut === "litige" ? (
-                                  <span className="text-xs text-gray-400 italic">Non créée (litige)</span>
-                                ) : (
-                                  <span className="text-xs text-gray-300">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                    {pctEc !== null && <span className="block text-[10px]">({pctEc.toFixed(1)}%)</span>}
+                                  </p>
+                                ) : <p className="font-semibold text-gray-400">—</p>}
+                              </div>
+                            </div>
+                            {t.statut === "confirme" && (
+                              <button
+                                onClick={() => setLocation(lienStock)}
+                                className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Voir dans Stocks
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Affichage desktop : table */}
+                    <div className="hidden sm:block bg-white rounded-xl border border-gray-100 overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                          <tr>
+                            <th className="px-4 py-3 text-left">N°</th>
+                            <th className="px-4 py-3 text-left">Entrepôt / Délégué</th>
+                            <th className="px-4 py-3 text-right">Départ</th>
+                            <th className="px-4 py-3 text-right">Arrivée</th>
+                            <th className="px-4 py-3 text-right">Écart</th>
+                            <th className="px-4 py-3 text-center">Statut</th>
+                            <th className="px-4 py-3 text-center hidden lg:table-cell">Stock central</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {historique.map((t) => {
+                            const ecart = t.ecartKg ? parseFloat(t.ecartKg) : null;
+                            const dep = t.poidsDepart_kg ? parseFloat(t.poidsDepart_kg) : null;
+                            const pctEc = dep && ecart ? Math.abs(ecart / dep * 100) : null;
+                            const lienStock = `/stocks?tab=journal&q=${encodeURIComponent(t.numeroTransfert)}`;
+                            return (
+                              <tr key={t.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 font-mono font-medium text-gray-800">{t.numeroTransfert}</td>
+                                <td className="px-4 py-3">
+                                  <p className="font-medium text-gray-800">{t.entrepotNom}</p>
+                                  <p className="text-xs text-gray-400">{t.delegueNom} {t.deleguePrenoms}</p>
+                                </td>
+                                <td className="px-4 py-3 text-right text-gray-700">{t.poidsDepart_kg ? kg(t.poidsDepart_kg) : "—"}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{t.poidsArrivee_kg ? kg(t.poidsArrivee_kg) : "—"}</td>
+                                <td className="px-4 py-3 text-right">
+                                  {ecart !== null ? (
+                                    <span className={`text-xs font-medium ${Math.abs(ecart) > 0 ? "text-red-600" : "text-green-600"}`}>
+                                      {ecart > 0 ? "-" : "+"}{kg(Math.abs(ecart))}
+                                      {pctEc !== null && ` (${pctEc.toFixed(1)}%)`}
+                                    </span>
+                                  ) : "—"}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <StatutBadge statut={t.statut} />
+                                  {t.statut === "confirme" && (
+                                    <button
+                                      onClick={() => setLocation(lienStock)}
+                                      className="mt-1.5 flex items-center justify-center gap-1 text-xs text-green-700 hover:text-green-900 hover:underline w-full"
+                                      title="Voir l'entrée dans le stock central"
+                                    >
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      Entrée créée
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-center hidden lg:table-cell">
+                                  {t.statut === "confirme" ? (
+                                    <button
+                                      onClick={() => setLocation(lienStock)}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                                      title="Voir le mouvement correspondant dans la page Stocks"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      Voir dans Stocks
+                                      <ArrowRight className="w-3 h-3" />
+                                    </button>
+                                  ) : t.statut === "litige" ? (
+                                    <span className="text-xs text-gray-400 italic">Non créée (litige)</span>
+                                  ) : (
+                                    <span className="text-xs text-gray-300">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
           </div>
