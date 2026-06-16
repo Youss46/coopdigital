@@ -294,6 +294,14 @@ export async function drawFooter(
   const contentWidth = pageWidth - marginLeft - marginRight;
   const footerY      = pageHeight - 32;
 
+  // PDFKit déclenche continueOnNewPage() dès que doc.y > page.maxY()
+  // (= page.height - margin.bottom).  Le footer est dessiné à pageHeight-32,
+  // soit 810 pt pour A4 avec marge basse de 50 pt (maxY = 791.89 pt).
+  // Sans cette neutralisation temporaire chaque appel .text() du footer
+  // crée une page vide supplémentaire.
+  const savedBottomMargin = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0;
+
   doc
     .moveTo(marginLeft, footerY - 6)
     .lineTo(pageWidth - marginRight, footerY - 6)
@@ -324,4 +332,6 @@ export async function drawFooter(
       footerY,
       { width: 55, align: "right", lineBreak: false },
     );
+
+  doc.page.margins.bottom = savedBottomMargin;
 }
