@@ -295,6 +295,13 @@
       "when": 1782144420000,
       "tag": "0041_transferts_stock_nombre_sacs_arrivee",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1782230820000,
+      "tag": "0042_fix_config_comptable_missing_columns",
+      "breakpoints": true
     }
   ]
 }
