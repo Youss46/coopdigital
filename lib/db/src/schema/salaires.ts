@@ -31,6 +31,7 @@ export const modePaiementPersonnelEnum = pgEnum("mode_paiement_personnel", [
   "mtn_momo",
   "virement",
   "especes",
+  "banque",
 ]);
 
 export const bulletinStatutEnum = pgEnum("bulletin_statut", [
@@ -143,6 +144,8 @@ export const bulletinsPaieTable = pgTable("bulletins_paie", {
   datePaiement: timestamp("date_paiement", { withTimezone: true }),
   referencePaiement: text("reference_paiement"),
   payePar: integer("paye_par").references(() => usersTable.id),
+  compteSourceType: text("compte_source_type"),
+  compteSourceId: integer("compte_source_id"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

@@ -379,6 +379,56 @@ export async function virementVersCaisse(
   };
 }
 
+// ─── Débit banque pour paiement de salaire ────────────────────────────────────
+// L'écriture comptable est gérée séparément par generateEcrituresSalaire.
+
+export async function debitBanqueForSalaire(
+  compteId: number,
+  cooperativeId: number,
+  montantFcfa: number,
+  libelle: string,
+  reference: string | null,
+  userId: number | null,
+): Promise<{ nouveauSolde: number; alerte?: string }> {
+  const compte = await getCompte(compteId);
+  if (!compte) throw new Error("Compte bancaire introuvable");
+  if (compte.cooperativeId !== cooperativeId) throw new Error("Accès refusé");
+
+  const montant = Math.abs(montantFcfa);
+  const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
+  const nouveauSolde = soldeActuel - montant;
+
+  const dateOp = today();
+
+  await db.insert(mouvementsBanqueTable).values({
+    compteId,
+    cooperativeId,
+    type: "debit",
+    motif: "paiement_salaire",
+    montantFcfa: montant.toString(),
+    libelle,
+    reference: reference ?? null,
+    dateOperation: dateOp,
+    dateValeur: null,
+    soldeApresFcfa: nouveauSolde.toString(),
+    enregistrePar: userId ?? null,
+  });
+
+  await db.update(comptesBancairesTable)
+    .set({ soldeActuelFcfa: nouveauSolde.toString() })
+    .where(eq(comptesBancairesTable.id, compteId));
+
+  const soldeMini = parseFloat(compte.soldeMiniAlerteFcfa as string);
+  let alerte: string | undefined;
+  if (soldeMini > 0 && nouveauSolde < soldeMini) {
+    alerte = `⚠️ Solde banque sous le seuil d'alerte (${soldeMini.toLocaleString("fr-FR")} FCFA)`;
+    logger.warn({ compteId, nouveauSolde, soldeMini }, "Compte bancaire sous seuil minimum après paiement salaire");
+  }
+
+  logger.info({ compteId, montant, nouveauSolde }, "Banque débitée (paiement salaire)");
+  return { nouveauSolde, alerte };
+}
+
 // ─── Alertes solde ────────────────────────────────────────────────────────────
 
 export async function getAlertes(cooperativeId: number) {

@@ -20,7 +20,6 @@ import {
   useGenererBulletins,
   useGetBulletins,
   useValiderBulletin,
-  usePayerBulletin,
   useDeleteBulletin,
   useGetAvancesPersonnel,
   useCreateAvancePersonnel,
@@ -446,7 +445,6 @@ function TabPaie() {
   );
   const generer = useGenererBulletins();
   const valider = useValiderBulletin();
-  const payer = usePayerBulletin();
   const supprimer = useDeleteBulletin();
 
   async function handleGenerer() {
@@ -475,14 +473,31 @@ function TabPaie() {
     }
   }
 
-  async function handlePayer(id: number, reference: string) {
+  async function handlePayer(
+    id: number,
+    params: { reference: string; compteSourceType?: "caisse" | "banque" | "mobile"; compteSourceId?: number },
+  ) {
     try {
-      await payer.mutateAsync({ id, data: { referencePaiement: reference || undefined } });
-      toast({ title: "Bulletin marqué payé" });
+      const token = localStorage.getItem("coop_token") ?? "";
+      const res = await fetch(`${BASE}/api/salaires/bulletins/${id}/payer`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          referencePaiement: params.reference || undefined,
+          compteSourceType: params.compteSourceType,
+          compteSourceId: params.compteSourceId,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { erreur?: string };
+        throw new Error(data.erreur ?? "Erreur lors du paiement");
+      }
+      toast({ title: "Bulletin marqué payé — compte de trésorerie débité" });
       setShowPayer(null);
       refetch();
-    } catch {
-      toast({ title: "Erreur lors du paiement", variant: "destructive" });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur lors du paiement";
+      toast({ title: msg, variant: "destructive" });
     }
   }
 
@@ -703,7 +718,7 @@ function TabPaie() {
         <PayerModal
           bulletin={showPayer}
           onClose={() => setShowPayer(null)}
-          onPayer={handlePayer}
+          onPayer={(id, params) => handlePayer(id, params)}
         />
       )}
     </div>
@@ -1185,6 +1200,7 @@ function PersonnelModal({
                 <option value="orange_money">Orange Money</option>
                 <option value="mtn_momo">MTN MoMo</option>
                 <option value="virement">Virement bancaire</option>
+                <option value="banque">Compte Banque</option>
               </select>
             </Field>
             {(form.modePaiement === "orange_money" || form.modePaiement === "mtn_momo") && (
@@ -1197,7 +1213,7 @@ function PersonnelModal({
                 />
               </Field>
             )}
-            {form.modePaiement === "virement" && (
+            {(form.modePaiement === "virement" || form.modePaiement === "banque") && (
               <Field label="RIB Bancaire">
                 <input
                   className={INPUT_CLS}
@@ -1246,6 +1262,20 @@ function PersonnelModal({
   );
 }
 
+type ComptesTresorerie = {
+  caisses: { id: number; nom: string; type_caisse: string; solde_actuel_fcfa: string }[];
+  banques: { id: number; nom: string; banque: string; solde_actuel_fcfa: string }[];
+  mobiles: { id: number; nom: string; operateur: string; solde_actuel_fcfa: string }[];
+};
+
+const MODE_PAIEMENT_LABELS: Record<string, string> = {
+  especes: "Espèces",
+  orange_money: "Orange Money",
+  mtn_momo: "MTN MoMo",
+  virement: "Virement bancaire",
+  banque: "Compte Banque",
+};
+
 function PayerModal({
   bulletin,
   onClose,
@@ -1253,15 +1283,48 @@ function PayerModal({
 }: {
   bulletin: BulletinAvecPersonnel;
   onClose: () => void;
-  onPayer: (id: number, reference: string) => Promise<void>;
+  onPayer: (id: number, params: { reference: string; compteSourceType?: "caisse" | "banque" | "mobile"; compteSourceId?: number }) => Promise<void>;
 }) {
   const [reference, setReference] = useState("");
+  const [compteSourceId, setCompteSourceId] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+
+  const modePaiement = bulletin.personnel.modePaiement ?? "especes";
+
+  const compteSourceType: "caisse" | "banque" | "mobile" | undefined =
+    modePaiement === "especes" ? "caisse"
+    : modePaiement === "orange_money" || modePaiement === "mtn_momo" ? "mobile"
+    : modePaiement === "banque" || modePaiement === "virement" ? "banque"
+    : undefined;
+
+  const { data: comptes, isLoading: comptesLoading } = useQuery<ComptesTresorerie>({
+    queryKey: ["comptes-tresorerie"],
+    queryFn: () => apiFetchSalaires<ComptesTresorerie>("/api/salaires/comptes-tresorerie"),
+    enabled: compteSourceType !== undefined,
+  });
+
+  const comptesDisponibles = compteSourceType === "caisse"
+    ? (comptes?.caisses ?? []).map((c) => ({ id: c.id, label: `${c.nom} (${Number(c.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA)` }))
+    : compteSourceType === "mobile"
+    ? (comptes?.mobiles ?? [])
+        .filter((m) => m.operateur === modePaiement)
+        .map((m) => ({ id: m.id, label: `${m.nom} (${Number(m.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA)` }))
+    : compteSourceType === "banque"
+    ? (comptes?.banques ?? []).map((b) => ({ id: b.id, label: `${b.nom} — ${b.banque} (${Number(b.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA)` }))
+    : [];
+
+  const firstId = comptesDisponibles[0]?.id;
+  const selectedCompteId = compteSourceId ?? firstId;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (compteSourceType && !selectedCompteId) return;
     setLoading(true);
-    await onPayer(bulletin.bulletin.id, reference);
+    await onPayer(bulletin.bulletin.id, {
+      reference,
+      compteSourceType,
+      compteSourceId: selectedCompteId,
+    });
     setLoading(false);
   }
 
@@ -1281,7 +1344,40 @@ function PayerModal({
               {formatFcfa(bulletin.bulletin.salaireNetFcfa)}
             </p>
             <p className="text-xs text-gray-500 mt-1">{bulletin.bulletin.periode}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              Moyen : {MODE_PAIEMENT_LABELS[modePaiement] ?? modePaiement}
+            </p>
           </div>
+
+          {compteSourceType && (
+            <Field label={
+              compteSourceType === "caisse" ? "Caisse à débiter"
+              : compteSourceType === "mobile" ? "Compte mobile marchand à débiter"
+              : "Compte bancaire à débiter"
+            } required>
+              {comptesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+                </div>
+              ) : comptesDisponibles.length === 0 ? (
+                <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                  Aucun compte disponible pour ce mode de paiement. Le paiement sera enregistré sans débit automatique.
+                </p>
+              ) : (
+                <select
+                  className={INPUT_CLS}
+                  value={selectedCompteId ?? ""}
+                  onChange={(e) => setCompteSourceId(Number(e.target.value) || undefined)}
+                  required
+                >
+                  {comptesDisponibles.map((c) => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
+              )}
+            </Field>
+          )}
+
           <Field label="Référence de paiement (optionnel)">
             <input
               className={INPUT_CLS}
@@ -1290,6 +1386,7 @@ function PayerModal({
               placeholder="N° transaction, référence virement…"
             />
           </Field>
+
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"

@@ -34,7 +34,7 @@ export const sessionsCaisseTable = pgTable("sessions_caisse", {
 export const mouvementsCaisseTable = pgTable("mouvements_caisse", {
   id:                  serial("id").primaryKey(),
   caisseId:            integer("caisse_id").notNull(),
-  sessionId:           integer("session_id").notNull(),
+  sessionId:           integer("session_id"),
   cooperativeId:       integer("cooperative_id").notNull(),
   type:                varchar("type", { length: 10 }).notNull(),
   motif:               varchar("motif", { length: 50 }).notNull(),

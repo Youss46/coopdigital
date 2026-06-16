@@ -7,11 +7,15 @@ import {
   lignesBulletinTable,
   avancesPersonnelTable,
   configPaieTable,
+  comptesMobilesMarchandsTable,
+  mouvementsMobileMarchandTable,
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { generateBulletin, generateMasse } from "../services/paieService";
 import { generateEcrituresSalaire } from "../services/comptabiliteService";
 import { generateBulletinPaie } from "../services/pdfService";
+import { debitCaisseForSalaire, listCaisses } from "../services/caisseService";
+import { debitBanqueForSalaire, listComptes as listComptessBanque } from "../services/banqueService";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -505,26 +509,67 @@ export async function payerBulletin(
 ): Promise<void> {
   try {
     const id = parseId(req.params["id"]);
-    const { referencePaiement } = req.body as { referencePaiement?: string };
+    const cid = coopId(req);
+    const { referencePaiement, compteSourceType, compteSourceId } = req.body as {
+      referencePaiement?: string;
+      compteSourceType?: "caisse" | "banque" | "mobile";
+      compteSourceId?: number;
+    };
 
     const [b] = await db
       .select()
       .from(bulletinsPaieTable)
-      .where(
-        and(
-          eq(bulletinsPaieTable.id, id),
-          eq(bulletinsPaieTable.cooperativeId, coopId(req)),
-        ),
-      )
+      .where(and(eq(bulletinsPaieTable.id, id), eq(bulletinsPaieTable.cooperativeId, cid)))
       .limit(1);
-    if (!b) {
-      res.status(404).json({ erreur: "Bulletin introuvable" });
-      return;
-    }
+    if (!b) { res.status(404).json({ erreur: "Bulletin introuvable" }); return; }
     if (b.statut !== "valide") {
       res.status(400).json({ erreur: "Seuls les bulletins validés peuvent être marqués payés" });
       return;
     }
+
+    // ── Débit du compte de trésorerie sélectionné ──────────────────────────────
+    if (compteSourceType && compteSourceId) {
+      const libelle = `Salaire – bulletin #${id}`;
+      const ref = referencePaiement ?? null;
+      const userId = req.user?.id ?? null;
+      const montant = b.salaireNetFcfa;
+
+      if (compteSourceType === "caisse") {
+        await debitCaisseForSalaire(compteSourceId, cid, montant, libelle, ref, userId);
+      } else if (compteSourceType === "banque") {
+        await debitBanqueForSalaire(compteSourceId, cid, montant, libelle, ref, userId);
+      } else if (compteSourceType === "mobile") {
+        const [compte] = await db
+          .select()
+          .from(comptesMobilesMarchandsTable)
+          .where(and(eq(comptesMobilesMarchandsTable.id, compteSourceId), eq(comptesMobilesMarchandsTable.cooperativeId, cid)))
+          .limit(1);
+        if (!compte) { res.status(404).json({ erreur: "Compte mobile introuvable" }); return; }
+        const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
+        if (soldeActuel < montant) {
+          res.status(400).json({ erreur: `Solde insuffisant sur le compte mobile. Disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA` });
+          return;
+        }
+        const newSolde = soldeActuel - montant;
+        const today = new Date().toISOString().slice(0, 10);
+        await db.insert(mouvementsMobileMarchandTable).values({
+          compteId: compteSourceId,
+          cooperativeId: cid,
+          type: "debit",
+          motif: "paiement_salaire",
+          montantFcfa: montant.toString(),
+          libelle,
+          reference: ref ?? null,
+          dateOperation: today,
+          soldeApresFcfa: newSolde.toString(),
+          enregistrePar: userId,
+        });
+        await db.update(comptesMobilesMarchandsTable)
+          .set({ soldeActuelFcfa: newSolde.toString() })
+          .where(eq(comptesMobilesMarchandsTable.id, compteSourceId));
+      }
+    }
+
     const [updated] = await db
       .update(bulletinsPaieTable)
       .set({
@@ -532,10 +577,13 @@ export async function payerBulletin(
         datePaiement: new Date(),
         referencePaiement: referencePaiement ?? null,
         payePar: req.user?.id ?? null,
+        compteSourceType: compteSourceType ?? null,
+        compteSourceId: compteSourceId ?? null,
       })
       .where(eq(bulletinsPaieTable.id, id))
       .returning();
 
+    // Écriture comptable OHADA (async, non bloquant)
     void (async () => {
       const [p] = await db
         .select({ nom: personnelTable.nom, prenoms: personnelTable.prenoms })
@@ -543,13 +591,15 @@ export async function payerBulletin(
         .where(eq(personnelTable.id, b.personnelId))
         .limit(1);
       if (p && updated) {
-        await generateEcrituresSalaire(coopId(req), {
+        const compteCredit = compteSourceType === "caisse" ? "571" : "521";
+        await generateEcrituresSalaire(cid, {
           bulletinId: updated.id,
           personnelNom: `${p.prenoms} ${p.nom}`,
           salaireNetFcfa: updated.salaireNetFcfa,
           salaireBrutFcfa: updated.salaireBrutFcfa,
           cotisationsSalarieFcfa: updated.salaireBrutFcfa - updated.salaireNetFcfa,
           datePaiement: new Date().toISOString().split("T")[0]!,
+          compteCredit,
         });
       }
     })();
@@ -558,6 +608,38 @@ export async function payerBulletin(
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "payerBulletin");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ── Comptes de trésorerie disponibles (pour le modal de paiement salaire) ──────
+
+export async function getComptesTresorerie(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const cid = coopId(req);
+    const [caisses, banques, mobiles] = await Promise.all([
+      listCaisses(cid),
+      listComptessBanque(cid),
+      db.select({
+        id: comptesMobilesMarchandsTable.id,
+        nom: comptesMobilesMarchandsTable.nom,
+        operateur: comptesMobilesMarchandsTable.operateur,
+        solde_actuel_fcfa: comptesMobilesMarchandsTable.soldeActuelFcfa,
+      })
+        .from(comptesMobilesMarchandsTable)
+        .where(and(
+          eq(comptesMobilesMarchandsTable.cooperativeId, cid),
+          eq(comptesMobilesMarchandsTable.actif, true),
+        ))
+        .orderBy(comptesMobilesMarchandsTable.nom),
+    ]);
+    res.json({ caisses, banques, mobiles });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "getComptesTresorerie");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

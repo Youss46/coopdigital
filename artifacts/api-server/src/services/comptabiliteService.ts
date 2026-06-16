@@ -254,8 +254,9 @@ export async function generateEcrituresSalaire(cooperativeId: number, params: {
   salaireBrutFcfa: number;
   cotisationsSalarieFcfa: number;
   datePaiement: string;
+  compteCredit?: string;
 }) {
-  const { bulletinId, personnelNom, salaireNetFcfa, salaireBrutFcfa, cotisationsSalarieFcfa, datePaiement } = params;
+  const { bulletinId, personnelNom, salaireNetFcfa, salaireBrutFcfa, cotisationsSalarieFcfa, datePaiement, compteCredit = "521" } = params;
   const piece = `SAL-${bulletinId}`;
 
   const promises: Promise<unknown>[] = [
@@ -268,7 +269,7 @@ export async function generateEcrituresSalaire(cooperativeId: number, params: {
     proposerEcriture(cooperativeId, {
       source: "salaire", sourceId: bulletinId,
       libelle: `Versement salaire net – ${personnelNom}`,
-      compteDebit: "421", compteCredit: "521",
+      compteDebit: "421", compteCredit: compteCredit,
       montantFcfa: salaireNetFcfa, date: datePaiement, numeroPiece: piece,
     }),
   ];

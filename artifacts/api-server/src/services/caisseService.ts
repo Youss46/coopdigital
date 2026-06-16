@@ -834,3 +834,56 @@ export async function debiterCaisseParResponsable(
   );
   return { nouveauSolde: result.soldeActuel, alerte: result.alerte };
 }
+
+// ─── Débit caisse pour paiement de salaire ────────────────────────────────────
+// N'exige pas de session ouverte (session_id nullable depuis la migration).
+// L'écriture comptable est gérée séparément par generateEcrituresSalaire.
+
+export async function debitCaisseForSalaire(
+  caisseId: number,
+  cooperativeId: number,
+  montantFcfa: number,
+  libelle: string,
+  reference: string | null,
+  userId: number | null,
+): Promise<{ nouveauSolde: number; alerte?: string }> {
+  const caisse = await getCaisse(caisseId);
+  if (!caisse) throw new Error("Caisse introuvable");
+  if (caisse.cooperativeId !== cooperativeId) throw new Error("Accès refusé");
+
+  const montant = Math.round(montantFcfa);
+  const soldeActuel = parseFloat(caisse.soldeActuelFcfa as string);
+  if (soldeActuel < montant) {
+    throw new Error(`Solde insuffisant en caisse. Disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA`);
+  }
+  const nouveauSolde = soldeActuel - montant;
+
+  const sessionRow = await getSessionActive(caisseId);
+
+  await db.insert(mouvementsCaisseTable).values({
+    caisseId,
+    sessionId: sessionRow?.id ?? null,
+    cooperativeId,
+    type: "sortie",
+    motif: "paiement_salaire",
+    montantFcfa: montant.toString(),
+    libelle,
+    referenceOperation: reference ?? null,
+    soldeApresFcfa: nouveauSolde.toString(),
+    enregistrePar: userId,
+  });
+
+  await db.update(caissesTable)
+    .set({ soldeActuelFcfa: nouveauSolde.toString() })
+    .where(eq(caissesTable.id, caisseId));
+
+  const fondMin = parseFloat(caisse.fondCaisseMinimumFcfa as string);
+  let alerte: string | undefined;
+  if (fondMin > 0 && nouveauSolde < fondMin) {
+    alerte = `⚠️ Solde caisse sous le fond minimum (${fondMin.toLocaleString("fr-FR")} FCFA)`;
+    logger.warn({ caisseId, nouveauSolde, fondMin }, "Caisse sous fond minimum après paiement salaire");
+  }
+
+  logger.info({ caisseId, montant, nouveauSolde }, "Caisse débitée (paiement salaire)");
+  return { nouveauSolde, alerte };
+}

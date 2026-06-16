@@ -26,6 +26,7 @@ import {
   getHistoriqueMasse,
   getConfigPaie,
   updateConfigPaie,
+  getComptesTresorerie,
 } from "../controllers/salairesController";
 
 const router: IRouter = Router();
@@ -127,6 +128,13 @@ router.put(
 // ─── Config paie ─────────────────────────────────────────────────────────────
 router.get("/salaires/config-paie",  checkPermission("salaires", "lire"),              getConfigPaie);
 router.put("/salaires/config-paie",  checkPermission("salaires", "modifier_personnel"), updateConfigPaie);
+
+// ─── Comptes de trésorerie (pour modal paiement salaire) ─────────────────────
+router.get(
+  "/salaires/comptes-tresorerie",
+  checkPermission("salaires", "payer_bulletins"),
+  getComptesTresorerie,
+);
 
 // ─── Rapports ────────────────────────────────────────────────────────────────
 router.get(
