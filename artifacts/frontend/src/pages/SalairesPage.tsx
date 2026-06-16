@@ -4,7 +4,7 @@ import {
   Users, FileText, BarChart2, CreditCard, Settings,
   Plus, RefreshCw, CheckCircle, Banknote,
   Loader2, ChevronDown, TrendingUp, Building2,
-  UserCheck, AlertCircle, FileDown, Save, Info, Pencil, Trash2,
+  UserCheck, AlertCircle, FileDown, Save, Info, Pencil, Trash2, RotateCcw,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -523,6 +523,27 @@ function TabPaie() {
     refetch();
   }
 
+  async function handleReconcilier() {
+    if (!await confirm({
+      title: "Réconcilier les écritures",
+      description: "Cela va générer les écritures comptables manquantes pour tous les bulletins déjà payés qui n'en ont pas. Continuer ?",
+      confirmLabel: "Réconcilier",
+    })) return;
+    try {
+      const token = localStorage.getItem("coop_token") ?? "";
+      const res = await fetch(`${BASE}/api/salaires/reconcilier-ecritures`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json() as { reconcilies?: number; total?: number; message?: string; erreur?: string };
+      if (!res.ok) throw new Error(data.erreur ?? "Erreur");
+      toast({ title: data.message ?? `${data.reconcilies} écriture(s) générée(s)` });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erreur lors de la réconciliation";
+      toast({ title: msg, variant: "destructive" });
+    }
+  }
+
   const list: BulletinAvecPersonnel[] = bulletins ?? [];
   const nbBrouillons = list.filter((b: BulletinAvecPersonnel) => b.bulletin.statut === "brouillon").length;
   const nbValides = list.filter((b: BulletinAvecPersonnel) => b.bulletin.statut === "valide").length;
@@ -577,6 +598,16 @@ function TabPaie() {
               >
                 <CheckCircle className="h-4 w-4" />
                 Valider tous ({nbBrouillons})
+              </button>
+            )}
+            {canValider && nbPayes > 0 && (
+              <button
+                onClick={handleReconcilier}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm"
+                title="Générer les écritures comptables manquantes pour les bulletins déjà payés"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Réconcilier écritures
               </button>
             )}
           </div>

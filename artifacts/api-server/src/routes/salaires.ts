@@ -27,6 +27,7 @@ import {
   getConfigPaie,
   updateConfigPaie,
   getComptesTresorerie,
+  reconcilierEcrituresSalaires,
 } from "../controllers/salairesController";
 
 const router: IRouter = Router();
@@ -134,6 +135,13 @@ router.get(
   "/salaires/comptes-tresorerie",
   checkPermission("salaires", "payer_bulletins"),
   getComptesTresorerie,
+);
+
+// ─── Réconciliation écritures comptables ─────────────────────────────────────
+router.post(
+  "/salaires/reconcilier-ecritures",
+  checkPermission("salaires", "valider_bulletins"),
+  reconcilierEcrituresSalaires,
 );
 
 // ─── Rapports ────────────────────────────────────────────────────────────────

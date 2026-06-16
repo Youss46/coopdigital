@@ -9,8 +9,10 @@ import {
   configPaieTable,
   comptesMobilesMarchandsTable,
   mouvementsMobileMarchandTable,
+  ecrituresComptablesTable,
+  ecrituresEnAttenteTable,
 } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, notExists } from "drizzle-orm";
 import { generateBulletin, generateMasse } from "../services/paieService";
 import { generateEcrituresSalaire } from "../services/comptabiliteService";
 import { generateBulletinPaie } from "../services/pdfService";
@@ -1019,6 +1021,102 @@ export async function updateConfigPaie(req: Request, res: Response): Promise<voi
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "updateConfigPaie");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ── Réconciliation : génère les écritures manquantes pour les bulletins payés ──
+export async function reconcilierEcrituresSalaires(req: Request, res: Response): Promise<void> {
+  try {
+    const cid = coopId(req);
+
+    // Bulletins payés sans aucune écriture (ni journal ni en attente) portant leur sourceId
+    const bulletinsPaye = await db
+      .select({
+        id: bulletinsPaieTable.id,
+        personnelId: bulletinsPaieTable.personnelId,
+        salaireNetFcfa: bulletinsPaieTable.salaireNetFcfa,
+        salaireBrutFcfa: bulletinsPaieTable.salaireBrutFcfa,
+        datePaiement: bulletinsPaieTable.datePaiement,
+        compteSourceType: bulletinsPaieTable.compteSourceType,
+      })
+      .from(bulletinsPaieTable)
+      .where(
+        and(
+          eq(bulletinsPaieTable.cooperativeId, cid),
+          eq(bulletinsPaieTable.statut, "paye"),
+          notExists(
+            db.select({ x: sql`1` })
+              .from(ecrituresComptablesTable)
+              .where(and(
+                eq(ecrituresComptablesTable.cooperativeId, cid),
+                eq(ecrituresComptablesTable.source, "salaire"),
+                eq(ecrituresComptablesTable.sourceId, bulletinsPaieTable.id),
+              ))
+          ),
+          notExists(
+            db.select({ x: sql`1` })
+              .from(ecrituresEnAttenteTable)
+              .where(and(
+                eq(ecrituresEnAttenteTable.cooperativeId, cid),
+                eq(ecrituresEnAttenteTable.source, "salaire"),
+                eq(ecrituresEnAttenteTable.sourceId, bulletinsPaieTable.id),
+              ))
+          ),
+        )
+      );
+
+    if (bulletinsPaye.length === 0) {
+      res.json({ reconcilies: 0, message: "Aucun bulletin sans écriture trouvé" });
+      return;
+    }
+
+    // Charger le personnel en une seule requête
+    const personnelIds = [...new Set(bulletinsPaye.map(b => b.personnelId))];
+    const personnelRows = await db
+      .select({ id: personnelTable.id, nom: personnelTable.nom, prenoms: personnelTable.prenoms })
+      .from(personnelTable)
+      .where(inArray(personnelTable.id, personnelIds));
+    const personnelMap = Object.fromEntries(personnelRows.map(p => [p.id, p]));
+
+    // Générer les écritures manquantes
+    let reconcilies = 0;
+    const erreurs: { bulletinId: number; erreur: string }[] = [];
+
+    for (const b of bulletinsPaye) {
+      try {
+        const p = personnelMap[b.personnelId];
+        const personnelNom = p ? `${p.prenoms} ${p.nom}` : `Personnel #${b.personnelId}`;
+        const compteCredit = b.compteSourceType === "caisse" ? "571" : b.compteSourceType === "mobile" ? "554" : "521";
+        const dateStr = b.datePaiement
+          ? new Date(b.datePaiement).toISOString().split("T")[0]!
+          : new Date().toISOString().split("T")[0]!;
+
+        await generateEcrituresSalaire(cid, {
+          bulletinId: b.id,
+          personnelNom,
+          salaireNetFcfa: b.salaireNetFcfa,
+          salaireBrutFcfa: b.salaireBrutFcfa,
+          cotisationsSalarieFcfa: b.salaireBrutFcfa - b.salaireNetFcfa,
+          datePaiement: dateStr,
+          compteCredit,
+        });
+        reconcilies++;
+      } catch (err) {
+        req.log.error({ err, bulletinId: b.id }, "reconcilierEcrituresSalaires: erreur bulletin");
+        erreurs.push({ bulletinId: b.id, erreur: String(err) });
+      }
+    }
+
+    res.json({
+      reconcilies,
+      total: bulletinsPaye.length,
+      erreurs: erreurs.length > 0 ? erreurs : undefined,
+      message: `${reconcilies} écriture(s) générée(s) sur ${bulletinsPaye.length} bulletin(s) sans écriture`,
+    });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "reconcilierEcrituresSalaires");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
