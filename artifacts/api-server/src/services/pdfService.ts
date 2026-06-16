@@ -60,13 +60,19 @@ function ligneTableau(doc: InstanceType<typeof PDFDocument>, colonnes: string[],
 
 /** Helper : ajoute les pieds de page sur toutes les pages bufferisées puis libère le buffer.
  *  Le flushPages() DOIT être appelé avant doc.end() avec bufferPages:true, sinon PDFKit
- *  génère des pages vides résiduelles après les pages de contenu. */
+ *  génère des pages vides résiduelles après les pages de contenu.
+ *  IMPORTANT : drawFooter place du texte à pageHeight-32 (position absolue), ce qui pousse
+ *  doc.y au-delà de la marge basse. Sans reset de doc.y, PDFKit croit qu'il y a un
+ *  débordement et insère une page vide supplémentaire lors du doc.end(). */
 async function addFooters(doc: InstanceType<typeof PDFDocument>, cooperativeId: number): Promise<void> {
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(i);
     await drawFooter(doc, cooperativeId, i + 1, range.count);
   }
+  // Réinitialise doc.y dans la zone de contenu pour éviter qu'une page vide
+  // soit auto-créée par PDFKit lors de l'appel à doc.end().
+  doc.y = MARGIN;
   doc.flushPages();
 }
 
