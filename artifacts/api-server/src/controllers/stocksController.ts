@@ -96,14 +96,14 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
     const dateFin = req.query["date_fin"] as string | undefined;
 
     const entrepotCondition = entrepotId
-      ? sql`${entrepotsTable.cooperativeId} = ${cooperativeId} AND ${mouvementsStockTable.entrepotId} = ${entrepotId}`
-      : sql`${entrepotsTable.cooperativeId} = ${cooperativeId}`;
+      ? sql`e.cooperative_id = ${cooperativeId} AND ms.entrepot_id = ${entrepotId}`
+      : sql`e.cooperative_id = ${cooperativeId}`;
 
     const dateDebutCondition = dateDebut
-      ? sql`AND ${mouvementsStockTable.createdAt} >= ${new Date(dateDebut)}`
+      ? sql`AND ms.created_at >= ${new Date(dateDebut)}`
       : sql``;
     const dateFinCondition = dateFin
-      ? sql`AND ${mouvementsStockTable.createdAt} <= ${new Date(dateFin + "T23:59:59Z")}`
+      ? sql`AND ms.created_at <= ${new Date(dateFin + "T23:59:59Z")}`
       : sql``;
 
     const rows = await db.execute<{
