@@ -24,6 +24,9 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       scope: base,
       base,
       manifest: {
@@ -41,25 +44,14 @@ export default defineConfig({
           { src: `${base}logo-512.png`, sizes: "512x512", type: "image/png", purpose: "any maskable" },
         ],
       },
-      workbox: {
-        navigateFallback: `${base}index.html`,
-        navigateFallbackDenylist: [/^\/api\//],
-        globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,ico,svg,png,woff2}"],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        cleanupOutdatedCaches: true,
-        runtimeCaching: [
-          {
-            urlPattern: /^\/api\//,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "m15-api-cache-v1",
-              expiration: { maxEntries: 150, maxAgeSeconds: 60 * 60 * 24 },
-              networkTimeoutSeconds: 10,
-            },
-          },
-        ],
       },
-      devOptions: { enabled: false },
+      devOptions: {
+        enabled: true,
+        type: "module",
+      },
     }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
