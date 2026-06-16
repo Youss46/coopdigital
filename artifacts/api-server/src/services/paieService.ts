@@ -7,12 +7,13 @@
  *   Taxe apprentissage : 0,50 %
  *   FPC              :  1,20 %
  *
- *  ITS — barème progressif annuel :
- *    0 – 600 000        →  0 %
- *    600 001 – 1 200 000 → 10 %
- *    1 200 001 – 2 400 000 → 15 %
- *    2 400 001 – 4 800 000 → 20 %
- *    > 4 800 000         → 25 %
+ *  ITS — barème progressif mensuel (appliqué sur le brut mensuel) :
+ *    0 – 75 000           →  0 %
+ *    75 001 – 240 000     → 16 %
+ *    240 001 – 800 000    → 21 %
+ *    800 001 – 2 400 000  → 24 %
+ *    2 400 001 – 8 000 000 → 28 %
+ *    > 8 000 000          → 32 %
  *
  *  Prime d'ancienneté (sur salaire de base) :
  *    < 2 ans → 0 %   |  2–5 ans → 3 %  |  5–10 ans → 5 %  |  > 10 ans → 8 %
@@ -70,23 +71,26 @@ const NOMS_MOIS = [
 ];
 
 // ─── Barème ITS ──────────────────────────────────────────────────────────────
+// Barème progressif mensuel (Côte d'Ivoire – DGI 2024)
+// Appliqué directement sur le salaire brut mensuel.
 
-function calculerITS(salaireAnnuelBrut: number): number {
+function calculerITS(salaireMensuelBrut: number): number {
   const tranches = [
-    { min: 0,         max: 600_000,         rate: 0 },
-    { min: 600_000,   max: 1_200_000,        rate: 0.10 },
-    { min: 1_200_000, max: 2_400_000,        rate: 0.15 },
-    { min: 2_400_000, max: 4_800_000,        rate: 0.20 },
-    { min: 4_800_000, max: Infinity,         rate: 0.25 },
+    { min: 0,           max: 75_000,         rate: 0    },
+    { min: 75_000,      max: 240_000,        rate: 0.16 },
+    { min: 240_000,     max: 800_000,        rate: 0.21 },
+    { min: 800_000,     max: 2_400_000,      rate: 0.24 },
+    { min: 2_400_000,   max: 8_000_000,      rate: 0.28 },
+    { min: 8_000_000,   max: Infinity,       rate: 0.32 },
   ];
 
   let its = 0;
   for (const t of tranches) {
-    if (salaireAnnuelBrut <= t.min) break;
-    const tranchable = Math.min(salaireAnnuelBrut, t.max) - t.min;
+    if (salaireMensuelBrut <= t.min) break;
+    const tranchable = Math.min(salaireMensuelBrut, t.max) - t.min;
     its += tranchable * t.rate;
   }
-  return Math.round(its / 12);
+  return Math.round(its);
 }
 
 // ─── Prime d'ancienneté ──────────────────────────────────────────────────────
@@ -220,10 +224,10 @@ export async function generateBulletin(
     lignesRetenues.push({ libelle: `CNPS part salariale (${taux} %)`, montant: cnpsSal });
   }
 
-  // ITS
+  // ITS (barème mensuel, appliqué sur le brut mensuel)
   let its = 0;
   if (cfg.itsActif) {
-    its = calculerITS(brut * 12);
+    its = calculerITS(brut);
     lignesRetenues.push({ libelle: "Impôt sur salaire (ITS)", montant: its });
   }
 

@@ -1616,7 +1616,7 @@ function TabConfigPaie() {
       <ConfigSection title="ITS — Impôt sur Traitement et Salaires" badge="Retenue sur employé">
         <ConfigRow
           label="Impôt sur salaire (ITS)"
-          desc="Barème progressif annuel : 0 % → 10 % → 15 % → 20 % → 25 %"
+          desc="Barème progressif mensuel : 0–75 000 → 0 % · 75–240 k → 16 % · 240–800 k → 21 % · 800 k–2,4 M → 24 % · 2,4–8 M → 28 % · > 8 M → 32 %"
           actif={form.itsActif}
           onToggle={(v) => set("itsActif", v)}
           saving={mut.isPending || !canEdit}
