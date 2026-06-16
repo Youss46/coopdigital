@@ -127,16 +127,50 @@ function AlerteBadge({ type }: { type: string }) {
   );
 }
 
+// ─── Cache helpers ────────────────────────────────────────────────────────────
+
+const CACHE_KEY = "pca_dashboard_cache";
+
+interface CacheEntry {
+  synthese: Synthese;
+  comparaison: ComparaisonRow[];
+  savedAt: string;
+}
+
+function readCache(): CacheEntry | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as CacheEntry) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(synthese: Synthese, comparaison: ComparaisonRow[]) {
+  try {
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ synthese, comparaison, savedAt: new Date().toISOString() })
+    );
+  } catch {
+    // storage peut être plein — ignorer silencieusement
+  }
+}
+
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 export default function PcaDashboardPage() {
   const { utilisateur } = useAuth();
   const [, setLoc] = useLocation();
-  const [synthese, setSynthese] = useState<Synthese | null>(null);
-  const [comparaison, setComparaison] = useState<ComparaisonRow[]>([]);
+
+  const cache = readCache();
+  const [synthese, setSynthese] = useState<Synthese | null>(cache?.synthese ?? null);
+  const [comparaison, setComparaison] = useState<ComparaisonRow[]>(cache?.comparaison ?? []);
   const [loading, setLoading] = useState(true);
-  const [erreur, setErreur] = useState("");
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [horsLigne, setHorsLigne] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date>(
+    cache?.savedAt ? new Date(cache.savedAt) : new Date()
+  );
 
   if (utilisateur?.role !== "pca") {
     return (
@@ -149,7 +183,7 @@ export default function PcaDashboardPage() {
 
   const charger = async () => {
     setLoading(true);
-    setErreur("");
+    setHorsLigne(false);
     try {
       const [s, c] = await Promise.all([
         apiFetch<Synthese>("/dashboard/pca/synthese"),
@@ -158,8 +192,10 @@ export default function PcaDashboardPage() {
       setSynthese(s);
       setComparaison(c);
       setLastRefresh(new Date());
+      writeCache(s, c);
     } catch {
-      setErreur("Impossible de charger les données. Vérifiez votre connexion.");
+      setHorsLigne(true);
+      // Si aucune donnée en cache ni en state → on garde le state vide
     } finally {
       setLoading(false);
     }
@@ -175,11 +211,11 @@ export default function PcaDashboardPage() {
     );
   }
 
-  if (erreur) {
+  if (!synthese) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <AlertTriangle className="w-12 h-12 text-red-400" />
-        <p className="text-red-600 font-medium">{erreur}</p>
+        <p className="text-red-600 font-medium">Impossible de charger les données. Vérifiez votre connexion.</p>
         <button onClick={charger} className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm">
           Réessayer
         </button>
@@ -201,6 +237,28 @@ export default function PcaDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Bannière hors ligne */}
+      {horsLigne && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">Données hors ligne</p>
+            <p className="text-xs text-amber-700">
+              Connexion indisponible — dernière mise à jour le{" "}
+              {lastRefresh.toLocaleDateString("fr-FR", { day: "2-digit", month: "long" })} à{" "}
+              {lastRefresh.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          </div>
+          <button
+            onClick={charger}
+            disabled={loading}
+            className="text-xs font-semibold text-amber-800 underline underline-offset-2 disabled:opacity-50"
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -208,7 +266,8 @@ export default function PcaDashboardPage() {
           <p className="text-sm text-gray-500 mt-0.5">
             Vue de synthèse haute direction — Lecture seule
             <span className="ml-3 text-xs text-gray-400">
-              Actualisé à {lastRefresh.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+              {horsLigne ? "Données du cache — " : "Actualisé à "}
+              {lastRefresh.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
             </span>
           </p>
         </div>
