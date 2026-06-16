@@ -15,7 +15,7 @@ import {
 import { eq, and, desc, sql, inArray, notExists } from "drizzle-orm";
 import { generateBulletin, generateMasse } from "../services/paieService";
 import { generateEcrituresSalaire, insererEcrituresSalaireDirectes } from "../services/comptabiliteService";
-import { generateBulletinPaie } from "../services/pdfService";
+import { generateBulletinPaie, generateBulletinsPaieGroupes } from "../services/pdfService";
 import { debitCaisseForSalaire, listCaisses } from "../services/caisseService";
 import { debitBanqueForSalaire, listComptes as listComptessBanque } from "../services/banqueService";
 
@@ -1117,5 +1117,42 @@ export async function reconcilierEcrituresSalaires(req: Request, res: Response):
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "reconcilierEcrituresSalaires");
     res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── Export groupé — tous les bulletins d'un mois dans un PDF ─────────────────
+export async function exportBulletinsPdf(req: Request, res: Response): Promise<void> {
+  try {
+    const cid  = coopId(req);
+    const mois  = parseInt(String(req.query["mois"]  ?? ""), 10);
+    const annee = parseInt(String(req.query["annee"] ?? ""), 10);
+    if (!mois || !annee || mois < 1 || mois > 12) {
+      res.status(400).json({ erreur: "Paramètres mois/annee invalides" });
+      return;
+    }
+    const bulletins = await db
+      .select({ id: bulletinsPaieTable.id })
+      .from(bulletinsPaieTable)
+      .where(and(
+        eq(bulletinsPaieTable.cooperativeId, cid),
+        eq(bulletinsPaieTable.mois, mois),
+        eq(bulletinsPaieTable.annee, annee),
+      ))
+      .orderBy(bulletinsPaieTable.id);
+    if (bulletins.length === 0) {
+      res.status(404).json({ erreur: "Aucun bulletin pour cette période" });
+      return;
+    }
+    const ids = bulletins.map(b => b.id);
+    const buffer = await generateBulletinsPaieGroupes(ids, cid);
+    const moisStr = String(mois).padStart(2, "0");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="bulletins_paie_${annee}_${moisStr}.pdf"`);
+    res.setHeader("Content-Length", String(buffer.length));
+    res.end(buffer);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "exportBulletinsPdf");
+    res.status(500).json({ erreur: "Erreur génération PDF groupé" });
   }
 }

@@ -49,6 +49,19 @@ async function downloadPdfBulletin(bulletinId: number) {
   openPdfViewer(URL.createObjectURL(blob), `bulletin_paie_${bulletinId}.pdf`);
 }
 
+async function downloadGroupePdf(mois: number, annee: number) {
+  const token = localStorage.getItem("coop_token") ?? "";
+  const res = await fetch(`${BASE}/api/salaires/bulletins/export-pdf?mois=${mois}&annee=${annee}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  if (blob.size === 0) return;
+  const moisStr = String(mois).padStart(2, "0");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `bulletins_paie_${annee}_${moisStr}.pdf`;
+  a.click();
+}
+
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const MOIS_NOMS = [
@@ -422,6 +435,7 @@ function TabPaie() {
   const [annee, setAnnee] = useState(now.getFullYear());
   const [showPayer, setShowPayer] = useState<BulletinAvecPersonnel | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [exportingGroupe, setExportingGroupe] = useState(false);
   const [downloadingBulletins, setDownloadingBulletins] = useState<Set<number>>(new Set());
 
   async function handleDownloadBulletin(id: number) {
@@ -608,6 +622,24 @@ function TabPaie() {
               >
                 <RotateCcw className="h-4 w-4" />
                 Réconcilier écritures
+              </button>
+            )}
+            {list.length > 0 && (
+              <button
+                onClick={async () => {
+                  if (exportingGroupe) return;
+                  setExportingGroupe(true);
+                  try { await downloadGroupePdf(mois, annee); }
+                  finally { setExportingGroupe(false); }
+                }}
+                disabled={exportingGroupe}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 text-sm disabled:opacity-60"
+                title={`Télécharger tous les bulletins de ${MOIS_NOMS[mois]} ${annee} en un seul PDF`}
+              >
+                {exportingGroupe
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <FileDown className="h-4 w-4" />}
+                Exporter tout ({list.length})
               </button>
             )}
           </div>

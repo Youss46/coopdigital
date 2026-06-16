@@ -856,17 +856,29 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
 // ─────────────────────────────────────────────────────────────────────────────
 // 7. Bulletin de paie
 // ─────────────────────────────────────────────────────────────────────────────
-export async function generateBulletinPaie(bulletinId: number, cooperativeId: number): Promise<Buffer> {
+// ── Type & helpers internes pour le bulletin de paie ─────────────────────────
+
+type BulletinData = {
+  bulletin:  typeof bulletinsPaieTable.$inferSelect;
+  agent:     typeof personnelTable.$inferSelect | undefined;
+  avantages: (typeof lignesBulletinTable.$inferSelect)[];
+  retenues:  (typeof lignesBulletinTable.$inferSelect)[];
+};
+
+async function fetchBulletinData(bulletinId: number, cooperativeId: number): Promise<BulletinData> {
   const [bulletin] = await db.select().from(bulletinsPaieTable)
     .where(and(eq(bulletinsPaieTable.id, bulletinId), eq(bulletinsPaieTable.cooperativeId, cooperativeId)));
   if (!bulletin) throw new Error("Bulletin introuvable");
-
   const [agent] = await db.select().from(personnelTable).where(eq(personnelTable.id, bulletin.personnelId));
-  const lignes = await db.select().from(lignesBulletinTable).where(eq(lignesBulletinTable.bulletinId, bulletinId));
-  const avantages = lignes.filter(l => l.type === "avantage");
-  const retenues  = lignes.filter(l => l.type === "retenue");
+  const lignes  = await db.select().from(lignesBulletinTable).where(eq(lignesBulletinTable.bulletinId, bulletinId));
+  return { bulletin, agent, avantages: lignes.filter(l => l.type === "avantage"), retenues: lignes.filter(l => l.type === "retenue") };
+}
 
-  const { doc, endPromise } = makePdfDoc();
+async function drawBulletinOnDoc(
+  doc: InstanceType<typeof PDFDocument>,
+  cooperativeId: number,
+  { bulletin, agent, avantages, retenues }: BulletinData,
+): Promise<void> {
   const ref = `BP-${bulletin.annee}-${String(bulletin.mois).padStart(2,"0")}-${String(bulletin.personnelId).padStart(3,"0")}`;
   await drawHeader(doc, cooperativeId, { titre_document: "Bulletin de Paie", reference: ref });
 
@@ -942,7 +954,28 @@ export async function generateBulletinPaie(bulletinId: number, cooperativeId: nu
   doc.text("Salarié (signature)", PAGE_W - MARGIN - 170, y, { width: 160, align: "center" });
   doc.rect(MARGIN, y + 12, 150, 38).stroke("#d1d5db");
   doc.rect(PAGE_W - MARGIN - 170, y + 12, 160, 38).stroke("#d1d5db");
+}
 
+export async function generateBulletinPaie(bulletinId: number, cooperativeId: number): Promise<Buffer> {
+  const data = await fetchBulletinData(bulletinId, cooperativeId);
+  const { doc, endPromise } = makePdfDoc();
+  await drawBulletinOnDoc(doc, cooperativeId, data);
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7b. Export groupé — bulletins de paie (un par page dans un seul PDF)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateBulletinsPaieGroupes(bulletinIds: number[], cooperativeId: number): Promise<Buffer> {
+  if (bulletinIds.length === 0) throw new Error("Aucun bulletin sélectionné");
+  const { doc, endPromise } = makePdfDoc();
+  for (let i = 0; i < bulletinIds.length; i++) {
+    if (i > 0) doc.addPage();
+    const data = await fetchBulletinData(bulletinIds[i]!, cooperativeId);
+    await drawBulletinOnDoc(doc, cooperativeId, data);
+  }
   await addFooters(doc, cooperativeId);
   doc.end();
   return endPromise;

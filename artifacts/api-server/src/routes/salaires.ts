@@ -28,6 +28,7 @@ import {
   updateConfigPaie,
   getComptesTresorerie,
   reconcilierEcrituresSalaires,
+  exportBulletinsPdf,
 } from "../controllers/salairesController";
 
 const router: IRouter = Router();
@@ -82,6 +83,11 @@ router.get(
   "/salaires/bulletins",
   checkPermission("salaires", "lire"),
   listBulletins,
+);
+router.get(
+  "/salaires/bulletins/export-pdf",
+  checkPermission("salaires", "lire"),
+  exportBulletinsPdf,
 );
 router.get(
   "/salaires/bulletins/:id/pdf",
