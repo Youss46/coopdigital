@@ -250,7 +250,7 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
             <p className="text-white text-sm font-medium truncate">
               {utilisateur?.prenoms} {utilisateur?.nom}
             </p>
-            <p className="text-green-300 text-xs truncate capitalize">
+            <p className="text-green-300 text-xs truncate uppercase">
               {utilisateur?.role?.replace(/_/g, " ")}
             </p>
           </div>
