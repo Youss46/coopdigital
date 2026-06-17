@@ -48,6 +48,7 @@ import {
   Users2,
   Ship,
   WifiOff,
+  AlertTriangle,
 } from "lucide-react";
 import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
 import { useOffline } from "@/contexts/OfflineContext";
@@ -58,6 +59,27 @@ import InstallButton from "./InstallButton";
 import GlobalSearch from "./GlobalSearch";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
+
+function SystemBanner() {
+  const { data } = useQuery<{ actif: boolean; message: string | null }>({
+    queryKey: ["system-banner"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/system/banner`);
+      if (!r.ok) return { actif: false, message: null };
+      return r.json() as Promise<{ actif: boolean; message: string | null }>;
+    },
+    refetchInterval: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
+    retry: false,
+  });
+  if (!data?.actif || !data.message) return null;
+  return (
+    <div className="flex-shrink-0 bg-red-600 text-white px-4 py-2.5 flex items-start gap-2 text-sm">
+      <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+      <span className="font-medium">{data.message}</span>
+    </div>
+  );
+}
 
 // ── Icônes — même ordre que NAV_ITEMS dans src/config/navigation.ts ──────────
 // Pour ajouter un module : éditer navigation.ts en premier, puis ajouter l'icône ici.
@@ -333,6 +355,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <HelpPanel />
           <NotificationPanel />
         </header>
+
+        {/* Bannière système (maintenance) */}
+        <SystemBanner />
 
         {/* Contenu */}
         <main className="flex-1 overflow-auto">

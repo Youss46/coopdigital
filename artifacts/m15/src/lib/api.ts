@@ -194,6 +194,21 @@ export async function toggleRenouvellementAuto(id: number, activer: boolean) {
   });
 }
 
+// ─── Bannière système ─────────────────────────────────────────────────────────
+
+export interface SystemBanner { actif: boolean; message: string | null }
+
+export async function fetchSystemBanner(): Promise<SystemBanner> {
+  return request<SystemBanner>("/m15/system/banner");
+}
+
+export async function updateSystemBanner(data: SystemBanner): Promise<void> {
+  await request<{ ok: boolean }>("/m15/system/banner", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function formatFcfa(v: number | string | null | undefined): string {

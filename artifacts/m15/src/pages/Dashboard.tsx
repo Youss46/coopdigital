@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
-import { fetchDashboard, formatFcfa, formatDate, type DashboardM15 } from "@/lib/api";
+import { fetchDashboard, fetchSystemBanner, updateSystemBanner, formatFcfa, formatDate, type DashboardM15, type SystemBanner } from "@/lib/api";
 import {
   Building2, Users, AlertTriangle, TrendingUp, Clock, CheckCircle2,
-  PauseCircle, XCircle, Loader2, Plus, RefreshCw,
+  PauseCircle, XCircle, Loader2, Plus, RefreshCw, Megaphone, Save,
+  BellOff, Bell,
 } from "lucide-react";
 
 function KpiCard({ label, value, icon: Icon, color, sub }: {
@@ -30,6 +31,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [banner, setBanner] = useState<SystemBanner | null>(null);
+  const [bannerMessage, setBannerMessage] = useState("");
+  const [bannerActif, setBannerActif] = useState(false);
+  const [bannerSaving, setBannerSaving] = useState(false);
+  const [bannerDirty, setBannerDirty] = useState(false);
+
   async function load() {
     setLoading(true); setError("");
     try { setData(await fetchDashboard()); }
@@ -37,7 +44,27 @@ export default function Dashboard() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { void load(); }, []);
+  async function loadBanner() {
+    try {
+      const b = await fetchSystemBanner();
+      setBanner(b);
+      setBannerActif(b.actif);
+      setBannerMessage(b.message ?? "");
+    } catch {}
+  }
+
+  async function saveBanner() {
+    setBannerSaving(true);
+    try {
+      await updateSystemBanner({ actif: bannerActif, message: bannerMessage.trim() || null });
+      const updated = { actif: bannerActif, message: bannerMessage.trim() || null };
+      setBanner(updated);
+      setBannerDirty(false);
+    } catch {}
+    finally { setBannerSaving(false); }
+  }
+
+  useEffect(() => { void load(); void loadBanner(); }, []);
 
   return (
     <Layout>
@@ -130,6 +157,57 @@ export default function Dashboard() {
             )}
           </>
         )}
+
+        {/* ─── Bannière système ─────────────────────────────────────────────── */}
+        <div className="mt-8 bg-card border rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b flex items-center gap-2">
+            <Megaphone size={16} className="text-orange-500" />
+            <h2 className="font-semibold text-sm sm:text-base">Message système</h2>
+            <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full ${banner?.actif ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"}`}>
+              {banner?.actif ? "Actif" : "Inactif"}
+            </span>
+          </div>
+          <div className="p-5 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Ce message s'affiche en bannière rouge sur tous les tableaux de bord CoopDigital tant qu'il est actif.
+            </p>
+            <textarea
+              value={bannerMessage}
+              onChange={e => { setBannerMessage(e.target.value); setBannerDirty(true); }}
+              rows={3}
+              placeholder="Ex : Plateforme en maintenance. Cela ne devrait pas tarder. Nous vous prions de nous excuser pour la gêne occasionnée."
+              className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={() => { setBannerActif(a => !a); setBannerDirty(true); }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  bannerActif
+                    ? "bg-red-100 text-red-700 hover:bg-red-200"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {bannerActif ? <Bell size={14} /> : <BellOff size={14} />}
+                {bannerActif ? "Bannière activée" : "Bannière désactivée"}
+              </button>
+              <button
+                onClick={() => void saveBanner()}
+                disabled={bannerSaving || !bannerDirty}
+                className="ml-auto flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+              >
+                {bannerSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Enregistrer
+              </button>
+            </div>
+            {banner && !bannerDirty && (
+              <p className="text-xs text-muted-foreground">
+                {banner.actif && banner.message
+                  ? `Aperçu : "${banner.message}"`
+                  : "Aucun message actif en ce moment."}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </Layout>
   );

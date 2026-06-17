@@ -21,6 +21,10 @@ import {
   updatePcaHandler,
 } from "../controllers/m15Controller.js";
 import {
+  getSystemBannerHandler,
+  updateSystemBannerHandler,
+} from "../controllers/systemController.js";
+import {
   tousLesTicketsM15Handler,
   detailTicketM15Handler,
   repondreM15Handler,
@@ -31,6 +35,9 @@ import {
 const router = Router();
 
 router.post("/m15/auth/login", loginM15Handler);
+
+// Public — consulté par CoopDigital sans authentification
+router.get("/system/banner", getSystemBannerHandler);
 
 router.use("/m15", m15AuthMiddleware);
 
@@ -55,6 +62,10 @@ router.put("/m15/cooperatives/:id/reactiver", requireM15Role("superadmin", "admi
 router.post("/m15/cooperatives/:id/reset-password-pca", requireM15Role("superadmin", "admin"), resetPasswordPcaHandler);
 router.put("/m15/cooperatives/:id/pca", requireM15Role("superadmin", "admin"), updatePcaHandler);
 router.delete("/m15/cooperatives/:id", requireM15Role("superadmin"), supprimerCooperativeHandler);
+
+// ─── Bannière système ─────────────────────────────────────────────────────────
+router.get("/m15/system/banner",  requireM15Role("superadmin", "admin"), getSystemBannerHandler);
+router.put("/m15/system/banner",  requireM15Role("superadmin", "admin"), updateSystemBannerHandler);
 
 // ─── Support tickets (vue M15) ────────────────────────────────────────────────
 router.get("/m15/support/tickets",                  tousLesTicketsM15Handler);
