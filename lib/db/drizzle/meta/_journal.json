@@ -302,6 +302,13 @@
       "when": 1782230820000,
       "tag": "0042_fix_config_comptable_missing_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1782317220000,
+      "tag": "0043_system_banner",
+      "breakpoints": true
     }
   ]
 }
