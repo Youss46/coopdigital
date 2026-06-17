@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
 import { usePushSubscription } from "./hooks/usePushSubscription";
 import OfflineBanner from "./components/OfflineBanner";
+import SystemBanner from "./components/SystemBanner";
 import Login from "./pages/Login";
 import Accueil from "./pages/Accueil";
 import CollecteFlow from "./pages/CollecteFlow";
@@ -70,6 +71,7 @@ export default function App() {
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <AuthProvider>
         <OfflineProvider>
+          <SystemBanner />
           <OfflineBanner />
           <AppRoutes />
         </OfflineProvider>

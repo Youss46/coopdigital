@@ -8,6 +8,7 @@ import AvancesPage from "@/pages/AvancesPage";
 import PartsSocialesPage from "@/pages/PartsSocialesPage";
 import DocumentsPage from "@/pages/DocumentsPage";
 import { InstallBanner, OfflineBanner, OnlineToast } from "@/components/InstallPrompt";
+import SystemBanner from "@/components/SystemBanner";
 import { Loader2 } from "lucide-react";
 import VerifierPage from "@/pages/VerifierPage";
 import OpsPendantesPage from "@/pages/OpsPendantesPage";
@@ -73,6 +74,7 @@ export default function App() {
     <AuthProvider>
       <OfflineProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <SystemBanner />
           <OfflineBanner />
           <OnlineToast />
           <PushSetup />
