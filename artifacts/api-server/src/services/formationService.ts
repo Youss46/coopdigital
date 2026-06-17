@@ -2,7 +2,7 @@ import { db, programmesFormationTable, sessionsFormationTable, inscriptionsForma
 import { eq, and, inArray, sql, desc, not } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 import { getConfig } from "./configService.js";
 
@@ -803,29 +803,29 @@ export async function exportInscritsExcel(cooperativeId: number, sessionId: numb
     "Signature":        "",
   }));
 
-  const wb = XLSX.utils.book_new();
+  const wb = new ExcelJS.Workbook();
 
   // Onglet info session
-  const info = [
+  const wsInfo = wb.addWorksheet("Informations");
+  wsInfo.addRows([
     ["Session",    sess.titre],
     ["Date",       fmtDate(sess.date_session)],
     ["Lieu",       sess.lieu ?? "—"],
     ["Formateur",  sess.formateur ?? "—"],
     ["Nb inscrits", inscrits.length],
-  ];
-  const wsInfo = XLSX.utils.aoa_to_sheet(info);
-  XLSX.utils.book_append_sheet(wb, wsInfo, "Informations");
+  ]);
 
   // Onglet inscrits
-  const ws = XLSX.utils.json_to_sheet(rows);
-  // Largeurs de colonnes
-  ws["!cols"] = [
-    { wch: 4 }, { wch: 20 }, { wch: 20 }, { wch: 14 },
-    { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 10 }, { wch: 18 }, { wch: 20 },
-  ];
-  XLSX.utils.book_append_sheet(wb, ws, "Inscrits");
+  const ws = wb.addWorksheet("Inscrits");
+  const colWidths = [4, 20, 20, 14, 14, 14, 16, 10, 18, 20];
+  if (rows.length > 0) {
+    const headers = Object.keys(rows[0]!);
+    ws.columns = headers.map((h, i) => ({ header: h, key: h, width: colWidths[i] ?? 15 }));
+    rows.forEach(r => ws.addRow(r));
+  }
 
-  return Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
+  const buf = await wb.xlsx.writeBuffer();
+  return Buffer.from(buf as ArrayBuffer);
 }
 
 export async function exportInscritsPdf(cooperativeId: number, sessionId: number): Promise<Buffer> {

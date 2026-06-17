@@ -1312,19 +1312,25 @@ function OngletCarteGlobale() {
         "Date vérification":  p.eudrDateVerification ?? "",
       }));
 
-      const { utils, writeFile } = await import("xlsx");
-      const ws = utils.json_to_sheet(rows, { origin: 2 } as any);
-      utils.sheet_add_aoa(ws, [
-        [data.nomCooperative ?? "Export EUDR"],
-        [`Export EUDR — Parcelles · ${new Date().toLocaleDateString("fr-FR")}`],
-      ], { origin: "A1" });
-      ws["!cols"] = [
-        { wch: 28 }, { wch: 16 }, { wch: 16 },
-        { wch: 16 }, { wch: 16 }, { wch: 6 }, { wch: 18 },
-      ];
-      const wb = utils.book_new();
-      utils.book_append_sheet(wb, ws, "EUDR");
-      writeFile(wb, `eudr_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("EUDR");
+      const colWidths = [28, 16, 16, 16, 16, 6, 18];
+      const headers = Object.keys(rows[0] ?? {});
+      ws.columns = colWidths.map((w, i) => ({ key: headers[i] ?? `col${i}`, width: w }));
+      ws.addRow([data.nomCooperative ?? "Export EUDR"]);
+      ws.addRow([`Export EUDR — Parcelles · ${new Date().toLocaleDateString("fr-FR")}`]);
+      ws.addRow([]);
+      ws.addRow(headers);
+      rows.forEach(r => ws.addRow(Object.values(r)));
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `eudr_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (e) {
       console.error(e);
       alert("Erreur lors de la génération du fichier Excel.");

@@ -315,13 +315,13 @@ function ImportReleve() {
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
       >
-        <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
+        <input ref={inputRef} type="file" accept=".csv,.xlsx" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
         <Upload size={36} className="mx-auto mb-3 text-gray-300" />
         <p className="font-medium text-gray-600">
           {file ? file.name : "Glissez votre relevé ici ou cliquez pour choisir"}
         </p>
-        <p className="text-sm text-gray-400 mt-1">Formats acceptés : CSV (;  ,) ou Excel (.xlsx, .xls)</p>
+        <p className="text-sm text-gray-400 mt-1">Formats acceptés : CSV (;  ,) ou Excel (.xlsx)</p>
         {previewing && <p className="text-sm text-blue-500 mt-2">Analyse en cours…</p>}
       </div>
 

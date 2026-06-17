@@ -1,7 +1,7 @@
 import { db, relevesBancairesTable, lignesReleveTable, ecrituresComptablesTable } from "@workspace/db";
 import { eq, and, sql, between, or, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 
@@ -169,20 +169,33 @@ function convertirLignes(
 
 // ─── Import CSV ───────────────────────────────────────────────────────────────
 
-export function parseFileBuffer(buffer: Buffer, mimetype: string, originalname: string)
-  : { headers: string[]; preview: (string | number | undefined)[][]; rows: (string | number | undefined)[][] } {
+export async function parseFileBuffer(buffer: Buffer, mimetype: string, originalname: string)
+  : Promise<{ headers: string[]; preview: (string | number | undefined)[][]; rows: (string | number | undefined)[][] }> {
 
   const isXlsx = mimetype.includes("excel") || mimetype.includes("spreadsheet")
-    || originalname.endsWith(".xlsx") || originalname.endsWith(".xls");
+    || originalname.endsWith(".xlsx");
+  const isLegacyXls = originalname.endsWith(".xls") && !originalname.endsWith(".xlsx");
+
+  if (isLegacyXls) {
+    throw new Error("Le format .xls (Excel 97-2003) n'est plus pris en charge. Veuillez convertir votre fichier en .xlsx (Excel 2007+) avant de l'importer.");
+  }
 
   if (isXlsx) {
-    const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
-    const ws = wb.Sheets[wb.SheetNames[0]!]!;
-    const raw = XLSX.utils.sheet_to_json<(string | number | undefined)[]>(ws, {
-      header: 1, defval: undefined, blankrows: false,
+    const wb = new ExcelJS.Workbook();
+    // ExcelJS Buffer type vs Node 24 generic Buffer<ArrayBufferLike> mismatch
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (wb.xlsx.load as (b: any) => Promise<ExcelJS.Workbook>)(buffer);
+    const ws = wb.worksheets[0];
+    if (!ws) { return { headers: [], preview: [], rows: [] }; }
+    const raw: (string | number | undefined)[][] = [];
+    ws.eachRow({ includeEmpty: false }, (row) => {
+      const vals = (row.values as (ExcelJS.CellValue | undefined)[]).slice(1).map(
+        v => (v === null ? undefined : typeof v === "object" && v instanceof Date ? v.toISOString() : v as string | number | undefined)
+      );
+      raw.push(vals);
     });
     const headers = (raw[0] ?? []).map(v => String(v ?? ""));
-    const rows    = raw.slice(1) as (string | number | undefined)[][];
+    const rows    = raw.slice(1);
     return { headers, preview: rows.slice(0, 5), rows };
   }
 
@@ -204,7 +217,7 @@ export async function importerReleve(cooperativeId: number, opts: {
   importePar?: number;
   userMapping?: Record<string, string>;
 }) {
-  const { headers, rows } = parseFileBuffer(opts.buffer, opts.mimetype, opts.originalname);
+  const { headers, rows } = await parseFileBuffer(opts.buffer, opts.mimetype, opts.originalname);
   const colMap = detecterColonnes(headers);
   const { lignes, erreurs } = convertirLignes(headers, rows, colMap, opts.userMapping);
 

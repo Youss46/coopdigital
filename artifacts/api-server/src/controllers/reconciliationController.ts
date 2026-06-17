@@ -12,9 +12,8 @@ export const upload = multer({
       || file.mimetype.includes("excel")
       || file.mimetype.includes("spreadsheet")
       || file.originalname.endsWith(".csv")
-      || file.originalname.endsWith(".xlsx")
-      || file.originalname.endsWith(".xls");
-    if (!ok) cb(new Error("Format non supporté — CSV ou Excel uniquement"));
+      || file.originalname.endsWith(".xlsx");
+    if (!ok) cb(new Error("Format non supporté — CSV ou Excel (.xlsx) uniquement"));
     else cb(null, true);
   },
 });
@@ -24,7 +23,7 @@ export const upload = multer({
 export async function postPreview(req: Request, res: Response): Promise<void> {
   try {
     if (!req.file) { res.status(400).json({ error: "Fichier requis" }); return; }
-    const { headers, preview } = svc.parseFileBuffer(req.file.buffer, req.file.mimetype, req.file.originalname);
+    const { headers, preview } = await svc.parseFileBuffer(req.file.buffer, req.file.mimetype, req.file.originalname);
     res.json({ headers, preview });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur parsing";
