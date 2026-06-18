@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Ship, Plus, Trash2, CheckCircle2, XCircle, Leaf } from "lucide-react";
+import { ArrowLeft, Ship, CheckCircle2, XCircle, Leaf, Package, Search, CheckSquare, Square } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -37,12 +37,15 @@ async function apiPost<T>(path: string, token: string | null, body: unknown): Pr
   return res.json() as Promise<T>;
 }
 
-interface LotLigne {
-  key: string;
-  poidsKg: string;
-  nombreSacs: string;
-  certificatEudr: string;
-  parcelleOrigine: string;
+interface LotDisponible {
+  id: number;
+  qrCodeLot: string;
+  statut: string;
+  poidsTotalKg: string;
+  entrepot: string | null;
+  dateCreation: string;
+  nbLivraisons?: number;
+  nbProducteurs?: number;
 }
 
 interface Exportateur   { id: number; nom: string; }
@@ -95,9 +98,12 @@ export default function NouvelleExpeditionPage() {
   const [phytoDateExpiration, setPhytoDateExpiration] = useState("");
   const [phytoOrganisme, setPhytoOrganisme] = useState("DPVC");
 
-  // Documents et lots
+  // Documents
   const [docsValides, setDocsValides] = useState<Record<string, boolean>>({});
-  const [lots, setLots] = useState<LotLigne[]>([]);
+
+  // Sélection de lots
+  const [selectedLotIds, setSelectedLotIds] = useState<Set<number>>(new Set());
+  const [lotSearch, setLotSearch] = useState("");
 
   // Requêtes flotte + exportateurs
   const { data: vehiculesFlotte = [] } = useQuery<VehiculeFlotte[]>({
@@ -115,27 +121,51 @@ export default function NouvelleExpeditionPage() {
     queryFn: () => apiFetch("/api/exportateurs", token),
   });
 
-  // Vehicule sélectionné → info affichée
+  const { data: lotsDisponibles = [], isLoading: lotsLoading } = useQuery<LotDisponible[]>({
+    queryKey: ["lots-disponibles-creation"],
+    queryFn: () => apiFetch("/api/lots?statut=en_stock", token),
+  });
+
+  // Véhicule sélectionné → info affichée
   const vehiculeSelectionne = vehiculesFlotte.find(v => String(v.id) === vehiculeId);
   const chauffeurSelectionne = chauffeursFlotte.find(c => String(c.id) === chauffeurId);
 
+  // Lots filtrés par recherche
+  const lotsFiltres = lotsDisponibles.filter(l =>
+    lotSearch === "" ||
+    l.qrCodeLot.toLowerCase().includes(lotSearch.toLowerCase()) ||
+    (l.entrepot ?? "").toLowerCase().includes(lotSearch.toLowerCase())
+  );
+
+  const toggleLot = (id: number) => {
+    setSelectedLotIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const mutation = useMutation({
-    mutationFn: (body: unknown) => apiPost("/api/expeditions", token, body),
-    onSuccess: (data: unknown) => {
-      toast({ title: "Expédition créée", description: `${(data as { numeroExpedition?: string }).numeroExpedition ?? ""}` });
+    mutationFn: (body: unknown) => apiPost<{ id: number; numeroExpedition: string }>("/api/expeditions", token, body),
+    onSuccess: async (exp) => {
+      // Attacher les lots sélectionnés
+      if (selectedLotIds.size > 0) {
+        await Promise.allSettled(
+          Array.from(selectedLotIds).map(lotId =>
+            apiPost(`/api/expeditions/${exp.id}/lots`, token, { lotId })
+          )
+        );
+      }
+      toast({ title: "Expédition créée", description: exp.numeroExpedition });
       navigate("/expeditions");
     },
     onError: (err: Error) => {
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      setIsSubmitting(false);
     },
   });
-
-  const ajouterLot = () =>
-    setLots(prev => [...prev, { key: Date.now().toString(), poidsKg: "", nombreSacs: "", certificatEudr: "", parcelleOrigine: "" }]);
-
-  const supprimerLot   = (key: string) => setLots(prev => prev.filter(l => l.key !== key));
-  const mettreAJourLot = (key: string, field: keyof LotLigne, value: string) =>
-    setLots(prev => prev.map(l => l.key === key ? { ...l, [field]: value } : l));
 
   const toggleDoc = (key: string) => setDocsValides(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -157,6 +187,7 @@ export default function NouvelleExpeditionPage() {
       ? exportateurNom || undefined
       : exportateurs.find(e => String(e.id) === exportateurId)?.nom;
 
+    setIsSubmitting(true);
     mutation.mutate({
       typeVehicule,
       vehiculeId:         vehiculeId ? parseInt(vehiculeId, 10) : undefined,
@@ -182,12 +213,6 @@ export default function NouvelleExpeditionPage() {
       certificatPhytoDateExpiration: phytoDateExpiration || undefined,
       certificatPhytoOrganisme:      phytoOrganisme || "DPVC",
       documents: [...DOCS_REQUIS, ...DOCS_OPTIONNELS].filter(d => docsValides[d.key]).map(d => ({ type: d.key, url: "", date: new Date().toISOString() })),
-      lots: lots.filter(l => l.poidsKg).map(l => ({
-        poidsKg:        parseFloat(l.poidsKg),
-        nombreSacs:     l.nombreSacs ? parseInt(l.nombreSacs, 10) : undefined,
-        certificatEudr: l.certificatEudr || undefined,
-        parcelleOrigine: l.parcelleOrigine || undefined,
-      })),
     });
   };
 
@@ -371,41 +396,112 @@ export default function NouvelleExpeditionPage() {
         </CardContent>
       </Card>
 
-      {/* LOTS EUDR */}
-      <Card>
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">🌿 Lots cacao — traçabilité EUDR</CardTitle>
-          <Button variant="outline" size="sm" onClick={ajouterLot} className="gap-1">
-            <Plus className="h-3 w-3" /> Ajouter un lot
-          </Button>
+      {/* SÉLECTION DES LOTS */}
+      <Card className="border-green-200">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Leaf className="h-4 w-4 text-green-600" />
+              Lots cacao — traçabilité EUDR
+            </CardTitle>
+            {selectedLotIds.size > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                <CheckSquare className="h-3 w-3" />
+                {selectedLotIds.size} lot{selectedLotIds.size > 1 ? "s" : ""} sélectionné{selectedLotIds.size > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Sélectionnez les lots <span className="font-medium">en stock</span> à expédier. La liaison est enregistrée automatiquement à la création.
+          </p>
         </CardHeader>
         <CardContent className="space-y-3">
-          {lots.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">Aucun lot ajouté. Cliquez sur "Ajouter un lot" pour lier les lots à des membres producteurs.</p>
+          {/* Barre de recherche */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              className="pl-9 text-sm"
+              placeholder="Rechercher par QR code ou entrepôt…"
+              value={lotSearch}
+              onChange={e => setLotSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Liste des lots */}
+          {lotsLoading ? (
+            <div className="flex items-center justify-center py-8 text-gray-400 text-sm">
+              Chargement des lots…
+            </div>
+          ) : lotsDisponibles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+              <Package className="h-8 w-8 text-gray-300" />
+              <p className="text-sm text-gray-500 font-medium">Aucun lot en stock</p>
+              <p className="text-xs text-gray-400">Créez des lots depuis le module Traçabilité avant d'enregistrer une expédition.</p>
+            </div>
+          ) : lotsFiltres.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">Aucun lot ne correspond à la recherche.</p>
           ) : (
-            lots.map(lot => (
-              <div key={lot.key} className="grid grid-cols-5 gap-2 items-end border rounded-lg p-3 bg-gray-50">
-                <div>
-                  <Label className="text-xs">Poids (kg)</Label>
-                  <Input type="number" value={lot.poidsKg} onChange={e => mettreAJourLot(lot.key, "poidsKg", e.target.value)} placeholder="500" />
-                </div>
-                <div>
-                  <Label className="text-xs">Sacs</Label>
-                  <Input type="number" value={lot.nombreSacs} onChange={e => mettreAJourLot(lot.key, "nombreSacs", e.target.value)} placeholder="10" />
-                </div>
-                <div>
-                  <Label className="text-xs">Cert. EUDR</Label>
-                  <Input value={lot.certificatEudr} onChange={e => mettreAJourLot(lot.key, "certificatEudr", e.target.value)} placeholder="EUDR-..." />
-                </div>
-                <div>
-                  <Label className="text-xs">Parcelle origine</Label>
-                  <Input value={lot.parcelleOrigine} onChange={e => mettreAJourLot(lot.key, "parcelleOrigine", e.target.value)} placeholder="GPS ou code" />
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => supprimerLot(lot.key)} className="text-red-500 hover:text-red-700">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))
+            <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden max-h-72 overflow-y-auto">
+              {lotsFiltres.map(lot => {
+                const selected = selectedLotIds.has(lot.id);
+                const shortCode = lot.qrCodeLot.slice(0, 8).toUpperCase();
+                const poids = parseFloat(lot.poidsTotalKg ?? "0").toLocaleString("fr-FR");
+                const dateStr = new Date(lot.dateCreation).toLocaleDateString("fr-FR");
+                return (
+                  <div
+                    key={lot.id}
+                    onClick={() => toggleLot(lot.id)}
+                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
+                      selected ? "bg-green-50 hover:bg-green-100" : "bg-white hover:bg-gray-50"
+                    }`}
+                  >
+                    {/* Checkbox visuel */}
+                    <div className={`flex-shrink-0 w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                      selected ? "text-green-700" : "text-gray-300"
+                    }`}>
+                      {selected ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5" />}
+                    </div>
+
+                    {/* Infos lot */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-mono font-bold text-gray-900">
+                          LOT-{shortCode}
+                        </span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                          en stock
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                        <span><span className="font-medium text-gray-700">{poids} kg</span></span>
+                        {lot.entrepot && <span>📦 {lot.entrepot}</span>}
+                        <span>📅 {dateStr}</span>
+                        {lot.nbLivraisons != null && <span>🌱 {lot.nbLivraisons} livraison{lot.nbLivraisons > 1 ? "s" : ""}</span>}
+                      </div>
+                    </div>
+
+                    {/* Poids badge */}
+                    <div className={`flex-shrink-0 text-right ${selected ? "text-green-700" : "text-gray-400"}`}>
+                      <p className="text-sm font-semibold">{poids} kg</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {selectedLotIds.size > 0 && lotsDisponibles.length > 0 && (
+            <div className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm">
+              <span className="text-green-800 font-medium">
+                {selectedLotIds.size} lot{selectedLotIds.size > 1 ? "s" : ""} sélectionné{selectedLotIds.size > 1 ? "s" : ""}
+              </span>
+              <span className="text-green-700 font-bold">
+                {lotsDisponibles
+                  .filter(l => selectedLotIds.has(l.id))
+                  .reduce((s, l) => s + parseFloat(l.poidsTotalKg ?? "0"), 0)
+                  .toLocaleString("fr-FR")} kg total
+              </span>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -510,10 +606,10 @@ export default function NouvelleExpeditionPage() {
         <Button
           className="bg-green-700 hover:bg-green-800 gap-2"
           onClick={handleSubmit}
-          disabled={mutation.isPending}
+          disabled={isSubmitting || mutation.isPending}
         >
           <Ship className="h-4 w-4" />
-          {mutation.isPending ? "Enregistrement…" : "Enregistrer →"}
+          {isSubmitting || mutation.isPending ? "Enregistrement…" : "Enregistrer →"}
         </Button>
       </div>
     </div>
