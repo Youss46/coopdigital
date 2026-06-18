@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, Ship, MapPin, CheckCircle2,
   ChevronRight, FileText, Users, Leaf, AlertCircle,
-  Plus, Unlink, Link,
+  Plus, Unlink, Link, Download,
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -96,6 +96,7 @@ export default function ExpeditionDetailPage() {
 
   const [showReception, setShowReception] = useState(false);
   const [showLotsPanel, setShowLotsPanel] = useState(false);
+  const [downloadingBL, setDownloadingBL] = useState(false);
   const [poidsRecu, setPoidsRecu] = useState("");
   const [recepisse, setRecepisse] = useState("");
   const [receptionnaire, setReceptionnaire] = useState("");
@@ -501,11 +502,42 @@ export default function ExpeditionDetailPage() {
       {/* Documents */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-2"><FileText className="h-4 w-4" /> Documents</CardTitle>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <FileText className="h-4 w-4" /> Documents
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto gap-1.5 h-7 text-xs border-green-700 text-green-700 hover:bg-green-50"
+              disabled={downloadingBL}
+              onClick={async () => {
+                setDownloadingBL(true);
+                try {
+                  const res = await fetch(`${BASE}/api/expeditions/${id}/bon-livraison`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                  });
+                  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `bon-livraison-${String(exp.numeroExpedition ?? id)}.pdf`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch {
+                  toast({ title: "Erreur", description: "Impossible de générer le bon de livraison.", variant: "destructive" });
+                } finally {
+                  setDownloadingBL(false);
+                }
+              }}
+            >
+              <Download className="h-3 w-3" />
+              {downloadingBL ? "Génération…" : "Bon de livraison"}
+            </Button>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {documents.length === 0 ? (
-            <p className="text-xs text-gray-400">Aucun document joint</p>
+            <p className="text-xs text-gray-400">Aucun document joint. Téléchargez le bon de livraison via le bouton ci-dessus.</p>
           ) : (
             <div className="grid grid-cols-2 gap-2">
               {documents.map((d, i) => (

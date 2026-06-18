@@ -24,6 +24,8 @@ import {
   entrepotsDeleguesTable,
   usersTable,
   cooperativesTable,
+  expeditionsTable,
+  expeditionLotsTable,
 } from "@workspace/db";
 import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
@@ -1636,6 +1638,213 @@ export async function generateRapportTransfert(transfertId: number, cooperativeI
   doc.rect(MARGIN,       y, 160, 40).stroke("#d1d5db");
   doc.rect(MARGIN + 180, y, 160, 40).stroke("#d1d5db");
   doc.rect(MARGIN + 360, y, 130, 40).stroke("#d1d5db");
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bon de livraison — Expédition au port
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateBonLivraison(expeditionId: number, cooperativeId: number): Promise<Buffer> {
+  const [exp] = await db
+    .select()
+    .from(expeditionsTable)
+    .where(and(eq(expeditionsTable.id, expeditionId), eq(expeditionsTable.cooperativeId, cooperativeId)));
+  if (!exp) throw new Error("Expédition introuvable");
+
+  const lots = await db
+    .select({
+      lotId:           expeditionLotsTable.lotId,
+      poidsKg:         expeditionLotsTable.poidsKg,
+      nombreSacs:      expeditionLotsTable.nombreSacs,
+      certificatEudr:  expeditionLotsTable.certificatEudr,
+      parcelleOrigine: expeditionLotsTable.parcelleOrigine,
+      membreNom:       membresTable.nom,
+      membrePrenoms:   membresTable.prenoms,
+    })
+    .from(expeditionLotsTable)
+    .leftJoin(membresTable, eq(expeditionLotsTable.membreId, membresTable.id))
+    .where(eq(expeditionLotsTable.expeditionId, expeditionId));
+
+  const { doc, endPromise } = makePdfDoc();
+  const W = PAGE_W - 2 * MARGIN;
+
+  await drawHeader(doc, cooperativeId, {
+    titre_document: "BON DE LIVRAISON",
+    reference: exp.numeroExpedition,
+  });
+
+  let y = doc.y;
+
+  // ── Bandeau récapitulatif ─────────────────────────────────────────────────
+  doc.rect(MARGIN, y, W, 28).fill("#f0fdf4").stroke("#bbf7d0");
+  doc.fontSize(11).fillColor(VERT).font("Helvetica-Bold")
+    .text(`Expédition  ${exp.numeroExpedition}`, MARGIN + 10, y + 8, { width: W / 2 - 10, lineBreak: false });
+  const dateDepart = exp.dateDepart
+    ? new Date(exp.dateDepart).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+    : "—";
+  doc.fontSize(9).fillColor(GRIS).font("Helvetica")
+    .text(`Date départ : ${dateDepart}`, MARGIN + W / 2, y + 10, { width: W / 2 - 10, align: "right", lineBreak: false });
+  y += 36;
+
+  // ── Deux colonnes : Expéditeur | Destinataire ─────────────────────────────
+  const colW = (W - 16) / 2;
+
+  doc.rect(MARGIN, y, colW, 80).fill("#f9fafb").stroke("#e5e7eb");
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica-Bold")
+    .text("EXPÉDITEUR", MARGIN + 8, y + 6, { width: colW - 16, lineBreak: false });
+  doc.fontSize(9).fillColor("black").font("Helvetica")
+    .text(exp.lieuDepart ?? "Magasin central", MARGIN + 8, y + 20, { width: colW - 16 });
+
+  const col2X = MARGIN + colW + 16;
+  doc.rect(col2X, y, colW, 80).fill("#f9fafb").stroke("#e5e7eb");
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica-Bold")
+    .text("DESTINATAIRE", col2X + 8, y + 6, { width: colW - 16, lineBreak: false });
+  doc.fontSize(9).fillColor("black").font("Helvetica")
+    .text(`Port de ${exp.port}`, col2X + 8, y + 20, { width: colW - 16 });
+  if (exp.exportateurNom) {
+    doc.text(`Exportateur : ${exp.exportateurNom}`, col2X + 8, y + 34, { width: colW - 16 });
+  }
+  if (exp.entrepotDestination) {
+    doc.text(`Entrepôt : ${exp.entrepotDestination}`, col2X + 8, y + 48, { width: colW - 16 });
+  }
+  if (exp.numeroContratExport) {
+    doc.fontSize(8).fillColor(GRIS)
+      .text(`Contrat export : ${exp.numeroContratExport}`, col2X + 8, y + 62, { width: colW - 16 });
+  }
+  y += 88;
+
+  // ── Transport ──────────────────────────────────────────────────────────────
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("TRANSPORT", MARGIN, y);
+  y += 14;
+
+  const transportFields: Array<[string, string]> = [
+    ["Immatriculation",  exp.immatriculation ?? "—"],
+    ["Chauffeur",        exp.nomChauffeur ?? "—"],
+    ["Téléphone",        exp.telephoneChauffeur ?? "—"],
+    ["Transporteur",     exp.transporteur ?? (exp.typeVehicule === "propre" ? "Flotte propre" : "—")],
+    ["Bon de transport", exp.numeroBonTransport ?? "—"],
+  ];
+  for (const [ri, [label, val]] of transportFields.entries()) {
+    if (ri % 2 === 0) doc.rect(MARGIN, y, W, 16).fill("#f9fafb");
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
+    doc.fontSize(8).fillColor("black").font("Helvetica-Bold")
+      .text(val, MARGIN + 170, y + 4, { width: W - 176, lineBreak: false });
+    y += 16;
+  }
+  y += 10;
+
+  // ── Certificat phytosanitaire ──────────────────────────────────────────────
+  if (exp.certificatPhytoNumero) {
+    doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("CERTIFICAT PHYTOSANITAIRE", MARGIN, y);
+    y += 14;
+    const phytoFields: Array<[string, string]> = [
+      ["Numéro",      exp.certificatPhytoNumero],
+      ["Organisme",   exp.certificatPhytoOrganisme ?? "DPVC"],
+      ["Émission",    exp.certificatPhytoDateEmission ? formaterDate(exp.certificatPhytoDateEmission) : "—"],
+      ["Expiration",  exp.certificatPhytoDateExpiration ? formaterDate(exp.certificatPhytoDateExpiration) : "—"],
+    ];
+    for (const [ri, [label, val]] of phytoFields.entries()) {
+      if (ri % 2 === 0) doc.rect(MARGIN, y, W, 16).fill("#ecfdf5");
+      doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+        .text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
+      doc.fontSize(8).fillColor("black").font("Helvetica-Bold")
+        .text(val, MARGIN + 170, y + 4, { width: W - 176, lineBreak: false });
+      y += 16;
+    }
+    y += 10;
+  }
+
+  // ── Lots cacao ─────────────────────────────────────────────────────────────
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("DÉTAIL DES LOTS CACAO", MARGIN, y);
+  y += 14;
+
+  const lCols = [50, 155, 80, 120, 90];
+  const lHeaders = ["Lot #", "Producteur", "Poids (kg)", "Cert. EUDR", "Parcelle"];
+  ligneTableau(doc, lHeaders, lCols, MARGIN, y, VERT);
+  y += 18;
+
+  let totalPoidsLots = 0;
+  let totalSacs = 0;
+
+  for (const [idx, l] of lots.entries()) {
+    if (y > 720) {
+      doc.addPage();
+      await drawHeader(doc, cooperativeId, {
+        titre_document: "BON DE LIVRAISON (suite)",
+        reference: exp.numeroExpedition,
+      });
+      y = doc.y;
+      ligneTableau(doc, lHeaders, lCols, MARGIN, y, VERT);
+      y += 18;
+    }
+    const poids = l.poidsKg ? parseFloat(String(l.poidsKg)) : 0;
+    totalPoidsLots += poids;
+    totalSacs += l.nombreSacs ?? 0;
+
+    if (idx % 2 === 0) doc.rect(MARGIN, y, lCols.reduce((a, b) => a + b, 0), 16).fill("#f0fdf4");
+    ligneTableau(doc, [
+      l.lotId ? `#${l.lotId}` : "—",
+      l.membreNom ? `${l.membreNom} ${l.membrePrenoms ?? ""}`.trim() : "—",
+      poids > 0 ? poids.toLocaleString("fr-FR") : "—",
+      l.certificatEudr ?? "—",
+      l.parcelleOrigine ?? "—",
+    ], lCols, MARGIN, y);
+    y += 16;
+  }
+
+  if (lots.length === 0) {
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text("Aucun lot rattaché à cette expédition.", MARGIN, y + 4);
+    y += 20;
+  }
+
+  // ── Ligne totaux ───────────────────────────────────────────────────────────
+  y += 4;
+  doc.rect(MARGIN, y, lCols.reduce((a, b) => a + b, 0), 18).fill(VERT);
+  doc.fontSize(9).fillColor("white").font("Helvetica-Bold")
+    .text("TOTAL", MARGIN + 6, y + 5, { width: lCols[0]! + lCols[1]! - 6, lineBreak: false });
+  doc.text(
+    totalPoidsLots > 0 ? totalPoidsLots.toLocaleString("fr-FR") + " kg" : "—",
+    MARGIN + lCols[0]! + lCols[1]!, y + 5,
+    { width: lCols[2]! - 6, lineBreak: false },
+  );
+  if (exp.nombreSacs || totalSacs > 0) {
+    const sacs = exp.nombreSacs ?? totalSacs;
+    doc.fontSize(8).fillColor("white").font("Helvetica")
+      .text(`${sacs} sac${sacs > 1 ? "s" : ""}`, MARGIN + lCols[0]! + lCols[1]! + lCols[2]!, y + 6, {
+        width: lCols[3]! + lCols[4]! - 6,
+        lineBreak: false,
+      });
+  }
+  y += 26;
+
+  // ── Récap poids expédition ─────────────────────────────────────────────────
+  if (exp.poidsChargeKg) {
+    const poidsCharge = parseFloat(String(exp.poidsChargeKg));
+    doc.rect(MARGIN, y, W, 22).fill("#fffbeb").stroke("#fde68a");
+    doc.fontSize(9).fillColor(OR).font("Helvetica-Bold")
+      .text(`Poids total chargé : ${poidsCharge.toLocaleString("fr-FR")} kg`, MARGIN + 10, y + 6, {
+        width: W - 20, lineBreak: false,
+      });
+    y += 30;
+  }
+
+  // ── Zone signatures ────────────────────────────────────────────────────────
+  y = Math.max(y + 20, 660);
+  const sigW = Math.floor(W / 3) - 10;
+  const sigLabels = ["Responsable expédition", "Chauffeur (lu et approuvé)", "Réceptionnaire port"];
+  sigLabels.forEach((label, i) => {
+    const sx = MARGIN + i * (sigW + 15);
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text(label, sx, y, { width: sigW, align: "center", lineBreak: false });
+    doc.rect(sx, y + 14, sigW, 42).stroke("#d1d5db");
+    doc.fontSize(7).fillColor("#aaaaaa").font("Helvetica")
+      .text("Nom & Signature", sx, y + 48, { width: sigW, align: "center", lineBreak: false });
+  });
 
   await addFooters(doc, cooperativeId);
   doc.end();
