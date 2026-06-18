@@ -54,6 +54,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   // ── Commerce ─────────────────────────────────────────────────────────────────
   { href: "/fournisseurs",           label: "Fournisseurs",              roles: ["pca","directeur","comptable","delegue","auditeur"],                          category: "Commerce" },
   { href: "/exportateurs",           label: "Exportateurs",              roles: ["pca","directeur","comptable","auditeur"],                                    category: "Commerce" },
+  { href: "/ventes",                 label: "Ventes cacao",              roles: ["pca","directeur","comptable","auditeur"],                                    category: "Commerce" },
   { href: "/creances",               label: "Créances",                  roles: ["pca","directeur","comptable","auditeur"],                                    category: "Commerce" },
   { href: "/prix",                   label: "Suivi des Prix",            roles: ["pca","directeur","comptable","responsable_tracabilite","delegue","auditeur"], category: "Commerce" },
 

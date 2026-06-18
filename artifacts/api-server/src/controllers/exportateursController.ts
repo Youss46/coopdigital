@@ -212,6 +212,14 @@ export async function createVente(req: Request, res: Response): Promise<void> {
       })
       .returning();
 
+    // Marquer le lot comme "vendu" et lier la vente
+    if (lotId) {
+      await db
+        .update(lotsTable)
+        .set({ statut: "vendu", venteExportateurId: vente!.id })
+        .where(and(eq(lotsTable.id, lotId), eq(lotsTable.cooperativeId, cooperativeId)));
+    }
+
     const [detail] = await db
       .select(venteSelect)
       .from(ventesExportateursTable)

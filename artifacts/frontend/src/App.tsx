@@ -18,6 +18,7 @@ import TracabilitePage from "@/pages/TracabilitePage";
 import ParcellePage from "@/pages/ParcellePage";
 import StocksPage from "@/pages/StocksPage";
 import ExportateursPage from "@/pages/ExportateursPage";
+import VentesPage from "@/pages/VentesPage";
 import CreancesPage from "@/pages/CreancesPage";
 import CommunicationPage from "@/pages/CommunicationPage";
 import SalairesPage from "@/pages/SalairesPage";
@@ -138,6 +139,9 @@ function AppRoutes() {
       </Route>
       <Route path="/exportateurs">
         <ProtectedRoute component={ExportateursPage} />
+      </Route>
+      <Route path="/ventes">
+        <ProtectedRoute component={VentesPage} />
       </Route>
       <Route path="/creances">
         <ProtectedRoute component={CreancesPage} />
