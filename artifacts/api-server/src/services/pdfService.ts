@@ -1645,6 +1645,224 @@ export async function generateRapportTransfert(transfertId: number, cooperativeI
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Rapport EUDR — Expédition au port
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateRapportEudrPdf(expeditionId: number, cooperativeId: number): Promise<Buffer> {
+  const [exp] = await db
+    .select()
+    .from(expeditionsTable)
+    .where(and(eq(expeditionsTable.id, expeditionId), eq(expeditionsTable.cooperativeId, cooperativeId)));
+  if (!exp) throw new Error("Expédition introuvable");
+
+  const lots = await db
+    .select({
+      lotId:           expeditionLotsTable.lotId,
+      poidsKg:         expeditionLotsTable.poidsKg,
+      nombreSacs:      expeditionLotsTable.nombreSacs,
+      certificatEudr:  expeditionLotsTable.certificatEudr,
+      parcelleOrigine: expeditionLotsTable.parcelleOrigine,
+      membreNom:       membresTable.nom,
+      membrePrenoms:   membresTable.prenoms,
+      membreCni:       membresTable.numeroCni,
+      parcelleLat:     membresTable.parcelleLat,
+      parcelleLng:     membresTable.parcelleLng,
+      superficieHa:    membresTable.superficieHa,
+    })
+    .from(expeditionLotsTable)
+    .leftJoin(membresTable, eq(expeditionLotsTable.membreId, membresTable.id))
+    .where(eq(expeditionLotsTable.expeditionId, expeditionId));
+
+  const poidsTotal    = lots.reduce((s, l) => s + (l.poidsKg ? parseFloat(String(l.poidsKg)) : 0), 0);
+  const avecCert      = lots.filter(l => l.certificatEudr).length;
+  const avecParcelle  = lots.filter(l => l.parcelleOrigine || (l.parcelleLat && l.parcelleLng)).length;
+  const conforme      = avecCert === lots.length && avecParcelle === lots.length;
+
+  const { doc, endPromise } = makePdfDoc();
+  const W = PAGE_W - 2 * MARGIN;
+  const BLEU = "#1e40af";
+
+  await drawHeader(doc, cooperativeId, {
+    titre_document: "RAPPORT EUDR",
+    reference: exp.numeroExpedition,
+  });
+
+  let y = doc.y;
+
+  // ── Bandeau conformité ────────────────────────────────────────────────────
+  const confBg  = conforme ? "#f0fdf4" : "#fff7ed";
+  const confBdr = conforme ? "#bbf7d0" : "#fde68a";
+  const confClr = conforme ? VERT     : "#b45309";
+  doc.rect(MARGIN, y, W, 32).fill(confBg).stroke(confBdr);
+  const confLabel = conforme
+    ? "✅  Expédition CONFORME EUDR — Traçabilité complète"
+    : "⚠️  Traçabilité incomplète — certains lots manquent de données EUDR";
+  doc.fontSize(10).fillColor(confClr).font("Helvetica-Bold")
+    .text(confLabel, MARGIN + 12, y + 11, { width: W - 24, lineBreak: false });
+  y += 42;
+
+  // ── KPIs ─────────────────────────────────────────────────────────────────
+  const kpis = [
+    { label: "Lots / Producteurs",    val: String(lots.length) },
+    { label: "Poids total",           val: `${poidsTotal.toLocaleString("fr-FR")} kg` },
+    { label: "Cert. EUDR renseignées", val: `${avecCert} / ${lots.length}` },
+    { label: "Parcelles tracées",     val: `${avecParcelle} / ${lots.length}` },
+    { label: "Port de destination",   val: exp.port },
+    { label: "Exportateur",           val: exp.exportateurNom ?? "—" },
+  ];
+  const kpiW = (W - 10) / 3;
+  kpis.forEach((kpi, i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    if (col === 0 && row > 0) y += 44;
+    const kx = MARGIN + col * (kpiW + 5);
+    doc.rect(kx, y, kpiW, 36).fill("#f8fafc").stroke("#e2e8f0");
+    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+      .text(kpi.label, kx + 8, y + 6, { width: kpiW - 16, lineBreak: false });
+    doc.fontSize(12).fillColor(BLEU).font("Helvetica-Bold")
+      .text(kpi.val, kx + 8, y + 17, { width: kpiW - 16, lineBreak: false });
+  });
+  y += 50;
+
+  // ── Infos expédition ──────────────────────────────────────────────────────
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("INFORMATIONS EXPÉDITION", MARGIN, y);
+  y += 14;
+  const infoFields: Array<[string, string]> = [
+    ["N° Expédition",   exp.numeroExpedition],
+    ["Date départ",     exp.dateDepart ? formaterDate(exp.dateDepart.toISOString()) : "—"],
+    ["Lieu départ",     exp.lieuDepart ?? "Magasin central"],
+    ["Port",            exp.port],
+    ["Contrat export",  exp.numeroContratExport ?? "—"],
+    ["Certificat phyto", exp.certificatPhytoNumero ?? "Non renseigné"],
+  ];
+  for (const [ri, [label, val]] of infoFields.entries()) {
+    if (ri % 2 === 0) doc.rect(MARGIN, y, W, 16).fill("#f8fafc");
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
+    doc.fontSize(8).fillColor("black").font("Helvetica-Bold")
+      .text(val, MARGIN + 170, y + 4, { width: W - 176, lineBreak: false });
+    y += 16;
+  }
+  y += 12;
+
+  // ── Tableau des lots ──────────────────────────────────────────────────────
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("TRAÇABILITÉ DES LOTS — PRODUCTEURS", MARGIN, y);
+  y += 14;
+
+  const lCols = [40, 130, 65, 105, 85, 70];
+  const lHeaders = ["Lot #", "Producteur", "Poids (kg)", "Cert. EUDR", "Parcelle / GPS", "Surf. (ha)"];
+  ligneTableau(doc, lHeaders, lCols, MARGIN, y, BLEU);
+  y += 18;
+
+  for (const [idx, l] of lots.entries()) {
+    if (y > 720) {
+      doc.addPage();
+      await drawHeader(doc, cooperativeId, {
+        titre_document: "RAPPORT EUDR (suite)",
+        reference: exp.numeroExpedition,
+      });
+      y = doc.y;
+      ligneTableau(doc, lHeaders, lCols, MARGIN, y, BLEU);
+      y += 18;
+    }
+    const poids = l.poidsKg ? parseFloat(String(l.poidsKg)) : 0;
+    const hasCert = Boolean(l.certificatEudr);
+    const hasGps  = Boolean(l.parcelleLat && l.parcelleLng);
+
+    if (idx % 2 === 0) doc.rect(MARGIN, y, lCols.reduce((a, b) => a + b, 0), 16).fill("#f0f9ff");
+
+    const gpsStr = hasGps
+      ? `${parseFloat(String(l.parcelleLat)).toFixed(4)}, ${parseFloat(String(l.parcelleLng)).toFixed(4)}`
+      : (l.parcelleOrigine ?? "—");
+
+    ligneTableau(doc, [
+      l.lotId ? `#${l.lotId}` : "—",
+      l.membreNom ? `${l.membreNom} ${l.membrePrenoms ?? ""}`.trim() : "—",
+      poids > 0 ? poids.toLocaleString("fr-FR") : "—",
+      hasCert ? `✓ ${l.certificatEudr!}` : "⚠ Manquant",
+      gpsStr,
+      l.superficieHa ? String(l.superficieHa) : "—",
+    ], lCols, MARGIN, y);
+
+    if (!hasCert || !hasGps) {
+      doc.fontSize(6).fillColor("#dc2626")
+        .text(
+          !hasCert && !hasGps ? "⚠ Cert. + GPS manquants"
+          : !hasCert ? "⚠ Certificat manquant"
+          : "⚠ GPS manquant",
+          MARGIN + lCols[0]! + lCols[1]!, y + 8,
+          { width: lCols[2]! + lCols[3]!, lineBreak: false },
+        );
+    }
+    y += 16;
+  }
+
+  if (lots.length === 0) {
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text("Aucun lot rattaché à cette expédition.", MARGIN, y + 4);
+    y += 20;
+  }
+
+  // ── Ligne totaux ──────────────────────────────────────────────────────────
+  y += 4;
+  const totW = lCols.reduce((a, b) => a + b, 0);
+  doc.rect(MARGIN, y, totW, 18).fill(BLEU);
+  doc.fontSize(9).fillColor("white").font("Helvetica-Bold")
+    .text("TOTAL", MARGIN + 6, y + 5, { width: lCols[0]! + lCols[1]! - 6, lineBreak: false });
+  doc.text(
+    `${poidsTotal.toLocaleString("fr-FR")} kg`,
+    MARGIN + lCols[0]! + lCols[1]!, y + 5,
+    { width: lCols[2]! - 6, lineBreak: false },
+  );
+  doc.fontSize(8).fillColor("white").font("Helvetica")
+    .text(
+      `${avecCert}/${lots.length} cert.  ·  ${avecParcelle}/${lots.length} parcelles`,
+      MARGIN + lCols[0]! + lCols[1]! + lCols[2]!, y + 6,
+      { width: lCols[3]! + lCols[4]! + lCols[5]! - 6, lineBreak: false },
+    );
+  y += 28;
+
+  // ── Déclaration de conformité ─────────────────────────────────────────────
+  y += 8;
+  doc.rect(MARGIN, y, W, conforme ? 44 : 52).fill(confBg).stroke(confBdr);
+  doc.fontSize(9).fillColor(confClr).font("Helvetica-Bold")
+    .text("DÉCLARATION DE CONFORMITÉ EUDR", MARGIN + 10, y + 8, { width: W - 20, lineBreak: false });
+  if (conforme) {
+    doc.fontSize(8).fillColor("black").font("Helvetica")
+      .text(
+        `Le soussigné certifie que l'ensemble des ${lots.length} lots composant l'expédition ${exp.numeroExpedition} `
+        + `sont couverts par un certificat EUDR valide et que les parcelles d'origine sont géolocalisées conformément `
+        + `au Règlement (UE) 2023/1115.`,
+        MARGIN + 10, y + 22, { width: W - 20 },
+      );
+  } else {
+    doc.fontSize(8).fillColor("#92400e").font("Helvetica")
+      .text(
+        `⚠ Traçabilité incomplète : ${lots.length - avecCert} lot(s) sans certificat EUDR, `
+        + `${lots.length - avecParcelle} lot(s) sans parcelle tracée. `
+        + `Cette expédition ne peut pas être déclarée conforme au Règlement (UE) 2023/1115 en l'état.`,
+        MARGIN + 10, y + 22, { width: W - 20 },
+      );
+  }
+  y += conforme ? 52 : 60;
+
+  // ── Zone signatures ───────────────────────────────────────────────────────
+  y = Math.max(y + 20, 680);
+  const sigW2 = Math.floor(W / 2) - 10;
+  [["Responsable qualité / Traçabilité", MARGIN], ["Directeur de la coopérative", MARGIN + sigW2 + 20]].forEach(([label, sx]) => {
+    const sxN = Number(sx);
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text(String(label), sxN, y, { width: sigW2, align: "center", lineBreak: false });
+    doc.rect(sxN, y + 14, sigW2, 44).stroke("#d1d5db");
+    doc.fontSize(7).fillColor("#aaaaaa").font("Helvetica")
+      .text("Nom, Fonction & Signature", sxN, y + 50, { width: sigW2, align: "center", lineBreak: false });
+  });
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Bon de livraison — Expédition au port
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateBonLivraison(expeditionId: number, cooperativeId: number): Promise<Buffer> {

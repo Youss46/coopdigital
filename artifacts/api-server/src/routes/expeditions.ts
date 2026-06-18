@@ -14,6 +14,7 @@ import {
   handleRattacherLot,
   handleDetacherLot,
   handleBonLivraison,
+  handleRapportEudrPdf,
 } from "../controllers/expeditionsController";
 
 const router = Router();
@@ -88,6 +89,12 @@ router.get(
   "/expeditions/:id/eudr",
   checkPermission("expeditions", "rapport_eudr"),
   handleRapportEudr,
+);
+
+router.get(
+  "/expeditions/:id/eudr/pdf",
+  checkPermission("expeditions", "lire"),
+  handleRapportEudrPdf,
 );
 
 router.get(

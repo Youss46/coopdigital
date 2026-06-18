@@ -97,6 +97,7 @@ export default function ExpeditionDetailPage() {
   const [showReception, setShowReception] = useState(false);
   const [showLotsPanel, setShowLotsPanel] = useState(false);
   const [downloadingBL, setDownloadingBL] = useState(false);
+  const [downloadingEudr, setDownloadingEudr] = useState(false);
   const [poidsRecu, setPoidsRecu] = useState("");
   const [recepisse, setRecepisse] = useState("");
   const [receptionnaire, setReceptionnaire] = useState("");
@@ -504,35 +505,66 @@ export default function ExpeditionDetailPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <FileText className="h-4 w-4" /> Documents
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-auto gap-1.5 h-7 text-xs border-green-700 text-green-700 hover:bg-green-50"
-              disabled={downloadingBL}
-              onClick={async () => {
-                setDownloadingBL(true);
-                try {
-                  const res = await fetch(`${BASE}/api/expeditions/${id}/bon-livraison`, {
-                    headers: token ? { Authorization: `Bearer ${token}` } : {},
-                  });
-                  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                  const blob = await res.blob();
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `bon-livraison-${String(exp.numeroExpedition ?? id)}.pdf`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                } catch {
-                  toast({ title: "Erreur", description: "Impossible de générer le bon de livraison.", variant: "destructive" });
-                } finally {
-                  setDownloadingBL(false);
-                }
-              }}
-            >
-              <Download className="h-3 w-3" />
-              {downloadingBL ? "Génération…" : "Bon de livraison"}
-            </Button>
+            <div className="ml-auto flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-7 text-xs border-blue-700 text-blue-700 hover:bg-blue-50"
+                disabled={downloadingEudr}
+                onClick={async () => {
+                  setDownloadingEudr(true);
+                  try {
+                    const res = await fetch(`${BASE}/api/expeditions/${id}/eudr/pdf`, {
+                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `rapport-eudr-${String(exp.numeroExpedition ?? id)}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    toast({ title: "Erreur", description: "Impossible de générer le rapport EUDR.", variant: "destructive" });
+                  } finally {
+                    setDownloadingEudr(false);
+                  }
+                }}
+              >
+                <Download className="h-3 w-3" />
+                {downloadingEudr ? "Génération…" : "Rapport EUDR"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-7 text-xs border-green-700 text-green-700 hover:bg-green-50"
+                disabled={downloadingBL}
+                onClick={async () => {
+                  setDownloadingBL(true);
+                  try {
+                    const res = await fetch(`${BASE}/api/expeditions/${id}/bon-livraison`, {
+                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `bon-livraison-${String(exp.numeroExpedition ?? id)}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    toast({ title: "Erreur", description: "Impossible de générer le bon de livraison.", variant: "destructive" });
+                  } finally {
+                    setDownloadingBL(false);
+                  }
+                }}
+              >
+                <Download className="h-3 w-3" />
+                {downloadingBL ? "Génération…" : "Bon de livraison"}
+              </Button>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
