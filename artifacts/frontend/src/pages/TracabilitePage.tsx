@@ -226,16 +226,20 @@ function DetailModal({
   const [showExpedier, setShowExpedier] = useState(false);
   const queryClient = useQueryClient();
 
+  const getLotUrl = () =>
+    `${window.location.origin}/portail/lots/${data!.lot.qrCodeLot}`;
+
   const copyQr = () => {
     if (!data?.lot.qrCodeLot) return;
-    navigator.clipboard.writeText(data.lot.qrCodeLot);
+    navigator.clipboard.writeText(getLotUrl());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const downloadQr = () => {
     if (!data?.lot.qrCodeLot) return;
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(data.lot.qrCodeLot)}`;
+    const lotUrl = getLotUrl();
+    const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(lotUrl)}`;
     const a = document.createElement("a");
     a.href = url;
     a.download = `lot-qr-${data.lot.qrCodeLot.slice(0, 8)}.png`;
@@ -245,7 +249,8 @@ function DetailModal({
 
   const imprimerQr = () => {
     if (!data?.lot.qrCodeLot) return;
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(data.lot.qrCodeLot)}`;
+    const lotUrl = getLotUrl();
+    const url = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(lotUrl)}`;
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(`
@@ -255,6 +260,7 @@ function DetailModal({
         <p style="font-family:monospace;font-size:12px">${data.lot.qrCodeLot}</p>
         <img src="${url}" style="margin:20px 0" />
         <p>Poids: ${formaterPoids(data.lot.poidsTotalKg)} · Entrepôt: ${data.lot.entrepot ?? "—"}</p>
+        <p style="font-size:10px;color:#888;word-break:break-all">${lotUrl}</p>
         <script>window.onload=()=>{window.print();window.close()}</script>
       </body></html>
     `);

@@ -11,6 +11,7 @@ import { InstallBanner, OfflineBanner, OnlineToast } from "@/components/InstallP
 import SystemBanner from "@/components/SystemBanner";
 import { Loader2 } from "lucide-react";
 import VerifierPage from "@/pages/VerifierPage";
+import LotPublicPage from "@/pages/LotPublicPage";
 import OpsPendantesPage from "@/pages/OpsPendantesPage";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useEffect } from "react";
@@ -49,6 +50,7 @@ function AppRoutes() {
     return (
       <Switch>
         <Route path="/verifier/:code" component={VerifierPage} />
+        <Route path="/lots/:qrCode" component={LotPublicPage} />
         <Route path="/connexion" component={ConnexionPage} />
         <Route><Redirect to="/connexion" /></Route>
       </Switch>
@@ -58,6 +60,7 @@ function AppRoutes() {
   return (
     <Switch>
       <Route path="/verifier/:code" component={VerifierPage} />
+      <Route path="/lots/:qrCode" component={LotPublicPage} />
       <Route path="/" component={DashboardPage} />
       <Route path="/livraisons" component={LivraisonsPage} />
       <Route path="/avances" component={AvancesPage} />

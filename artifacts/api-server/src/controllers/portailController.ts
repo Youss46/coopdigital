@@ -237,6 +237,77 @@ export async function verifierMembreHandler(req: Request, res: Response): Promis
   }
 }
 
+export async function verifierLotPublicHandler(req: Request, res: Response): Promise<void> {
+  const qrCode = String(req.params["qrCode"] ?? "").trim();
+  if (!qrCode) { res.status(400).json({ erreur: "Code QR requis" }); return; }
+  try {
+    const { lotsTable, cooperativesTable, lotLivraisonsTable, livraisonsTable, membresTable } = await import("@workspace/db");
+    const { eq, sql } = await import("drizzle-orm");
+
+    const [lot] = await db
+      .select({
+        id:            lotsTable.id,
+        qrCodeLot:     lotsTable.qrCodeLot,
+        statut:        lotsTable.statut,
+        poidsTotalKg:  lotsTable.poidsTotalKg,
+        entrepot:      lotsTable.entrepot,
+        dateCreation:  lotsTable.dateCreation,
+        cooperativeId: lotsTable.cooperativeId,
+        coopNom:       cooperativesTable.nom,
+        coopVille:     cooperativesTable.ville,
+        nbSacs: sql<number>`coalesce(sum(${livraisonsTable.nombreSacs}), 0)::int`,
+      })
+      .from(lotsTable)
+      .leftJoin(cooperativesTable, eq(lotsTable.cooperativeId, cooperativesTable.id))
+      .leftJoin(lotLivraisonsTable, eq(lotLivraisonsTable.lotId, lotsTable.id))
+      .leftJoin(livraisonsTable, eq(livraisonsTable.id, lotLivraisonsTable.livraisonId))
+      .where(eq(lotsTable.qrCodeLot, qrCode))
+      .groupBy(lotsTable.id, cooperativesTable.nom, cooperativesTable.ville);
+
+    if (!lot) { res.status(404).json({ erreur: "Lot introuvable" }); return; }
+
+    const producteurs = await db
+      .select({
+        membreNom:    membresTable.nom,
+        membrePrenoms: membresTable.prenoms,
+        village:      membresTable.village,
+        poidsKg:      livraisonsTable.poidsKg,
+      })
+      .from(lotLivraisonsTable)
+      .innerJoin(livraisonsTable, eq(livraisonsTable.id, lotLivraisonsTable.livraisonId))
+      .innerJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+      .where(eq(lotLivraisonsTable.lotId, lot.id));
+
+    const statutLabels: Record<string, string> = {
+      en_stock:  "En stock",
+      vendu:     "Vendu",
+      transit:   "En transit",
+      refoule:   "Refoulé",
+      fusionne:  "Fusionné",
+    };
+
+    res.json({
+      id:           lot.id,
+      qrCodeLot:    lot.qrCodeLot,
+      statut:       lot.statut,
+      statutLabel:  statutLabels[lot.statut ?? ""] ?? lot.statut,
+      poidsTotalKg: lot.poidsTotalKg,
+      nombreSacs:   lot.nbSacs,
+      entrepot:     lot.entrepot,
+      dateCreation: lot.dateCreation,
+      cooperative:  { nom: lot.coopNom, ville: lot.coopVille },
+      producteurs:  producteurs.map(p => ({
+        nom:     `${p.membreNom ?? ""} ${p.membrePrenoms ?? ""}`.trim(),
+        village: p.village,
+        poidsKg: p.poidsKg,
+      })),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur";
+    res.status(500).json({ erreur: msg });
+  }
+}
+
 // ─── Notifications in-app portail ─────────────────────────────────────────────
 
 export async function getNotificationsPortailHandler(req: Request, res: Response): Promise<void> {

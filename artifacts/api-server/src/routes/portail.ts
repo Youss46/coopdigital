@@ -12,6 +12,7 @@ import {
   getCarteMembreHandler,
   savePhotoHandler,
   verifierMembreHandler,
+  verifierLotPublicHandler,
   getVapidKeyPortailHandler,
   subscribePushPortailHandler,
   unsubscribePushPortailHandler,
@@ -23,6 +24,7 @@ import {
 const router = Router();
 
 router.get("/portail/verifier/:code", verifierMembreHandler);
+router.get("/portail/lots/:qrCode", verifierLotPublicHandler);
 router.post("/portail/connexion", connexionPortail);
 
 router.get("/portail/profil",          portailAuthMiddleware, getProfilHandler);
