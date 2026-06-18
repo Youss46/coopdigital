@@ -5,9 +5,10 @@ import {
   useCreateUser,
   useDeleteUser,
   useToggleUserActif,
+  useResetUserPassword,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Trash2, ToggleLeft, ToggleRight, ShieldCheck, Copy, RefreshCw, CheckCheck, Share2 } from "lucide-react";
+import { UserPlus, Trash2, ToggleLeft, ToggleRight, ShieldCheck, Copy, RefreshCw, CheckCheck, Share2, KeyRound } from "lucide-react";
 
 // ——— Génération de mot de passe sécurisé ———
 function genererMotDePasse(): string {
@@ -507,6 +508,204 @@ function DeleteModal({ nom, prenoms, onConfirm, onCancel, loading }: DeleteModal
   );
 }
 
+// ——— Modal réinitialisation mot de passe ———
+interface ResetPasswordModalProps {
+  nom: string;
+  prenoms: string;
+  email: string;
+  userId: number;
+  onClose: () => void;
+}
+
+function ResetPasswordModal({ nom, prenoms, email, userId, onClose }: ResetPasswordModalProps) {
+  const { toast } = useToast();
+  const resetMutation = useResetUserPassword();
+  const [phase, setPhase] = useState<"confirm" | "succes">("confirm");
+  const [motDePasse, setMotDePasse] = useState(() => genererMotDePasse());
+  const [copie, setCopie] = useState(false);
+
+  const regenerer = useCallback(() => {
+    setMotDePasse(genererMotDePasse());
+    setCopie(false);
+  }, []);
+
+  const copierMDP = useCallback(async () => {
+    await navigator.clipboard.writeText(motDePasse);
+    setCopie(true);
+    setTimeout(() => setCopie(false), 2000);
+  }, [motDePasse]);
+
+  const partagerWhatsApp = useCallback(() => {
+    const appUrl = window.location.origin + (import.meta.env.BASE_URL ?? "/");
+    const msg = [
+      `Bonjour ${prenoms},`,
+      "",
+      "Votre mot de passe CoopDigital a été réinitialisé :",
+      `🌐 Adresse : ${appUrl}`,
+      `📧 Email : ${email}`,
+      `🔑 Nouveau mot de passe temporaire : ${motDePasse}`,
+      "",
+      "Merci de changer votre mot de passe dès la première connexion.",
+      "— CoopDigital",
+    ].join("\n");
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  }, [prenoms, email, motDePasse]);
+
+  const handleReset = () => {
+    resetMutation.mutate(
+      { id: userId, data: { nouveauMotDePasse: motDePasse } },
+      {
+        onSuccess: () => setPhase("succes"),
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "Erreur lors de la réinitialisation";
+          toast({ title: "Erreur", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col">
+
+        {phase === "succes" ? (
+          <>
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div
+                className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+                style={{ backgroundColor: "#d1fae5" }}
+              >
+                <CheckCheck className="w-6 h-6" style={{ color: "#1a4731" }} />
+              </div>
+              <h3 className="font-bold text-gray-900 text-lg">Mot de passe réinitialisé !</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {prenoms} {nom}
+              </p>
+            </div>
+
+            <div className="mx-6 mb-4 rounded-xl border border-gray-100 bg-gray-50 divide-y divide-gray-100">
+              <div className="px-4 py-3">
+                <p className="text-xs text-gray-400 mb-0.5">Email</p>
+                <p className="text-sm font-medium text-gray-800 break-all">{email}</p>
+              </div>
+              <div className="px-4 py-3 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Mot de passe temporaire</p>
+                  <p className="text-sm font-mono font-bold text-gray-900 tracking-wider">{motDePasse}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={copierMDP}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                  style={copie
+                    ? { backgroundColor: "#d1fae5", color: "#1a4731" }
+                    : { backgroundColor: "#f3f4f6", color: "#374151" }}
+                >
+                  {copie ? <CheckCheck size={13} /> : <Copy size={13} />}
+                  {copie ? "Copié !" : "Copier"}
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 pb-6 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={partagerWhatsApp}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-medium"
+                style={{ backgroundColor: "#25D366" }}
+              >
+                <Share2 size={15} />
+                Partager sur WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Fermer
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: "#1a4731" }}
+              >
+                <KeyRound className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900">Réinitialiser le mot de passe</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{prenoms} {nom}</p>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                Un nouveau mot de passe temporaire sera généré pour ce compte. L'utilisateur
+                devra le changer à sa prochaine connexion.
+              </p>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-gray-700">Nouveau mot de passe temporaire</label>
+                  <button
+                    type="button"
+                    onClick={regenerer}
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    <RefreshCw size={11} />
+                    Régénérer
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1 flex items-center px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
+                    <span className="text-sm font-mono font-semibold text-gray-800 tracking-wider flex-1">
+                      {motDePasse}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={copierMDP}
+                    title="Copier le mot de passe"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors"
+                    style={copie
+                      ? { backgroundColor: "#d1fae5", borderColor: "#6ee7b7", color: "#1a4731" }
+                      : { backgroundColor: "white", borderColor: "#e5e7eb", color: "#374151" }}
+                  >
+                    {copie ? <CheckCheck size={15} /> : <Copy size={15} />}
+                    {copie ? "Copié !" : "Copier"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={resetMutation.isPending}
+                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
+                  style={{ backgroundColor: "#1a4731" }}
+                >
+                  {resetMutation.isPending ? "Réinitialisation…" : "Réinitialiser"}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ——— Page principale ———
 export default function ComptesPage() {
   const { utilisateur } = useAuth();
@@ -524,6 +723,12 @@ export default function ComptesPage() {
     id: number;
     nom: string;
     prenoms: string;
+  } | null>(null);
+  const [resetTarget, setResetTarget] = useState<{
+    id: number;
+    nom: string;
+    prenoms: string;
+    email: string;
   } | null>(null);
 
   // Accès refusé si pas PCA / Directeur
@@ -626,6 +831,9 @@ export default function ComptesPage() {
                   const canDelete =
                     (requesterRole === "pca" && !isOwn) ||
                     (requesterRole === "directeur" && !isPca && !isOwn);
+                  const canResetPwd =
+                    (requesterRole === "pca" && !isOwn) ||
+                    (requesterRole === "directeur" && !isPca && !isOwn);
 
                   return (
                     <tr key={compte.id} className="hover:bg-gray-50 transition-colors">
@@ -662,6 +870,24 @@ export default function ComptesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          {/* Réinitialiser le mot de passe */}
+                          {canResetPwd && (
+                            <button
+                              onClick={() =>
+                                setResetTarget({
+                                  id: compte.id,
+                                  nom: compte.nom,
+                                  prenoms: compte.prenoms,
+                                  email: compte.email,
+                                })
+                              }
+                              title="Réinitialiser le mot de passe"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                            >
+                              <KeyRound size={16} />
+                            </button>
+                          )}
+
                           {/* Activer / Désactiver — pas sur soi-même et pas PCA désactivé */}
                           {!isOwn && !isPca && (
                             <button
@@ -722,6 +948,17 @@ export default function ComptesPage() {
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
           loading={deleteMutation.isPending}
+        />
+      )}
+
+      {/* Modal réinitialisation mot de passe */}
+      {resetTarget && (
+        <ResetPasswordModal
+          userId={resetTarget.id}
+          nom={resetTarget.nom}
+          prenoms={resetTarget.prenoms}
+          email={resetTarget.email}
+          onClose={() => setResetTarget(null)}
         />
       )}
     </div>

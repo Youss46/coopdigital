@@ -24,6 +24,40 @@ export function canCreateUser(requesterRole: string, targetRole: string): boolea
 }
 
 /**
+ * Vérifie si l'utilisateur peut réinitialiser le mot de passe du compte cible.
+ *
+ * Règle :
+ *   - PCA : peut réinitialiser tous les comptes SAUF le sien
+ *   - Directeur : peut réinitialiser tous les comptes SAUF pca et le sien
+ *   - Autres : aucun droit
+ */
+export function canResetUserPassword(
+  requesterRole: string,
+  requesterId: number,
+  targetUserId: number,
+  targetRole: string,
+): { allowed: boolean; message?: string } {
+  if (requesterRole === "pca") {
+    if (requesterId === targetUserId) {
+      return { allowed: false, message: "Vous ne pouvez pas réinitialiser votre propre mot de passe ici" };
+    }
+    return { allowed: true };
+  }
+
+  if (requesterRole === "directeur") {
+    if (targetRole === "pca") {
+      return { allowed: false, message: "Le directeur ne peut pas réinitialiser le mot de passe du PCA" };
+    }
+    if (requesterId === targetUserId) {
+      return { allowed: false, message: "Vous ne pouvez pas réinitialiser votre propre mot de passe ici" };
+    }
+    return { allowed: true };
+  }
+
+  return { allowed: false, message: "Droits insuffisants" };
+}
+
+/**
  * Vérifie si l'utilisateur peut supprimer le compte cible.
  *
  * Règle 2 :

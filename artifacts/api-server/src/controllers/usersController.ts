@@ -8,7 +8,7 @@ import {
   ResetUserPasswordBody,
   ToggleUserActifBody,
 } from "@workspace/api-zod";
-import { canCreateUser, canDeleteUser } from "../middlewares/roleGuard";
+import { canCreateUser, canDeleteUser, canResetUserPassword } from "../middlewares/roleGuard";
 
 const ROLES_ALLOWED_TO_MANAGE = ["pca", "directeur"];
 
@@ -192,6 +192,7 @@ export async function resetUserPassword(req: Request, res: Response): Promise<vo
   const id = parseInt(String(req.params["id"] ?? "0"), 10);
   if (!id) { res.status(400).json({ erreur: "ID invalide" }); return; }
 
+  const requesterId = req.user?.id ?? 0;
   const requesterRole = req.user?.role ?? "";
   if (!ROLES_ALLOWED_TO_MANAGE.includes(requesterRole)) {
     res.status(403).json({ erreur: "Droits insuffisants" });
@@ -218,10 +219,16 @@ export async function resetUserPassword(req: Request, res: Response): Promise<vo
       .limit(1);
     if (!existing) { res.status(404).json({ erreur: "Compte introuvable" }); return; }
 
+    const check = canResetUserPassword(requesterRole, requesterId, id, existing.role);
+    if (!check.allowed) {
+      res.status(403).json({ erreur: check.message ?? "Action non autorisée" });
+      return;
+    }
+
     const passwordHash = await bcrypt.hash(parse.data.nouveauMotDePasse, 10);
     await db
       .update(usersTable)
-      .set({ passwordHash })
+      .set({ passwordHash, motDePasseTemporaire: true })
       .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)));
 
     res.json({ message: "Mot de passe réinitialisé avec succès" });
