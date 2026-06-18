@@ -131,6 +131,12 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   const migrationsSource = path.resolve(artifactDir, "../../lib/db/drizzle");
   const migrationsDest = path.resolve(artifactDir, "dist/migrations");
   await cp(migrationsSource, migrationsDest, { recursive: true });
+
+  // Assets publics (logo par défaut, etc.) — copiés dans dist/public/ pour
+  // être disponibles en production (Railway, Docker) où le cwd peut différer.
+  const publicSource = path.resolve(artifactDir, "public");
+  const publicDest = path.resolve(artifactDir, "dist/public");
+  await cp(publicSource, publicDest, { recursive: true });
 }
 
 buildAll().catch((err) => {

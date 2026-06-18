@@ -5,6 +5,7 @@
  */
 import PDFDocument from "pdfkit";
 import path from "path";
+import { fileURLToPath } from "url";
 import fs from "fs";
 import { getConfig } from "./configService";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
@@ -12,7 +13,31 @@ import { logger } from "../lib/logger";
 
 type PdfDoc = InstanceType<typeof PDFDocument>;
 
-const DEFAULT_LOGO_PATH = path.join(process.cwd(), "public", "logo-192.png");
+// Résolution du chemin logo robuste : priorité à __dirname (disponible dans le
+// bundle ESM via le banner esbuild), sinon repli sur process.cwd().
+// Cela garantit que le logo est trouvé en production (Railway, Docker) même
+// quand le répertoire courant diffère du répertoire du binaire.
+function resolveDefaultLogoPath(): string {
+  try {
+    // Dans le bundle ESM produit par esbuild, __dirname est injecté via le banner.
+    // Dans le code TypeScript source (tsx / ts-node), import.meta.url est disponible.
+    const dir =
+      typeof __dirname !== "undefined"
+        ? __dirname
+        : path.dirname(fileURLToPath(import.meta.url));
+    // En production : dist/public/logo-192.png (build.mjs copie public/ → dist/public/)
+    const distPath = path.join(dir, "public", "logo-192.png");
+    if (fs.existsSync(distPath)) return distPath;
+    // En développement : le cwd est artifacts/api-server/, public/ est à sa racine
+    const cwdPath = path.join(process.cwd(), "public", "logo-192.png");
+    if (fs.existsSync(cwdPath)) return cwdPath;
+    return distPath; // chemin canonique même s'il manque (l'erreur sera gérée plus bas)
+  } catch {
+    return path.join(process.cwd(), "public", "logo-192.png");
+  }
+}
+
+const DEFAULT_LOGO_PATH = resolveDefaultLogoPath();
 const objectStorageService = new ObjectStorageService();
 
 // ── Caches mémoire ────────────────────────────────────────────────────────────
@@ -64,6 +89,15 @@ async function getLogoBuffer(
   const config = await getCachedConfig(cooperativeId);
   let result: { buffer: Buffer; source: "cooperative" | "default" };
 
+  const readDefaultLogo = (): Buffer | null => {
+    try {
+      return fs.readFileSync(DEFAULT_LOGO_PATH);
+    } catch (err) {
+      logger.warn({ err, path: DEFAULT_LOGO_PATH }, "Logo par défaut introuvable — PDF sans logo");
+      return null;
+    }
+  };
+
   if (config?.logoUrl) {
     try {
       let buffer: Buffer;
@@ -80,10 +114,16 @@ async function getLogoBuffer(
       if (!(err instanceof ObjectNotFoundError)) {
         logger.warn({ err, cooperativeId }, "Logo coop inaccessible — utilisation logo par défaut");
       }
-      result = { buffer: fs.readFileSync(DEFAULT_LOGO_PATH), source: "default" };
+      const fallback = readDefaultLogo();
+      result = fallback
+        ? { buffer: fallback, source: "default" }
+        : { buffer: Buffer.alloc(0), source: "default" };
     }
   } else {
-    result = { buffer: fs.readFileSync(DEFAULT_LOGO_PATH), source: "default" };
+    const defaultBuf = readDefaultLogo();
+    result = defaultBuf
+      ? { buffer: defaultBuf, source: "default" }
+      : { buffer: Buffer.alloc(0), source: "default" };
   }
 
   logoCache.set(cooperativeId, { data: result, ts: Date.now() });
@@ -128,23 +168,25 @@ export async function drawHeader(
   const logoSize = 55;
   const logoX    = marginLeft;
   const logoY    = 12;
-  try {
-    doc.image(logoBuffer, logoX, logoY, {
-      width: logoSize,
-      height: logoSize,
-      fit: [logoSize, logoSize],
-    });
-  } catch (_) {
-    // Format non supporté par PDFKit (SVG, WebP, etc.) → repli sur logo par défaut
-    if (logoSource === "cooperative") {
-      try {
-        const fallback = fs.readFileSync(DEFAULT_LOGO_PATH);
-        doc.image(fallback, logoX, logoY, {
-          width: logoSize,
-          height: logoSize,
-          fit: [logoSize, logoSize],
-        });
-      } catch (_2) { /* logo facultatif */ }
+  if (logoBuffer.length > 0) {
+    try {
+      doc.image(logoBuffer, logoX, logoY, {
+        width: logoSize,
+        height: logoSize,
+        fit: [logoSize, logoSize],
+      });
+    } catch (_) {
+      // Format non supporté par PDFKit (SVG, WebP, etc.) → repli sur logo par défaut
+      if (logoSource === "cooperative") {
+        try {
+          const fallback = fs.readFileSync(DEFAULT_LOGO_PATH);
+          doc.image(fallback, logoX, logoY, {
+            width: logoSize,
+            height: logoSize,
+            fit: [logoSize, logoSize],
+          });
+        } catch (_2) { /* logo facultatif */ }
+      }
     }
   }
 
