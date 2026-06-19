@@ -98,6 +98,11 @@ export default function VentesPage() {
     queryFn:  () => apiFetch("/api/lots?statut=en_stock", token),
     enabled:  modalVente,
   });
+  const { data: prixActuel } = useQuery<{ prixVenteExportFcfa: string } | null>({
+    queryKey: ["prix-actuel"],
+    queryFn:  () => apiFetch("/api/prix/actuel", token),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const mutVente = useCreateVente({
     mutation: {
@@ -131,6 +136,14 @@ export default function VentesPage() {
   });
 
   const lotSelectionne = lotsEnStock.find(l => String(l.id) === form.lotId);
+
+  function ouvrirModalVente() {
+    const prixExport = prixActuel?.prixVenteExportFcfa
+      ? String(Math.round(parseFloat(prixActuel.prixVenteExportFcfa)))
+      : "";
+    setForm({ ...VENTE_INIT, prixUnitaireFcfa: prixExport });
+    setModalVente(true);
+  }
 
   function handleLotChange(lotId: string) {
     const lot = lotsEnStock.find(l => String(l.id) === lotId);
@@ -196,7 +209,7 @@ export default function VentesPage() {
         </div>
         {peutCreer && (
           <button
-            onClick={() => setModalVente(true)}
+            onClick={ouvrirModalVente}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg bg-green-700 hover:bg-green-800"
           >
             <PlusCircle size={15} />
@@ -294,7 +307,7 @@ export default function VentesPage() {
             </div>
             {peutCreer && (
               <button
-                onClick={() => setModalVente(true)}
+                onClick={ouvrirModalVente}
                 className="mt-2 flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg bg-green-700 hover:bg-green-800"
               >
                 <PlusCircle size={14} /> Nouvelle vente
@@ -452,7 +465,12 @@ export default function VentesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Prix unitaire (FCFA/kg) *</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Prix unitaire (FCFA/kg) *
+                    {prixActuel?.prixVenteExportFcfa && (
+                      <span className="ml-1 text-green-600 font-normal text-xs">· suivi des prix</span>
+                    )}
+                  </label>
                   <input
                     type="number"
                     value={form.prixUnitaireFcfa}

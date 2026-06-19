@@ -1,24 +1,15 @@
 import { useState } from "react";
-import { Link } from "wouter";
-import { MoneyInput } from "@/components/ui/money-input";
 import {
   useGetExportateurs,
   useCreateExportateur,
   useGetExportateurById,
-  useGetVentes,
-  useCreateVente,
-  useGetDevisesTaux,
-  usePostDevisesConvertir,
   useSignalerRefusVente,
   useGetEntrepots,
-  type TauxChange,
   type EntrepotStock,
 } from "@workspace/api-client-react";
 import {
   getGetExportateursQueryKey,
-  getGetVentesQueryKey,
   getGetExportateurByIdQueryKey,
-  getGetDevisesTauxQueryKey,
   getGetEntrepotsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -61,26 +52,14 @@ export default function ExportateursPage() {
   const peutSignalerRefus = usePermission("refus", "traiter");
   const [vueFiche, setVueFiche] = useState<number | null>(null);
   const [modalExp, setModalExp] = useState(false);
-  const [modalVente, setModalVente] = useState(false);
   const [modalRefus, setModalRefus] = useState<number | null>(null);
   const [formRefus, setFormRefus] = useState(REFUS_INIT);
   const [formExp, setFormExp] = useState({ nom: "", contact: "", ville: "", agrementNumero: "" });
-  const [formVente, setFormVente] = useState({
-    exportateurId: "",
-    poidsKg: "",
-    prixUnitaireFcfa: "",
-    dateVente: new Date().toISOString().split("T")[0]!,
-    dateEcheanceReglement: "",
-    deviseFacturation: "XOF",
-    montantDeviseEtrangere: "",
-  });
-  const [conversionResult, setConversionResult] = useState<{ montantFcfa: number; tauxApplique: number; dateApplication: string; sourceTaux: string } | null>(null);
 
   const { data: exportateurs = [], isLoading } = useGetExportateurs();
   const { data: fiche } = useGetExportateurById(vueFiche ?? 0, {
     query: { enabled: vueFiche !== null, queryKey: getGetExportateurByIdQueryKey(vueFiche ?? 0) },
   });
-  const { data: ventes = [] } = useGetVentes({}, { query: { enabled: vueFiche === null, queryKey: getGetVentesQueryKey({}) } });
 
   const mutExp = useCreateExportateur({
     mutation: {
@@ -88,19 +67,6 @@ export default function ExportateursPage() {
         queryClient.invalidateQueries({ queryKey: getGetExportateursQueryKey() });
         setModalExp(false);
         setFormExp({ nom: "", contact: "", ville: "", agrementNumero: "" });
-      },
-    },
-  });
-
-  const mutVente = useCreateVente({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetVentesQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetExportateursQueryKey() });
-        if (vueFiche) queryClient.invalidateQueries({ queryKey: getGetExportateurByIdQueryKey(vueFiche) });
-        setModalVente(false);
-        setFormVente({ exportateurId: "", poidsKg: "", prixUnitaireFcfa: "", dateVente: new Date().toISOString().split("T")[0]!, dateEcheanceReglement: "", deviseFacturation: "XOF", montantDeviseEtrangere: "" });
-        setConversionResult(null);
       },
     },
   });
@@ -120,34 +86,6 @@ export default function ExportateursPage() {
   });
 
   const { data: entrepots = [] } = useGetEntrepots({ query: { queryKey: getGetEntrepotsQueryKey() } });
-  const { data: tauxActuels = [] } = useGetDevisesTaux({ query: { queryKey: getGetDevisesTauxQueryKey() } });
-  const mutConvertir = usePostDevisesConvertir();
-
-  const estDeviseEtrangere = formVente.deviseFacturation !== "XOF";
-  const montantEstime =
-    !estDeviseEtrangere && formVente.poidsKg && formVente.prixUnitaireFcfa
-      ? Math.round(parseFloat(formVente.poidsKg) * parseInt(formVente.prixUnitaireFcfa))
-      : null;
-
-  function getTauxInfo(code: string) {
-    return (tauxActuels as TauxChange[]).find((t) => t.devise_source === code);
-  }
-
-  function handleDeviseFChange(devise: string) {
-    setFormVente((f) => ({ ...f, deviseFacturation: devise, montantDeviseEtrangere: "" }));
-    setConversionResult(null);
-  }
-
-  function handleMontantDeviseChange(val: string) {
-    setFormVente((f) => ({ ...f, montantDeviseEtrangere: val }));
-    setConversionResult(null);
-    if (val && formVente.deviseFacturation !== "XOF" && parseFloat(val) > 0) {
-      mutConvertir.mutate(
-        { data: { montant: parseFloat(val), deviseSource: formVente.deviseFacturation, date: formVente.dateVente } },
-        { onSuccess: (data) => setConversionResult(data as typeof conversionResult) },
-      );
-    }
-  }
 
   // Vue fiche exportateur
   if (vueFiche !== null && fiche) {
@@ -331,15 +269,6 @@ export default function ExportateursPage() {
           <p className="text-gray-500 text-sm mt-1">Gestion des acheteurs et créances</p>
         </div>
         <div className="flex gap-2">
-          {peutCreer && (
-            <button
-              onClick={() => setModalVente(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50"
-            >
-              <PlusCircle size={15} />
-              Nouvelle vente
-            </button>
-          )}
           {peutCreer && (
             <button
               onClick={() => setModalExp(true)}
@@ -558,122 +487,6 @@ export default function ExportateursPage() {
         </div>
       )}
 
-      {/* Modal nouvelle vente */}
-      {modalVente && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
-            <div className="px-6 py-5 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900">Nouvelle vente</h3>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Exportateur *</label>
-                <select
-                  value={formVente.exportateurId}
-                  onChange={(e) => setFormVente((f) => ({ ...f, exportateurId: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
-                >
-                  <option value="">— Sélectionner —</option>
-                  {exportateurs.map((e) => <option key={e.id} value={e.id}>{e.nom}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Poids (kg) *</label>
-                  <input type="number" step="0.1" value={formVente.poidsKg} onChange={(e) => setFormVente((f) => ({ ...f, poidsKg: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" placeholder="5000" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Prix/kg (FCFA) *</label>
-                  <MoneyInput value={formVente.prixUnitaireFcfa} onChange={(raw) => setFormVente((f) => ({ ...f, prixUnitaireFcfa: raw }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" placeholder="1 200" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Date vente *</label>
-                  <input type="date" value={formVente.dateVente} onChange={(e) => setFormVente((f) => ({ ...f, dateVente: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Échéance règlement</label>
-                  <input type="date" value={formVente.dateEcheanceReglement} onChange={(e) => setFormVente((f) => ({ ...f, dateEcheanceReglement: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
-                </div>
-              </div>
-              {/* Section devise de facturation */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Devise de facturation</label>
-                <select
-                  value={formVente.deviseFacturation}
-                  onChange={(e) => handleDeviseFChange(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
-                >
-                  <option value="XOF">FCFA (XOF)</option>
-                  {(tauxActuels as TauxChange[]).map((t) => (
-                    <option key={t.devise_source} value={t.devise_source}>{t.devise_source}</option>
-                  ))}
-                </select>
-              </div>
-              {estDeviseEtrangere && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Montant en {formVente.deviseFacturation}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formVente.montantDeviseEtrangere}
-                    onChange={(e) => handleMontantDeviseChange(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
-                    placeholder="ex : 150000"
-                  />
-                  {(() => { const ti = getTauxInfo(formVente.deviseFacturation); return ti ? (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Taux {ti.source_taux} du {formaterDate(ti.date_application)} :{" "}
-                      1 {formVente.deviseFacturation} = {parseFloat(ti.taux).toLocaleString("fr-FR")} FCFA
-                    </p>
-                  ) : null; })()}
-                </div>
-              )}
-              {conversionResult && estDeviseEtrangere && (
-                <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-                  <p className="text-xs text-gray-500">Montant converti en FCFA</p>
-                  <p className="text-lg font-bold text-blue-800">{formaterFCFA(conversionResult.montantFcfa)}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Taux appliqué : {conversionResult.tauxApplique.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} — Source : {conversionResult.sourceTaux}
-                  </p>
-                </div>
-              )}
-              {montantEstime !== null && (
-                <div className="bg-green-50 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Montant total estimé</p>
-                  <p className="text-lg font-bold text-green-800">{formaterFCFA(montantEstime)}</p>
-                </div>
-              )}
-            </div>
-            <div className="px-6 pb-5 flex gap-3">
-              <button onClick={() => setModalVente(false)} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700">Annuler</button>
-              <button
-                onClick={() => mutVente.mutate({ data: {
-                  exportateurId: parseInt(formVente.exportateurId),
-                  poidsKg: parseFloat(formVente.poidsKg),
-                  prixUnitaireFcfa: parseInt(formVente.prixUnitaireFcfa),
-                  dateVente: formVente.dateVente,
-                  dateEcheanceReglement: formVente.dateEcheanceReglement || undefined,
-                  ...(estDeviseEtrangere && formVente.montantDeviseEtrangere ? {
-                    deviseFacturation: formVente.deviseFacturation,
-                    montantDeviseEtrangere: parseFloat(formVente.montantDeviseEtrangere),
-                    tauxChangeApplique: conversionResult?.tauxApplique,
-                    montantFcfaConverti: conversionResult?.montantFcfa,
-                  } : {})
-                } })}
-                disabled={!formVente.exportateurId || !formVente.poidsKg || !formVente.prixUnitaireFcfa || mutVente.isPending}
-                className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-                style={{ backgroundColor: "#1a4731" }}
-              >
-                {mutVente.isPending ? "Enregistrement…" : "Enregistrer"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
