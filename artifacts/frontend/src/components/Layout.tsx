@@ -53,6 +53,7 @@ import {
 import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
+import { OfflineBanner } from "./OfflineIndicator";
 import NotificationPanel from "./NotificationPanel";
 import HelpPanel from "./HelpPanel";
 import InstallButton from "./InstallButton";
@@ -355,6 +356,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <HelpPanel />
           <NotificationPanel />
         </header>
+
+        {/* Bannière hors connexion — dans le flux, sous l'en-tête, ne masque pas le hamburger */}
+        <OfflineBanner />
 
         {/* Bannière système (maintenance) */}
         <SystemBanner />

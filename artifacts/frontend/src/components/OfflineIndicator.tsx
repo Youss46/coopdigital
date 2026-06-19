@@ -10,7 +10,7 @@ export function OfflineBanner() {
 
   if (!isOnline) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-white text-sm font-medium px-4 py-2.5 flex items-center justify-center gap-2 shadow-md">
+      <div className="w-full flex-shrink-0 bg-amber-500 text-white text-sm font-medium px-4 py-2.5 flex items-center justify-center gap-2 shadow-sm">
         <WifiOff size={15} className="shrink-0" />
         <span>
           Hors connexion
@@ -26,7 +26,7 @@ export function OfflineBanner() {
 
   if (syncStatus === "syncing") {
     return (
-      <div className="fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-white text-sm font-medium px-4 py-2.5 flex items-center justify-center gap-2 shadow-md">
+      <div className="w-full flex-shrink-0 bg-blue-600 text-white text-sm font-medium px-4 py-2.5 flex items-center justify-center gap-2 shadow-sm">
         <RefreshCw size={15} className="animate-spin shrink-0" />
         <span>Synchronisation en cours…</span>
       </div>

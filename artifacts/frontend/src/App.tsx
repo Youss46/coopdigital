@@ -67,7 +67,7 @@ import PendingOpsPage from "@/pages/PendingOpsPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/toaster";
-import { OfflineBanner, OnlineToast } from "@/components/OfflineIndicator";
+import { OnlineToast } from "@/components/OfflineIndicator";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import PdfViewerModal from "@/components/PdfViewerModal";
 
@@ -290,7 +290,6 @@ function App() {
         {!splashTermine && <SplashScreen onTermine={handleSplashTermine} />}
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
-            <OfflineBanner />
             <OnlineToast />
             <AppRoutes />
             <Toaster />
