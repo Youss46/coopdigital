@@ -11,6 +11,7 @@ import {
 } from "@workspace/db";
 import { eq, inArray, sql, desc, and } from "drizzle-orm";
 import { CreateLotBody, UpdateLotStatutBody } from "@workspace/api-zod";
+import { generateLotEudrPdf } from "../services/pdfService";
 
 const livraisonSelect = {
   id: livraisonsTable.id,
@@ -494,5 +495,35 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
   } catch (err) {
     req.log.error({ err }, "Erreur getLotTracabilite");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function getLotEudrPdf(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  if (!id) {
+    res.status(400).json({ erreur: "ID lot invalide" });
+    return;
+  }
+  try {
+    const buf = await generateLotEudrPdf(id, cooperativeId);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="lot-${id}-eudr.pdf"`,
+      "Content-Length": String(buf.length),
+    });
+    res.send(buf);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Erreur interne";
+    if (msg === "Lot introuvable") {
+      res.status(404).json({ erreur: msg });
+    } else {
+      req.log.error({ err }, "Erreur getLotEudrPdf");
+      res.status(500).json({ erreur: "Erreur interne du serveur" });
+    }
   }
 }

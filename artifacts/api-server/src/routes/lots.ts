@@ -9,6 +9,7 @@ import {
   getLotTracabilite,
   fusionnerLots,
   expedierLot,
+  getLotEudrPdf,
 } from "../controllers/lotsController";
 
 const router: IRouter = Router();
@@ -22,5 +23,6 @@ router.get("/lots/qr/:code", checkPermission("tracabilite", "scanner_qr"), getLo
 router.put("/lots/:id/expedier", checkPermission("tracabilite", "modifier_lot"), expedierLot);
 router.put("/lots/:id/statut", checkPermission("tracabilite", "modifier_lot"), updateLotStatut);
 router.get("/lots/:id/tracabilite", checkPermission("tracabilite", "lire"), getLotTracabilite);
+router.get("/lots/:id/eudr/pdf", checkPermission("tracabilite", "lire"), getLotEudrPdf);
 
 export default router;

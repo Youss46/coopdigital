@@ -2293,3 +2293,249 @@ export async function generateBonLivraison(expeditionId: number, cooperativeId: 
   doc.end();
   return endPromise;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fiche EUDR individuelle — un seul lot
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateLotEudrPdf(lotId: number, cooperativeId: number): Promise<Buffer> {
+  const [lot] = await db
+    .select()
+    .from(lotsTable)
+    .where(and(eq(lotsTable.id, lotId), eq(lotsTable.cooperativeId, cooperativeId)));
+  if (!lot) throw new Error("Lot introuvable");
+
+  const livraisonLinks = await db
+    .select({ livraisonId: lotLivraisonsTable.livraisonId })
+    .from(lotLivraisonsTable)
+    .where(eq(lotLivraisonsTable.lotId, lotId));
+  const livraisonIds = livraisonLinks.map((l) => l.livraisonId);
+
+  const livraisons = livraisonIds.length
+    ? await db
+        .select({
+          membreId:   livraisonsTable.membreId,
+          poidsKg:    livraisonsTable.poidsKg,
+          poidsNetKg: livraisonsTable.poidsNetKg,
+        })
+        .from(livraisonsTable)
+        .where(inArray(livraisonsTable.id, livraisonIds))
+    : [];
+
+  const membreIds = [...new Set(livraisons.map((l) => l.membreId))];
+
+  const membres = membreIds.length
+    ? await db
+        .select({ id: membresTable.id, nom: membresTable.nom, prenoms: membresTable.prenoms })
+        .from(membresTable)
+        .where(inArray(membresTable.id, membreIds))
+    : [];
+
+  const parcelles = membreIds.length
+    ? await db
+        .select({
+          membreId:                parcellesTable.membreId,
+          coordonneesPoint:        parcellesTable.coordonneesPoint,
+          superficieDeclareeHa:    parcellesTable.superficieDeclareeHa,
+          superficieCalculeeHa:    parcellesTable.superficieCalculeeHa,
+          eudrStatut:              parcellesTable.eudrStatut,
+          eudrRisqueDeforestation: parcellesTable.eudrRisqueDeforestation,
+        })
+        .from(parcellesTable)
+        .where(and(inArray(parcellesTable.membreId, membreIds), eq(parcellesTable.actif, true)))
+    : [];
+
+  const poidsParMembre: Record<number, number> = {};
+  for (const liv of livraisons) {
+    const kg = parseFloat(String(liv.poidsNetKg ?? liv.poidsKg ?? "0"));
+    poidsParMembre[liv.membreId] = (poidsParMembre[liv.membreId] ?? 0) + kg;
+  }
+
+  const membreMap = new Map(membres.map((m) => [m.id, m]));
+  const parcellesParMembre = new Map<number, typeof parcelles[0]>();
+  for (const p of parcelles) {
+    if (!parcellesParMembre.has(p.membreId)) parcellesParMembre.set(p.membreId, p);
+  }
+
+  type ProducteurRow = {
+    nom: string; poidsKg: number; superficieHa: string | null;
+    gpsStr: string; hasGps: boolean; eudrStatut: string; eudrStatutLabel: string;
+    eudrRisque: string; eudrRisqueLabel: string; eudrConforme: boolean;
+  };
+
+  const producteurs: ProducteurRow[] = membreIds.map((mid) => {
+    const m = membreMap.get(mid);
+    const p = parcellesParMembre.get(mid) ?? null;
+    const point = p?.coordonneesPoint as { lat: number; lng: number } | null;
+    const hasGps = Boolean(point?.lat && point?.lng);
+    const gpsStr = hasGps ? `${point!.lat.toFixed(5)}, ${point!.lng.toFixed(5)}` : "—";
+    const superficieHa = p ? (p.superficieCalculeeHa ?? p.superficieDeclareeHa ?? null) : null;
+    const eudrStatut = p?.eudrStatut ?? "non_verifie";
+    const eudrRisque = p?.eudrRisqueDeforestation ?? "inconnu";
+    return {
+      nom:             m ? `${m.nom} ${m.prenoms ?? ""}`.trim() : "—",
+      poidsKg:         poidsParMembre[mid] ?? 0,
+      superficieHa:    superficieHa != null ? Number(superficieHa).toFixed(2) : null,
+      gpsStr, hasGps, eudrStatut,
+      eudrStatutLabel: EUDR_STATUT_LABELS[eudrStatut] ?? eudrStatut,
+      eudrRisque,
+      eudrRisqueLabel: EUDR_RISQUE_LABELS[eudrRisque] ?? eudrRisque,
+      eudrConforme:    eudrStatut === "conforme" && hasGps,
+    };
+  });
+
+  const nbConformes    = producteurs.filter((p) => p.eudrConforme).length;
+  const nbNonVerifies  = producteurs.filter((p) => p.eudrStatut === "non_verifie").length;
+  const nbNonConformes = producteurs.filter((p) => p.eudrStatut === "non_conforme").length;
+  const conforme       = producteurs.length > 0 && nbNonConformes === 0 && nbNonVerifies === 0;
+
+  const domain = process.env["REPLIT_DEV_DOMAIN"] ?? null;
+  const lotPublicUrl = domain
+    ? `https://${domain}/portail/lots/${lot.qrCodeLot}`
+    : lot.qrCodeLot;
+  const qrBuf = await fetchQrImageBuffer(lotPublicUrl, 100);
+
+  const { doc, endPromise } = makePdfDoc();
+  const W     = PAGE_W - 2 * MARGIN;
+  const BLEU  = "#1e40af";
+  const AMBRE = "#b45309";
+  const ROUGE = "#dc2626";
+
+  await drawHeader(doc, cooperativeId, {
+    titre_document: "FICHE EUDR — LOT",
+    reference: lot.qrCodeLot,
+  });
+  let y = doc.y;
+
+  // ── Bandeau conformité ─────────────────────────────────────────────────────
+  const confBg  = conforme ? "#f0fdf4" : "#fff7ed";
+  const confBdr = conforme ? "#bbf7d0" : "#fde68a";
+  const confClr = conforme ? VERT     : AMBRE;
+  doc.rect(MARGIN, y, W, 30).fill(confBg).stroke(confBdr);
+  doc.fontSize(10).fillColor(confClr).font("Helvetica-Bold")
+    .text(
+      conforme
+        ? "Lot CONFORME EUDR — Tracabilite complete"
+        : "Tracabilite incomplete — certains producteurs manquent de donnees EUDR",
+      MARGIN + 12, y + 10, { width: W - 24, lineBreak: false },
+    );
+  y += 40;
+
+  // ── Infos lot + QR ─────────────────────────────────────────────────────────
+  const QR_SIZE  = 82;
+  const infoW    = W - QR_SIZE - 14;
+
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("INFORMATIONS LOT", MARGIN, y);
+  y += 14;
+
+  const infoFields: Array<[string, string]> = [
+    ["Ref. lot",        lot.qrCodeLot],
+    ["Date creation",   formaterDate(lot.dateCreation!)],
+    ["Poids total",     `${formaterNombre(parseFloat(String(lot.poidsTotalKg)))} kg`],
+    ["Entrepot",        lot.entrepot ?? "—"],
+    ["Statut",          lot.statut],
+    ["Producteurs",     String(membreIds.length)],
+    ["Conformes EUDR",  `${nbConformes} / ${membreIds.length}`],
+    ["Non verifies",    `${nbNonVerifies} / ${membreIds.length}`],
+    ["Pays origine",    "Cote d'Ivoire"],
+    ["Produit",         "Cacao"],
+  ];
+  const infoStartY = y;
+  for (const [ri, [label, val]] of infoFields.entries()) {
+    if (ri % 2 === 0) doc.rect(MARGIN, y, infoW, 16).fill("#f8fafc");
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text(label, MARGIN + 6, y + 4, { width: 150, lineBreak: false });
+    doc.fontSize(8).fillColor("black").font("Helvetica-Bold")
+      .text(val, MARGIN + 160, y + 4, { width: infoW - 166, lineBreak: false });
+    y += 16;
+  }
+
+  const qrX = MARGIN + infoW + 14;
+  if (qrBuf) {
+    doc.image(qrBuf, qrX, infoStartY, { width: QR_SIZE, height: QR_SIZE });
+  }
+  doc.fontSize(6).fillColor(GRIS).font("Helvetica")
+    .text("Portail public — scannez pour verifier", qrX, infoStartY + QR_SIZE + 3,
+      { width: QR_SIZE, align: "center", lineBreak: false });
+
+  y += 20;
+
+  // ── Tableau producteurs ────────────────────────────────────────────────────
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold")
+    .text("PRODUCTEURS & DONNEES EUDR", MARGIN, y);
+  y += 14;
+
+  const cols: Array<{ label: string; w: number }> = [
+    { label: "Producteur",   w: 110 },
+    { label: "Poids (kg)",   w: 60  },
+    { label: "Superf. (ha)", w: 62  },
+    { label: "GPS",          w: 104 },
+    { label: "Statut EUDR",  w: 74  },
+    { label: "Risque",       w: 74  },
+  ];
+
+  let cx = MARGIN;
+  doc.rect(MARGIN, y, W, 18).fill(VERT);
+  for (const col of cols) {
+    doc.fontSize(8).fillColor("white").font("Helvetica-Bold")
+      .text(col.label, cx + 4, y + 5, { width: col.w - 8, lineBreak: false });
+    cx += col.w;
+  }
+  y += 18;
+
+  for (const [ri, p] of producteurs.entries()) {
+    const rowH = 18;
+    if (ri % 2 === 0) doc.rect(MARGIN, y, W, rowH).fill("#f8fafc");
+    const statutColor = p.eudrStatut === "conforme" ? VERT
+      : p.eudrStatut === "non_conforme" ? ROUGE : GRIS;
+    const vals = [p.nom, formaterNombre(p.poidsKg), p.superficieHa ?? "—", p.gpsStr, p.eudrStatutLabel, p.eudrRisqueLabel];
+    cx = MARGIN;
+    for (const [ci, col] of cols.entries()) {
+      const color = ci === 4 ? statutColor : "black";
+      doc.fontSize(7.5).fillColor(color).font(ci === 0 ? "Helvetica-Bold" : "Helvetica")
+        .text(vals[ci]!, cx + 4, y + 5, { width: col.w - 8, lineBreak: false });
+      cx += col.w;
+    }
+    y += rowH;
+  }
+
+  if (producteurs.length === 0) {
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text("Aucun producteur lie a ce lot.", MARGIN + 6, y + 6);
+    y += 24;
+  }
+  y += 20;
+
+  // ── KPIs conformité ───────────────────────────────────────────────────────
+  const kpis = [
+    { label: "Conformes EUDR",    val: String(nbConformes),    color: VERT  },
+    { label: "Non conformes",     val: String(nbNonConformes), color: ROUGE },
+    { label: "Non verifies",      val: String(nbNonVerifies),  color: AMBRE },
+    { label: "Total producteurs", val: String(membreIds.length), color: BLEU },
+  ];
+  const kpiW = (W - 15) / 4;
+  kpis.forEach((kpi, i) => {
+    const kx = MARGIN + i * (kpiW + 5);
+    doc.rect(kx, y, kpiW, 36).fill("#f8fafc").stroke("#e2e8f0");
+    doc.fontSize(7).fillColor(GRIS).font("Helvetica")
+      .text(kpi.label, kx + 6, y + 5, { width: kpiW - 12, lineBreak: false, align: "center" });
+    doc.fontSize(16).fillColor(kpi.color).font("Helvetica-Bold")
+      .text(kpi.val, kx + 6, y + 14, { width: kpiW - 12, lineBreak: false, align: "center" });
+  });
+  y += 46;
+
+  // ── Déclaration EUDR ──────────────────────────────────────────────────────
+  doc.rect(MARGIN, y, W, 1).fill("#e2e8f0");
+  y += 10;
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+    .text(
+      "Le responsable de la cooperative atteste que les donnees EUDR ci-dessus sont exactes " +
+      "et que ce lot de cacao est issu de parcelles n'ayant pas contribue a la deforestation " +
+      "ou a la degradation des forets apres le 31 decembre 2020, conformement au " +
+      "Reglement (UE) 2023/1115 relatif aux produits associes a la deforestation.",
+      MARGIN, y, { width: W },
+    );
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}

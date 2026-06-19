@@ -36,6 +36,7 @@ import {
   AlertOctagon,
   MapPin,
   FileJson,
+  FileText,
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/contexts/AuthContext";
@@ -221,10 +222,14 @@ function DetailModal({
   peutModifier: boolean;
 }) {
   const { data, isLoading } = useGetLotTracabilite(lotId);
+  const { token } = useAuth();
   const [copied, setCopied] = useState(false);
   const [confirmStatut, setConfirmStatut] = useState<LotStatut | null>(null);
   const [showExpedier, setShowExpedier] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const queryClient = useQueryClient();
+
+  const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
 
   const getLotUrl = () =>
     `${window.location.origin}/portail/lots/${data!.lot.qrCodeLot}`;
@@ -301,6 +306,28 @@ function DetailModal({
     a.download = `eudr-lot-${data.lot.qrCodeLot.slice(0, 8)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const telechargerEudrPdf = async () => {
+    if (!data?.lot.id) return;
+    setDownloadingPdf(true);
+    try {
+      const res = await fetch(`${BASE}/lots/${data.lot.id}/eudr/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `eudr-lot-${data.lot.qrCodeLot.slice(0, 8)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Erreur lors de la génération du PDF EUDR.");
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const statut = data?.lot.statut as LotStatut | undefined;
@@ -501,6 +528,13 @@ function DetailModal({
                       <FileJson size={13} /> Export EUDR
                     </button>
                     <button
+                      onClick={telechargerEudrPdf}
+                      disabled={downloadingPdf}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-emerald-300 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-50 disabled:opacity-50"
+                    >
+                      <FileText size={13} /> {downloadingPdf ? "Génération…" : "PDF EUDR"}
+                    </button>
+                    <button
                       onClick={imprimerQr}
                       className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
                     >
@@ -518,6 +552,13 @@ function DetailModal({
                     className="flex items-center gap-1.5 px-3 py-1.5 border border-emerald-300 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-50"
                   >
                     <FileJson size={13} /> Export EUDR
+                  </button>
+                  <button
+                    onClick={telechargerEudrPdf}
+                    disabled={downloadingPdf}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-emerald-300 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-50 disabled:opacity-50"
+                  >
+                    <FileText size={13} /> {downloadingPdf ? "Génération…" : "PDF EUDR"}
                   </button>
                   <button
                     onClick={imprimerQr}
