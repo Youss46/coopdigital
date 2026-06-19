@@ -1,4 +1,4 @@
-import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, parcellesTable } from "@workspace/db";
+import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, parcellesTable, ventesExportateursTable } from "@workspace/db";
 import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
 import { proposerEcriture } from "./comptabiliteService";
 import { notifExpeditionArriveePort, notifExpeditionLitige } from "./notificationService.js";
@@ -403,6 +403,45 @@ export async function createExpedition(cooperativeId: number, userId: number, in
   return exp;
 }
 
+// ── Prix unitaire réel de l'expédition ───────────────────────────────────────
+// Cherche le prix unitaire (FCFA/kg) dans la vente exportateur liée aux lots
+// de cette expédition. Retourne la valeur réelle si trouvée, sinon 0 (indication
+// que la vente n'a pas encore été saisie — le montant sera recalculé ultérieurement).
+
+const PRIX_COUT_DEFAUT_KG = 0;
+
+async function getPrixUnitaireExpedition(expeditionId: number): Promise<number> {
+  const lots = await db
+    .select({ lotId: expeditionLotsTable.lotId })
+    .from(expeditionLotsTable)
+    .where(eq(expeditionLotsTable.expeditionId, expeditionId));
+
+  if (lots.length === 0) return PRIX_COUT_DEFAUT_KG;
+
+  const lotIds = lots.map((l) => l.lotId);
+
+  const ventes = await db
+    .select({
+      prixUnitaireFcfa: ventesExportateursTable.prixUnitaireFcfa,
+      poidsKg:          ventesExportateursTable.poidsKg,
+    })
+    .from(ventesExportateursTable)
+    .where(inArray(ventesExportateursTable.lotId, lotIds));
+
+  if (ventes.length === 0) return PRIX_COUT_DEFAUT_KG;
+
+  // Moyenne pondérée des prix unitaires des ventes liées
+  let totalMontant = 0;
+  let totalPoids   = 0;
+  for (const v of ventes) {
+    const poids = parseFloat(String(v.poidsKg ?? "0"));
+    const prix  = Number(v.prixUnitaireFcfa ?? 0);
+    totalMontant += poids * prix;
+    totalPoids   += poids;
+  }
+  return totalPoids > 0 ? Math.round(totalMontant / totalPoids) : PRIX_COUT_DEFAUT_KG;
+}
+
 // ── Changement de statut ────────────────────────────────────────────────────
 
 const TRANSITIONS_VALIDES: Record<string, string[]> = {
@@ -467,22 +506,27 @@ export async function changerStatut(
   });
 
   // Écriture comptable au chargement (en_preparation → charge)
+  // On ne propose l'écriture que si le prix unitaire est connu (vente exportateur déjà saisie).
+  // Si ce n'est pas le cas, l'écriture sera générée lors de la confirmation de réception.
   if (nouveauStatut === "charge" && exp.poidsChargeKg) {
     const dateStr = new Date().toISOString().split("T")[0]!;
-    const montant = Math.round(parseFloat(String(exp.poidsChargeKg)) * 500);
-    try {
-      await proposerEcriture(cooperativeId, {
-        source:    "stock",
-        sourceId:  expeditionId,
-        libelle:   `Départ ${exp.numeroExpedition} vers Port ${exp.port}`,
-        compteDebit:  "381",
-        compteCredit: "311",
-        montantFcfa:  montant,
-        date:         dateStr,
-        numeroPiece:  exp.numeroExpedition,
-      });
-    } catch (err) {
-      logger.error({ err }, "Erreur écriture comptable chargement");
+    const prixKg = await getPrixUnitaireExpedition(expeditionId);
+    if (prixKg > 0) {
+      const montant = Math.round(parseFloat(String(exp.poidsChargeKg)) * prixKg);
+      try {
+        await proposerEcriture(cooperativeId, {
+          source:    "stock",
+          sourceId:  expeditionId,
+          libelle:   `Départ ${exp.numeroExpedition} vers Port ${exp.port}`,
+          compteDebit:  "381",
+          compteCredit: "311",
+          montantFcfa:  montant,
+          date:         dateStr,
+          numeroPiece:  exp.numeroExpedition,
+        });
+      } catch (err) {
+        logger.error({ err }, "Erreur écriture comptable chargement");
+      }
     }
   }
 
@@ -551,23 +595,14 @@ export async function confirmerReception(
   });
 
   const dateStr = new Date().toISOString().split("T")[0]!;
-  const montantStockTransit = Math.round(poidsCharge * 500);
-  const montantVente        = Math.round(poidsRecu * 600);
+  const prixKg = await getPrixUnitaireExpedition(expeditionId);
+  const montantStockTransit = Math.round(poidsCharge * prixKg);
 
   if (nouveauStatut === "receptionne") {
     try {
-      const exportateurId = input.exportateurId ?? exp.exportateurId;
-      const libExport = exp.exportateurNom ? `Client ${exp.exportateurNom}` : "Client exportateur";
-      await proposerEcriture(cooperativeId, {
-        source:      "vente",
-        sourceId:    expeditionId,
-        libelle:     `Réception ${exp.numeroExpedition} — Port ${exp.port}`,
-        compteDebit:  "4111",
-        compteCredit: "701",
-        montantFcfa:  montantVente,
-        date:         dateStr,
-        numeroPiece:  exp.numeroExpedition,
-      });
+      // Solde stock transit : soldé au même prix que le départ (381 → 4111)
+      // NB : le chiffre d'affaires est enregistré séparément via "Vente cacao"
+      //      (generateEcrituresVente) lorsque la vente exportateur est créée.
       await proposerEcriture(cooperativeId, {
         source:      "stock",
         sourceId:    expeditionId,
@@ -599,7 +634,7 @@ export async function confirmerReception(
       }
     }
   } else {
-    const montantEcart = Math.round(Math.abs(ecart) * 500);
+    const montantEcart = Math.round(Math.abs(ecart) * prixKg);
     try {
       await proposerEcriture(cooperativeId, {
         source:      "stock",
