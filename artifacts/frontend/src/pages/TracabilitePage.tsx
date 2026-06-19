@@ -312,7 +312,7 @@ function DetailModal({
     if (!data?.lot.id) return;
     setDownloadingPdf(true);
     try {
-      const res = await fetch(`${BASE}/lots/${data.lot.id}/eudr/pdf`, {
+      const res = await fetch(`${BASE}/api/lots/${data.lot.id}/eudr/pdf`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error(`Erreur ${res.status}`);
