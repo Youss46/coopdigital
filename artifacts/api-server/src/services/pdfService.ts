@@ -26,6 +26,7 @@ import {
   cooperativesTable,
   expeditionsTable,
   expeditionLotsTable,
+  parcellesTable,
 } from "@workspace/db";
 import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
@@ -1657,6 +1658,7 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
   const lots = await db
     .select({
       lotId:           expeditionLotsTable.lotId,
+      membreId:        expeditionLotsTable.membreId,
       poidsKg:         expeditionLotsTable.poidsKg,
       nombreSacs:      expeditionLotsTable.nombreSacs,
       certificatEudr:  expeditionLotsTable.certificatEudr,
@@ -1664,17 +1666,50 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
       membreNom:       membresTable.nom,
       membrePrenoms:   membresTable.prenoms,
       membreCni:       membresTable.numeroCni,
-      parcelleLat:     membresTable.parcelleLat,
-      parcelleLng:     membresTable.parcelleLng,
       superficieHa:    membresTable.superficieHa,
     })
     .from(expeditionLotsTable)
     .leftJoin(membresTable, eq(expeditionLotsTable.membreId, membresTable.id))
     .where(eq(expeditionLotsTable.expeditionId, expeditionId));
 
+  // Récupère les parcelles GPS (parcellesTable) pour tous les membres du lot
+  const membreIds = lots.map(l => l.membreId).filter((id): id is number => id !== null && id !== undefined);
+  const parcellesGps = membreIds.length
+    ? await db
+        .select({
+          membreId:           parcellesTable.membreId,
+          coordonneesPoint:   parcellesTable.coordonneesPoint,
+          polygone:           parcellesTable.polygone,
+          superficieCalculeeHa: parcellesTable.superficieCalculeeHa,
+          superficieDeclareeHa: parcellesTable.superficieDeclareeHa,
+        })
+        .from(parcellesTable)
+        .where(and(inArray(parcellesTable.membreId, membreIds), eq(parcellesTable.actif, true)))
+    : [];
+
+  // Map membreId → première parcelle avec GPS (coordonnées point ou polygone)
+  const gpsParMembre = new Map<number, {
+    lat: number | null; lng: number | null;
+    hasPolygone: boolean;
+    superficieHa: string | null;
+  }>();
+  for (const p of parcellesGps) {
+    if (!p.membreId) continue;
+    const point = p.coordonneesPoint as { lat: number; lng: number } | null;
+    const hasPolygone = !!(p.polygone && (p.polygone as unknown[]).length > 0);
+    if (!gpsParMembre.has(p.membreId) && (point || hasPolygone)) {
+      gpsParMembre.set(p.membreId, {
+        lat: point?.lat ?? null,
+        lng: point?.lng ?? null,
+        hasPolygone,
+        superficieHa: p.superficieCalculeeHa ?? p.superficieDeclareeHa ?? null,
+      });
+    }
+  }
+
   const poidsTotal    = lots.reduce((s, l) => s + (l.poidsKg ? parseFloat(String(l.poidsKg)) : 0), 0);
   const avecCert      = lots.filter(l => l.certificatEudr).length;
-  const avecParcelle  = lots.filter(l => l.parcelleOrigine || (l.parcelleLat && l.parcelleLng)).length;
+  const avecParcelle  = lots.filter(l => l.membreId !== null && gpsParMembre.has(l.membreId!)).length;
   const conforme      = avecCert === lots.length && avecParcelle === lots.length;
 
   const { doc, endPromise } = makePdfDoc();
@@ -1766,13 +1801,22 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
     }
     const poids = l.poidsKg ? parseFloat(String(l.poidsKg)) : 0;
     const hasCert = Boolean(l.certificatEudr);
-    const hasGps  = Boolean(l.parcelleLat && l.parcelleLng);
+    const gpsData = l.membreId ? gpsParMembre.get(l.membreId) ?? null : null;
+    const hasGps  = gpsData !== null;
 
     if (idx % 2 === 0) doc.rect(MARGIN, y, lCols.reduce((a, b) => a + b, 0), 16).fill("#f0f9ff");
 
-    const gpsStr = hasGps
-      ? `${parseFloat(String(l.parcelleLat)).toFixed(4)}, ${parseFloat(String(l.parcelleLng)).toFixed(4)}`
+    const gpsStr = gpsData
+      ? (gpsData.lat !== null && gpsData.lng !== null
+        ? `${gpsData.lat.toFixed(4)}, ${gpsData.lng.toFixed(4)}`
+        : "Polygone GPS")
       : (l.parcelleOrigine ?? "—");
+
+    const superficieAff = gpsData?.superficieHa
+      ? `${parseFloat(String(gpsData.superficieHa)).toFixed(2)} ha`
+      : l.superficieHa
+      ? `${parseFloat(String(l.superficieHa)).toFixed(2)} ha`
+      : "—";
 
     ligneTableau(doc, [
       l.lotId ? `#${l.lotId}` : "—",
@@ -1780,7 +1824,7 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
       poids > 0 ? poids.toLocaleString("fr-FR") : "—",
       hasCert ? `✓ ${l.certificatEudr!}` : "⚠ Manquant",
       gpsStr,
-      l.superficieHa ? String(l.superficieHa) : "—",
+      superficieAff,
     ], lCols, MARGIN, y);
 
     if (!hasCert || !hasGps) {

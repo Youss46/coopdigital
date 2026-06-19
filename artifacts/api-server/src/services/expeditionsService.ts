@@ -1,4 +1,4 @@
-import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable } from "@workspace/db";
+import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, parcellesTable } from "@workspace/db";
 import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
 import { proposerEcriture } from "./comptabiliteService";
 import { notifExpeditionArriveePort, notifExpeditionLitige } from "./notificationService.js";
@@ -653,8 +653,33 @@ export async function getRapportEudr(cooperativeId: number, expeditionId: number
   if (!exp) throw new Error("Expédition introuvable");
 
   const poidsTotal = exp.lots.reduce((s, l) => s + parseFloat(String(l.poidsKg ?? "0")), 0);
-  const avecParcelle  = exp.lots.filter(l => l.parcelleOrigine).length;
   const avecCertificat = exp.lots.filter(l => l.certificatEudr).length;
+
+  // Récupère les parcelles GPS (parcellesTable) pour tous les membres du lot
+  const membreIds = exp.lots
+    .map(l => l.membreId)
+    .filter((id): id is number => id !== null && id !== undefined);
+
+  const parcellesGpsRows = membreIds.length
+    ? await db
+        .select({
+          membreId:         parcellesTable.membreId,
+          coordonneesPoint: parcellesTable.coordonneesPoint,
+          polygone:         parcellesTable.polygone,
+        })
+        .from(parcellesTable)
+        .where(and(inArray(parcellesTable.membreId, membreIds), eq(parcellesTable.actif, true)))
+    : [];
+
+  const membresAvecGps = new Set<number>();
+  for (const p of parcellesGpsRows) {
+    if (!p.membreId) continue;
+    const hasPoint   = !!(p.coordonneesPoint);
+    const hasPolygon = !!(p.polygone && (p.polygone as unknown[]).length > 0);
+    if (hasPoint || hasPolygon) membresAvecGps.add(p.membreId);
+  }
+
+  const avecParcelle = exp.lots.filter(l => l.membreId !== null && l.membreId !== undefined && membresAvecGps.has(l.membreId!)).length;
 
   return {
     numeroExpedition: exp.numeroExpedition,
