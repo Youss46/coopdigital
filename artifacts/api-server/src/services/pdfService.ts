@@ -46,6 +46,9 @@ function formaterFCFA(n: number): string {
   // On remplace par un espace ordinaire pour un rendu correct.
   return new Intl.NumberFormat("fr-FR").format(n).replace(/[\u202F\u00A0]/g, " ") + " FCFA";
 }
+function formaterNombre(n: number): string {
+  return new Intl.NumberFormat("fr-FR").format(n).replace(/[\u202F\u00A0]/g, " ");
+}
 function formaterDate(d: string | Date): string {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
@@ -1738,7 +1741,7 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
   // ── KPIs ─────────────────────────────────────────────────────────────────
   const kpis = [
     { label: "Lots / Producteurs",    val: String(lots.length) },
-    { label: "Poids total",           val: `${poidsTotal.toLocaleString("fr-FR")} kg` },
+    { label: "Poids total",           val: `${formaterNombre(poidsTotal)} kg` },
     { label: "Cert. EUDR renseignées", val: `${avecCert} / ${lots.length}` },
     { label: "Parcelles tracées",     val: `${avecParcelle} / ${lots.length}` },
     { label: "Port de destination",   val: exp.port },
@@ -1821,7 +1824,7 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
     ligneTableau(doc, [
       l.lotId ? `#${l.lotId}` : "—",
       l.membreNom ? `${l.membreNom} ${l.membrePrenoms ?? ""}`.trim() : "—",
-      poids > 0 ? poids.toLocaleString("fr-FR") : "—",
+      poids > 0 ? formaterNombre(poids) : "—",
       hasCert ? `✓ ${l.certificatEudr!}` : "⚠ Manquant",
       gpsStr,
       superficieAff,
@@ -1853,7 +1856,7 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
   doc.fontSize(9).fillColor("white").font("Helvetica-Bold")
     .text("TOTAL", MARGIN + 6, y + 5, { width: lCols[0]! + lCols[1]! - 6, lineBreak: false });
   doc.text(
-    `${poidsTotal.toLocaleString("fr-FR")} kg`,
+    `${formaterNombre(poidsTotal)} kg`,
     MARGIN + lCols[0]! + lCols[1]!, y + 5,
     { width: lCols[2]! - 6, lineBreak: false },
   );
@@ -2051,7 +2054,7 @@ export async function generateBonLivraison(expeditionId: number, cooperativeId: 
     ligneTableau(doc, [
       l.lotId ? `#${l.lotId}` : "—",
       l.membreNom ? `${l.membreNom} ${l.membrePrenoms ?? ""}`.trim() : "—",
-      poids > 0 ? poids.toLocaleString("fr-FR") : "—",
+      poids > 0 ? formaterNombre(poids) : "—",
       l.certificatEudr ?? "—",
       l.parcelleOrigine ?? "—",
     ], lCols, MARGIN, y);
@@ -2070,7 +2073,7 @@ export async function generateBonLivraison(expeditionId: number, cooperativeId: 
   doc.fontSize(9).fillColor("white").font("Helvetica-Bold")
     .text("TOTAL", MARGIN + 6, y + 5, { width: lCols[0]! + lCols[1]! - 6, lineBreak: false });
   doc.text(
-    totalPoidsLots > 0 ? totalPoidsLots.toLocaleString("fr-FR") + " kg" : "—",
+    totalPoidsLots > 0 ? formaterNombre(totalPoidsLots) + " kg" : "—",
     MARGIN + lCols[0]! + lCols[1]!, y + 5,
     { width: lCols[2]! - 6, lineBreak: false },
   );
@@ -2089,7 +2092,7 @@ export async function generateBonLivraison(expeditionId: number, cooperativeId: 
     const poidsCharge = parseFloat(String(exp.poidsChargeKg));
     doc.rect(MARGIN, y, W, 22).fill("#fffbeb").stroke("#fde68a");
     doc.fontSize(9).fillColor(OR).font("Helvetica-Bold")
-      .text(`Poids total chargé : ${poidsCharge.toLocaleString("fr-FR")} kg`, MARGIN + 10, y + 6, {
+      .text(`Poids total chargé : ${formaterNombre(poidsCharge)} kg`, MARGIN + 10, y + 6, {
         width: W - 20, lineBreak: false,
       });
     y += 30;
