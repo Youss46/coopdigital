@@ -1655,6 +1655,13 @@ export async function generateRapportTransfert(transfertId: number, cooperativeI
 // Structure par lot, miroir de l'export EUDR de la page Traçabilité + QR code
 // ─────────────────────────────────────────────────────────────────────────────
 
+function centroidePolygone(poly: [number, number][] | null | undefined): { lat: number; lng: number } | null {
+  if (!poly || poly.length === 0) return null;
+  const lat = poly.reduce((s, p) => s + (p[0] ?? 0), 0) / poly.length;
+  const lng = poly.reduce((s, p) => s + (p[1] ?? 0), 0) / poly.length;
+  return { lat, lng };
+}
+
 async function fetchQrImageBuffer(data: string, size = 100): Promise<Buffer | null> {
   try {
     const url = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&format=png&data=${encodeURIComponent(data)}`;
@@ -1713,7 +1720,10 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
   const lotsDistincts = Array.from(lotsMap.values());
 
   // ── 3. Pour chaque lot : producteurs + données EUDR + QR code ─────────────
-  const domain = process.env.REPLIT_DEV_DOMAIN ?? null;
+  const portailBase =
+    process.env.PORTAIL_BASE_URL?.replace(/\/$/, "") ||
+    (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]?.trim()}` : null) ||
+    (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null);
 
   type Producteur = {
     nom: string;
@@ -1741,8 +1751,8 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
   };
 
   const lotsRendus: LotRendu[] = await Promise.all(lotsDistincts.map(async (lot) => {
-    const lotPublicUrl = domain
-      ? `https://${domain}/portail/lots/${lot.qrCodeLot}`
+    const lotPublicUrl = portailBase
+      ? `${portailBase}/portail/lots/${lot.qrCodeLot}`
       : lot.qrCodeLot;
 
     // Producteurs du lot via lotLivraisonsTable → livraisonsTable → membresTable
@@ -1774,6 +1784,7 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
           .select({
             membreId:             parcellesTable.membreId,
             coordonneesPoint:     parcellesTable.coordonneesPoint,
+            polygone:             parcellesTable.polygone,
             superficieDeclareeHa: parcellesTable.superficieDeclareeHa,
             superficieCalculeeHa: parcellesTable.superficieCalculeeHa,
             eudrStatut:           parcellesTable.eudrStatut,
@@ -1795,7 +1806,9 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
     // Construire la liste des producteurs
     const producteurs: Producteur[] = Array.from(poidsParMembre.entries()).map(([membreId, info]) => {
       const p = parcelleParMembre.get(membreId);
-      const point = p?.coordonneesPoint as { lat: number; lng: number } | null | undefined;
+      const point =
+        (p?.coordonneesPoint as { lat: number; lng: number } | null | undefined) ??
+        centroidePolygone(p?.polygone as [number, number][] | null | undefined);
       const hasGps = !!(point?.lat && point?.lng);
       const gpsStr = hasGps
         ? `${point!.lat.toFixed(5)}, ${point!.lng.toFixed(5)}`
@@ -2335,6 +2348,7 @@ export async function generateLotEudrPdf(lotId: number, cooperativeId: number): 
         .select({
           membreId:                parcellesTable.membreId,
           coordonneesPoint:        parcellesTable.coordonneesPoint,
+          polygone:                parcellesTable.polygone,
           superficieDeclareeHa:    parcellesTable.superficieDeclareeHa,
           superficieCalculeeHa:    parcellesTable.superficieCalculeeHa,
           eudrStatut:              parcellesTable.eudrStatut,
@@ -2365,7 +2379,9 @@ export async function generateLotEudrPdf(lotId: number, cooperativeId: number): 
   const producteurs: ProducteurRow[] = membreIds.map((mid) => {
     const m = membreMap.get(mid);
     const p = parcellesParMembre.get(mid) ?? null;
-    const point = p?.coordonneesPoint as { lat: number; lng: number } | null;
+    const point =
+      (p?.coordonneesPoint as { lat: number; lng: number } | null) ??
+      centroidePolygone(p?.polygone as [number, number][] | null | undefined);
     const hasGps = Boolean(point?.lat && point?.lng);
     const gpsStr = hasGps ? `${point!.lat.toFixed(5)}, ${point!.lng.toFixed(5)}` : "—";
     const superficieHa = p ? (p.superficieCalculeeHa ?? p.superficieDeclareeHa ?? null) : null;
@@ -2388,9 +2404,12 @@ export async function generateLotEudrPdf(lotId: number, cooperativeId: number): 
   const nbNonConformes = producteurs.filter((p) => p.eudrStatut === "non_conforme").length;
   const conforme       = producteurs.length > 0 && nbNonConformes === 0 && nbNonVerifies === 0;
 
-  const domain = process.env["REPLIT_DEV_DOMAIN"] ?? null;
-  const lotPublicUrl = domain
-    ? `https://${domain}/portail/lots/${lot.qrCodeLot}`
+  const portailBase =
+    process.env.PORTAIL_BASE_URL?.replace(/\/$/, "") ||
+    (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]?.trim()}` : null) ||
+    (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null);
+  const lotPublicUrl = portailBase
+    ? `${portailBase}/portail/lots/${lot.qrCodeLot}`
     : lot.qrCodeLot;
   const qrBuf = await fetchQrImageBuffer(lotPublicUrl, 100);
 
