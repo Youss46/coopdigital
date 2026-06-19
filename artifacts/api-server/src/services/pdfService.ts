@@ -27,6 +27,8 @@ import {
   expeditionsTable,
   expeditionLotsTable,
   parcellesTable,
+  lotsTable,
+  lotLivraisonsTable,
 } from "@workspace/db";
 import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
@@ -1650,102 +1652,235 @@ export async function generateRapportTransfert(transfertId: number, cooperativeI
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rapport EUDR — Expédition au port
+// Structure par lot, miroir de l'export EUDR de la page Traçabilité + QR code
 // ─────────────────────────────────────────────────────────────────────────────
+
+async function fetchQrImageBuffer(data: string, size = 100): Promise<Buffer | null> {
+  try {
+    const url = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&format=png&data=${encodeURIComponent(data)}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+const EUDR_STATUT_LABELS: Record<string, string> = {
+  conforme:      "Conforme",
+  non_conforme:  "Non conforme",
+  non_verifie:   "Non verifie",
+};
+const EUDR_RISQUE_LABELS: Record<string, string> = {
+  faible:   "Faible",
+  moyen:    "Moyen",
+  eleve:    "Eleve",
+  inconnu:  "Inconnu",
+};
+
 export async function generateRapportEudrPdf(expeditionId: number, cooperativeId: number): Promise<Buffer> {
+  // ── 1. Expedition ─────────────────────────────────────────────────────────
   const [exp] = await db
     .select()
     .from(expeditionsTable)
     .where(and(eq(expeditionsTable.id, expeditionId), eq(expeditionsTable.cooperativeId, cooperativeId)));
   if (!exp) throw new Error("Expédition introuvable");
 
-  const lots = await db
+  // ── 2. Lots distincts de l'expédition ─────────────────────────────────────
+  const expLotRows = await db
     .select({
-      lotId:           expeditionLotsTable.lotId,
-      membreId:        expeditionLotsTable.membreId,
-      poidsKg:         expeditionLotsTable.poidsKg,
-      nombreSacs:      expeditionLotsTable.nombreSacs,
-      certificatEudr:  expeditionLotsTable.certificatEudr,
-      parcelleOrigine: expeditionLotsTable.parcelleOrigine,
-      membreNom:       membresTable.nom,
-      membrePrenoms:   membresTable.prenoms,
-      membreCni:       membresTable.numeroCni,
-      superficieHa:    membresTable.superficieHa,
+      lotId:        expeditionLotsTable.lotId,
+      qrCodeLot:    lotsTable.qrCodeLot,
+      poidsTotalKg: lotsTable.poidsTotalKg,
+      dateCreation: lotsTable.dateCreation,
     })
     .from(expeditionLotsTable)
-    .leftJoin(membresTable, eq(expeditionLotsTable.membreId, membresTable.id))
+    .innerJoin(lotsTable, eq(lotsTable.id, expeditionLotsTable.lotId))
     .where(eq(expeditionLotsTable.expeditionId, expeditionId));
 
-  // Récupère les parcelles GPS (parcellesTable) pour tous les membres du lot
-  const membreIds = lots.map(l => l.membreId).filter((id): id is number => id !== null && id !== undefined);
-  const parcellesGps = membreIds.length
-    ? await db
-        .select({
-          membreId:           parcellesTable.membreId,
-          coordonneesPoint:   parcellesTable.coordonneesPoint,
-          polygone:           parcellesTable.polygone,
-          superficieCalculeeHa: parcellesTable.superficieCalculeeHa,
-          superficieDeclareeHa: parcellesTable.superficieDeclareeHa,
-        })
-        .from(parcellesTable)
-        .where(and(inArray(parcellesTable.membreId, membreIds), eq(parcellesTable.actif, true)))
-    : [];
-
-  // Map membreId → première parcelle avec GPS (coordonnées point ou polygone)
-  const gpsParMembre = new Map<number, {
-    lat: number | null; lng: number | null;
-    hasPolygone: boolean;
-    superficieHa: string | null;
-  }>();
-  for (const p of parcellesGps) {
-    if (!p.membreId) continue;
-    const point = p.coordonneesPoint as { lat: number; lng: number } | null;
-    const hasPolygone = !!(p.polygone && (p.polygone as unknown[]).length > 0);
-    if (!gpsParMembre.has(p.membreId) && (point || hasPolygone)) {
-      gpsParMembre.set(p.membreId, {
-        lat: point?.lat ?? null,
-        lng: point?.lng ?? null,
-        hasPolygone,
-        superficieHa: p.superficieCalculeeHa ?? p.superficieDeclareeHa ?? null,
+  // Dédupliquer les lots
+  const lotsMap = new Map<number, { lotId: number; qrCodeLot: string; poidsTotalKg: string; dateCreation: Date }>();
+  for (const r of expLotRows) {
+    if (r.lotId && !lotsMap.has(r.lotId)) {
+      lotsMap.set(r.lotId, {
+        lotId:        r.lotId,
+        qrCodeLot:    r.qrCodeLot,
+        poidsTotalKg: r.poidsTotalKg,
+        dateCreation: r.dateCreation,
       });
     }
   }
+  const lotsDistincts = Array.from(lotsMap.values());
 
-  const poidsTotal    = lots.reduce((s, l) => s + (l.poidsKg ? parseFloat(String(l.poidsKg)) : 0), 0);
-  const avecCert      = lots.filter(l => l.certificatEudr).length;
-  const avecParcelle  = lots.filter(l => l.membreId !== null && gpsParMembre.has(l.membreId!)).length;
-  const conforme      = avecCert === lots.length && avecParcelle === lots.length;
+  // ── 3. Pour chaque lot : producteurs + données EUDR + QR code ─────────────
+  const domain = process.env.REPLIT_DEV_DOMAIN ?? null;
 
+  type Producteur = {
+    nom: string;
+    poidsKg: number;
+    superficieHa: string | null;
+    gpsStr: string;
+    hasGps: boolean;
+    eudrStatut: string;
+    eudrStatutLabel: string;
+    eudrRisque: string;
+    eudrRisqueLabel: string;
+    eudrConforme: boolean;
+  };
+  type LotRendu = {
+    lotId: number;
+    qrCodeLot: string;
+    poidsTotalKg: number;
+    dateCreation: Date;
+    lotPublicUrl: string;
+    qrBuf: Buffer | null;
+    producteurs: Producteur[];
+    nbConformes: number;
+    nbNonVerifies: number;
+    nbNonConformes: number;
+  };
+
+  const lotsRendus: LotRendu[] = await Promise.all(lotsDistincts.map(async (lot) => {
+    const lotPublicUrl = domain
+      ? `https://${domain}/portail/lots/${lot.qrCodeLot}`
+      : lot.qrCodeLot;
+
+    // Producteurs du lot via lotLivraisonsTable → livraisonsTable → membresTable
+    const livraisonsLot = await db
+      .select({
+        membreId:     livraisonsTable.membreId,
+        membreNom:    membresTable.nom,
+        membrePrenoms: membresTable.prenoms,
+        poidsKg:      livraisonsTable.poidsKg,
+      })
+      .from(lotLivraisonsTable)
+      .innerJoin(livraisonsTable, eq(livraisonsTable.id, lotLivraisonsTable.livraisonId))
+      .innerJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+      .where(eq(lotLivraisonsTable.lotId, lot.lotId));
+
+    // Agréger poids par membre
+    const poidsParMembre = new Map<number, { nom: string; poidsKg: number }>();
+    for (const l of livraisonsLot) {
+      const prev = poidsParMembre.get(l.membreId) ?? { nom: `${l.membreNom ?? ""} ${l.membrePrenoms ?? ""}`.trim(), poidsKg: 0 };
+      prev.poidsKg += l.poidsKg ? parseFloat(String(l.poidsKg)) : 0;
+      poidsParMembre.set(l.membreId, prev);
+    }
+
+    const membreIds = Array.from(poidsParMembre.keys());
+
+    // Données EUDR depuis parcellesTable (première parcelle active par membre)
+    const parcelles = membreIds.length
+      ? await db
+          .select({
+            membreId:             parcellesTable.membreId,
+            coordonneesPoint:     parcellesTable.coordonneesPoint,
+            superficieDeclareeHa: parcellesTable.superficieDeclareeHa,
+            superficieCalculeeHa: parcellesTable.superficieCalculeeHa,
+            eudrStatut:           parcellesTable.eudrStatut,
+            eudrRisqueDeforestation: parcellesTable.eudrRisqueDeforestation,
+          })
+          .from(parcellesTable)
+          .where(and(
+            inArray(parcellesTable.membreId, membreIds),
+            eq(parcellesTable.actif, true),
+          ))
+      : [];
+
+    // Map membreId → données parcelle EUDR
+    const parcelleParMembre = new Map<number, typeof parcelles[number]>();
+    for (const p of parcelles) {
+      if (!parcelleParMembre.has(p.membreId)) parcelleParMembre.set(p.membreId, p);
+    }
+
+    // Construire la liste des producteurs
+    const producteurs: Producteur[] = Array.from(poidsParMembre.entries()).map(([membreId, info]) => {
+      const p = parcelleParMembre.get(membreId);
+      const point = p?.coordonneesPoint as { lat: number; lng: number } | null | undefined;
+      const hasGps = !!(point?.lat && point?.lng);
+      const gpsStr = hasGps
+        ? `${point!.lat.toFixed(5)}, ${point!.lng.toFixed(5)}`
+        : "—";
+      const superficieHa = p
+        ? (p.superficieCalculeeHa ?? p.superficieDeclareeHa ?? null)
+        : null;
+      const eudrStatut = p?.eudrStatut ?? "non_verifie";
+      const eudrRisque = p?.eudrRisqueDeforestation ?? "inconnu";
+      return {
+        nom:             info.nom || "—",
+        poidsKg:         info.poidsKg,
+        superficieHa,
+        gpsStr,
+        hasGps,
+        eudrStatut,
+        eudrStatutLabel: EUDR_STATUT_LABELS[eudrStatut] ?? eudrStatut,
+        eudrRisque,
+        eudrRisqueLabel: EUDR_RISQUE_LABELS[eudrRisque] ?? eudrRisque,
+        eudrConforme:    eudrStatut === "conforme" && hasGps,
+      };
+    });
+
+    const nbConformes    = producteurs.filter(p => p.eudrConforme).length;
+    const nbNonVerifies  = producteurs.filter(p => p.eudrStatut === "non_verifie").length;
+    const nbNonConformes = producteurs.filter(p => p.eudrStatut === "non_conforme").length;
+
+    const [qrBuf] = await Promise.all([fetchQrImageBuffer(lotPublicUrl, 100)]);
+
+    return {
+      lotId:        lot.lotId,
+      qrCodeLot:    lot.qrCodeLot,
+      poidsTotalKg: parseFloat(lot.poidsTotalKg),
+      dateCreation: lot.dateCreation,
+      lotPublicUrl,
+      qrBuf,
+      producteurs,
+      nbConformes,
+      nbNonVerifies,
+      nbNonConformes,
+    };
+  }));
+
+  // ── 4. Métriques globales ─────────────────────────────────────────────────
+  const totalLots         = lotsRendus.length;
+  const totalProducteurs  = lotsRendus.reduce((s, l) => s + l.producteurs.length, 0);
+  const poidsTotal        = lotsRendus.reduce((s, l) => s + l.poidsTotalKg, 0);
+  const totalConformes    = lotsRendus.reduce((s, l) => s + l.nbConformes, 0);
+  const totalNonVerifies  = lotsRendus.reduce((s, l) => s + l.nbNonVerifies, 0);
+  const conforme          = totalLots > 0 && lotsRendus.every(l => l.nbNonConformes === 0 && l.nbNonVerifies === 0);
+
+  // ── 5. Rendu PDF ──────────────────────────────────────────────────────────
   const { doc, endPromise } = makePdfDoc();
-  const W = PAGE_W - 2 * MARGIN;
+  const W    = PAGE_W - 2 * MARGIN;
   const BLEU = "#1e40af";
+  const AMBRE = "#b45309";
 
   await drawHeader(doc, cooperativeId, {
     titre_document: "RAPPORT EUDR",
     reference: exp.numeroExpedition,
   });
-
   let y = doc.y;
 
   // ── Bandeau conformité ────────────────────────────────────────────────────
   const confBg  = conforme ? "#f0fdf4" : "#fff7ed";
   const confBdr = conforme ? "#bbf7d0" : "#fde68a";
-  const confClr = conforme ? VERT     : "#b45309";
-  doc.rect(MARGIN, y, W, 32).fill(confBg).stroke(confBdr);
-  const confLabel = conforme
-    ? "✅  Expédition CONFORME EUDR — Traçabilité complète"
-    : "⚠️  Traçabilité incomplète — certains lots manquent de données EUDR";
+  const confClr = conforme ? VERT     : AMBRE;
+  doc.rect(MARGIN, y, W, 30).fill(confBg).stroke(confBdr);
   doc.fontSize(10).fillColor(confClr).font("Helvetica-Bold")
-    .text(confLabel, MARGIN + 12, y + 11, { width: W - 24, lineBreak: false });
-  y += 42;
+    .text(
+      conforme
+        ? "Expedition CONFORME EUDR — Tracabilite complete"
+        : "Tracabilite incomplete — certains producteurs manquent de donnees EUDR",
+      MARGIN + 12, y + 10, { width: W - 24, lineBreak: false },
+    );
+  y += 40;
 
-  // ── KPIs ─────────────────────────────────────────────────────────────────
+  // ── KPIs ──────────────────────────────────────────────────────────────────
   const kpis = [
-    { label: "Lots / Producteurs",    val: String(lots.length) },
-    { label: "Poids total",           val: `${formaterNombre(poidsTotal)} kg` },
-    { label: "Cert. EUDR renseignées", val: `${avecCert} / ${lots.length}` },
-    { label: "Parcelles tracées",     val: `${avecParcelle} / ${lots.length}` },
-    { label: "Port de destination",   val: exp.port },
-    { label: "Exportateur",           val: exp.exportateurNom ?? "—" },
+    { label: "Lots",              val: String(totalLots) },
+    { label: "Producteurs",       val: String(totalProducteurs) },
+    { label: "Poids total",       val: `${formaterNombre(poidsTotal)} kg` },
+    { label: "Conformes EUDR",    val: `${totalConformes} / ${totalProducteurs}` },
+    { label: "Non verifies",      val: `${totalNonVerifies} / ${totalProducteurs}` },
+    { label: "Port destination",  val: exp.port },
   ];
   const kpiW = (W - 10) / 3;
   kpis.forEach((kpi, i) => {
@@ -1757,20 +1892,22 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
     doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
       .text(kpi.label, kx + 8, y + 6, { width: kpiW - 16, lineBreak: false });
     doc.fontSize(12).fillColor(BLEU).font("Helvetica-Bold")
-      .text(kpi.val, kx + 8, y + 17, { width: kpiW - 16, lineBreak: false });
+      .text(kpi.val, kx + 8, y + 18, { width: kpiW - 16, lineBreak: false });
   });
   y += 50;
 
   // ── Infos expédition ──────────────────────────────────────────────────────
-  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("INFORMATIONS EXPÉDITION", MARGIN, y);
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("INFORMATIONS EXPEDITION", MARGIN, y);
   y += 14;
   const infoFields: Array<[string, string]> = [
-    ["N° Expédition",   exp.numeroExpedition],
-    ["Date départ",     exp.dateDepart ? formaterDate(exp.dateDepart.toISOString()) : "—"],
-    ["Lieu départ",     exp.lieuDepart ?? "Magasin central"],
+    ["N Expedition",    exp.numeroExpedition],
+    ["Date depart",     exp.dateDepart ? formaterDate(exp.dateDepart.toISOString()) : "—"],
+    ["Lieu depart",     exp.lieuDepart ?? "Magasin central"],
     ["Port",            exp.port],
     ["Contrat export",  exp.numeroContratExport ?? "—"],
-    ["Certificat phyto", exp.certificatPhytoNumero ?? "Non renseigné"],
+    ["Exportateur",     exp.exportateurNom ?? "—"],
+    ["Certificat phyto", exp.certificatPhytoNumero ?? "Non renseigne"],
+    ["Pays origine",    "Cote d'Ivoire"],
   ];
   for (const [ri, [label, val]] of infoFields.entries()) {
     if (ri % 2 === 0) doc.rect(MARGIN, y, W, 16).fill("#f8fafc");
@@ -1780,129 +1917,170 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
       .text(val, MARGIN + 170, y + 4, { width: W - 176, lineBreak: false });
     y += 16;
   }
-  y += 12;
+  y += 16;
 
-  // ── Tableau des lots ──────────────────────────────────────────────────────
-  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("TRAÇABILITÉ DES LOTS — PRODUCTEURS", MARGIN, y);
-  y += 14;
+  // ── Section par lot ───────────────────────────────────────────────────────
+  const QR_SIZE  = 85;
+  const INFO_W   = W - QR_SIZE - 12;
+  const pCols    = [130, 55, 62, 95, 75, 60];
+  const pHeaders = ["Producteur", "Poids kg", "Sup. ha", "GPS (lat, lng)", "EUDR Statut", "Risque"];
 
-  const lCols = [40, 130, 65, 105, 85, 70];
-  const lHeaders = ["Lot #", "Producteur", "Poids (kg)", "Cert. EUDR", "Parcelle / GPS", "Surf. (ha)"];
-  ligneTableau(doc, lHeaders, lCols, MARGIN, y, BLEU);
-  y += 18;
-
-  for (const [idx, l] of lots.entries()) {
-    if (y > 720) {
+  for (const lot of lotsRendus) {
+    const sectionH = 18 + Math.max(QR_SIZE + 4, 40) + 18 + lot.producteurs.length * 15 + 20;
+    if (y + sectionH > 780 && y > 150) {
       doc.addPage();
-      await drawHeader(doc, cooperativeId, {
-        titre_document: "RAPPORT EUDR (suite)",
-        reference: exp.numeroExpedition,
-      });
+      await drawHeader(doc, cooperativeId, { titre_document: "RAPPORT EUDR (suite)", reference: exp.numeroExpedition });
       y = doc.y;
-      ligneTableau(doc, lHeaders, lCols, MARGIN, y, BLEU);
-      y += 18;
     }
-    const poids = l.poidsKg ? parseFloat(String(l.poidsKg)) : 0;
-    const hasCert = Boolean(l.certificatEudr);
-    const gpsData = l.membreId ? gpsParMembre.get(l.membreId) ?? null : null;
-    const hasGps  = gpsData !== null;
 
-    if (idx % 2 === 0) doc.rect(MARGIN, y, lCols.reduce((a, b) => a + b, 0), 16).fill("#f0f9ff");
+    // En-tête du lot
+    doc.rect(MARGIN, y, W, 18).fill(VERT);
+    doc.fontSize(9).fillColor("white").font("Helvetica-Bold")
+      .text(`LOT #${lot.lotId}`, MARGIN + 6, y + 5, { width: 80, lineBreak: false });
+    doc.fontSize(8).fillColor("white").font("Helvetica")
+      .text(
+        `${formaterNombre(lot.poidsTotalKg)} kg  |  ${lot.producteurs.length} producteur(s)  |  ${formaterDate(lot.dateCreation)}`,
+        MARGIN + 90, y + 6, { width: W - 190, lineBreak: false },
+      );
+    // Statut conformité du lot
+    const lotOk = lot.nbNonConformes === 0 && lot.nbNonVerifies === 0;
+    doc.fontSize(7.5).fillColor(lotOk ? "#86efac" : "#fde68a").font("Helvetica-Bold")
+      .text(lotOk ? "CONFORME" : "INCOMPLET", MARGIN + W - 75, y + 5, { width: 70, align: "right", lineBreak: false });
+    y += 22;
 
-    const gpsStr = gpsData
-      ? (gpsData.lat !== null && gpsData.lng !== null
-        ? `${gpsData.lat.toFixed(4)}, ${gpsData.lng.toFixed(4)}`
-        : "Polygone GPS")
-      : (l.parcelleOrigine ?? "—");
+    // Zone QR + infos lot
+    const infoY = y;
+    // Infos lot (à gauche)
+    doc.fontSize(7).fillColor(GRIS).font("Helvetica")
+      .text("Code QR / URL traçabilité :", MARGIN, y + 2, { width: INFO_W, lineBreak: false });
+    y += 11;
+    doc.fontSize(6).fillColor("#374151").font("Helvetica")
+      .text(lot.lotPublicUrl, MARGIN, y, { width: INFO_W });
+    y = Math.max(y + 10, infoY + 18);
+    doc.fontSize(7).fillColor(GRIS).font("Helvetica").text("UUID lot :", MARGIN, y, { lineBreak: false });
+    y += 9;
+    doc.fontSize(6).fillColor("#6b7280").font("Helvetica").text(lot.qrCodeLot, MARGIN, y, { width: INFO_W });
+    y += 10;
+    // Conformité lot
+    const conformStr = lot.nbNonConformes > 0
+      ? `${lot.nbNonConformes} non conforme(s)`
+      : lot.nbNonVerifies > 0
+      ? `${lot.nbNonVerifies} non verifie(s)`
+      : `${lot.nbConformes}/${lot.producteurs.length} conformes`;
+    const conformColor = lot.nbNonConformes > 0 ? "#dc2626" : lot.nbNonVerifies > 0 ? AMBRE : "#16a34a";
+    doc.fontSize(8).fillColor(conformColor).font("Helvetica-Bold")
+      .text(conformStr, MARGIN, y, { width: INFO_W, lineBreak: false });
+    y += 14;
 
-    const superficieAff = gpsData?.superficieHa
-      ? `${parseFloat(String(gpsData.superficieHa)).toFixed(2)} ha`
-      : l.superficieHa
-      ? `${parseFloat(String(l.superficieHa)).toFixed(2)} ha`
-      : "—";
-
-    ligneTableau(doc, [
-      l.lotId ? `#${l.lotId}` : "—",
-      l.membreNom ? `${l.membreNom} ${l.membrePrenoms ?? ""}`.trim() : "—",
-      poids > 0 ? formaterNombre(poids) : "—",
-      hasCert ? `✓ ${l.certificatEudr!}` : "⚠ Manquant",
-      gpsStr,
-      superficieAff,
-    ], lCols, MARGIN, y);
-
-    if (!hasCert || !hasGps) {
-      doc.fontSize(6).fillColor("#dc2626")
-        .text(
-          !hasCert && !hasGps ? "⚠ Cert. + GPS manquants"
-          : !hasCert ? "⚠ Certificat manquant"
-          : "⚠ GPS manquant",
-          MARGIN + lCols[0]! + lCols[1]!, y + 8,
-          { width: lCols[2]! + lCols[3]!, lineBreak: false },
-        );
+    // QR code image (à droite de la zone)
+    if (lot.qrBuf) {
+      const qrX = MARGIN + W - QR_SIZE;
+      const qrY = infoY;
+      try {
+        doc.image(lot.qrBuf, qrX, qrY, { width: QR_SIZE, height: QR_SIZE });
+        doc.rect(qrX, qrY, QR_SIZE, QR_SIZE).stroke("#d1d5db");
+      } catch { /* skip si image invalide */ }
     }
+
+    // S'assurer qu'on est en dessous du QR code
+    y = Math.max(y, infoY + QR_SIZE + 6);
+
+    // Tableau producteurs
+    ligneTableau(doc, pHeaders, pCols, MARGIN, y, BLEU);
     y += 16;
+
+    if (lot.producteurs.length === 0) {
+      doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+        .text("Aucun producteur trouvé pour ce lot.", MARGIN + 4, y + 3);
+      y += 14;
+    }
+
+    for (const [pidx, p] of lot.producteurs.entries()) {
+      if (y > 760) {
+        doc.addPage();
+        await drawHeader(doc, cooperativeId, { titre_document: "RAPPORT EUDR (suite)", reference: exp.numeroExpedition });
+        y = doc.y;
+        ligneTableau(doc, pHeaders, pCols, MARGIN, y, BLEU);
+        y += 16;
+      }
+
+      if (pidx % 2 === 0) doc.rect(MARGIN, y, pCols.reduce((a, b) => a + b, 0), 14).fill("#f8fafc");
+
+      const eudrColor = p.eudrStatut === "conforme" ? "#16a34a"
+        : p.eudrStatut === "non_conforme" ? "#dc2626"
+        : "#92400e";
+
+      let cx = MARGIN;
+      const cellsData = [
+        { val: p.nom,             w: pCols[0]!, color: "black" },
+        { val: p.poidsKg > 0 ? formaterNombre(p.poidsKg) : "—", w: pCols[1]!, color: "black" },
+        { val: p.superficieHa ? `${parseFloat(String(p.superficieHa)).toFixed(2)}` : "—", w: pCols[2]!, color: "black" },
+        { val: p.gpsStr,          w: pCols[3]!, color: p.hasGps ? "#1e40af" : GRIS },
+        { val: p.eudrStatutLabel, w: pCols[4]!, color: eudrColor },
+        { val: p.eudrRisqueLabel, w: pCols[5]!, color: "black" },
+      ];
+      for (const cell of cellsData) {
+        doc.fontSize(7).fillColor(cell.color).font(cell.color !== "black" && cell.color !== GRIS ? "Helvetica-Bold" : "Helvetica")
+          .text(cell.val, cx + 3, y + 4, { width: cell.w - 6, lineBreak: false });
+        cx += cell.w;
+      }
+      doc.fillColor("black");
+      y += 14;
+    }
+
+    // Ligne total du lot
+    const totWLot = pCols.reduce((a, b) => a + b, 0);
+    doc.rect(MARGIN, y, totWLot, 14).fill("#e2e8f0");
+    doc.fontSize(7.5).fillColor("#374151").font("Helvetica-Bold")
+      .text("Total lot", MARGIN + 3, y + 3, { width: pCols[0]! - 6, lineBreak: false });
+    doc.text(
+      `${formaterNombre(lot.poidsTotalKg)} kg`,
+      MARGIN + pCols[0]!, y + 3, { width: pCols[1]! - 6, lineBreak: false },
+    );
+    y += 20;
   }
 
-  if (lots.length === 0) {
-    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+  if (lotsRendus.length === 0) {
+    doc.fontSize(9).fillColor(GRIS).font("Helvetica")
       .text("Aucun lot rattaché à cette expédition.", MARGIN, y + 4);
     y += 20;
   }
 
-  // ── Ligne totaux ──────────────────────────────────────────────────────────
-  y += 4;
-  const totW = lCols.reduce((a, b) => a + b, 0);
-  doc.rect(MARGIN, y, totW, 18).fill(BLEU);
-  doc.fontSize(9).fillColor("white").font("Helvetica-Bold")
-    .text("TOTAL", MARGIN + 6, y + 5, { width: lCols[0]! + lCols[1]! - 6, lineBreak: false });
-  doc.text(
-    `${formaterNombre(poidsTotal)} kg`,
-    MARGIN + lCols[0]! + lCols[1]!, y + 5,
-    { width: lCols[2]! - 6, lineBreak: false },
-  );
-  doc.fontSize(8).fillColor("white").font("Helvetica")
-    .text(
-      `${avecCert}/${lots.length} cert.  ·  ${avecParcelle}/${lots.length} parcelles`,
-      MARGIN + lCols[0]! + lCols[1]! + lCols[2]!, y + 6,
-      { width: lCols[3]! + lCols[4]! + lCols[5]! - 6, lineBreak: false },
-    );
-  y += 28;
-
   // ── Déclaration de conformité ─────────────────────────────────────────────
+  if (y + 70 > 780) { doc.addPage(); await drawHeader(doc, cooperativeId, { titre_document: "RAPPORT EUDR", reference: exp.numeroExpedition }); y = doc.y; }
   y += 8;
-  doc.rect(MARGIN, y, W, conforme ? 44 : 52).fill(confBg).stroke(confBdr);
+  doc.rect(MARGIN, y, W, conforme ? 52 : 60).fill(confBg).stroke(confBdr);
   doc.fontSize(9).fillColor(confClr).font("Helvetica-Bold")
-    .text("DÉCLARATION DE CONFORMITÉ EUDR", MARGIN + 10, y + 8, { width: W - 20, lineBreak: false });
+    .text("DECLARATION DE CONFORMITE EUDR — Reglement (UE) 2023/1115", MARGIN + 10, y + 8, { width: W - 20, lineBreak: false });
   if (conforme) {
     doc.fontSize(8).fillColor("black").font("Helvetica")
       .text(
-        `Le soussigné certifie que l'ensemble des ${lots.length} lots composant l'expédition ${exp.numeroExpedition} `
-        + `sont couverts par un certificat EUDR valide et que les parcelles d'origine sont géolocalisées conformément `
-        + `au Règlement (UE) 2023/1115.`,
+        `Le soussigne certifie que l'ensemble des ${totalProducteurs} producteurs composant les ${totalLots} lot(s) `
+        + `de l'expedition ${exp.numeroExpedition} ont ete verifies conformes EUDR : parcelles geolocalisees `
+        + `et statuts de deforestation conformes au Reglement (UE) 2023/1115.`,
         MARGIN + 10, y + 22, { width: W - 20 },
       );
   } else {
     doc.fontSize(8).fillColor("#92400e").font("Helvetica")
       .text(
-        `⚠ Traçabilité incomplète : ${lots.length - avecCert} lot(s) sans certificat EUDR, `
-        + `${lots.length - avecParcelle} lot(s) sans parcelle tracée. `
-        + `Cette expédition ne peut pas être déclarée conforme au Règlement (UE) 2023/1115 en l'état.`,
+        `Tracabilite incomplete : ${totalNonVerifies} producteur(s) non verifie(s), `
+        + `${lotsRendus.reduce((s, l) => s + l.nbNonConformes, 0)} non conforme(s). `
+        + `Cette expedition ne peut pas etre declaree conforme au Reglement (UE) 2023/1115 en l'etat.`,
         MARGIN + 10, y + 22, { width: W - 20 },
       );
   }
-  y += conforme ? 52 : 60;
+  y += conforme ? 60 : 68;
 
   // ── Zone signatures ───────────────────────────────────────────────────────
-  y = Math.max(y + 20, 680);
+  y = Math.max(y + 16, 680);
   const sigW2 = Math.floor(W / 2) - 10;
-  [["Responsable qualité / Traçabilité", MARGIN], ["Directeur de la coopérative", MARGIN + sigW2 + 20]].forEach(([label, sx]) => {
-    const sxN = Number(sx);
+  for (const [label, sx] of [["Responsable qualite / Tracabilite", MARGIN], ["Directeur de la cooperative", MARGIN + sigW2 + 20]] as [string, number][]) {
     doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-      .text(String(label), sxN, y, { width: sigW2, align: "center", lineBreak: false });
-    doc.rect(sxN, y + 14, sigW2, 44).stroke("#d1d5db");
+      .text(label, sx, y, { width: sigW2, align: "center", lineBreak: false });
+    doc.rect(sx, y + 14, sigW2, 44).stroke("#d1d5db");
     doc.fontSize(7).fillColor("#aaaaaa").font("Helvetica")
-      .text("Nom, Fonction & Signature", sxN, y + 50, { width: sigW2, align: "center", lineBreak: false });
-  });
+      .text("Nom, Fonction & Signature", sx, y + 50, { width: sigW2, align: "center", lineBreak: false });
+  }
 
   await addFooters(doc, cooperativeId);
   doc.end();
