@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
+import { setAuthTokenGetter, setBaseUrl, setOnUnauthorized } from "@workspace/api-client-react";
 
 // Strip trailing /api if present — VITE_API_URL must point to the server root,
 // not /api, because Orval already prepends /api to every generated path.
@@ -9,6 +9,15 @@ const TOKEN_KEY = "coop_token";
 const USER_KEY = "coop_user";
 
 setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
+
+// Quand le serveur répond 401 (token expiré ou invalide), on efface la session
+// et on redirige vers la page de connexion plutôt que d'afficher un tableau vide.
+setOnUnauthorized(() => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+  window.location.href = `${base}/login`;
+});
 
 interface Utilisateur {
   id: number;

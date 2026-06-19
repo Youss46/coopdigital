@@ -24,6 +24,11 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      clearToken();
+      window.location.href = `${import.meta.env.BASE_URL ?? "/"}connexion`;
+      throw new Error("Session expirée");
+    }
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { erreur?: string }).erreur ?? `Erreur ${res.status}`);
   }

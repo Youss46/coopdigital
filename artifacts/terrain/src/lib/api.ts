@@ -16,6 +16,11 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   };
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
+    if (res.status === 401) {
+      clearAuth();
+      window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
+      throw new Error("Session expirée");
+    }
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
   }
