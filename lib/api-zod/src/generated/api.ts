@@ -727,6 +727,7 @@ export const GetLotTracabiliteResponse = zod.object({
 }).passthrough().nullish(),
   "polygone": zod.unknown().nullish(),
   "superficieDeclareeHa": zod.string().nullish(),
+  "superficieCalculeeHa": zod.string().nullish(),
   "eudrStatut": zod.string().nullish(),
   "eudrRisqueDeforestation": zod.string().nullish()
 })).optional()

@@ -277,7 +277,13 @@ function DetailModal({
       producteurs: (data.parcelles ?? []).map((p) => ({
         nom: `${p.membreNom ?? ""} ${p.membrePrenoms ?? ""}`.trim(),
         parcelle_gps: p.coordonneesPoint ?? null,
-        superficie_ha: p.superficieDeclareeHa ? parseFloat(String(p.superficieDeclareeHa)) : null,
+        polygone: p.polygone ?? null,
+        superficie_ha: p.superficieCalculeeHa
+          ? parseFloat(String(p.superficieCalculeeHa))
+          : p.superficieDeclareeHa
+          ? parseFloat(String(p.superficieDeclareeHa))
+          : null,
+        superficie_declaree_ha: p.superficieDeclareeHa ? parseFloat(String(p.superficieDeclareeHa)) : null,
         poids_kg: data.livraisons
           .filter((l) => l.membreId === p.membreId)
           .reduce((s, l) => s + parseFloat(String(l.poidsKg)), 0),
@@ -614,15 +620,29 @@ function DetailModal({
                     <MapPin size={14} /> Parcelles géolocalisées ({(data.parcelles ?? []).length})
                   </h3>
                   <div className="space-y-2">
-                    {(data.parcelles ?? []).map((p) => (
+                    {(data.parcelles ?? []).map((p) => {
+                      const hasPolygone = !!(p.polygone && (p.polygone as unknown[]).length > 0);
+                      const hasPoint = !!(p.coordonneesPoint);
+                      const superficieHa = p.superficieCalculeeHa
+                        ? parseFloat(String(p.superficieCalculeeHa))
+                        : p.superficieDeclareeHa
+                        ? parseFloat(String(p.superficieDeclareeHa))
+                        : null;
+                      const gpsLabel = hasPoint
+                        ? `GPS: ${(p.coordonneesPoint as { lat: number; lng: number }).lat.toFixed(5)}, ${(p.coordonneesPoint as { lat: number; lng: number }).lng.toFixed(5)}`
+                        : hasPolygone
+                        ? "Polygone GPS"
+                        : "GPS non renseigné";
+                      return (
                       <div key={p.id} className="flex items-center justify-between py-2 px-3 bg-emerald-50 rounded-lg text-sm">
                         <div>
                           <p className="font-medium text-gray-800">{p.membreNom} {p.membrePrenoms}</p>
                           <p className="text-xs text-gray-500">
-                            {p.coordonneesPoint
-                              ? `GPS: ${(p.coordonneesPoint as { lat: number; lng: number }).lat.toFixed(5)}, ${(p.coordonneesPoint as { lat: number; lng: number }).lng.toFixed(5)}`
-                              : "GPS non renseigné"}
-                            {p.superficieDeclareeHa ? ` · ${parseFloat(String(p.superficieDeclareeHa)).toFixed(2)} ha` : ""}
+                            {gpsLabel}
+                            {superficieHa !== null ? ` · ${superficieHa.toFixed(2)} ha` : ""}
+                            {p.superficieCalculeeHa && p.superficieDeclareeHa && parseFloat(String(p.superficieCalculeeHa)) !== parseFloat(String(p.superficieDeclareeHa))
+                              ? ` (${parseFloat(String(p.superficieDeclareeHa)).toFixed(2)} ha déclarée)`
+                              : ""}
                           </p>
                         </div>
                         <span
@@ -637,7 +657,8 @@ function DetailModal({
                           {p.eudrStatut ?? "non vérifié"}
                         </span>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

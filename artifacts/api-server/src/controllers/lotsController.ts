@@ -481,6 +481,7 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
             coordonneesPoint: parcellesTable.coordonneesPoint,
             polygone: parcellesTable.polygone,
             superficieDeclareeHa: parcellesTable.superficieDeclareeHa,
+            superficieCalculeeHa: parcellesTable.superficieCalculeeHa,
             eudrStatut: parcellesTable.eudrStatut,
             eudrRisqueDeforestation: parcellesTable.eudrRisqueDeforestation,
           })

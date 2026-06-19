@@ -7115,6 +7115,8 @@ components:
           nullable: true
         superficieDeclareeHa:
           type: ["string", "null"]
+        superficieCalculeeHa:
+          type: ["string", "null"]
         eudrStatut:
           type: ["string", "null"]
         eudrRisqueDeforestation:

@@ -1113,6 +1113,8 @@ export interface ParcelleEudr {
   /** @nullable */
   superficieDeclareeHa?: string | null;
   /** @nullable */
+  superficieCalculeeHa?: string | null;
+  /** @nullable */
   eudrStatut?: string | null;
   /** @nullable */
   eudrRisqueDeforestation?: string | null;
