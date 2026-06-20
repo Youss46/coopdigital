@@ -86,7 +86,7 @@ export default defineConfig({
         runtimeCaching: [
           {
             // PDF exports et rapports — jamais mis en cache (binaire, dynamique)
-            urlPattern: /^\/api\/(membres\/export-pdf|rapports\/)/,
+            urlPattern: /^\/api\/(membres\/export-pdf|rapports\/|support\/guide)/,
             handler: "NetworkOnly",
           },
           {

@@ -174,10 +174,9 @@ export async function generateGuideUtilisateurAsync(): Promise<Buffer> {
 }
 
 function generateGuideContent(doc: PdfDoc) {
-  const cw = pageW(doc);
-
   // ══ PAGE DE COUVERTURE ═══════════════════════════════════════════════════════
   doc.addPage();
+  const cw = pageW(doc);
   doc.save().rect(0, 0, cw, 340).fill(VERT).restore();
   doc.save().polygon([0, 270], [cw, 200], [cw, 340], [0, 340]).fill(VERT_CLAIR).restore();
 
