@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   HelpCircle, X, FileText, MessageCircle, List,
-  ChevronRight, ChevronDown, Send, Star,
+  ChevronRight, ChevronDown, Send, Download, Loader2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -257,8 +257,35 @@ export default function HelpPanel() {
   const [open, setOpen] = useState(false);
   const [onglet, setOnglet] = useState<Onglet>("accueil");
   const [location] = useLocation();
+  const [downloadingGuide, setDownloadingGuide] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const module = detectModule(location);
+  const { token } = useAuth();
+  const { toast } = useToast();
+
+  async function handleDownloadGuide() {
+    setDownloadingGuide(true);
+    try {
+      const r = await fetch(`${BASE}/api/support/guide`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) throw new Error("Erreur serveur");
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Guide_CoopDigital_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "Guide téléchargé", description: "Le guide PDF a été téléchargé avec succès." });
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de télécharger le guide.", variant: "destructive" });
+    } finally {
+      setDownloadingGuide(false);
+    }
+  }
 
   // Fermer en cliquant à l'extérieur
   useEffect(() => {
@@ -325,6 +352,23 @@ export default function HelpPanel() {
             {onglet === "accueil" && (
               <div className="p-4 space-y-3">
                 <p className="text-sm text-gray-600">Besoin d'aide ? Notre équipe M15 Tech est là pour vous.</p>
+
+                <button
+                  onClick={handleDownloadGuide}
+                  disabled={downloadingGuide}
+                  className="w-full flex items-center gap-3 border-2 border-green-500 rounded-xl p-3 hover:bg-green-50 transition-colors text-left bg-green-50/50 disabled:opacity-60"
+                >
+                  {downloadingGuide
+                    ? <Loader2 size={20} className="text-green-600 animate-spin shrink-0" />
+                    : <Download size={20} className="text-green-600 shrink-0" />}
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-green-800">
+                      {downloadingGuide ? "Génération en cours…" : "Télécharger le guide PDF"}
+                    </p>
+                    <p className="text-xs text-green-600">Manuel complet — toutes fonctionnalités</p>
+                  </div>
+                  {!downloadingGuide && <ChevronRight size={14} className="ml-auto text-green-500" />}
+                </button>
 
                 <button
                   onClick={() => setOnglet("ticket")}
