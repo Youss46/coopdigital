@@ -69,7 +69,14 @@ export async function handleCreateExpedition(req: Request, res: Response): Promi
     res.status(201).json(exp);
   } catch (err) {
     req.log.error({ err }, "handleCreateExpedition");
-    res.status(500).json({ erreur: "Erreur interne" });
+    const msg = err instanceof Error ? err.message : "Erreur interne";
+    // Détecter les erreurs de colonnes manquantes pour faciliter le diagnostic
+    const isColumnMissing = msg.includes("column") && msg.includes("does not exist");
+    res.status(500).json({
+      erreur: isColumnMissing
+        ? `Colonne manquante en base de données : ${msg}. Appliquez les migrations manquantes sur Railway.`
+        : "Erreur interne",
+    });
   }
 }
 
