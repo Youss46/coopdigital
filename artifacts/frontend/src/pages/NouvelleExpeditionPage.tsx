@@ -252,6 +252,125 @@ export default function NouvelleExpeditionPage() {
         <span className="ml-auto text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full font-mono">N° auto</span>
       </div>
 
+      {/* SÉLECTION DES LOTS */}
+      <Card className="border-green-200">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Leaf className="h-4 w-4 text-green-600" />
+              Lots cacao — traçabilité EUDR
+            </CardTitle>
+            {selectedLotIds.size > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                <CheckSquare className="h-3 w-3" />
+                {selectedLotIds.size} lot{selectedLotIds.size > 1 ? "s" : ""} sélectionné{selectedLotIds.size > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Sélectionnez les lots <span className="font-medium">en stock ou vendus</span> (non encore expédiés) à acheminer. La liaison est enregistrée automatiquement.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Barre de recherche */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              className="pl-9 text-sm"
+              placeholder="Rechercher par QR code ou entrepôt…"
+              value={lotSearch}
+              onChange={e => setLotSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Liste des lots */}
+          {lotsLoading ? (
+            <div className="flex items-center justify-center py-8 text-gray-400 text-sm">
+              Chargement des lots…
+            </div>
+          ) : lotsDisponibles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+              <Package className="h-8 w-8 text-gray-300" />
+              <p className="text-sm text-gray-500 font-medium">Aucun lot disponible à expédier</p>
+              <p className="text-xs text-gray-400">Créez des lots depuis le module Traçabilité avant d'enregistrer une expédition.</p>
+            </div>
+          ) : lotsFiltres.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">Aucun lot ne correspond à la recherche.</p>
+          ) : (
+            <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden max-h-72 overflow-y-auto">
+              {lotsFiltres.map(lot => {
+                const selected = selectedLotIds.has(lot.id);
+                const shortCode = lot.qrCodeLot.slice(0, 8).toUpperCase();
+                const poids = parseFloat(lot.poidsTotalKg ?? "0").toLocaleString("fr-FR");
+                const dateStr = new Date(lot.dateCreation).toLocaleDateString("fr-FR");
+                const isVendu = lot.statut === "vendu";
+                return (
+                  <div
+                    key={lot.id}
+                    onClick={() => toggleLot(lot.id)}
+                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
+                      selected ? "bg-green-50 hover:bg-green-100" : "bg-white hover:bg-gray-50"
+                    }`}
+                  >
+                    {/* Checkbox visuel */}
+                    <div className={`flex-shrink-0 w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                      selected ? "text-green-700" : "text-gray-300"
+                    }`}>
+                      {selected ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5" />}
+                    </div>
+
+                    {/* Infos lot */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-mono font-bold text-gray-900">
+                          LOT-{shortCode}
+                        </span>
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                          isVendu ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"
+                        }`}>
+                          {isVendu ? "vendu" : "en stock"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                        <span><span className="font-medium text-gray-700">{poids} kg</span></span>
+                        {lot.nombreSacs != null && <span>🎒 {lot.nombreSacs.toLocaleString("fr-FR")} sacs</span>}
+                        {lot.entrepot && <span>📦 {lot.entrepot}</span>}
+                        <span>📅 {dateStr}</span>
+                        {lot.nbLivraisons != null && <span>🌱 {lot.nbLivraisons} livraison{lot.nbLivraisons > 1 ? "s" : ""}</span>}
+                      </div>
+                    </div>
+
+                    {/* Poids badge */}
+                    <div className={`flex-shrink-0 text-right ${selected ? "text-green-700" : "text-gray-400"}`}>
+                      <p className="text-sm font-semibold">{poids} kg</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {selectedLotIds.size > 0 && lotsDisponibles.length > 0 && (
+            <div className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm">
+              <span className="text-green-800 font-medium">
+                {selectedLotIds.size} lot{selectedLotIds.size > 1 ? "s" : ""} sélectionné{selectedLotIds.size > 1 ? "s" : ""}
+              </span>
+              <span className="text-green-700 font-bold">
+                {lotsDisponibles
+                  .filter(l => selectedLotIds.has(l.id))
+                  .reduce((s, l) => s + parseFloat(l.poidsTotalKg ?? "0"), 0)
+                  .toLocaleString("fr-FR")} kg
+                {lotsDisponibles.filter(l => selectedLotIds.has(l.id) && l.nombreSacs != null).length > 0 && (
+                  <span className="ml-2">
+                    · {lotsDisponibles.filter(l => selectedLotIds.has(l.id)).reduce((s, l) => s + (l.nombreSacs ?? 0), 0).toLocaleString("fr-FR")} sacs
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* VÉHICULE */}
       <Card>
         <CardHeader className="pb-3">
@@ -428,125 +547,6 @@ export default function NouvelleExpeditionPage() {
               )}
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* SÉLECTION DES LOTS */}
-      <Card className="border-green-200">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Leaf className="h-4 w-4 text-green-600" />
-              Lots cacao — traçabilité EUDR
-            </CardTitle>
-            {selectedLotIds.size > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                <CheckSquare className="h-3 w-3" />
-                {selectedLotIds.size} lot{selectedLotIds.size > 1 ? "s" : ""} sélectionné{selectedLotIds.size > 1 ? "s" : ""}
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Sélectionnez les lots <span className="font-medium">en stock ou vendus</span> (non encore expédiés) à acheminer. La liaison est enregistrée automatiquement.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {/* Barre de recherche */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              className="pl-9 text-sm"
-              placeholder="Rechercher par QR code ou entrepôt…"
-              value={lotSearch}
-              onChange={e => setLotSearch(e.target.value)}
-            />
-          </div>
-
-          {/* Liste des lots */}
-          {lotsLoading ? (
-            <div className="flex items-center justify-center py-8 text-gray-400 text-sm">
-              Chargement des lots…
-            </div>
-          ) : lotsDisponibles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
-              <Package className="h-8 w-8 text-gray-300" />
-              <p className="text-sm text-gray-500 font-medium">Aucun lot disponible à expédier</p>
-              <p className="text-xs text-gray-400">Créez des lots depuis le module Traçabilité avant d'enregistrer une expédition.</p>
-            </div>
-          ) : lotsFiltres.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">Aucun lot ne correspond à la recherche.</p>
-          ) : (
-            <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden max-h-72 overflow-y-auto">
-              {lotsFiltres.map(lot => {
-                const selected = selectedLotIds.has(lot.id);
-                const shortCode = lot.qrCodeLot.slice(0, 8).toUpperCase();
-                const poids = parseFloat(lot.poidsTotalKg ?? "0").toLocaleString("fr-FR");
-                const dateStr = new Date(lot.dateCreation).toLocaleDateString("fr-FR");
-                const isVendu = lot.statut === "vendu";
-                return (
-                  <div
-                    key={lot.id}
-                    onClick={() => toggleLot(lot.id)}
-                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
-                      selected ? "bg-green-50 hover:bg-green-100" : "bg-white hover:bg-gray-50"
-                    }`}
-                  >
-                    {/* Checkbox visuel */}
-                    <div className={`flex-shrink-0 w-5 h-5 rounded flex items-center justify-center transition-colors ${
-                      selected ? "text-green-700" : "text-gray-300"
-                    }`}>
-                      {selected ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5" />}
-                    </div>
-
-                    {/* Infos lot */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-mono font-bold text-gray-900">
-                          LOT-{shortCode}
-                        </span>
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
-                          isVendu ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"
-                        }`}>
-                          {isVendu ? "vendu" : "en stock"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
-                        <span><span className="font-medium text-gray-700">{poids} kg</span></span>
-                        {lot.nombreSacs != null && <span>🎒 {lot.nombreSacs.toLocaleString("fr-FR")} sacs</span>}
-                        {lot.entrepot && <span>📦 {lot.entrepot}</span>}
-                        <span>📅 {dateStr}</span>
-                        {lot.nbLivraisons != null && <span>🌱 {lot.nbLivraisons} livraison{lot.nbLivraisons > 1 ? "s" : ""}</span>}
-                      </div>
-                    </div>
-
-                    {/* Poids badge */}
-                    <div className={`flex-shrink-0 text-right ${selected ? "text-green-700" : "text-gray-400"}`}>
-                      <p className="text-sm font-semibold">{poids} kg</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {selectedLotIds.size > 0 && lotsDisponibles.length > 0 && (
-            <div className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm">
-              <span className="text-green-800 font-medium">
-                {selectedLotIds.size} lot{selectedLotIds.size > 1 ? "s" : ""} sélectionné{selectedLotIds.size > 1 ? "s" : ""}
-              </span>
-              <span className="text-green-700 font-bold">
-                {lotsDisponibles
-                  .filter(l => selectedLotIds.has(l.id))
-                  .reduce((s, l) => s + parseFloat(l.poidsTotalKg ?? "0"), 0)
-                  .toLocaleString("fr-FR")} kg
-                {lotsDisponibles.filter(l => selectedLotIds.has(l.id) && l.nombreSacs != null).length > 0 && (
-                  <span className="ml-2">
-                    · {lotsDisponibles.filter(l => selectedLotIds.has(l.id)).reduce((s, l) => s + (l.nombreSacs ?? 0), 0).toLocaleString("fr-FR")} sacs
-                  </span>
-                )}
-              </span>
-            </div>
-          )}
         </CardContent>
       </Card>
 
