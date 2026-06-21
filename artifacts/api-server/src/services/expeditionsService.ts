@@ -175,6 +175,7 @@ export async function getLotsDisponibles(cooperativeId: number, expeditionId: nu
       dateCreation:  lotsTable.dateCreation,
       qrCodeLot:     lotsTable.qrCodeLot,
       campagneId:    lotsTable.campagneId,
+      nombreSacs:    lotsTable.nombreSacs,
     })
     .from(lotsTable)
     .where(

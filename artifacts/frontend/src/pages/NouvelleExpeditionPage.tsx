@@ -194,6 +194,12 @@ export default function NouvelleExpeditionPage() {
       ? exportateurNom || undefined
       : exportateurs.find(e => String(e.id) === exportateurId)?.nom;
 
+    const nombreSacsInt = nombreSacs.trim() !== "" ? parseInt(nombreSacs, 10) : undefined;
+    if (nombreSacsInt !== undefined && (isNaN(nombreSacsInt) || nombreSacsInt < 0)) {
+      toast({ title: "Nombre de sacs invalide", description: "Veuillez saisir un entier positif.", variant: "destructive" });
+      return;
+    }
+
     setIsSubmitting(true);
     mutation.mutate({
       typeVehicule,
@@ -207,7 +213,7 @@ export default function NouvelleExpeditionPage() {
       dateDepart,
       lieuDepart,
       poidsChargeKg:  parseFloat(poidsCharge),
-      nombreSacs:     nombreSacs ? parseInt(nombreSacs, 10) : undefined,
+      nombreSacs:     nombreSacsInt,
       numeroLots:     numeroLots || undefined,
       port: portFinal,
       entrepotDestination: entrepotDestination || undefined,
