@@ -405,7 +405,7 @@ export default function NouvelleExpeditionPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Véhicule *</Label>
-                  <Select value={vehiculeId || undefined} onValueChange={setVehiculeId}>
+                  <Select value={vehiculeId} onValueChange={setVehiculeId}>
                     <SelectTrigger>
                       <SelectValue placeholder={vehiculesFlotte.length === 0 ? "Aucun véhicule dans la flotte" : "Sélectionner…"} />
                     </SelectTrigger>
@@ -424,7 +424,7 @@ export default function NouvelleExpeditionPage() {
                 </div>
                 <div>
                   <Label>Chauffeur *</Label>
-                  <Select value={chauffeurId || undefined} onValueChange={setChauffeurId}>
+                  <Select value={chauffeurId} onValueChange={setChauffeurId}>
                     <SelectTrigger>
                       <SelectValue placeholder={chauffeursFlotte.length === 0 ? "Aucun chauffeur actif" : "Sélectionner…"} />
                     </SelectTrigger>
