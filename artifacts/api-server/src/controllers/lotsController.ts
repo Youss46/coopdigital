@@ -39,7 +39,14 @@ export async function listLots(req: Request, res: Response): Promise<void> {
     const statut = req.query["statut"] as string | undefined;
 
     const conditions: ReturnType<typeof eq>[] = [eq(lotsTable.cooperativeId, cooperativeId)];
-    if (statut) conditions.push(eq(lotsTable.statut, statut as "en_stock" | "vendu" | "transit" | "refoule" | "fusionne"));
+    if (statut) {
+      const statuts = statut.split(",").map(s => s.trim()).filter(Boolean) as ("en_stock" | "vendu" | "transit" | "refoule" | "fusionne")[];
+      if (statuts.length === 1) {
+        conditions.push(eq(lotsTable.statut, statuts[0]!));
+      } else if (statuts.length > 1) {
+        conditions.push(inArray(lotsTable.statut, statuts));
+      }
+    }
 
     const rows = await db
       .select({
@@ -253,8 +260,8 @@ export async function expedierLot(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    if (lotExist.statut !== "en_stock") {
-      res.status(400).json({ erreur: "Seuls les lots EN STOCK peuvent être expédiés" });
+    if (!["en_stock", "vendu"].includes(lotExist.statut)) {
+      res.status(400).json({ erreur: "Seuls les lots EN STOCK ou VENDUS peuvent être expédiés" });
       return;
     }
 

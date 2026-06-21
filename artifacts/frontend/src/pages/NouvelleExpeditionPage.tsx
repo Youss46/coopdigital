@@ -123,7 +123,7 @@ export default function NouvelleExpeditionPage() {
 
   const { data: lotsDisponibles = [], isLoading: lotsLoading } = useQuery<LotDisponible[]>({
     queryKey: ["lots-disponibles-creation"],
-    queryFn: () => apiFetch("/api/lots?statut=en_stock", token),
+    queryFn: () => apiFetch("/api/lots?statut=en_stock,vendu", token),
   });
 
   // Véhicule sélectionné → info affichée
@@ -412,7 +412,7 @@ export default function NouvelleExpeditionPage() {
             )}
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            Sélectionnez les lots <span className="font-medium">en stock</span> à expédier. La liaison est enregistrée automatiquement à la création.
+            Sélectionnez les lots <span className="font-medium">en stock ou vendus</span> (non encore expédiés) à acheminer. La liaison est enregistrée automatiquement.
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -435,7 +435,7 @@ export default function NouvelleExpeditionPage() {
           ) : lotsDisponibles.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
               <Package className="h-8 w-8 text-gray-300" />
-              <p className="text-sm text-gray-500 font-medium">Aucun lot en stock</p>
+              <p className="text-sm text-gray-500 font-medium">Aucun lot disponible à expédier</p>
               <p className="text-xs text-gray-400">Créez des lots depuis le module Traçabilité avant d'enregistrer une expédition.</p>
             </div>
           ) : lotsFiltres.length === 0 ? (
@@ -447,6 +447,7 @@ export default function NouvelleExpeditionPage() {
                 const shortCode = lot.qrCodeLot.slice(0, 8).toUpperCase();
                 const poids = parseFloat(lot.poidsTotalKg ?? "0").toLocaleString("fr-FR");
                 const dateStr = new Date(lot.dateCreation).toLocaleDateString("fr-FR");
+                const isVendu = lot.statut === "vendu";
                 return (
                   <div
                     key={lot.id}
@@ -468,8 +469,10 @@ export default function NouvelleExpeditionPage() {
                         <span className="text-sm font-mono font-bold text-gray-900">
                           LOT-{shortCode}
                         </span>
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                          en stock
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                          isVendu ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"
+                        }`}>
+                          {isVendu ? "vendu" : "en stock"}
                         </span>
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">

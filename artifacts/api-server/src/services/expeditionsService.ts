@@ -180,7 +180,7 @@ export async function getLotsDisponibles(cooperativeId: number, expeditionId: nu
     .where(
       and(
         eq(lotsTable.cooperativeId, cooperativeId),
-        inArray(lotsTable.statut, ["en_stock", "transit"]),
+        inArray(lotsTable.statut, ["en_stock", "vendu"]),
         ...(dejaIds.length > 0 ? [notInArray(lotsTable.id, dejaIds)] : [])
       )
     )
