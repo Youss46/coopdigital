@@ -167,6 +167,10 @@ export default function NouvelleExpeditionPage() {
         setNombreSacs(String(totalSacs));
       }
 
+      // Numéro de lots (référence)
+      const refs = lotsSelectionnes.map(l => "LOT-" + l.qrCodeLot.slice(0, 8).toUpperCase());
+      setNumeroLots(refs.join(", "));
+
       return next;
     });
   };
@@ -515,7 +519,19 @@ export default function NouvelleExpeditionPage() {
             </div>
             <div className="col-span-2">
               <Label>N° de lots (référence)</Label>
-              <Input value={numeroLots} onChange={e => setNumeroLots(e.target.value)} placeholder="LOT-001, LOT-002, ..." />
+              <Input
+                value={numeroLots}
+                onChange={e => setNumeroLots(e.target.value)}
+                placeholder="LOT-001, LOT-002, ..."
+                readOnly={selectedLotIds.size > 0}
+                className={selectedLotIds.size > 0 ? "bg-gray-50 text-gray-600 cursor-default" : ""}
+              />
+              {selectedLotIds.size > 0 && (
+                <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                  <span>✦</span>
+                  <span>Renseigné automatiquement depuis {selectedLotIds.size} lot{selectedLotIds.size > 1 ? "s" : ""} sélectionné{selectedLotIds.size > 1 ? "s" : ""}.</span>
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
