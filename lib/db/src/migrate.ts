@@ -17,6 +17,13 @@ async function applyHotfixes(client: pg.Client): Promise<void> {
     `ALTER TABLE mouvements_caisse ALTER COLUMN session_id DROP NOT NULL`,
     `ALTER TABLE bulletins_paie ADD COLUMN IF NOT EXISTS compte_source_type text`,
     `ALTER TABLE bulletins_paie ADD COLUMN IF NOT EXISTS compte_source_id integer`,
+    // Migration 0045 : nombre_sacs sur expeditions (idempotent)
+    `ALTER TABLE expeditions ADD COLUMN IF NOT EXISTS nombre_sacs integer`,
+    // Migration 0046 : colonnes de liaison comptable sur expeditions (idempotent)
+    `ALTER TABLE expeditions ADD COLUMN IF NOT EXISTS ecriture_depart_id    integer`,
+    `ALTER TABLE expeditions ADD COLUMN IF NOT EXISTS ecriture_arrivee_id   integer`,
+    `ALTER TABLE expeditions ADD COLUMN IF NOT EXISTS ecriture_transport_id integer`,
+    `ALTER TABLE expeditions ADD COLUMN IF NOT EXISTS ecriture_ecart_id     integer`,
   ];
 
   for (const sql of hotfixes) {
