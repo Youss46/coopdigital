@@ -1,4 +1,4 @@
-import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, parcellesTable, ventesExportateursTable } from "@workspace/db";
+import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable } from "@workspace/db";
 import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
 import { proposerEcriture } from "./comptabiliteService";
 import { notifExpeditionArriveePort, notifExpeditionLitige } from "./notificationService.js";
@@ -442,6 +442,94 @@ async function getPrixUnitaireExpedition(expeditionId: number): Promise<number> 
   return totalPoids > 0 ? Math.round(totalMontant / totalPoids) : PRIX_COUT_DEFAUT_KG;
 }
 
+// ── Déduction stock lors du chargement ──────────────────────────────────────
+// Appelé lors de la transition en_preparation → charge.
+// Pour chaque lot attaché à l'expédition, crée un mouvement de sortie dans
+// l'entrepôt source du lot. Non-bloquant : les erreurs sont loguées seulement.
+
+async function deduireStockChargement(
+  expeditionId: number,
+  cooperativeId: number,
+  userId: number,
+  numeroExpedition: string,
+): Promise<void> {
+  // Récupérer les lots attachés avec leur entrepôt source et leur poids
+  const lotsAttaches = await db
+    .select({
+      lotId:       expeditionLotsTable.lotId,
+      poidsKg:     expeditionLotsTable.poidsKg,
+      nombreSacs:  expeditionLotsTable.nombreSacs,
+      entrepotNom: lotsTable.entrepot,
+    })
+    .from(expeditionLotsTable)
+    .leftJoin(lotsTable, eq(lotsTable.id, expeditionLotsTable.lotId))
+    .where(
+      and(
+        eq(expeditionLotsTable.expeditionId, expeditionId),
+        sql`${expeditionLotsTable.lotId} IS NOT NULL`,
+      )
+    );
+
+  if (lotsAttaches.length === 0) return;
+
+  // Regrouper par nom d'entrepôt (un lot → un entrepôt)
+  const parEntrepot = new Map<string, { poidsKg: number; nombreSacs: number; lotId: number | null }>();
+  for (const lot of lotsAttaches) {
+    const nom = (lot.entrepotNom ?? "").trim();
+    if (!nom) continue;
+    const poids = parseFloat(String(lot.poidsKg ?? "0"));
+    if (poids <= 0) continue;
+    const existing = parEntrepot.get(nom);
+    if (existing) {
+      existing.poidsKg   += poids;
+      existing.nombreSacs += lot.nombreSacs ?? 0;
+    } else {
+      parEntrepot.set(nom, {
+        poidsKg:    poids,
+        nombreSacs: lot.nombreSacs ?? 0,
+        lotId:      lot.lotId ?? null,
+      });
+    }
+  }
+
+  if (parEntrepot.size === 0) return;
+
+  // Pour chaque entrepôt impliqué, insérer un mouvement de sortie
+  for (const [nomEntrepot, data] of parEntrepot) {
+    const [entrepot] = await db
+      .select({ id: entrepotsTable.id })
+      .from(entrepotsTable)
+      .where(and(
+        eq(entrepotsTable.cooperativeId, cooperativeId),
+        eq(entrepotsTable.nom, nomEntrepot),
+      ))
+      .limit(1);
+
+    if (!entrepot) {
+      logger.warn(
+        { nomEntrepot, expeditionId },
+        "Entrepôt introuvable pour déduction stock – mouvement ignoré",
+      );
+      continue;
+    }
+
+    await db.insert(mouvementsStockTable).values({
+      entrepotId:  entrepot.id,
+      lotId:       data.lotId,
+      type:        "sortie",
+      poidsKg:     String(data.poidsKg.toFixed(2)),
+      nombreSacs:  data.nombreSacs > 0 ? data.nombreSacs : null,
+      motif:       `Chargement expédition ${numeroExpedition}`,
+      agentId:     userId,
+    });
+
+    logger.info(
+      { entrepotId: entrepot.id, poidsKg: data.poidsKg, expeditionId },
+      "Sortie stock enregistrée – chargement expédition",
+    );
+  }
+}
+
 // ── Changement de statut ────────────────────────────────────────────────────
 
 const TRANSITIONS_VALIDES: Record<string, string[]> = {
@@ -505,27 +593,35 @@ export async function changerStatut(
     positionGps:     positionGps ?? null,
   });
 
-  // Écriture comptable au chargement (en_preparation → charge)
-  // On ne propose l'écriture que si le prix unitaire est connu (vente exportateur déjà saisie).
-  // Si ce n'est pas le cas, l'écriture sera générée lors de la confirmation de réception.
-  if (nouveauStatut === "charge" && exp.poidsChargeKg) {
-    const dateStr = new Date().toISOString().split("T")[0]!;
-    const prixKg = await getPrixUnitaireExpedition(expeditionId);
-    if (prixKg > 0) {
-      const montant = Math.round(parseFloat(String(exp.poidsChargeKg)) * prixKg);
-      try {
-        await proposerEcriture(cooperativeId, {
-          source:    "stock",
-          sourceId:  expeditionId,
-          libelle:   `Départ ${exp.numeroExpedition} vers Port ${exp.port}`,
-          compteDebit:  "381",
-          compteCredit: "311",
-          montantFcfa:  montant,
-          date:         dateStr,
-          numeroPiece:  exp.numeroExpedition,
-        });
-      } catch (err) {
-        logger.error({ err }, "Erreur écriture comptable chargement");
+  // Déduction stock + écriture comptable au chargement (en_preparation → charge)
+  if (nouveauStatut === "charge") {
+    // 1. Mouvement de sortie dans les entrepôts sources (non-bloquant)
+    try {
+      await deduireStockChargement(expeditionId, cooperativeId, userId, exp.numeroExpedition);
+    } catch (err) {
+      logger.error({ err }, "Erreur déduction stock chargement");
+    }
+
+    // 2. Écriture comptable si prix unitaire connu (vente exportateur déjà saisie)
+    if (exp.poidsChargeKg) {
+      const dateStr = new Date().toISOString().split("T")[0]!;
+      const prixKg = await getPrixUnitaireExpedition(expeditionId);
+      if (prixKg > 0) {
+        const montant = Math.round(parseFloat(String(exp.poidsChargeKg)) * prixKg);
+        try {
+          await proposerEcriture(cooperativeId, {
+            source:       "stock",
+            sourceId:     expeditionId,
+            libelle:      `Départ ${exp.numeroExpedition} vers Port ${exp.port}`,
+            compteDebit:  "381",
+            compteCredit: "311",
+            montantFcfa:  montant,
+            date:         dateStr,
+            numeroPiece:  exp.numeroExpedition,
+          });
+        } catch (err) {
+          logger.error({ err }, "Erreur écriture comptable chargement");
+        }
       }
     }
   }
