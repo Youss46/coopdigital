@@ -106,6 +106,7 @@ export default function NouvelleExpeditionPage() {
   const [selectedLotIds, setSelectedLotIds] = useState<Set<number>>(new Set());
   const [lotSearch, setLotSearch] = useState("");
   const [nombreSacsCalcule, setNombreSacsCalcule] = useState(0);
+  const [poidsChargeCalcule, setPoidsChargeCalcule] = useState(0);
 
   // Requêtes flotte + exportateurs
   const { data: vehiculesFlotte = [] } = useQuery<VehiculeFlotte[]>({
@@ -144,20 +145,27 @@ export default function NouvelleExpeditionPage() {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
 
-      const totalSacs = lotsDisponibles
-        .filter(l => next.has(l.id) && l.nombreSacs != null)
-        .reduce((s, l) => s + (l.nombreSacs ?? 0), 0);
+      const lotsSelectionnes = lotsDisponibles.filter(l => next.has(l.id));
 
-      setNombreSacsCalcule(totalSacs);
-
+      // Poids total
+      const totalPoids = lotsSelectionnes.reduce((s, l) => s + parseFloat(l.poidsTotalKg ?? "0"), 0);
+      setPoidsChargeCalcule(totalPoids);
       if (next.size === 0) {
-        // Tous les lots désélectionnés : vider le champ
+        setPoidsCharge("");
+      } else {
+        setPoidsCharge(totalPoids > 0 ? String(Math.round(totalPoids * 10) / 10) : "");
+      }
+
+      // Nombre de sacs
+      const totalSacs = lotsSelectionnes
+        .filter(l => l.nombreSacs != null)
+        .reduce((s, l) => s + (l.nombreSacs ?? 0), 0);
+      setNombreSacsCalcule(totalSacs);
+      if (next.size === 0) {
         setNombreSacs("");
       } else if (totalSacs > 0) {
-        // Au moins un lot avec des données de sacs : auto-remplir
         setNombreSacs(String(totalSacs));
       }
-      // Si lots sélectionnés mais aucun n'a de nombreSacs : ne pas toucher la saisie manuelle
 
       return next;
     });
@@ -480,6 +488,12 @@ export default function NouvelleExpeditionPage() {
             <div>
               <Label>Poids chargé (kg) *</Label>
               <Input type="number" value={poidsCharge} onChange={e => setPoidsCharge(e.target.value)} placeholder="18500" />
+              {poidsChargeCalcule > 0 && poidsCharge === String(Math.round(poidsChargeCalcule * 10) / 10) && (
+                <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                  <span>✦</span>
+                  <span>Calculé automatiquement depuis {selectedLotIds.size} lot{selectedLotIds.size > 1 ? "s" : ""} sélectionné{selectedLotIds.size > 1 ? "s" : ""}. Modifiable si besoin.</span>
+                </p>
+              )}
               {vehiculeSelectionne?.capaciteKg && poidsCharge && parseFloat(poidsCharge) > parseFloat(vehiculeSelectionne.capaciteKg) && (
                 <p className="text-xs text-orange-600 mt-1">⚠️ Dépasse la capacité ({parseFloat(vehiculeSelectionne.capaciteKg).toLocaleString("fr-FR")} kg)</p>
               )}
