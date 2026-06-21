@@ -240,7 +240,7 @@ export default function NouvelleExpeditionPage() {
       numeroLots:     numeroLots || undefined,
       port: portFinal,
       entrepotDestination: entrepotDestination || undefined,
-      exportateurId:  !isLibre ? parseInt(exportateurId, 10) : undefined,
+      exportateurId:  !isLibre && exportateurId ? parseInt(exportateurId, 10) : undefined,
       exportateurNom: exNom,
       numeroContratExport: numeroContrat || undefined,
       heureEstimeeArrivee: heureEstimeeArrivee || undefined,

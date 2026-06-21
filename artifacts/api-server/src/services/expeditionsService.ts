@@ -364,7 +364,7 @@ export async function createExpedition(cooperativeId: number, userId: number, in
     numeroLots:         input.numeroLots ?? null,
     port:               input.port,
     entrepotDestination: input.entrepotDestination ?? null,
-    exportateurId:      input.exportateurId ?? null,
+    exportateurId:      (input.exportateurId != null && !Number.isNaN(input.exportateurId)) ? input.exportateurId : null,
     exportateurNom:     input.exportateurNom ?? null,
     numeroContratExport: input.numeroContratExport ?? null,
     heureEstimeeArrivee: input.heureEstimeeArrivee ? new Date(input.heureEstimeeArrivee) : null,
