@@ -1060,12 +1060,15 @@ export interface LotDetail {
   createdAt: string;
   nbProducteurs?: number;
   nbLivraisons?: number;
+  /** @nullable */
+  nombreSacs?: number | null;
 }
 
 export interface LotInput {
   cooperativeId: number;
   livraisonIds: number[];
   entrepot?: string;
+  nombreSacs?: number;
 }
 
 export type LotStatutInputStatut = typeof LotStatutInputStatut[keyof typeof LotStatutInputStatut];

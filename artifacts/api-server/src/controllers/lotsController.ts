@@ -60,6 +60,7 @@ export async function listLots(req: Request, res: Response): Promise<void> {
         createdAt: lotsTable.createdAt,
         venteExportateurId: lotsTable.venteExportateurId,
         parentLotIds: lotsTable.parentLotIds,
+        nombreSacs: lotsTable.nombreSacs,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })
@@ -90,7 +91,7 @@ export async function createLot(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { livraisonIds, entrepot } = parse.data;
+  const { livraisonIds, entrepot, nombreSacs } = parse.data;
 
   try {
     const deja = await db
@@ -114,7 +115,7 @@ export async function createLot(req: Request, res: Response): Promise<void> {
 
     const [lot] = await db
       .insert(lotsTable)
-      .values({ cooperativeId, poidsTotalKg, entrepot: entrepot ?? null })
+      .values({ cooperativeId, poidsTotalKg, entrepot: entrepot ?? null, nombreSacs: nombreSacs ?? null })
       .returning();
 
     if (!lot) {
@@ -138,6 +139,7 @@ export async function createLot(req: Request, res: Response): Promise<void> {
         createdAt: lotsTable.createdAt,
         venteExportateurId: lotsTable.venteExportateurId,
         parentLotIds: lotsTable.parentLotIds,
+        nombreSacs: lotsTable.nombreSacs,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })
@@ -175,6 +177,7 @@ export async function getLotByQr(req: Request, res: Response): Promise<void> {
         createdAt: lotsTable.createdAt,
         venteExportateurId: lotsTable.venteExportateurId,
         parentLotIds: lotsTable.parentLotIds,
+        nombreSacs: lotsTable.nombreSacs,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })
@@ -383,6 +386,7 @@ export async function fusionnerLots(req: Request, res: Response): Promise<void> 
           createdAt: lotsTable.createdAt,
           venteExportateurId: lotsTable.venteExportateurId,
           parentLotIds: lotsTable.parentLotIds,
+          nombreSacs: lotsTable.nombreSacs,
           nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
           nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
         })
@@ -421,6 +425,7 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
         createdAt: lotsTable.createdAt,
         venteExportateurId: lotsTable.venteExportateurId,
         parentLotIds: lotsTable.parentLotIds,
+        nombreSacs: lotsTable.nombreSacs,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })

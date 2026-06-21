@@ -898,6 +898,7 @@ export default function TracabilitePage() {
   const [filtreStatut, setFiltreStatut] = useState<LotStatut | "">("");
   const [selection, setSelection] = useState<number[]>([]);
   const [entrepotId, setEntrepotId] = useState<string>("");
+  const [nombreSacsInput, setNombreSacsInput] = useState<string>("");
   const [lotDetail, setLotDetail] = useState<number | null>(null);
   const [showFusion, setShowFusion] = useState(false);
 
@@ -915,6 +916,7 @@ export default function TracabilitePage() {
         setOnglet("lots");
         setSelection([]);
         setEntrepotId("");
+        setNombreSacsInput("");
       },
     },
   });
@@ -949,6 +951,7 @@ export default function TracabilitePage() {
         cooperativeId: utilisateur.cooperativeId,
         livraisonIds: selection,
         entrepot: entrepotNom ?? undefined,
+        nombreSacs: nombreSacsInput ? parseInt(nombreSacsInput, 10) : undefined,
       },
     });
   };
@@ -1073,6 +1076,9 @@ export default function TracabilitePage() {
                       <th className="text-left px-4 py-3 font-medium text-gray-500">QR Code</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500">Poids</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">
+                        Sacs
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">
                         Producteurs
                       </th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">
@@ -1102,6 +1108,9 @@ export default function TracabilitePage() {
                         </td>
                         <td className="px-4 py-3 font-semibold text-gray-900">
                           {formaterPoids(lot.poidsTotalKg)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">
+                          {lot.nombreSacs != null ? lot.nombreSacs.toLocaleString("fr-FR") : "—"}
                         </td>
                         <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">
                           {lot.nbProducteurs ?? 0} producteur{(lot.nbProducteurs ?? 0) > 1 ? "s" : ""}
@@ -1139,23 +1148,38 @@ export default function TracabilitePage() {
         <div className="space-y-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h3 className="font-semibold text-gray-900 mb-4">Paramètres du lot</h3>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Entrepôt de stockage (optionnel)
-              </label>
-              <select
-                value={entrepotId}
-                onChange={(e) => setEntrepotId(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 bg-white"
-              >
-                <option value="">— Sélectionner un entrepôt —</option>
-                {entrepots.map((e) => (
-                  <option key={e.id} value={String(e.id)}>
-                    {e.nom}
-                    {e.ville ? ` — ${e.ville}` : ""}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Entrepôt de stockage (optionnel)
+                </label>
+                <select
+                  value={entrepotId}
+                  onChange={(e) => setEntrepotId(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 bg-white"
+                >
+                  <option value="">— Sélectionner un entrepôt —</option>
+                  {entrepots.map((e) => (
+                    <option key={e.id} value={String(e.id)}>
+                      {e.nom}
+                      {e.ville ? ` — ${e.ville}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Nombre de sacs (optionnel)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={nombreSacsInput}
+                  onChange={(e) => setNombreSacsInput(e.target.value)}
+                  placeholder="ex : 250"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                />
+              </div>
             </div>
           </div>
 

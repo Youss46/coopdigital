@@ -44,6 +44,7 @@ interface LotDisponible {
   poidsTotalKg: string;
   entrepot: string | null;
   dateCreation: string;
+  nombreSacs?: number | null;
   nbLivraisons?: number;
   nbProducteurs?: number;
 }
@@ -141,6 +142,12 @@ export default function NouvelleExpeditionPage() {
     setSelectedLotIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
+      // Recalculer le nombre de sacs total à partir des lots sélectionnés
+      const nextIds = new Set(next);
+      const totalSacs = lotsDisponibles
+        .filter(l => nextIds.has(l.id) && l.nombreSacs != null)
+        .reduce((s, l) => s + (l.nombreSacs ?? 0), 0);
+      if (totalSacs > 0) setNombreSacs(String(totalSacs));
       return next;
     });
   };
@@ -477,6 +484,7 @@ export default function NouvelleExpeditionPage() {
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
                         <span><span className="font-medium text-gray-700">{poids} kg</span></span>
+                        {lot.nombreSacs != null && <span>🎒 {lot.nombreSacs.toLocaleString("fr-FR")} sacs</span>}
                         {lot.entrepot && <span>📦 {lot.entrepot}</span>}
                         <span>📅 {dateStr}</span>
                         {lot.nbLivraisons != null && <span>🌱 {lot.nbLivraisons} livraison{lot.nbLivraisons > 1 ? "s" : ""}</span>}
@@ -502,7 +510,12 @@ export default function NouvelleExpeditionPage() {
                 {lotsDisponibles
                   .filter(l => selectedLotIds.has(l.id))
                   .reduce((s, l) => s + parseFloat(l.poidsTotalKg ?? "0"), 0)
-                  .toLocaleString("fr-FR")} kg total
+                  .toLocaleString("fr-FR")} kg
+                {lotsDisponibles.filter(l => selectedLotIds.has(l.id) && l.nombreSacs != null).length > 0 && (
+                  <span className="ml-2">
+                    · {lotsDisponibles.filter(l => selectedLotIds.has(l.id)).reduce((s, l) => s + (l.nombreSacs ?? 0), 0).toLocaleString("fr-FR")} sacs
+                  </span>
+                )}
               </span>
             </div>
           )}

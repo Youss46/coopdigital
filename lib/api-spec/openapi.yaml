@@ -7055,6 +7055,8 @@ components:
           type: integer
         nbLivraisons:
           type: integer
+        nombreSacs:
+          type: ["integer", "null"]
 
     LotInput:
       type: object
@@ -7068,6 +7070,8 @@ components:
             type: integer
         entrepot:
           type: string
+        nombreSacs:
+          type: integer
 
     LotStatutInput:
       type: object

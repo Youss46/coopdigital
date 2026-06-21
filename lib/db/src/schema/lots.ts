@@ -19,6 +19,7 @@ export const lotsTable = pgTable("lots", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   parentLotIds: integer("parent_lot_ids").array(),
   venteExportateurId: integer("vente_exportateur_id"),
+  nombreSacs: integer("nombre_sacs"),
 });
 
 export const lotLivraisonsTable = pgTable("lot_livraisons", {

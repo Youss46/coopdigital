@@ -538,7 +538,8 @@ export const GetLotsResponseItem = zod.object({
   "entrepot": zod.string().nullish(),
   "createdAt": zod.string(),
   "nbProducteurs": zod.number().optional(),
-  "nbLivraisons": zod.number().optional()
+  "nbLivraisons": zod.number().optional(),
+  "nombreSacs": zod.number().nullish()
 })
 export const GetLotsResponse = zod.array(GetLotsResponseItem)
 
@@ -549,7 +550,8 @@ export const GetLotsResponse = zod.array(GetLotsResponseItem)
 export const CreateLotBody = zod.object({
   "cooperativeId": zod.number(),
   "livraisonIds": zod.array(zod.number()),
-  "entrepot": zod.string().optional()
+  "entrepot": zod.string().optional(),
+  "nombreSacs": zod.number().optional()
 })
 
 
@@ -572,7 +574,8 @@ export const GetLotByQrResponse = zod.object({
   "entrepot": zod.string().nullish(),
   "createdAt": zod.string(),
   "nbProducteurs": zod.number().optional(),
-  "nbLivraisons": zod.number().optional()
+  "nbLivraisons": zod.number().optional(),
+  "nombreSacs": zod.number().nullish()
 })
 
 
@@ -600,7 +603,8 @@ export const UpdateLotStatutResponse = zod.object({
   "entrepot": zod.string().nullish(),
   "createdAt": zod.string(),
   "nbProducteurs": zod.number().optional(),
-  "nbLivraisons": zod.number().optional()
+  "nbLivraisons": zod.number().optional(),
+  "nombreSacs": zod.number().nullish()
 })
 
 
@@ -640,7 +644,8 @@ export const ExpedierLotResponse = zod.object({
   "entrepot": zod.string().nullish(),
   "createdAt": zod.string(),
   "nbProducteurs": zod.number().optional(),
-  "nbLivraisons": zod.number().optional()
+  "nbLivraisons": zod.number().optional(),
+  "nombreSacs": zod.number().nullish()
 })
 
 
@@ -664,7 +669,8 @@ export const GetLotTracabiliteResponse = zod.object({
   "entrepot": zod.string().nullish(),
   "createdAt": zod.string(),
   "nbProducteurs": zod.number().optional(),
-  "nbLivraisons": zod.number().optional()
+  "nbLivraisons": zod.number().optional(),
+  "nombreSacs": zod.number().nullish()
 }),
   "livraisons": zod.array(zod.object({
   "id": zod.number(),
