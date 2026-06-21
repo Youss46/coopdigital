@@ -69,14 +69,27 @@ export async function handleCreateExpedition(req: Request, res: Response): Promi
     res.status(201).json(exp);
   } catch (err) {
     req.log.error({ err }, "handleCreateExpedition");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
-    // Détecter les erreurs de colonnes manquantes pour faciliter le diagnostic
-    const isColumnMissing = msg.includes("column") && msg.includes("does not exist");
-    res.status(500).json({
-      erreur: isColumnMissing
-        ? `Colonne manquante en base de données : ${msg}. Appliquez les migrations manquantes sur Railway.`
-        : "Erreur interne",
-    });
+    const msg = err instanceof Error ? err.message : String(err);
+    const isColumnMissing   = msg.includes("column") && msg.includes("does not exist");
+    const isMissingRelation = !isColumnMissing && msg.includes("relation") && msg.includes("does not exist");
+    const isFKViolation     = msg.includes("violates foreign key constraint");
+    const isUniqueViolation = msg.includes("duplicate key value violates unique constraint");
+    const isCheckViolation  = msg.includes("violates check constraint");
+    const isNotNull         = msg.includes("violates not-null constraint") || msg.includes("null value in column");
+
+    if (isColumnMissing) {
+      res.status(500).json({ erreur: `Colonne manquante en base de données : ${msg}. Appliquez les migrations manquantes sur Railway.` });
+    } else if (isMissingRelation) {
+      res.status(500).json({ erreur: `Table manquante en base de données : ${msg}. Appliquez les migrations manquantes sur Railway.` });
+    } else if (isFKViolation) {
+      res.status(400).json({ erreur: `Référence invalide : ${msg}` });
+    } else if (isUniqueViolation) {
+      res.status(409).json({ erreur: `Doublon détecté : ${msg}` });
+    } else if (isCheckViolation || isNotNull) {
+      res.status(400).json({ erreur: `Contrainte de données : ${msg}` });
+    } else {
+      res.status(500).json({ erreur: `Erreur interne : ${msg}` });
+    }
   }
 }
 
