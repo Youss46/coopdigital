@@ -105,6 +105,7 @@ export default function NouvelleExpeditionPage() {
   // Sélection de lots
   const [selectedLotIds, setSelectedLotIds] = useState<Set<number>>(new Set());
   const [lotSearch, setLotSearch] = useState("");
+  const [nombreSacsCalcule, setNombreSacsCalcule] = useState(0);
 
   // Requêtes flotte + exportateurs
   const { data: vehiculesFlotte = [] } = useQuery<VehiculeFlotte[]>({
@@ -142,12 +143,22 @@ export default function NouvelleExpeditionPage() {
     setSelectedLotIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
-      // Recalculer le nombre de sacs total à partir des lots sélectionnés
-      const nextIds = new Set(next);
+
       const totalSacs = lotsDisponibles
-        .filter(l => nextIds.has(l.id) && l.nombreSacs != null)
+        .filter(l => next.has(l.id) && l.nombreSacs != null)
         .reduce((s, l) => s + (l.nombreSacs ?? 0), 0);
-      if (totalSacs > 0) setNombreSacs(String(totalSacs));
+
+      setNombreSacsCalcule(totalSacs);
+
+      if (next.size === 0) {
+        // Tous les lots désélectionnés : vider le champ
+        setNombreSacs("");
+      } else if (totalSacs > 0) {
+        // Au moins un lot avec des données de sacs : auto-remplir
+        setNombreSacs(String(totalSacs));
+      }
+      // Si lots sélectionnés mais aucun n'a de nombreSacs : ne pas toucher la saisie manuelle
+
       return next;
     });
   };
@@ -356,7 +367,18 @@ export default function NouvelleExpeditionPage() {
             </div>
             <div>
               <Label>Nombre de sacs *</Label>
-              <Input type="number" value={nombreSacs} onChange={e => setNombreSacs(e.target.value)} placeholder="370" />
+              <Input
+                type="number"
+                value={nombreSacs}
+                onChange={e => { setNombreSacs(e.target.value); }}
+                placeholder="370"
+              />
+              {nombreSacsCalcule > 0 && nombreSacs === String(nombreSacsCalcule) && (
+                <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                  <span>✦</span>
+                  <span>Calculé automatiquement depuis {selectedLotIds.size} lot{selectedLotIds.size > 1 ? "s" : ""} sélectionné{selectedLotIds.size > 1 ? "s" : ""}. Modifiable si besoin.</span>
+                </p>
+              )}
             </div>
             <div className="col-span-2">
               <Label>N° de lots (référence)</Label>
