@@ -309,6 +309,13 @@
       "when": 1782317220000,
       "tag": "0043_system_banner",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1782403620000,
+      "tag": "0044_lots_nombre_sacs",
+      "breakpoints": true
     }
   ]
 }
