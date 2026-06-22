@@ -54,15 +54,12 @@ export async function getEntrepots(req: Request, res: Response): Promise<void> {
               ELSE -ms.poids_kg::numeric END),
           0
         )::float AS "stockActuelKg",
-        COALESCE((
-          SELECT SUM(l.nombre_sacs)
-          FROM mouvements_stock ms2
-          JOIN livraisons l
-            ON ms2.motif ~ '^Livraison #[0-9]+$'
-           AND l.id = CAST(REGEXP_REPLACE(ms2.motif, '^Livraison #', '') AS INTEGER)
-          WHERE ms2.entrepot_id = e.id
-            AND ms2.type IN ('entree', 'retour_refus')
-        ), 0)::integer AS "nombreSacsTotal"
+        COALESCE(
+          SUM(CASE WHEN ms.type IN ('entree', 'retour_refus')
+              THEN ms.nombre_sacs
+              ELSE -ms.nombre_sacs END),
+          0
+        )::integer AS "nombreSacsTotal"
       FROM entrepots e
       LEFT JOIN mouvements_stock ms ON ms.entrepot_id = e.id
       WHERE e.cooperative_id = ${cooperativeId}
