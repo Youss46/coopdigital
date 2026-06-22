@@ -20,12 +20,20 @@ function toNum(v: unknown): number {
 
 async function genererNumeroTransfert(cooperativeId: number): Promise<string> {
   const annee = new Date().getFullYear();
+  // Format multi-tenant : TRF-{année}-{coopId}-{seq}
+  // Garantit l'unicité globale même si deux coopératives ont le même compteur
+  const prefixe = `TRF-${annee}-${cooperativeId}-`;
   const [row] = await db
     .select({ nb: count() })
     .from(transfertsStockTable)
-    .where(eq(transfertsStockTable.cooperativeId, cooperativeId));
+    .where(
+      and(
+        eq(transfertsStockTable.cooperativeId, cooperativeId),
+        sql`numero_transfert LIKE ${prefixe + "%"}`,
+      )
+    );
   const seq = (Number(row?.nb ?? 0) + 1).toString().padStart(4, "0");
-  return `TRF-${annee}-${seq}`;
+  return `${prefixe}${seq}`;
 }
 
 // ─── Entrepôts ───────────────────────────────────────────────────────────────

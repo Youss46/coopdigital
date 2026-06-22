@@ -15,7 +15,10 @@ function toDateStr(d: Date | string): string {
 
 export async function genererReference(cooperativeId: number, sens: "effectue" | "recu"): Promise<string> {
   const annee = new Date().getFullYear();
+  // Format multi-tenant : DON-EFF-{année}-{coopId}-{seq}
+  // Garantit l'unicité globale même si deux coopératives ont le même compteur
   const prefix = sens === "effectue" ? "DON-EFF" : "DON-REC";
+  const prefixe = `${prefix}-${annee}-${cooperativeId}-`;
   const [row] = await db
     .select({ nb: sql<number>`count(*)::int` })
     .from(donsTable)
@@ -27,7 +30,7 @@ export async function genererReference(cooperativeId: number, sens: "effectue" |
       ),
     );
   const num = String((row?.nb ?? 0) + 1).padStart(4, "0");
-  return `${prefix}-${annee}-${num}`;
+  return `${prefixe}${num}`;
 }
 
 // ── Créer un don ───────────────────────────────────────────────────────────────
