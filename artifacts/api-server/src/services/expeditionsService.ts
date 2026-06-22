@@ -323,7 +323,16 @@ export interface CreateExpeditionInput {
 }
 
 export async function createExpedition(cooperativeId: number, userId: number, input: CreateExpeditionInput) {
-  const numero = await genererNumeroExpedition(cooperativeId);
+  // Normalise les champs optionnels : chaîne vide → null (le formulaire peut envoyer "" pour les champs non remplis)
+  const toIntOrNull = (v: unknown): number | null => {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const toDateStrOrNull = (v: unknown): string | null => {
+    if (v == null || v === "") return null;
+    return String(v);
+  };
 
   // Si camion propre avec vehiculeId, auto-résoudre immatriculation depuis flotte
   let immatriculation = input.immatriculation ?? null;
@@ -344,17 +353,6 @@ export async function createExpedition(cooperativeId: number, userId: number, in
     }
   }
 
-  // Normalise les champs optionnels : chaîne vide → null (le formulaire peut envoyer "" pour les champs non remplis)
-  const toIntOrNull = (v: unknown): number | null => {
-    if (v == null || v === "") return null;
-    const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  };
-  const toDateStrOrNull = (v: unknown): string | null => {
-    if (v == null || v === "") return null;
-    return String(v);
-  };
-
   // Rattachement automatique à la campagne en cours si non fourni
   let campagneId = toIntOrNull(input.campagneId);
   if (!campagneId) {
@@ -370,9 +368,8 @@ export async function createExpedition(cooperativeId: number, userId: number, in
     campagneId = campagneActive?.id ?? null;
   }
 
-  const [exp] = await db.insert(expeditionsTable).values({
+  const values = {
     cooperativeId,
-    numeroExpedition:   numero,
     campagneId,
     exerciceId:         toIntOrNull(input.exerciceId),
     typeVehicule:       input.typeVehicule,
@@ -399,35 +396,58 @@ export async function createExpedition(cooperativeId: number, userId: number, in
     certificatPhytoDateExpiration: toDateStrOrNull(input.certificatPhytoDateExpiration),
     certificatPhytoOrganisme:      input.certificatPhytoOrganisme || "DPVC",
     documents:          input.documents ?? [],
-    statut:             "en_preparation",
+    statut:             "en_preparation" as const,
     creePar:            userId,
-  }).returning();
+  };
 
-  if (!exp) throw new Error("Échec création expédition");
+  // Tente l'insertion dans une transaction atomique.
+  // En cas de doublon sur numero_expedition (résidu de tests partiels),
+  // on régénère un numéro plus élevé et on réessaie une fois.
+  const isUniqueViolation = (err: unknown) =>
+    err instanceof Error &&
+    (err.message.includes("duplicate key") || (err.cause instanceof Error && err.cause.message.includes("duplicate key")));
 
-  if (input.lots && input.lots.length > 0) {
-    await db.insert(expeditionLotsTable).values(
-      input.lots.map(l => ({
-        expeditionId:    exp.id,
-        membreId:        l.membreId ?? null,
-        livraisonId:     l.livraisonId ?? null,
-        poidsKg:         l.poidsKg ? String(l.poidsKg) : null,
-        nombreSacs:      l.nombreSacs ?? null,
-        certificatEudr:  l.certificatEudr ?? null,
-        parcelleOrigine: l.parcelleOrigine ?? null,
-      }))
-    );
+  const tryInsert = async (numero: string) =>
+    db.transaction(async (tx) => {
+      const [exp] = await tx.insert(expeditionsTable).values({ numeroExpedition: numero, ...values }).returning();
+      if (!exp) throw new Error("Échec création expédition");
+
+      if (input.lots && input.lots.length > 0) {
+        await tx.insert(expeditionLotsTable).values(
+          input.lots.map(l => ({
+            expeditionId:    exp.id,
+            membreId:        l.membreId ?? null,
+            livraisonId:     l.livraisonId ?? null,
+            poidsKg:         l.poidsKg ? String(l.poidsKg) : null,
+            nombreSacs:      l.nombreSacs ?? null,
+            certificatEudr:  l.certificatEudr ?? null,
+            parcelleOrigine: l.parcelleOrigine ?? null,
+          }))
+        );
+      }
+
+      await tx.insert(expeditionHistoriqueTable).values({
+        expeditionId:   exp.id,
+        statutPrecedent: null,
+        statutNouveau:  "en_preparation",
+        faitPar:        userId,
+        notes:          "Expédition créée",
+      });
+
+      return exp;
+    });
+
+  const numero = await genererNumeroExpedition(cooperativeId);
+  try {
+    return await tryInsert(numero);
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      // Numéro déjà pris (résidu d'un test partiel) — on régénère le suivant
+      const numeroSuivant = await genererNumeroExpedition(cooperativeId);
+      return await tryInsert(numeroSuivant);
+    }
+    throw err;
   }
-
-  await db.insert(expeditionHistoriqueTable).values({
-    expeditionId:   exp.id,
-    statutPrecedent: null,
-    statutNouveau:  "en_preparation",
-    faitPar:        userId,
-    notes:          "Expédition créée",
-  });
-
-  return exp;
 }
 
 // ── Prix unitaire réel de l'expédition ───────────────────────────────────────
