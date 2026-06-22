@@ -12,8 +12,21 @@ import {
   getLotsDisponibles,
   rattacherLot,
   detacherLot,
+  genererNumeroExpedition,
 } from "../services/expeditionsService";
 import { generateBonLivraison, generateRapportEudrPdf } from "../services/pdfService";
+
+export async function handleProchainNumero(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const numero = await genererNumeroExpedition(cooperativeId);
+    res.json({ numero });
+  } catch (err) {
+    req.log.error({ err }, "handleProchainNumero");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
 
 export async function handleListExpeditions(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;

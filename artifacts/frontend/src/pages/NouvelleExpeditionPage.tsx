@@ -129,6 +129,12 @@ export default function NouvelleExpeditionPage() {
     queryFn: () => apiFetch("/api/lots?statut=en_stock,vendu", token),
   });
 
+  const { data: prochainNumero } = useQuery<{ numero: string }>({
+    queryKey: ["expedition-prochain-numero"],
+    queryFn: () => apiFetch("/api/expeditions/prochain-numero", token),
+    staleTime: 0,
+  });
+
   // Véhicule sélectionné → info affichée
   const vehiculeSelectionne = vehiculesFlotte.find(v => String(v.id) === vehiculeId);
   const chauffeurSelectionne = chauffeursFlotte.find(c => String(c.id) === chauffeurId);
@@ -261,7 +267,9 @@ export default function NouvelleExpeditionPage() {
         </Button>
         <Ship className="h-5 w-5 text-green-700" />
         <h1 className="text-xl font-bold text-gray-900">Nouvelle expédition</h1>
-        <span className="ml-auto text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full font-mono">N° auto</span>
+        <span className="ml-auto text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full font-mono font-semibold">
+          {prochainNumero ? prochainNumero.numero : "N° …"}
+        </span>
       </div>
 
       {/* SÉLECTION DES LOTS */}
