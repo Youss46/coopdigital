@@ -159,12 +159,17 @@ export default function ExpeditionsPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-red-200 bg-red-50">
+        <Card
+          className={`border-red-200 bg-red-50 cursor-pointer transition-shadow hover:shadow-md ${filtreStatut === "litige" ? "ring-2 ring-red-400" : ""}`}
+          onClick={() => setFiltreStatut(prev => prev === "litige" ? "tous" : "litige")}
+        >
           <CardContent className="p-4 flex items-center gap-3">
             <AlertTriangle className="h-8 w-8 text-red-600" />
             <div>
               <p className="text-2xl font-bold text-red-700">{stats?.litiges ?? "—"}</p>
-              <p className="text-xs text-red-600">Litiges ⚠️</p>
+              <p className="text-xs text-red-600">
+                {filtreStatut === "litige" ? "▼ Filtre actif — cliquer pour retirer" : "Litiges ⚠️ — cliquer pour filtrer"}
+              </p>
             </div>
           </CardContent>
         </Card>
