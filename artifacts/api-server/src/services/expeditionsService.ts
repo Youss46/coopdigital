@@ -748,17 +748,33 @@ export async function confirmerReception(
 
   const poidsCharge = parseFloat(String(exp.poidsChargeKg ?? "0"));
   const poidsRecu   = input.poidsRecuPortKg;
-  const ecart       = poidsCharge - poidsRecu;
-  const tauxEcart   = poidsCharge > 0 ? Math.abs(ecart) / poidsCharge : 0;
+  const ecartPoids  = poidsCharge - poidsRecu;
+  const tauxEcart   = poidsCharge > 0 ? Math.abs(ecartPoids) / poidsCharge : 0;
 
-  const nouveauStatut: "receptionne" | "litige" = tauxEcart > SEUIL_LITIGE ? "litige" : "receptionne";
+  // Écart sacs — calculé uniquement si les deux valeurs sont connues
+  const sacsCharges = exp.nombreSacs ?? null;
+  const sacsRecus   = input.nombreSacsRecuPort ?? null;
+  const ecartSacs   = sacsCharges !== null && sacsRecus !== null ? sacsCharges - sacsRecus : null;
+  const tauxEcartSacs = ecartSacs !== null && sacsCharges !== null && sacsCharges > 0
+    ? Math.abs(ecartSacs) / sacsCharges
+    : null;
+
+  // Litige si l'écart de POIDS OU l'écart de SACS dépasse le seuil de 2 %
+  const littigePoids = tauxEcart > SEUIL_LITIGE;
+  const littigeSacs  = tauxEcartSacs !== null && tauxEcartSacs > SEUIL_LITIGE;
+  const nouveauStatut: "receptionne" | "litige" = littigePoids || littigeSacs ? "litige" : "receptionne";
   const provisionLitige = nouveauStatut === "litige";
+
+  // Notes enrichies avec infos sacs
+  const notesSacs = ecartSacs !== null
+    ? `. Sacs reçus : ${sacsRecus}/${sacsCharges}. Écart sacs : ${ecartSacs > 0 ? "-" : "+"}${Math.abs(ecartSacs)} sac(s) (${((tauxEcartSacs ?? 0) * 100).toFixed(2)}%)`
+    : "";
 
   await db.update(expeditionsTable).set({
     statut:             nouveauStatut,
     poidsRecuPortKg:    String(poidsRecu),
-    nombreSacsRecuPort: input.nombreSacsRecuPort ?? null,
-    ecartPoidsKg:       String(ecart),
+    nombreSacsRecuPort: sacsRecus,
+    ecartPoidsKg:       String(ecartPoids),
     motifEcart:         (input.motifEcart as typeof expeditionsTable.$inferSelect["motifEcart"]) ?? null,
     numeroRecepissePort: input.numeroRecepissePort,
     nomReceptionnaire:  input.nomReceptionnaire,
@@ -773,7 +789,7 @@ export async function confirmerReception(
     statutPrecedent: exp.statut,
     statutNouveau:   nouveauStatut,
     faitPar:         userId,
-    notes:           `Réception port. Poids reçu: ${poidsRecu} kg. Écart: ${ecart.toFixed(2)} kg (${(tauxEcart * 100).toFixed(2)}%)`,
+    notes:           `Réception port. Poids reçu : ${poidsRecu} kg. Écart poids : ${ecartPoids.toFixed(2)} kg (${(tauxEcart * 100).toFixed(2)}%)${notesSacs}`,
   });
 
   const dateStr = new Date().toISOString().split("T")[0]!;

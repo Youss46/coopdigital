@@ -181,10 +181,29 @@ export default function ExpeditionDetailPage() {
   const tauxEcart = ecartKg !== null && poidsCharge > 0
     ? Math.abs(ecartKg) / poidsCharge * 100
     : null;
-  const niveauAlerte = tauxEcart === null ? null
+
+  // Écart sacs — calculé uniquement si les deux valeurs sont connues
+  const sacsCharges = exp.nombreSacs ? parseInt(String(exp.nombreSacs)) : null;
+  const ecartSacs = nombreSacsRecu && sacsCharges !== null
+    ? sacsCharges - parseInt(nombreSacsRecu, 10)
+    : null;
+  const tauxEcartSacs = ecartSacs !== null && sacsCharges !== null && sacsCharges > 0
+    ? Math.abs(ecartSacs) / sacsCharges * 100
+    : null;
+
+  // Niveau d'alerte global : le pire entre poids et sacs
+  const niveauAlertePoids = tauxEcart === null ? null
     : tauxEcart <= 0.5 ? "acceptable"
-    : tauxEcart <= 2 ? "a_justifier"
+    : tauxEcart <= 2   ? "a_justifier"
     : "litige";
+  const niveauAlerteSacs = tauxEcartSacs === null ? null
+    : tauxEcartSacs <= 0.5 ? "acceptable"
+    : tauxEcartSacs <= 2   ? "a_justifier"
+    : "litige";
+  const alerteRank = (n: string | null) => n === "litige" ? 2 : n === "a_justifier" ? 1 : n === "acceptable" ? 0 : -1;
+  const niveauAlerte = alerteRank(niveauAlertePoids) >= alerteRank(niveauAlerteSacs)
+    ? niveauAlertePoids
+    : niveauAlerteSacs;
 
   const lots = Array.isArray(exp.lots) ? exp.lots as Record<string, unknown>[] : [];
   const historique = Array.isArray(exp.historique) ? exp.historique as Record<string, unknown>[] : [];
@@ -628,22 +647,31 @@ export default function ExpeditionDetailPage() {
             </div>
 
             {/* Prévisualisation écart */}
-            {tauxEcart !== null && (
+            {(tauxEcart !== null || tauxEcartSacs !== null) && (
               <div className={`rounded-lg p-4 border ${
                 niveauAlerte === "acceptable"  ? "bg-green-50 border-green-300"
                 : niveauAlerte === "a_justifier" ? "bg-orange-50 border-orange-300"
                 : "bg-red-50 border-red-300"
               }`}>
-                <div className="font-semibold mb-2">
+                <div className="font-semibold mb-3">
                   {niveauAlerte === "acceptable"  ? "✅ Réception conforme"
                   : niveauAlerte === "a_justifier" ? "⚠️ Écart à justifier"
                   : "🔴 LITIGE — Direction sera notifiée"}
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-sm">
-                  <div><span className="text-gray-500">Chargé :</span> <strong>{poidsCharge.toLocaleString("fr-FR")} kg</strong></div>
-                  <div><span className="text-gray-500">Reçu :</span> <strong>{parseFloat(poidsRecu || "0").toLocaleString("fr-FR")} kg</strong></div>
-                  <div><span className="text-gray-500">Écart :</span> <strong className={niveauAlerte !== "acceptable" ? "text-red-600" : ""}>{ecartKg !== null ? `${ecartKg.toFixed(1)} kg (${tauxEcart.toFixed(2)}%)` : "—"}</strong></div>
-                </div>
+                {tauxEcart !== null && (
+                  <div className="grid grid-cols-3 gap-2 text-sm mb-2">
+                    <div><span className="text-gray-500">Poids chargé :</span> <strong>{poidsCharge.toLocaleString("fr-FR")} kg</strong></div>
+                    <div><span className="text-gray-500">Poids reçu :</span> <strong>{parseFloat(poidsRecu || "0").toLocaleString("fr-FR")} kg</strong></div>
+                    <div><span className="text-gray-500">Écart :</span> <strong className={niveauAlertePoids !== "acceptable" ? "text-red-600" : ""}>{ecartKg !== null ? `${ecartKg.toFixed(1)} kg (${tauxEcart.toFixed(2)}%)` : "—"}</strong></div>
+                  </div>
+                )}
+                {tauxEcartSacs !== null && sacsCharges !== null && (
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div><span className="text-gray-500">Sacs chargés :</span> <strong>{sacsCharges} sacs</strong></div>
+                    <div><span className="text-gray-500">Sacs reçus :</span> <strong>{nombreSacsRecu} sacs</strong></div>
+                    <div><span className="text-gray-500">Écart :</span> <strong className={niveauAlerteSacs !== "acceptable" ? "text-red-600" : ""}>{ecartSacs !== null ? `${ecartSacs > 0 ? "-" : "+"}${Math.abs(ecartSacs)} sac(s) (${tauxEcartSacs.toFixed(2)}%)` : "—"}</strong></div>
+                  </div>
+                )}
               </div>
             )}
 
