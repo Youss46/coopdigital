@@ -477,6 +477,62 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       }
     }
 
+    // Pré-vérification compte Mobile Marchand (avant la transaction)
+    if (isMobileMarchand && cooperativeId) {
+      const [compteMobile] = await db
+        .select({
+          id:             comptesMobilesMarchandsTable.id,
+          soldeActuelFcfa: comptesMobilesMarchandsTable.soldeActuelFcfa,
+        })
+        .from(comptesMobilesMarchandsTable)
+        .where(
+          and(
+            eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
+            eq(comptesMobilesMarchandsTable.operateur, mode as "wave" | "orange_money" | "mtn_momo"),
+            eq(comptesMobilesMarchandsTable.actif, true),
+          ),
+        )
+        .limit(1);
+
+      if (!compteMobile) {
+        res.status(422).json({ erreur: "Aucun compte valide n'a été trouvé pour ce mode de paiement." });
+        return;
+      }
+      if (parseFloat(String(compteMobile.soldeActuelFcfa)) < row.paiement.montantFcfa) {
+        res.status(422).json({ erreur: "Fonds insuffisants sur le compte pour effectuer ce paiement." });
+        return;
+      }
+    }
+
+    // Pré-vérification Caisse Centrale pour espèces hors-délégué (membre base centrale)
+    const isNonDelegueEspeces = req.user?.role !== "delegue" && mode === "especes";
+    const isMembreBaseCentrale = !row.membreDelegueId;
+    if (isNonDelegueEspeces && isMembreBaseCentrale && cooperativeId) {
+      const [caisseCentrale] = await db
+        .select({
+          id:             caissesTable.id,
+          soldeActuelFcfa: caissesTable.soldeActuelFcfa,
+        })
+        .from(caissesTable)
+        .where(
+          and(
+            eq(caissesTable.cooperativeId, cooperativeId),
+            eq(caissesTable.typeCaisse, "centrale"),
+            eq(caissesTable.actif, true),
+          ),
+        )
+        .limit(1);
+
+      if (!caisseCentrale) {
+        res.status(422).json({ erreur: "Aucun compte valide n'a été trouvé pour ce mode de paiement." });
+        return;
+      }
+      if (parseFloat(String(caisseCentrale.soldeActuelFcfa)) < row.paiement.montantFcfa) {
+        res.status(422).json({ erreur: "Fonds insuffisants sur le compte pour effectuer ce paiement." });
+        return;
+      }
+    }
+
     await db.transaction(async (tx) => {
       // 2. Mettre à jour le paiement
       await tx
@@ -522,8 +578,6 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
 
     // 6. Débiter la Caisse Centrale si paiement espèces par un rôle non-délégué
     //    pour un membre rattaché à la base centrale (delegueId IS NULL)
-    const isNonDelegueEspeces = req.user?.role !== "delegue" && mode === "especes";
-    const isMembreBaseCentrale = !row.membreDelegueId;
     if (isNonDelegueEspeces && isMembreBaseCentrale && cooperativeId) {
       await debiterCaisseCentralePaiement(
         cooperativeId,
