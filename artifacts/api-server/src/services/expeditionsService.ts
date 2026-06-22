@@ -355,10 +355,25 @@ export async function createExpedition(cooperativeId: number, userId: number, in
     return String(v);
   };
 
+  // Rattachement automatique à la campagne en cours si non fourni
+  let campagneId = toIntOrNull(input.campagneId);
+  if (!campagneId) {
+    const [campagneActive] = await db
+      .select({ id: campagnesTable.id })
+      .from(campagnesTable)
+      .where(and(
+        eq(campagnesTable.cooperativeId, cooperativeId),
+        eq(campagnesTable.statut, "ouverte"),
+      ))
+      .orderBy(desc(campagnesTable.createdAt))
+      .limit(1);
+    campagneId = campagneActive?.id ?? null;
+  }
+
   const [exp] = await db.insert(expeditionsTable).values({
     cooperativeId,
     numeroExpedition:   numero,
-    campagneId:         toIntOrNull(input.campagneId),
+    campagneId,
     exerciceId:         toIntOrNull(input.exerciceId),
     typeVehicule:       input.typeVehicule,
     vehiculeId:         toIntOrNull(input.vehiculeId),
