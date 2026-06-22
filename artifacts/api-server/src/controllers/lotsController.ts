@@ -94,6 +94,21 @@ export async function createLot(req: Request, res: Response): Promise<void> {
   const { livraisonIds, entrepot, nombreSacs } = parse.data;
 
   try {
+    // Vérifier que toutes les livraisons appartiennent à cette coopérative
+    const livraisonsVerif = await db
+      .select({ id: livraisonsTable.id })
+      .from(livraisonsTable)
+      .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+      .where(and(
+        inArray(livraisonsTable.id, livraisonIds),
+        eq(membresTable.cooperativeId, cooperativeId),
+      ));
+
+    if (livraisonsVerif.length !== livraisonIds.length) {
+      res.status(403).json({ erreur: "Une ou plusieurs livraisons n'appartiennent pas à votre coopérative" });
+      return;
+    }
+
     const deja = await db
       .select({ livraisonId: lotLivraisonsTable.livraisonId })
       .from(lotLivraisonsTable)
@@ -265,6 +280,21 @@ export async function expedierLot(req: Request, res: Response): Promise<void> {
 
     if (!["en_stock", "vendu"].includes(lotExist.statut)) {
       res.status(400).json({ erreur: "Seuls les lots EN STOCK ou VENDUS peuvent être expédiés" });
+      return;
+    }
+
+    // Vérifier que la vente exportateur appartient à la même coopérative
+    const [venteVerif] = await db
+      .select({ id: ventesExportateursTable.id })
+      .from(ventesExportateursTable)
+      .innerJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
+      .where(and(
+        eq(ventesExportateursTable.id, venteExportateurId),
+        eq(exportateursTable.cooperativeId, cooperativeId),
+      ));
+
+    if (!venteVerif) {
+      res.status(403).json({ erreur: "Vente exportateur introuvable ou non autorisée" });
       return;
     }
 
