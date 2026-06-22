@@ -8,7 +8,9 @@ import { logger } from "../lib/logger";
 
 export async function genererNumeroExpedition(cooperativeId: number): Promise<string> {
   const annee = new Date().getFullYear();
-  const prefixe = `EXP-${annee}-`;
+  // Format multi-tenant : EXP-{année}-{coopId}-{seq}
+  // Garantit l'unicité globale même si deux coopératives commencent leur séquence à 0001
+  const prefixe = `EXP-${annee}-${cooperativeId}-`;
   const rows = await db
     .select({ numero: expeditionsTable.numeroExpedition })
     .from(expeditionsTable)
@@ -24,8 +26,10 @@ export async function genererNumeroExpedition(cooperativeId: number): Promise<st
   let suivant = 1;
   if (rows.length > 0) {
     const last = rows[0]!.numero;
-    const num = parseInt(last.split("-")[2] ?? "0", 10);
-    suivant = num + 1;
+    // Dernier segment = numéro séquentiel
+    const parts = last.split("-");
+    const num = parseInt(parts[parts.length - 1] ?? "0", 10);
+    suivant = isNaN(num) ? 1 : num + 1;
   }
   return `${prefixe}${String(suivant).padStart(4, "0")}`;
 }
