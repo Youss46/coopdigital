@@ -724,6 +724,7 @@ export async function confirmerReception(
   userId: number,
   input: {
     poidsRecuPortKg: number;
+    nombreSacsRecuPort?: number;
     numeroRecepissePort: string;
     nomReceptionnaire: string;
     dateArriveePort?: string;
@@ -756,6 +757,7 @@ export async function confirmerReception(
   await db.update(expeditionsTable).set({
     statut:             nouveauStatut,
     poidsRecuPortKg:    String(poidsRecu),
+    nombreSacsRecuPort: input.nombreSacsRecuPort ?? null,
     ecartPoidsKg:       String(ecart),
     motifEcart:         (input.motifEcart as typeof expeditionsTable.$inferSelect["motifEcart"]) ?? null,
     numeroRecepissePort: input.numeroRecepissePort,

@@ -99,6 +99,7 @@ export default function ExpeditionDetailPage() {
   const [downloadingBL, setDownloadingBL] = useState(false);
   const [downloadingEudr, setDownloadingEudr] = useState(false);
   const [poidsRecu, setPoidsRecu] = useState("");
+  const [nombreSacsRecu, setNombreSacsRecu] = useState("");
   const [recepisse, setRecepisse] = useState("");
   const [receptionnaire, setReceptionnaire] = useState("");
   const [motifEcart, setMotifEcart] = useState("");
@@ -280,6 +281,9 @@ export default function ExpeditionDetailPage() {
             {exp.poidsRecuPortKg ? (
               <>
                 <div className="font-semibold text-lg">{parseFloat(String(exp.poidsRecuPortKg)).toLocaleString("fr-FR")} kg reçus</div>
+                {exp.nombreSacsRecuPort && (
+                  <div className="text-gray-700">📦 {String(exp.nombreSacsRecuPort)} sacs reçus</div>
+                )}
                 {exp.ecartPoidsKg && (
                   <div className={`font-medium ${parseFloat(String(exp.ecartPoidsKg)) > 0 ? "text-red-600" : "text-green-600"}`}>
                     Écart : {parseFloat(String(exp.ecartPoidsKg)).toFixed(1)} kg
@@ -600,6 +604,16 @@ export default function ExpeditionDetailPage() {
                 />
               </div>
               <div>
+                <Label>Nombre de sacs reçus</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={nombreSacsRecu}
+                  onChange={e => setNombreSacsRecu(e.target.value)}
+                  placeholder="Ex : 320"
+                />
+              </div>
+              <div>
                 <Label>N° récépissé port *</Label>
                 <Input value={recepisse} onChange={e => setRecepisse(e.target.value)} placeholder="REC-2025-..." />
               </div>
@@ -652,6 +666,7 @@ export default function ExpeditionDetailPage() {
                 disabled={receptionMutation.isPending || !poidsRecu || !recepisse || !receptionnaire}
                 onClick={() => receptionMutation.mutate({
                   poidsRecuPortKg:    parseFloat(poidsRecu),
+                  nombreSacsRecuPort: nombreSacsRecu ? parseInt(nombreSacsRecu, 10) : undefined,
                   numeroRecepissePort: recepisse,
                   nomReceptionnaire:  receptionnaire,
                   motifEcart:         motifEcart || undefined,

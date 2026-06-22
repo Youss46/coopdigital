@@ -69,6 +69,7 @@ export const expeditionsTable = pgTable("expeditions", {
   // Réception port
   dateArriveePort:      timestamp("date_arrivee_port", { withTimezone: true }),
   poidsRecuPortKg:      numeric("poids_recu_port_kg", { precision: 12, scale: 2 }),
+  nombreSacsRecuPort:   integer("nombre_sacs_recu_port"),
   numeroRecepissePort:  varchar("numero_recepisse_port", { length: 100 }),
   nomReceptionnaire:    varchar("nom_receptionnaire", { length: 200 }),
   statutReception:      varchar("statut_reception", { length: 20 }),
