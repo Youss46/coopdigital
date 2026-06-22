@@ -1,6 +1,6 @@
 import {
   pgTable, pgEnum, serial, integer, varchar, numeric, text,
-  boolean, timestamp, jsonb, date,
+  boolean, timestamp, jsonb, date, unique,
 } from "drizzle-orm/pg-core";
 import { cooperativesTable } from "./cooperatives";
 import { campagnesTable } from "./campagnes";
@@ -37,7 +37,7 @@ export const expeditionsTable = pgTable("expeditions", {
   id:                   serial("id").primaryKey(),
   cooperativeId:        integer("cooperative_id").notNull().references(() => cooperativesTable.id),
 
-  numeroExpedition:     varchar("numero_expedition", { length: 30 }).notNull().unique(),
+  numeroExpedition:     varchar("numero_expedition", { length: 30 }).notNull(),
   campagneId:           integer("campagne_id").references(() => campagnesTable.id),
   exerciceId:           integer("exercice_id"),
 
@@ -94,7 +94,9 @@ export const expeditionsTable = pgTable("expeditions", {
   creePar:              integer("cree_par"),
   createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:            timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  unique("expeditions_coop_numero_uq").on(t.cooperativeId, t.numeroExpedition),
+]);
 
 export const expeditionLotsTable = pgTable("expedition_lots", {
   id:              serial("id").primaryKey(),

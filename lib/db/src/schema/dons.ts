@@ -1,5 +1,5 @@
 import {
-  pgTable, serial, integer, varchar, text, date, timestamp, boolean, numeric,
+  pgTable, serial, integer, varchar, text, date, timestamp, boolean, numeric, unique,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -22,7 +22,7 @@ export const donsTable = pgTable("dons", {
   categorieId: integer("categorie_id"),
 
   // Référence
-  reference: varchar("reference", { length: 50 }).unique(),
+  reference: varchar("reference", { length: 50 }),
   libelle: varchar("libelle", { length: 300 }).notNull(),
   description: text("description"),
   dateDon: date("date_don").notNull(),
@@ -63,7 +63,9 @@ export const donsTable = pgTable("dons", {
   enregistrePar: integer("enregistre_par"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }),
-});
+}, (t) => [
+  unique("dons_coop_reference_uq").on(t.cooperativeId, t.reference),
+]);
 
 export const lignesDonNatureTable = pgTable("lignes_don_nature", {
   id: serial("id").primaryKey(),

@@ -1,6 +1,6 @@
 import {
   pgTable, pgEnum, serial, integer, varchar, numeric, text,
-  boolean, timestamp, jsonb,
+  boolean, timestamp, jsonb, unique,
 } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 import { cooperativesTable } from "./cooperatives";
@@ -81,7 +81,7 @@ export const entrepotsMouvementsTable = pgTable("entrepot_mouvements", {
 export const transfertsStockTable = pgTable("transferts_stock", {
   id:                serial("id").primaryKey(),
 
-  numeroTransfert:   varchar("numero_transfert", { length: 30 }).notNull().unique(),
+  numeroTransfert:   varchar("numero_transfert", { length: 30 }).notNull(),
   campagneId:        integer("campagne_id").references(() => campagnesTable.id),
 
   entrepotSourceId:  integer("entrepot_source_id").notNull().references(() => entrepotsDeleguesTable.id),
@@ -116,7 +116,9 @@ export const transfertsStockTable = pgTable("transferts_stock", {
 
   createdAt:         timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:         timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  unique("transferts_stock_coop_numero_uq").on(t.cooperativeId, t.numeroTransfert),
+]);
 
 export type EntrepotDelegue     = typeof entrepotsDeleguesTable.$inferSelect;
 export type EntrepotMouvement   = typeof entrepotsMouvementsTable.$inferSelect;
