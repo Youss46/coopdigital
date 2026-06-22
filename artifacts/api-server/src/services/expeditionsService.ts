@@ -223,7 +223,8 @@ export async function rattacherLot(expeditionId: number, lotId: number, cooperat
     .values({
       expeditionId,
       lotId,
-      poidsKg: lot.poidsTotalKg,
+      poidsKg:    lot.poidsTotalKg,
+      nombreSacs: lot.nombreSacs ?? null,
     })
     .returning();
 
@@ -653,7 +654,39 @@ export async function changerStatut(
       logger.error({ err }, "Erreur déduction stock chargement");
     }
 
-    // 2. Écriture comptable si prix unitaire connu (vente exportateur déjà saisie)
+    // 2. Mettre à jour expeditionsTable.nombreSacs avec le total des lots rattachés
+    //    et passer le statut des lots en "transit"
+    try {
+      const lotsChargement = await db
+        .select({
+          lotId:      expeditionLotsTable.lotId,
+          nombreSacs: expeditionLotsTable.nombreSacs,
+        })
+        .from(expeditionLotsTable)
+        .where(eq(expeditionLotsTable.expeditionId, expeditionId));
+
+      const totalSacs = lotsChargement.reduce((sum, l) => sum + (l.nombreSacs ?? 0), 0);
+      if (totalSacs > 0) {
+        await db
+          .update(expeditionsTable)
+          .set({ nombreSacs: totalSacs })
+          .where(eq(expeditionsTable.id, expeditionId));
+      }
+
+      const lotIds = lotsChargement
+        .map(l => l.lotId)
+        .filter((id): id is number => id !== null);
+      if (lotIds.length > 0) {
+        await db
+          .update(lotsTable)
+          .set({ statut: "transit" })
+          .where(inArray(lotsTable.id, lotIds));
+      }
+    } catch (err) {
+      logger.error({ err }, "Erreur mise à jour sacs/statut lots au chargement");
+    }
+
+    // 3. Écriture comptable si prix unitaire connu (vente exportateur déjà saisie)
     if (exp.poidsChargeKg) {
       const dateStr = new Date().toISOString().split("T")[0]!;
       const prixKg = await getPrixUnitaireExpedition(expeditionId);
