@@ -344,34 +344,45 @@ export async function createExpedition(cooperativeId: number, userId: number, in
     }
   }
 
+  // Normalise les champs optionnels : chaîne vide → null (le formulaire peut envoyer "" pour les champs non remplis)
+  const toIntOrNull = (v: unknown): number | null => {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const toDateStrOrNull = (v: unknown): string | null => {
+    if (v == null || v === "") return null;
+    return String(v);
+  };
+
   const [exp] = await db.insert(expeditionsTable).values({
     cooperativeId,
     numeroExpedition:   numero,
-    campagneId:         input.campagneId ?? null,
-    exerciceId:         input.exerciceId ?? null,
+    campagneId:         toIntOrNull(input.campagneId),
+    exerciceId:         toIntOrNull(input.exerciceId),
     typeVehicule:       input.typeVehicule,
-    vehiculeId:         input.vehiculeId ?? null,
-    chauffeurId:        input.chauffeurId ?? null,
+    vehiculeId:         toIntOrNull(input.vehiculeId),
+    chauffeurId:        toIntOrNull(input.chauffeurId),
     immatriculation,
     nomChauffeur,
     telephoneChauffeur,
-    transporteur:       input.transporteur ?? null,
-    numeroBonTransport: input.numeroBonTransport ?? null,
+    transporteur:       input.transporteur || null,
+    numeroBonTransport: input.numeroBonTransport || null,
     dateDepart:         input.dateDepart ? new Date(input.dateDepart) : null,
-    lieuDepart:         input.lieuDepart ?? "Magasin central",
+    lieuDepart:         input.lieuDepart || "Magasin central",
     poidsChargeKg:      input.poidsChargeKg ? String(input.poidsChargeKg) : null,
-    nombreSacs:         input.nombreSacs ?? null,
-    numeroLots:         input.numeroLots ?? null,
+    nombreSacs:         toIntOrNull(input.nombreSacs),
+    numeroLots:         input.numeroLots || null,
     port:               input.port,
-    entrepotDestination: input.entrepotDestination ?? null,
-    exportateurId:      (input.exportateurId != null && !Number.isNaN(input.exportateurId)) ? input.exportateurId : null,
-    exportateurNom:     input.exportateurNom ?? null,
-    numeroContratExport: input.numeroContratExport ?? null,
+    entrepotDestination: input.entrepotDestination || null,
+    exportateurId:      toIntOrNull(input.exportateurId),
+    exportateurNom:     input.exportateurNom || null,
+    numeroContratExport: input.numeroContratExport || null,
     heureEstimeeArrivee: input.heureEstimeeArrivee ? new Date(input.heureEstimeeArrivee) : null,
-    certificatPhytoNumero:         input.certificatPhytoNumero ?? null,
-    certificatPhytoDateEmission:   input.certificatPhytoDateEmission ?? null,
-    certificatPhytoDateExpiration: input.certificatPhytoDateExpiration ?? null,
-    certificatPhytoOrganisme:      input.certificatPhytoOrganisme ?? "DPVC",
+    certificatPhytoNumero:         input.certificatPhytoNumero || null,
+    certificatPhytoDateEmission:   toDateStrOrNull(input.certificatPhytoDateEmission),
+    certificatPhytoDateExpiration: toDateStrOrNull(input.certificatPhytoDateExpiration),
+    certificatPhytoOrganisme:      input.certificatPhytoOrganisme || "DPVC",
     documents:          input.documents ?? [],
     statut:             "en_preparation",
     creePar:            userId,
