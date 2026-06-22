@@ -98,6 +98,7 @@ export default function ExpeditionDetailPage() {
   const [showLotsPanel, setShowLotsPanel] = useState(false);
   const [downloadingBL, setDownloadingBL] = useState(false);
   const [downloadingEudr, setDownloadingEudr] = useState(false);
+  const [downloadingConstat, setDownloadingConstat] = useState(false);
   const [poidsRecu, setPoidsRecu] = useState("");
   const [nombreSacsRecu, setNombreSacsRecu] = useState("");
   const [recepisse, setRecepisse] = useState("");
@@ -587,6 +588,37 @@ export default function ExpeditionDetailPage() {
                 <Download className="h-3 w-3" />
                 {downloadingBL ? "Génération…" : "Bon de livraison"}
               </Button>
+              {exp.poidsRecuPortKg && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-7 text-xs border-blue-700 text-blue-700 hover:bg-blue-50"
+                  disabled={downloadingConstat}
+                  onClick={async () => {
+                    setDownloadingConstat(true);
+                    try {
+                      const res = await fetch(`${BASE}/api/expeditions/${id}/constat-reception`, {
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      });
+                      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `constat-reception-${String(exp.numeroExpedition ?? id)}.pdf`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch {
+                      toast({ title: "Erreur", description: "Impossible de générer le constat de réception.", variant: "destructive" });
+                    } finally {
+                      setDownloadingConstat(false);
+                    }
+                  }}
+                >
+                  <Download className="h-3 w-3" />
+                  {downloadingConstat ? "Génération…" : "Constat de réception"}
+                </Button>
+              )}
             </div>
           </CardTitle>
         </CardHeader>

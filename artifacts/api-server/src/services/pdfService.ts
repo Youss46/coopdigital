@@ -2558,3 +2558,218 @@ export async function generateLotEudrPdf(lotId: number, cooperativeId: number): 
   doc.end();
   return endPromise;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constat de réception port
+// ─────────────────────────────────────────────────────────────────────────────
+const SEUIL_ACCEPTABLE_PCT = 0.5;
+const SEUIL_LITIGE_PCT     = 2.0;
+
+function niveauEcart(taux: number): "acceptable" | "a_justifier" | "litige" {
+  if (taux <= SEUIL_ACCEPTABLE_PCT) return "acceptable";
+  if (taux <= SEUIL_LITIGE_PCT)     return "a_justifier";
+  return "litige";
+}
+
+function couleurNiveau(niveau: "acceptable" | "a_justifier" | "litige"): { bg: string; border: string; text: string } {
+  if (niveau === "acceptable")  return { bg: "#f0fdf4", border: "#86efac", text: "#15803d" };
+  if (niveau === "a_justifier") return { bg: "#fff7ed", border: "#fdba74", text: "#c2410c" };
+  return                               { bg: "#fef2f2", border: "#fca5a5", text: "#b91c1c" };
+}
+
+function labelNiveau(niveau: "acceptable" | "a_justifier" | "litige"): string {
+  if (niveau === "acceptable")  return "RECEPTION CONFORME — Ecart dans les tolerances";
+  if (niveau === "a_justifier") return "ECART A JUSTIFIER — Ecart entre 0,5 % et 2 %";
+  return                               "LITIGE — Ecart superieur a 2 % (direction notifiee)";
+}
+
+const MOTIF_LABELS: Record<string, string> = {
+  perte_transport:   "Perte pendant le transport",
+  vol:               "Vol",
+  humidite:          "Humidite / Sechage",
+  erreur_pesee:      "Erreur de pesee",
+  conditionnement:   "Erreur de conditionnement",
+  autre:             "Autre",
+};
+
+export async function generateConstatReception(expeditionId: number, cooperativeId: number): Promise<Buffer> {
+  const [exp] = await db
+    .select()
+    .from(expeditionsTable)
+    .where(and(eq(expeditionsTable.id, expeditionId), eq(expeditionsTable.cooperativeId, cooperativeId)));
+  if (!exp) throw new Error("Expedition introuvable");
+
+  if (!exp.poidsRecuPortKg) throw new Error("La reception n'a pas encore ete confirmee pour cette expedition");
+
+  const { doc, endPromise } = makePdfDoc();
+  const W = PAGE_W - 2 * MARGIN;
+
+  await drawHeader(doc, cooperativeId, {
+    titre_document: "CONSTAT DE RECEPTION",
+    reference: exp.numeroExpedition ?? `EXP-${expeditionId}`,
+  });
+
+  let y = doc.y + 4;
+
+  // ── Calculs écarts ─────────────────────────────────────────────────────────
+  const poidsCharge = parseFloat(String(exp.poidsChargeKg ?? "0"));
+  const poidsRecu   = parseFloat(String(exp.poidsRecuPortKg ?? "0"));
+  const ecartPoids  = poidsCharge - poidsRecu;
+  const tauxPoidsPct = poidsCharge > 0 ? Math.abs(ecartPoids) / poidsCharge * 100 : 0;
+
+  const sacsCharges = exp.nombreSacs ?? null;
+  const sacsRecus   = exp.nombreSacsRecuPort ?? null;
+  const ecartSacs   = sacsCharges !== null && sacsRecus !== null ? sacsCharges - sacsRecus : null;
+  const tauxSacsPct = ecartSacs !== null && sacsCharges !== null && sacsCharges > 0
+    ? Math.abs(ecartSacs) / sacsCharges * 100 : null;
+
+  const niveauPoids = niveauEcart(tauxPoidsPct);
+  const niveauSacs  = tauxSacsPct !== null ? niveauEcart(tauxSacsPct) : null;
+  const niveauGlobal: "acceptable" | "a_justifier" | "litige" =
+    niveauSacs === "litige" || niveauPoids === "litige" ? "litige"
+    : niveauSacs === "a_justifier" || niveauPoids === "a_justifier" ? "a_justifier"
+    : "acceptable";
+
+  const couleur = couleurNiveau(niveauGlobal);
+
+  // ── Bandeau statut ────────────────────────────────────────────────────────
+  doc.rect(MARGIN, y, W, 22).fill(couleur.bg).stroke(couleur.border);
+  doc.fontSize(8.5).fillColor(couleur.text).font("Helvetica-Bold")
+    .text(labelNiveau(niveauGlobal), MARGIN + 10, y + 7, { width: W - 20, lineBreak: false });
+  y += 30;
+
+  // ── Deux colonnes : Expédition | Réception ────────────────────────────────
+  const colW = (W - 12) / 2;
+
+  // Col gauche : infos expédition
+  doc.rect(MARGIN, y, colW, 90).fill("#f9fafb").stroke("#e5e7eb");
+  doc.fontSize(7.5).fillColor(GRIS).font("Helvetica-Bold")
+    .text("EXPEDITION", MARGIN + 8, y + 7);
+  const dateDepart = exp.dateDepart
+    ? new Date(exp.dateDepart).toLocaleDateString("fr-FR") : "—";
+  const lignesExp: Array<[string, string]> = [
+    ["N° Expedition",  exp.numeroExpedition ?? `EXP-${expeditionId}`],
+    ["Date depart",    dateDepart],
+    ["Lieu depart",    exp.lieuDepart ?? "—"],
+    ["Port destination", exp.port ?? "—"],
+    ["Exportateur",    exp.exportateurNom ?? "—"],
+  ];
+  let ly = y + 20;
+  for (const [label, val] of lignesExp) {
+    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+      .text(`${label} :`, MARGIN + 8, ly, { width: colW / 2 - 4, lineBreak: false });
+    doc.fontSize(7.5).fillColor("black").font("Helvetica-Bold")
+      .text(val, MARGIN + colW / 2 + 4, ly, { width: colW / 2 - 12, lineBreak: false });
+    ly += 12;
+  }
+
+  // Col droite : infos réception
+  const col2X = MARGIN + colW + 12;
+  doc.rect(col2X, y, colW, 90).fill("#f9fafb").stroke("#e5e7eb");
+  doc.fontSize(7.5).fillColor(GRIS).font("Helvetica-Bold")
+    .text("RECEPTION PORT", col2X + 8, y + 7);
+  const dateArrivee = exp.dateArriveePort
+    ? new Date(exp.dateArriveePort).toLocaleDateString("fr-FR") : "—";
+  const dateGen = new Date().toLocaleDateString("fr-FR");
+  const lignesRec: Array<[string, string]> = [
+    ["Date arrivee port", dateArrivee],
+    ["N° Recepisse",      exp.numeroRecepissePort ?? "—"],
+    ["Receptionnaire",    exp.nomReceptionnaire ?? "—"],
+    ["Frais transport",   exp.fraisTransportFcfa != null ? formaterFCFA(exp.fraisTransportFcfa) : "—"],
+    ["Date constat",      dateGen],
+  ];
+  let ly2 = y + 20;
+  for (const [label, val] of lignesRec) {
+    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+      .text(`${label} :`, col2X + 8, ly2, { width: colW / 2 - 4, lineBreak: false });
+    doc.fontSize(7.5).fillColor("black").font("Helvetica-Bold")
+      .text(val, col2X + colW / 2 + 4, ly2, { width: colW / 2 - 12, lineBreak: false });
+    ly2 += 12;
+  }
+  y += 98;
+
+  // ── Tableau comparatif Chargé / Reçu / Écart ──────────────────────────────
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold")
+    .text("COMPARATIF MARCHANDISE", MARGIN, y);
+  y += 14;
+
+  const colsW = [W * 0.34, W * 0.22, W * 0.22, W * 0.22];
+  // En-tête tableau
+  ligneTableau(doc, ["Mesure", "Charge au depart", "Recu au port", "Ecart"], colsW, MARGIN, y, VERT);
+  y += 18;
+
+  // Ligne poids
+  const ecartPoidsStr = `${ecartPoids > 0 ? "-" : "+"}${formaterNombre(Math.abs(ecartPoids))} kg (${tauxPoidsPct.toFixed(2)}%)`;
+  const fondPoids = niveauPoids === "acceptable" ? "#f0fdf4" : niveauPoids === "a_justifier" ? "#fff7ed" : "#fef2f2";
+  doc.rect(MARGIN, y, W, 16).fill(fondPoids);
+  ligneTableau(doc, [
+    "Poids (kg)",
+    `${formaterNombre(poidsCharge)} kg`,
+    `${formaterNombre(poidsRecu)} kg`,
+    ecartPoidsStr,
+  ], colsW, MARGIN, y);
+  y += 18;
+
+  // Ligne sacs (si disponible)
+  if (sacsCharges !== null && sacsRecus !== null && ecartSacs !== null) {
+    const ecartSacsStr = `${ecartSacs > 0 ? "-" : "+"}${Math.abs(ecartSacs)} sac(s) (${(tauxSacsPct ?? 0).toFixed(2)}%)`;
+    const fondSacs = niveauSacs === "acceptable" ? "#f0fdf4" : niveauSacs === "a_justifier" ? "#fff7ed" : "#fef2f2";
+    doc.rect(MARGIN, y, W, 16).fill(fondSacs);
+    ligneTableau(doc, [
+      "Nombre de sacs",
+      `${formaterNombre(sacsCharges)} sacs`,
+      `${formaterNombre(sacsRecus)} sacs`,
+      ecartSacsStr,
+    ], colsW, MARGIN, y);
+    y += 18;
+  }
+  y += 10;
+
+  // ── Motif d'écart ─────────────────────────────────────────────────────────
+  if (exp.motifEcart) {
+    const motifLabel = MOTIF_LABELS[exp.motifEcart] ?? exp.motifEcart;
+    doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("MOTIF DE L'ECART", MARGIN, y);
+    y += 14;
+    doc.rect(MARGIN, y, W, 24).fill("#fffbeb").stroke("#fde68a");
+    doc.fontSize(9).fillColor("#92400e").font("Helvetica")
+      .text(motifLabel, MARGIN + 10, y + 8, { width: W - 20, lineBreak: false });
+    y += 32;
+  }
+  y += 4;
+
+  // ── Zone de signatures ────────────────────────────────────────────────────
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("SIGNATURES", MARGIN, y);
+  y += 14;
+
+  const sigW = (W - 24) / 3;
+  const sigH  = 80;
+  const sigLabels = ["Receptionnaire", "Gerant de la cooperative", "Visa douanes / exportateur"];
+
+  for (let i = 0; i < 3; i++) {
+    const sx = MARGIN + i * (sigW + 12);
+    doc.rect(sx, y, sigW, sigH).fill("#f9fafb").stroke("#d1d5db");
+    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica-Bold")
+      .text(sigLabels[i]!, sx + 6, y + 6, { width: sigW - 12, align: "center", lineBreak: false });
+    doc.fontSize(7).fillColor("#9ca3af").font("Helvetica")
+      .text("Nom :", sx + 6, y + 22, { width: sigW - 12, lineBreak: false });
+    // Ligne de signature
+    doc.moveTo(sx + 6, y + 60).lineTo(sx + sigW - 6, y + 60)
+      .strokeColor("#9ca3af").lineWidth(0.5).stroke();
+    doc.fontSize(7).fillColor("#9ca3af").font("Helvetica")
+      .text("Signature et cachet", sx + 6, y + 63, { width: sigW - 12, align: "center", lineBreak: false });
+  }
+  y += sigH + 14;
+
+  // ── Mention légale ─────────────────────────────────────────────────────────
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica-Oblique")
+    .text(
+      "Ce constat est etabli contradictoirement et vaut preuve de reception pour les besoins " +
+      "de la comptabilite-matiere et du suivi des expeditions. Tout ecart superieur a 2 % fait l'objet " +
+      "d'une procedure de litige conformement au contrat de transport.",
+      MARGIN, y, { width: W },
+    );
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}

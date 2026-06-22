@@ -16,6 +16,7 @@ import {
   handleBonLivraison,
   handleRapportEudrPdf,
   handleProchainNumero,
+  handleConstatReception,
 } from "../controllers/expeditionsController";
 
 const router = Router();
@@ -108,6 +109,12 @@ router.get(
   "/expeditions/:id/bon-livraison",
   checkPermission("expeditions", "lire"),
   handleBonLivraison,
+);
+
+router.get(
+  "/expeditions/:id/constat-reception",
+  checkPermission("expeditions", "lire"),
+  handleConstatReception,
 );
 
 export default router;
