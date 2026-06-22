@@ -742,7 +742,7 @@ export async function confirmerReception(
   if (rows.length === 0) throw new Error("Expédition introuvable");
   const exp = rows[0]!;
 
-  if (!["arrive_port", "en_transit"].includes(exp.statut)) {
+  if (!["arrive_port", "en_transit", "receptionne", "litige"].includes(exp.statut)) {
     throw new Error("L'expédition doit être en transit ou arrivée au port pour confirmer la réception");
   }
 
@@ -862,7 +862,7 @@ export async function confirmerReception(
       cooperativeId,
       exp.numeroExpedition,
       exp.port,
-      ecart,
+      ecartPoids,
       tauxEcart * 100,
       expeditionId,
     );
@@ -870,7 +870,7 @@ export async function confirmerReception(
 
   return {
     statut:         nouveauStatut,
-    ecartKg:        ecart,
+    ecartKg:        ecartPoids,
     tauxEcartPct:   tauxEcart * 100,
     provisionLitige,
     niveauAlerte:
