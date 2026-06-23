@@ -809,7 +809,6 @@ function OngletCatalogue() {
           onClose={() => setPanneauHistorique(null)}
           onApprovisionner={() => {
             setModalAppro(panneauHistorique);
-            setPanneauHistorique(null);
           }}
         />
       )}
