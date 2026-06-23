@@ -81,7 +81,23 @@ function ecartIcon(pct: number) {
 }
 
 // ─── Onglet 1 : Hypothèses ────────────────────────────────────────────────────
-function OngletHypotheses({ budgetId, campagneId }: { budgetId: number; campagneId: number }) {
+interface HypothesesExistantes {
+  tonnagePrevisionnelKg?: string | number | null;
+  prixAchatMoyenFcfa?:    string | number | null;
+  prixVenteMoyenFcfa?:    string | number | null;
+  nbMembresActifs?:        number | null;
+  nbLivraisonsEstimees?:  number | null;
+}
+
+function OngletHypotheses({
+  budgetId,
+  campagneId,
+  hypotheses,
+}: {
+  budgetId: number;
+  campagneId: number;
+  hypotheses?: HypothesesExistantes | null;
+}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const peutModifier = usePermission("budget", "modifier");
@@ -92,6 +108,18 @@ function OngletHypotheses({ budgetId, campagneId }: { budgetId: number; campagne
     nbMembresActifs:       "",
     nbLivraisonsEstimees:  "",
   });
+
+  // Pré-remplir le formulaire dès que les hypothèses existantes sont chargées
+  useEffect(() => {
+    if (!hypotheses) return;
+    setForm({
+      tonnagePrevisionnelKg: hypotheses.tonnagePrevisionnelKg != null ? String(parseFloat(String(hypotheses.tonnagePrevisionnelKg))) : "",
+      prixAchatMoyenFcfa:    hypotheses.prixAchatMoyenFcfa    != null ? String(parseFloat(String(hypotheses.prixAchatMoyenFcfa)))    : "",
+      prixVenteMoyenFcfa:    hypotheses.prixVenteMoyenFcfa    != null ? String(parseFloat(String(hypotheses.prixVenteMoyenFcfa)))    : "",
+      nbMembresActifs:       hypotheses.nbMembresActifs        != null ? String(hypotheses.nbMembresActifs)        : "",
+      nbLivraisonsEstimees:  hypotheses.nbLivraisonsEstimees   != null ? String(hypotheses.nbLivraisonsEstimees)   : "",
+    });
+  }, [hypotheses]);
 
   const mutHypo = usePostBudgetIdHypotheses({
     mutation: {
@@ -659,7 +687,11 @@ export default function BudgetPage() {
       </div>
 
       {onglet === "hypotheses" && currentBudgetId && (
-        <OngletHypotheses budgetId={currentBudgetId} campagneId={campagneId} />
+        <OngletHypotheses
+          budgetId={currentBudgetId}
+          campagneId={campagneId}
+          hypotheses={detail?.hypotheses as HypothesesExistantes | null | undefined}
+        />
       )}
       {onglet === "detail" && detail && currentBudgetId && (
         <OngletBudgetDetail data={detail} budgetId={currentBudgetId} campagneId={campagneId} />
