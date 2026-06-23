@@ -503,14 +503,18 @@ function PanneauHistoriqueAppros({
   onClose: () => void;
   onApprovisionner: () => void;
 }) {
-  const { data: appros, isLoading, isError, refetch } = useQuery<ApproRow[]>({
+  const { data: appros, isLoading, isError, error, refetch } = useQuery<ApproRow[], Error>({
     queryKey: ["appros-intrant", intrant.id],
     queryFn: async () => {
       const token = typeof window !== "undefined" ? localStorage.getItem("coop_token") : null;
       const res = await fetch(`/api/intrants/${intrant.id}/appros`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
-      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      if (!res.ok) {
+        let detail = "";
+        try { const body = await res.json() as { erreur?: string }; detail = body.erreur ?? ""; } catch { /* ignore */ }
+        throw new Error(`HTTP ${res.status}${detail ? ` — ${detail}` : ""}`);
+      }
       return res.json() as Promise<ApproRow[]>;
     },
   });
@@ -560,7 +564,11 @@ function PanneauHistoriqueAppros({
             <div className="text-center py-12">
               <AlertTriangle size={32} className="mx-auto mb-3 text-amber-400" />
               <p className="text-sm font-medium text-gray-700">Impossible de charger l'historique</p>
-              <p className="text-xs text-gray-400 mt-1">Vérifiez votre connexion ou rechargez la page.</p>
+              {error && (
+                <p className="mt-2 mx-auto max-w-xs rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-xs font-mono text-red-700 text-left break-all">
+                  {error.message}
+                </p>
+              )}
               <button
                 onClick={() => void refetch()}
                 className="mt-4 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
