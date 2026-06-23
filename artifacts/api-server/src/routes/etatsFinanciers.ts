@@ -6,6 +6,7 @@ import {
   getCompteResultat,
   getFluxTresorerie,
   getMargeCampagnes,
+  getComparatifCampagnes,
 } from "../controllers/etatsFinanciersController";
 
 const router: IRouter = Router();
@@ -16,5 +17,6 @@ router.get("/etats-financiers/bilan", checkPermission("comptabilite", "voir_bila
 router.get("/etats-financiers/compte-resultat", checkPermission("comptabilite", "voir_compte_resultat"), getCompteResultat);
 router.get("/etats-financiers/flux-tresorerie", checkPermission("comptabilite", "lire"), getFluxTresorerie);
 router.get("/etats-financiers/marge-par-campagne", checkPermission("comptabilite", "lire"), getMargeCampagnes);
+router.get("/etats-financiers/comparatif-campagnes", checkPermission("comptabilite", "lire"), getComparatifCampagnes);
 
 export default router;

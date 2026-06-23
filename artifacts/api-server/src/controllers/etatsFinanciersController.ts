@@ -187,6 +187,73 @@ export async function getFluxTresorerie(req: Request, res: Response): Promise<vo
   }
 }
 
+export async function getComparatifCampagnes(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = coopId(req);
+
+    const rows = await db.execute(sql`
+      SELECT
+        c.id                                                        AS "campagneId",
+        c.libelle,
+        c.annee_debut                                               AS "anneeDebut",
+        c.annee_fin                                                 AS "anneeFin",
+        c.statut,
+        COALESCE(SUM(l.poids_net_kg), 0)::int                      AS "tonnageKg",
+        COUNT(DISTINCT l.membre_id)::int                            AS "membresActifs",
+        COALESCE(SUM(CASE WHEN e.compte_credit = '701' THEN e.montant_fcfa ELSE 0 END), 0)::int AS "caVentesFcfa",
+        COALESCE(SUM(CASE WHEN e.compte_debit  = '601' THEN e.montant_fcfa ELSE 0 END), 0)::int AS "coutAchatsFcfa",
+        COALESCE(SUM(CASE WHEN e.compte_debit IN ('621','641','661') THEN e.montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
+      FROM campagnes c
+      LEFT JOIN livraisons l
+        ON l.campagne_id = c.id
+      LEFT JOIN ecritures_comptables e
+        ON e.cooperative_id = c.cooperative_id
+        AND e.exercice = c.annee_debut
+      WHERE c.cooperative_id = ${cooperativeId}
+      GROUP BY c.id, c.libelle, c.annee_debut, c.annee_fin, c.statut
+      ORDER BY c.annee_debut DESC
+      LIMIT 6
+    `);
+
+    const result = (rows.rows as Array<{
+      campagneId: number;
+      libelle: string;
+      anneeDebut: number;
+      anneeFin: number;
+      statut: string;
+      tonnageKg: number;
+      membresActifs: number;
+      caVentesFcfa: number;
+      coutAchatsFcfa: number;
+      chargesFcfa: number;
+    }>).map((r) => {
+      const margeNetteFcfa = r.caVentesFcfa - r.coutAchatsFcfa - r.chargesFcfa;
+      const tauxMarge = r.caVentesFcfa > 0 ? Math.round((margeNetteFcfa / r.caVentesFcfa) * 10000) / 100 : 0;
+      return {
+        campagneId: r.campagneId,
+        libelle: r.libelle,
+        anneeDebut: r.anneeDebut,
+        anneeFin: r.anneeFin,
+        statut: r.statut,
+        tonnageKg: r.tonnageKg,
+        tonnageTonnes: Math.round(r.tonnageKg / 1000 * 10) / 10,
+        membresActifs: r.membresActifs,
+        caVentesFcfa: r.caVentesFcfa,
+        coutAchatsFcfa: r.coutAchatsFcfa,
+        chargesFcfa: r.chargesFcfa,
+        margeNetteFcfa,
+        tauxMarge,
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur getComparatifCampagnes");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 export async function getMargeCampagnes(req: Request, res: Response): Promise<void> {
   try {
     const rows = await db.execute(sql`

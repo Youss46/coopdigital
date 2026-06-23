@@ -649,6 +649,193 @@ function FicheMembre() {
   );
 }
 
+// ─── Onglet 4 : Comparatif campagnes ─────────────────────────────────────────
+interface ComparatifCampagne {
+  campagneId: number;
+  libelle: string;
+  anneeDebut: number;
+  anneeFin: number;
+  statut: string;
+  tonnageKg: number;
+  tonnageTonnes: number;
+  membresActifs: number;
+  caVentesFcfa: number;
+  coutAchatsFcfa: number;
+  chargesFcfa: number;
+  margeNetteFcfa: number;
+  tauxMarge: number;
+}
+
+const BLEU = "#3b82f6";
+
+function TabComparatif() {
+  const { data: campagnes = [], isLoading } = useQuery<ComparatifCampagne[]>({
+    queryKey: ["comparatif-campagnes"],
+    queryFn: async () => {
+      const token = localStorage.getItem("coop_token");
+      const r = await fetch(`${BASE}/api/etats-financiers/comparatif-campagnes`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!r.ok) throw new Error("Erreur chargement");
+      return r.json() as Promise<ComparatifCampagne[]>;
+    },
+    staleTime: 60_000,
+  });
+
+  if (isLoading) return <Skeleton />;
+
+  const data = [...campagnes].reverse();
+
+  const chartCA = data.map((c) => ({
+    campagne: c.libelle,
+    CA: c.caVentesFcfa,
+    "Marge nette": c.margeNetteFcfa,
+  }));
+
+  const chartOpe = data.map((c) => ({
+    campagne: c.libelle,
+    "Tonnage (t)": c.tonnageTonnes,
+    "Membres actifs": c.membresActifs,
+  }));
+
+  const statutBadge = (s: string) => {
+    if (s === "ouverte")  return "bg-green-100 text-green-700";
+    if (s === "fermee")   return "bg-amber-100 text-amber-700";
+    return "bg-gray-100 text-gray-500";
+  };
+  const statutLabel = (s: string) =>
+    s === "ouverte" ? "En cours" : s === "fermee" ? "Fermée" : "Archivée";
+
+  if (campagnes.length === 0) {
+    return (
+      <div className="text-center py-20 text-gray-400">
+        <p className="text-4xl mb-3">📊</p>
+        <p className="text-sm">Aucune campagne enregistrée</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Tableau récapitulatif */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <SectionTitre titre="Vue consolidée par campagne" description="Tonnage collecté, membres actifs, CA et marge — toutes les campagnes" />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+              <tr>
+                <th className="text-left px-5 py-3">Campagne</th>
+                <th className="text-right px-5 py-3">Statut</th>
+                <th className="text-right px-5 py-3">Tonnage</th>
+                <th className="text-right px-5 py-3">Membres actifs</th>
+                <th className="text-right px-5 py-3">CA ventes</th>
+                <th className="text-right px-5 py-3">Marge nette</th>
+                <th className="text-right px-5 py-3">Taux marge</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {campagnes.map((c) => (
+                <tr key={c.campagneId} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-3 font-semibold text-gray-900">{c.libelle}</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statutBadge(c.statut)}`}>
+                      {statutLabel(c.statut)}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-right font-mono text-gray-700">
+                    {c.tonnageTonnes > 0 ? `${c.tonnageTonnes.toLocaleString("fr-FR")} t` : "—"}
+                  </td>
+                  <td className="px-5 py-3 text-right font-mono text-gray-700">
+                    {c.membresActifs > 0 ? c.membresActifs.toLocaleString("fr-FR") : "—"}
+                  </td>
+                  <td className="px-5 py-3 text-right font-mono text-gray-900">
+                    {c.caVentesFcfa > 0 ? FCFA(c.caVentesFcfa) : "—"}
+                  </td>
+                  <td className={`px-5 py-3 text-right font-mono font-semibold ${c.margeNetteFcfa >= 0 ? "text-green-700" : "text-red-600"}`}>
+                    {c.caVentesFcfa > 0 ? FCFA(c.margeNetteFcfa) : "—"}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    {c.caVentesFcfa > 0 ? (
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        c.tauxMarge >= 10 ? "bg-green-100 text-green-800" :
+                        c.tauxMarge >= 0  ? "bg-amber-100 text-amber-800" :
+                        "bg-red-100 text-red-800"
+                      }`}>
+                        {c.tauxMarge.toFixed(1)} %
+                      </span>
+                    ) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Graphique CA & Marge */}
+      {chartCA.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <SectionTitre titre="CA et marge nette par campagne" description="En FCFA — 6 dernières campagnes" />
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={chartCA} barCategoryGap="30%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="campagne" tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={(v) => (v / 1_000_000).toFixed(0) + "M"} tick={{ fontSize: 10 }} />
+              <Tooltip formatter={(v: number) => FCFA(v)} />
+              <Legend />
+              <Bar dataKey="CA" fill={VERT} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="Marge nette" fill={VERT_CLAIR} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Graphique Tonnage & Membres */}
+      {chartOpe.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <SectionTitre titre="Tonnage collecté et membres actifs par campagne" description="Évolution opérationnelle" />
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={chartOpe} barCategoryGap="30%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="campagne" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="t" orientation="left" tickFormatter={(v) => `${v} t`} tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="m" orientation="right" tickFormatter={(v) => String(v)} tick={{ fontSize: 10 }} />
+              <Tooltip />
+              <Legend />
+              <Bar yAxisId="t" dataKey="Tonnage (t)" fill={OR} radius={[3, 3, 0, 0]} />
+              <Bar yAxisId="m" dataKey="Membres actifs" fill={BLEU} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* KPIs de la campagne en cours */}
+      {(() => {
+        const courante = campagnes.find((c) => c.statut === "ouverte") ?? campagnes[0];
+        if (!courante) return null;
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <SectionTitre titre={`Campagne en cours : ${courante.libelle}`} description="Indicateurs clés" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <KpiCard label="Tonnage collecté" value={`${courante.tonnageTonnes.toLocaleString("fr-FR")} t`} sous="kg collectés" couleur={OR} />
+              <KpiCard label="Membres actifs" value={String(courante.membresActifs)} sous="ayant livré" couleur={BLEU} />
+              <KpiCard label="CA ventes cacao" value={FCFA(courante.caVentesFcfa)} sous={`Campagne ${courante.libelle}`} couleur={VERT} />
+              <KpiCard
+                label="Marge nette"
+                value={FCFA(courante.margeNetteFcfa)}
+                sous={`Taux : ${courante.tauxMarge.toFixed(1)} %`}
+                couleur={courante.margeNetteFcfa >= 0 ? VERT : ROUGE}
+              />
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
 // ─── Reporting EUDR (pour responsable_tracabilite) ────────────────────────────
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const apiFetch = (url: string) => fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } });
@@ -951,10 +1138,11 @@ function ReportingEudr() {
 }
 
 // ─── Page principale ─────────────────────────────────────────────────────────
-type Onglet = "dashboard" | "etats" | "rapports";
+type Onglet = "dashboard" | "etats" | "rapports" | "comparatif";
 
 const ONGLETS: { id: Onglet; label: string }[] = [
   { id: "dashboard", label: "Tableau de bord financier" },
+  { id: "comparatif", label: "Comparatif campagnes" },
   { id: "etats", label: "États financiers" },
   { id: "rapports", label: "Rapports téléchargeables" },
 ];
@@ -1006,6 +1194,7 @@ export default function ReportingPage() {
 
       {/* Contenu */}
       {onglet === "dashboard" && <TabDashboard />}
+      {onglet === "comparatif" && <TabComparatif />}
       {onglet === "etats" && <TabEtatsFinanciers />}
       {onglet === "rapports" && <TabRapports />}
     </div>
