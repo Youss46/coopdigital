@@ -7,6 +7,24 @@ import { eq, and, asc, sql } from "drizzle-orm";
 import { syncRealise, getAlertesDepassement } from "../services/budgetService";
 import { CampagneFermeeError } from "../lib/campagneGuard";
 
+// Convertit une ligne Drizzle (camelCase) en objet snake_case attendu par le client
+function toLigneBudgetSnake(l: typeof lignesBudgetTable.$inferSelect) {
+  return {
+    id:                        l.id,
+    budget_id:                 l.budgetId,
+    categorie:                 l.categorie,
+    libelle:                   l.libelle,
+    montant_previsionnel_fcfa: l.montantPrevisionnelFcfa ?? "0",
+    montant_realise_fcfa:      l.montantRealiseFcfa      ?? "0",
+    ecart_pct:                 l.ecartPct                ?? null,
+    ecart_fcfa:                null,
+    ordre:                     l.ordre,
+    created_at:                l.createdAt instanceof Date
+                                 ? l.createdAt.toISOString()
+                                 : (l.createdAt ?? null),
+  };
+}
+
 class TenantError extends Error {
   readonly status = 401;
   readonly erreur = "Coopérative non associée au compte";
@@ -134,7 +152,7 @@ export async function getBudgetCampagne(req: Request, res: Response): Promise<vo
 
     res.json({
       budget,
-      lignes,
+      lignes: lignes.map(toLigneBudgetSnake),
       hypotheses: hypotheses ?? null,
       totaux,
       resultat: {
@@ -196,7 +214,7 @@ export async function modifierLigne(req: Request, res: Response): Promise<void> 
       return;
     }
 
-    res.json(updated);
+    res.json(toLigneBudgetSnake(updated));
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur modifierLigne");
@@ -234,7 +252,7 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
   try {
     const budgetId = parseInt(String(req.params["id"] ?? "0"));
     const alertes  = await getAlertesDepassement(budgetId);
-    res.json(alertes);
+    res.json(alertes.map(toLigneBudgetSnake));
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getAlertes");
@@ -258,7 +276,7 @@ export async function getRapport(req: Request, res: Response): Promise<void> {
 
     // Grouper par catégorie
     const parCategorie: Record<string, {
-      lignes: typeof lignes;
+      lignes: ReturnType<typeof toLigneBudgetSnake>[];
       totalPrev: number;
       totalReel: number;
       ecartPct: number;
@@ -269,7 +287,7 @@ export async function getRapport(req: Request, res: Response): Promise<void> {
         parCategorie[l.categorie] = { lignes: [], totalPrev: 0, totalReel: 0, ecartPct: 0 };
       }
       const cat = parCategorie[l.categorie]!;
-      cat.lignes.push(l);
+      cat.lignes.push(toLigneBudgetSnake(l));
       cat.totalPrev += parseFloat(l.montantPrevisionnelFcfa ?? "0");
       cat.totalReel += parseFloat(l.montantRealiseFcfa      ?? "0");
     }
