@@ -15,6 +15,7 @@ import {
   getGetMembresQueryKey,
   getListIntrantsQueryKey,
   getGetIntrantsStockAlertesQueryKey,
+  customFetch,
 } from "@workspace/api-client-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sprout, Plus, AlertTriangle, Package, TrendingDown, BarChart3, ChevronDown, X, History } from "lucide-react";
@@ -505,18 +506,7 @@ function PanneauHistoriqueAppros({
 }) {
   const { data: appros, isLoading, isError, error, refetch } = useQuery<ApproRow[], Error>({
     queryKey: ["appros-intrant", intrant.id],
-    queryFn: async () => {
-      const token = typeof window !== "undefined" ? localStorage.getItem("coop_token") : null;
-      const res = await fetch(`/api/intrants/${intrant.id}/appros`, {
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      });
-      if (!res.ok) {
-        let detail = "";
-        try { const body = await res.json() as { erreur?: string }; detail = body.erreur ?? ""; } catch { /* ignore */ }
-        throw new Error(`HTTP ${res.status}${detail ? ` — ${detail}` : ""}`);
-      }
-      return res.json() as Promise<ApproRow[]>;
-    },
+    queryFn: () => customFetch<ApproRow[]>(`/api/intrants/${intrant.id}/appros`),
   });
 
   const totalQuantite = (appros ?? []).reduce((s, a) => s + parseFloat(a.quantite), 0);
