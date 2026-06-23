@@ -15,8 +15,8 @@ import {
   getGetMembresQueryKey,
   getListCategoriesIntrantsQueryKey,
 } from "@workspace/api-client-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sprout, Plus, AlertTriangle, Package, TrendingDown, BarChart3, ChevronDown, X, Tag } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Sprout, Plus, AlertTriangle, Package, TrendingDown, BarChart3, ChevronDown, X, Tag, History } from "lucide-react";
 
 const apiFetch = (url: string, opts?: RequestInit) => {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -409,6 +409,142 @@ function ModalRemboursement({ distributionId, membreNom, soldeDu, onClose }: { d
   );
 }
 
+// ─── Panneau Historique Appros ────────────────────────────────────────────────
+
+type ApproRow = {
+  id: number;
+  dateAppro: string;
+  quantite: string;
+  prixUnitaireFcfa: string;
+  montantTotalFcfa: string;
+  fournisseur: string | null;
+  numeroFacture: string | null;
+};
+
+function PanneauHistoriqueAppros({
+  intrant,
+  onClose,
+  onApprovisionner,
+}: {
+  intrant: { id: number; nom: string; unite: string };
+  onClose: () => void;
+  onApprovisionner: () => void;
+}) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const { data: appros, isLoading } = useQuery<ApproRow[]>({
+    queryKey: ["appros-intrant", intrant.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/intrants/${intrant.id}/appros`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) throw new Error("Erreur chargement historique");
+      return res.json() as Promise<ApproRow[]>;
+    },
+  });
+
+  const totalQuantite = (appros ?? []).reduce((s, a) => s + parseFloat(a.quantite), 0);
+  const totalMontant = (appros ?? []).reduce((s, a) => s + parseFloat(a.montantTotalFcfa), 0);
+
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end" onClick={onClose}>
+      <div
+        className="relative h-full w-full max-w-md bg-white shadow-2xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <History size={16} className="text-gray-400" />
+              <h3 className="font-bold text-gray-900 text-sm">Historique des approvisionnements</h3>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">{intrant.nom}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-4">
+            <X size={18} />
+          </button>
+        </div>
+
+        {(appros ?? []).length > 0 && (
+          <div className="grid grid-cols-2 gap-3 px-6 py-4 bg-gray-50 border-b border-gray-100">
+            <div className="bg-white rounded-xl border border-gray-200 px-4 py-3">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wide font-medium">Total reçu</p>
+              <p className="text-lg font-bold text-gray-900 mt-0.5">
+                {formaterNombre(totalQuantite, 3)} <span className="text-xs font-normal text-gray-500">{intrant.unite}</span>
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 px-4 py-3">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wide font-medium">Valeur totale</p>
+              <p className="text-lg font-bold text-gray-900 mt-0.5 text-sm">{formaterFCFA(totalMontant)}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+          {isLoading && (
+            <div className="text-center py-12 text-gray-400 text-sm">Chargement…</div>
+          )}
+          {!isLoading && (appros ?? []).length === 0 && (
+            <div className="text-center py-12">
+              <Package size={32} className="mx-auto mb-3 text-gray-300" />
+              <p className="text-sm text-gray-400">Aucun approvisionnement enregistré</p>
+              <button
+                onClick={onApprovisionner}
+                className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium"
+                style={{ backgroundColor: "#1a4731" }}
+              >
+                Premier approvisionnement
+              </button>
+            </div>
+          )}
+          {(appros ?? []).map((a) => (
+            <div key={a.id} className="bg-gray-50 rounded-xl border border-gray-100 px-4 py-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {formaterNombre(parseFloat(a.quantite), 3)} {intrant.unite}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {new Date(a.dateAppro).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-semibold" style={{ color: "#1a4731" }}>
+                    {formaterFCFA(parseFloat(a.montantTotalFcfa))}
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {formaterFCFA(parseFloat(a.prixUnitaireFcfa))} / {intrant.unite}
+                  </p>
+                </div>
+              </div>
+              {(a.fournisseur || a.numeroFacture) && (
+                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-200">
+                  {a.fournisseur && (
+                    <span className="text-[11px] text-gray-500">{a.fournisseur}</span>
+                  )}
+                  {a.numeroFacture && (
+                    <span className="text-[11px] text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{a.numeroFacture}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100">
+          <button
+            onClick={onApprovisionner}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-white text-sm font-bold"
+            style={{ backgroundColor: "#1a4731" }}
+          >
+            <Plus size={15} />
+            Nouvel approvisionnement
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Onglet Catalogue ─────────────────────────────────────────────────────────
 
 function OngletCatalogue() {
@@ -418,6 +554,7 @@ function OngletCatalogue() {
   const [showModalIntrant, setShowModalIntrant] = useState(false);
   const [modalAppro, setModalAppro] = useState<{ id: number; nom: string; unite: string } | null>(null);
   const [showDetailAlertes, setShowDetailAlertes] = useState(false);
+  const [panneauHistorique, setPanneauHistorique] = useState<{ id: number; nom: string; unite: string } | null>(null);
 
   const categorieOptions = (categories ?? []).map((c) => ({ id: c.id, libelle: c.libelle }));
   const nbAlertes = alertes?.length ?? 0;
@@ -527,12 +664,21 @@ function OngletCatalogue() {
                     <td className="px-4 py-3 text-right text-gray-500 hidden sm:table-cell">{formaterNombre(i.stockMinimum, 3)} {i.unite}</td>
                     <td className="px-4 py-3 text-right text-gray-500 hidden md:table-cell">{formaterFCFA(i.prixUnitaireFcfa)} / {i.unite}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => setModalAppro({ id: i.id, nom: i.nom, unite: i.unite })}
-                        className="text-xs px-3 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
-                      >
-                        Approvisionner
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setPanneauHistorique({ id: i.id, nom: i.nom, unite: i.unite })}
+                          className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 flex items-center gap-1"
+                          title="Historique des approvisionnements"
+                        >
+                          <History size={12} />
+                        </button>
+                        <button
+                          onClick={() => setModalAppro({ id: i.id, nom: i.nom, unite: i.unite })}
+                          className="text-xs px-3 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                        >
+                          Approvisionner
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -554,6 +700,16 @@ function OngletCatalogue() {
           intrantNom={modalAppro.nom}
           unite={modalAppro.unite}
           onClose={() => setModalAppro(null)}
+        />
+      )}
+      {panneauHistorique && (
+        <PanneauHistoriqueAppros
+          intrant={panneauHistorique}
+          onClose={() => setPanneauHistorique(null)}
+          onApprovisionner={() => {
+            setModalAppro(panneauHistorique);
+            setPanneauHistorique(null);
+          }}
         />
       )}
     </div>

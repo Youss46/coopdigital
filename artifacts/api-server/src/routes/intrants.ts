@@ -9,6 +9,7 @@ import {
   listCategories,
   createCategorie,
   createAppro,
+  getApprosByIntrant,
   createDistribution,
   getDistributionsMembre,
   getEncours,
@@ -40,6 +41,7 @@ router.get("/intrants/distribution/membre/:id", checkPermission("intrants", "voi
 
 // CRUD catalogue
 router.get("/intrants", checkPermission("intrants", "voir"), listIntrants);
+router.get("/intrants/:id/appros", checkPermission("intrants", "voir"), getApprosByIntrant);
 router.get("/intrants/:id", checkPermission("intrants", "voir"), getIntrantById);
 router.post("/intrants", checkPermission("intrants", "creer"), createIntrant);
 router.put("/intrants/:id", checkPermission("intrants", "modifier"), updateIntrant);

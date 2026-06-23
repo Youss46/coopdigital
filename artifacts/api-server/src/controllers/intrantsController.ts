@@ -280,6 +280,42 @@ export async function createAppro(req: Request, res: Response): Promise<void> {
   }
 }
 
+// ─── HISTORIQUE APPROS PAR INTRANT ────────────────────────────────────────────
+
+export async function getApprosByIntrant(req: Request, res: Response): Promise<void> {
+  try {
+    const intrantId = parseInt(String(req.params["id"]));
+    if (!intrantId) { res.status(400).json({ erreur: "id invalide" }); return; }
+
+    const rows = await db
+      .select({
+        id: approvisionnmentsIntrantsTable.id,
+        intrantId: approvisionnmentsIntrantsTable.intrantId,
+        dateAppro: approvisionnmentsIntrantsTable.dateAppro,
+        quantite: approvisionnmentsIntrantsTable.quantite,
+        prixUnitaireFcfa: approvisionnmentsIntrantsTable.prixUnitaireFcfa,
+        montantTotalFcfa: approvisionnmentsIntrantsTable.montantTotalFcfa,
+        fournisseur: approvisionnmentsIntrantsTable.fournisseur,
+        numeroFacture: approvisionnmentsIntrantsTable.numeroFacture,
+        createdAt: approvisionnmentsIntrantsTable.createdAt,
+      })
+      .from(approvisionnmentsIntrantsTable)
+      .where(
+        and(
+          eq(approvisionnmentsIntrantsTable.intrantId, intrantId),
+          eq(approvisionnmentsIntrantsTable.cooperativeId, coopId(req))
+        )
+      )
+      .orderBy(desc(approvisionnmentsIntrantsTable.dateAppro));
+
+    res.json(rows);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur getApprosByIntrant");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 // ─── DISTRIBUTION ─────────────────────────────────────────────────────────────
 
 export async function createDistribution(req: Request, res: Response): Promise<void> {
