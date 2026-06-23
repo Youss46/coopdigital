@@ -87,6 +87,7 @@ function ModalNouvelIntrant({ onClose, categorieOptions }: { onClose: () => void
                 onSuccess: () => {
                   void queryClient.invalidateQueries({ queryKey: getListIntrantsQueryKey() });
                   void queryClient.invalidateQueries({ queryKey: getGetIntrantsStockAlertesQueryKey() });
+                  void queryClient.invalidateQueries({ queryKey: ["appros-intrant", intrant.id] });
                   onClose();
                 },
               }
@@ -351,6 +352,7 @@ function ModalAppro({ intrantId, intrantNom, unite, onClose }: { intrantId: numb
         onSuccess: () => {
           void queryClient.invalidateQueries({ queryKey: getListIntrantsQueryKey() });
           void queryClient.invalidateQueries({ queryKey: getGetIntrantsStockAlertesQueryKey() });
+          void queryClient.invalidateQueries({ queryKey: ["appros-intrant", intrantId] });
           onClose();
         },
       }
