@@ -51,6 +51,17 @@ INSERT INTO categories_equipements (cooperative_id, libelle, duree_amortissement
   (1, 'Motos et deux-roues',           4,  'lineaire',   '2446', '2846')
 ON CONFLICT DO NOTHING;
 
+-- Catégories d'intrants par défaut
+INSERT INTO categories_intrants (cooperative_id, libelle, unite) VALUES
+  (1, 'Engrais',            'kg'),
+  (1, 'Pesticides',         'litre'),
+  (1, 'Fongicides',         'litre'),
+  (1, 'Herbicides',         'litre'),
+  (1, 'Semences',           'kg'),
+  (1, 'Équipements EPI',    'unité'),
+  (1, 'Matériel agricole',  'unité')
+ON CONFLICT DO NOTHING;
+
 -- Paiements liés aux livraisons
 INSERT INTO paiements (livraison_id, membre_id, montant_fcfa, mode_paiement, statut) VALUES
   (1, 1, 58450, 'orange_money', 'confirme'),

@@ -7,6 +7,7 @@ import {
   updateIntrant,
   getStockAlertes,
   listCategories,
+  createCategorie,
   createAppro,
   createDistribution,
   getDistributionsMembre,
@@ -20,6 +21,7 @@ const router = Router();
 
 // Catégories
 router.get("/intrants/categories", checkPermission("intrants", "voir"), listCategories);
+router.post("/intrants/categories", checkPermission("intrants", "creer"), createCategorie);
 
 // Stock alertes
 router.get("/intrants/stock-alerte", checkPermission("intrants", "voir"), getStockAlertes);

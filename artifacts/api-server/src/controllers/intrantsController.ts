@@ -186,6 +186,29 @@ export async function listCategories(req: Request, res: Response): Promise<void>
   }
 }
 
+export async function createCategorie(req: Request, res: Response): Promise<void> {
+  try {
+    const { libelle, unite } = req.body as Record<string, unknown>;
+    if (!libelle || typeof libelle !== "string" || libelle.trim() === "") {
+      res.status(400).json({ erreur: "libelle requis" });
+      return;
+    }
+    const [row] = await db
+      .insert(categoriesIntrantsTable)
+      .values({
+        cooperativeId: coopId(req),
+        libelle: libelle.trim(),
+        unite: (typeof unite === "string" && unite.trim()) ? unite.trim() : "unité",
+      })
+      .returning();
+    res.status(201).json(row);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur createCategorie");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 // ─── APPROVISIONNEMENT ────────────────────────────────────────────────────────
 
 export async function createAppro(req: Request, res: Response): Promise<void> {

@@ -13,9 +13,18 @@ import {
   useGetIntrantsStockAlertes,
   useGetMembres,
   getGetMembresQueryKey,
+  getListCategoriesIntrantsQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Sprout, Plus, AlertTriangle, Package, TrendingDown, BarChart3, ChevronDown, X } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Sprout, Plus, AlertTriangle, Package, TrendingDown, BarChart3, ChevronDown, X, Tag } from "lucide-react";
+
+const apiFetch = (url: string, opts?: RequestInit) => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  return fetch(url, {
+    ...opts,
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...opts?.headers },
+  });
+};
 
 function formaterFCFA(n: number | string) {
   const val = typeof n === "string" ? parseFloat(n) : n;
@@ -28,6 +37,65 @@ function formaterNombre(n: number | string, decimales = 1) {
 }
 
 type Onglet = "catalogue" | "distribution" | "encours" | "rapport";
+
+// ─── Modal Nouvelle Catégorie ─────────────────────────────────────────────────
+
+function ModalNouvelleCategorie({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [libelle, setLibelle] = useState("");
+  const [unite, setUnite] = useState("unité");
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiFetch("/api/intrants/categories", {
+        method: "POST",
+        body: JSON.stringify({ libelle, unite }),
+      });
+      if (!res.ok) throw new Error("Erreur création catégorie");
+      return res.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: getListCategoriesIntrantsQueryKey() });
+      onClose();
+    },
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="font-bold text-gray-900">Nouvelle catégorie</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Libellé *</label>
+            <input required value={libelle} onChange={(e) => setLibelle(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+              placeholder="Ex: Engrais" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Unité par défaut</label>
+            <select value={unite} onChange={(e) => setUnite(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none">
+              <option value="kg">kg</option>
+              <option value="litre">litre</option>
+              <option value="unité">unité</option>
+              <option value="sac">sac</option>
+            </select>
+          </div>
+          {mutation.isError && <p className="text-sm text-red-600">Erreur lors de la création</p>}
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700">Annuler</button>
+            <button type="submit" disabled={mutation.isPending} className="flex-1 py-2.5 rounded-lg text-white text-sm font-bold" style={{ backgroundColor: "#1a4731" }}>
+              {mutation.isPending ? "Création…" : "Créer"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 // ─── Modal Nouvel Intrant ────────────────────────────────────────────────────
 
@@ -296,9 +364,11 @@ function OngletCatalogue() {
 
   const categorieOptions = (categories ?? []).map((c) => ({ id: c.id, libelle: c.libelle }));
   const nbAlertes = alertes?.length ?? 0;
+  const [showModalCategorie, setShowModalCategorie] = useState(false);
 
   return (
     <div className="space-y-4">
+      {showModalCategorie && <ModalNouvelleCategorie onClose={() => setShowModalCategorie(false)} />}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {nbAlertes > 0 && (
@@ -341,14 +411,23 @@ function OngletCatalogue() {
             </div>
           )}
         </div>
-        <button
-          onClick={() => setShowModalIntrant(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium"
-          style={{ backgroundColor: "#1a4731" }}
-        >
-          <Plus size={15} />
-          Nouvel intrant
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowModalCategorie(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50"
+          >
+            <Tag size={15} />
+            Nouvelle catégorie
+          </button>
+          <button
+            onClick={() => setShowModalIntrant(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium"
+            style={{ backgroundColor: "#1a4731" }}
+          >
+            <Plus size={15} />
+            Nouvel intrant
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
