@@ -247,6 +247,7 @@ export default function Membres() {
           dateNaissance: (form as Record<string, unknown>)["dateNaissance"],
           typeFournisseur: (form as Record<string, unknown>)["typeFournisseur"],
           nbrePartsSouscrites: (form as Record<string, unknown>)["nbrePartsSouscrites"] ? Number((form as Record<string, unknown>)["nbrePartsSouscrites"]) : undefined,
+          carteProducteur: (form as Record<string, unknown>)["carteProducteur"] || undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any),
       },
