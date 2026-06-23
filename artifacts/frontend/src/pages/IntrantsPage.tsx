@@ -503,14 +503,14 @@ function PanneauHistoriqueAppros({
   onClose: () => void;
   onApprovisionner: () => void;
 }) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("coop_token") : null;
-  const { data: appros, isLoading } = useQuery<ApproRow[]>({
+  const { data: appros, isLoading, isError, refetch } = useQuery<ApproRow[]>({
     queryKey: ["appros-intrant", intrant.id],
     queryFn: async () => {
+      const token = typeof window !== "undefined" ? localStorage.getItem("coop_token") : null;
       const res = await fetch(`/api/intrants/${intrant.id}/appros`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
-      if (!res.ok) throw new Error("Erreur chargement historique");
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
       return res.json() as Promise<ApproRow[]>;
     },
   });
@@ -556,7 +556,20 @@ function PanneauHistoriqueAppros({
           {isLoading && (
             <div className="text-center py-12 text-gray-400 text-sm">Chargement…</div>
           )}
-          {!isLoading && (appros ?? []).length === 0 && (
+          {!isLoading && isError && (
+            <div className="text-center py-12">
+              <AlertTriangle size={32} className="mx-auto mb-3 text-amber-400" />
+              <p className="text-sm font-medium text-gray-700">Impossible de charger l'historique</p>
+              <p className="text-xs text-gray-400 mt-1">Vérifiez votre connexion ou rechargez la page.</p>
+              <button
+                onClick={() => void refetch()}
+                className="mt-4 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Réessayer
+              </button>
+            </div>
+          )}
+          {!isLoading && !isError && (appros ?? []).length === 0 && (
             <div className="text-center py-12">
               <Package size={32} className="mx-auto mb-3 text-gray-300" />
               <p className="text-sm text-gray-400">Aucun approvisionnement enregistré</p>
