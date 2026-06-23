@@ -20,7 +20,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sprout, Plus, AlertTriangle, Package, TrendingDown, BarChart3, ChevronDown, X, History } from "lucide-react";
 
 const apiFetch = (url: string, opts?: RequestInit) => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = typeof window !== "undefined" ? localStorage.getItem("coop_token") : null;
   return fetch(url, {
     ...opts,
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...opts?.headers },
@@ -501,7 +501,7 @@ function PanneauHistoriqueAppros({
   onClose: () => void;
   onApprovisionner: () => void;
 }) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = typeof window !== "undefined" ? localStorage.getItem("coop_token") : null;
   const { data: appros, isLoading } = useQuery<ApproRow[]>({
     queryKey: ["appros-intrant", intrant.id],
     queryFn: async () => {
