@@ -256,6 +256,134 @@ function ModalNouvelIntrant({ onClose, categorieOptions }: { onClose: () => void
   );
 }
 
+// ─── Modal Modifier Intrant ───────────────────────────────────────────────────
+
+type IntrantEditable = {
+  id: number; nom: string; unite: string; prixUnitaireFcfa: string | number;
+  stockMinimum: string | number; description: string | null;
+  fournisseurIntrant: string | null; datePeremption: string | null;
+  categorieId: number | null;
+};
+
+function ModalModifierIntrant({
+  intrant, categorieOptions, onClose,
+}: {
+  intrant: IntrantEditable;
+  categorieOptions: Array<{ id: number; libelle: string }>;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const mutation = useUpdateIntrant();
+  const [form, setForm] = useState({
+    nom: intrant.nom,
+    unite: intrant.unite,
+    prixUnitaireFcfa: String(intrant.prixUnitaireFcfa ?? ""),
+    stockMinimum: String(intrant.stockMinimum ?? ""),
+    description: intrant.description ?? "",
+    fournisseurIntrant: intrant.fournisseurIntrant ?? "",
+    datePeremption: intrant.datePeremption ?? "",
+    categorieId: intrant.categorieId ? String(intrant.categorieId) : "",
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    mutation.mutate(
+      {
+        id: intrant.id,
+        data: {
+          nom: form.nom,
+          unite: form.unite,
+          prixUnitaireFcfa: form.prixUnitaireFcfa ? parseFloat(form.prixUnitaireFcfa) : undefined,
+          stockMinimum: form.stockMinimum ? parseFloat(form.stockMinimum) : undefined,
+          description: form.description || undefined,
+          fournisseurIntrant: form.fournisseurIntrant || undefined,
+          datePeremption: form.datePeremption || undefined,
+          categorieId: form.categorieId ? parseInt(form.categorieId) : undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          void queryClient.invalidateQueries({ queryKey: ["listIntrants"] });
+          onClose();
+        },
+      }
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="font-bold text-gray-900">Modifier l'intrant</h3>
+            <p className="text-xs text-gray-500 mt-0.5">{intrant.nom}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
+              <input required value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Catégorie</label>
+              <select value={form.categorieId} onChange={(e) => setForm({ ...form, categorieId: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none">
+                <option value="">— Aucune —</option>
+                {categorieOptions.map((c) => <option key={c.id} value={c.id}>{c.libelle}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Unité *</label>
+              <select value={form.unite} onChange={(e) => setForm({ ...form, unite: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none">
+                <option value="kg">kg</option>
+                <option value="litre">litre</option>
+                <option value="unité">unité</option>
+                <option value="sac">sac</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Prix unitaire (FCFA)</label>
+              <MoneyInput value={form.prixUnitaireFcfa} onChange={(raw) => setForm({ ...form, prixUnitaireFcfa: raw })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="0" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Stock minimum</label>
+              <input type="number" min="0" step="0.001" value={form.stockMinimum} onChange={(e) => setForm({ ...form, stockMinimum: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="0" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Fournisseur</label>
+              <input value={form.fournisseurIntrant} onChange={(e) => setForm({ ...form, fournisseurIntrant: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="Nom du fournisseur" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Date de péremption</label>
+              <input type="date" value={form.datePeremption} onChange={(e) => setForm({ ...form, datePeremption: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+            </div>
+          </div>
+          {mutation.isError && <p className="text-sm text-red-600">Erreur lors de la modification</p>}
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700">Annuler</button>
+            <button type="submit" disabled={mutation.isPending} className="flex-1 py-2.5 rounded-lg text-white text-sm font-bold" style={{ backgroundColor: "#1a4731" }}>
+              {mutation.isPending ? "Enregistrement…" : "Enregistrer"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal Approvisionnement ─────────────────────────────────────────────────
 
 function ModalAppro({ intrantId, intrantNom, unite, onClose }: { intrantId: number; intrantNom: string; unite: string; onClose: () => void }) {
@@ -555,6 +683,7 @@ function OngletCatalogue() {
   const [modalAppro, setModalAppro] = useState<{ id: number; nom: string; unite: string } | null>(null);
   const [showDetailAlertes, setShowDetailAlertes] = useState(false);
   const [panneauHistorique, setPanneauHistorique] = useState<{ id: number; nom: string; unite: string } | null>(null);
+  const [editIntrant, setEditIntrant] = useState<IntrantEditable | null>(null);
 
   const categorieOptions = (categories ?? []).map((c) => ({ id: c.id, libelle: c.libelle }));
   const nbAlertes = alertes?.length ?? 0;
@@ -673,8 +802,25 @@ function OngletCatalogue() {
                           <History size={12} />
                         </button>
                         <button
-                          onClick={() => setModalAppro({ id: i.id, nom: i.nom, unite: i.unite })}
+                          onClick={() => setEditIntrant({
+                            id: i.id,
+                            nom: i.nom,
+                            unite: i.unite,
+                            prixUnitaireFcfa: i.prixUnitaireFcfa,
+                            stockMinimum: i.stockMinimum,
+                            description: i.description ?? null,
+                            fournisseurIntrant: i.fournisseurIntrant ?? null,
+                            datePeremption: i.datePeremption ?? null,
+                            categorieId: i.categorieId ?? null,
+                          })}
                           className="text-xs px-3 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          onClick={() => setModalAppro({ id: i.id, nom: i.nom, unite: i.unite })}
+                          className="text-xs px-3 py-1 rounded-lg text-white font-medium"
+                          style={{ backgroundColor: "#1a4731" }}
                         >
                           Approvisionner
                         </button>
@@ -693,6 +839,13 @@ function OngletCatalogue() {
 
       {showModalIntrant && (
         <ModalNouvelIntrant categorieOptions={categorieOptions} onClose={() => setShowModalIntrant(false)} />
+      )}
+      {editIntrant && (
+        <ModalModifierIntrant
+          intrant={editIntrant}
+          categorieOptions={categorieOptions}
+          onClose={() => setEditIntrant(null)}
+        />
       )}
       {modalAppro && (
         <ModalAppro
