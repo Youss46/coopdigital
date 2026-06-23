@@ -121,11 +121,15 @@ function OngletHypotheses({
     });
   }, [hypotheses]);
 
+  const [justSaved, setJustSaved] = useState(false);
+
   const mutHypo = usePostBudgetIdHypotheses({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetBudgetCampagneIdQueryKey(campagneId) });
         toast({ title: "Hypothèses enregistrées" });
+        setJustSaved(true);
+        setTimeout(() => setJustSaved(false), 3000);
       },
       onError: () => toast({ title: "Erreur", variant: "destructive" }),
     },
@@ -135,10 +139,62 @@ function OngletHypotheses({
   const pxAchat = parseFloat(form.prixAchatMoyenFcfa)   || 0;
   const pxVente = parseFloat(form.prixVenteMoyenFcfa)   || 0;
 
+  // Nombre de champs renseignés (dans le formulaire actuel)
+  const champsRenseignes = [
+    form.tonnagePrevisionnelKg,
+    form.prixAchatMoyenFcfa,
+    form.prixVenteMoyenFcfa,
+    form.nbMembresActifs,
+    form.nbLivraisonsEstimees,
+  ].filter((v) => v !== "").length;
+  const total = 5;
+  const complet = champsRenseignes === total;
+  const aDesData = champsRenseignes > 0;
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-5">Hypothèses de campagne</h3>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-semibold text-gray-900">Hypothèses de campagne</h3>
+          <div className="flex items-center gap-2">
+            {/* Barre de complétion */}
+            {aDesData && (
+              <div className="flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  {Array.from({ length: total }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-4 h-1.5 rounded-full transition-colors ${
+                        i < champsRenseignes ? "bg-green-500" : "bg-gray-200"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-gray-500">
+                  {champsRenseignes}/{total}
+                </span>
+              </div>
+            )}
+            {/* Badge statut */}
+            {justSaved ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
+                <CheckCircle2 size={12} /> Enregistré
+              </span>
+            ) : complet ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <CheckCircle2 size={12} /> Complètes
+              </span>
+            ) : aDesData ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                <AlertTriangle size={12} /> Partielles
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200">
+                Non renseignées
+              </span>
+            )}
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {[
             { key: "tonnagePrevisionnelKg", label: "Tonnage prévisionnel (kg)", placeholder: "ex : 500000" },
@@ -193,11 +249,15 @@ function OngletHypotheses({
                   },
                 })
               }
-              disabled={mutHypo.isPending}
-              className="px-5 py-2.5 text-sm font-medium text-white rounded-lg disabled:opacity-50"
-              style={{ backgroundColor: VERT }}
+              disabled={mutHypo.isPending || justSaved}
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white rounded-lg disabled:opacity-70 transition-colors"
+              style={{ backgroundColor: justSaved ? "#16a34a" : VERT }}
             >
-              {mutHypo.isPending ? "Enregistrement…" : "Enregistrer les hypothèses"}
+              {mutHypo.isPending
+                ? "Enregistrement…"
+                : justSaved
+                ? <><CheckCircle2 size={15} /> Enregistré</>
+                : "Enregistrer les hypothèses"}
             </button>
           </div>
         )}
