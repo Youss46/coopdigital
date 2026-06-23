@@ -78,6 +78,9 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/formations-rse",         label: "Formations RSE",            roles: ["pca","directeur","comptable","auditeur"],                                    category: "RH & Social" },
   { href: "/equipements",            label: "Équipements",               roles: ["pca","directeur","comptable","auditeur"],                                    category: "RH & Social" },
 
+  // ── Archives ─────────────────────────────────────────────────────────────────
+  { href: "/archives",               label: "Archives",                  roles: ["pca","directeur","comptable","auditeur"],                                    category: "Archives" },
+
   // ── Pilotage ─────────────────────────────────────────────────────────────────
   { href: "/previsions",             label: "Prévisions",                roles: ["pca","directeur","comptable","auditeur"],                                    category: "Pilotage" },
   { href: "/reporting",              label: "Reporting",                 roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],           category: "Pilotage" },

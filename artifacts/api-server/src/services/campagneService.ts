@@ -7,6 +7,7 @@ import {
 import { eq, and, sql, desc, ne, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { recalculerTous } from "./scoringService";
+import { archiverCampagne } from "./archiveService";
 
 export interface ResultatVerification {
   code: string;
@@ -397,6 +398,11 @@ export async function cloturerCampagne(cooperativeId: number, campagneId: number
   await db.update(campagnesTable)
     .set({ statut: "fermee", dateFermeture })
     .where(and(eq(campagnesTable.id, campagneId), eq(campagnesTable.cooperativeId, cooperativeId)));
+
+  // Archivage automatique — fire-and-forget (non bloquant, se fait après scoring)
+  archiverCampagne(cooperativeId, campagneId, userId).catch((err) =>
+    logger.warn({ err, campagneId }, "Erreur archivage post-clôture (non bloquant)"),
+  );
 
   // Scoring final de tous les membres — fire-and-forget (non bloquant)
   recalculerTous(cooperativeId, campagneId).catch((err) =>

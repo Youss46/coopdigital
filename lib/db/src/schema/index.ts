@@ -1,4 +1,5 @@
 export * from "./cooperatives";
+export * from "./archives";
 export * from "./users";
 export * from "./membres";
 export * from "./cotisations";
