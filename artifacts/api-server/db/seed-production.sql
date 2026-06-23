@@ -15,7 +15,22 @@ INSERT INTO users (cooperative_id, nom, prenoms, email, password_hash, role) VAL
    'admin')
 ON CONFLICT (email) DO NOTHING;
 
--- 3. Superadmin M15 Tech (mot de passe : @Youss054626)
+-- 3. Catégories d'intrants par défaut
+INSERT INTO categories_intrants (cooperative_id, libelle, unite)
+SELECT c.id, v.libelle, v.unite
+FROM cooperatives c
+CROSS JOIN (VALUES
+  ('Engrais',           'kg'),
+  ('Pesticides',        'litre'),
+  ('Fongicides',        'litre'),
+  ('Herbicides',        'litre'),
+  ('Semences',          'kg'),
+  ('Équipements EPI',   'unité'),
+  ('Matériel agricole', 'unité')
+) AS v(libelle, unite)
+ON CONFLICT DO NOTHING;
+
+-- 4. Superadmin M15 Tech (mot de passe : @Youss054626)
 INSERT INTO m15_users (nom, email, password_hash, role, actif) VALUES
   ('Youss', 'contacteyouss@gmail.com',
    '$2b$10$PMEzxeEVMl9hcBsb/GrVPe0JcuLWFUXB5ZqTUUopt9tonMPEdPJSq',
