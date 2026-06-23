@@ -553,10 +553,12 @@ interface ResetPasswordModalProps {
   prenoms: string;
   email: string;
   userId: number;
+  role: string;
+  telephone?: string | null;
   onClose: () => void;
 }
 
-function ResetPasswordModal({ nom, prenoms, email, userId, onClose }: ResetPasswordModalProps) {
+function ResetPasswordModal({ nom, prenoms, email, userId, role, telephone, onClose }: ResetPasswordModalProps) {
   const { toast } = useToast();
   const resetMutation = useResetUserPassword();
   const [phase, setPhase] = useState<"confirm" | "succes">("confirm");
@@ -574,21 +576,43 @@ function ResetPasswordModal({ nom, prenoms, email, userId, onClose }: ResetPassw
     setTimeout(() => setCopie(false), 2000);
   }, [motDePasse]);
 
+  const TERRAIN_URL = "https://coopdigital.m15-edutech.ci";
+
   const partagerWhatsApp = useCallback(() => {
-    const appUrl = window.location.origin + (import.meta.env.BASE_URL ?? "/");
-    const msg = [
-      `Bonjour ${prenoms},`,
-      "",
-      "Votre mot de passe CoopDigital a été réinitialisé :",
-      `🌐 Adresse : ${appUrl}`,
-      `📧 Email : ${email}`,
-      `🔑 Nouveau mot de passe temporaire : ${motDePasse}`,
-      "",
-      "Merci de changer votre mot de passe dès la première connexion.",
-      "— CoopDigital",
-    ].join("\n");
+    const isAgentTerrain = role === "agent_terrain";
+    const appUrl = isAgentTerrain
+      ? TERRAIN_URL
+      : window.location.origin + (import.meta.env.BASE_URL ?? "/");
+
+    let msg: string;
+    if (isAgentTerrain) {
+      msg = [
+        `Bonjour ${prenoms},`,
+        "",
+        "Votre mot de passe sur la plateforme Agent Terrain CoopDigital a été réinitialisé :",
+        `🌐 Adresse : ${appUrl}`,
+        `📱 Numéro de téléphone : ${telephone || "—"}`,
+        `🔑 Nouveau mot de passe temporaire : ${motDePasse}`,
+        "",
+        "Connectez-vous avec votre numéro de téléphone et ce mot de passe.",
+        "Merci de changer votre mot de passe dès la première connexion.",
+        "— CoopDigital",
+      ].join("\n");
+    } else {
+      msg = [
+        `Bonjour ${prenoms},`,
+        "",
+        "Votre mot de passe CoopDigital a été réinitialisé :",
+        `🌐 Adresse : ${appUrl}`,
+        `📧 Email : ${email}`,
+        `🔑 Nouveau mot de passe temporaire : ${motDePasse}`,
+        "",
+        "Merci de changer votre mot de passe dès la première connexion.",
+        "— CoopDigital",
+      ].join("\n");
+    }
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
-  }, [prenoms, email, motDePasse]);
+  }, [prenoms, email, telephone, role, motDePasse]);
 
   const handleReset = () => {
     resetMutation.mutate(
@@ -624,8 +648,17 @@ function ResetPasswordModal({ nom, prenoms, email, userId, onClose }: ResetPassw
 
             <div className="mx-6 mb-4 rounded-xl border border-gray-100 bg-gray-50 divide-y divide-gray-100">
               <div className="px-4 py-3">
-                <p className="text-xs text-gray-400 mb-0.5">Email</p>
-                <p className="text-sm font-medium text-gray-800 break-all">{email}</p>
+                {role === "agent_terrain" ? (
+                  <>
+                    <p className="text-xs text-gray-400 mb-0.5">Numéro de téléphone</p>
+                    <p className="text-sm font-medium text-gray-800 break-all">{telephone || "—"}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-400 mb-0.5">Email</p>
+                    <p className="text-sm font-medium text-gray-800 break-all">{email}</p>
+                  </>
+                )}
               </div>
               <div className="px-4 py-3 flex items-center justify-between gap-2">
                 <div>
@@ -768,6 +801,8 @@ export default function ComptesPage() {
     nom: string;
     prenoms: string;
     email: string;
+    role: string;
+    telephone?: string | null;
   } | null>(null);
 
   // Accès refusé si pas PCA / Directeur
@@ -918,6 +953,8 @@ export default function ComptesPage() {
                                   nom: compte.nom,
                                   prenoms: compte.prenoms,
                                   email: compte.email,
+                                  role: compte.role,
+                                  telephone: compte.telephone,
                                 })
                               }
                               title="Réinitialiser le mot de passe"
@@ -997,6 +1034,8 @@ export default function ComptesPage() {
           nom={resetTarget.nom}
           prenoms={resetTarget.prenoms}
           email={resetTarget.email}
+          role={resetTarget.role}
+          telephone={resetTarget.telephone}
           onClose={() => setResetTarget(null)}
         />
       )}
