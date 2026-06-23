@@ -14,6 +14,8 @@ import {
   useGetMembres,
   getGetMembresQueryKey,
   getListCategoriesIntrantsQueryKey,
+  getListIntrantsQueryKey,
+  getGetIntrantsStockAlertesQueryKey,
 } from "@workspace/api-client-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sprout, Plus, AlertTriangle, Package, TrendingDown, BarChart3, ChevronDown, X, Tag, History } from "lucide-react";
@@ -142,14 +144,14 @@ function ModalNouvelIntrant({ onClose, categorieOptions }: { onClose: () => void
               },
               {
                 onSuccess: () => {
-                  void queryClient.invalidateQueries({ queryKey: ["listIntrants"] });
-                  void queryClient.invalidateQueries({ queryKey: ["getStockAlertes"] });
+                  void queryClient.invalidateQueries({ queryKey: getListIntrantsQueryKey() });
+                  void queryClient.invalidateQueries({ queryKey: getGetIntrantsStockAlertesQueryKey() });
                   onClose();
                 },
               }
             );
           } else {
-            void queryClient.invalidateQueries({ queryKey: ["listIntrants"] });
+            void queryClient.invalidateQueries({ queryKey: getListIntrantsQueryKey() });
             onClose();
           }
         },
@@ -303,7 +305,7 @@ function ModalModifierIntrant({
       },
       {
         onSuccess: () => {
-          void queryClient.invalidateQueries({ queryKey: ["listIntrants"] });
+          void queryClient.invalidateQueries({ queryKey: getListIntrantsQueryKey() });
           onClose();
         },
       }
@@ -406,8 +408,8 @@ function ModalAppro({ intrantId, intrantNom, unite, onClose }: { intrantId: numb
       },
       {
         onSuccess: () => {
-          void queryClient.invalidateQueries({ queryKey: ["listIntrants"] });
-          void queryClient.invalidateQueries({ queryKey: ["getStockAlertes"] });
+          void queryClient.invalidateQueries({ queryKey: getListIntrantsQueryKey() });
+          void queryClient.invalidateQueries({ queryKey: getGetIntrantsStockAlertesQueryKey() });
           onClose();
         },
       }
@@ -914,7 +916,7 @@ function OngletDistribution() {
       },
       {
         onSuccess: () => {
-          void queryClient.invalidateQueries({ queryKey: ["listIntrants"] });
+          void queryClient.invalidateQueries({ queryKey: getListIntrantsQueryKey() });
           setSucces(true);
           setMembreSelectionne(null);
           setMembreQ("");
