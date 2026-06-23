@@ -4,6 +4,7 @@ import cron from "node-cron";
 import { checkEcheancesEnRetard } from "./services/empruntService";
 import { runNotificationsCron } from "./jobs/notificationsCron";
 import { runMigrations } from "@workspace/db";
+import { bootstrapReferenceData } from "./services/bootstrapService";
 import path from "path";
 
 const rawPort = process.env["PORT"];
@@ -19,7 +20,10 @@ if (Number.isNaN(port) || port <= 0) {
 const migrationsFolder = path.resolve(process.cwd(), "../../lib/db/drizzle");
 
 runMigrations(migrationsFolder)
-  .then(() => logger.info("Migrations DB appliquées"))
+  .then(() => {
+    logger.info("Migrations DB appliquées");
+    return bootstrapReferenceData();
+  })
   .catch((err) => logger.error({ err }, "Erreur migrations DB — démarrage quand même"));
 
 app.listen(port, (err) => {
