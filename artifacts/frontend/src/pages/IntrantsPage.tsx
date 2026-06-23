@@ -102,7 +102,13 @@ function ModalNouvelleCategorie({ onClose }: { onClose: () => void }) {
 function ModalNouvelIntrant({ onClose, categorieOptions }: { onClose: () => void; categorieOptions: Array<{ id: number; libelle: string }> }) {
   const queryClient = useQueryClient();
   const mutation = useCreateIntrant();
-  const [form, setForm] = useState({ nom: "", unite: "kg", prixUnitaireFcfa: "", stockMinimum: "", description: "", fournisseurIntrant: "", datePeremption: "", categorieId: "" });
+  const approMutation = useCreateApprovIntrant();
+  const [form, setForm] = useState({
+    nom: "", unite: "kg", prixUnitaireFcfa: "", stockMinimum: "", stockInitial: "",
+    description: "", fournisseurIntrant: "", datePeremption: "", categorieId: "",
+  });
+
+  const isPending = mutation.isPending || approMutation.isPending;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,9 +126,32 @@ function ModalNouvelIntrant({ onClose, categorieOptions }: { onClose: () => void
         },
       },
       {
-        onSuccess: () => {
-          void queryClient.invalidateQueries({ queryKey: ["listIntrants"] });
-          onClose();
+        onSuccess: (intrant) => {
+          const qteInitiale = form.stockInitial ? parseFloat(form.stockInitial) : 0;
+          const prix = form.prixUnitaireFcfa ? parseFloat(form.prixUnitaireFcfa) : 0;
+          if (qteInitiale > 0) {
+            approMutation.mutate(
+              {
+                data: {
+                  intrantId: intrant.id,
+                  dateAppro: new Date().toISOString().split("T")[0]!,
+                  quantite: qteInitiale,
+                  prixUnitaireFcfa: prix > 0 ? prix : 1,
+                  fournisseur: form.fournisseurIntrant || undefined,
+                },
+              },
+              {
+                onSuccess: () => {
+                  void queryClient.invalidateQueries({ queryKey: ["listIntrants"] });
+                  void queryClient.invalidateQueries({ queryKey: ["getStockAlertes"] });
+                  onClose();
+                },
+              }
+            );
+          } else {
+            void queryClient.invalidateQueries({ queryKey: ["listIntrants"] });
+            onClose();
+          }
         },
       }
     );
@@ -167,30 +196,58 @@ function ModalNouvelIntrant({ onClose, categorieOptions }: { onClose: () => void
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Stock minimum</label>
-              <input type="number" min="0" value={form.stockMinimum} onChange={(e) => setForm({ ...form, stockMinimum: e.target.value })}
+              <input type="number" min="0" step="0.001" value={form.stockMinimum} onChange={(e) => setForm({ ...form, stockMinimum: e.target.value })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="0" />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Fournisseur</label>
-              <input value={form.fournisseurIntrant} onChange={(e) => setForm({ ...form, fournisseurIntrant: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="Nom du fournisseur" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Date de péremption</label>
-              <input type="date" value={form.datePeremption} onChange={(e) => setForm({ ...form, datePeremption: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
-              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Stock initial</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Quantité en stock ({form.unite || "unité"})
+                  <span className="ml-1 text-gray-400 font-normal">— optionnel</span>
+                </label>
+                <input type="number" min="0" step="0.001" value={form.stockInitial} onChange={(e) => setForm({ ...form, stockInitial: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="0" />
+                {form.stockInitial && parseFloat(form.stockInitial) > 0 && (
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Un approvisionnement initial sera créé automatiquement à la date d'aujourd'hui.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-          {mutation.isError && <p className="text-sm text-red-600">Erreur lors de la création</p>}
+
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Informations complémentaires</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Fournisseur</label>
+                <input value={form.fournisseurIntrant} onChange={(e) => setForm({ ...form, fournisseurIntrant: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="Nom du fournisseur" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Date de péremption</label>
+                <input type="date" value={form.datePeremption} onChange={(e) => setForm({ ...form, datePeremption: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+              </div>
+            </div>
+          </div>
+
+          {(mutation.isError || approMutation.isError) && (
+            <p className="text-sm text-red-600">Erreur lors de la création</p>
+          )}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700">Annuler</button>
-            <button type="submit" disabled={mutation.isPending} className="flex-1 py-2.5 rounded-lg text-white text-sm font-bold" style={{ backgroundColor: "#1a4731" }}>
-              {mutation.isPending ? "Création…" : "Créer l'intrant"}
+            <button type="submit" disabled={isPending} className="flex-1 py-2.5 rounded-lg text-white text-sm font-bold" style={{ backgroundColor: "#1a4731" }}>
+              {isPending ? "Création…" : "Créer l'intrant"}
             </button>
           </div>
         </form>
