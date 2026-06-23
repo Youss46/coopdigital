@@ -70,22 +70,27 @@ export async function authentifierMembre(
   const parsed = parseCodeMembre(codeMembre);
   if (!parsed) throw new Error("Format de code membre invalide (ex: MBR-2025-0001)");
 
-  // Chercher par (numero_membre, année d'adhésion) — peut retourner plusieurs coops
+  // Normalisation du téléphone : supprime espaces, tirets, parenthèses, points, +
+  const telCanon = (t: string) => t.replace(/[\s\-()+.]/g, "");
+  const telNorm = telCanon(telephone);
+
+  // Filtrer directement en SQL sur (numero_membre, année, téléphone normalisé)
+  // → aucune donnée inter-coopératives n'est ramenée en mémoire
   const candidats = await db
     .select()
     .from(membresTable)
     .where(
       and(
         eq(membresTable.numeroMembre, parsed.numero),
-        sql`EXTRACT(YEAR FROM ${membresTable.dateAdhesion}::date) = ${parsed.year}`
+        sql`EXTRACT(YEAR FROM ${membresTable.dateAdhesion}::date) = ${parsed.year}`,
+        sql`REGEXP_REPLACE(${membresTable.telephone}, '[\s()\-\.+]', '', 'g') = ${telNorm}`
       )
     );
 
-  if (candidats.length === 0) throw new Error("Membre introuvable");
+  if (candidats.length === 0) throw new Error("Code membre ou téléphone incorrect");
 
-  // Vérification du téléphone comme second facteur (isole le bon tenant)
-  const telCanon = (t: string) => t.replace(/[\s\-().+]/g, "");
-  const membre = candidats.find(m => telCanon(m.telephone) === telCanon(telephone));
+  // Défense en profondeur côté JS (double vérification)
+  const membre = candidats.find(m => telCanon(m.telephone) === telNorm);
   if (!membre) throw new Error("Code membre ou téléphone incorrect");
 
   return membre;

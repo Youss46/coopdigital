@@ -666,8 +666,20 @@ export async function transfererRattachement(req: Request, res: Response): Promi
 
 export async function getMembreByQr(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) {
+      res.status(401).json({ erreur: "Coopérative non associée au compte" });
+      return;
+    }
     const token = String(req.params["token"] ?? "");
-    const [membre] = await db.select().from(membresTable).where(eq(membresTable.qrCodeToken, token)).limit(1);
+    const [membre] = await db
+      .select()
+      .from(membresTable)
+      .where(and(
+        eq(membresTable.qrCodeToken, token),
+        eq(membresTable.cooperativeId, cooperativeId),
+      ))
+      .limit(1);
     if (!membre) {
       res.status(404).json({ erreur: "Membre introuvable" });
       return;
