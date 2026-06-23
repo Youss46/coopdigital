@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { MoneyInput } from "@/components/ui/money-input";
 import {
   useGetAvances,
@@ -59,6 +59,10 @@ export default function Avances() {
     dateEcheance: "",
     motif: "",
   });
+  const [membreSearch, setMembreSearch] = useState("");
+  const [membreDropdownOuvert, setMembreDropdownOuvert] = useState(false);
+  const membreInputRef = useRef<HTMLInputElement>(null);
+  const membreDropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedMembreId = form.membreId ? parseInt(form.membreId) : 0;
   const { data: scoreResume } = useGetScoringResume(selectedMembreId, {
@@ -73,6 +77,7 @@ export default function Avances() {
         queryClient.invalidateQueries({ queryKey: getGetAvancesEncoursQueryKey() });
         setModalOuvert(false);
         setForm({ membreId: "", montantOctroyeFcfa: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+        setMembreSearch("");
       },
     },
   });
@@ -100,6 +105,7 @@ export default function Avances() {
       void queueOp({ localId: crypto.randomUUID(), type: "avance", data: payload });
       setModalOuvert(false);
       setForm({ membreId: "", montantOctroyeFcfa: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+      setMembreSearch("");
       setNotifHorsLigne("Avance enregistrée hors ligne — sera synchronisée dès le retour en ligne");
       setTimeout(() => setNotifHorsLigne(null), 6000);
       return;
@@ -281,22 +287,82 @@ export default function Avances() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-bold text-gray-900">Octroyer une avance</h3>
-              <button onClick={() => setModalOuvert(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+              <button onClick={() => { setModalOuvert(false); setMembreSearch(""); setMembreDropdownOuvert(false); }} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-              <div>
+              <div className="relative">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Membre *</label>
-                <select
-                  required
-                  value={form.membreId}
-                  onChange={(e) => setForm({ ...form, membreId: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
-                >
-                  <option value="">Sélectionner un membre…</option>
-                  {membres.filter((m) => m.statut === "actif").map((m) => (
-                    <option key={m.id} value={m.id}>{m.nom} {m.prenoms} — {m.telephone}</option>
-                  ))}
-                </select>
+                <input
+                  ref={membreInputRef}
+                  type="text"
+                  required={!form.membreId}
+                  readOnly={!!form.membreId}
+                  value={form.membreId
+                    ? (() => { const m = membres.find((x) => String(x.id) === form.membreId); return m ? `${m.nom} ${m.prenoms}` : membreSearch; })()
+                    : membreSearch}
+                  onChange={(e) => {
+                    setMembreSearch(e.target.value);
+                    setForm({ ...form, membreId: "" });
+                    setMembreDropdownOuvert(true);
+                  }}
+                  onFocus={() => { if (!form.membreId) setMembreDropdownOuvert(true); }}
+                  onClick={() => {
+                    if (form.membreId) {
+                      setForm({ ...form, membreId: "" });
+                      setMembreSearch("");
+                      setMembreDropdownOuvert(true);
+                      setTimeout(() => membreInputRef.current?.focus(), 0);
+                    }
+                  }}
+                  onBlur={() => setTimeout(() => setMembreDropdownOuvert(false), 150)}
+                  placeholder="Rechercher un membre par nom…"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-700 cursor-text"
+                  autoComplete="off"
+                />
+                {form.membreId && (
+                  <button
+                    type="button"
+                    onClick={() => { setForm({ ...form, membreId: "" }); setMembreSearch(""); setTimeout(() => membreInputRef.current?.focus(), 0); }}
+                    className="absolute right-3 top-1/2 translate-y-1 text-gray-400 hover:text-gray-600 text-lg leading-none"
+                  >×</button>
+                )}
+                {membreDropdownOuvert && !form.membreId && (
+                  <div
+                    ref={membreDropdownRef}
+                    className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto"
+                  >
+                    {membres
+                      .filter((m) => m.statut === "actif" && (
+                        membreSearch === "" ||
+                        `${m.nom} ${m.prenoms}`.toLowerCase().includes(membreSearch.toLowerCase()) ||
+                        (m.telephone ?? "").includes(membreSearch)
+                      ))
+                      .map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onMouseDown={() => {
+                            setForm({ ...form, membreId: String(m.id) });
+                            setMembreSearch("");
+                            setMembreDropdownOuvert(false);
+                          }}
+                          className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                        >
+                          <span className="font-medium text-gray-900">{m.nom} {m.prenoms}</span>
+                          {m.telephone && <span className="ml-2 text-xs text-gray-400">{m.telephone}</span>}
+                        </button>
+                      ))}
+                    {membres.filter((m) => m.statut === "actif" && (
+                      membreSearch === "" ||
+                      `${m.nom} ${m.prenoms}`.toLowerCase().includes(membreSearch.toLowerCase()) ||
+                      (m.telephone ?? "").includes(membreSearch)
+                    )).length === 0 && (
+                      <p className="px-3 py-3 text-sm text-gray-400 text-center">Aucun membre trouvé</p>
+                    )}
+                  </div>
+                )}
+                {/* Champ caché pour la validation HTML5 required */}
+                <input type="hidden" name="membreId" value={form.membreId} required />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA) *</label>
@@ -356,7 +422,7 @@ export default function Avances() {
               <div className="flex gap-3 pt-1">
                 <button
                   type="button"
-                  onClick={() => setModalOuvert(false)}
+                  onClick={() => { setModalOuvert(false); setMembreSearch(""); setMembreDropdownOuvert(false); }}
                   className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Annuler
