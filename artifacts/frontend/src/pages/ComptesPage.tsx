@@ -143,26 +143,56 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
     setTimeout(() => setCopie(false), 2000);
   }, [motDePasse]);
 
+  const TERRAIN_URL = "https://coopdigital.m15-edutech.ci";
+
   const partagerWhatsApp = useCallback(() => {
-    const appUrl = window.location.origin + (import.meta.env.BASE_URL ?? "/");
+    const isAgentTerrain = form.role === "agent_terrain";
+    const appUrl = isAgentTerrain
+      ? TERRAIN_URL
+      : window.location.origin + (import.meta.env.BASE_URL ?? "/");
     const ligne = (label: string, val: string) => `${label} : ${val}`;
-    const msg = [
-      `Bonjour ${form.prenoms || ""},`,
-      "",
-      "Voici vos informations de connexion CoopDigital :",
-      ligne("🌐 Adresse", appUrl),
-      ligne("📧 Email", form.email || "—"),
-      ligne("🔑 Mot de passe temporaire", motDePasse),
-      "",
-      "Merci de changer votre mot de passe dès la première connexion.",
-      "— CoopDigital",
-    ].join("\n");
+
+    let msg: string;
+    if (isAgentTerrain) {
+      msg = [
+        `Bonjour ${form.prenoms || ""},`,
+        "",
+        "Voici vos informations de connexion à la plateforme Agent Terrain CoopDigital :",
+        ligne("🌐 Adresse", appUrl),
+        ligne("📱 Numéro de téléphone", form.telephone || "—"),
+        ligne("🔑 Mot de passe temporaire", motDePasse),
+        "",
+        "Connectez-vous avec votre numéro de téléphone et ce mot de passe.",
+        "Merci de changer votre mot de passe dès la première connexion.",
+        "— CoopDigital",
+      ].join("\n");
+    } else {
+      msg = [
+        `Bonjour ${form.prenoms || ""},`,
+        "",
+        "Voici vos informations de connexion CoopDigital :",
+        ligne("🌐 Adresse", appUrl),
+        ligne("📧 Email", form.email || "—"),
+        ligne("🔑 Mot de passe temporaire", motDePasse),
+        "",
+        "Merci de changer votre mot de passe dès la première connexion.",
+        "— CoopDigital",
+      ].join("\n");
+    }
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
-  }, [form.prenoms, form.email, motDePasse]);
+  }, [form.prenoms, form.email, form.telephone, form.role, motDePasse]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.role) return;
+    if (form.role === "agent_terrain" && !form.telephone.trim()) {
+      toast({
+        title: "Champ obligatoire",
+        description: "Le numéro de téléphone est obligatoire pour un compte Agent terrain.",
+        variant: "destructive",
+      });
+      return;
+    }
     createMutation.mutate(
       {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -215,8 +245,17 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
             <div className="mx-6 mb-4 rounded-xl border border-gray-100 bg-gray-50 divide-y divide-gray-100">
               <div className="px-4 py-3 flex items-center justify-between gap-2">
                 <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Email</p>
-                  <p className="text-sm font-medium text-gray-800 break-all">{form.email}</p>
+                  {form.role === "agent_terrain" ? (
+                    <>
+                      <p className="text-xs text-gray-400 mb-0.5">Numéro de téléphone</p>
+                      <p className="text-sm font-medium text-gray-800 break-all">{form.telephone}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-gray-400 mb-0.5">Email</p>
+                      <p className="text-sm font-medium text-gray-800 break-all">{form.email}</p>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="px-4 py-3 flex items-center justify-between gap-2">
