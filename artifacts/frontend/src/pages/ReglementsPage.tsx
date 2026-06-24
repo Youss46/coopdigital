@@ -81,19 +81,24 @@ function ModalValidation({
   onClose,
   onConfirm,
   loading,
+  sessionCaisseOuverte,
 }: {
   paiement: PaiementListItem;
   onClose: () => void;
   onConfirm: (ref: string, telephone: string) => void;
   loading: boolean;
+  sessionCaisseOuverte?: boolean | null;
 }) {
   const [ref, setRef] = useState("");
   const [telephone, setTelephone] = useState(paiement.telephone ?? "");
   const [touched, setTouched] = useState(false);
   const isMobile = paiement.modePaiement === "orange_money" || paiement.modePaiement === "mtn_momo" || paiement.modePaiement === "wave";
+  const isEspeces = paiement.modePaiement === "especes";
+  const sessionBloquee = isEspeces && sessionCaisseOuverte === false;
   const refManquante = isMobile && !ref.trim();
 
   function handleConfirm() {
+    if (sessionBloquee) return;
     if (refManquante) { setTouched(true); return; }
     onConfirm(ref, telephone);
   }
@@ -144,6 +149,20 @@ function ModalValidation({
               <span className="text-xs text-gray-400">Livr. {paiement.dateLivraison}</span>
             )}
           </div>
+
+          {/* Bandeau bloquant — aucune session de caisse ouverte */}
+          {sessionBloquee && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
+              <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Caisse non ouverte</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Aucune session de caisse n'est ouverte aujourd'hui. Ouvrez une session dans la page{" "}
+                  <span className="font-semibold">Caisse</span> avant de valider un règlement en espèces.
+                </p>
+              </div>
+            </div>
+          )}
 
           {isMobile && (
             <div>
@@ -198,9 +217,9 @@ function ModalValidation({
             </button>
             <button
               onClick={handleConfirm}
-              disabled={loading}
+              disabled={loading || sessionBloquee}
               className="flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1.5"
-              style={{ backgroundColor: "#1a4731" }}
+              style={{ backgroundColor: sessionBloquee ? "#9ca3af" : "#1a4731" }}
             >
               {loading ? (
                 <Loader2 size={15} className="animate-spin" />
@@ -447,7 +466,7 @@ export default function ReglementsPage() {
 
   // Solde caisse délégué (visible seulement pour le rôle délégué)
   // On passe par /api/caisse qui filtre automatiquement sur responsable_id pour le rôle délégué
-  const { data: caissesData } = useQuery<Array<{ solde_actuel_fcfa: string; fond_caisse_minimum_fcfa: string }>>({
+  const { data: caissesData } = useQuery<Array<{ solde_actuel_fcfa: string; fond_caisse_minimum_fcfa: string; session_statut: string | null }>>({
     queryKey: ["caisse-delegue-solde", utilisateur?.id],
     queryFn: () => apiFetch(`/api/caisse`),
     enabled: isDelegue && !!utilisateur?.id,
@@ -457,6 +476,9 @@ export default function ReglementsPage() {
   const caisseDelegue = caissesData?.[0]
     ? { caisse: { solde: parseFloat(caissesData[0].solde_actuel_fcfa), plafond: null } }
     : undefined;
+  const sessionDelegueOuverte = caissesData?.[0] != null
+    ? caissesData[0].session_statut === "ouverte"
+    : null;
 
   // Session Caisse Centrale (visible pour les rôles non-délégué — Directeur, PCA, Comptable)
   const { data: caissesNonDelegueData } = useQuery<Array<{
@@ -828,6 +850,7 @@ export default function ReglementsPage() {
           onClose={() => setModal(null)}
           onConfirm={handleValider}
           loading={validerMut.isPending}
+          sessionCaisseOuverte={isDelegue ? sessionDelegueOuverte : sessionCentraleOuverte}
         />
       )}
       {modal?.type === "rejeter" && (

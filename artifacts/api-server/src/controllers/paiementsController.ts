@@ -2,7 +2,7 @@ import { type Request, type Response } from "express";
 import { db, paiementsTable, membresTable, livraisonsTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable } from "@workspace/db";
 import { eq, desc, and, sql, gte, lt, lte, inArray } from "drizzle-orm";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
-import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvement } from "../services/caisseService.js";
+import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvement, getSessionActive } from "../services/caisseService.js";
 import { notifierParRole } from "../services/notificationService.js";
 import { logger } from "../lib/logger.js";
 
@@ -527,6 +527,16 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         res.status(422).json({ erreur: "Aucun compte valide n'a été trouvé pour ce mode de paiement." });
         return;
       }
+
+      // Vérifier qu'une session de caisse est ouverte aujourd'hui
+      const sessionCentrale = await getSessionActive(caisseCentrale.id);
+      if (!sessionCentrale) {
+        res.status(422).json({
+          erreur: "Aucune session de caisse ouverte. Ouvrez une session dans la page Caisse avant de valider des paiements en espèces.",
+        });
+        return;
+      }
+
       if (parseFloat(String(caisseCentrale.soldeActuelFcfa)) < row.paiement.montantFcfa) {
         res.status(422).json({ erreur: "Fonds insuffisants sur le compte pour effectuer ce paiement." });
         return;
