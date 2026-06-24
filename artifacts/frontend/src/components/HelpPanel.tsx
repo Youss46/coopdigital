@@ -263,6 +263,10 @@ export default function HelpPanel() {
   const { token } = useAuth();
   const { toast } = useToast();
 
+  // iOS Safari ne supporte pas l'attribut `download` sur les blob URLs.
+  // On détecte iOS et on ouvre le PDF dans le viewer natif à la place.
+  const isIos = /iP(hone|ad|od)/i.test(navigator.userAgent);
+
   async function handleDownloadGuide() {
     setDownloadingGuide(true);
     try {
@@ -272,14 +276,28 @@ export default function HelpPanel() {
       if (!r.ok) throw new Error("Erreur serveur");
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Guide_CoopDigital_${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      toast({ title: "Guide téléchargé", description: "Le guide PDF a été téléchargé avec succès." });
+
+      if (isIos) {
+        // iOS : ouvrir dans un nouvel onglet — l'utilisateur peut ensuite
+        // appuyer sur "Partager > Enregistrer dans Fichiers"
+        window.open(url, "_blank");
+        toast({
+          title: "Guide ouvert",
+          description: 'Appuyez sur "Partager" puis "Enregistrer dans Fichiers" pour le conserver.',
+        });
+        // Libérer l'URL après un délai suffisant pour le chargement
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      } else {
+        // Desktop et Android : téléchargement direct
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Guide_CoopDigital_${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        toast({ title: "Guide téléchargé", description: "Le guide PDF a été téléchargé avec succès." });
+      }
     } catch {
       toast({ title: "Erreur", description: "Impossible de télécharger le guide.", variant: "destructive" });
     } finally {
