@@ -11,7 +11,6 @@ export const refusDecisionEnum = pgEnum("refus_decision", [
   "declassement",
   "autre_acheteur",
   "perte",
-  "expedition_port",
 ]);
 
 export const refusStatutEnum = pgEnum("refus_statut", ["en_attente", "traite"]);

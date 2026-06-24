@@ -351,13 +351,6 @@
       "when": 1782749221000,
       "tag": "0049_archives_campagnes",
       "breakpoints": true
-    },
-    {
-      "idx": 50,
-      "version": "7",
-      "when": 1782835621000,
-      "tag": "0050_refus_expedition_port",
-      "breakpoints": true
     }
   ]
 }

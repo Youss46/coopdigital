@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   PackageX, Loader2, AlertTriangle, CheckCircle2, RotateCcw,
-  TrendingDown, ShoppingCart, UserPlus, Ship,
+  TrendingDown, ShoppingCart, UserPlus,
 } from "lucide-react";
 import {
   useListRefus,
@@ -31,7 +31,6 @@ const DECISION_LABELS: Record<string, string> = {
   declassement: "Déclassement",
   autre_acheteur: "Autre acheteur",
   perte: "Perte",
-  expedition_port: "Réorientation port",
 };
 
 const DECISION_ICONS: Record<string, React.ElementType> = {
@@ -39,7 +38,6 @@ const DECISION_ICONS: Record<string, React.ElementType> = {
   declassement: TrendingDown,
   autre_acheteur: ShoppingCart,
   perte: AlertTriangle,
-  expedition_port: Ship,
 };
 
 const DECISION_COLORS: Record<string, string> = {
@@ -47,7 +45,6 @@ const DECISION_COLORS: Record<string, string> = {
   declassement: "text-amber-600",
   autre_acheteur: "text-green-600",
   perte: "text-red-600",
-  expedition_port: "text-cyan-600",
 };
 
 function fmt(v: number | string | undefined | null, suffix = " kg") {
@@ -93,8 +90,8 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
     e.preventDefault();
     if (!form.decision) return;
 
-    if ((form.decision === "retour_stock" || form.decision === "expedition_port") && !form.entrepotRetourId) {
-      toast({ title: "Entrepôt de destination obligatoire", variant: "destructive" });
+    if (form.decision === "retour_stock" && !form.entrepotRetourId) {
+      toast({ title: "Entrepôt obligatoire pour un retour stock", variant: "destructive" });
       return;
     }
 
@@ -133,14 +130,7 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
       void queryClient.invalidateQueries({ queryKey: getGetStockAlertesQueryKey() });
       void queryClient.invalidateQueries({ queryKey: getListRefusQueryKey() });
       void queryClient.invalidateQueries({ queryKey: getGetStatsRefusQueryKey() });
-      if (form.decision === "expedition_port") {
-        toast({
-          title: "Réorientation port enregistrée",
-          description: "Un nouveau lot a été créé dans l'entrepôt. Rendez-vous dans Expéditions pour l'inclure dans un envoi.",
-        });
-      } else {
-        toast({ title: "Lot refoulé traité avec succès" });
-      }
+      toast({ title: "Lot refoulé traité avec succès" });
       onDone();
     } catch {
       toast({ title: "Erreur lors du traitement", variant: "destructive" });
@@ -158,9 +148,8 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Décision *</label>
             <div className="grid grid-cols-2 gap-2">
-              {(["retour_stock", "declassement", "autre_acheteur", "perte", "expedition_port"] as const).map((d) => {
+              {(["retour_stock", "declassement", "autre_acheteur", "perte"] as const).map((d) => {
                 const Icon = DECISION_ICONS[d]!;
-                const color = DECISION_COLORS[d]!;
                 return (
                   <button
                     type="button"
@@ -170,9 +159,9 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
                       form.decision === d
                         ? "border-green-600 bg-green-50 text-green-700"
                         : "border-gray-200 text-gray-600 hover:border-gray-300"
-                    } ${form.decision === d ? "" : color}`}
+                    }`}
                   >
-                    <Icon className="w-4 h-4 shrink-0" />
+                    <Icon className="w-4 h-4" />
                     {DECISION_LABELS[d]}
                   </button>
                 );
@@ -196,34 +185,6 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
                   </option>
                 ))}
               </select>
-            </div>
-          )}
-
-          {/* ── Réorientation port ── */}
-          {form.decision === "expedition_port" && (
-            <div className="space-y-3">
-              <div className="flex items-start gap-2 rounded-lg bg-cyan-50 border border-cyan-200 p-3 text-xs text-cyan-800">
-                <Ship className="w-4 h-4 mt-0.5 shrink-0 text-cyan-600" />
-                <span>
-                  Le lot sera retourné à l'entrepôt sélectionné et un <strong>nouveau lot</strong> sera créé
-                  automatiquement, prêt à être inclus dans une expédition vers le port.
-                </span>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Entrepôt de retour *</label>
-                <select
-                  className={INPUT_CLS}
-                  value={form.entrepotRetourId ?? ""}
-                  onChange={(e) => field("entrepotRetourId", parseInt(e.target.value) || undefined)}
-                >
-                  <option value="">— Choisir un entrepôt —</option>
-                  {entrepots.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nom}{e.ville ? ` — ${e.ville}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
           )}
 
