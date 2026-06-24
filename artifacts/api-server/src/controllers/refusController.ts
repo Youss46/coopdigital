@@ -5,6 +5,8 @@ import {
   ventesExportateursTable,
   mouvementsStockTable,
   exportateursTable,
+  entrepotsTable,
+  lotsTable,
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -88,7 +90,7 @@ export async function traiterRefus(req: Request, res: Response) {
     modeReglement,
     dateEcheanceRefus,
   } = req.body as {
-    decision: "retour_stock" | "declassement" | "autre_acheteur" | "perte";
+    decision: "retour_stock" | "declassement" | "autre_acheteur" | "perte" | "expedition_port";
     entrepotRetourId?: number;
     ancienGrade?: string;
     nouveauGrade?: string;
@@ -196,18 +198,46 @@ export async function traiterRefus(req: Request, res: Response) {
         motif: motifPerte ?? `Perte lot refoulé #${refus.venteExportateurId}`,
         agentId: userId,
       });
+    } else if (decision === "expedition_port" && entrepotRetourId) {
+      // Retour physique en entrepôt
+      await tx.insert(mouvementsStockTable).values({
+        entrepotId: entrepotRetourId,
+        type: "retour_refus",
+        poidsKg: refus.poidsRefuleKg,
+        motif: `Réorientation port — lot refoulé #${refus.venteExportateurId}`,
+        agentId: userId,
+      });
+
+      // Récupérer le nom de l'entrepôt pour le lot
+      const [entrepot] = await tx
+        .select({ nom: entrepotsTable.nom })
+        .from(entrepotsTable)
+        .where(eq(entrepotsTable.id, entrepotRetourId))
+        .limit(1);
+
+      // Créer un nouveau lot prêt pour expédition
+      await tx.insert(lotsTable).values({
+        cooperativeId,
+        statut: "en_stock",
+        poidsTotalKg: refus.poidsRefuleKg,
+        entrepot: entrepot?.nom ?? null,
+        nombreSacs: refus.nombreSacsRefoules,
+      });
     }
   });
 
   // ── Écritures comptables (hors transaction) ───────────────────────────────
   const dateOp = new Date().toISOString().slice(0, 10);
 
-  if (decision === "retour_stock") {
+  if (decision === "retour_stock" || decision === "expedition_port") {
     const montantEstime = Math.round(Number(refus.poidsRefuleKg) * 900);
+    const libelle = decision === "expedition_port"
+      ? `Réorientation port — lot refoulé #${refus.venteExportateurId}`
+      : `Retour stock lot refoulé #${refus.venteExportateurId}`;
     void proposerEcriture(cooperativeId, {
       source: "stock",
       sourceId: refus.id,
-      libelle: `Retour stock lot refoulé #${refus.venteExportateurId}`,
+      libelle,
       compteDebit: "31",
       compteCredit: "603",
       montantFcfa: montantEstime,

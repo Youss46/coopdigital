@@ -2188,6 +2188,7 @@ export const TraiterRefusInputDecision = {
   declassement: 'declassement',
   autre_acheteur: 'autre_acheteur',
   perte: 'perte',
+  expedition_port: 'expedition_port',
 } as const;
 
 export type TraiterRefusInputModeReglement = typeof TraiterRefusInputModeReglement[keyof typeof TraiterRefusInputModeReglement] | null;

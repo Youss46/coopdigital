@@ -2590,7 +2590,7 @@ export const TraiterRefusParams = zod.object({
 })
 
 export const TraiterRefusBody = zod.object({
-  "decision": zod.enum(['retour_stock', 'declassement', 'autre_acheteur', 'perte']),
+  "decision": zod.enum(['retour_stock', 'declassement', 'autre_acheteur', 'perte', 'expedition_port']),
   "entrepotRetourId": zod.number().optional(),
   "ancienGrade": zod.string().optional(),
   "nouveauGrade": zod.string().optional(),

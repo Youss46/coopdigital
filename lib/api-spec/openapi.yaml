@@ -8531,7 +8531,7 @@ components:
       properties:
         decision:
           type: string
-          enum: [retour_stock, declassement, autre_acheteur, perte]
+          enum: [retour_stock, declassement, autre_acheteur, perte, expedition_port]
         entrepotRetourId:
           type: integer
         ancienGrade:
