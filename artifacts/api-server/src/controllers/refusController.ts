@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import {
   traitementsRefusTable,
   ventesExportateursTable,
+  expeditionsTable,
   mouvementsStockTable,
   exportateursTable,
 } from "@workspace/db";
@@ -35,11 +36,21 @@ export async function listRefus(req: Request, res: Response) {
         nombreSacsRefoules: ventesExportateursTable.nombreSacsRefoules,
         numeroBonSortie: ventesExportateursTable.numeroBonSortie,
       },
+      expedition: {
+        id: expeditionsTable.id,
+        numeroExpedition: expeditionsTable.numeroExpedition,
+        port: expeditionsTable.port,
+        dateArriveePort: expeditionsTable.dateArriveePort,
+      },
     })
     .from(traitementsRefusTable)
     .leftJoin(
       ventesExportateursTable,
       eq(traitementsRefusTable.venteExportateurId, ventesExportateursTable.id)
+    )
+    .leftJoin(
+      expeditionsTable,
+      eq(traitementsRefusTable.expeditionId, expeditionsTable.id)
     )
     .where(
       and(

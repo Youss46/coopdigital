@@ -106,6 +106,10 @@ export default function ExpeditionDetailPage() {
   const [motifEcart, setMotifEcart] = useState("");
   const [fraisTransport, setFraisTransport] = useState("");
   const [notes, setNotes] = useState("");
+  const [hasRefoulement, setHasRefoulement] = useState(false);
+  const [poidsRefoul, setPoidsRefoul] = useState("");
+  const [nombreSacsRefoul, setNombreSacsRefoul] = useState("");
+  const [motifRefoulement, setMotifRefoulement] = useState("");
 
   const { data: exp, isLoading } = useQuery<Record<string, unknown>>({
     queryKey: ["expedition", id],
@@ -678,6 +682,63 @@ export default function ExpeditionDetailPage() {
               </div>
             </div>
 
+            {/* Section stock refoulé */}
+            <div className="border border-orange-200 rounded-lg p-4 bg-orange-50 space-y-3">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="hasRefoulement"
+                  checked={hasRefoulement}
+                  onChange={e => { setHasRefoulement(e.target.checked); if (!e.target.checked) { setPoidsRefoul(""); setNombreSacsRefoul(""); setMotifRefoulement(""); }}}
+                  className="w-4 h-4 accent-orange-600"
+                />
+                <label htmlFor="hasRefoulement" className="text-sm font-medium text-orange-800">
+                  📦 Stock refoulé (refus partiel à l'arrivée)
+                </label>
+              </div>
+              {hasRefoulement && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs text-orange-700">Quantité refoulée (kg) *</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={poidsRefoul}
+                      onChange={e => setPoidsRefoul(e.target.value)}
+                      placeholder="Ex : 500"
+                      className="border-orange-300"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-orange-700">Nombre de sacs refoulés</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={nombreSacsRefoul}
+                      onChange={e => setNombreSacsRefoul(e.target.value)}
+                      placeholder="Ex : 10"
+                      className="border-orange-300"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-xs text-orange-700">Motif du refus *</Label>
+                    <Input
+                      value={motifRefoulement}
+                      onChange={e => setMotifRefoulement(e.target.value)}
+                      placeholder="Ex : Taux d'humidité trop élevé, moisissures…"
+                      className="border-orange-300"
+                    />
+                  </div>
+                  {poidsRefoul && poidsRecu && (
+                    <div className="col-span-2 text-xs text-orange-700 bg-orange-100 rounded p-2">
+                      Quantité acceptée = {(parseFloat(poidsRecu) - parseFloat(poidsRefoul)).toLocaleString("fr-FR")} kg
+                      {" "}(reçu {parseFloat(poidsRecu).toLocaleString("fr-FR")} − refoulé {parseFloat(poidsRefoul).toLocaleString("fr-FR")})
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Prévisualisation écart */}
             {(tauxEcart !== null || tauxEcartSacs !== null) && (
               <div className={`rounded-lg p-4 border ${
@@ -723,7 +784,11 @@ export default function ExpeditionDetailPage() {
               <Button variant="outline" onClick={() => setShowReception(false)}>Annuler</Button>
               <Button
                 className="bg-blue-700 hover:bg-blue-800"
-                disabled={receptionMutation.isPending || !poidsRecu || !recepisse || !receptionnaire}
+                disabled={
+                  receptionMutation.isPending ||
+                  !poidsRecu || !recepisse || !receptionnaire ||
+                  (hasRefoulement && (!poidsRefoul || !motifRefoulement))
+                }
                 onClick={() => receptionMutation.mutate({
                   poidsRecuPortKg:    parseFloat(poidsRecu),
                   nombreSacsRecuPort: nombreSacsRecu ? parseInt(nombreSacsRecu, 10) : undefined,
@@ -731,6 +796,11 @@ export default function ExpeditionDetailPage() {
                   nomReceptionnaire:  receptionnaire,
                   motifEcart:         motifEcart || undefined,
                   fraisTransportFcfa: fraisTransport ? parseInt(fraisTransport, 10) : undefined,
+                  ...(hasRefoulement && poidsRefoul ? {
+                    poidsRefuleKg:      parseFloat(poidsRefoul),
+                    nombreSacsRefoules: nombreSacsRefoul ? parseInt(nombreSacsRefoul, 10) : undefined,
+                    motifRefus:         motifRefoulement || undefined,
+                  } : {}),
                 })}
               >
                 {receptionMutation.isPending ? "Enregistrement…" : "Confirmer la réception →"}

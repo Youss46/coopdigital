@@ -1,4 +1,4 @@
-import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable } from "@workspace/db";
+import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable } from "@workspace/db";
 import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
 import { proposerEcriture } from "./comptabiliteService";
 import { notifExpeditionArriveePort, notifExpeditionLitige } from "./notificationService.js";
@@ -731,6 +731,9 @@ export async function confirmerReception(
     motifEcart?: string;
     fraisTransportFcfa?: number;
     exportateurId?: number;
+    poidsRefuleKg?: number;
+    nombreSacsRefoules?: number;
+    motifRefus?: string;
   }
 ) {
   const rows = await db
@@ -791,6 +794,22 @@ export async function confirmerReception(
     faitPar:         userId,
     notes:           `Réception port. Poids reçu : ${poidsRecu} kg. Écart poids : ${ecartPoids.toFixed(2)} kg (${(tauxEcart * 100).toFixed(2)}%)${notesSacs}`,
   });
+
+  // ── Enregistrement du stock refoulé si présent ──────────────────────────────
+  const poidsRefule = input.poidsRefuleKg ?? 0;
+  if (poidsRefule > 0) {
+    const dateRefus = (input.dateArriveePort ?? new Date().toISOString()).split("T")[0]!;
+    await db.insert(traitementsRefusTable).values({
+      cooperativeId,
+      expeditionId,
+      sourceType:          "reception_port",
+      dateRefus,
+      poidsRefuleKg:       String(poidsRefule),
+      nombreSacsRefoules:  input.nombreSacsRefoules ?? 0,
+      motifRefus:          input.motifRefus ?? null,
+      statut:              "en_attente",
+    });
+  }
 
   const dateStr = new Date().toISOString().split("T")[0]!;
   const prixKg = await getPrixUnitaireExpedition(expeditionId);

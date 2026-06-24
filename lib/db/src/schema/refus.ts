@@ -1,8 +1,9 @@
-import { pgTable, serial, integer, text, numeric, boolean, timestamp, date, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, varchar, numeric, boolean, timestamp, date, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { cooperativesTable } from "./cooperatives";
 import { ventesExportateursTable } from "./exportateurs";
+import { expeditionsTable } from "./expeditions";
 import { usersTable } from "./users";
 import { entrepotsTable } from "./stocks";
 
@@ -18,7 +19,9 @@ export const refusStatutEnum = pgEnum("refus_statut", ["en_attente", "traite"]);
 export const traitementsRefusTable = pgTable("traitements_refus", {
   id: serial("id").primaryKey(),
   cooperativeId: integer("cooperative_id").notNull().references(() => cooperativesTable.id),
-  venteExportateurId: integer("vente_exportateur_id").notNull().references(() => ventesExportateursTable.id),
+  venteExportateurId: integer("vente_exportateur_id").references(() => ventesExportateursTable.id),
+  expeditionId: integer("expedition_id").references(() => expeditionsTable.id),
+  sourceType: varchar("source_type", { length: 30 }).notNull().default("vente_exportateur"),
   dateRefus: date("date_refus", { mode: "string" }).notNull(),
   poidsRefuleKg: numeric("poids_refoule_kg", { precision: 10, scale: 2 }).notNull(),
   nombreSacsRefoules: integer("nombre_sacs_refoules").notNull(),

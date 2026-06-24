@@ -420,8 +420,11 @@ export default function RefusPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {refusList?.map((row) => {
-            const r = row.refus;
+          {refusList?.map((rawRow) => {
+            const row = rawRow as typeof rawRow & {
+              expedition: { id: number; numeroExpedition: string; port: string; dateArriveePort: Date | null } | null;
+            };
+            const r = row.refus as typeof row.refus & { sourceType?: string };
             const estTraite = r.statut === "traite";
             return (
               <div
@@ -447,12 +450,19 @@ export default function RefusPage() {
                       )}
                     </div>
                     <div className="font-semibold text-gray-900 text-sm">
-                      Lot #{r.venteExportateurId}
-                      {row.vente?.produit && ` — ${row.vente.produit}`}
+                      {r.sourceType === "reception_port" && row.expedition?.numeroExpedition
+                        ? `Expédition ${row.expedition.numeroExpedition}`
+                        : `Lot #${r.venteExportateurId ?? "—"}`}
+                      {r.sourceType === "reception_port"
+                        ? row.expedition?.port ? ` — Port de ${row.expedition.port}` : ""
+                        : row.vente?.produit ? ` — ${row.vente.produit}` : ""}
                     </div>
                     <div className="text-xs text-gray-500 mt-0.5">
-                      Poids : <strong>{fmt(r.poidsRefuleKg)}</strong>
-                      {row.vente?.numeroBonSortie && ` · BS n°${row.vente.numeroBonSortie}`}
+                      Poids refoulé : <strong>{fmt(r.poidsRefuleKg)}</strong>
+                      {r.sourceType !== "reception_port" && row.vente?.numeroBonSortie && ` · BS n°${row.vente.numeroBonSortie}`}
+                      {r.sourceType === "reception_port" && (
+                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">⚓ Réception port</span>
+                      )}
                     </div>
                     {r.motifRefus && (
                       <div className="text-xs text-gray-400 mt-0.5 italic">Motif : {r.motifRefus}</div>
