@@ -163,7 +163,7 @@ overrides:
   qs: ">=6.15.2"
   form-data: ">=4.0.6"
   "@babel/core": ">=7.29.7"
-  dompurify: ">=3.4.9"
+  dompurify: ">=3.4.11"
   markdown-it: ">=14.2.0"
   js-yaml: ">=4.2.0"
   uuid: ">=11.0.0"
