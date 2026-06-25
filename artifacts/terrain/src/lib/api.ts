@@ -1,4 +1,4 @@
-import { getToken } from "./auth";
+import { getToken, clearAuth } from "./auth";
 import { queueOp, queueGpsOp, type PendingOpType, type GpsOp } from "./idb";
 import type {
   CollecteInput, PaiementInput, AvanceInput,
