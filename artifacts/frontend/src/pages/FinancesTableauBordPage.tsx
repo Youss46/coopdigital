@@ -4,7 +4,6 @@ import {
   Wallet, AlertTriangle, TrendingUp, Users, Landmark,
   RefreshCw, ArrowRight, CheckCircle2, Clock, BarChart3,
 } from "lucide-react";
-import { formaterFCFACourt } from "@/lib/formatters";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -55,7 +54,6 @@ function KpiCard({
   icon: Icon,
   label,
   value,
-  montantFcfa,
   sub,
   alert,
   ok,
@@ -65,7 +63,6 @@ function KpiCard({
   icon: React.ElementType;
   label: string;
   value: string;
-  montantFcfa?: number;
   sub?: string;
   alert?: boolean;
   ok?: boolean;
@@ -92,14 +89,12 @@ function KpiCard({
         </div>
         <div className="min-w-0">
           <p className="text-xs text-gray-500 font-medium mb-0.5 truncate">{label}</p>
-          {montantFcfa !== undefined ? (
-            <>
-              <p className={`hidden sm:block text-xl font-bold ${alert ? "text-red-700" : "text-gray-900"}`}>{value}</p>
-              <p className={`sm:hidden text-lg font-bold truncate ${alert ? "text-red-700" : "text-gray-900"}`}>{formaterFCFACourt(montantFcfa)}</p>
-            </>
-          ) : (
-            <p className={`text-xl font-bold ${alert ? "text-red-700" : "text-gray-900"}`}>{value}</p>
-          )}
+          <p
+            className={`text-sm sm:text-xl font-bold leading-tight break-words ${alert ? "text-red-700" : "text-gray-900"}`}
+            title={value}
+          >
+            {value}
+          </p>
           {sub && <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{sub}</p>}
         </div>
         <div className="flex items-center gap-1 text-xs text-gray-400 font-medium mt-auto">
@@ -217,7 +212,6 @@ export default function FinancesTableauBordPage() {
               icon={Wallet}
               label="Trésorerie — caisses actives"
               value={FCFA(data.tresorerie.totalCaissesFcfa)}
-              montantFcfa={data.tresorerie.totalCaissesFcfa}
               sub={`${data.tresorerie.nombreCaisses} caisse${data.tresorerie.nombreCaisses > 1 ? "s" : ""} active${data.tresorerie.nombreCaisses > 1 ? "s" : ""}`}
               alert={data.tresorerie.nombreCaissesBasses > 0}
               ok={data.tresorerie.nombreCaissesBasses === 0 && data.tresorerie.totalCaissesFcfa > 0}
@@ -230,7 +224,6 @@ export default function FinancesTableauBordPage() {
               icon={AlertTriangle}
               label="Créances en retard"
               value={FCFA(data.creances.totalEnRetardFcfa)}
-              montantFcfa={data.creances.totalEnRetardFcfa}
               sub={
                 data.creances.nbEnRetard > 0
                   ? `${data.creances.nbEnRetard} exportateur${data.creances.nbEnRetard > 1 ? "s" : ""} en retard · Total non réglé : ${FCFA(data.creances.totalNonRegleFcfa)}`
@@ -247,7 +240,6 @@ export default function FinancesTableauBordPage() {
               icon={Users}
               label={`Salaires à payer — ${MOIS[data.salaires.mois]} ${data.salaires.annee}`}
               value={FCFA(data.salaires.montantAPayerFcfa)}
-              montantFcfa={data.salaires.montantAPayerFcfa}
               sub={
                 data.salaires.nbBulletinsNonPaies > 0
                   ? `${data.salaires.nbBulletinsNonPaies} bulletin${data.salaires.nbBulletinsNonPaies > 1 ? "s" : ""} en attente de paiement`
@@ -277,7 +269,6 @@ export default function FinancesTableauBordPage() {
               icon={TrendingUp}
               label="Avances membres en cours"
               value={FCFA(data.avances.totalEncoursFcfa)}
-              montantFcfa={data.avances.totalEncoursFcfa}
               sub={
                 data.avances.nombreEncours > 0
                   ? `${data.avances.nombreEncours} avance${data.avances.nombreEncours > 1 ? "s" : ""} non remboursée${data.avances.nombreEncours > 1 ? "s" : ""}`
@@ -294,7 +285,6 @@ export default function FinancesTableauBordPage() {
               icon={Landmark}
               label="Emprunts en cours — capital restant"
               value={FCFA(data.emprunts.totalSoldeRestantFcfa)}
-              montantFcfa={data.emprunts.totalSoldeRestantFcfa}
               sub={
                 data.emprunts.nombreEnCours > 0
                   ? `${data.emprunts.nombreEnCours} emprunt${data.emprunts.nombreEnCours > 1 ? "s" : ""} actif${data.emprunts.nombreEnCours > 1 ? "s" : ""}`
