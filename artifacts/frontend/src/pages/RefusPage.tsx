@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   PackageX, Loader2, AlertTriangle, CheckCircle2, RotateCcw,
-  TrendingDown, ShoppingCart, UserPlus,
+  TrendingDown, ShoppingCart, UserPlus, FileDown,
 } from "lucide-react";
 import {
   useListRefus,
@@ -468,14 +468,34 @@ export default function RefusPage() {
                       <div className="text-xs text-gray-400 mt-0.5 italic">Motif : {r.motifRefus}</div>
                     )}
                   </div>
-                  {!estTraite && peutTraiter && (
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    {!estTraite && peutTraiter && (
+                      <button
+                        onClick={() => setModal({ id: r.id, poids: r.poidsRefuleKg })}
+                        className={`${BTN_CLS} bg-green-600 text-white hover:bg-green-700 text-xs px-3 py-1.5`}
+                      >
+                        Traiter
+                      </button>
+                    )}
                     <button
-                      onClick={() => setModal({ id: r.id, poids: r.poidsRefuleKg })}
-                      className={`${BTN_CLS} bg-green-600 text-white hover:bg-green-700 text-xs px-3 py-1.5`}
+                      title="Télécharger le constat PDF"
+                      onClick={async () => {
+                        const token = localStorage.getItem("coop_token") ?? "";
+                        const res = await fetch(`/api/refus/${r.id}/constat-pdf`, {
+                          headers: token ? { Authorization: `Bearer ${token}` } : {},
+                        });
+                        if (!res.ok) return;
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url; a.download = `constat-refoulement-${r.id}.pdf`; a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="flex items-center justify-center gap-1 px-2.5 py-1.5 border border-gray-200 text-gray-500 rounded-lg text-xs hover:bg-gray-50"
                     >
-                      Traiter
+                      <FileDown className="w-3.5 h-3.5" /> Constat
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             );

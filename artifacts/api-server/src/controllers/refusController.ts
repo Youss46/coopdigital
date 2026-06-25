@@ -257,6 +257,24 @@ export async function traiterRefus(req: Request, res: Response) {
   return res.json(updated);
 }
 
+export async function getConstatRefoulementPdf(req: Request, res: Response) {
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  const cooperativeId = coopId(req);
+  try {
+    const { generateConstatRefoulement } = await import("../services/pdfService");
+    const pdfBuffer = await generateConstatRefoulement(id, cooperativeId);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="constat-refoulement-${id}.pdf"`,
+      "Content-Length": String(pdfBuffer.length),
+    });
+    res.end(pdfBuffer);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur interne";
+    res.status(400).json({ erreur: msg });
+  }
+}
+
 export async function countRefusEnAttente(req: Request, res: Response) {
   const result = await db
     .select({ count: sql<number>`COUNT(*)` })

@@ -470,7 +470,7 @@ async function getPrixUnitaireExpedition(expeditionId: number): Promise<number> 
 
   if (lots.length === 0) return PRIX_COUT_DEFAUT_KG;
 
-  const lotIds = lots.map((l) => l.lotId);
+  const lotIds = lots.map((l) => l.lotId).filter((id): id is number => id !== null);
 
   const ventes = await db
     .select({
@@ -851,12 +851,12 @@ export async function confirmerReception(
       }
     }
   } else {
-    const montantEcart = Math.round(Math.abs(ecart) * prixKg);
+    const montantEcart = Math.round(Math.abs(ecartPoids) * prixKg);
     try {
       await proposerEcriture(cooperativeId, {
         source:      "stock",
         sourceId:    expeditionId,
-        libelle:     `Écart litige ${exp.numeroExpedition} — ${ecart.toFixed(1)} kg`,
+        libelle:     `Écart litige ${exp.numeroExpedition} — ${ecartPoids.toFixed(1)} kg`,
         compteDebit:  "6511",
         compteCredit: "381",
         montantFcfa:  montantEcart,

@@ -29,6 +29,7 @@ import {
   parcellesTable,
   lotsTable,
   lotLivraisonsTable,
+  traitementsRefusTable,
 } from "@workspace/db";
 import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
@@ -2675,7 +2676,6 @@ export async function generateConstatReception(expeditionId: number, cooperative
     ["Date arrivee port", dateArrivee],
     ["N° Recepisse",      exp.numeroRecepissePort ?? "—"],
     ["Receptionnaire",    exp.nomReceptionnaire ?? "—"],
-    ["Frais transport",   exp.fraisTransportFcfa != null ? formaterFCFA(exp.fraisTransportFcfa) : "—"],
     ["Date constat",      dateGen],
   ];
   let ly2 = y + 20;
@@ -2766,6 +2766,204 @@ export async function generateConstatReception(expeditionId: number, cooperative
       "Ce constat est etabli contradictoirement et vaut preuve de reception pour les besoins " +
       "de la comptabilite-matiere et du suivi des expeditions. Tout ecart superieur a 2 % fait l'objet " +
       "d'une procedure de litige conformement au contrat de transport.",
+      MARGIN, y, { width: W },
+    );
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
+// ── Constat de refoulement ────────────────────────────────────────────────────
+export async function generateConstatRefoulement(refusId: number, cooperativeId: number): Promise<Buffer> {
+  const [refus] = await db
+    .select({
+      refus: traitementsRefusTable,
+      expedition: {
+        id: expeditionsTable.id,
+        numeroExpedition: expeditionsTable.numeroExpedition,
+        port: expeditionsTable.port,
+        poidsChargeKg: expeditionsTable.poidsChargeKg,
+        poidsRecuPortKg: expeditionsTable.poidsRecuPortKg,
+        nombreSacs: expeditionsTable.nombreSacs,
+        nombreSacsRecuPort: expeditionsTable.nombreSacsRecuPort,
+        dateArriveePort: expeditionsTable.dateArriveePort,
+        nomReceptionnaire: expeditionsTable.nomReceptionnaire,
+        numeroRecepissePort: expeditionsTable.numeroRecepissePort,
+      },
+    })
+    .from(traitementsRefusTable)
+    .leftJoin(expeditionsTable, eq(traitementsRefusTable.expeditionId, expeditionsTable.id))
+    .where(and(
+      eq(traitementsRefusTable.id, refusId),
+      eq(traitementsRefusTable.cooperativeId, cooperativeId),
+    ))
+    .limit(1);
+
+  if (!refus) throw new Error("Refus introuvable");
+
+  const r = refus.refus;
+  const exp = refus.expedition;
+
+  const { doc, endPromise } = makePdfDoc();
+  const W = PAGE_W - 2 * MARGIN;
+
+  await drawHeader(doc, cooperativeId, {
+    titre_document: "CONSTAT DE REFOULEMENT",
+    reference: exp?.numeroExpedition ? `REFOUL-${refusId} / ${exp.numeroExpedition}` : `REFOUL-${refusId}`,
+  });
+
+  let y = doc.y + 4;
+
+  // ── Bandeau statut ─────────────────────────────────────────────────────────
+  const estTraite = r.statut === "traite";
+  const bandeauBg  = estTraite ? "#f0fdf4" : "#fff7ed";
+  const bandeauBrd = estTraite ? "#86efac" : "#fde68a";
+  const bandeauTxt = estTraite ? "#166534" : "#92400e";
+  const bandeauMsg = estTraite ? "TRAITE" : "EN ATTENTE DE TRAITEMENT";
+  doc.rect(MARGIN, y, W, 22).fill(bandeauBg).stroke(bandeauBrd);
+  doc.fontSize(8.5).fillColor(bandeauTxt).font("Helvetica-Bold")
+    .text(`STOCK REFOULE — ${bandeauMsg}`, MARGIN + 10, y + 7, { width: W - 20, lineBreak: false });
+  y += 30;
+
+  // ── Deux colonnes : Expédition | Refoulement ──────────────────────────────
+  const colW = (W - 12) / 2;
+
+  const dateRefus  = r.dateRefus ? new Date(r.dateRefus).toLocaleDateString("fr-FR") : "—";
+  const dateGen    = new Date().toLocaleDateString("fr-FR");
+
+  // Col gauche : infos expédition
+  doc.rect(MARGIN, y, colW, 90).fill("#f9fafb").stroke("#e5e7eb");
+  doc.fontSize(7.5).fillColor(GRIS).font("Helvetica-Bold")
+    .text("EXPEDITION", MARGIN + 8, y + 7);
+  const lignesExp: Array<[string, string]> = [
+    ["N° Expedition",  exp?.numeroExpedition ?? "—"],
+    ["Port d'arrivee", exp?.port ?? "—"],
+    ["Receptionnaire", exp?.nomReceptionnaire ?? "—"],
+    ["N° Recepisse",   exp?.numeroRecepissePort ?? "—"],
+    ["Source",         r.sourceType === "reception_port" ? "Reception port" : "Vente exportateur"],
+  ];
+  let ly = y + 20;
+  for (const [label, val] of lignesExp) {
+    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+      .text(`${label} :`, MARGIN + 8, ly, { width: colW / 2 - 4, lineBreak: false });
+    doc.fontSize(7.5).fillColor("black").font("Helvetica-Bold")
+      .text(val, MARGIN + colW / 2 + 4, ly, { width: colW / 2 - 12, lineBreak: false });
+    ly += 12;
+  }
+
+  // Col droite : infos refoulement
+  const col2X = MARGIN + colW + 12;
+  doc.rect(col2X, y, colW, 90).fill("#fff7ed").stroke("#fed7aa");
+  doc.fontSize(7.5).fillColor("#9a3412").font("Helvetica-Bold")
+    .text("REFOULEMENT", col2X + 8, y + 7);
+  const lignesRef: Array<[string, string]> = [
+    ["Date du refus",       dateRefus],
+    ["Poids refoule",       `${formaterNombre(parseFloat(String(r.poidsRefuleKg ?? "0")))} kg`],
+    ["Sacs refoules",       r.nombreSacsRefoules !== null ? String(r.nombreSacsRefoules) : "—"],
+    ["Motif",               r.motifRefus ?? "—"],
+    ["Date constat",        dateGen],
+  ];
+  let ly2 = y + 20;
+  for (const [label, val] of lignesRef) {
+    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+      .text(`${label} :`, col2X + 8, ly2, { width: colW / 2 - 4, lineBreak: false });
+    doc.fontSize(7.5).fillColor("black").font("Helvetica-Bold")
+      .text(val, col2X + colW / 2 + 4, ly2, { width: colW / 2 - 12, lineBreak: false });
+    ly2 += 12;
+  }
+  y += 98;
+
+  // ── Tableau comparatif Marchandise ────────────────────────────────────────
+  if (exp?.poidsChargeKg && exp?.poidsRecuPortKg) {
+    doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold")
+      .text("BILAN MARCHANDISE", MARGIN, y);
+    y += 14;
+
+    const poidsCharge  = parseFloat(String(exp.poidsChargeKg));
+    const poidsRecu    = parseFloat(String(exp.poidsRecuPortKg));
+    const poidsRefule  = parseFloat(String(r.poidsRefuleKg ?? "0"));
+    const poidsAccepte = poidsRecu - poidsRefule;
+
+    const colsW = [W * 0.40, W * 0.20, W * 0.20, W * 0.20];
+    ligneTableau(doc, ["Mesure", "Charge", "Recu au port", "Accepte", "Refoule"].slice(0, 4), colsW, MARGIN, y, VERT);
+    y += 18;
+
+    // Ligne poids
+    ligneTableau(doc, [
+      "Poids (kg)",
+      `${formaterNombre(poidsCharge)} kg`,
+      `${formaterNombre(poidsRecu)} kg`,
+      `${formaterNombre(poidsAccepte)} kg`,
+    ], colsW, MARGIN, y);
+    y += 18;
+
+    // Ligne refoulé
+    doc.rect(MARGIN, y, W, 16).fill("#fff7ed");
+    ligneTableau(doc, [
+      "Dont refoule",
+      "—",
+      "—",
+      `${formaterNombre(poidsRefule)} kg`,
+    ], colsW, MARGIN, y);
+    y += 26;
+  }
+
+  // ── Motif du refus ────────────────────────────────────────────────────────
+  if (r.motifRefus) {
+    doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("MOTIF DU REFOULEMENT", MARGIN, y);
+    y += 14;
+    doc.rect(MARGIN, y, W, 28).fill("#fff7ed").stroke("#fed7aa");
+    doc.fontSize(9).fillColor("#9a3412").font("Helvetica")
+      .text(r.motifRefus, MARGIN + 10, y + 10, { width: W - 20 });
+    y += 36;
+  }
+  y += 4;
+
+  // ── Décision (si traitée) ─────────────────────────────────────────────────
+  if (estTraite && r.decision) {
+    const DECISION_FR: Record<string, string> = {
+      retour_stock: "Retour en stock",
+      declassement: "Déclassement qualité",
+      autre_acheteur: "Vente à un autre acheteur",
+      perte: "Perte constatée",
+    };
+    doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("DECISION PRISE", MARGIN, y);
+    y += 14;
+    doc.rect(MARGIN, y, W, 24).fill("#f0fdf4").stroke("#86efac");
+    doc.fontSize(9).fillColor("#166534").font("Helvetica-Bold")
+      .text(DECISION_FR[r.decision] ?? r.decision, MARGIN + 10, y + 8, { width: W - 20, lineBreak: false });
+    y += 32;
+  }
+
+  // ── Zone de signatures ────────────────────────────────────────────────────
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("SIGNATURES", MARGIN, y);
+  y += 14;
+
+  const sigW = (W - 12) / 2;
+  const sigH  = 80;
+  const sigLabels = ["Responsable coopérative", "Réceptionnaire port / exportateur"];
+
+  for (let i = 0; i < 2; i++) {
+    const sx = MARGIN + i * (sigW + 12);
+    doc.rect(sx, y, sigW, sigH).fill("#f9fafb").stroke("#d1d5db");
+    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica-Bold")
+      .text(sigLabels[i]!, sx + 6, y + 6, { width: sigW - 12, align: "center", lineBreak: false });
+    doc.fontSize(7).fillColor("#9ca3af").font("Helvetica")
+      .text("Nom :", sx + 6, y + 22, { width: sigW - 12, lineBreak: false });
+    doc.moveTo(sx + 6, y + 60).lineTo(sx + sigW - 6, y + 60)
+      .strokeColor("#9ca3af").lineWidth(0.5).stroke();
+    doc.fontSize(7).fillColor("#9ca3af").font("Helvetica")
+      .text("Signature et cachet", sx + 6, y + 63, { width: sigW - 12, align: "center", lineBreak: false });
+  }
+  y += sigH + 14;
+
+  // ── Mention légale ────────────────────────────────────────────────────────
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica-Oblique")
+    .text(
+      "Ce constat de refoulement est etabli par la cooperative et les parties concernees. " +
+      "Il retrace la quantite de marchandise refusee lors de la reception au port et servira " +
+      "de base pour le traitement du stock refoule conformement aux procedures internes.",
       MARGIN, y, { width: W },
     );
 

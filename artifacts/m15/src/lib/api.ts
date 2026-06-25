@@ -178,6 +178,13 @@ export async function supprimerCooperative(id: number, motif: string, confirmati
 
 // ─── Licences ─────────────────────────────────────────────────────────────────
 
+export async function activerCooperative(coopId: number, cleLicence: string) {
+  return request<{ message: string }>("/m15/licences/activer", {
+    method: "POST",
+    body: JSON.stringify({ cleLicence, cooperativeId: coopId }),
+  });
+}
+
 export async function renouvelerLicence(id: number, data: {
   dureeAns: number; montantPaye?: number; modePaiement?: string; referencePaiement?: string;
 }) {

@@ -4,14 +4,14 @@ import Layout from "@/components/Layout";
 import {
   fetchCooperative, fetchPlans, renouvelerLicence, suspendreCooperative,
   reactiverCooperative, supprimerCooperative, toggleRenouvellementAuto,
-  resetPasswordPca, updatePca,
+  resetPasswordPca, updatePca, activerCooperative,
   formatDate, formatFcfa, statutColor, joursColor,
   type CoopDetail as CoopDetailType, type Plan,
 } from "@/lib/api";
 import {
   Loader2, AlertCircle, ArrowLeft, CheckCircle2, PauseCircle, XCircle,
   RefreshCw, Trash2, RotateCcw, Clock, History, BarChart3, FileKey,
-  User, KeyRound, Copy, Check, ShieldAlert, Pencil, Phone, Mail,
+  User, KeyRound, Copy, Check, ShieldAlert, Pencil, Phone, Mail, Play,
 } from "lucide-react";
 
 type Tab = "licence" | "pca" | "stats" | "historique";
@@ -57,6 +57,7 @@ export default function CoopDetail() {
   const [showSupprimer, setShowSupprimer] = useState(false);
   const [showResetPca, setShowResetPca] = useState(false);
   const [showEditPca, setShowEditPca] = useState(false);
+  const [showActiver, setShowActiver] = useState(false);
 
   const [renouvDuree, setRenouvDuree] = useState<Duree>(1);
   const [renouvMontant, setRenouvMontant] = useState("");
@@ -96,6 +97,16 @@ export default function CoopDetail() {
     setEditEmail(data.pca.email);
     setActionError("");
     setShowEditPca(true);
+  }
+
+  async function doActiver() {
+    if (!data?.licenceCourante) return;
+    setActionLoading(true); setActionError("");
+    try {
+      await activerCooperative(data.cooperative.id, data.licenceCourante.cleLicence);
+      setShowActiver(false); await load();
+    } catch (e) { setActionError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setActionLoading(false); }
   }
 
   async function doRenouveler() {
@@ -216,6 +227,11 @@ export default function CoopDetail() {
                   <button onClick={load} className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-muted">
                     <RefreshCw size={13} />
                   </button>
+                  {data.licenceCourante?.statut === "inactive" && (
+                    <button onClick={() => { setShowActiver(true); setActionError(""); }} className="flex items-center gap-1.5 px-3 py-2 border border-green-300 text-green-700 bg-green-50 rounded-lg text-sm hover:bg-green-100 font-medium">
+                      <Play size={13} /> Activer la licence
+                    </button>
+                  )}
                   {data.licenceCourante?.statut === "active" && (
                     <>
                       <button onClick={() => { setShowRenouveler(true); setActionError(""); }} className="flex items-center gap-1.5 px-3 py-2 border border-primary/30 text-primary rounded-lg text-sm hover:bg-primary/5">
@@ -415,6 +431,26 @@ export default function CoopDetail() {
           </>
         )}
       </div>
+
+      {/* Modal Activer */}
+      {showActiver && data?.licenceCourante && (
+        <Modal title="Activer la licence" onClose={() => setShowActiver(false)}>
+          <div className="space-y-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm">
+              <div className="font-semibold text-green-800 mb-2">✅ Activation immédiate</div>
+              <p className="text-green-700">La licence <span className="font-mono bg-white px-1 rounded">{data.licenceCourante.cleLicence}</span> sera activée aujourd'hui pour une durée de <strong>{data.licenceCourante.dureeAns} an{data.licenceCourante.dureeAns > 1 ? "s" : ""}</strong>.</p>
+              <p className="text-green-600 mt-1 text-xs">Le compte PCA de la coopérative pourra se connecter immédiatement après activation.</p>
+            </div>
+            {actionError && <div className="text-destructive text-sm flex items-center gap-1"><AlertCircle size={14} /> {actionError}</div>}
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setShowActiver(false)} className="flex-1 py-2.5 border rounded-lg text-sm">Annuler</button>
+              <button onClick={doActiver} disabled={actionLoading} className="flex-1 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
+                {actionLoading && <Loader2 size={14} className="animate-spin" />} Activer maintenant
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Modal Renouveler */}
       {showRenouveler && (
