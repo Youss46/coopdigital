@@ -18,7 +18,8 @@ export type NavItemConfig = {
 export const NAV_ITEMS: NavItemConfig[] = [
   // ── Dashboards ──────────────────────────────────────────────────────────────
   { href: "/dashboard/pca",          label: "Vue PCA",                   roles: ["pca"],                                                                       category: "Tableau de bord" },
-  { href: "/dashboard",              label: "Tableau de bord",           roles: ["pca","directeur","comptable","caissier","magasinier","responsable_tracabilite","auditeur"], category: "Tableau de bord" },
+  { href: "/dashboard",              label: "Tableau de bord",           roles: ["pca","directeur","comptable","magasinier","responsable_tracabilite","auditeur"], category: "Tableau de bord" },
+  { href: "/dashboard-caissier",    label: "Tableau de bord",           roles: ["caissier"],                                                                          category: "Tableau de bord" },
   { href: "/dashboard-delegue",      label: "Tableau de bord délégué",   roles: ["delegue"],                                                                   category: "Tableau de bord" },
 
   // ── Agent terrain ────────────────────────────────────────────────────────────

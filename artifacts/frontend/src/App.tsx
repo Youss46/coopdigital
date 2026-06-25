@@ -105,7 +105,9 @@ function AppRoutes() {
         {estConnecte ? <Redirect to={accueil} /> : <Redirect to="/login" />}
       </Route>
       <Route path="/dashboard">
-        <ProtectedRoute component={Dashboard} />
+        {utilisateur?.role === "caissier"
+          ? <Redirect to="/dashboard-caissier" />
+          : <ProtectedRoute component={Dashboard} />}
       </Route>
       <Route path="/dashboard-delegue">
         <ProtectedRoute component={DashboardDelegue} />
