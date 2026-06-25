@@ -103,22 +103,22 @@ export default function MobileMarchandPage() {
   }
 
   return (
-    <div>
+    <div className="px-4 py-4 sm:px-0 sm:py-0">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Comptes Mobiles Marchands</h1>
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">Comptes Mobiles Marchands</h1>
           <p className="text-sm text-gray-500 mt-0.5">{comptes.length} compte(s) enregistré(s)</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-shrink-0">
           <button onClick={refetch} disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-xs sm:text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Actualiser
+            <span className="hidden sm:inline">Actualiser</span>
           </button>
           {peutCreer && (
             <button onClick={() => setModalCreer(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-xs sm:text-sm hover:bg-blue-700 whitespace-nowrap">
               <Plus size={14} /> Nouveau compte
             </button>
           )}
@@ -147,30 +147,30 @@ export default function MobileMarchandPage() {
         {selected && (
           <>
             {/* Liste condensée */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               {comptes.map(c => (
                 <div key={c.id}
                   onClick={() => loadJournal(c)}
-                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selected.id === c.id ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white hover:border-blue-300"}`}>
-                  <OperateurBadge op={c.operateur} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 text-sm truncate">{c.nom}</p>
-                    <p className="text-xs text-gray-500">{FCFA(c.solde_actuel_fcfa)}</p>
+                  className={`rounded-xl border cursor-pointer transition-all ${selected.id === c.id ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white hover:border-blue-300"}`}>
+                  <div className="flex items-center gap-3 p-3">
+                    <OperateurBadge op={c.operateur} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 text-sm truncate">{c.nom}</p>
+                      <p className="text-xs text-gray-500">{FCFA(c.solde_actuel_fcfa)}</p>
+                    </div>
                   </div>
                   {peutMouvement && selected.id === c.id && (
-                    <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
+                    <div className="flex gap-1.5 flex-wrap px-3 pb-3" onClick={e => e.stopPropagation()}>
                       <button onClick={() => setModalVirement(c.id)}
-                        title="Virement depuis banque"
-                        className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700 whitespace-nowrap">
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700 whitespace-nowrap">
                         <Landmark size={11} /> Banque
                       </button>
                       <button onClick={() => setModalVirementCaisse(c.id)}
-                        title="Virement caisse"
-                        className="flex items-center gap-1 px-2 py-1 bg-amber-500 text-white rounded-lg text-xs hover:bg-amber-600 whitespace-nowrap">
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-500 text-white rounded-lg text-xs hover:bg-amber-600 whitespace-nowrap">
                         <Wallet size={11} /> Caisse
                       </button>
                       <button onClick={() => setModalMvt(c.id)}
-                        className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 whitespace-nowrap">
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 whitespace-nowrap">
                         <Plus size={11} /> Mouvement
                       </button>
                     </div>
