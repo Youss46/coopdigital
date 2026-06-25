@@ -98,9 +98,14 @@ function KpiCard({
         )}
       </div>
       <p className="text-sm text-gray-500 mb-1">{label}</p>
-      <div className="flex items-baseline gap-1">
-        <span className="text-2xl font-black text-gray-900">{value}</span>
-        {unit && <span className="text-sm text-gray-400">{unit}</span>}
+      <div className="flex items-baseline gap-1 flex-wrap">
+        <span
+          className="text-sm sm:text-2xl font-black text-gray-900 leading-tight break-words"
+          title={unit ? `${value} ${unit}` : value}
+        >
+          {value}
+        </span>
+        {unit && <span className="text-xs sm:text-sm text-gray-400">{unit}</span>}
       </div>
       {sub && <p className={`text-xs mt-1 font-medium ${subColor}`}>{sub}</p>}
     </div>
