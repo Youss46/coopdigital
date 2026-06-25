@@ -184,50 +184,50 @@ export default function BanquePage() {
   // ─── Rendu ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-4 max-w-7xl mx-auto space-y-6">
+    <div className="px-4 py-4 sm:p-4 max-w-7xl mx-auto space-y-6">
 
       {/* En-tête */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           {selected && (
-            <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600">
+            <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
               <ChevronRight className="rotate-180 h-5 w-5" />
             </button>
           )}
-          <Building2 className="h-7 w-7 text-blue-600" />
-          <h1 className="text-2xl font-bold text-gray-900">
+          <Building2 className="h-6 w-6 text-blue-600 flex-shrink-0" />
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
             {selected ? selected.nom : "Comptes bancaires"}
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {selected && canEdit && (
             <>
               <button
                 onClick={() => setShowVirementMobile(true)}
-                className="flex items-center gap-2 px-3 py-2 text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50"
+                className="flex items-center gap-1.5 px-2.5 py-2 text-xs sm:text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50 whitespace-nowrap"
               >
-                <ArrowRightLeft className="h-4 w-4" />
-                Virt. Mobile
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Virt. </span>Mobile
               </button>
               <button
                 onClick={() => setShowVirementCaisse(true)}
-                className="flex items-center gap-2 px-3 py-2 text-sm border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50"
+                className="flex items-center gap-1.5 px-2.5 py-2 text-xs sm:text-sm border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 whitespace-nowrap"
               >
-                <Wallet className="h-4 w-4" />
-                Virt. Caisse
+                <Wallet className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Virt. </span>Caisse
               </button>
               <button
                 onClick={() => setShowRapprochement(true)}
-                className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="flex items-center gap-1.5 px-2.5 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap"
               >
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Rapprocher
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                <span className="hidden xs:inline">Rapprocher</span>
               </button>
               <button
                 onClick={() => setShowMouvement(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3.5 w-3.5" />
                 Mouvement
               </button>
             </>
@@ -235,9 +235,9 @@ export default function BanquePage() {
           {!selected && canCreate && (
             <button
               onClick={() => { setEditCompte(null); setShowCreerCompte(true); }}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
               Nouveau compte
             </button>
           )}
@@ -335,32 +335,32 @@ export default function BanquePage() {
 
           {/* Filtres */}
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="flex flex-wrap gap-3 items-center">
-              <Filter className="h-4 w-4 text-gray-400" />
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-center">
+              <Filter className="h-4 w-4 text-gray-400 hidden sm:block" />
               <div className="flex items-center gap-1.5">
-                <label className="text-xs text-gray-500">Du</label>
+                <label className="text-xs text-gray-500 whitespace-nowrap">Du</label>
                 <input type="date" value={dateDebut} onChange={e => setDateDebut(e.target.value)}
-                  className="text-sm border border-gray-200 rounded px-2 py-1" />
+                  className="text-xs sm:text-sm border border-gray-200 rounded px-2 py-1 w-full" />
               </div>
               <div className="flex items-center gap-1.5">
-                <label className="text-xs text-gray-500">Au</label>
+                <label className="text-xs text-gray-500 whitespace-nowrap">Au</label>
                 <input type="date" value={dateFin} onChange={e => setDateFin(e.target.value)}
-                  className="text-sm border border-gray-200 rounded px-2 py-1" />
+                  className="text-xs sm:text-sm border border-gray-200 rounded px-2 py-1 w-full" />
               </div>
               <select value={filterType} onChange={e => setFilterType(e.target.value)}
-                className="text-sm border border-gray-200 rounded px-2 py-1">
+                className="text-xs sm:text-sm border border-gray-200 rounded px-2 py-1 col-span-2 sm:col-span-1">
                 <option value="tous">Tous les types</option>
                 <option value="credit">Crédits</option>
                 <option value="debit">Débits</option>
               </select>
-              <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+              <label className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-600 cursor-pointer col-span-2 sm:col-span-1">
                 <input type="checkbox" checked={nonRapproche} onChange={e => setNonRapproche(e.target.checked)}
                   className="rounded" />
                 Non rapprochés seulement
               </label>
               {(dateDebut || dateFin || filterType !== "tous" || nonRapproche) && (
                 <button onClick={() => { setDateDebut(""); setDateFin(""); setFilterType("tous"); setNonRapproche(false); }}
-                  className="text-xs text-gray-400 hover:text-red-500">
+                  className="text-xs text-gray-400 hover:text-red-500 col-span-2 sm:col-span-1">
                   Réinitialiser
                 </button>
               )}
@@ -377,50 +377,47 @@ export default function BanquePage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date op.</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Libellé</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Référence</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Crédit</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Débit</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Solde après</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Rappr.</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Libellé</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Référence</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Crédit</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Débit</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Solde après</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Rappr.</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {mouvements.map(m => (
                     <tr key={m.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                        <div>{DATE_FR(m.date_operation)}</div>
+                      <td className="px-3 py-3 text-gray-600 whitespace-nowrap">
+                        <div className="text-xs">{DATE_FR(m.date_operation)}</div>
                         <div className="text-xs text-gray-400 font-mono">{m.created_at?.slice(11, 16)}</div>
-                        {m.date_valeur && m.date_valeur !== m.date_operation && (
-                          <div className="text-xs text-gray-400">Valeur: {DATE_FR(m.date_valeur)}</div>
-                        )}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-gray-800">{m.libelle ?? LABEL_MOTIF(m.type, m.motif)}</div>
-                        <div className="text-xs text-gray-400">{LABEL_MOTIF(m.type, m.motif)}</div>
+                      <td className="px-3 py-3 max-w-[140px] sm:max-w-none">
+                        <div className="text-gray-800 truncate">{m.libelle ?? LABEL_MOTIF(m.type, m.motif)}</div>
+                        <div className="text-xs text-gray-400 sm:hidden">{m.reference ?? ""}</div>
                       </td>
-                      <td className="px-4 py-3 text-gray-400 text-xs font-mono">{m.reference ?? "—"}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-3 text-gray-400 text-xs font-mono hidden md:table-cell">{m.reference ?? "—"}</td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap">
                         {m.type === "credit" ? (
-                          <span className="font-medium text-green-700">
-                            <TrendingUp className="inline h-3 w-3 mr-1" />
+                          <span className="font-medium text-green-700 text-xs sm:text-sm">
+                            <TrendingUp className="inline h-3 w-3 mr-0.5" />
                             {FCFA(m.montant_fcfa)}
                           </span>
-                        ) : "—"}
+                        ) : <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-3 text-right whitespace-nowrap">
                         {m.type === "debit" ? (
-                          <span className="font-medium text-red-600">
-                            <TrendingDown className="inline h-3 w-3 mr-1" />
+                          <span className="font-medium text-red-600 text-xs sm:text-sm">
+                            <TrendingDown className="inline h-3 w-3 mr-0.5" />
                             {FCFA(m.montant_fcfa)}
                           </span>
-                        ) : "—"}
+                        ) : <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-gray-700">
+                      <td className="px-3 py-3 text-right font-mono text-gray-700 text-xs hidden sm:table-cell">
                         {m.solde_apres_fcfa ? FCFA(m.solde_apres_fcfa) : "—"}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-3 text-center hidden sm:table-cell">
                         {m.rapproche
                           ? <Check className="mx-auto h-4 w-4 text-green-500" />
                           : <div className="mx-auto h-4 w-4 rounded border border-gray-300" />
