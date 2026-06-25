@@ -134,7 +134,7 @@ export async function getProfilMembre(membreId: number) {
   const [campagneActive] = await db
     .select({ id: campagnesTable.id, libelle: campagnesTable.libelle })
     .from(campagnesTable)
-    .where(eq(campagnesTable.statut, "ouverte"))
+    .where(and(eq(campagnesTable.cooperativeId, membre.cooperativeId), eq(campagnesTable.statut, "ouverte")))
     .limit(1);
 
   return {

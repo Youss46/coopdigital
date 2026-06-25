@@ -66,7 +66,9 @@ export default function DashboardPage() {
   const livraisonsMois = livraisons.filter(l => l.dateLivraison >= moisDebut);
   const kgMois = livraisonsMois.reduce((s, l) => s + Number(l.poidsKg), 0);
   const campagneId = profil?.campagneActive?.id;
-  const livraisonsCampagne = campagneId ? livraisons.filter(l => l.campagneId === campagneId) : livraisons;
+  const livraisonsCampagne = campagneId
+    ? livraisons.filter(l => l.campagneId === campagneId || l.campagneId === null)
+    : livraisons;
   const kgCampagne = livraisonsCampagne.reduce((s, l) => s + Number(l.poidsKg), 0);
 
   if (loading) {
