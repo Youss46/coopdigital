@@ -7,7 +7,7 @@ import type {
 
 const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api/terrain`;
 
-async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function apiFetch<T>(path: string, options: RequestInit = {}, skipSessionExpiry = false): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -16,7 +16,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   };
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
-    if (res.status === 401) {
+    if (res.status === 401 && !skipSessionExpiry) {
       clearAuth();
       window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
       throw new Error("Session expirée");
@@ -33,7 +33,11 @@ export function apiPost<T>(path: string, data: unknown): Promise<T> {
 }
 
 export async function loginTerrain(telephone: string, motDePasse: string) {
-  return apiPost<{ token: string; agent: import("./types").AgentUser }>("/auth/login", { telephone, motDePasse });
+  return apiFetch<{ token: string; agent: import("./types").AgentUser }>(
+    "/auth/login",
+    { method: "POST", body: JSON.stringify({ telephone, motDePasse }) },
+    true,
+  );
 }
 
 export async function getProfil() {
