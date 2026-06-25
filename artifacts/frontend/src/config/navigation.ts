@@ -32,7 +32,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
 
   // ── Collecte ─────────────────────────────────────────────────────────────────
   { href: "/campagnes",              label: "Campagnes",                 roles: ["pca","directeur","comptable","magasinier","delegue","auditeur"],              category: "Collecte" },
-  { href: "/livraisons",             label: "Livraisons",                roles: ["pca","directeur","comptable","caissier","delegue","auditeur"],                          category: "Collecte" },
+  { href: "/livraisons",             label: "Livraisons",                roles: ["pca","directeur","comptable","caissier","magasinier","delegue","auditeur"],          category: "Collecte" },
   { href: "/transport",              label: "Transport",                 roles: ["pca","directeur","comptable","auditeur","magasinier"],                       category: "Collecte" },
   { href: "/expeditions",            label: "Expéditions port",          roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],           category: "Collecte" },
 

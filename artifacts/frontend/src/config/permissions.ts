@@ -51,8 +51,8 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   livraisons: {
-    lire:      ["pca", "directeur", "comptable", "caissier", "responsable_tracabilite", "delegue", "auditeur"],
-    creer:     ["pca", "directeur", "delegue"],
+    lire:      ["pca", "directeur", "comptable", "caissier", "responsable_tracabilite", "delegue", "magasinier", "auditeur"],
+    creer:     ["pca", "directeur", "delegue", "magasinier"],
     modifier:  ["pca", "directeur"],
     supprimer: ["pca", "directeur"],
   },

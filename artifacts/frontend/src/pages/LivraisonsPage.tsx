@@ -8,7 +8,7 @@ import {
   Warehouse, ChevronDown, MapPin, User, Printer,
 } from "lucide-react";
 
-const ROLES_CREER = ["pca", "directeur", "delegue"];
+const ROLES_CREER = ["pca", "directeur", "delegue", "magasinier"];
 const ROLES_VOIR_DELEGUES = ["pca", "directeur", "magasinier", "comptable", "auditeur"];
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
