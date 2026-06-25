@@ -2,6 +2,7 @@ export type UserRole =
   | "pca"
   | "directeur"
   | "comptable"
+  | "caissier"
   | "magasinier"
   | "responsable_tracabilite"
   | "delegue"

@@ -7,6 +7,7 @@ export const USER_ROLES = [
   "pca",
   "directeur",
   "comptable",
+  "caissier",
   "magasinier",
   "responsable_tracabilite",
   "delegue",

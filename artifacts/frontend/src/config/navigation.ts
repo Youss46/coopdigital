@@ -18,20 +18,20 @@ export type NavItemConfig = {
 export const NAV_ITEMS: NavItemConfig[] = [
   // ── Dashboards ──────────────────────────────────────────────────────────────
   { href: "/dashboard/pca",          label: "Vue PCA",                   roles: ["pca"],                                                                       category: "Tableau de bord" },
-  { href: "/dashboard",              label: "Tableau de bord",           roles: ["pca","directeur","comptable","magasinier","responsable_tracabilite","auditeur"], category: "Tableau de bord" },
+  { href: "/dashboard",              label: "Tableau de bord",           roles: ["pca","directeur","comptable","caissier","magasinier","responsable_tracabilite","auditeur"], category: "Tableau de bord" },
   { href: "/dashboard-delegue",      label: "Tableau de bord délégué",   roles: ["delegue"],                                                                   category: "Tableau de bord" },
 
   // ── Agent terrain ────────────────────────────────────────────────────────────
   { href: "/missions",               label: "Mes missions",              roles: ["agent_terrain"],                                                             category: "Terrain" },
 
   // ── Membres ──────────────────────────────────────────────────────────────────
-  { href: "/membres",                label: "Membres",                   roles: ["pca","directeur","comptable","responsable_tracabilite","delegue","auditeur"], category: "Membres" },
+  { href: "/membres",                label: "Membres",                   roles: ["pca","directeur","comptable","caissier","responsable_tracabilite","delegue","auditeur"], category: "Membres" },
   { href: "/cartes-membres",         label: "Cartes membres",            roles: ["pca","directeur","comptable","delegue","auditeur"],                          category: "Membres" },
   { href: "/scoring",                label: "Scoring Producteurs",       roles: ["pca","directeur","comptable","auditeur"],                                    category: "Membres" },
 
   // ── Collecte ─────────────────────────────────────────────────────────────────
   { href: "/campagnes",              label: "Campagnes",                 roles: ["pca","directeur","comptable","magasinier","delegue","auditeur"],              category: "Collecte" },
-  { href: "/livraisons",             label: "Livraisons",                roles: ["pca","directeur","comptable","delegue","auditeur"],                          category: "Collecte" },
+  { href: "/livraisons",             label: "Livraisons",                roles: ["pca","directeur","comptable","caissier","delegue","auditeur"],                          category: "Collecte" },
   { href: "/transport",              label: "Transport",                 roles: ["pca","directeur","comptable","auditeur","magasinier"],                       category: "Collecte" },
   { href: "/expeditions",            label: "Expéditions port",          roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],           category: "Collecte" },
 
@@ -47,9 +47,9 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/refus",                  label: "Stocks refoulés",           roles: ["pca","directeur","magasinier","comptable","auditeur"],                       category: "Stocks" },
 
   // ── Finance membre ───────────────────────────────────────────────────────────
-  { href: "/avances",                label: "Avances",                   roles: ["pca","directeur","comptable","delegue","auditeur"],                          category: "Finance membre" },
+  { href: "/avances",                label: "Avances",                   roles: ["pca","directeur","comptable","caissier","delegue","auditeur"],                          category: "Finance membre" },
   { href: "/intrants",               label: "Intrants",                  roles: ["pca","directeur","comptable","delegue","auditeur","magasinier"],             category: "Finance membre" },
-  { href: "/reglements",             label: "Règlements",                roles: ["pca","directeur","comptable","delegue","auditeur"],                          category: "Finance membre" },
+  { href: "/reglements",             label: "Règlements",                roles: ["pca","directeur","comptable","caissier","delegue","auditeur"],                          category: "Finance membre" },
 
   // ── Commerce ─────────────────────────────────────────────────────────────────
   { href: "/fournisseurs",           label: "Fournisseurs",              roles: ["pca","directeur","comptable","delegue","auditeur"],                          category: "Commerce" },
@@ -64,7 +64,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/emprunts",               label: "Emprunts",                  roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
   { href: "/subventions",            label: "Subventions",               roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
   { href: "/dons",                   label: "Dons",                      roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
-  { href: "/caisse",                 label: "Caisse",                    roles: ["pca","directeur","comptable","auditeur","delegue"],                          category: "Finances" },
+  { href: "/caisse",                 label: "Caisse",                    roles: ["pca","directeur","comptable","caissier","auditeur","delegue"],                          category: "Finances" },
   { href: "/banque",                 label: "Banque",                    roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
   { href: "/mobile-marchand",        label: "Mobile Marchands",          roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
   { href: "/fiscalite",              label: "Fiscalité",                 roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
@@ -89,7 +89,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
 
   // ── Organisation ─────────────────────────────────────────────────────────────
   { href: "/gouvernance",            label: "Gouvernance",               roles: ["pca","directeur","secretaire","auditeur"],                                   category: "Organisation" },
-  { href: "/communication",          label: "Communication",             roles: ["pca","directeur","comptable","magasinier","responsable_tracabilite","delegue","auditeur","agent_terrain"], category: "Organisation", showMessagesBadge: true },
+  { href: "/communication",          label: "Communication",             roles: ["pca","directeur","comptable","caissier","magasinier","responsable_tracabilite","delegue","auditeur","agent_terrain"], category: "Organisation", showMessagesBadge: true },
   { href: "/delegues",               label: "Délégués Localité",         roles: ["pca","directeur","comptable","auditeur"],                                    category: "Organisation" },
   { href: "/administration/comptes", label: "Administration",            roles: ["pca","directeur"],                                                           category: "Organisation" },
   { href: "/parametres",             label: "Paramètres",                roles: ["pca","directeur"],                                                           category: "Organisation" },

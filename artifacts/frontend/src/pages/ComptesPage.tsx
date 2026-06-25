@@ -35,6 +35,7 @@ type UserRole =
   | "pca"
   | "directeur"
   | "comptable"
+  | "caissier"
   | "magasinier"
   | "responsable_tracabilite"
   | "delegue"
@@ -45,6 +46,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   pca: "PCA",
   directeur: "Directeur",
   comptable: "Comptable",
+  caissier: "Caissier.e",
   magasinier: "Magasinier",
   responsable_tracabilite: "Resp. Traçabilité",
   delegue: "Délégué de localité",
@@ -56,6 +58,7 @@ const ROLE_BADGE_STYLE: Record<UserRole, { bg: string; text: string }> = {
   pca: { bg: "#4c1d95", text: "#ffffff" },
   directeur: { bg: "#1a4731", text: "#ffffff" },
   comptable: { bg: "#1d4ed8", text: "#ffffff" },
+  caissier: { bg: "#be185d", text: "#ffffff" },
   magasinier: { bg: "#c2410c", text: "#ffffff" },
   responsable_tracabilite: { bg: "#0f766e", text: "#ffffff" },
   delegue: { bg: "#15803d", text: "#ffffff" },
@@ -69,6 +72,7 @@ function getRolesCreables(requesterRole: string): UserRole[] {
     "pca",
     "directeur",
     "comptable",
+    "caissier",
     "magasinier",
     "responsable_tracabilite",
     "delegue",

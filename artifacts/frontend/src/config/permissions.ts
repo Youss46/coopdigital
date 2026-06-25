@@ -14,7 +14,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   membres: {
-    lire:     ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur", "agent_terrain"],
+    lire:     ["pca", "directeur", "comptable", "caissier", "responsable_tracabilite", "delegue", "auditeur", "agent_terrain"],
     creer:    ["pca", "directeur", "delegue", "responsable_tracabilite"],
     modifier: ["pca", "directeur", "delegue", "responsable_tracabilite"],
     supprimer:["pca", "directeur"],
@@ -44,24 +44,24 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   avances: {
-    lire:      ["pca", "directeur", "comptable", "delegue", "auditeur"],
-    octroyer:  ["pca", "directeur", "delegue"],
-    rembourser:["pca", "directeur", "delegue"],
+    lire:      ["pca", "directeur", "comptable", "caissier", "delegue", "auditeur"],
+    octroyer:  ["pca", "directeur", "caissier", "delegue"],
+    rembourser:["pca", "directeur", "caissier", "delegue"],
     supprimer: ["pca", "directeur"],
   },
 
   livraisons: {
-    lire:      ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
+    lire:      ["pca", "directeur", "comptable", "caissier", "responsable_tracabilite", "delegue", "auditeur"],
     creer:     ["pca", "directeur", "delegue"],
     modifier:  ["pca", "directeur"],
     supprimer: ["pca", "directeur"],
   },
 
   paiements: {
-    lire:     ["pca", "directeur", "comptable", "delegue", "auditeur"],
-    confirmer:["pca", "directeur", "delegue"],
-    valider:  ["pca", "directeur", "comptable", "delegue"],
-    rejeter:  ["pca", "directeur", "comptable", "delegue"],
+    lire:     ["pca", "directeur", "comptable", "caissier", "delegue", "auditeur"],
+    confirmer:["pca", "directeur", "caissier", "delegue"],
+    valider:  ["pca", "directeur", "comptable", "caissier", "delegue"],
+    rejeter:  ["pca", "directeur", "comptable", "caissier", "delegue"],
     annuler:  ["pca", "directeur"],
   },
 
@@ -97,7 +97,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   reporting: {
-    voir_dashboard:             ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "auditeur"],
+    voir_dashboard:             ["pca", "directeur", "comptable", "caissier", "magasinier", "responsable_tracabilite", "auditeur"],
     generer_rapport_mensuel:    ["pca", "directeur", "comptable"],
     generer_bilan_campagne:     ["pca", "directeur", "comptable"],
     generer_fiche_membre:       ["pca", "directeur", "delegue"],
@@ -105,7 +105,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   communication: {
-    lire_historique:    ["pca", "directeur", "comptable", "delegue", "magasinier", "responsable_tracabilite", "auditeur", "agent_terrain"],
+    lire_historique:    ["pca", "directeur", "comptable", "caissier", "delegue", "magasinier", "responsable_tracabilite", "auditeur", "agent_terrain"],
     envoyer_sms:        ["pca", "directeur", "delegue"],
     envoyer_whatsapp:   ["pca", "directeur"],
     configurer_alertes: ["pca", "directeur"],
