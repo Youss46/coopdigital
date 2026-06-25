@@ -371,7 +371,7 @@ export default function PcaDashboardPage() {
           label="Trésorerie disponible"
           value={fmtFull(Math.abs(s.financier.tresorerie_disponible_fcfa))}
           unit="FCFA"
-          sub={s.financier.tresorerie_disponible_fcfa >= 0 ? "✅ Solde positif" : "⚠️ Solde négatif"}
+          sub={s.financier.tresorerie_disponible_fcfa >= 0 ? "✅ Caisses + Banque + Mobile" : "⚠️ Solde négatif"}
           subColor={s.financier.tresorerie_disponible_fcfa >= 0 ? "text-green-600" : "text-red-600"}
         />
         <KpiCard
