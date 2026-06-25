@@ -212,8 +212,8 @@ function ModalCreerAgent({ onClose, onSuccess }: ModalAgentProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Téléphone <span className="text-gray-400">(optionnel)</span></label>
-                <input value={form.telephone}
+                <label className="block text-xs font-medium text-gray-700 mb-1">Téléphone *</label>
+                <input required type="tel" value={form.telephone}
                   onChange={(e) => setForm({ ...form, telephone: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
                   placeholder="+225 07 00 00 00 00" />
@@ -258,7 +258,7 @@ function ModalCreerAgent({ onClose, onSuccess }: ModalAgentProps) {
                   Annuler
                 </button>
                 <button
-                  disabled={!form.nom || !form.prenoms || !form.email || mutation.isPending}
+                  disabled={!form.nom || !form.prenoms || !form.email || !form.telephone.trim() || mutation.isPending}
                   onClick={() => { setErreur(""); mutation.mutate(); }}
                   className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50"
                   style={{ backgroundColor: "#1a4731" }}>
