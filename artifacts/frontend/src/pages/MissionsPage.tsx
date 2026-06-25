@@ -94,14 +94,15 @@ function ModalCreerAgent({ onClose, onSuccess }: ModalAgentProps) {
       "",
       "Voici vos informations de connexion CoopDigital Terrain :",
       `🌐 Adresse : ${appUrl}`,
-      `📧 Email : ${form.email || "—"}`,
+      `📱 Numéro de téléphone : ${form.telephone || "—"}`,
       `🔑 Mot de passe temporaire : ${motDePasse}`,
       "",
+      "Connectez-vous avec votre numéro de téléphone et ce mot de passe.",
       "Merci de changer votre mot de passe dès la première connexion.",
       "— CoopDigital",
     ].join("\n");
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
-  }, [form.prenoms, form.email, motDePasse]);
+  }, [form.prenoms, form.telephone, motDePasse]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -147,8 +148,8 @@ function ModalCreerAgent({ onClose, onSuccess }: ModalAgentProps) {
             </div>
             <div className="mx-6 mb-4 rounded-xl border border-gray-100 bg-gray-50 divide-y divide-gray-100">
               <div className="px-4 py-3">
-                <p className="text-xs text-gray-400 mb-0.5">Email</p>
-                <p className="text-sm font-medium text-gray-800 break-all">{form.email}</p>
+                <p className="text-xs text-gray-400 mb-0.5">Numéro de téléphone</p>
+                <p className="text-sm font-medium text-gray-800 break-all">{form.telephone || "—"}</p>
               </div>
               <div className="px-4 py-3 flex items-center justify-between gap-2">
                 <div>
