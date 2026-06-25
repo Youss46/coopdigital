@@ -132,7 +132,12 @@ export async function getProfilMembre(membreId: number) {
   } catch { /* colonne absente — on garde "non_emise" */ }
 
   const [campagneActive] = await db
-    .select({ id: campagnesTable.id, libelle: campagnesTable.libelle })
+    .select({
+      id: campagnesTable.id,
+      libelle: campagnesTable.libelle,
+      anneeDebut: campagnesTable.anneeDebut,
+      anneeFin: campagnesTable.anneeFin,
+    })
     .from(campagnesTable)
     .where(and(eq(campagnesTable.cooperativeId, membre.cooperativeId), eq(campagnesTable.statut, "ouverte")))
     .limit(1);

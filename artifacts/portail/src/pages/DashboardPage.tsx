@@ -110,7 +110,15 @@ export default function DashboardPage() {
           {profil?.prenoms} {profil?.nom}
         </h1>
         {profil?.campagneActive && (
-          <p className="text-green-200 text-base mt-2">{profil.campagneActive.libelle}</p>
+          <div className="mt-3 inline-flex items-center gap-2 bg-white/15 rounded-2xl px-4 py-2">
+            <span className="text-base">🌿</span>
+            <div>
+              <p className="text-white font-semibold text-sm leading-tight">{profil.campagneActive.libelle}</p>
+              <p className="text-green-200 text-xs mt-0.5">
+                Campagne {profil.campagneActive.anneeDebut} – {profil.campagneActive.anneeFin} · En cours
+              </p>
+            </div>
+          </div>
         )}
         <p className="text-green-300 text-sm mt-1">{profil?.codeMembre}</p>
       </div>

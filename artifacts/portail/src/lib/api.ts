@@ -45,7 +45,7 @@ export type Profil = {
   telephone: string; village: string | null; groupement: string | null;
   dateAdhesion: string; statut: string;
   photoUrl: string | null; carteStatut: string;
-  campagneActive: { id: number; libelle: string } | null;
+  campagneActive: { id: number; libelle: string; anneeDebut: number; anneeFin: number } | null;
 };
 
 export type Livraison = {
