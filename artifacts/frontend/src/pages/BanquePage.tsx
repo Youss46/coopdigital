@@ -63,7 +63,8 @@ interface Mouvement {
 export default function BanquePage() {
   const { toast }       = useToast();
   const { utilisateur } = useAuth();
-  const canEdit = utilisateur?.role !== "auditeur";
+  const canEdit   = utilisateur?.role !== "auditeur";
+  const canCreate = !["auditeur", "caissier"].includes(utilisateur?.role ?? "");
 
   const [comptes,         setComptes]         = useState<Compte[]>([]);
   const [selected,        setSelected]        = useState<Compte | null>(null);
@@ -231,7 +232,7 @@ export default function BanquePage() {
               </button>
             </>
           )}
-          {!selected && canEdit && (
+          {!selected && canCreate && (
             <button
               onClick={() => { setEditCompte(null); setShowCreerCompte(true); }}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -286,7 +287,7 @@ export default function BanquePage() {
                   </div>
                   {c.iban && <p className="text-xs text-gray-400 mt-3 font-mono truncate">{c.iban}</p>}
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                    {canEdit && (
+                    {canCreate && (
                       <button
                         onClick={e => { e.stopPropagation(); setEditCompte(c); setShowCreerCompte(true); }}
                         className="text-xs text-gray-400 hover:text-blue-600"

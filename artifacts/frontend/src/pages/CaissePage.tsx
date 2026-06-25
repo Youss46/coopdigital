@@ -373,7 +373,7 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
 }) {
   const { toast } = useToast();
   const { utilisateur } = useAuth();
-  const peutCreerCaisse = utilisateur?.role !== "delegue";
+  const peutCreerCaisse = !["delegue", "caissier"].includes(utilisateur?.role ?? "");
   const [modalMvt, setModalMvt] = useState<number | null>(null);
   const [modalFermer, setModalFermer] = useState<number | null>(null);
   const [modalCreer, setModalCreer] = useState(false);
