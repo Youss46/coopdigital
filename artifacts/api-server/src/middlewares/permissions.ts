@@ -290,17 +290,17 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE — COMPTES BANCAIRES
   banque: {
-    voir:             ["pca", "directeur", "comptable", "auditeur"],
+    voir:             ["pca", "directeur", "comptable", "caissier", "auditeur"],
     creer:            ["pca", "directeur"],
-    enregistrer_mvt:  ["pca", "directeur", "comptable"],
+    enregistrer_mvt:  ["pca", "directeur", "comptable", "caissier"],
     rapprocher:       ["pca", "directeur", "comptable"],
   },
 
   // MODULE — COMPTES MOBILES MARCHANDS
   mobile_marchand: {
-    voir:            ["pca", "directeur", "comptable", "auditeur"],
+    voir:            ["pca", "directeur", "comptable", "caissier", "auditeur"],
     creer:           ["pca", "directeur"],
-    enregistrer_mvt: ["pca", "directeur", "comptable"],
+    enregistrer_mvt: ["pca", "directeur", "comptable", "caissier"],
   },
 
   // MODULE — GESTION DE CAISSE
