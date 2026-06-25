@@ -519,6 +519,7 @@ export default function PcaDashboardPage() {
       {/* Jauge trésorerie vs engagements */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
         <h3 className="font-bold text-gray-900 mb-4">Trésorerie disponible vs engagements (avances + emprunts)</h3>
+        <p className="text-xs text-gray-400 -mt-3 mb-4">Trésorerie = caisses actives + comptes bancaires + mobiles marchands</p>
         <div className="flex flex-col sm:flex-row items-center gap-6">
           <div className="w-48 h-48 flex-shrink-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -538,7 +539,7 @@ export default function PcaDashboardPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-green-800" />
-                <span className="text-sm text-gray-600">Trésorerie disponible</span>
+                <span className="text-sm text-gray-600">Trésorerie (caisses + banque + mobile)</span>
               </div>
               <span className="text-base font-bold text-green-800">
                 {fmtFull(s.financier.tresorerie_disponible_fcfa)} FCFA
