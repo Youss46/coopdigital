@@ -1411,7 +1411,7 @@ export const GetUsersResponseItem = zod.object({
   "prenoms": zod.string(),
   "email": zod.string(),
   "telephone": zod.string().nullish(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'caissier', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
   "createdAt": zod.coerce.date()
@@ -1431,7 +1431,7 @@ export const CreateUserBody = zod.object({
   "prenoms": zod.string(),
   "email": zod.string().email(),
   "telephone": zod.string().optional(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur', 'delegue']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'caissier', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur', 'delegue']),
   "motDePasse": zod.string().min(createUserBodyMotDePasseMin)
 })
 
@@ -1456,7 +1456,7 @@ export const UpdateUserResponse = zod.object({
   "prenoms": zod.string(),
   "email": zod.string(),
   "telephone": zod.string().nullish(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'caissier', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
   "createdAt": zod.coerce.date()
@@ -1508,7 +1508,7 @@ export const ToggleUserActifResponse = zod.object({
   "prenoms": zod.string(),
   "email": zod.string(),
   "telephone": zod.string().nullish(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'caissier', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
   "createdAt": zod.coerce.date()
