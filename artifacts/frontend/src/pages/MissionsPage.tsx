@@ -88,7 +88,7 @@ function ModalCreerAgent({ onClose, onSuccess }: ModalAgentProps) {
   }, [motDePasse]);
 
   const partagerWhatsApp = useCallback(() => {
-    const appUrl = "https://terrain.coopdigital.app";
+    const appUrl = "https://coopdigital.m15-edutech.ci";
     const msg = [
       `Bonjour ${form.prenoms || ""},`,
       "",
