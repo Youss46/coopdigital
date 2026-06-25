@@ -905,6 +905,7 @@ export const LivraisonInputModePaiement = {
   mtn_momo: 'mtn_momo',
   especes: 'especes',
   wave: 'wave',
+  cheque: 'cheque',
   differe: 'differe',
 } as const;
 

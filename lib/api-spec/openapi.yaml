@@ -6816,7 +6816,7 @@ components:
           type: string
         modePaiement:
           type: string
-          enum: [orange_money, mtn_momo, especes, wave, differe]
+          enum: [orange_money, mtn_momo, especes, wave, cheque, differe]
         campagneId:
           type: integer
           nullable: true
