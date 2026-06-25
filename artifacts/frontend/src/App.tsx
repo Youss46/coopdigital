@@ -7,6 +7,7 @@ import SplashScreen from "@/components/SplashScreen";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import DashboardDelegue from "@/pages/DashboardDelegue";
+import DashboardCaissier from "@/pages/DashboardCaissier";
 import Membres from "@/pages/Membres";
 import MissionsPage from "@/pages/MissionsPage";
 import MissionDetailPage from "@/pages/MissionDetailPage";
@@ -94,6 +95,7 @@ function AppRoutes() {
   const accueil =
     utilisateur?.role === "agent_terrain" ? "/missions" :
     utilisateur?.role === "delegue"       ? "/dashboard-delegue" :
+    utilisateur?.role === "caissier"      ? "/dashboard-caissier" :
     "/dashboard";
   return (
     <Switch>
@@ -107,6 +109,9 @@ function AppRoutes() {
       </Route>
       <Route path="/dashboard-delegue">
         <ProtectedRoute component={DashboardDelegue} />
+      </Route>
+      <Route path="/dashboard-caissier">
+        <ProtectedRoute component={DashboardCaissier} />
       </Route>
       <Route path="/membres/:id">
         <ProtectedRoute component={MembreFiche} />
