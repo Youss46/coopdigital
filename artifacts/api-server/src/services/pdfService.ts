@@ -721,8 +721,10 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     ["Date de livraison",  formaterDate(row.dateLivraison)],
     ["Produit",            row.produit ?? "Cacao"],
     ["Nombre de sacs",     row.nombreSacs ? String(row.nombreSacs) : "—"],
-    ["Poids brut",         row.produitBrutKg ? `${parseFloat(row.produitBrutKg).toFixed(2)} kg` : `${parseFloat(row.poidsKg).toFixed(2)} kg`],
-    ["Retenue",            row.retenueKg ? `${parseFloat(row.retenueKg).toFixed(2)} kg` : "0 kg"],
+    ["Poids brut",         row.produitBrutKg
+      ? `${parseFloat(row.produitBrutKg).toFixed(2)} kg`
+      : `${(parseFloat(row.poidsKg) + parseFloat(row.retenueKg ?? "0")).toFixed(2)} kg`],
+    ["Retenue",            row.retenueKg && parseFloat(row.retenueKg) > 0 ? `${parseFloat(row.retenueKg).toFixed(2)} kg` : "0 kg"],
     ["Poids net retenu",   `${parseFloat(row.poidsKg).toFixed(2)} kg`],
     ["Prix unitaire",      `${formaterFCFA(row.prixUnitaireFcfa)} / kg`],
   ];
