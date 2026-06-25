@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, Search, Plus, Loader2, ChevronRight, Calendar,
   Scale, Banknote, TrendingDown, ArrowDownCircle, FileDown,
-  Warehouse, ChevronDown, MapPin, User,
+  Warehouse, ChevronDown, MapPin, User, Printer,
 } from "lucide-react";
 
 const ROLES_CREER = ["pca", "directeur", "delegue"];
@@ -262,12 +262,17 @@ export default function LivraisonsPage() {
 
 // ─── LivraisonRow ─────────────────────────────────────────────────────────────
 
-async function downloadRecuLivraison(id: number) {
+async function fetchRecuBlob(id: number): Promise<Blob | null> {
   const res = await fetch(`${BASE}/api/rapports/recu/livraison/${id}`, {
     headers: { Authorization: `Bearer ${tok()}` },
   });
-  if (!res.ok) return;
-  const blob = await res.blob();
+  if (!res.ok) return null;
+  return res.blob();
+}
+
+async function downloadRecuLivraison(id: number) {
+  const blob = await fetchRecuBlob(id);
+  if (!blob) return;
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -277,9 +282,19 @@ async function downloadRecuLivraison(id: number) {
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
 }
 
+async function printRecuLivraison(id: number) {
+  const blob = await fetchRecuBlob(id);
+  if (!blob) return;
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank");
+  if (win) win.addEventListener("load", () => { win.print(); });
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
 function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
   const [ouvert, setOuvert] = useState(false);
   const [downloadingRecu, setDownloadingRecu] = useState(false);
+  const [printingRecu, setPrintingRecu] = useState(false);
   const poids = parseFloat(l.poidsKg ?? "0");
 
   return (
@@ -352,22 +367,32 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
               valueCls="font-bold text-green-700"
             />
           </div>
-          <button
-            onClick={async () => {
-              setDownloadingRecu(true);
-              await downloadRecuLivraison(l.id);
-              setDownloadingRecu(false);
-            }}
-            disabled={downloadingRecu}
-            className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50"
-            style={{ backgroundColor: "#1a4731" }}
-          >
-            {downloadingRecu ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <><FileDown size={12} /> Télécharger le reçu PDF</>
-            )}
-          </button>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={async () => {
+                setDownloadingRecu(true);
+                await downloadRecuLivraison(l.id);
+                setDownloadingRecu(false);
+              }}
+              disabled={downloadingRecu || printingRecu}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50"
+              style={{ backgroundColor: "#1a4731" }}
+            >
+              {downloadingRecu ? <Loader2 size={12} className="animate-spin" /> : <><FileDown size={12} /> Télécharger</>}
+            </button>
+            <button
+              onClick={async () => {
+                setPrintingRecu(true);
+                await printRecuLivraison(l.id);
+                setPrintingRecu(false);
+              }}
+              disabled={downloadingRecu || printingRecu}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium disabled:opacity-50 border"
+              style={{ borderColor: "#1a4731", color: "#1a4731" }}
+            >
+              {printingRecu ? <Loader2 size={12} className="animate-spin" /> : <><Printer size={12} /> Imprimer</>}
+            </button>
+          </div>
         </div>
       )}
     </div>
