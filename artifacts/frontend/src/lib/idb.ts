@@ -1,7 +1,8 @@
 export type AdminOpType = "livraison" | "avance" | "remboursement";
 
 export interface LivraisonData {
-  membreId: number;
+  membreId?: number;
+  fournisseurId?: number;
   poidsKg: number;
   prixUnitaireFcfa: number;
   dateLivraison: string;

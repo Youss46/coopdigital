@@ -42,7 +42,11 @@ const TYPE_ICONS: Record<string, React.ElementType> = {
 function OpSummary({ op, membres }: { op: PendingAdminOp; membres: Record<number, string> }) {
   if (op.type === "livraison") {
     const d = op.data as LivraisonData;
-    const nomMembre = membres[d.membreId] ?? `Membre #${d.membreId}`;
+    const nomMembre = d.membreId != null
+      ? (membres[d.membreId] ?? `Membre #${d.membreId}`)
+      : d.fournisseurId != null
+        ? `Fournisseur ext. #${d.fournisseurId}`
+        : "Producteur inconnu";
     const montantBrut = Math.round(d.poidsKg * d.prixUnitaireFcfa);
     return (
       <div className="text-sm text-gray-700 space-y-0.5">

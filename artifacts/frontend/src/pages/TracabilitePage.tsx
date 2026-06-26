@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", {
@@ -891,6 +892,7 @@ function ModalFusion({
 export default function TracabilitePage() {
   const queryClient = useQueryClient();
   const { utilisateur } = useAuth();
+  const { toast } = useToast();
   const peutCreerLot = usePermission("tracabilite", "creer_lot");
   const peutModifier = usePermission("tracabilite", "modifier_lot");
 
@@ -913,10 +915,18 @@ export default function TracabilitePage() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetLotsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetLivraisonsNonLoteesQueryKey() });
+        toast({ title: "Lot créé avec succès", description: "Le lot a été créé et est en stock." });
         setOnglet("lots");
         setSelection([]);
         setEntrepotId("");
         setNombreSacsInput("");
+      },
+      onError: (err) => {
+        const msg =
+          (err as { data?: { erreur?: string } } | null)?.data?.erreur ??
+          (err as Error | null)?.message ??
+          "Erreur lors de la création du lot";
+        toast({ title: "Erreur", description: msg, variant: "destructive" });
       },
     },
   });
@@ -1287,6 +1297,15 @@ export default function TracabilitePage() {
               </div>
             )}
           </div>
+
+          {mutCreate.isError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+              <strong>Erreur :</strong>{" "}
+              {(mutCreate.error as { data?: { erreur?: string } } | null)?.data?.erreur ??
+                (mutCreate.error as Error | null)?.message ??
+                "Impossible de créer le lot"}
+            </div>
+          )}
 
           {selection.length > 0 && (
             <div className="bg-[#1a4731] rounded-xl p-4 flex items-center justify-between gap-4">
