@@ -5,11 +5,12 @@ import {
   lotLivraisonsTable,
   livraisonsTable,
   membresTable,
+  fournisseursTable,
   ventesExportateursTable,
   exportateursTable,
   parcellesTable,
 } from "@workspace/db";
-import { eq, inArray, sql, desc, and } from "drizzle-orm";
+import { eq, inArray, sql, desc, and, or } from "drizzle-orm";
 import { CreateLotBody, UpdateLotStatutBody } from "@workspace/api-zod";
 import { generateLotEudrPdf } from "../services/pdfService";
 
@@ -95,17 +96,24 @@ export async function createLot(req: Request, res: Response): Promise<void> {
 
   try {
     // Vérifier que toutes les livraisons appartiennent à cette coopérative
-    // (membres OU fournisseurs externes)
-    const livraisonsVerif = await db.execute<{ id: number }>(sql`
-      SELECT l.id
-      FROM livraisons l
-      LEFT JOIN membres   m ON m.id = l.membre_id
-      LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id
-      WHERE l.id = ANY(${livraisonIds})
-        AND (m.cooperative_id = ${cooperativeId} OR f.cooperative_id = ${cooperativeId})
-    `);
+    // (membres OU fournisseurs externes) — on utilise Drizzle type-safe au lieu
+    // de sql`ANY()` qui ne sérialise pas les tableaux JS correctement avec pg.
+    const livraisonsVerif = await db
+      .select({ id: livraisonsTable.id })
+      .from(livraisonsTable)
+      .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+      .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+      .where(
+        and(
+          inArray(livraisonsTable.id, livraisonIds),
+          or(
+            eq(membresTable.cooperativeId, cooperativeId),
+            eq(fournisseursTable.cooperativeId, cooperativeId),
+          ),
+        ),
+      );
 
-    if (livraisonsVerif.rows.length !== livraisonIds.length) {
+    if (livraisonsVerif.length !== livraisonIds.length) {
       res.status(403).json({ erreur: "Une ou plusieurs livraisons n'appartiennent pas à votre coopérative" });
       return;
     }
