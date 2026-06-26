@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Send, Inbox, CheckCircle, Clock, Users, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
+import { Send, Inbox, CheckCircle, Clock, Users, MessageSquare, ChevronDown, ChevronUp, User } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -26,14 +26,35 @@ function formaterDate(d: string) {
 }
 
 const DESTINATAIRES_OPTIONS = [
-  { value: "tous",                   label: "Tous les utilisateurs" },
-  { value: "direction",              label: "Direction (PCA, Directeur, Comptable)" },
-  { value: "agent_terrain",          label: "Agents terrain" },
-  { value: "delegue",                label: "Délégués" },
-  { value: "magasinier",             label: "Magasiniers" },
-  { value: "responsable_tracabilite",label: "Responsables traçabilité" },
-  { value: "auditeur",               label: "Auditeurs" },
+  { value: "tous",                    label: "Tous les utilisateurs" },
+  { value: "direction",               label: "Direction (PCA, Directeur, Comptable)" },
+  { value: "agent_terrain",           label: "Agents terrain" },
+  { value: "delegue",                 label: "Délégués" },
+  { value: "magasinier",              label: "Magasiniers" },
+  { value: "responsable_tracabilite", label: "Responsables traçabilité" },
+  { value: "auditeur",                label: "Auditeurs" },
+  { value: "__specifique__",          label: "Utilisateur spécifique…" },
 ];
+
+const ROLE_LABELS: Record<string, string> = {
+  pca: "PCA",
+  directeur: "Directeur",
+  comptable: "Comptable",
+  caissier: "Caissier",
+  delegue: "Délégué",
+  agent_terrain: "Agent terrain",
+  magasinier: "Magasinier",
+  responsable_tracabilite: "Resp. traçabilité",
+  auditeur: "Auditeur",
+};
+
+interface Utilisateur {
+  id: number;
+  nom: string;
+  prenoms: string;
+  role: string;
+  actif: boolean;
+}
 
 interface MessageEnvoye {
   id: number;
@@ -55,17 +76,49 @@ interface MessageRecu {
   lu: boolean;
 }
 
+function destLabel(d: string): string {
+  if (d.startsWith("user:")) return "Utilisateur direct";
+  return DESTINATAIRES_OPTIONS.find((o) => o.value === d)?.label ?? d;
+}
+
 // ─── Onglet Composer ──────────────────────────────────────────────────────────
 
 function TabComposer({ onSuccess }: { onSuccess: () => void }) {
   const [sujet, setSujet] = useState("");
   const [contenu, setContenu] = useState("");
   const [destinataires, setDestinataires] = useState("tous");
-  const [confirmation, setConfirmation] = useState<{ id: number; nb: number } | null>(null);
+  const [destinataireUserId, setDestinatataireUserId] = useState<string>("");
+  const [confirmation, setConfirmation] = useState<{ id: number; nb: number; nom?: string } | null>(null);
+
+  const modeSpecifique = destinataires === "__specifique__";
+
+  const { data: utilisateurs = [] } = useQuery<Utilisateur[]>({
+    queryKey: ["users-liste"],
+    queryFn: async () => {
+      const r = await apiFetch("/api/users");
+      if (!r.ok) return [];
+      return r.json() as Promise<Utilisateur[]>;
+    },
+    enabled: modeSpecifique,
+  });
+
+  const utilisateursActifs = utilisateurs.filter((u) => u.actif);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const r = await apiPost("/api/communication/messages", { sujet, contenu, destinataires });
+      let destPayload: string;
+      if (modeSpecifique) {
+        if (!destinataireUserId) throw new Error("Veuillez sélectionner un destinataire");
+        destPayload = `user:${destinataireUserId}`;
+      } else {
+        destPayload = destinataires;
+      }
+
+      const r = await apiPost("/api/communication/messages", {
+        sujet,
+        contenu,
+        destinataires: destPayload,
+      });
       if (!r.ok) {
         const e = await r.json().catch(() => ({ erreur: `Erreur ${r.status}` })) as { erreur: string };
         throw new Error(e.erreur);
@@ -73,15 +126,22 @@ function TabComposer({ onSuccess }: { onSuccess: () => void }) {
       return r.json() as Promise<{ id: number; nbDestinataires: number }>;
     },
     onSuccess: (data) => {
-      setConfirmation({ id: data.id, nb: data.nbDestinataires });
+      let nom: string | undefined;
+      if (modeSpecifique && destinataireUserId) {
+        const u = utilisateursActifs.find((u) => String(u.id) === destinataireUserId);
+        if (u) nom = `${u.prenoms} ${u.nom}`;
+      }
+      setConfirmation({ id: data.id, nb: data.nbDestinataires, nom });
       setSujet("");
       setContenu("");
       setDestinataires("tous");
+      setDestinatataireUserId("");
       onSuccess();
     },
   });
 
-  const destLabel = DESTINATAIRES_OPTIONS.find((d) => d.value === destinataires)?.label ?? destinataires;
+  const peutEnvoyer = !sujet.trim() || !contenu.trim() || mutation.isPending ||
+    (modeSpecifique && !destinataireUserId);
 
   return (
     <div className="space-y-5">
@@ -90,10 +150,12 @@ function TabComposer({ onSuccess }: { onSuccess: () => void }) {
           <CheckCircle size={18} className="text-green-600 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-green-800">
-              Message envoyé à {confirmation.nb} utilisateur{confirmation.nb > 1 ? "s" : ""}
+              {confirmation.nom
+                ? `Message envoyé à ${confirmation.nom}`
+                : `Message envoyé à ${confirmation.nb} utilisateur${confirmation.nb > 1 ? "s" : ""}`}
             </p>
             <p className="text-xs text-green-600 mt-0.5">
-              Une notification push a été envoyée à chaque destinataire connecté.
+              Une notification push a été envoyée au{confirmation.nom ? "" : "x"} destinataire{confirmation.nb > 1 ? "s" : ""} connecté{confirmation.nb > 1 ? "s" : ""}.
             </p>
           </div>
           <button onClick={() => setConfirmation(null)} className="text-green-400 hover:text-green-600 text-xs">✕</button>
@@ -110,16 +172,43 @@ function TabComposer({ onSuccess }: { onSuccess: () => void }) {
         <label className="block text-xs font-medium text-gray-600 mb-1">Destinataires</label>
         <select
           value={destinataires}
-          onChange={(e) => setDestinataires(e.target.value)}
+          onChange={(e) => { setDestinataires(e.target.value); setDestinatataireUserId(""); }}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
         >
           {DESTINATAIRES_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
-        <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-          <Users size={11} /> {destLabel}
-        </p>
+
+        {modeSpecifique && (
+          <div className="mt-2">
+            <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
+              <User size={11} /> Choisir l'utilisateur
+            </label>
+            {utilisateursActifs.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">Chargement des utilisateurs…</p>
+            ) : (
+              <select
+                value={destinataireUserId}
+                onChange={(e) => setDestinatataireUserId(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+              >
+                <option value="">— Sélectionner un utilisateur —</option>
+                {utilisateursActifs.map((u) => (
+                  <option key={u.id} value={String(u.id)}>
+                    {u.prenoms} {u.nom} ({ROLE_LABELS[u.role] ?? u.role})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
+        {!modeSpecifique && (
+          <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+            <Users size={11} /> {DESTINATAIRES_OPTIONS.find((d) => d.value === destinataires)?.label ?? destinataires}
+          </p>
+        )}
       </div>
 
       <div>
@@ -147,7 +236,7 @@ function TabComposer({ onSuccess }: { onSuccess: () => void }) {
 
       <button
         onClick={() => mutation.mutate()}
-        disabled={!sujet.trim() || !contenu.trim() || mutation.isPending}
+        disabled={peutEnvoyer}
         className="w-full py-3 text-white rounded-lg font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
         style={{ backgroundColor: VERT }}
       >
@@ -186,6 +275,11 @@ function MessageCard({ msg, onLu }: { msg: MessageRecu; onLu: (id: number) => vo
             {ouvert ? <ChevronUp size={14} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />}
           </div>
           <p className="text-xs text-gray-400 mt-0.5">
+            {msg.destinataires.startsWith("user:") && (
+              <span className="inline-flex items-center gap-0.5 text-blue-500 mr-1">
+                <User size={9} /> Message direct ·
+              </span>
+            )}
             {msg.auteurNom} · {formaterDate(msg.createdAt)}
           </p>
         </div>
@@ -269,8 +363,24 @@ function TabEnvoyes() {
     },
   });
 
-  const destLabel = (d: string) =>
-    DESTINATAIRES_OPTIONS.find((o) => o.value === d)?.label ?? d;
+  const { data: utilisateurs = [] } = useQuery<Utilisateur[]>({
+    queryKey: ["users-liste"],
+    queryFn: async () => {
+      const r = await apiFetch("/api/users");
+      if (!r.ok) return [];
+      return r.json() as Promise<Utilisateur[]>;
+    },
+    enabled: messages.some((m) => m.destinataires.startsWith("user:")),
+  });
+
+  function resolveDestLabel(d: string): string {
+    if (d.startsWith("user:")) {
+      const uid = parseInt(d.replace("user:", ""), 10);
+      const u = utilisateurs.find((u) => u.id === uid);
+      return u ? `${u.prenoms} ${u.nom} (${ROLE_LABELS[u.role] ?? u.role})` : "Utilisateur direct";
+    }
+    return destLabel(d);
+  }
 
   if (isLoading) {
     return (
@@ -293,12 +403,16 @@ function TabEnvoyes() {
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-medium text-gray-900">{m.sujet}</p>
               <span className="text-xs text-gray-400 flex-shrink-0 flex items-center gap-1">
-                <Users size={10} /> {m.nbDestinataires}
+                {m.destinataires.startsWith("user:")
+                  ? <User size={10} className="text-blue-400" />
+                  : <Users size={10} />}
+                {m.destinataires.startsWith("user:") ? "1" : m.nbDestinataires}
               </span>
             </div>
             <p className="text-xs text-gray-500 line-clamp-2">{m.contenu}</p>
-            <p className="text-xs text-gray-400">
-              → {destLabel(m.destinataires)} · {formaterDate(m.createdAt)}
+            <p className="text-xs text-gray-400 flex items-center gap-1">
+              {m.destinataires.startsWith("user:") && <User size={9} className="text-blue-400" />}
+              → {resolveDestLabel(m.destinataires)} · {formaterDate(m.createdAt)}
             </p>
           </div>
         ))

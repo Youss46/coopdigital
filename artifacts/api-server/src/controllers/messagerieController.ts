@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { db, messagesInternesTable, lecturesMessagesTable, usersTable } from "@workspace/db";
-import { eq, desc, and, notExists, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, notExists, inArray, sql, or } from "drizzle-orm";
 import { envoyerPushGroupe } from "../services/pushService.js";
 
 function coopId(req: Request): number | null {
@@ -12,6 +12,11 @@ const ROLES_DIRECTION = ["pca", "directeur", "comptable"] as const;
 // ─── Résoudre les destinataires selon la cible ────────────────────────────────
 
 async function resoudreDestinataires(cooperativeId: number, cible: string): Promise<number[]> {
+  if (cible.startsWith("user:")) {
+    const uid = parseInt(cible.replace("user:", ""), 10);
+    return isNaN(uid) ? [] : [uid];
+  }
+
   let rows: { id: number }[];
 
   if (cible === "tous") {
@@ -150,7 +155,10 @@ export async function getMessagesRecus(req: Request, res: Response): Promise<voi
       .leftJoin(usersTable, eq(messagesInternesTable.auteurId, usersTable.id))
       .where(and(
         eq(messagesInternesTable.cooperativeId, cooperativeId),
-        inArray(messagesInternesTable.destinataires, ciblesValides.filter((c): c is string => !!c)),
+        or(
+          inArray(messagesInternesTable.destinataires, ciblesValides.filter((c): c is string => !!c)),
+          eq(messagesInternesTable.destinataires, `user:${userId}`),
+        ),
       ))
       .orderBy(desc(messagesInternesTable.createdAt))
       .limit(100);
@@ -202,7 +210,10 @@ export async function getNonLus(req: Request, res: Response): Promise<void> {
       .from(messagesInternesTable)
       .where(and(
         eq(messagesInternesTable.cooperativeId, cooperativeId),
-        inArray(messagesInternesTable.destinataires, ciblesValides.filter((c): c is string => !!c)),
+        or(
+          inArray(messagesInternesTable.destinataires, ciblesValides.filter((c): c is string => !!c)),
+          eq(messagesInternesTable.destinataires, `user:${userId}`),
+        ),
         notExists(
           db.select({ one: sql`1` })
             .from(lecturesMessagesTable)
