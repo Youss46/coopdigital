@@ -170,6 +170,23 @@ function TabEtatsFinanciers() {
   const { data: bilan, isLoading: bl } = useGetBilan({ exercice: ANNEE });
   const { data: cr, isLoading: crl } = useGetCompteResultat({ exercice: ANNEE });
   const { data: flux, isLoading: fl } = useGetFluxTresorerie({ exercice: ANNEE });
+  const peutTelecharger = usePermission("reporting", "voir_etats_financiers");
+  const [loadingPdf, setLoadingPdf] = useState<string | null>(null);
+
+  async function telechargerEtat(url: string, nomFichier: string, cle: string) {
+    setLoadingPdf(cle);
+    try {
+      const token = getAuthToken();
+      const resp = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!resp.ok) throw new Error(`Erreur ${resp.status}`);
+      const blob = await resp.blob();
+      openPdfViewer(URL.createObjectURL(blob), nomFichier);
+    } catch (e) {
+      alert("Échec du téléchargement : " + String(e));
+    } finally {
+      setLoadingPdf(null);
+    }
+  }
 
   if (bl || crl || fl) return <Skeleton />;
 
@@ -187,6 +204,38 @@ function TabEtatsFinanciers() {
   // Flux trésorerie
   return (
     <div className="space-y-8">
+      {/* Boutons de téléchargement états financiers */}
+      {peutTelecharger && (
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => telechargerEtat(
+              `${BASE}/api/rapports/etats-financiers/bilan?exercice=${ANNEE}`,
+              `bilan_ohada_${ANNEE}.pdf`,
+              "bilan",
+            )}
+            disabled={loadingPdf === "bilan"}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60"
+          >
+            {loadingPdf === "bilan"
+              ? <><span className="animate-spin">⏳</span> Génération…</>
+              : <><Download size={14} /> Télécharger le Bilan {ANNEE}</>}
+          </button>
+          <button
+            onClick={() => telechargerEtat(
+              `${BASE}/api/rapports/etats-financiers/compte-resultat?exercice=${ANNEE}`,
+              `compte_resultat_ohada_${ANNEE}.pdf`,
+              "cr",
+            )}
+            disabled={loadingPdf === "cr"}
+            className="flex items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-60"
+          >
+            {loadingPdf === "cr"
+              ? <><span className="animate-spin">⏳</span> Génération…</>
+              : <><Download size={14} /> Télécharger le Compte de résultat {ANNEE}</>}
+          </button>
+        </div>
+      )}
+
       {/* Bilan */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
         <SectionTitre titre={`Bilan OHADA ${ANNEE}`} description="Actif et passif consolidés" />

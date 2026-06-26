@@ -4,6 +4,8 @@ import {
   getMemberPdf,
   getMonthlyReport,
   getCampaignBilan,
+  getBilanOHADAPdf,
+  getCompteResultatOHADAPdf,
   getRecuLivraison,
   getRecuPaiement,
   getBulletinPaie,
@@ -15,9 +17,11 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/rapports/membre/:id",        checkPermission("reporting", "generer_fiche_membre"),     getMemberPdf);
-router.get("/rapports/mensuel/:mois/:an", checkPermission("reporting", "generer_rapport_mensuel"),  getMonthlyReport);
-router.get("/rapports/campagne/:annee",   checkPermission("reporting", "generer_bilan_campagne"),   getCampaignBilan);
+router.get("/rapports/membre/:id",                     checkPermission("reporting", "generer_fiche_membre"),     getMemberPdf);
+router.get("/rapports/mensuel/:mois/:an",              checkPermission("reporting", "generer_rapport_mensuel"),  getMonthlyReport);
+router.get("/rapports/campagne/:annee",                checkPermission("reporting", "generer_bilan_campagne"),   getCampaignBilan);
+router.get("/rapports/etats-financiers/bilan",         checkPermission("reporting", "voir_etats_financiers"),    getBilanOHADAPdf);
+router.get("/rapports/etats-financiers/compte-resultat", checkPermission("reporting", "voir_etats_financiers"),  getCompteResultatOHADAPdf);
 
 router.get("/rapports/recu/livraison/:id",  checkPermission("reporting", "generer_recu"),  getRecuLivraison);
 router.get("/rapports/recu/paiement/:id",   checkPermission("reporting", "generer_recu"),  getRecuPaiement);

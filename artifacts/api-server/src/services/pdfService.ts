@@ -2973,3 +2973,276 @@ export async function generateConstatRefoulement(refusId: number, cooperativeId:
   doc.end();
   return endPromise;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bilan OHADA — état financier téléchargeable
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateBilanOHADA(cooperativeId: number, exercice: number): Promise<Buffer> {
+  const rows = await db.execute(sql`
+    SELECT
+      p.numero_compte AS "numeroCompte",
+      p.libelle,
+      p.type,
+      (
+        COALESCE(SUM(CASE WHEN e.compte_debit  = p.numero_compte THEN e.montant_fcfa ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN e.compte_credit = p.numero_compte THEN e.montant_fcfa ELSE 0 END), 0)
+      )::int AS "solde"
+    FROM plan_comptable p
+    LEFT JOIN ecritures_comptables e
+      ON (e.compte_debit = p.numero_compte OR e.compte_credit = p.numero_compte)
+      AND e.cooperative_id = ${cooperativeId}
+      AND e.exercice = ${exercice}
+    WHERE p.cooperative_id = ${cooperativeId}
+    GROUP BY p.id, p.numero_compte, p.libelle, p.type
+    ORDER BY p.numero_compte
+  `);
+
+  const lignes = rows.rows as Array<{ numeroCompte: string; libelle: string; type: string; solde: number }>;
+  const actif  = lignes.filter(l => l.type === "actif"  && l.solde > 0).map(l => ({ compte: l.numeroCompte, libelle: l.libelle, montant: l.solde }));
+  const passif = lignes.filter(l => l.type === "passif" && l.solde < 0).map(l => ({ compte: l.numeroCompte, libelle: l.libelle, montant: Math.abs(l.solde) }));
+  const produitsNet   = lignes.filter(l => l.type === "produit").reduce((s, l) => s + Math.abs(l.solde), 0);
+  const chargesNet    = lignes.filter(l => l.type === "charge").reduce((s, l) => s + l.solde, 0);
+  const resultatNet   = produitsNet - chargesNet;
+  if (resultatNet !== 0) passif.push({ compte: "130", libelle: "Résultat de l'exercice", montant: resultatNet });
+
+  const totalActif  = actif.reduce((s, a) => s + a.montant, 0);
+  const totalPassif = passif.reduce((s, a) => s + a.montant, 0);
+
+  const { doc, endPromise } = makePdfDoc();
+  const W     = PAGE_W - 2 * MARGIN;
+  const halfW = (W - 10) / 2;
+  const MID   = MARGIN + halfW + 10;
+  const ROW_H = 16;
+  const colW  = halfW * 0.65;
+  const amtW  = halfW * 0.35 - 4;
+
+  await drawHeader(doc, cooperativeId, { titre_document: `Bilan OHADA — Exercice ${exercice}` });
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+    .text(`Au 31 décembre ${exercice}  —  Unité : FCFA`, MARGIN, doc.y, { width: W, align: "right" });
+  doc.moveDown(0.5);
+
+  let y = doc.y;
+  doc.rect(MARGIN, y, halfW, ROW_H).fill(VERT);
+  doc.rect(MID, y, halfW, ROW_H).fill(OR);
+  doc.fontSize(9).fillColor("white").font("Helvetica-Bold")
+    .text("ACTIF",  MARGIN + 4, y + 4, { width: halfW - 8, lineBreak: false })
+    .text("PASSIF", MID + 4,    y + 4, { width: halfW - 8, lineBreak: false });
+  y += ROW_H;
+
+  doc.rect(MARGIN, y, halfW, ROW_H - 2).fill("#f0fdf4");
+  doc.rect(MID, y, halfW, ROW_H - 2).fill("#fffbeb");
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica-Bold")
+    .text("Libellé",  MARGIN + 4,       y + 3, { width: colW - 8, lineBreak: false })
+    .text("Montant",  MARGIN + 4 + colW, y + 3, { width: amtW, align: "right", lineBreak: false })
+    .text("Libellé",  MID + 4,           y + 3, { width: colW - 8, lineBreak: false })
+    .text("Montant",  MID + 4 + colW,    y + 3, { width: amtW, align: "right", lineBreak: false });
+  y += ROW_H - 2;
+
+  const maxRows = Math.max(actif.length, passif.length);
+  for (let i = 0; i < maxRows; i++) {
+    const bg = i % 2 === 0 ? "#f9fafb" : "white";
+    doc.rect(MARGIN, y, halfW, ROW_H).fill(bg);
+    doc.rect(MID, y, halfW, ROW_H).fill(bg);
+    const a = actif[i];
+    if (a) {
+      doc.fontSize(7).fillColor("black").font("Helvetica")
+        .text(`${a.libelle} (${a.compte})`, MARGIN + 4, y + 4, { width: colW - 8, lineBreak: false });
+      doc.fontSize(7).fillColor("black").font("Helvetica")
+        .text(formaterFCFA(a.montant), MARGIN + 4 + colW, y + 4, { width: amtW, align: "right", lineBreak: false });
+    }
+    const p = passif[i];
+    if (p) {
+      doc.fontSize(7).fillColor("black").font("Helvetica")
+        .text(`${p.libelle} (${p.compte})`, MID + 4, y + 4, { width: colW - 8, lineBreak: false });
+      doc.fontSize(7).fillColor("black").font("Helvetica")
+        .text(formaterFCFA(p.montant), MID + 4 + colW, y + 4, { width: amtW, align: "right", lineBreak: false });
+    }
+    y += ROW_H;
+  }
+
+  y += 2;
+  doc.rect(MARGIN, y, halfW, ROW_H + 2).fill(VERT);
+  doc.rect(MID, y, halfW, ROW_H + 2).fill(OR);
+  doc.fontSize(8).fillColor("white").font("Helvetica-Bold")
+    .text("TOTAL ACTIF",  MARGIN + 4,       y + 4, { width: colW - 8, lineBreak: false });
+  doc.fontSize(8).fillColor("white").font("Helvetica-Bold")
+    .text(formaterFCFA(totalActif), MARGIN + 4 + colW, y + 4, { width: amtW, align: "right", lineBreak: false });
+  doc.fontSize(8).fillColor("white").font("Helvetica-Bold")
+    .text("TOTAL PASSIF", MID + 4,           y + 4, { width: colW - 8, lineBreak: false });
+  doc.fontSize(8).fillColor("white").font("Helvetica-Bold")
+    .text(formaterFCFA(totalPassif), MID + 4 + colW, y + 4, { width: amtW, align: "right", lineBreak: false });
+  y += ROW_H + 2 + 16;
+
+  const delta = Math.abs(totalActif - totalPassif);
+  if (delta < 100) {
+    doc.fontSize(8).fillColor(VERT).font("Helvetica-Bold").text("Bilan equilibre", MARGIN, y);
+  } else {
+    doc.fontSize(8).fillColor("#dc2626").font("Helvetica-Bold")
+      .text(`Ecart non equilibre : ${formaterFCFA(delta)} — verifier les ecritures comptables.`, MARGIN, y, { width: W });
+  }
+  y += 24;
+
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica-Oblique")
+    .text(
+      `Le present bilan est etabli conformement au Systeme Comptable OHADA. ` +
+      `Les montants sont exprimes en FCFA. ` +
+      `Document genere le ${formaterDate(new Date())} par CoopDigital.`,
+      MARGIN, y, { width: W },
+    );
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Compte de résultat OHADA — état financier téléchargeable
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateCompteResultatOHADA(cooperativeId: number, exercice: number): Promise<Buffer> {
+  const rows = await db.execute(sql`
+    SELECT
+      p.numero_compte AS "numeroCompte",
+      p.libelle,
+      p.type,
+      COALESCE(
+        CASE
+          WHEN p.type = 'produit' THEN SUM(CASE WHEN e.compte_credit = p.numero_compte THEN e.montant_fcfa ELSE 0 END)
+          WHEN p.type = 'charge'  THEN SUM(CASE WHEN e.compte_debit  = p.numero_compte THEN e.montant_fcfa ELSE 0 END)
+          ELSE 0
+        END, 0
+      )::int AS montant
+    FROM plan_comptable p
+    LEFT JOIN ecritures_comptables e
+      ON (e.compte_debit = p.numero_compte OR e.compte_credit = p.numero_compte)
+      AND e.cooperative_id = ${cooperativeId}
+      AND e.exercice = ${exercice}
+    WHERE p.cooperative_id = ${cooperativeId} AND p.type IN ('produit', 'charge')
+    GROUP BY p.id, p.numero_compte, p.libelle, p.type
+    ORDER BY p.numero_compte
+  `);
+
+  const lignes        = rows.rows as Array<{ numeroCompte: string; libelle: string; type: string; montant: number }>;
+  const produits      = lignes.filter(l => l.type === "produit");
+  const charges       = lignes.filter(l => l.type === "charge");
+  const totalProduits = produits.reduce((s, l) => s + l.montant, 0);
+  const totalCharges  = charges.reduce((s, l) => s + l.montant, 0);
+  const resultatNet   = totalProduits - totalCharges;
+
+  const mensuel = await db.execute(sql`
+    SELECT
+      EXTRACT(MONTH FROM date_ecriture::date)::int AS mois,
+      COALESCE(SUM(CASE WHEN compte_credit = '701' THEN montant_fcfa ELSE 0 END), 0)::int AS "produitsFcfa",
+      COALESCE(SUM(CASE WHEN compte_debit IN ('601','621','641','661') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
+    FROM ecritures_comptables
+    WHERE cooperative_id = ${cooperativeId} AND exercice = ${exercice}
+    GROUP BY mois ORDER BY mois
+  `);
+  const mensuelMap: Record<number, { p: number; c: number }> = {};
+  (mensuel.rows as Array<{ mois: number; produitsFcfa: number; chargesFcfa: number }>).forEach(r => {
+    mensuelMap[r.mois] = { p: r.produitsFcfa, c: r.chargesFcfa };
+  });
+
+  const { doc, endPromise } = makePdfDoc();
+  const W     = PAGE_W - 2 * MARGIN;
+  const ROW_H = 16;
+  const colW  = W * 0.65;
+  const amtW  = W * 0.35 - 4;
+
+  await drawHeader(doc, cooperativeId, { titre_document: `Compte de resultat — Exercice ${exercice}` });
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+    .text(`Du 1er janvier au 31 decembre ${exercice}  —  Unite : FCFA`, MARGIN, doc.y, { width: W, align: "right" });
+  doc.moveDown(0.5);
+
+  let y = doc.y;
+
+  doc.rect(MARGIN, y, W, ROW_H).fill(VERT);
+  doc.fontSize(9).fillColor("white").font("Helvetica-Bold").text("PRODUITS", MARGIN + 4, y + 4, { width: W - 8, lineBreak: false });
+  y += ROW_H;
+  produits.forEach((p, i) => {
+    doc.rect(MARGIN, y, W, ROW_H).fill(i % 2 === 0 ? "#f0fdf4" : "white");
+    doc.fontSize(7).fillColor("black").font("Helvetica")
+      .text(`${p.libelle}  (${p.numeroCompte})`, MARGIN + 4, y + 4, { width: colW - 8, lineBreak: false });
+    doc.fontSize(7).fillColor("black").font("Helvetica")
+      .text(formaterFCFA(p.montant), MARGIN + 4 + colW, y + 4, { width: amtW, align: "right", lineBreak: false });
+    y += ROW_H;
+  });
+  if (produits.length === 0) {
+    doc.fontSize(7).fillColor(GRIS).font("Helvetica-Oblique").text("Aucun produit enregistre sur cet exercice.", MARGIN + 4, y + 4, { width: W - 8 });
+    y += ROW_H;
+  }
+  doc.rect(MARGIN, y, W, ROW_H + 2).fill("#d1fae5");
+  doc.fontSize(8).fillColor("#065f46").font("Helvetica-Bold")
+    .text("Total Produits", MARGIN + 4, y + 4, { width: colW - 8, lineBreak: false });
+  doc.fontSize(8).fillColor("#065f46").font("Helvetica-Bold")
+    .text(formaterFCFA(totalProduits), MARGIN + 4 + colW, y + 4, { width: amtW, align: "right", lineBreak: false });
+  y += ROW_H + 2 + 10;
+
+  doc.rect(MARGIN, y, W, ROW_H).fill(OR);
+  doc.fontSize(9).fillColor("white").font("Helvetica-Bold").text("CHARGES", MARGIN + 4, y + 4, { width: W - 8, lineBreak: false });
+  y += ROW_H;
+  charges.forEach((c, i) => {
+    doc.rect(MARGIN, y, W, ROW_H).fill(i % 2 === 0 ? "#fffbeb" : "white");
+    doc.fontSize(7).fillColor("black").font("Helvetica")
+      .text(`${c.libelle}  (${c.numeroCompte})`, MARGIN + 4, y + 4, { width: colW - 8, lineBreak: false });
+    doc.fontSize(7).fillColor("black").font("Helvetica")
+      .text(formaterFCFA(c.montant), MARGIN + 4 + colW, y + 4, { width: amtW, align: "right", lineBreak: false });
+    y += ROW_H;
+  });
+  if (charges.length === 0) {
+    doc.fontSize(7).fillColor(GRIS).font("Helvetica-Oblique").text("Aucune charge enregistree sur cet exercice.", MARGIN + 4, y + 4, { width: W - 8 });
+    y += ROW_H;
+  }
+  doc.rect(MARGIN, y, W, ROW_H + 2).fill("#fee2e2");
+  doc.fontSize(8).fillColor("#991b1b").font("Helvetica-Bold")
+    .text("Total Charges", MARGIN + 4, y + 4, { width: colW - 8, lineBreak: false });
+  doc.fontSize(8).fillColor("#991b1b").font("Helvetica-Bold")
+    .text(formaterFCFA(totalCharges), MARGIN + 4 + colW, y + 4, { width: amtW, align: "right", lineBreak: false });
+  y += ROW_H + 2 + 10;
+
+  const isBene = resultatNet >= 0;
+  doc.rect(MARGIN, y, W, ROW_H + 6).fill(isBene ? "#065f46" : "#7f1d1d");
+  doc.fontSize(10).fillColor("white").font("Helvetica-Bold")
+    .text(`RESULTAT NET ${isBene ? "BENEFICIAIRE" : "DEFICITAIRE"}`, MARGIN + 4, y + 6, { width: colW - 8, lineBreak: false });
+  doc.fontSize(10).fillColor("white").font("Helvetica-Bold")
+    .text(formaterFCFA(Math.abs(resultatNet)), MARGIN + 4 + colW, y + 6, { width: amtW, align: "right", lineBreak: false });
+  y += ROW_H + 6 + 24;
+
+  doc.addPage();
+  await drawHeader(doc, cooperativeId, { titre_document: `Ventilation mensuelle — Exercice ${exercice}` });
+  doc.moveDown(0.3);
+
+  const moisNoms = ["Janvier","Fevrier","Mars","Avril","Mai","Juin","Juillet","Aout","Septembre","Octobre","Novembre","Decembre"];
+  const mCols = [90, 90, 90, 90];
+  y = doc.y;
+  ligneTableau(doc, ["Mois", "Produits (FCFA)", "Charges (FCFA)", "Resultat (FCFA)"], mCols, MARGIN, y, VERT);
+  y += 18;
+  for (let m = 1; m <= 12; m++) {
+    const d   = mensuelMap[m] ?? { p: 0, c: 0 };
+    const res = d.p - d.c;
+    if (m % 2 === 0) doc.rect(MARGIN, y, mCols.reduce((a, b) => a + b, 0), ROW_H).fill("#f9fafb");
+    doc.fontSize(7).fillColor("black").font("Helvetica")
+      .text(moisNoms[m - 1]!, MARGIN + 3, y + 4, { width: mCols[0]! - 6, lineBreak: false })
+      .text(formaterFCFA(d.p), MARGIN + mCols[0]! + 3, y + 4, { width: mCols[1]! - 6, lineBreak: false })
+      .text(formaterFCFA(d.c), MARGIN + mCols[0]! + mCols[1]! + 3, y + 4, { width: mCols[2]! - 6, lineBreak: false });
+    doc.fontSize(7).fillColor(res >= 0 ? "#065f46" : "#991b1b").font(res !== 0 ? "Helvetica-Bold" : "Helvetica")
+      .text(formaterFCFA(res), MARGIN + mCols[0]! + mCols[1]! + mCols[2]! + 3, y + 4, { width: mCols[3]! - 6, lineBreak: false });
+    y += ROW_H;
+  }
+  y += 2;
+  const sumP = Object.values(mensuelMap).reduce((s, m) => s + m.p, 0);
+  const sumC = Object.values(mensuelMap).reduce((s, m) => s + m.c, 0);
+  ligneTableau(doc, ["Total annuel", formaterFCFA(sumP), formaterFCFA(sumC), formaterFCFA(sumP - sumC)], mCols, MARGIN, y, OR);
+  y += 18 + 24;
+
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica-Oblique")
+    .text(
+      `Le present compte de resultat est etabli conformement au Systeme Comptable OHADA. ` +
+      `Les montants sont exprimes en FCFA. ` +
+      `Document genere le ${formaterDate(new Date())} par CoopDigital.`,
+      MARGIN, y, { width: W },
+    );
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
