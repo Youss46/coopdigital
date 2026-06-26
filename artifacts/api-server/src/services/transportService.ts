@@ -55,10 +55,10 @@ export async function updateVehicule(
 
 // ─── ALERTES VÉHICULES ────────────────────────────────────────────────────────
 
-export async function getAlertes(cooperativeId: number) {
+export async function getAlertes(cooperativeId: number, joursAlerte = 30) {
   const today = new Date();
   const limite = new Date(today);
-  limite.setDate(today.getDate() + 30);
+  limite.setDate(today.getDate() + joursAlerte);
   const limiteStr = limite.toISOString().split("T")[0];
 
   const vehicules = await db
@@ -438,9 +438,9 @@ export async function getRapportVehicule(cooperativeId: number, vehiculeId: numb
 
 // ─── ALERTES CHAUFFEURS ───────────────────────────────────────────────────────
 
-export async function getAlertesChauffeurs(cooperativeId: number) {
+export async function getAlertesChauffeurs(cooperativeId: number, joursAlerte = 30) {
   const limite = new Date();
-  limite.setDate(limite.getDate() + 30);
+  limite.setDate(limite.getDate() + joursAlerte);
   const limiteStr = limite.toISOString().split("T")[0];
 
   const chauffeurs = await db

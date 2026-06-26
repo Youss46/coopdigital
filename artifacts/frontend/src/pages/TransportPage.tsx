@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MoneyInput } from "@/components/ui/money-input";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   useGetVehicules,
   useCreateVehicule,
@@ -66,6 +67,10 @@ import {
   Play,
   Square,
   Wrench,
+  Settings,
+  History,
+  ShieldAlert,
+  Gauge,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -983,6 +988,389 @@ function TabRapports() {
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
+const BASE = import.meta.env.VITE_API_URL ?? "";
+
+type AlerteVehicule = {
+  vehicule_id: number; immatriculation: string;
+  type: "assurance" | "visite_technique" | "entretien" | "entretien_km";
+  message: string; date_expiration: string | null;
+};
+type AlerteChauffeur = {
+  chauffeur_id: number; nom: string;
+  type: "permis"; message: string; date_expiration: string | null;
+};
+type EntretienRow = {
+  id: number; vehicule_id: number; type_entretien: string;
+  date_entretien: string; kilometrage_entretien: number | null;
+  description: string | null; cout_fcfa: number | null;
+  garage: string | null; prochain_entretien_km: number | null;
+  prochain_entretien_date: string | null; created_at: string;
+};
+
+const TYPES_ENTRETIEN = [
+  "Vidange huile", "Vidange + filtres", "Revision generale",
+  "Freins", "Pneus", "Batterie", "Courroie distribution",
+  "Climatisation", "Assurance", "Visite technique", "Autre",
+];
+
+const URGENCE: Record<string, { label: string; icon: React.ReactNode; className: string; bg: string }> = {
+  assurance:        { label: "Assurance",       icon: <ShieldAlert className="h-4 w-4" />,   className: "text-red-700",    bg: "bg-red-50 border-red-200" },
+  visite_technique: { label: "Visite tech.",     icon: <CheckCircle2 className="h-4 w-4" />,  className: "text-orange-700", bg: "bg-orange-50 border-orange-200" },
+  entretien:        { label: "Entretien date",   icon: <Wrench className="h-4 w-4" />,        className: "text-yellow-700", bg: "bg-yellow-50 border-yellow-200" },
+  entretien_km:     { label: "Entretien km",     icon: <Gauge className="h-4 w-4" />,         className: "text-yellow-700", bg: "bg-yellow-50 border-yellow-200" },
+  permis:           { label: "Permis chauffeur", icon: <AlertTriangle className="h-4 w-4" />, className: "text-red-700",    bg: "bg-red-50 border-red-200" },
+};
+
+type EntretienFormData = {
+  type_entretien: string; date_entretien: string; kilometrage_entretien: string;
+  description: string; cout_fcfa: string; garage: string;
+  prochain_entretien_km: string; prochain_entretien_date: string;
+};
+
+const entretienVide: EntretienFormData = {
+  type_entretien: "Vidange huile", date_entretien: new Date().toISOString().split("T")[0],
+  kilometrage_entretien: "", description: "", cout_fcfa: "",
+  garage: "", prochain_entretien_km: "", prochain_entretien_date: "",
+};
+
+function TabMaintenance() {
+  const { token } = useAuth();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const [joursAlerte, setJoursAlerte] = useState<number>(() =>
+    parseInt(localStorage.getItem("transport_seuil_jours") ?? "30") || 30,
+  );
+  const [seuilInput, setSeuilInput] = useState(String(joursAlerte));
+  const [showSeuilEdit, setShowSeuilEdit] = useState(false);
+
+  const [selectedVehiculeId, setSelectedVehiculeId] = useState<string>("");
+  const [showEntretienForm, setShowEntretienForm] = useState(false);
+  const [entretienTargetId, setEntretienTargetId] = useState<number | null>(null);
+  const [form, setForm] = useState<EntretienFormData>(entretienVide);
+
+  const authHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+
+  const alertesQuery = useQuery({
+    queryKey: ["transport-alertes-custom", joursAlerte],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/transport/vehicules/alertes?jours=${joursAlerte}`, { headers: authHeaders });
+      if (!r.ok) throw new Error("Erreur alertes");
+      return r.json() as Promise<{ alertes_vehicules: AlerteVehicule[]; alertes_chauffeurs: AlerteChauffeur[] }>;
+    },
+  });
+
+  const { data: vehiculesData } = useGetVehicules();
+  const vehicules = vehiculesData?.vehicules ?? [];
+
+  const entretiensQuery = useQuery({
+    queryKey: ["entretiens-vehicule", selectedVehiculeId],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/transport/vehicules/${selectedVehiculeId}/entretiens`, { headers: authHeaders });
+      if (!r.ok) throw new Error("Erreur entretiens");
+      return r.json() as Promise<{ entretiens: EntretienRow[] }>;
+    },
+    enabled: !!selectedVehiculeId,
+  });
+
+  const createMut = useMutation({
+    mutationFn: async ({ vehiculeId, data }: { vehiculeId: number; data: object }) => {
+      const r = await fetch(`${BASE}/api/transport/vehicules/${vehiculeId}/entretien`, {
+        method: "POST", headers: authHeaders, body: JSON.stringify(data),
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as { erreur?: string }).erreur ?? "Erreur"); }
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["entretiens-vehicule", selectedVehiculeId] });
+      qc.invalidateQueries({ queryKey: ["transport-alertes-custom", joursAlerte] });
+      qc.invalidateQueries({ queryKey: getGetVehiculesQueryKey() });
+      toast({ title: "Entretien enregistre" });
+      setShowEntretienForm(false);
+      setForm(entretienVide);
+    },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  function saveSeuil() {
+    const n = parseInt(seuilInput);
+    if (!isNaN(n) && n >= 1 && n <= 365) {
+      setJoursAlerte(n);
+      localStorage.setItem("transport_seuil_jours", String(n));
+    }
+    setShowSeuilEdit(false);
+  }
+
+  function openEntretien(vehiculeId: number) {
+    setEntretienTargetId(vehiculeId);
+    if (String(vehiculeId) !== selectedVehiculeId) setSelectedVehiculeId(String(vehiculeId));
+    setForm({ ...entretienVide, date_entretien: new Date().toISOString().split("T")[0] });
+    setShowEntretienForm(true);
+  }
+
+  function handleSubmitEntretien() {
+    if (!entretienTargetId || !form.type_entretien || !form.date_entretien) return;
+    createMut.mutate({
+      vehiculeId: entretienTargetId,
+      data: {
+        type_entretien:          form.type_entretien,
+        date_entretien:          form.date_entretien,
+        kilometrage_entretien:   form.kilometrage_entretien ? Number(form.kilometrage_entretien) : undefined,
+        description:             form.description || undefined,
+        cout_fcfa:               form.cout_fcfa ? Number(form.cout_fcfa) : undefined,
+        garage:                  form.garage || undefined,
+        prochain_entretien_km:   form.prochain_entretien_km ? Number(form.prochain_entretien_km) : undefined,
+        prochain_entretien_date: form.prochain_entretien_date || undefined,
+      },
+    });
+  }
+
+  const alertesV = alertesQuery.data?.alertes_vehicules ?? [];
+  const alertesC = alertesQuery.data?.alertes_chauffeurs ?? [];
+  const totalAlertes = alertesV.length + alertesC.length;
+
+  const alertesParType = Object.entries(URGENCE).map(([type, meta]) => ({
+    type, meta,
+    items: [
+      ...alertesV.filter(a => a.type === type).map(a => ({
+        id: `v${a.vehicule_id}`, label: a.immatriculation, message: a.message,
+        date: a.date_expiration, vehiculeId: a.vehicule_id as number | null,
+      })),
+      ...alertesC.filter(a => a.type === type).map(a => ({
+        id: `c${a.chauffeur_id}`, label: a.nom, message: a.message,
+        date: a.date_expiration, vehiculeId: null,
+      })),
+    ],
+  })).filter(g => g.items.length > 0);
+
+  const entretiens = entretiensQuery.data?.entretiens ?? [];
+  const selectedVehicule = vehicules.find(v => String(v.id) === selectedVehiculeId);
+
+  return (
+    <div className="space-y-6">
+
+      {/* Seuil d'alerte */}
+      <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <Settings className="h-4 w-4" />
+          <span>Seuil d'alerte : <strong>{joursAlerte} jours</strong> avant expiration</span>
+        </div>
+        {!showSeuilEdit ? (
+          <Button variant="outline" size="sm" onClick={() => { setSeuilInput(String(joursAlerte)); setShowSeuilEdit(true); }}>
+            Modifier
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Input
+              type="number" min={1} max={365} className="w-20 h-8 text-sm"
+              value={seuilInput}
+              onChange={e => setSeuilInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") saveSeuil(); if (e.key === "Escape") setShowSeuilEdit(false); }}
+              autoFocus
+            />
+            <span className="text-sm text-gray-500">jours</span>
+            <Button size="sm" onClick={saveSeuil}>OK</Button>
+            <Button size="sm" variant="outline" onClick={() => setShowSeuilEdit(false)}>Annuler</Button>
+          </div>
+        )}
+      </div>
+
+      {/* Alertes consolidees */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="h-5 w-5 text-red-600" />
+          <h2 className="text-base font-semibold">
+            Alertes actives
+            {totalAlertes > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white text-xs font-bold">{totalAlertes}</span>
+            )}
+          </h2>
+        </div>
+
+        {alertesQuery.isLoading && <div className="text-sm text-gray-400 py-4">Chargement...</div>}
+
+        {!alertesQuery.isLoading && totalAlertes === 0 && (
+          <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-6 text-center">
+            <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
+            <p className="text-sm text-green-700 font-medium">Aucune alerte dans les {joursAlerte} prochains jours</p>
+          </div>
+        )}
+
+        {alertesParType.length > 0 && (
+          <div className="space-y-3">
+            {alertesParType.map(({ type, meta, items }) => (
+              <div key={type} className={`rounded-xl border p-4 ${meta.bg}`}>
+                <div className={`flex items-center gap-2 font-semibold text-sm mb-2 ${meta.className}`}>
+                  {meta.icon}{meta.label} ({items.length})
+                </div>
+                <div className="space-y-1">
+                  {items.map(item => (
+                    <div key={item.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{item.label}</span>
+                        <span className="text-gray-600">— {item.message}</span>
+                      </div>
+                      {item.vehiculeId != null && (
+                        <Button
+                          size="sm" variant="outline" className="h-7 text-xs shrink-0 ml-2"
+                          onClick={() => openEntretien(item.vehiculeId!)}
+                        >
+                          <Wrench className="h-3 w-3 mr-1" />Entretien
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Historique entretiens */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <History className="h-5 w-5 text-gray-600" />
+          <h2 className="text-base font-semibold">Historique des entretiens</h2>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <Select value={selectedVehiculeId} onValueChange={setSelectedVehiculeId}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Choisir un vehicule" />
+            </SelectTrigger>
+            <SelectContent>
+              {vehicules.map(v => (
+                <SelectItem key={v.id} value={String(v.id)}>
+                  {v.immatriculation}{v.marque ? ` — ${v.marque}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedVehiculeId && (
+            <Button size="sm" onClick={() => openEntretien(Number(selectedVehiculeId))}>
+              <Plus className="h-4 w-4 mr-1.5" />Nouvel entretien
+            </Button>
+          )}
+        </div>
+
+        {selectedVehiculeId && (
+          <div className="rounded-lg border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Kilom.</TableHead>
+                  <TableHead>Garage</TableHead>
+                  <TableHead>Cout</TableHead>
+                  <TableHead>Prochain entretien</TableHead>
+                  <TableHead>Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {entretiensQuery.isLoading && (
+                  <TableRow><TableCell colSpan={7} className="text-center text-gray-400 py-6">Chargement...</TableCell></TableRow>
+                )}
+                {!entretiensQuery.isLoading && entretiens.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-gray-400 py-8">
+                      <Wrench className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                      <p>Aucun entretien pour {selectedVehicule?.immatriculation}</p>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {entretiens.map(e => (
+                  <TableRow key={e.id}>
+                    <TableCell className="text-sm font-medium">{formatDate(e.date_entretien)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">{e.type_entretien}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {e.kilometrage_entretien != null ? `${e.kilometrage_entretien.toLocaleString("fr-FR")} km` : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm">{e.garage ?? "—"}</TableCell>
+                    <TableCell className="text-sm">
+                      {e.cout_fcfa != null ? formatFcfa(e.cout_fcfa) : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {e.prochain_entretien_date && <span>{formatDate(e.prochain_entretien_date)}</span>}
+                      {e.prochain_entretien_km != null && <span className="ml-1 text-gray-500">/ {e.prochain_entretien_km.toLocaleString("fr-FR")} km</span>}
+                      {!e.prochain_entretien_date && e.prochain_entretien_km == null && "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-600 max-w-36 truncate">{e.description ?? "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal entretien */}
+      <Dialog open={showEntretienForm} onOpenChange={o => { if (!o) { setShowEntretienForm(false); setEntretienTargetId(null); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Enregistrer un entretien
+              {entretienTargetId != null && vehicules.find(v => v.id === entretienTargetId) && (
+                <span className="ml-2 text-green-700 font-normal text-base">
+                  — {vehicules.find(v => v.id === entretienTargetId)!.immatriculation}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <Label>Type d'entretien *</Label>
+              <Select value={form.type_entretien} onValueChange={v => setForm(f => ({ ...f, type_entretien: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TYPES_ENTRETIEN.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Date d'entretien *</Label>
+              <Input type="date" value={form.date_entretien} onChange={e => setForm(f => ({ ...f, date_entretien: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Kilom. a l'entretien</Label>
+              <Input type="number" value={form.kilometrage_entretien} onChange={e => setForm(f => ({ ...f, kilometrage_entretien: e.target.value }))} placeholder="ex : 45 000" />
+            </div>
+            <div>
+              <Label>Cout (FCFA)</Label>
+              <MoneyInput value={form.cout_fcfa} onChange={raw => setForm(f => ({ ...f, cout_fcfa: raw }))} />
+            </div>
+            <div>
+              <Label>Garage / prestataire</Label>
+              <Input value={form.garage} onChange={e => setForm(f => ({ ...f, garage: e.target.value }))} placeholder="ex : Garage Coulibaly" />
+            </div>
+            <div>
+              <Label>Prochain entretien (km)</Label>
+              <Input type="number" value={form.prochain_entretien_km} onChange={e => setForm(f => ({ ...f, prochain_entretien_km: e.target.value }))} placeholder="ex : 50 000" />
+            </div>
+            <div>
+              <Label>Prochain entretien (date)</Label>
+              <Input type="date" value={form.prochain_entretien_date} onChange={e => setForm(f => ({ ...f, prochain_entretien_date: e.target.value }))} />
+            </div>
+            <div className="col-span-2">
+              <Label>Description / observations</Label>
+              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} placeholder="Pieces changees, observations..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEntretienForm(false)}>Annuler</Button>
+            <Button onClick={handleSubmitEntretien} disabled={createMut.isPending}>
+              {createMut.isPending ? "Enregistrement..." : "Enregistrer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function TransportPage() {
   return (
     <div className="space-y-6">
@@ -992,7 +1380,7 @@ export default function TransportPage() {
       </div>
 
       <Tabs defaultValue="flotte">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="flotte" className="flex items-center gap-1.5">
             <Truck className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline truncate">Flotte</span>
@@ -1005,15 +1393,20 @@ export default function TransportPage() {
             <MapPin className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline truncate">Missions</span>
           </TabsTrigger>
+          <TabsTrigger value="maintenance" className="flex items-center gap-1.5">
+            <Wrench className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Maintenance</span>
+          </TabsTrigger>
           <TabsTrigger value="rapports" className="flex items-center gap-1.5">
             <BarChart3 className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden sm:inline truncate">Coûts</span>
+            <span className="hidden sm:inline truncate">Couts</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="flotte" className="mt-6"><TabFlotte /></TabsContent>
         <TabsContent value="chauffeurs" className="mt-6"><TabChauffeurs /></TabsContent>
         <TabsContent value="missions" className="mt-6"><TabMissions /></TabsContent>
+        <TabsContent value="maintenance" className="mt-6"><TabMaintenance /></TabsContent>
         <TabsContent value="rapports" className="mt-6"><TabRapports /></TabsContent>
       </Tabs>
     </div>

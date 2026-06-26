@@ -227,9 +227,11 @@ export async function handleGetAlertes(req: Request, res: Response): Promise<voi
   try {
     const cooperativeId = req.user?.cooperativeId;
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const jours = typeof req.query["jours"] === "string" ? parseInt(req.query["jours"]) : 30;
+    const joursAlerte = isNaN(jours) || jours < 1 ? 30 : Math.min(jours, 365);
     const [alertesV, alertesC] = await Promise.all([
-      getAlertes(cooperativeId),
-      getAlertesChauffeurs(cooperativeId),
+      getAlertes(cooperativeId, joursAlerte),
+      getAlertesChauffeurs(cooperativeId, joursAlerte),
     ]);
     res.json({ alertes_vehicules: alertesV, alertes_chauffeurs: alertesC });
   } catch (err) {
