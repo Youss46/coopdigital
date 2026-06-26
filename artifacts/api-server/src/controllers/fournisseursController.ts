@@ -206,7 +206,15 @@ export async function createFournisseur(req: Request, res: Response) {
     return res.status(201).json(fournisseur);
   } catch (err) {
     req.log.error({ err }, "Erreur createFournisseur");
-    const msg = (err as { detail?: string })?.detail ?? (err as Error)?.message ?? "Erreur interne";
+    // Drizzle wraps the PG error in err.cause — prefer that detail
+    type PgLike = { detail?: string; message?: string };
+    const cause = (err as { cause?: PgLike })?.cause;
+    const msg =
+      cause?.detail ??
+      cause?.message ??
+      (err as PgLike)?.detail ??
+      (err as Error)?.message ??
+      "Erreur interne";
     return res.status(500).json({ erreur: msg });
   }
 }

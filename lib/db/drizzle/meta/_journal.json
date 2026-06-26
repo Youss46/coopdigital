@@ -372,6 +372,13 @@
       "when": 1782836000000,
       "tag": "0052_cheques_emis",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1782922400000,
+      "tag": "0053_fournisseurs_agrement_ifnotexists",
+      "breakpoints": true
     }
   ]
 }
