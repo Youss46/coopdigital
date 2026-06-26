@@ -49,6 +49,7 @@ export * from "./messages_mission";
 export * from "./pushSubscriptions";
 export * from "./pushSubscriptionsPortail";
 export * from "./banque";
+export * from "./cheques";
 export * from "./mobile_marchand";
 export * from "./portailNotifications";
 export * from "./expeditions";

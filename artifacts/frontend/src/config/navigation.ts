@@ -67,6 +67,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/dons",                   label: "Dons",                      roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
   { href: "/caisse",                 label: "Caisse",                    roles: ["pca","directeur","comptable","caissier","auditeur","delegue"],                          category: "Finances" },
   { href: "/banque",                 label: "Banque",                    roles: ["pca","directeur","comptable","caissier","auditeur"],                         category: "Finances" },
+  { href: "/cheques",                label: "Chèques émis",              roles: ["pca","directeur","comptable","caissier","auditeur"],                         category: "Finances" },
   { href: "/mobile-marchand",        label: "Mobile Marchands",          roles: ["pca","directeur","comptable","caissier","auditeur"],                         category: "Finances" },
   { href: "/fiscalite",              label: "Fiscalité",                 roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
   { href: "/reconciliation",         label: "Réconciliation",            roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },

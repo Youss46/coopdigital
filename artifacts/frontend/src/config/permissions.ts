@@ -65,6 +65,15 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     annuler:  ["pca", "directeur"],
   },
 
+  cheques: {
+    lire:      ["pca", "directeur", "comptable", "caissier", "auditeur"],
+    creer:     ["pca", "directeur", "comptable", "caissier"],
+    modifier:  ["pca", "directeur", "comptable", "caissier"],
+    encaisser: ["pca", "directeur", "comptable", "caissier"],
+    rejeter:   ["pca", "directeur", "comptable"],
+    annuler:   ["pca", "directeur"],
+  },
+
   exportateurs: {
     lire:     ["pca", "directeur", "comptable", "auditeur"],
     creer:    ["pca", "directeur"],

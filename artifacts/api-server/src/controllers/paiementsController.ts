@@ -600,7 +600,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     // 7. Notifier le producteur (best-effort)
     void envoyerPushGroupePortail([row.paiement.membreId], {
       title: "✅ Paiement validé",
-      body: `${new Intl.NumberFormat("fr-FR").format(row.paiement.montantFcfa)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : "espèces"}`,
+      body: `${new Intl.NumberFormat("fr-FR").format(row.paiement.montantFcfa)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : mode === "wave" ? "Wave" : mode === "cheque" ? "Chèque" : "Espèces"}`,
       url: "/paiements",
     });
 

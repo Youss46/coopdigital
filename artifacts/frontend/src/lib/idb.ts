@@ -5,7 +5,7 @@ export interface LivraisonData {
   poidsKg: number;
   prixUnitaireFcfa: number;
   dateLivraison: string;
-  modePaiement: "orange_money" | "mtn_momo" | "especes" | "wave" | "differe";
+  modePaiement: "orange_money" | "mtn_momo" | "especes" | "wave" | "cheque" | "differe";
   campagneId: number | null;
   nombreSacs?: number | null;
   retenueKg?: number | null;

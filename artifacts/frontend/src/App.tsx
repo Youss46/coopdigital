@@ -51,6 +51,7 @@ import FormationsPage from "@/pages/FormationsPage";
 import FormationsRsePage from "@/pages/FormationsRsePage";
 import CaissePage from "@/pages/CaissePage";
 import BanquePage from "@/pages/BanquePage";
+import ChequesPage from "@/pages/ChequesPage";
 import MobileMarchandPage from "@/pages/MobileMarchandPage";
 import FiscalitePage from "@/pages/FiscalitePage";
 import ReconciliationPage from "@/pages/ReconciliationPage";
@@ -243,6 +244,9 @@ function AppRoutes() {
       </Route>
       <Route path="/banque">
         <ProtectedRoute component={BanquePage} />
+      </Route>
+      <Route path="/cheques">
+        <ProtectedRoute component={ChequesPage} />
       </Route>
       <Route path="/mobile-marchand">
         <ProtectedRoute component={MobileMarchandPage} />

@@ -23,6 +23,7 @@ function comptesForMouvement(type: string, motif: string): { debit: string; cred
     retrait_especes:      "571",  // Caisse
     frais_bancaires:      "638",  // Autres charges externes
     remboursement_emprunt:"162",  // Emprunts
+    paiement_cheque:      "401",  // Fournisseurs (producteurs payés par chèque)
     autre_debit:          "628",  // Frais divers
   };
   return { debit: debits[motif] ?? "628", credit: "521" };

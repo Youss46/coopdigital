@@ -1,5 +1,6 @@
 import { type Request, type Response } from "express";
 import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable, lotsTable, campagnesTable, entrepotsTable, mouvementsStockTable } from "@workspace/db";
+import { creerChequeDepuisLivraison } from "../services/chequesService.js";
 import { eq, and, desc, notInArray } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
 import { checkLivraison, creerAnomalies } from "../services/anomalieService";
@@ -277,6 +278,19 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       body: `${Number(result.livraison.poidsKg).toLocaleString("fr-FR")} kg — ${result.livraison.montantNetFcfa.toLocaleString("fr-FR")} FCFA net`,
       url: "/portail/livraisons",
     });
+
+    // ── Création automatique d'un chèque émis si mode = cheque ───────────────
+    if (modePaiement === "cheque" && result.paiement) {
+      const dateStr = typeof dateLivraison === "string" ? dateLivraison : new Date().toISOString().slice(0, 10);
+      void creerChequeDepuisLivraison(cooperativeId, {
+        paiementId:   result.paiement.id,
+        membreId,
+        livraisonId:  result.livraison.id,
+        membreNom:    `${result.livraison.membrePrenoms ?? ""} ${result.livraison.membreNom}`.trim(),
+        montantFcfa:  result.livraison.montantNetFcfa,
+        dateEmission: dateStr,
+      }, req.user?.id ?? 0);
+    }
 
     // ── Entrée stock entrepôt délégué (choix explicite ou auto via agentId) ──
     if (entrepotDelegueId) {
