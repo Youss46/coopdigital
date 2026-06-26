@@ -144,7 +144,7 @@ export async function getFluxTresorerie(req: Request, res: Response): Promise<vo
     const rows = await db.execute(sql`
       SELECT
         COALESCE(SUM(CASE WHEN compte_debit = '521' AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "encaissementsExportateursFcfa",
-        COALESCE(SUM(CASE WHEN compte_debit = '401' AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "paiementsProducteursFcfa",
+        COALESCE(SUM(CASE WHEN compte_debit = '401' AND compte_credit IN ('521','552','571') AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "paiementsProducteursFcfa",
         COALESCE(SUM(CASE WHEN compte_credit = '521' AND source = 'avance' THEN montant_fcfa ELSE 0 END), 0)::int AS "avancesOctroyes",
         COALESCE(SUM(CASE WHEN compte_debit = '521' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalEntrees",
         COALESCE(SUM(CASE WHEN compte_credit = '521' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalSorties"

@@ -617,8 +617,12 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     }
 
     // 7. Écriture comptable décaissement pour modes non-espèces
-    //    (espèces : enregistrerMouvement crée 401/571 via source "caisse")
+    //    Espèces   → enregistrerMouvement crée 401/571 via source "caisse"
+    //    Mobile    → 401/552 (orange_money, mtn_momo, wave)
+    //    Chèque    → 401/521 (banque)
     if (mode !== "especes" && cooperativeId) {
+      const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
+      const compteCredit = isMobile ? "552" : "521";
       const dateStr = new Date().toISOString().slice(0, 10);
       const producteurNom = `${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`;
       void proposerEcriture(cooperativeId, {
@@ -626,7 +630,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         sourceId: id,
         libelle: `Paiement producteur – ${producteurNom}`,
         compteDebit: "401",
-        compteCredit: "521",
+        compteCredit,
         montantFcfa: row.paiement.montantFcfa,
         date: dateStr,
         numeroPiece: `PAI-${id}`,
