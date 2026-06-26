@@ -67,8 +67,8 @@ export default function NotificationPanel() {
   const notifications = notifData?.notifications ?? [];
 
   function invalidateAll() {
-    qc.invalidateQueries({ queryKey: ["getNotifications"] });
-    qc.invalidateQueries({ queryKey: ["getNotificationsCount"] });
+    qc.invalidateQueries({ queryKey: getGetNotificationsQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetNotificationsCountQueryKey() });
   }
 
   // Fermer en cliquant en dehors
