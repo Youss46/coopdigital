@@ -938,6 +938,8 @@ export const PaiementListItemModePaiement = {
   orange_money: 'orange_money',
   mtn_momo: 'mtn_momo',
   especes: 'especes',
+  wave: 'wave',
+  cheque: 'cheque',
 } as const;
 
 export type PaiementListItemStatut = typeof PaiementListItemStatut[keyof typeof PaiementListItemStatut];
@@ -955,7 +957,8 @@ export const PaiementListItemStatut = {
 export interface PaiementListItem {
   id: number;
   livraisonId: number;
-  membreId: number;
+  /** @nullable */
+  membreId?: number | null;
   montantFcfa: number;
   modePaiement: PaiementListItemModePaiement;
   /** @nullable */
@@ -972,6 +975,12 @@ export interface PaiementListItem {
   membrePrenoms?: string | null;
   /** @nullable */
   telephone?: string | null;
+  /** @nullable */
+  fournisseurNom?: string | null;
+  /** @nullable */
+  fournisseurPrenoms?: string | null;
+  /** @nullable */
+  fournisseurTelephone?: string | null;
   /** @nullable */
   dateLivraison?: string | null;
   /** @nullable */

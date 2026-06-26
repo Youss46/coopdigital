@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
-import { db, paiementsTable, membresTable, livraisonsTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable } from "@workspace/db";
-import { eq, desc, and, sql, gte, lt, lte, inArray } from "drizzle-orm";
+import { db, paiementsTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable } from "@workspace/db";
+import { eq, desc, and, or, sql, gte, lt, lte, inArray, type SQL } from "drizzle-orm";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
 import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvement, getSessionActive } from "../services/caisseService.js";
 import { notifierParRole } from "../services/notificationService.js";
@@ -254,6 +254,10 @@ const SELECT_FIELDS = {
   membreNom: membresTable.nom,
   membrePrenoms: membresTable.prenoms,
   telephone: membresTable.telephone,
+  // Fournisseur externe (pisteur)
+  fournisseurNom: fournisseursTable.nom,
+  fournisseurPrenoms: fournisseursTable.prenoms,
+  fournisseurTelephone: fournisseursTable.telephone,
   // Livraison
   dateLivraison: livraisonsTable.dateLivraison,
   poidsNetKg: livraisonsTable.poidsNetKg,
@@ -271,6 +275,7 @@ async function fetchEnrichedPaiement(id: number) {
     .from(paiementsTable)
     .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
     .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
+    .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
     .where(eq(paiementsTable.id, id))
     .limit(1);
   return row ?? null;
@@ -291,7 +296,11 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     const periode = req.query["periode"] as string | undefined;
     const limit = Math.min(200, parseInt(String(req.query["limit"] ?? "100")));
 
-    const conditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
+    const coopFilter = or(
+      eq(membresTable.cooperativeId, cooperativeId),
+      eq(fournisseursTable.cooperativeId, cooperativeId),
+    )!;
+    const conditions: SQL<unknown>[] = [coopFilter];
     if (statut) conditions.push(eq(paiementsTable.statut, statut as "en_attente" | "confirme" | "echec" | "rejete" | "en_cours" | "effectue"));
     if (membreId) conditions.push(eq(paiementsTable.membreId, membreId));
     // Un délégué ne voit que les règlements des membres qui lui sont rattachés
@@ -314,6 +323,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
       .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
+      .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .where(and(...conditions))
       .orderBy(desc(paiementsTable.createdAt))
       .limit(limit);
@@ -340,7 +350,11 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
 
-    const statsConditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
+    const statsCoopFilter = or(
+      eq(membresTable.cooperativeId, cooperativeId),
+      eq(fournisseursTable.cooperativeId, cooperativeId),
+    )!;
+    const statsConditions: SQL<unknown>[] = [statsCoopFilter];
     // Un délégué ne voit que les stats des membres qui lui sont rattachés
     if (req.user?.role === "delegue" && req.user?.id) {
       statsConditions.push(eq(membresTable.delegueId, req.user.id));
@@ -352,10 +366,11 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
         montantFcfa: paiementsTable.montantFcfa,
         dateValidation: paiementsTable.dateValidation,
         createdAt: paiementsTable.createdAt,
-        cooperativeId: membresTable.cooperativeId,
       })
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
+      .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
+      .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .where(and(...statsConditions));
 
     let enAttente = { count: 0, montant_total: 0 };

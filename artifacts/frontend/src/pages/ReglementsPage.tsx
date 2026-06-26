@@ -21,6 +21,15 @@ import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
+function nomProducteur(p: PaiementListItem) {
+  const nom = p.membreNom ?? p.fournisseurNom ?? "";
+  const prenoms = p.membrePrenoms ?? p.fournisseurPrenoms ?? "";
+  return `${nom} ${prenoms}`.trim() || "—";
+}
+function telProducteur(p: PaiementListItem) {
+  return p.telephone ?? p.fournisseurTelephone ?? null;
+}
+
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const apiFetch = (url: string) =>
@@ -113,7 +122,7 @@ function ModalValidation({
             </div>
             <div>
               <h3 className="font-bold text-gray-900 text-sm">Confirmer le paiement</h3>
-              <p className="text-xs text-gray-500">{paiement.membreNom} {paiement.membrePrenoms}</p>
+              <p className="text-xs text-gray-500">{nomProducteur(paiement)}</p>
             </div>
             <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-600">
               <X size={16} />
@@ -269,7 +278,7 @@ function ModalRejet({
             </div>
             <div>
               <h3 className="font-bold text-gray-900 text-sm">Rejeter le paiement</h3>
-              <p className="text-xs text-gray-500">{paiement.membreNom} {paiement.membrePrenoms} · {fmt(paiement.montantNetFcfa ?? paiement.montantFcfa)}</p>
+              <p className="text-xs text-gray-500">{nomProducteur(paiement)} · {fmt(paiement.montantNetFcfa ?? paiement.montantFcfa)}</p>
             </div>
             <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-600">
               <X size={16} />
@@ -382,7 +391,7 @@ function ModalRecu({ paiement, onClose }: { paiement: PaiementListItem; onClose:
           <div className="border border-gray-100 rounded-xl divide-y divide-gray-100 text-sm">
             <div className="px-4 py-2.5 flex justify-between">
               <span className="text-gray-500 flex items-center gap-1.5"><User size={12} /> Producteur</span>
-              <span className="font-medium text-gray-900">{paiement.membreNom} {paiement.membrePrenoms}</span>
+              <span className="font-medium text-gray-900">{nomProducteur(paiement)}</span>
             </div>
             <div className="px-4 py-2.5 flex justify-between">
               <span className="text-gray-500 flex items-center gap-1.5"><Package size={12} /> Poids net</span>
@@ -570,9 +579,8 @@ export default function ReglementsPage() {
     if (!recherche) return true;
     const r = recherche.toLowerCase();
     return (
-      (p.membreNom ?? "").toLowerCase().includes(r) ||
-      (p.membrePrenoms ?? "").toLowerCase().includes(r) ||
-      (p.telephone ?? "").includes(r)
+      nomProducteur(p).toLowerCase().includes(r) ||
+      (telProducteur(p) ?? "").includes(r)
     );
   });
 
@@ -933,13 +941,13 @@ function PaiementRow({
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold text-gray-900 text-sm">
-              {p.membreNom} {p.membrePrenoms}
+              {nomProducteur(p)}
             </p>
             <StatutBadge statut={p.statut} />
             <ModeBadge mode={p.modePaiement} />
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
-            {p.telephone && <span>{p.telephone}</span>}
+            {telProducteur(p) && <span>{telProducteur(p)}</span>}
             {p.dateLivraison && <span>Livr. {p.dateLivraison}</span>}
             {poids && <span>{fmtPoids(poids)}</span>}
           </div>

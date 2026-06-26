@@ -6858,19 +6858,19 @@ components:
 
     PaiementListItem:
       type: object
-      required: [id, livraisonId, membreId, montantFcfa, modePaiement, statut, createdAt]
+      required: [id, livraisonId, montantFcfa, modePaiement, statut, createdAt]
       properties:
         id:
           type: integer
         livraisonId:
           type: integer
         membreId:
-          type: integer
+          type: ["integer", "null"]
         montantFcfa:
           type: integer
         modePaiement:
           type: string
-          enum: [orange_money, mtn_momo, especes]
+          enum: [orange_money, mtn_momo, especes, wave, cheque]
         referenceTransaction:
           type: ["string", "null"]
         statut:
@@ -6887,6 +6887,12 @@ components:
         membrePrenoms:
           type: ["string", "null"]
         telephone:
+          type: ["string", "null"]
+        fournisseurNom:
+          type: ["string", "null"]
+        fournisseurPrenoms:
+          type: ["string", "null"]
+        fournisseurTelephone:
           type: ["string", "null"]
         dateLivraison:
           type: ["string", "null"]
