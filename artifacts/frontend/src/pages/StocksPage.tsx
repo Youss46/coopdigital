@@ -66,7 +66,7 @@ export default function StocksPage() {
   }, [search]);
   const [form, setForm] = useState({ entrepotId: "", poidsKg: "", nombreSacs: "", motif: "" });
   const [modalEntrepot, setModalEntrepot] = useState(false);
-  const [formEntrepot, setFormEntrepot] = useState({ nom: "", ville: "", capaciteKg: "", capaciteSacs: "", seuilAlerteKg: "" });
+  const [formEntrepot, setFormEntrepot] = useState({ nom: "", ville: "", capaciteKg: "", capaciteSacs: "", seuilAlerteKg: "", pourFournisseursExt: false });
   const [errEntrepot, setErrEntrepot] = useState("");
 
   const mutCreerEntrepot = useMutation({
@@ -76,11 +76,12 @@ export default function StocksPage() {
       capaciteKg: parseFloat(formEntrepot.capaciteKg),
       capaciteSacs: formEntrepot.capaciteSacs ? parseInt(formEntrepot.capaciteSacs) : undefined,
       seuilAlerteKg: formEntrepot.seuilAlerteKg ? parseFloat(formEntrepot.seuilAlerteKg) : undefined,
+      pourFournisseursExt: formEntrepot.pourFournisseursExt,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
       setModalEntrepot(false);
-      setFormEntrepot({ nom: "", ville: "", capaciteKg: "", capaciteSacs: "", seuilAlerteKg: "" });
+      setFormEntrepot({ nom: "", ville: "", capaciteKg: "", capaciteSacs: "", seuilAlerteKg: "", pourFournisseursExt: false });
       setErrEntrepot("");
     },
     onError: (e: Error) => setErrEntrepot(e.message),
@@ -585,6 +586,15 @@ export default function StocksPage() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
                   placeholder="ex. 5000" />
               </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formEntrepot.pourFournisseursExt}
+                  onChange={(e) => setFormEntrepot((f) => ({ ...f, pourFournisseursExt: e.target.checked }))}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-xs text-gray-700">Entrepôt dédié pisteurs / fournisseurs externes</span>
+              </label>
               {errEntrepot && <p className="text-xs text-red-600">{errEntrepot}</p>}
             </div>
             <div className="px-6 pb-5 flex gap-3">

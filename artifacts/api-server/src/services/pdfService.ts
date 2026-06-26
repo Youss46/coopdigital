@@ -1774,6 +1774,7 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
     // Agréger poids par membre
     const poidsParMembre = new Map<number, { nom: string; poidsKg: number }>();
     for (const l of livraisonsLot) {
+      if (!l.membreId) continue;
       const prev = poidsParMembre.get(l.membreId) ?? { nom: `${l.membreNom ?? ""} ${l.membrePrenoms ?? ""}`.trim(), poidsKg: 0 };
       prev.poidsKg += l.poidsKg ? parseFloat(String(l.poidsKg)) : 0;
       poidsParMembre.set(l.membreId, prev);
@@ -2337,7 +2338,7 @@ export async function generateLotEudrPdf(lotId: number, cooperativeId: number): 
         .where(inArray(livraisonsTable.id, livraisonIds))
     : [];
 
-  const membreIds = [...new Set(livraisons.map((l) => l.membreId))];
+  const membreIds = [...new Set(livraisons.map((l) => l.membreId).filter((id): id is number => id !== null))];
 
   const membres = membreIds.length
     ? await db
@@ -2363,6 +2364,7 @@ export async function generateLotEudrPdf(lotId: number, cooperativeId: number): 
 
   const poidsParMembre: Record<number, number> = {};
   for (const liv of livraisons) {
+    if (!liv.membreId) continue;
     const kg = parseFloat(String(liv.poidsNetKg ?? liv.poidsKg ?? "0"));
     poidsParMembre[liv.membreId] = (poidsParMembre[liv.membreId] ?? 0) + kg;
   }

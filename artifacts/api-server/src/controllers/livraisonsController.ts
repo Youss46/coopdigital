@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
-import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, lotLivraisonsTable, lotsTable, campagnesTable, entrepotsTable, mouvementsStockTable } from "@workspace/db";
+import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, fournisseursTable, lotLivraisonsTable, lotsTable, campagnesTable, entrepotsTable, mouvementsStockTable } from "@workspace/db";
 import { creerChequeDepuisLivraison } from "../services/chequesService.js";
-import { eq, and, desc, notInArray } from "drizzle-orm";
+import { eq, and, desc, notInArray, or } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
 import { checkLivraison, creerAnomalies } from "../services/anomalieService";
 import { CreateLivraisonBody } from "@workspace/api-zod";
@@ -21,17 +21,24 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
     const membreId = req.query["membre_id"] ? parseInt(String(req.query["membre_id"])) : undefined;
     const limit = Math.min(100, parseInt(String(req.query["limit"] ?? "20")));
 
-    const conditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
-    if (membreId) conditions.push(eq(livraisonsTable.membreId, membreId));
-    // Un délégué ne voit que les livraisons des membres qui lui sont rattachés
+    const coopCondition = or(
+      eq(membresTable.cooperativeId, cooperativeId),
+      eq(fournisseursTable.cooperativeId, cooperativeId),
+    );
+    const extraConditions = [];
+    if (membreId) extraConditions.push(eq(livraisonsTable.membreId, membreId));
     if (req.user?.role === "delegue" && req.user?.id) {
-      conditions.push(eq(membresTable.delegueId, req.user.id));
+      extraConditions.push(eq(membresTable.delegueId, req.user.id));
     }
+    const whereClause = extraConditions.length > 0
+      ? and(coopCondition, ...extraConditions)
+      : coopCondition;
 
     const livraisons = await db
       .select({
         id: livraisonsTable.id,
         membreId: livraisonsTable.membreId,
+        fournisseurId: livraisonsTable.fournisseurId,
         poidsKg: livraisonsTable.poidsKg,
         prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
         montantBrutFcfa: livraisonsTable.montantBrutFcfa,
@@ -43,10 +50,13 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
         createdAt: livraisonsTable.createdAt,
         membreNom: membresTable.nom,
         membrePrenoms: membresTable.prenoms,
+        fournisseurNom: fournisseursTable.nom,
+        fournisseurPrenoms: fournisseursTable.prenoms,
       })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-      .where(and(...conditions))
+      .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+      .where(whereClause)
       .orderBy(desc(livraisonsTable.dateLivraison))
       .limit(limit);
 
@@ -70,28 +80,40 @@ export async function createLivraison(req: Request, res: Response): Promise<void
     return;
   }
 
-  const { membreId, poidsKg, prixUnitaireFcfa, dateLivraison, modePaiement,
+  const { membreId, fournisseurId, poidsKg, prixUnitaireFcfa, dateLivraison, modePaiement,
           campagneId, nombreSacs, retenueKg, sectionLivraison, entrepotId,
           entrepotDelegueId, datePaiementPrevue } = parse.data;
 
-  // poidsKg envoyé par le frontend = poids NET (après retenue)
-  // poidsBrut = net + retenue → c'est ce qui entre physiquement dans le stock
-  const poidsBrut = poidsKg + (retenueKg ?? 0);
+  if (!membreId && !fournisseurId) {
+    res.status(400).json({ erreur: "membreId ou fournisseurId est requis" });
+    return;
+  }
 
+  const poidsBrut = poidsKg + (retenueKg ?? 0);
   const estDiffere = modePaiement === "differe";
 
   try {
-    const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, membreId)).limit(1);
-    if (!membre) {
-      res.status(404).json({ erreur: "Membre introuvable" });
-      return;
-    }
-    if (membre.cooperativeId !== cooperativeId) {
-      res.status(403).json({ erreur: "Ce membre n'appartient pas à votre coopérative" });
-      return;
+    // ── Résolution du producteur (membre ou fournisseur externe) ──────────
+    let nomProducteur = "";
+    let membre: typeof membresTable.$inferSelect | undefined;
+
+    if (membreId) {
+      const rows = await db.select().from(membresTable).where(eq(membresTable.id, membreId)).limit(1);
+      membre = rows[0];
+      if (!membre) { res.status(404).json({ erreur: "Membre introuvable" }); return; }
+      if (membre.cooperativeId !== cooperativeId) {
+        res.status(403).json({ erreur: "Ce membre n'appartient pas à votre coopérative" }); return;
+      }
+      nomProducteur = `${membre.prenoms ?? ""} ${membre.nom}`.trim();
+    } else {
+      const [fourn] = await db.select().from(fournisseursTable).where(eq(fournisseursTable.id, fournisseurId!)).limit(1);
+      if (!fourn || fourn.cooperativeId !== cooperativeId) {
+        res.status(404).json({ erreur: "Fournisseur introuvable" }); return;
+      }
+      nomProducteur = `${fourn.prenoms ?? ""} ${fourn.nom}`.trim();
     }
 
-    // Résoudre la campagne : obligatoire (règle métier : 1 livraison = 1 campagne active)
+    // ── Résolution campagne ────────────────────────────────────────────────
     let campagneIdResolu: number | null = campagneId ?? null;
     if (!campagneIdResolu) {
       const [campagneActive] = await db
@@ -107,65 +129,68 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       return;
     }
 
-    // Si campagneId fourni explicitement, vérifier qu'elle n'est pas clôturée
     if (campagneId != null) {
       try {
         await assertCampagneOuverte(cooperativeId, campagneIdResolu);
       } catch (err) {
-        if (err instanceof CampagneFermeeError) {
-          res.status(err.status).json({ erreur: err.erreur });
-          return;
-        }
+        if (err instanceof CampagneFermeeError) { res.status(err.status).json({ erreur: err.erreur }); return; }
         throw err;
       }
     }
 
-    // ── Détection anomalies AVANT la transaction ──────────────────────────
-    const anomaliesDetectees = await checkLivraison(cooperativeId, {
-      membreId, poidsKg, prixUnitaireFcfa,
-      campagneIdResolu,
-      agentId: req.user?.id ?? null,
-    });
+    // ── Anomalies (membres seulement) ─────────────────────────────────────
+    const anomaliesDetectees = membreId
+      ? await checkLivraison(cooperativeId, { membreId, poidsKg, prixUnitaireFcfa, campagneIdResolu, agentId: req.user?.id ?? null })
+      : [];
     const anomaliesCritiques = anomaliesDetectees.filter((a) => a.niveauGravite === "critique");
     if (anomaliesCritiques.length > 0) {
       void creerAnomalies(cooperativeId, anomaliesCritiques, "livraisons");
-      res.status(422).json({
-        erreur: anomaliesCritiques[0]!.description,
-        anomalie: "bloquee",
-        anomalies: anomaliesCritiques,
-      });
+      res.status(422).json({ erreur: anomaliesCritiques[0]!.description, anomalie: "bloquee", anomalies: anomaliesCritiques });
       return;
     }
     const anomaliesAttention = anomaliesDetectees.filter((a) => a.niveauGravite !== "critique");
 
-    // Récupérer l'encours intrants AVANT la transaction (lecture seule)
-    const encoursIntrants = await getEncoursMembre(cooperativeId, membreId);
+    // ── Encours intrants (membres seulement) ──────────────────────────────
+    const encoursIntrants = membreId ? await getEncoursMembre(cooperativeId, membreId) : 0;
+
+    // ── Résolution entrepôt dédié fournisseurs ext ────────────────────────
+    let resolvedEntrepotId = entrepotId ?? null;
+    if (fournisseurId && !entrepotId && !entrepotDelegueId) {
+      const [dedié] = await db
+        .select({ id: entrepotsTable.id })
+        .from(entrepotsTable)
+        .where(and(eq(entrepotsTable.cooperativeId, cooperativeId), eq(entrepotsTable.pourFournisseursExt, true)))
+        .orderBy(entrepotsTable.id)
+        .limit(1);
+      if (dedié) resolvedEntrepotId = dedié.id;
+    }
 
     const result = await db.transaction(async (tx) => {
       const montantBrut = Math.round(poidsKg * prixUnitaireFcfa);
+      let avanceDeduite = 0;
+      let intrantsDeduits = 0;
+      let avanceEnCours: typeof avancesTable.$inferSelect | undefined;
 
-      // Récupérer l'avance en cours du membre
-      const [avanceEnCours] = await tx
-        .select()
-        .from(avancesTable)
-        .where(and(eq(avancesTable.membreId, membreId), eq(avancesTable.statut, "en_cours")))
-        .orderBy(desc(avancesTable.dateOctroi))
-        .limit(1);
+      if (membreId) {
+        const rows = await tx
+          .select().from(avancesTable)
+          .where(and(eq(avancesTable.membreId, membreId), eq(avancesTable.statut, "en_cours")))
+          .orderBy(desc(avancesTable.dateOctroi))
+          .limit(1);
+        avanceEnCours = rows[0];
+        avanceDeduite = avanceEnCours ? Math.min(avanceEnCours.soldeRestantFcfa, montantBrut) : 0;
+        const apresAvance = montantBrut - avanceDeduite;
+        intrantsDeduits = Math.min(encoursIntrants, Math.max(0, apresAvance));
+      }
 
-      const avanceDeduite = avanceEnCours ? Math.min(avanceEnCours.soldeRestantFcfa, montantBrut) : 0;
-      const apresAvance = montantBrut - avanceDeduite;
-
-      // Déduction intrants APRÈS avance
-      const intrantsDeduits = Math.min(encoursIntrants, Math.max(0, apresAvance));
-      const montantNet = apresAvance - intrantsDeduits;
-
+      const montantNet = montantBrut - avanceDeduite - intrantsDeduits;
       const dateStr = dateLivraison ?? new Date().toISOString().split("T")[0]!;
 
-      // Créer la livraison
       const [livraison] = await tx
         .insert(livraisonsTable)
         .values({
-          membreId,
+          membreId: membreId ?? null,
+          fournisseurId: fournisseurId ?? null,
           campagneId: campagneIdResolu,
           poidsKg: String(poidsKg),
           prixUnitaireFcfa,
@@ -186,12 +211,11 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         })
         .returning();
 
-      // Créer le paiement (différé = mode especes par défaut, sera confirmé lors du règlement)
       const [paiement] = await tx
         .insert(paiementsTable)
         .values({
           livraisonId: livraison!.id,
-          membreId,
+          membreId: membreId ?? null,
           montantFcfa: montantNet,
           modePaiement: estDiffere
             ? "especes"
@@ -200,36 +224,25 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         })
         .returning();
 
-      // Mettre à jour l'avance si applicable
       let avanceMaj = null;
       if (avanceEnCours && avanceDeduite > 0) {
         const nouveauRembourse = avanceEnCours.montantRembourse_fcfa + avanceDeduite;
         const nouveauSolde = avanceEnCours.soldeRestantFcfa - avanceDeduite;
-        const nouveauStatut = nouveauSolde === 0 ? "rembourse" : "en_cours";
-
         const [updated] = await tx
           .update(avancesTable)
-          .set({
-            montantRembourse_fcfa: nouveauRembourse,
-            soldeRestantFcfa: nouveauSolde,
-            statut: nouveauStatut,
-          })
+          .set({ montantRembourse_fcfa: nouveauRembourse, soldeRestantFcfa: nouveauSolde, statut: nouveauSolde === 0 ? "rembourse" : "en_cours" })
           .where(eq(avancesTable.id, avanceEnCours.id))
           .returning();
-
         avanceMaj = updated;
       }
 
-      // Remboursement automatique des intrants par déduction livraison
-      if (intrantsDeduits > 0) {
+      if (membreId && intrantsDeduits > 0) {
         await enregistrerRemboursementParLivraison(tx, cooperativeId, membreId, intrantsDeduits, dateStr);
       }
 
-      // ── Entrée stock : entrepôt central (magasin) ─────────────────────────
-      // Si entrepotDelegueId est renseigné, on ne touche pas au stock central
       if (!entrepotDelegueId) {
-        const entrepotCondition = entrepotId
-          ? and(eq(entrepotsTable.id, entrepotId), eq(entrepotsTable.cooperativeId, cooperativeId))
+        const entrepotCondition = resolvedEntrepotId
+          ? and(eq(entrepotsTable.id, resolvedEntrepotId), eq(entrepotsTable.cooperativeId, cooperativeId))
           : eq(entrepotsTable.cooperativeId, cooperativeId);
         const [entrepotCentral] = await tx
           .select({ id: entrepotsTable.id })
@@ -243,18 +256,14 @@ export async function createLivraison(req: Request, res: Response): Promise<void
             entrepotId: entrepotCentral.id,
             lotId: null,
             type: "entree",
-            poidsKg: String(poidsBrut),           // poids BRUT
+            poidsKg: String(poidsBrut),
             motif: `Livraison #${livraison!.id}`,
             agentId: req.user?.id ?? null,
           });
         }
       }
 
-      return {
-        livraison: { ...livraison!, membreNom: membre.nom, membrePrenoms: membre.prenoms },
-        paiement,
-        avanceMiseAJour: avanceMaj,
-      };
+      return { livraison: { ...livraison!, nomProducteur }, paiement, avanceMiseAJour: avanceMaj };
     });
 
     if (anomaliesAttention.length > 0) {
@@ -266,50 +275,37 @@ export async function createLivraison(req: Request, res: Response): Promise<void
 
     void generateEcrituresLivraison(cooperativeId, {
       livraisonId: result.livraison.id,
-      membreNom: `${result.livraison.membrePrenoms} ${result.livraison.membreNom}`,
+      membreNom: nomProducteur,
       montantBrutFcfa: result.livraison.montantBrutFcfa,
       avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
       montantNetFcfa: result.livraison.montantNetFcfa,
       dateLivraison: result.livraison.dateLivraison,
     });
 
-    void envoyerPushGroupePortail([membreId], {
-      title: "Livraison enregistrée",
-      body: `${Number(result.livraison.poidsKg).toLocaleString("fr-FR")} kg — ${result.livraison.montantNetFcfa.toLocaleString("fr-FR")} FCFA net`,
-      url: "/portail/livraisons",
-    });
+    if (membreId) {
+      void envoyerPushGroupePortail([membreId], {
+        title: "Livraison enregistrée",
+        body: `${Number(result.livraison.poidsKg).toLocaleString("fr-FR")} kg — ${result.livraison.montantNetFcfa.toLocaleString("fr-FR")} FCFA net`,
+        url: "/portail/livraisons",
+      });
 
-    // ── Création automatique d'un chèque émis si mode = cheque ───────────────
-    if (modePaiement === "cheque" && result.paiement) {
-      const dateStr = typeof dateLivraison === "string" ? dateLivraison : new Date().toISOString().slice(0, 10);
-      void creerChequeDepuisLivraison(cooperativeId, {
-        paiementId:   result.paiement.id,
-        membreId,
-        livraisonId:  result.livraison.id,
-        membreNom:    `${result.livraison.membrePrenoms ?? ""} ${result.livraison.membreNom}`.trim(),
-        montantFcfa:  result.livraison.montantNetFcfa,
-        dateEmission: dateStr,
-      }, req.user?.id ?? 0);
+      if (modePaiement === "cheque" && result.paiement) {
+        const dateStr = typeof dateLivraison === "string" ? dateLivraison : new Date().toISOString().slice(0, 10);
+        void creerChequeDepuisLivraison(cooperativeId, {
+          paiementId:   result.paiement.id,
+          membreId,
+          livraisonId:  result.livraison.id,
+          membreNom:    nomProducteur,
+          montantFcfa:  result.livraison.montantNetFcfa,
+          dateEmission: dateStr,
+        }, req.user?.id ?? 0);
+      }
     }
 
-    // ── Entrée stock entrepôt délégué (choix explicite ou auto via agentId) ──
     if (entrepotDelegueId) {
-      // Entrepôt délégué choisi explicitement par l'utilisateur
-      void entrerStockLivraison(
-        entrepotDelegueId,
-        cooperativeId,
-        poidsBrut,                                // poids BRUT
-        result.livraison.id,
-        req.user!.id,
-      );
+      void entrerStockLivraison(entrepotDelegueId, cooperativeId, poidsBrut, result.livraison.id, req.user!.id);
     } else {
-      // Fallback auto : si l'agent de saisie est un délégué avec un entrepôt
-      void entrerStockSiDelegue(
-        result.livraison.agentId,
-        cooperativeId,
-        poidsBrut,                                // poids BRUT
-        result.livraison.id,
-      );
+      void entrerStockSiDelegue(result.livraison.agentId, cooperativeId, poidsBrut, result.livraison.id);
     }
 
     res.status(201).json(result);
@@ -334,13 +330,17 @@ export async function getLivraisonsNonLotees(req: Request, res: Response): Promi
       .where(eq(lotsTable.cooperativeId, cooperativeId));
     const dejaIds = deja.map((d) => d.livraisonId);
 
-    const coopCondition = eq(membresTable.cooperativeId, cooperativeId);
+    const coopCondition = or(
+      eq(membresTable.cooperativeId, cooperativeId),
+      eq(fournisseursTable.cooperativeId, cooperativeId),
+    );
     const nonLoteCondition = dejaIds.length > 0 ? notInArray(livraisonsTable.id, dejaIds) : undefined;
 
     const livraisons = await db
       .select({
         id: livraisonsTable.id,
         membreId: livraisonsTable.membreId,
+        fournisseurId: livraisonsTable.fournisseurId,
         poidsKg: livraisonsTable.poidsKg,
         prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
         montantBrutFcfa: livraisonsTable.montantBrutFcfa,
@@ -352,9 +352,12 @@ export async function getLivraisonsNonLotees(req: Request, res: Response): Promi
         createdAt: livraisonsTable.createdAt,
         membreNom: membresTable.nom,
         membrePrenoms: membresTable.prenoms,
+        fournisseurNom: fournisseursTable.nom,
+        fournisseurPrenoms: fournisseursTable.prenoms,
       })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+      .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .where(nonLoteCondition ? and(coopCondition, nonLoteCondition) : coopCondition)
       .orderBy(desc(livraisonsTable.dateLivraison))
       .limit(500);

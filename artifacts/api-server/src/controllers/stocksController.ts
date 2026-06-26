@@ -35,19 +35,21 @@ export async function getEntrepots(req: Request, res: Response): Promise<void> {
       ville: string;
       capaciteKg: string;
       seuilAlerteKg: string | null;
+      pourFournisseursExt: boolean;
       createdAt: Date;
       stockActuelKg: number;
       nombreSacsTotal: number;
     }  & { capaciteSacs: number | null }>(sql`
       SELECT
         e.id,
-        e.cooperative_id  AS "cooperativeId",
+        e.cooperative_id        AS "cooperativeId",
         e.nom,
         e.ville,
-        e.capacite_kg     AS "capaciteKg",
-        e.capacite_sacs   AS "capaciteSacs",
-        e.seuil_alerte_kg AS "seuilAlerteKg",
-        e.created_at      AS "createdAt",
+        e.capacite_kg           AS "capaciteKg",
+        e.capacite_sacs         AS "capaciteSacs",
+        e.seuil_alerte_kg       AS "seuilAlerteKg",
+        e.pour_fournisseurs_ext AS "pourFournisseursExt",
+        e.created_at            AS "createdAt",
         COALESCE(
           SUM(CASE WHEN ms.type IN ('entree', 'retour_refus')
               THEN ms.poids_kg::numeric
@@ -344,12 +346,13 @@ export async function createEntrepot(req: Request, res: Response): Promise<void>
     return;
   }
 
-  const { nom, ville, capaciteKg, capaciteSacs, seuilAlerteKg } = req.body as {
+  const { nom, ville, capaciteKg, capaciteSacs, seuilAlerteKg, pourFournisseursExt } = req.body as {
     nom: string;
     ville: string;
     capaciteKg: number;
     capaciteSacs?: number;
     seuilAlerteKg?: number;
+    pourFournisseursExt?: boolean;
   };
 
   if (!nom || !ville || !capaciteKg) {
@@ -367,6 +370,7 @@ export async function createEntrepot(req: Request, res: Response): Promise<void>
         capaciteKg: String(capaciteKg),
         capaciteSacs: capaciteSacs != null ? capaciteSacs : null,
         seuilAlerteKg: seuilAlerteKg != null ? String(seuilAlerteKg) : null,
+        pourFournisseursExt: pourFournisseursExt ?? false,
       })
       .returning();
 

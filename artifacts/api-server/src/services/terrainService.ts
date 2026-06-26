@@ -552,13 +552,13 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
     ...recentesLivraisons.map((l) => ({
       heure: new Date(l.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
       type: "collecte",
-      label: `Collecte ${nomMap.get(l.membreId) ?? ""} — ${toNum(l.poidsKg)} kg`,
+      label: `Collecte ${(l.membreId ? nomMap.get(l.membreId) : null) ?? ""} — ${toNum(l.poidsKg)} kg`,
       montant: 0,
     })),
     ...recentesPaiements.map((p) => ({
       heure: new Date(p.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
       type: "paiement",
-      label: `Paiement ${nomMap.get(p.membreId) ?? ""} — ${formatFcfa(p.montantFcfa)}`,
+      label: `Paiement ${(p.membreId ? nomMap.get(p.membreId) : null) ?? ""} — ${formatFcfa(p.montantFcfa)}`,
       montant: p.montantFcfa,
     })),
   ].sort((a, b) => b.heure.localeCompare(a.heure)).slice(0, 8);

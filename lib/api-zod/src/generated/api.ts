@@ -422,7 +422,8 @@ export const GetLivraisonsResponse = zod.array(GetLivraisonsResponseItem)
  * @summary Enregistrer une livraison avec déduction d'avance automatique
  */
 export const CreateLivraisonBody = zod.object({
-  "membreId": zod.number(),
+  "membreId": zod.number().nullish(),
+  "fournisseurId": zod.number().nullish(),
   "poidsKg": zod.number(),
   "prixUnitaireFcfa": zod.number(),
   "dateLivraison": zod.string(),
@@ -753,6 +754,7 @@ export const GetEntrepotsResponseItem = zod.object({
   "stockActuelKg": zod.number(),
   "pourcentageRemplissage": zod.number().optional(),
   "enAlerte": zod.boolean().optional(),
+  "pourFournisseursExt": zod.boolean().optional(),
   "createdAt": zod.string()
 })
 export const GetEntrepotsResponse = zod.array(GetEntrepotsResponseItem)
@@ -822,6 +824,7 @@ export const GetStockAlertesResponseItem = zod.object({
   "stockActuelKg": zod.number(),
   "pourcentageRemplissage": zod.number().optional(),
   "enAlerte": zod.boolean().optional(),
+  "pourFournisseursExt": zod.boolean().optional(),
   "createdAt": zod.string()
 })
 export const GetStockAlertesResponse = zod.array(GetStockAlertesResponseItem)

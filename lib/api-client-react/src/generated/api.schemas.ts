@@ -910,7 +910,8 @@ export const LivraisonInputModePaiement = {
 } as const;
 
 export interface LivraisonInput {
-  membreId: number;
+  membreId?: number | null;
+  fournisseurId?: number | null;
   poidsKg: number;
   prixUnitaireFcfa: number;
   dateLivraison: string;
@@ -1172,6 +1173,7 @@ export interface EntrepotStock {
   stockActuelKg: number;
   pourcentageRemplissage?: number;
   enAlerte?: boolean;
+  pourFournisseursExt?: boolean;
   createdAt: string;
 }
 

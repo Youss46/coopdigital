@@ -6804,10 +6804,14 @@ components:
 
     LivraisonInput:
       type: object
-      required: [membreId, poidsKg, prixUnitaireFcfa, dateLivraison]
+      required: [poidsKg, prixUnitaireFcfa, dateLivraison]
       properties:
         membreId:
           type: integer
+          nullable: true
+        fournisseurId:
+          type: integer
+          nullable: true
         poidsKg:
           type: number
         prixUnitaireFcfa:
@@ -7169,6 +7173,8 @@ components:
         pourcentageRemplissage:
           type: number
         enAlerte:
+          type: boolean
+        pourFournisseursExt:
           type: boolean
         createdAt:
           type: string

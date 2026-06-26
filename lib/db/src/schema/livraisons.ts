@@ -5,12 +5,14 @@ import { membresTable } from "./membres";
 import { usersTable } from "./users";
 import { campagnesTable } from "./campagnes";
 import { balancesTable } from "./pesee";
+import { fournisseursTable } from "./fournisseurs";
 
 export const livraisonsTable = pgTable("livraisons", {
   id: serial("id").primaryKey(),
   membreId: integer("membre_id")
-    .notNull()
     .references(() => membresTable.id),
+  fournisseurId: integer("fournisseur_id")
+    .references(() => fournisseursTable.id),
   campagneId: integer("campagne_id").references(() => campagnesTable.id),
 
   // Champs enrichis GESTCOOP

@@ -386,6 +386,27 @@
       "when": 1782922460000,
       "tag": "0054_fournisseurs_code_unique_per_coop",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1783008860000,
+      "tag": "0055_livraisons_fournisseur_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1783008920000,
+      "tag": "0056_entrepots_pour_fournisseurs_ext",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1783008980000,
+      "tag": "0057_paiements_membre_id_nullable",
+      "breakpoints": true
     }
   ]
 }

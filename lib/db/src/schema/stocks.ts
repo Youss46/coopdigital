@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, numeric, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, text, timestamp, pgEnum, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { cooperativesTable } from "./cooperatives";
@@ -13,6 +13,7 @@ export const entrepotsTable = pgTable("entrepots", {
   capaciteKg: numeric("capacite_kg", { precision: 10, scale: 2 }).notNull(),
   capaciteSacs: integer("capacite_sacs"),
   seuilAlerteKg: numeric("seuil_alerte_kg", { precision: 10, scale: 2 }),
+  pourFournisseursExt: boolean("pour_fournisseurs_ext").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

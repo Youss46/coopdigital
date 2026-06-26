@@ -29,7 +29,6 @@ export const paiementsTable = pgTable("paiements", {
     .notNull()
     .references(() => livraisonsTable.id, { onDelete: "cascade" }),
   membreId: integer("membre_id")
-    .notNull()
     .references(() => membresTable.id),
   campagneId: integer("campagne_id").references(() => campagnesTable.id),
 

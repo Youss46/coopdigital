@@ -42,6 +42,9 @@ export default function NouvelleLivraison() {
 
   const [membreRecherche, setMembreRecherche] = useState("");
   const [membreSelectionne, setMembreSelectionne] = useState<{ id: number; nom: string; prenoms: string; telephone: string } | null>(null);
+  const [sourceType, setSourceType] = useState<"membre" | "fournisseur">("membre");
+  const [fournisseurRecherche, setFournisseurRecherche] = useState("");
+  const [fournisseurSelectionne, setFournisseurSelectionne] = useState<{ id: number; nom: string; prenoms: string | null; typeFournisseur: string } | null>(null);
   const [poidsKg, setPoidsKg] = useState("");
   const [poids2eme, setPoids2eme] = useState("");
   const [balanceId, setBalanceId] = useState<string>("");
@@ -103,6 +106,15 @@ export default function NouvelleLivraison() {
     },
   });
 
+  const { data: fournisseursData } = useQuery({
+    queryKey: ["fournisseurs-search-livraison", fournisseurRecherche],
+    queryFn: async () => {
+      const result = await apiFetch<Array<{ id: number; nom: string; prenoms: string | null; typeFournisseur: string }>>(`/fournisseurs?q=${encodeURIComponent(fournisseurRecherche)}`);
+      return result.filter((f) => f.typeFournisseur !== "membre");
+    },
+    enabled: sourceType === "fournisseur" && fournisseurRecherche.length >= 2,
+  });
+
   const avanceEnCours = avancesData?.avances?.[0];
   const soldeAvance = avanceEnCours?.soldeRestantFcfa ?? 0;
   const encoursIntrants = encoursIntrantsData?.encoursFcfa ?? 0;
@@ -151,7 +163,8 @@ export default function NouvelleLivraison() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!membreSelectionne || poidsNet <= 0 || prix <= 0) return;
+    const producteurOk = sourceType === "membre" ? !!membreSelectionne : !!fournisseurSelectionne;
+    if (!producteurOk || poidsNet <= 0 || prix <= 0) return;
     let resolvedEntrepotId: number | null = null;
     let resolvedEntrepotDelegueId: number | null = null;
     if (entrepotSelection.startsWith("central_")) {
@@ -161,7 +174,9 @@ export default function NouvelleLivraison() {
     }
 
     const payload = {
-      membreId: membreSelectionne.id,
+      ...(sourceType === "membre"
+        ? { membreId: membreSelectionne!.id }
+        : { fournisseurId: fournisseurSelectionne!.id }),
       poidsKg: poidsNet,
       prixUnitaireFcfa: prix,
       dateLivraison,
@@ -204,7 +219,11 @@ export default function NouvelleLivraison() {
         <div className="bg-white rounded-xl border border-gray-200 p-5 text-left space-y-3">
           <div className="flex justify-between">
             <span className="text-gray-500 text-sm">Producteur</span>
-            <span className="font-medium text-sm">{membreSelectionne?.nom} {membreSelectionne?.prenoms}</span>
+            <span className="font-medium text-sm">
+              {sourceType === "membre"
+                ? `${membreSelectionne?.nom ?? ""} ${membreSelectionne?.prenoms ?? ""}`.trim()
+                : `${fournisseurSelectionne?.nom ?? ""} ${fournisseurSelectionne?.prenoms ?? ""}`.trim()}
+            </span>
           </div>
           {campagneActive && (
             <div className="flex justify-between">
@@ -240,6 +259,8 @@ export default function NouvelleLivraison() {
               setSucces(null);
               setMembreSelectionne(null);
               setMembreRecherche("");
+              setFournisseurSelectionne(null);
+              setFournisseurRecherche("");
               setPoidsKg("");
               setPoids2eme("");
               setNombreSacs("");
@@ -296,13 +317,34 @@ export default function NouvelleLivraison() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Sélection membre */}
+        {/* Sélection producteur */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
           <h2 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
             <Search size={15} />
             Producteur
           </h2>
-          {!membreSelectionne ? (
+
+          {/* Toggle type de source */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => { setSourceType("membre"); setFournisseurSelectionne(null); setFournisseurRecherche(""); }}
+              className={`flex-1 py-2 transition-colors ${sourceType === "membre" ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
+              style={sourceType === "membre" ? { backgroundColor: "#1a4731" } : {}}
+            >
+              Membre coopérateur
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSourceType("fournisseur"); setMembreSelectionne(null); setMembreRecherche(""); }}
+              className={`flex-1 py-2 transition-colors border-l border-gray-200 ${sourceType === "fournisseur" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+            >
+              Pisteur / Externe
+            </button>
+          </div>
+
+          {/* Sélection membre */}
+          {sourceType === "membre" && (!membreSelectionne ? (
             <div className="relative">
               <input
                 type="search"
@@ -314,13 +356,8 @@ export default function NouvelleLivraison() {
               {membresData && membresData.membres.length > 0 && membreRecherche.length >= 2 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
                   {membresData.membres.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => {
-                        setMembreSelectionne({ id: m.id, nom: m.nom, prenoms: m.prenoms, telephone: m.telephone });
-                        setMembreRecherche("");
-                      }}
+                    <button key={m.id} type="button"
+                      onClick={() => { setMembreSelectionne({ id: m.id, nom: m.nom, prenoms: m.prenoms, telephone: m.telephone }); setMembreRecherche(""); }}
                       className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm"
                     >
                       <span className="font-medium">{m.nom} {m.prenoms}</span>
@@ -345,15 +382,43 @@ export default function NouvelleLivraison() {
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => setMembreSelectionne(null)}
-                className="text-gray-400 hover:text-gray-600 text-lg"
-              >
-                ×
-              </button>
+              <button type="button" onClick={() => setMembreSelectionne(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
             </div>
-          )}
+          ))}
+
+          {/* Sélection fournisseur externe / pisteur */}
+          {sourceType === "fournisseur" && (!fournisseurSelectionne ? (
+            <div className="relative">
+              <input
+                type="search"
+                placeholder="Rechercher un pisteur ou fournisseur externe…"
+                value={fournisseurRecherche}
+                onChange={(e) => setFournisseurRecherche(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
+              />
+              {fournisseursData && fournisseursData.length > 0 && fournisseurRecherche.length >= 2 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                  {fournisseursData.map((f) => (
+                    <button key={f.id} type="button"
+                      onClick={() => { setFournisseurSelectionne(f); setFournisseurRecherche(""); }}
+                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm"
+                    >
+                      <span className="font-medium">{f.nom} {f.prenoms ?? ""}</span>
+                      <span className="text-gray-400 ml-2 text-xs">{f.typeFournisseur === "pisteur" ? "Pisteur" : "Externe"}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between bg-blue-50 rounded-lg px-4 py-3">
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">{fournisseurSelectionne.nom} {fournisseurSelectionne.prenoms ?? ""}</p>
+                <p className="text-xs text-blue-600">{fournisseurSelectionne.typeFournisseur === "pisteur" ? "Pisteur" : "Fournisseur externe"}</p>
+              </div>
+              <button type="button" onClick={() => setFournisseurSelectionne(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
+            </div>
+          ))}
         </div>
 
         {/* Pesée */}
@@ -650,13 +715,13 @@ export default function NouvelleLivraison() {
               <span className="text-gray-500">Montant brut ({poidsNet.toFixed(3)} kg × {prix} FCFA)</span>
               <span className="font-medium">{formaterFCFA(montantBrut)}</span>
             </div>
-            {avanceDeduite > 0 && (
+            {sourceType === "membre" && avanceDeduite > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-amber-600">− Avance déduite</span>
                 <span className="text-amber-600 font-medium">− {formaterFCFA(avanceDeduite)}</span>
               </div>
             )}
-            {intrantsDeduits > 0 && (
+            {sourceType === "membre" && intrantsDeduits > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-orange-600 flex items-center gap-1">
                   <Sprout size={12} />
@@ -685,7 +750,7 @@ export default function NouvelleLivraison() {
 
         <button
           type="submit"
-          disabled={!membreSelectionne || poidsNet <= 0 || prix <= 0 || mutation.isPending}
+          disabled={(sourceType === "membre" ? !membreSelectionne : !fournisseurSelectionne) || poidsNet <= 0 || prix <= 0 || mutation.isPending}
           className="w-full py-3.5 rounded-xl text-white text-sm font-bold disabled:opacity-40 transition-opacity hover:opacity-90"
           style={{ backgroundColor: "#1a4731" }}
         >
