@@ -143,9 +143,12 @@ export async function proposerEcriture(
 
 /**
  * Livraison enregistrée :
- * 1) 601 / 401 = montant brut (achat cacao)
- * 2) 401 / 521 = montant net (décaissement banque)
- * 3) 401 / 416 = avance déduite (imputation créance)
+ * 1) 601 / 401 = montant brut (achat cacao — dette envers le producteur)
+ * 2) 401 / 4091 = avance déduite (imputation créance)
+ *
+ * NB : l'écriture de décaissement (401/521 ou 401/571) est générée
+ * au moment de la VALIDATION du règlement dans validerPaiement(),
+ * pas ici. À la livraison on constate uniquement la dette et les déductions.
  */
 export async function generateEcrituresLivraison(cooperativeId: number, params: {
   livraisonId: number;
@@ -155,7 +158,7 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
   montantNetFcfa: number;
   dateLivraison: string;
 }) {
-  const { livraisonId, membreNom, montantBrutFcfa, avanceDeduiteFcfa, montantNetFcfa, dateLivraison } = params;
+  const { livraisonId, membreNom, montantBrutFcfa, avanceDeduiteFcfa, dateLivraison } = params;
   const piece = `LIV-${livraisonId}`;
   const promises: Promise<unknown>[] = [];
 
@@ -165,14 +168,6 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
       libelle: `Achat cacao – ${membreNom}`,
       compteDebit: "601", compteCredit: "401",
       montantFcfa: montantBrutFcfa, date: dateLivraison, numeroPiece: piece,
-    }));
-  }
-  if (montantNetFcfa > 0) {
-    promises.push(proposerEcriture(cooperativeId, {
-      source: "livraison", sourceId: livraisonId,
-      libelle: `Paiement net livraison – ${membreNom}`,
-      compteDebit: "401", compteCredit: "521",
-      montantFcfa: montantNetFcfa, date: dateLivraison, numeroPiece: piece,
     }));
   }
   if (avanceDeduiteFcfa > 0) {

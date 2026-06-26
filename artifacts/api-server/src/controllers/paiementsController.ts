@@ -2,6 +2,7 @@ import { type Request, type Response } from "express";
 import { db, paiementsTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable } from "@workspace/db";
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, type SQL } from "drizzle-orm";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
+import { proposerEcriture } from "../services/comptabiliteService.js";
 import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvement, getSessionActive } from "../services/caisseService.js";
 import { notifierParRole } from "../services/notificationService.js";
 import { logger } from "../lib/logger.js";
@@ -615,7 +616,24 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       );
     }
 
-    // 7. Notifier le producteur (best-effort)
+    // 7. Écriture comptable décaissement pour modes non-espèces
+    //    (espèces : enregistrerMouvement crée 401/571 via source "caisse")
+    if (mode !== "especes" && cooperativeId) {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const producteurNom = `${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`;
+      void proposerEcriture(cooperativeId, {
+        source: "paiement",
+        sourceId: id,
+        libelle: `Paiement producteur – ${producteurNom}`,
+        compteDebit: "401",
+        compteCredit: "521",
+        montantFcfa: row.paiement.montantFcfa,
+        date: dateStr,
+        numeroPiece: `PAI-${id}`,
+      });
+    }
+
+    // 8. Notifier le producteur (best-effort)
     if (row.paiement.membreId) void envoyerPushGroupePortail([row.paiement.membreId], {
       title: "✅ Paiement validé",
       body: `${new Intl.NumberFormat("fr-FR").format(row.paiement.montantFcfa)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : mode === "wave" ? "Wave" : mode === "cheque" ? "Chèque" : "Espèces"}`,
