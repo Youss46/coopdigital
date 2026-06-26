@@ -33,9 +33,12 @@ interface EntrepotDelegue {
 
 interface Livraison {
   id: number;
-  membreId: number;
+  membreId: number | null;
+  fournisseurId: number | null;
   membreNom: string | null;
   membrePrenoms: string | null;
+  fournisseurNom: string | null;
+  fournisseurPrenoms: string | null;
   poidsKg: string;
   prixUnitaireFcfa: number | null;
   montantBrutFcfa: number | null;
@@ -92,7 +95,9 @@ export default function LivraisonsPage() {
     const r = recherche.toLowerCase();
     return (
       (l.membreNom ?? "").toLowerCase().includes(r) ||
-      (l.membrePrenoms ?? "").toLowerCase().includes(r)
+      (l.membrePrenoms ?? "").toLowerCase().includes(r) ||
+      (l.fournisseurNom ?? "").toLowerCase().includes(r) ||
+      (l.fournisseurPrenoms ?? "").toLowerCase().includes(r)
     );
   });
 
@@ -306,14 +311,14 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
         {/* Avatar initiales */}
         <div
           className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-          style={{ backgroundColor: "#1a4731" }}
+          style={{ backgroundColor: l.fournisseurId ? "#7c3aed" : "#1a4731" }}
         >
-          {(l.membreNom ?? "?")[0]?.toUpperCase()}
+          {(l.membreNom ?? l.fournisseurNom ?? "?")[0]?.toUpperCase()}
         </div>
 
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-900 truncate">
-            {l.membreNom ?? "—"} {l.membrePrenoms ?? ""}
+            {l.membreNom ?? l.fournisseurNom ?? "—"} {l.membrePrenoms ?? l.fournisseurPrenoms ?? ""}
           </p>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-xs text-gray-400 flex items-center gap-1">
