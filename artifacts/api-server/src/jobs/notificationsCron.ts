@@ -1,5 +1,5 @@
-import { db, avancesTable, cooperativesTable, membresTable } from "@workspace/db";
-import { eq, and, lt, sql, inArray } from "drizzle-orm";
+import { db, avancesTable, cooperativesTable, membresTable, intrantsTable } from "@workspace/db";
+import { eq, and, lt, lte, between, gt, sql, inArray, isNotNull } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { notifierParRole } from "../services/notificationService";
 
@@ -147,6 +147,99 @@ async function checkBudgetDepasse(cooperativeId: number): Promise<void> {
   }
 }
 
+// ─── Péremption des intrants phytosanitaires ──────────────────────────────────
+//
+// Seuils :
+//   • date_peremption < aujourd'hui          → critique  "Intrant(s) périmé(s)"
+//   • date_peremption dans 1–7 jours         → critique  "Expiration imminente"
+//   • date_peremption dans 8–30 jours        → attention "Expiration dans 30 jours"
+//
+// Seuls les intrants actifs avec stock > 0 et une date de péremption renseignée
+// sont considérés. Une seule notification groupée par seuil et par coopérative.
+
+async function checkPeremptionIntrants(cooperativeId: number): Promise<void> {
+  try {
+    const today   = new Date().toISOString().split("T")[0]!;
+    const in7j    = new Date(); in7j.setDate(in7j.getDate() + 7);
+    const in30j   = new Date(); in30j.setDate(in30j.getDate() + 30);
+    const d7  = in7j.toISOString().split("T")[0]!;
+    const d30 = in30j.toISOString().split("T")[0]!;
+
+    const intrants = await db
+      .select({
+        id:             intrantsTable.id,
+        nom:            intrantsTable.nom,
+        datePeremption: intrantsTable.datePeremption,
+        stockActuel:    intrantsTable.stockActuel,
+      })
+      .from(intrantsTable)
+      .where(and(
+        eq(intrantsTable.cooperativeId, cooperativeId),
+        eq(intrantsTable.actif, true),
+        isNotNull(intrantsTable.datePeremption),
+        gt(intrantsTable.stockActuel, "0"),
+        lte(intrantsTable.datePeremption, d30),   // seulement ceux qui expirent dans ≤ 30 j
+      ));
+
+    if (intrants.length === 0) return;
+
+    const perimes   = intrants.filter((i) => i.datePeremption! < today);
+    const imminents = intrants.filter((i) => i.datePeremption! >= today && i.datePeremption! <= d7);
+    const proches   = intrants.filter((i) => i.datePeremption! > d7   && i.datePeremption! <= d30);
+
+    const roles = ["pca", "directeur", "magasinier"] as const;
+
+    if (perimes.length > 0) {
+      const noms = perimes.slice(0, 3).map((i) => i.nom).join(", ");
+      const suite = perimes.length > 3 ? ` et ${perimes.length - 3} autre(s)` : "";
+      await notifierParRole(cooperativeId, [...roles], {
+        type:         "peremption_intrant",
+        gravite:      "critique",
+        titre:        `${perimes.length} intrant${perimes.length > 1 ? "s" : ""} périmé${perimes.length > 1 ? "s" : ""} en stock`,
+        message:      `${noms}${suite} ${perimes.length > 1 ? "sont périmés" : "est périmé"} et toujours en stock — retrait urgent recommandé.`,
+        lien:         "/intrants",
+        lienLibelle:  "Gérer les intrants",
+        sourceModule: "intrants",
+      });
+    }
+
+    if (imminents.length > 0) {
+      const noms = imminents.slice(0, 3).map((i) => i.nom).join(", ");
+      const suite = imminents.length > 3 ? ` et ${imminents.length - 3} autre(s)` : "";
+      await notifierParRole(cooperativeId, [...roles], {
+        type:         "peremption_intrant",
+        gravite:      "critique",
+        titre:        `Expiration imminente — ${imminents.length} intrant${imminents.length > 1 ? "s" : ""} dans ≤ 7 jours`,
+        message:      `${noms}${suite} expire${imminents.length > 1 ? "nt" : ""} dans moins de 7 jours. Planifiez la distribution ou le retrait.`,
+        lien:         "/intrants",
+        lienLibelle:  "Gérer les intrants",
+        sourceModule: "intrants",
+      });
+    }
+
+    if (proches.length > 0) {
+      const noms = proches.slice(0, 3).map((i) => i.nom).join(", ");
+      const suite = proches.length > 3 ? ` et ${proches.length - 3} autre(s)` : "";
+      await notifierParRole(cooperativeId, [...roles], {
+        type:         "peremption_intrant",
+        gravite:      "attention",
+        titre:        `${proches.length} intrant${proches.length > 1 ? "s" : ""} expirent dans les 30 jours`,
+        message:      `${noms}${suite} expire${proches.length > 1 ? "nt" : ""} dans moins de 30 jours. Pensez à planifier leur distribution.`,
+        lien:         "/intrants",
+        lienLibelle:  "Gérer les intrants",
+        sourceModule: "intrants",
+      });
+    }
+
+    logger.info(
+      { cooperativeId, perimes: perimes.length, imminents: imminents.length, proches: proches.length },
+      "checkPeremptionIntrants terminé",
+    );
+  } catch (err) {
+    logger.error({ err, cooperativeId }, "Erreur checkPeremptionIntrants (notif)");
+  }
+}
+
 // ─── Entrée principale du CRON ────────────────────────────────────────────────
 
 export async function runNotificationsCron(): Promise<void> {
@@ -171,6 +264,7 @@ export async function runNotificationsCron(): Promise<void> {
       checkEcrituresEnAttente(coopId),
       checkEcheancesEmprunt(coopId),
       checkBudgetDepasse(coopId),
+      checkPeremptionIntrants(coopId),
     ]),
   );
 

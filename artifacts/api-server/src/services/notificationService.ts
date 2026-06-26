@@ -48,7 +48,9 @@ export type NotifType =
   // ── Entrepôts délégués ────────────────────────────────────────────────
   | "transfert_planifie"
   | "transfert_confirme"
-  | "transfert_litige";
+  | "transfert_litige"
+  // ── Intrants ──────────────────────────────────────────
+  | "peremption_intrant";
 
 export type NotifGravite = "info" | "attention" | "critique";
 
@@ -96,6 +98,8 @@ const PREF_COL: Record<NotifType, keyof typeof preferencesNotificationsTable.$in
   // Expéditions port
   expedition_arrivee_port:  "notifMessageRecu",
   expedition_litige:        "notifAnomalieCritique",
+  // Intrants
+  peremption_intrant:       "notifStockFaible",
   // Entrepôts délégués
   transfert_planifie:       "notifMessageRecu",
   transfert_confirme:       "notifMessageRecu",
