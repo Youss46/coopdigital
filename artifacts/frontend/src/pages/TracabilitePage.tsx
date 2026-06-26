@@ -927,22 +927,30 @@ export default function TracabilitePage() {
     },
   });
 
+  const entrepotSelectionne = entrepots.find((e) => String(e.id) === entrepotId);
+  const entrepotNom = entrepotSelectionne?.nom ?? null;
+  const pourFournisseurs = entrepotSelectionne?.pourFournisseursExt === true;
+
+  const livraisonsAfficher = livraisonsDispos.filter((l) =>
+    pourFournisseurs
+      ? (l as { fournisseurId?: number | null }).fournisseurId != null
+      : (l as { membreId?: number | null }).membreId != null
+  );
+
   const toggleSelection = (id: number) =>
     setSelection((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
   const toutSelectionner = () => {
-    if (selection.length === livraisonsDispos.length) {
+    if (selection.length === livraisonsAfficher.length) {
       setSelection([]);
     } else {
-      setSelection(livraisonsDispos.map((l) => l.id));
+      setSelection(livraisonsAfficher.map((l) => l.id));
     }
   };
 
-  const poidsSelectionne = livraisonsDispos
+  const poidsSelectionne = livraisonsAfficher
     .filter((l) => selection.includes(l.id))
     .reduce((s, l) => s + parseFloat(l.poidsKg), 0);
-
-  const entrepotNom = entrepots.find((e) => String(e.id) === entrepotId)?.nom ?? null;
 
   const handleCreerLot = () => {
     if (selection.length === 0 || !utilisateur?.cooperativeId) return;
@@ -1155,7 +1163,7 @@ export default function TracabilitePage() {
                 </label>
                 <select
                   value={entrepotId}
-                  onChange={(e) => setEntrepotId(e.target.value)}
+                  onChange={(e) => { setEntrepotId(e.target.value); setSelection([]); }}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 bg-white"
                 >
                   <option value="">— Sélectionner un entrepôt —</option>
@@ -1186,7 +1194,12 @@ export default function TracabilitePage() {
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
               <h3 className="font-semibold text-gray-900">
-                Livraisons disponibles ({livraisonsDispos.length})
+                Livraisons disponibles ({livraisonsAfficher.length})
+                {pourFournisseurs && (
+                  <span className="ml-2 text-xs font-medium text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
+                    Fournisseurs ext.
+                  </span>
+                )}
               </h3>
               <div className="flex items-center gap-3">
                 {selection.length > 0 && (
@@ -1195,20 +1208,24 @@ export default function TracabilitePage() {
                     {formaterPoids(poidsSelectionne)}
                   </span>
                 )}
-                {livraisonsDispos.length > 0 && (
+                {livraisonsAfficher.length > 0 && (
                   <button
                     onClick={toutSelectionner}
                     className="text-xs font-medium text-gray-500 hover:text-[#1a4731] border border-gray-200 px-3 py-1 rounded-lg hover:border-[#1a4731] transition-colors"
                   >
-                    {selection.length === livraisonsDispos.length ? "Tout désélectionner" : "Tout sélectionner"}
+                    {selection.length === livraisonsAfficher.length ? "Tout désélectionner" : "Tout sélectionner"}
                   </button>
                 )}
               </div>
             </div>
 
-            {livraisonsDispos.length === 0 ? (
+            {livraisonsAfficher.length === 0 ? (
               <div className="p-8 text-center text-gray-400 text-sm">
-                Toutes les livraisons sont déjà dans un lot
+                {livraisonsDispos.length === 0
+                  ? "Toutes les livraisons sont déjà dans un lot"
+                  : pourFournisseurs
+                  ? "Aucune livraison fournisseur disponible pour cet entrepôt"
+                  : "Aucune livraison membre disponible"}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1216,7 +1233,9 @@ export default function TracabilitePage() {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="w-10 px-4 py-3"></th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-500">Membre</th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-500">
+                        {pourFournisseurs ? "Fournisseur" : "Membre"}
+                      </th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500">Poids</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">
                         Montant net
@@ -1227,7 +1246,11 @@ export default function TracabilitePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {livraisonsDispos.map((l) => {
+                    {livraisonsAfficher.map((l) => {
+                      const lv = l as typeof l & { fournisseurNom?: string | null; fournisseurPrenoms?: string | null };
+                      const nomAffiche = pourFournisseurs
+                        ? `${lv.fournisseurNom ?? ""} ${lv.fournisseurPrenoms ?? ""}`.trim() || "—"
+                        : `${l.membreNom ?? ""} ${l.membrePrenoms ?? ""}`.trim() || "—";
                       const sel = selection.includes(l.id);
                       return (
                         <tr
@@ -1246,9 +1269,7 @@ export default function TracabilitePage() {
                               {sel && <Check size={10} className="text-white" />}
                             </div>
                           </td>
-                          <td className="px-4 py-3 font-medium text-gray-900">
-                            {l.membreNom} {l.membrePrenoms}
-                          </td>
+                          <td className="px-4 py-3 font-medium text-gray-900">{nomAffiche}</td>
                           <td className="px-4 py-3 text-gray-700">{formaterPoids(l.poidsKg)}</td>
                           <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">
                             {l.montantNetFcfa != null
