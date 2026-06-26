@@ -148,50 +148,67 @@ export async function createFournisseur(req: Request, res: Response) {
     dateExpirationAgrement?: string;
   };
 
-  if (!body.typeFournisseur || !body.nom) {
-    return res.status(400).json({ erreur: "Données manquantes" });
+  if (!body.typeFournisseur || !body.nom?.trim()) {
+    return res.status(400).json({ erreur: "Données manquantes (nom et type requis)" });
   }
   if (body.typeFournisseur === "membre") {
     return res.status(400).json({ erreur: "Utiliser /depuis-membre pour les membres" });
   }
+  if (!["pisteur", "externe"].includes(body.typeFournisseur)) {
+    return res.status(400).json({ erreur: `Type fournisseur invalide : ${body.typeFournisseur}` });
+  }
 
-  const type = body.typeFournisseur as "pisteur" | "externe";
-  const annee = new Date().getFullYear();
-  const countRes = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(fournisseursTable)
-    .where(
-      and(
-        eq(fournisseursTable.cooperativeId, coopId(req)),
-        eq(fournisseursTable.typeFournisseur, type)
-      )
-    );
-  const seq = Number(countRes[0]?.count ?? 0) + 1;
-  const code = genCode(type, annee, seq);
+  try {
+    const cid  = coopId(req);
+    const type = body.typeFournisseur as "pisteur" | "externe";
+    const annee = new Date().getFullYear();
 
-  const [fournisseur] = await db
-    .insert(fournisseursTable)
-    .values({
-      cooperativeId: coopId(req),
-      typeFournisseur: type,
-      code,
-      nom: body.nom,
-      prenoms: body.prenoms,
-      sexe: body.sexe,
-      telephone: body.telephone,
-      section: body.section,
-      nationalite: body.nationalite ?? "Ivoirienne",
-      numeroCni: body.numeroCni,
-      origine: body.origine,
-      dateAdhesion: body.dateAdhesion,
-      lieuNaissance: body.lieuNaissance,
-      statutAgrement: type === "pisteur" ? "agree" : undefined,
-      dateAgrement: body.dateAgrement,
-      dateExpirationAgrement: body.dateExpirationAgrement,
-    })
-    .returning();
+    const countRes = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(fournisseursTable)
+      .where(and(
+        eq(fournisseursTable.cooperativeId, cid),
+        eq(fournisseursTable.typeFournisseur, type),
+      ));
+    const seq  = Number(countRes[0]?.count ?? 0) + 1;
+    const code = genCode(type, annee, seq);
 
-  return res.status(201).json(fournisseur);
+    // Convertit une date ISO string en "YYYY-MM-DD" pour Drizzle mode:"string"
+    const toDate = (v?: string): string | undefined => {
+      if (!v) return undefined;
+      const d = new Date(v);
+      if (isNaN(d.getTime())) return undefined;
+      return d.toISOString().slice(0, 10);
+    };
+
+    const [fournisseur] = await db
+      .insert(fournisseursTable)
+      .values({
+        cooperativeId: cid,
+        typeFournisseur: type,
+        code,
+        nom: body.nom.trim(),
+        prenoms: body.prenoms?.trim() || undefined,
+        sexe: body.sexe || undefined,
+        telephone: body.telephone?.trim() || undefined,
+        section: body.section?.trim() || undefined,
+        nationalite: body.nationalite ?? "Ivoirienne",
+        numeroCni: body.numeroCni?.trim() || undefined,
+        origine: body.origine?.trim() || undefined,
+        dateAdhesion: toDate(body.dateAdhesion),
+        lieuNaissance: body.lieuNaissance?.trim() || undefined,
+        statutAgrement: type === "pisteur" ? "agree" : undefined,
+        dateAgrement: toDate(body.dateAgrement),
+        dateExpirationAgrement: toDate(body.dateExpirationAgrement),
+      })
+      .returning();
+
+    return res.status(201).json(fournisseur);
+  } catch (err) {
+    req.log.error({ err }, "Erreur createFournisseur");
+    const msg = (err as { detail?: string })?.detail ?? (err as Error)?.message ?? "Erreur interne";
+    return res.status(500).json({ erreur: msg });
+  }
 }
 
 export async function createFournisseurDepuisMembre(req: Request, res: Response) {

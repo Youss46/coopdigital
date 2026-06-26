@@ -121,11 +121,14 @@ export default function FournisseursPage() {
         toast({ title: "Fournisseur mis à jour" });
       } else {
         await createMut.mutateAsync({ data: form as FournisseurInput });
-        toast({ title: "Fournisseur créé" });
+        toast({ title: "Fournisseur créé avec succès" });
       }
       setShowForm(false);
-    } catch {
-      toast({ title: "Erreur lors de la sauvegarde", variant: "destructive" });
+    } catch (err) {
+      const detail =
+        (err as { data?: { erreur?: string } })?.data?.erreur
+        ?? (err instanceof Error ? err.message : "Erreur lors de la sauvegarde");
+      toast({ title: detail, variant: "destructive" });
     }
   }
 
