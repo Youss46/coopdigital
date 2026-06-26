@@ -233,6 +233,19 @@ function TabEtatsFinanciers() {
               ? <><span className="animate-spin">⏳</span> Génération…</>
               : <><Download size={14} /> Télécharger le Compte de résultat {ANNEE}</>}
           </button>
+          <button
+            onClick={() => telechargerEtat(
+              `${BASE}/api/rapports/etats-financiers/flux-tresorerie?exercice=${ANNEE}`,
+              `flux_tresorerie_${ANNEE}.pdf`,
+              "flux",
+            )}
+            disabled={loadingPdf === "flux"}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60"
+          >
+            {loadingPdf === "flux"
+              ? <><span className="animate-spin">⏳</span> Génération…</>
+              : <><Download size={14} /> Télécharger les Flux de trésorerie {ANNEE}</>}
+          </button>
         </div>
       )}
 

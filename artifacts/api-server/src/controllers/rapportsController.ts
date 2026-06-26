@@ -5,6 +5,7 @@ import {
   generateBilanCampagne,
   generateBilanOHADA,
   generateCompteResultatOHADA,
+  generateFluxTresoreiriePdf,
   generateRecuLivraison,
   generateRecuPaiement,
   generateBulletinPaie,
@@ -253,5 +254,18 @@ export async function getCompteResultatOHADAPdf(req: Request, res: Response): Pr
   } catch (err) {
     req.log.error({ err }, "Erreur getCompteResultatOHADAPdf");
     res.status(500).json({ erreur: "Erreur génération PDF compte de résultat" });
+  }
+}
+
+export async function getFluxTresoreiriePdf(req: Request, res: Response): Promise<void> {
+  const exercice = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : new Date().getFullYear();
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const buffer = await generateFluxTresoreiriePdf(cooperativeId, exercice);
+    sendPdf(res, buffer, `flux_tresorerie_${exercice}.pdf`);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getFluxTresoreiriePdf");
+    res.status(500).json({ erreur: "Erreur génération PDF flux de trésorerie" });
   }
 }

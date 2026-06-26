@@ -3246,3 +3246,137 @@ export async function generateCompteResultatOHADA(cooperativeId: number, exercic
   doc.end();
   return endPromise;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tableau des flux de tresorerie OHADA
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateFluxTresoreiriePdf(cooperativeId: number, exercice: number): Promise<Buffer> {
+  const rows = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(CASE WHEN compte_debit  = '521' AND source = 'paiement'  THEN montant_fcfa ELSE 0 END), 0)::int AS "encaissementsExportateurs",
+      COALESCE(SUM(CASE WHEN compte_credit = '521' AND source = 'livraison' THEN montant_fcfa ELSE 0 END), 0)::int AS "paiementsProducteurs",
+      COALESCE(SUM(CASE WHEN compte_credit = '521' AND source = 'avance'    THEN montant_fcfa ELSE 0 END), 0)::int AS "avancesOctroyes",
+      COALESCE(SUM(CASE WHEN compte_debit  = '521' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalEntrees",
+      COALESCE(SUM(CASE WHEN compte_credit = '521' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalSorties"
+    FROM ecritures_comptables
+    WHERE cooperative_id = ${cooperativeId} AND exercice = ${exercice}
+  `);
+
+  const r = rows.rows[0] as {
+    encaissementsExportateurs: number;
+    paiementsProducteurs: number;
+    avancesOctroyes: number;
+    totalEntrees: number;
+    totalSorties: number;
+  };
+
+  const encaissements    = r?.encaissementsExportateurs ?? 0;
+  const paiements        = r?.paiementsProducteurs      ?? 0;
+  const avances          = r?.avancesOctroyes           ?? 0;
+  const totalEntrees     = r?.totalEntrees              ?? 0;
+  const totalSorties     = r?.totalSorties              ?? 0;
+  const fluxExploitation = encaissements - paiements;
+  const fluxFinancement  = -avances;
+  const soldeFinal       = totalEntrees - totalSorties;
+
+  const { doc, endPromise } = makePdfDoc();
+  const W    = PAGE_W - 2 * MARGIN;
+  const ROW_H = 18;
+  const COL1  = W * 0.65;
+
+  await drawHeader(doc, cooperativeId, {
+    titre_document: `Tableau des flux de tresorerie — Exercice ${exercice}`,
+  });
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+    .text(`Exercice clos le 31 decembre ${exercice}  —  Unite : FCFA`, MARGIN, doc.y, { width: W, align: "right" });
+  doc.moveDown(0.8);
+
+  function sectionTitre(titre: string) {
+    const y = doc.y;
+    doc.rect(MARGIN, y, W, ROW_H).fill(VERT);
+    doc.fontSize(8).fillColor("white").font("Helvetica-Bold")
+      .text(titre, MARGIN + 6, y + 5, { width: W - 12, lineBreak: false });
+    doc.y = y + ROW_H + 1;
+  }
+
+  function ligneDonnee(libelle: string, montant: number, bg: string, bold = false, txtColor = "black") {
+    const y = doc.y;
+    doc.rect(MARGIN, y, W, ROW_H).fill(bg);
+    const font = bold ? "Helvetica-Bold" : "Helvetica";
+    doc.fontSize(8).fillColor(txtColor).font(font)
+      .text(libelle, MARGIN + 6, y + 5, { width: COL1 - 6, lineBreak: false });
+    const txt = montant >= 0 ? formaterFCFA(montant) : `(${formaterFCFA(Math.abs(montant))})`;
+    doc.fontSize(8).fillColor(montant < 0 ? "#dc2626" : txtColor).font(font)
+      .text(txt, MARGIN + COL1, y + 5, { width: W - COL1 - 6, align: "right", lineBreak: false });
+    doc.y = y + ROW_H + 1;
+  }
+
+  // En-tête colonnes
+  const yH = doc.y;
+  doc.rect(MARGIN, yH, W, ROW_H - 4).fill("#f3f4f6");
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica-Bold")
+    .text("Description", MARGIN + 6, yH + 4, { width: COL1 - 6, lineBreak: false })
+    .text("Montant (FCFA)", MARGIN + COL1, yH + 4, { width: W - COL1 - 6, align: "right", lineBreak: false });
+  doc.y = yH + ROW_H - 4 + 4;
+
+  // Section I — Exploitation
+  sectionTitre("I. FLUX D'EXPLOITATION (activites operationnelles)");
+  ligneDonnee("Encaissements sur ventes exportateurs",      encaissements, "#f0fdf4");
+  ligneDonnee("(-) Paiements aux producteurs",              -paiements,    "#fef2f2");
+  doc.moveDown(0.3);
+  ligneDonnee("= Flux net d'exploitation", fluxExploitation, "#dcfce7", true,
+    fluxExploitation >= 0 ? VERT : "#dc2626");
+
+  doc.moveDown(0.8);
+
+  // Section II — Financement
+  sectionTitre("II. FLUX DE FINANCEMENT");
+  ligneDonnee("Avances consenties aux membres (decaissements)", -avances, "#fffbeb");
+  doc.moveDown(0.3);
+  ligneDonnee("= Flux net de financement", fluxFinancement, "#fef9c3", true,
+    fluxFinancement >= 0 ? VERT : "#b45309");
+
+  doc.moveDown(0.8);
+
+  // Section III — Autres
+  const autresMvts = soldeFinal - fluxExploitation - fluxFinancement;
+  sectionTitre("III. AUTRES MOUVEMENTS (caisse, banque, divers)");
+  ligneDonnee("Autres flux de tresorerie nets", autresMvts, "#f9fafb");
+
+  doc.moveDown(1);
+
+  // Solde final
+  const ySolde = doc.y;
+  const soldeBg = soldeFinal >= 0 ? "#166534" : "#991b1b";
+  doc.rect(MARGIN, ySolde, W, ROW_H + 4).fill(soldeBg);
+  doc.fontSize(10).fillColor("white").font("Helvetica-Bold")
+    .text("SOLDE FINAL DE TRESORERIE", MARGIN + 6, ySolde + 6, { width: COL1 - 6, lineBreak: false })
+    .text(
+      formaterFCFA(Math.abs(soldeFinal)) + (soldeFinal < 0 ? " (deficit)" : ""),
+      MARGIN + COL1, ySolde + 6, { width: W - COL1 - 6, align: "right", lineBreak: false },
+    );
+  doc.y = ySolde + ROW_H + 4 + 12;
+
+  // Recap numerique
+  const yR = doc.y;
+  doc.rect(MARGIN, yR, W, 1).fill("#e5e7eb");
+  doc.y = yR + 8;
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica")
+    .text(`Total entrees de fonds  : ${formaterFCFA(totalEntrees)}`, MARGIN, doc.y)
+    .text(`Total sorties de fonds  : ${formaterFCFA(totalSorties)}`, MARGIN, doc.y)
+    .text(`Variation nette         : ${soldeFinal >= 0 ? "+" : ""}${formaterFCFA(soldeFinal)}`, MARGIN, doc.y);
+
+  doc.moveDown(1);
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica-Oblique")
+    .text(
+      `Le present tableau est etabli conformement au Systeme Comptable OHADA (methode indirecte simplifiee). ` +
+      `Les flux sont calcules sur la base des ecritures comptables de l'exercice ${exercice}. ` +
+      `Les montants entre parentheses representent des sorties nettes de tresorerie. ` +
+      `Document genere le ${formaterDate(new Date())} par CoopDigital.`,
+      MARGIN, doc.y, { width: W },
+    );
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
