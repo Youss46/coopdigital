@@ -379,6 +379,13 @@
       "when": 1782922400000,
       "tag": "0053_fournisseurs_agrement_ifnotexists",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1782922460000,
+      "tag": "0054_fournisseurs_code_unique_per_coop",
+      "breakpoints": true
     }
   ]
 }

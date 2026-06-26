@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, boolean, date, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean, date, timestamp, pgEnum, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { cooperativesTable } from "./cooperatives";
@@ -11,7 +11,7 @@ export const fournisseursTable = pgTable("fournisseurs", {
   cooperativeId: integer("cooperative_id").notNull().references(() => cooperativesTable.id),
   typeFournisseur: fournisseurTypeEnum("type_fournisseur").notNull(),
   membreId: integer("membre_id").references(() => membresTable.id),
-  code: text("code").unique(),
+  code: text("code"),
   nom: text("nom").notNull(),
   prenoms: text("prenoms"),
   sexe: text("sexe"),
@@ -30,7 +30,9 @@ export const fournisseursTable = pgTable("fournisseurs", {
   actif: boolean("actif").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  unique("fournisseurs_cooperative_id_code_unique").on(t.cooperativeId, t.code),
+]);
 
 export const insertFournisseurSchema = createInsertSchema(fournisseursTable).omit({
   id: true,
