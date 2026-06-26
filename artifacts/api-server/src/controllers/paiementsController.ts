@@ -441,9 +441,12 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         nom: membresTable.nom,
         prenoms: membresTable.prenoms,
         membreDelegueId: membresTable.delegueId,
+        fournisseurCoopId: fournisseursTable.cooperativeId,
       })
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
+      .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
+      .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .where(eq(paiementsTable.id, id))
       .limit(1);
 
@@ -451,7 +454,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       res.status(404).json({ erreur: "Paiement introuvable" });
       return;
     }
-    if (row.membreCoopId !== cooperativeId) {
+    if (row.membreCoopId !== cooperativeId && row.fournisseurCoopId !== cooperativeId) {
       res.status(403).json({ erreur: "Ce paiement n'appartient pas à votre coopérative" });
       return;
     }
@@ -656,9 +659,12 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
         membreCoopId: membresTable.cooperativeId,
         telephone: membresTable.telephone,
         nom: membresTable.nom,
+        fournisseurCoopId: fournisseursTable.cooperativeId,
       })
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
+      .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
+      .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .where(eq(paiementsTable.id, id))
       .limit(1);
 
@@ -666,7 +672,7 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
       res.status(404).json({ erreur: "Paiement introuvable" });
       return;
     }
-    if (row.membreCoopId !== cooperativeId) {
+    if (row.membreCoopId !== cooperativeId && row.fournisseurCoopId !== cooperativeId) {
       res.status(403).json({ erreur: "Ce paiement n'appartient pas à votre coopérative" });
       return;
     }
