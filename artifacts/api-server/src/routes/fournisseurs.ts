@@ -9,12 +9,16 @@ import {
   updateFournisseur,
   updateAgrement,
   getRapportTypeFournisseur,
+  getStockFournisseurs,
+  createVenteFournisseur,
 } from "../controllers/fournisseursController";
 
 const router = Router();
 
 router.get("/fournisseurs/search", checkPermission("fournisseurs", "lire"), searchFournisseurs);
 router.get("/fournisseurs/rapport-type", checkPermission("fournisseurs", "lire"), getRapportTypeFournisseur);
+router.get("/fournisseurs/stock-disponible", checkPermission("exportateurs", "lire"), getStockFournisseurs);
+router.post("/fournisseurs/vente", checkPermission("exportateurs", "creer"), createVenteFournisseur);
 router.get("/fournisseurs", checkPermission("fournisseurs", "lire"), listFournisseurs);
 router.get("/fournisseurs/:id", checkPermission("fournisseurs", "lire"), getFournisseurById);
 router.post("/fournisseurs/depuis-membre/:id", checkPermission("fournisseurs", "creer"), createFournisseurDepuisMembre);

@@ -74,6 +74,24 @@ const VENTE_INIT = {
   dateEcheanceReglement:  "",
 };
 
+const VENTE_FOURN_INIT = {
+  fournisseurId:          "",
+  exportateurId:          "",
+  poidsKg:                "",
+  prixUnitaireFcfa:       "",
+  dateVente:              new Date().toISOString().split("T")[0]!,
+  dateEcheanceReglement:  "",
+};
+
+interface StockFournisseur {
+  id: number;
+  nom: string;
+  prenoms: string | null;
+  type_fournisseur: string;
+  poids_disponible_kg: string;
+  nb_livraisons: number;
+}
+
 export default function VentesPage() {
   const { token } = useAuth();
   const { toast } = useToast();
@@ -88,6 +106,9 @@ export default function VentesPage() {
   const [modalEncaisse, setModalEncaisse]     = useState<number | null>(null);
   const [montantEncaisse, setMontantEncaisse] = useState("");
   const [form, setForm]                       = useState(VENTE_INIT);
+  const [sourceStock, setSourceStock]         = useState<"lots" | "fournisseur">("lots");
+  const [formFourn, setFormFourn]             = useState(VENTE_FOURN_INIT);
+  const [submittingFourn, setSubmittingFourn] = useState(false);
 
   const { data: ventes = [], isLoading } = useGetVentes({}, {
     query: { queryKey: getGetVentesQueryKey({}) },
@@ -96,7 +117,13 @@ export default function VentesPage() {
   const { data: lotsEnStock = [] } = useQuery<LotDisponible[]>({
     queryKey: ["ventes-lots-stock"],
     queryFn:  () => apiFetch("/api/lots?statut=en_stock", token),
-    enabled:  modalVente,
+    enabled:  modalVente && sourceStock === "lots",
+  });
+
+  const { data: stockFournisseurs = [] } = useQuery<StockFournisseur[]>({
+    queryKey: ["ventes-stock-fournisseurs"],
+    queryFn:  () => apiFetch("/api/fournisseurs/stock-disponible", token),
+    enabled:  modalVente && sourceStock === "fournisseur",
   });
   const { data: prixActuel } = useQuery<{ prixVenteExportFcfa: string } | null>({
     queryKey: ["prix-actuel"],
@@ -142,7 +169,56 @@ export default function VentesPage() {
       ? String(Math.round(parseFloat(prixActuel.prixVenteExportFcfa)))
       : "";
     setForm({ ...VENTE_INIT, prixUnitaireFcfa: prixExport });
+    setFormFourn({ ...VENTE_FOURN_INIT, prixUnitaireFcfa: prixExport });
+    setSourceStock("lots");
     setModalVente(true);
+  }
+
+  function handleFournisseurChange(fournisseurId: string) {
+    const sf = stockFournisseurs.find(f => String(f.id) === fournisseurId);
+    setFormFourn(f => ({
+      ...f,
+      fournisseurId,
+      poidsKg: sf ? parseFloat(sf.poids_disponible_kg).toFixed(2) : f.poidsKg,
+    }));
+  }
+
+  async function handleSubmitVenteFournisseur() {
+    if (!formFourn.fournisseurId) { toast({ title: "Fournisseur requis", variant: "destructive" }); return; }
+    if (!formFourn.exportateurId) { toast({ title: "Exportateur requis", variant: "destructive" }); return; }
+    if (!formFourn.poidsKg || parseFloat(formFourn.poidsKg) <= 0) { toast({ title: "Poids requis", variant: "destructive" }); return; }
+    if (!formFourn.prixUnitaireFcfa || parseInt(formFourn.prixUnitaireFcfa) <= 0) { toast({ title: "Prix unitaire requis", variant: "destructive" }); return; }
+    if (!formFourn.dateVente) { toast({ title: "Date de vente requise", variant: "destructive" }); return; }
+
+    setSubmittingFourn(true);
+    try {
+      const BASE = import.meta.env.VITE_API_URL ?? "";
+      const res = await fetch(`${BASE}/api/fournisseurs/vente`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          fournisseurId:         parseInt(formFourn.fournisseurId),
+          exportateurId:         parseInt(formFourn.exportateurId),
+          poidsKg:               parseFloat(formFourn.poidsKg),
+          prixUnitaireFcfa:      parseInt(formFourn.prixUnitaireFcfa),
+          dateVente:             formFourn.dateVente,
+          dateEcheanceReglement: formFourn.dateEcheanceReglement || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({})) as { erreur?: string };
+        throw new Error(errBody.erreur ?? `HTTP ${res.status}`);
+      }
+      qc.invalidateQueries({ queryKey: getGetVentesQueryKey({}) });
+      qc.invalidateQueries({ queryKey: ["ventes-stock-fournisseurs"] });
+      setModalVente(false);
+      setFormFourn(VENTE_FOURN_INIT);
+      toast({ title: "Vente enregistrée", description: "Le lot fournisseur est créé et marqué comme vendu." });
+    } catch (err) {
+      toast({ title: "Erreur", description: err instanceof Error ? err.message : "Erreur interne", variant: "destructive" });
+    } finally {
+      setSubmittingFourn(false);
+    }
   }
 
   function handleLotChange(lotId: string) {
@@ -398,138 +474,207 @@ export default function VentesPage() {
             </div>
 
             <div className="px-6 py-5 space-y-4">
-              {/* Sélecteur de lot */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Lot à vendre</label>
-                <select
-                  value={form.lotId}
-                  onChange={e => handleLotChange(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+              {/* Toggle source */}
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                <button
+                  onClick={() => setSourceStock("lots")}
+                  className={`flex-1 py-2 text-sm font-medium transition ${sourceStock === "lots" ? "bg-green-700 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
                 >
-                  <option value="">— Saisie libre (sans lot) —</option>
-                  {lotsEnStock.map(lot => (
-                    <option key={lot.id} value={String(lot.id)}>
-                      LOT-{String(lot.id).padStart(4,"0")} • {parseFloat(lot.poidsTotalKg).toLocaleString("fr-FR")} kg
-                      {lot.entrepot ? ` • ${lot.entrepot}` : ""}
-                    </option>
-                  ))}
-                </select>
-                {lotSelectionne && (
-                  <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-green-800 font-medium">
-                        LOT-{String(lotSelectionne.id).padStart(4,"0")}
-                      </span>
-                      <span className="text-green-700 font-bold">
-                        {parseFloat(lotSelectionne.poidsTotalKg).toLocaleString("fr-FR")} kg
-                      </span>
+                  📦 Lots membres
+                </button>
+                <button
+                  onClick={() => setSourceStock("fournisseur")}
+                  className={`flex-1 py-2 text-sm font-medium transition border-l border-gray-200 ${sourceStock === "fournisseur" ? "bg-purple-700 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+                >
+                  🤝 Stock fournisseur
+                </button>
+              </div>
+
+              {sourceStock === "lots" ? (<>
+                {/* Sélecteur de lot */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Lot à vendre</label>
+                  <select
+                    value={form.lotId}
+                    onChange={e => handleLotChange(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  >
+                    <option value="">— Saisie libre (sans lot) —</option>
+                    {lotsEnStock.map(lot => (
+                      <option key={lot.id} value={String(lot.id)}>
+                        LOT-{String(lot.id).padStart(4,"0")} • {parseFloat(lot.poidsTotalKg).toLocaleString("fr-FR")} kg
+                        {lot.entrepot ? ` • ${lot.entrepot}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {lotSelectionne && (
+                    <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-green-800 font-medium">LOT-{String(lotSelectionne.id).padStart(4,"0")}</span>
+                        <span className="text-green-700 font-bold">{parseFloat(lotSelectionne.poidsTotalKg).toLocaleString("fr-FR")} kg</span>
+                      </div>
+                      <p className="text-xs text-green-600 mt-0.5">
+                        {lotSelectionne.entrepot ? `📦 ${lotSelectionne.entrepot} • ` : ""}
+                        Créé le {formaterDate(lotSelectionne.dateCreation)}
+                        {lotSelectionne.nbLivraisons ? ` • ${lotSelectionne.nbLivraisons} livraison(s)` : ""}
+                      </p>
                     </div>
-                    <p className="text-xs text-green-600 mt-0.5">
-                      {lotSelectionne.entrepot ? `📦 ${lotSelectionne.entrepot} • ` : ""}
-                      Créé le {formaterDate(lotSelectionne.dateCreation)}
-                      {lotSelectionne.nbLivraisons ? ` • ${lotSelectionne.nbLivraisons} livraison(s)` : ""}
-                    </p>
+                  )}
+                  {lotsEnStock.length === 0 && (
+                    <p className="text-xs text-orange-600 mt-1">⚠️ Aucun lot en stock. Créez des lots depuis le module Traçabilité.</p>
+                  )}
+                </div>
+
+                {/* Exportateur */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Exportateur *</label>
+                  <select value={form.exportateurId} onChange={e => setForm(f => ({ ...f, exportateurId: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+                    <option value="">— Sélectionner —</option>
+                    {exportateurs.map(exp => <option key={exp.id} value={String(exp.id)}>{exp.nom}{exp.ville ? ` (${exp.ville})` : ""}</option>)}
+                  </select>
+                </div>
+
+                {/* Poids + Prix */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Poids vendu (kg) *</label>
+                    <input type="number" step="0.01" value={form.poidsKg}
+                      onChange={e => setForm(f => ({ ...f, poidsKg: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="18 500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Prix unitaire (FCFA/kg) *
+                      {prixActuel?.prixVenteExportFcfa && <span className="ml-1 text-green-600 font-normal text-xs">· suivi des prix</span>}
+                    </label>
+                    <input type="number" value={form.prixUnitaireFcfa}
+                      onChange={e => setForm(f => ({ ...f, prixUnitaireFcfa: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="1 200" />
+                  </div>
+                </div>
+
+                {montantEstime !== null && (
+                  <div className="flex items-center justify-between px-4 py-3 bg-green-50 border border-green-200 rounded-lg">
+                    <span className="text-sm text-green-800 font-medium">Montant total estimé</span>
+                    <span className="text-lg font-bold text-green-900">{formaterFCFA(montantEstime)}</span>
                   </div>
                 )}
-                {lotsEnStock.length === 0 && (
-                  <p className="text-xs text-orange-600 mt-1">⚠️ Aucun lot en stock. Créez des lots depuis le module Traçabilité.</p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Date de vente *</label>
+                    <input type="date" value={form.dateVente} onChange={e => setForm(f => ({ ...f, dateVente: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Date d'échéance règlement</label>
+                    <input type="date" value={form.dateEcheanceReglement} onChange={e => setForm(f => ({ ...f, dateEcheanceReglement: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-400 border-t border-gray-100 pt-3">
+                  Les écritures comptables sont générées automatiquement. Le lot sélectionné sera marqué comme <strong>vendu</strong>.
+                </p>
+              </>) : (<>
+                {/* ── Formulaire Stock Fournisseur ── */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Pisteur / fournisseur *</label>
+                  <select value={formFourn.fournisseurId} onChange={e => handleFournisseurChange(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600">
+                    <option value="">— Sélectionner —</option>
+                    {stockFournisseurs.map(sf => (
+                      <option key={sf.id} value={String(sf.id)}>
+                        {sf.nom}{sf.prenoms ? ` ${sf.prenoms}` : ""} — {parseFloat(sf.poids_disponible_kg).toLocaleString("fr-FR")} kg dispo ({sf.nb_livraisons} livr.)
+                      </option>
+                    ))}
+                  </select>
+                  {stockFournisseurs.length === 0 && (
+                    <p className="text-xs text-orange-600 mt-1">⚠️ Aucun stock fournisseur disponible (toutes les livraisons sont déjà en lot).</p>
+                  )}
+                  {formFourn.fournisseurId && (() => {
+                    const sf = stockFournisseurs.find(f => String(f.id) === formFourn.fournisseurId);
+                    return sf ? (
+                      <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-center justify-between text-xs">
+                        <span className="text-purple-800 font-medium">Stock disponible</span>
+                        <span className="text-purple-700 font-bold">{parseFloat(sf.poids_disponible_kg).toLocaleString("fr-FR")} kg • {sf.nb_livraisons} livraison(s)</span>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Exportateur *</label>
+                  <select value={formFourn.exportateurId} onChange={e => setFormFourn(f => ({ ...f, exportateurId: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600">
+                    <option value="">— Sélectionner —</option>
+                    {exportateurs.map(exp => <option key={exp.id} value={String(exp.id)}>{exp.nom}{exp.ville ? ` (${exp.ville})` : ""}</option>)}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Poids vendu (kg) *</label>
+                    <input type="number" step="0.01" value={formFourn.poidsKg}
+                      onChange={e => setFormFourn(f => ({ ...f, poidsKg: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Prix unitaire (FCFA/kg) *
+                      {prixActuel?.prixVenteExportFcfa && <span className="ml-1 text-purple-600 font-normal text-xs">· suivi des prix</span>}
+                    </label>
+                    <input type="number" value={formFourn.prixUnitaireFcfa}
+                      onChange={e => setFormFourn(f => ({ ...f, prixUnitaireFcfa: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="1 200" />
+                  </div>
+                </div>
+
+                {formFourn.poidsKg && formFourn.prixUnitaireFcfa && (
+                  <div className="flex items-center justify-between px-4 py-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <span className="text-sm text-purple-800 font-medium">Montant total estimé</span>
+                    <span className="text-lg font-bold text-purple-900">{formaterFCFA(Math.round(parseFloat(formFourn.poidsKg) * parseInt(formFourn.prixUnitaireFcfa)))}</span>
+                  </div>
                 )}
-              </div>
 
-              {/* Exportateur */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Exportateur *</label>
-                <select
-                  value={form.exportateurId}
-                  onChange={e => setForm(f => ({ ...f, exportateurId: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                >
-                  <option value="">— Sélectionner —</option>
-                  {exportateurs.map(exp => (
-                    <option key={exp.id} value={String(exp.id)}>{exp.nom}{exp.ville ? ` (${exp.ville})` : ""}</option>
-                  ))}
-                </select>
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Date de vente *</label>
+                    <input type="date" value={formFourn.dateVente} onChange={e => setFormFourn(f => ({ ...f, dateVente: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Date d'échéance règlement</label>
+                    <input type="date" value={formFourn.dateEcheanceReglement} onChange={e => setFormFourn(f => ({ ...f, dateEcheanceReglement: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" />
+                  </div>
+                </div>
 
-              {/* Poids + Prix */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Poids vendu (kg) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={form.poidsKg}
-                    onChange={e => setForm(f => ({ ...f, poidsKg: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                    placeholder="18 500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Prix unitaire (FCFA/kg) *
-                    {prixActuel?.prixVenteExportFcfa && (
-                      <span className="ml-1 text-green-600 font-normal text-xs">· suivi des prix</span>
-                    )}
-                  </label>
-                  <input
-                    type="number"
-                    value={form.prixUnitaireFcfa}
-                    onChange={e => setForm(f => ({ ...f, prixUnitaireFcfa: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                    placeholder="1 200"
-                  />
-                </div>
-              </div>
-
-              {/* Montant estimé */}
-              {montantEstime !== null && (
-                <div className="flex items-center justify-between px-4 py-3 bg-green-50 border border-green-200 rounded-lg">
-                  <span className="text-sm text-green-800 font-medium">Montant total estimé</span>
-                  <span className="text-lg font-bold text-green-900">{formaterFCFA(montantEstime)}</span>
-                </div>
-              )}
-
-              {/* Dates */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Date de vente *</label>
-                  <input
-                    type="date"
-                    value={form.dateVente}
-                    onChange={e => setForm(f => ({ ...f, dateVente: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Date d'échéance règlement</label>
-                  <input
-                    type="date"
-                    value={form.dateEcheanceReglement}
-                    onChange={e => setForm(f => ({ ...f, dateEcheanceReglement: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                  />
-                </div>
-              </div>
-
-              <p className="text-xs text-gray-400 border-t border-gray-100 pt-3">
-                Les écritures comptables sont générées automatiquement. Le lot sélectionné sera marqué comme <strong>vendu</strong>.
-              </p>
+                <p className="text-xs text-gray-400 border-t border-gray-100 pt-3">
+                  Un lot est créé automatiquement depuis toutes les livraisons disponibles du fournisseur, puis lié à la vente.
+                </p>
+              </>)}
             </div>
 
             <div className="px-6 pb-5 flex gap-3 sticky bottom-0 bg-white border-t border-gray-100 pt-4">
               <button
-                onClick={() => { setModalVente(false); setForm(VENTE_INIT); }}
+                onClick={() => { setModalVente(false); setForm(VENTE_INIT); setFormFourn(VENTE_FOURN_INIT); }}
                 className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Annuler
               </button>
-              <button
-                onClick={handleSubmitVente}
-                disabled={mutVente.isPending}
-                className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium bg-green-700 hover:bg-green-800 disabled:opacity-50"
-              >
-                {mutVente.isPending ? "Enregistrement…" : "Enregistrer la vente →"}
-              </button>
+              {sourceStock === "lots" ? (
+                <button onClick={handleSubmitVente} disabled={mutVente.isPending}
+                  className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium bg-green-700 hover:bg-green-800 disabled:opacity-50">
+                  {mutVente.isPending ? "Enregistrement…" : "Enregistrer la vente →"}
+                </button>
+              ) : (
+                <button onClick={handleSubmitVenteFournisseur} disabled={submittingFourn}
+                  className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium bg-purple-700 hover:bg-purple-800 disabled:opacity-50">
+                  {submittingFourn ? "Enregistrement…" : "Enregistrer la vente →"}
+                </button>
+              )}
             </div>
           </div>
         </div>

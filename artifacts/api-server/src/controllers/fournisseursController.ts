@@ -1,7 +1,8 @@
 import { type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { fournisseursTable, membresTable, livraisonsTable } from "@workspace/db";
-import { eq, and, or, ilike, desc, sql } from "drizzle-orm";
+import { fournisseursTable, membresTable, livraisonsTable, lotsTable, lotLivraisonsTable, ventesExportateursTable, campagnesTable, exportateursTable } from "@workspace/db";
+import { eq, and, or, ilike, desc, sql, isNull, inArray } from "drizzle-orm";
+import { generateEcrituresVente } from "../services/comptabiliteService.js";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -370,4 +371,172 @@ export async function getRapportTypeFournisseur(req: Request, res: Response) {
     .groupBy(fournisseursTable.typeFournisseur);
 
   return res.json(result);
+}
+
+// ─── GET /fournisseurs/stock-disponible ───────────────────────────────────────
+// Retourne les fournisseurs ayant du stock non encore attribué à un lot.
+
+export async function getStockFournisseurs(req: Request, res: Response) {
+  const cid = coopId(req);
+
+  const rows = await db.execute<{
+    id: number;
+    nom: string;
+    prenoms: string | null;
+    type_fournisseur: string;
+    poids_disponible_kg: string;
+    nb_livraisons: number;
+  }>(sql`
+    SELECT
+      f.id,
+      f.nom,
+      f.prenoms,
+      f.type_fournisseur,
+      COALESCE(SUM(l.poids_kg::numeric), 0)::text AS poids_disponible_kg,
+      COUNT(l.id)::int                             AS nb_livraisons
+    FROM fournisseurs f
+    JOIN livraisons l
+      ON l.fournisseur_id = f.id
+    LEFT JOIN lot_livraisons ll
+      ON ll.livraison_id = l.id
+    WHERE f.cooperative_id = ${cid}
+      AND f.actif = true
+      AND ll.livraison_id IS NULL
+    GROUP BY f.id, f.nom, f.prenoms, f.type_fournisseur
+    HAVING SUM(l.poids_kg::numeric) > 0
+    ORDER BY f.nom
+  `);
+
+  return res.json(rows.rows);
+}
+
+// ─── POST /fournisseurs/vente ─────────────────────────────────────────────────
+// Crée automatiquement un lot depuis les livraisons non encore attribuées d'un
+// fournisseur, puis enregistre la vente à l'exportateur.
+
+export async function createVenteFournisseur(req: Request, res: Response) {
+  const cooperativeId = coopId(req);
+
+  const body = req.body as {
+    fournisseurId?: unknown;
+    exportateurId?: unknown;
+    poidsKg?: unknown;
+    prixUnitaireFcfa?: unknown;
+    dateVente?: unknown;
+    dateEcheanceReglement?: unknown;
+  };
+
+  const fournisseurId   = typeof body.fournisseurId   === "number" ? body.fournisseurId   : parseInt(String(body.fournisseurId   ?? "0"));
+  const exportateurId   = typeof body.exportateurId   === "number" ? body.exportateurId   : parseInt(String(body.exportateurId   ?? "0"));
+  const poidsKg         = typeof body.poidsKg         === "number" ? body.poidsKg         : parseFloat(String(body.poidsKg       ?? "0"));
+  const prixUnitaireFcfa = typeof body.prixUnitaireFcfa === "number" ? body.prixUnitaireFcfa : parseInt(String(body.prixUnitaireFcfa ?? "0"));
+  const dateVente        = typeof body.dateVente === "string" ? body.dateVente : "";
+  const dateEcheance     = typeof body.dateEcheanceReglement === "string" && body.dateEcheanceReglement ? body.dateEcheanceReglement : null;
+
+  if (!fournisseurId || !exportateurId || poidsKg <= 0 || prixUnitaireFcfa <= 0 || !dateVente) {
+    res.status(400).json({ erreur: "fournisseurId, exportateurId, poidsKg, prixUnitaireFcfa et dateVente sont requis" });
+    return;
+  }
+
+  // 1. Vérifier que le fournisseur appartient à la coop
+  const [fourn] = await db
+    .select({ id: fournisseursTable.id, nom: fournisseursTable.nom, prenoms: fournisseursTable.prenoms })
+    .from(fournisseursTable)
+    .where(and(eq(fournisseursTable.id, fournisseurId), eq(fournisseursTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!fourn) {
+    res.status(403).json({ erreur: "Fournisseur introuvable ou non autorisé" });
+    return;
+  }
+
+  // 2. Récupérer les livraisons non encore en lot
+  const livraisonsDispos = await db.execute<{ id: number; poids_kg: string }>(sql`
+    SELECT l.id, l.poids_kg
+    FROM livraisons l
+    LEFT JOIN lot_livraisons ll ON ll.livraison_id = l.id
+    WHERE l.fournisseur_id = ${fournisseurId}
+      AND ll.livraison_id IS NULL
+  `);
+
+  if (livraisonsDispos.rows.length === 0) {
+    res.status(400).json({ erreur: "Aucune livraison disponible (non encore en lot) pour ce fournisseur" });
+    return;
+  }
+
+  // 3. Vérifier l'exportateur
+  const [exp] = await db
+    .select({ id: exportateursTable.id, nom: exportateursTable.nom })
+    .from(exportateursTable)
+    .where(and(eq(exportateursTable.id, exportateurId), eq(exportateursTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!exp) {
+    res.status(403).json({ erreur: "Exportateur introuvable ou non autorisé" });
+    return;
+  }
+
+  const livraisonIds = livraisonsDispos.rows.map(r => r.id);
+  const poidsTotalKg = livraisonsDispos.rows.reduce((s, r) => s + parseFloat(r.poids_kg), 0);
+
+  // 4. Créer le lot
+  const [lot] = await db.insert(lotsTable).values({
+    cooperativeId,
+    poidsTotalKg: String(poidsTotalKg),
+    entrepot: `Stock ${fourn.nom}${fourn.prenoms ? " " + fourn.prenoms : ""}`,
+  }).returning();
+
+  if (!lot) {
+    res.status(500).json({ erreur: "Erreur lors de la création du lot fournisseur" });
+    return;
+  }
+
+  // 5. Lier les livraisons au lot
+  await db.insert(lotLivraisonsTable).values(livraisonIds.map(lid => ({ lotId: lot.id, livraisonId: lid })));
+
+  // 6. Campagne active
+  const [campagneActive] = await db
+    .select({ id: campagnesTable.id })
+    .from(campagnesTable)
+    .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
+    .orderBy(desc(campagnesTable.dateOuverture))
+    .limit(1);
+
+  const montantTotalFcfa = Math.round(poidsKg * prixUnitaireFcfa);
+
+  // 7. Créer la vente
+  const [vente] = await db.insert(ventesExportateursTable).values({
+    exportateurId,
+    lotId: lot.id,
+    campagneId: campagneActive?.id ?? null,
+    poidsKg: String(poidsKg),
+    prixUnitaireFcfa,
+    montantTotalFcfa,
+    dateVente,
+    dateEcheanceReglement: dateEcheance,
+    montantRecuFcfa: 0,
+    soldeDuFcfa: montantTotalFcfa,
+    statut: "en_attente",
+  }).returning();
+
+  // 8. Marquer le lot comme vendu
+  await db.update(lotsTable)
+    .set({ statut: "vendu", venteExportateurId: vente!.id })
+    .where(eq(lotsTable.id, lot.id));
+
+  // 9. Écriture comptable
+  void generateEcrituresVente(cooperativeId, {
+    venteId: vente!.id,
+    exportateurNom: exp.nom,
+    montantFcfa: montantTotalFcfa,
+    dateVente,
+  });
+
+  res.status(201).json({
+    venteId: vente!.id,
+    lotId: lot.id,
+    montantTotalFcfa,
+    poidsKg,
+    exportateurNom: exp.nom,
+    fournisseurNom: `${fourn.nom}${fourn.prenoms ? " " + fourn.prenoms : ""}`,
+    nbLivraisons: livraisonIds.length,
+  });
 }

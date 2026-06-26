@@ -95,16 +95,17 @@ export async function createLot(req: Request, res: Response): Promise<void> {
 
   try {
     // Vérifier que toutes les livraisons appartiennent à cette coopérative
-    const livraisonsVerif = await db
-      .select({ id: livraisonsTable.id })
-      .from(livraisonsTable)
-      .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-      .where(and(
-        inArray(livraisonsTable.id, livraisonIds),
-        eq(membresTable.cooperativeId, cooperativeId),
-      ));
+    // (membres OU fournisseurs externes)
+    const livraisonsVerif = await db.execute<{ id: number }>(sql`
+      SELECT l.id
+      FROM livraisons l
+      LEFT JOIN membres   m ON m.id = l.membre_id
+      LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id
+      WHERE l.id = ANY(${livraisonIds})
+        AND (m.cooperative_id = ${cooperativeId} OR f.cooperative_id = ${cooperativeId})
+    `);
 
-    if (livraisonsVerif.length !== livraisonIds.length) {
+    if (livraisonsVerif.rows.length !== livraisonIds.length) {
       res.status(403).json({ erreur: "Une ou plusieurs livraisons n'appartiennent pas à votre coopérative" });
       return;
     }
