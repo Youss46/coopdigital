@@ -68,3 +68,6 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
+VAPID_PUBLIC_KEY = "BKnMG7CUr2jjx0YvKSmTk3WxXEkYaj3LdxHl5xd222aazEThwDi6dg3SMfXHsLYpnONCXQwd1T58dGCoGdYZT5g"
+VAPID_PRIVATE_KEY = "6pzZD_J29CV_2M_d-tMaTpl1nSRzwd_1tXn_wz5fRH8"
+VAPID_SUBJECT = "mailto:admin@coopdigital.ci"
