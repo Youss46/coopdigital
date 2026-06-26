@@ -99,7 +99,7 @@ function ModalValidation({
   sessionCaisseOuverte?: boolean | null;
 }) {
   const [ref, setRef] = useState("");
-  const [telephone, setTelephone] = useState(paiement.telephone ?? "");
+  const [telephone, setTelephone] = useState(telProducteur(paiement) ?? "");
   const [touched, setTouched] = useState(false);
   const isMobile = paiement.modePaiement === "orange_money" || paiement.modePaiement === "mtn_momo" || paiement.modePaiement === "wave";
   const isEspeces = paiement.modePaiement === "especes";
