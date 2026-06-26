@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   UserCheck, Plus, Search, Loader2, Phone, MapPin,
@@ -10,6 +11,7 @@ import {
   useCreateFournisseur,
   useUpdateFournisseur,
   useUpdateAgrement,
+  getListFournisseursQueryKey,
   type Fournisseur,
   type FournisseurInput,
 } from "@workspace/api-client-react";
@@ -51,6 +53,7 @@ const FORM_VIDE_EXTERNE: Partial<FournisseurInput> = { typeFournisseur: "externe
 
 export default function FournisseursPage() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const peutCreer   = usePermission("fournisseurs", "creer");
   const peutModif   = usePermission("fournisseurs", "modifier");
@@ -123,6 +126,7 @@ export default function FournisseursPage() {
         await createMut.mutateAsync({ data: form as FournisseurInput });
         toast({ title: "Fournisseur créé avec succès" });
       }
+      await queryClient.invalidateQueries({ queryKey: getListFournisseursQueryKey() });
       setShowForm(false);
     } catch (err) {
       const detail =
@@ -143,6 +147,7 @@ export default function FournisseursPage() {
           ...(agrForm.dateExpiration ? { dateExpirationAgrement: agrForm.dateExpiration } : {}),
         },
       });
+      await queryClient.invalidateQueries({ queryKey: getListFournisseursQueryKey() });
       toast({ title: "Agrément mis à jour" });
       setShowAgrModal(null);
     } catch {
