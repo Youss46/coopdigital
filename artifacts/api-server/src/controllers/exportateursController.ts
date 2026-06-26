@@ -181,6 +181,7 @@ export async function createVente(req: Request, res: Response): Promise<void> {
 
   try {
     const { exportateurId, lotId, poidsKg, prixUnitaireFcfa, dateVente, dateEcheanceReglement } = parse.data;
+    const nombreSacs = typeof req.body.nombreSacs === "number" && req.body.nombreSacs > 0 ? req.body.nombreSacs as number : undefined;
 
     const [exp] = await db.select({ id: exportateursTable.id }).from(exportateursTable)
       .where(and(eq(exportateursTable.id, exportateurId), eq(exportateursTable.cooperativeId, cooperativeId))).limit(1);
@@ -212,11 +213,11 @@ export async function createVente(req: Request, res: Response): Promise<void> {
       })
       .returning();
 
-    // Marquer le lot comme "vendu" et lier la vente
+    // Marquer le lot comme "vendu" et lier la vente (+ nb sacs si fourni)
     if (lotId) {
       await db
         .update(lotsTable)
-        .set({ statut: "vendu", venteExportateurId: vente!.id })
+        .set({ statut: "vendu", venteExportateurId: vente!.id, ...(nombreSacs !== undefined ? { nombreSacs } : {}) })
         .where(and(eq(lotsTable.id, lotId), eq(lotsTable.cooperativeId, cooperativeId)));
     }
 

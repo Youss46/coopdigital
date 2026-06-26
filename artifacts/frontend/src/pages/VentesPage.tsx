@@ -70,6 +70,7 @@ const VENTE_INIT = {
   exportateurId:          "",
   poidsKg:                "",
   prixUnitaireFcfa:       "",
+  nombreSacs:             "",
   dateVente:              new Date().toISOString().split("T")[0]!,
   dateEcheanceReglement:  "",
 };
@@ -77,8 +78,8 @@ const VENTE_INIT = {
 const VENTE_FOURN_INIT = {
   fournisseurId:          "",
   exportateurId:          "",
-  poidsKg:                "",
   prixUnitaireFcfa:       "",
+  nombreSacs:             "",
   dateVente:              new Date().toISOString().split("T")[0]!,
   dateEcheanceReglement:  "",
 };
@@ -90,6 +91,12 @@ interface StockFournisseur {
   type_fournisseur: string;
   poids_disponible_kg: string;
   nb_livraisons: number;
+}
+
+interface LivraisonDispo {
+  id: number;
+  dateLivraison: string;
+  poidsKg: string;
 }
 
 export default function VentesPage() {
@@ -109,6 +116,7 @@ export default function VentesPage() {
   const [sourceStock, setSourceStock]         = useState<"lots" | "fournisseur">("lots");
   const [formFourn, setFormFourn]             = useState(VENTE_FOURN_INIT);
   const [submittingFourn, setSubmittingFourn] = useState(false);
+  const [selectedLivIds, setSelectedLivIds]   = useState<Set<number>>(new Set());
 
   const { data: ventes = [], isLoading } = useGetVentes({}, {
     query: { queryKey: getGetVentesQueryKey({}) },
@@ -124,6 +132,12 @@ export default function VentesPage() {
     queryKey: ["ventes-stock-fournisseurs"],
     queryFn:  () => apiFetch("/api/fournisseurs/stock-disponible", token),
     enabled:  modalVente && sourceStock === "fournisseur",
+  });
+
+  const { data: livraisonsDisposFourn = [] } = useQuery<LivraisonDispo[]>({
+    queryKey: ["livraisons-dispos-fourn", formFourn.fournisseurId],
+    queryFn:  () => apiFetch(`/api/fournisseurs/${formFourn.fournisseurId}/livraisons-disponibles`, token),
+    enabled:  modalVente && sourceStock === "fournisseur" && !!formFourn.fournisseurId,
   });
   const { data: prixActuel } = useQuery<{ prixVenteExportFcfa: string } | null>({
     queryKey: ["prix-actuel"],
@@ -171,22 +185,39 @@ export default function VentesPage() {
     setForm({ ...VENTE_INIT, prixUnitaireFcfa: prixExport });
     setFormFourn({ ...VENTE_FOURN_INIT, prixUnitaireFcfa: prixExport });
     setSourceStock("lots");
+    setSelectedLivIds(new Set());
     setModalVente(true);
   }
 
   function handleFournisseurChange(fournisseurId: string) {
-    const sf = stockFournisseurs.find(f => String(f.id) === fournisseurId);
-    setFormFourn(f => ({
-      ...f,
-      fournisseurId,
-      poidsKg: sf ? parseFloat(sf.poids_disponible_kg).toFixed(2) : f.poidsKg,
-    }));
+    setFormFourn(f => ({ ...f, fournisseurId }));
+    setSelectedLivIds(new Set());
   }
+
+  function toggleLivraison(id: number) {
+    setSelectedLivIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleToutesLivraisons() {
+    if (selectedLivIds.size === livraisonsDisposFourn.length) {
+      setSelectedLivIds(new Set());
+    } else {
+      setSelectedLivIds(new Set(livraisonsDisposFourn.map(l => l.id)));
+    }
+  }
+
+  const poidsSelectionne = livraisonsDisposFourn
+    .filter(l => selectedLivIds.has(l.id))
+    .reduce((s, l) => s + parseFloat(l.poidsKg), 0);
 
   async function handleSubmitVenteFournisseur() {
     if (!formFourn.fournisseurId) { toast({ title: "Fournisseur requis", variant: "destructive" }); return; }
+    if (selectedLivIds.size === 0) { toast({ title: "Sélectionnez au moins une livraison", variant: "destructive" }); return; }
     if (!formFourn.exportateurId) { toast({ title: "Exportateur requis", variant: "destructive" }); return; }
-    if (!formFourn.poidsKg || parseFloat(formFourn.poidsKg) <= 0) { toast({ title: "Poids requis", variant: "destructive" }); return; }
     if (!formFourn.prixUnitaireFcfa || parseInt(formFourn.prixUnitaireFcfa) <= 0) { toast({ title: "Prix unitaire requis", variant: "destructive" }); return; }
     if (!formFourn.dateVente) { toast({ title: "Date de vente requise", variant: "destructive" }); return; }
 
@@ -199,8 +230,9 @@ export default function VentesPage() {
         body: JSON.stringify({
           fournisseurId:         parseInt(formFourn.fournisseurId),
           exportateurId:         parseInt(formFourn.exportateurId),
-          poidsKg:               parseFloat(formFourn.poidsKg),
+          livraisonIds:          Array.from(selectedLivIds),
           prixUnitaireFcfa:      parseInt(formFourn.prixUnitaireFcfa),
+          nombreSacs:            formFourn.nombreSacs ? parseInt(formFourn.nombreSacs) : undefined,
           dateVente:             formFourn.dateVente,
           dateEcheanceReglement: formFourn.dateEcheanceReglement || undefined,
         }),
@@ -211,8 +243,10 @@ export default function VentesPage() {
       }
       qc.invalidateQueries({ queryKey: getGetVentesQueryKey({}) });
       qc.invalidateQueries({ queryKey: ["ventes-stock-fournisseurs"] });
+      qc.invalidateQueries({ queryKey: ["livraisons-dispos-fourn", formFourn.fournisseurId] });
       setModalVente(false);
       setFormFourn(VENTE_FOURN_INIT);
+      setSelectedLivIds(new Set());
       toast({ title: "Vente enregistrée", description: "Le lot fournisseur est créé et marqué comme vendu." });
     } catch (err) {
       toast({ title: "Erreur", description: err instanceof Error ? err.message : "Erreur interne", variant: "destructive" });
@@ -242,6 +276,7 @@ export default function VentesPage() {
         lotId:                 form.lotId ? parseInt(form.lotId) : undefined,
         poidsKg:               parseFloat(form.poidsKg),
         prixUnitaireFcfa:      parseInt(form.prixUnitaireFcfa),
+        nombreSacs:            form.nombreSacs ? parseInt(form.nombreSacs) : undefined,
         dateVente:             form.dateVente,
         dateEcheanceReglement: form.dateEcheanceReglement || undefined,
       } as Parameters<typeof mutVente.mutate>[0]["data"],
@@ -574,6 +609,12 @@ export default function VentesPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Nombre de sacs</label>
+                  <input type="number" min="0" value={form.nombreSacs} onChange={e => setForm(f => ({ ...f, nombreSacs: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="0" />
+                </div>
+
                 <p className="text-xs text-gray-400 border-t border-gray-100 pt-3">
                   Les écritures comptables sont générées automatiquement. Le lot sélectionné sera marqué comme <strong>vendu</strong>.
                 </p>
@@ -591,18 +632,42 @@ export default function VentesPage() {
                     ))}
                   </select>
                   {stockFournisseurs.length === 0 && (
-                    <p className="text-xs text-orange-600 mt-1">⚠️ Aucun stock fournisseur disponible (toutes les livraisons sont déjà en lot).</p>
+                    <p className="text-xs text-orange-600 mt-1">⚠️ Aucun stock fournisseur disponible.</p>
                   )}
-                  {formFourn.fournisseurId && (() => {
-                    const sf = stockFournisseurs.find(f => String(f.id) === formFourn.fournisseurId);
-                    return sf ? (
-                      <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-center justify-between text-xs">
-                        <span className="text-purple-800 font-medium">Stock disponible</span>
-                        <span className="text-purple-700 font-bold">{parseFloat(sf.poids_disponible_kg).toLocaleString("fr-FR")} kg • {sf.nb_livraisons} livraison(s)</span>
-                      </div>
-                    ) : null;
-                  })()}
                 </div>
+
+                {/* Checklist des livraisons */}
+                {formFourn.fournisseurId && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-gray-700">Livraisons à inclure *</label>
+                      {livraisonsDisposFourn.length > 0 && (
+                        <button onClick={toggleToutesLivraisons} className="text-xs text-purple-600 hover:underline">
+                          {selectedLivIds.size === livraisonsDisposFourn.length ? "Tout désélectionner" : "Tout sélectionner"}
+                        </button>
+                      )}
+                    </div>
+                    {livraisonsDisposFourn.length === 0 ? (
+                      <p className="text-xs text-orange-600">⚠️ Aucune livraison disponible pour ce fournisseur.</p>
+                    ) : (
+                      <div className="border border-gray-200 rounded-lg overflow-hidden max-h-44 overflow-y-auto">
+                        {livraisonsDisposFourn.map(liv => (
+                          <label key={liv.id} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-purple-50 border-b border-gray-100 last:border-b-0 ${selectedLivIds.has(liv.id) ? "bg-purple-50" : ""}`}>
+                            <input type="checkbox" checked={selectedLivIds.has(liv.id)} onChange={() => toggleLivraison(liv.id)} className="accent-purple-600" />
+                            <span className="text-xs text-gray-500 w-24 shrink-0">{liv.dateLivraison}</span>
+                            <span className="text-xs font-medium text-gray-800">{parseFloat(liv.poidsKg).toLocaleString("fr-FR")} kg</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {selectedLivIds.size > 0 && (
+                      <div className="mt-2 flex items-center justify-between px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-xs">
+                        <span className="text-purple-700">{selectedLivIds.size} livraison(s) sélectionnée(s)</span>
+                        <span className="font-bold text-purple-900">{poidsSelectionne.toLocaleString("fr-FR")} kg</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Exportateur *</label>
@@ -613,46 +678,44 @@ export default function VentesPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Poids vendu (kg) *</label>
-                    <input type="number" step="0.01" value={formFourn.poidsKg}
-                      onChange={e => setFormFourn(f => ({ ...f, poidsKg: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="0" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Prix unitaire (FCFA/kg) *
-                      {prixActuel?.prixVenteExportFcfa && <span className="ml-1 text-purple-600 font-normal text-xs">· suivi des prix</span>}
-                    </label>
-                    <input type="number" value={formFourn.prixUnitaireFcfa}
-                      onChange={e => setFormFourn(f => ({ ...f, prixUnitaireFcfa: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="1 200" />
-                  </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Prix unitaire (FCFA/kg) *
+                    {prixActuel?.prixVenteExportFcfa && <span className="ml-1 text-purple-600 font-normal text-xs">· suivi des prix</span>}
+                  </label>
+                  <input type="number" value={formFourn.prixUnitaireFcfa}
+                    onChange={e => setFormFourn(f => ({ ...f, prixUnitaireFcfa: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="1 200" />
                 </div>
 
-                {formFourn.poidsKg && formFourn.prixUnitaireFcfa && (
+                {poidsSelectionne > 0 && formFourn.prixUnitaireFcfa && (
                   <div className="flex items-center justify-between px-4 py-3 bg-purple-50 border border-purple-200 rounded-lg">
                     <span className="text-sm text-purple-800 font-medium">Montant total estimé</span>
-                    <span className="text-lg font-bold text-purple-900">{formaterFCFA(Math.round(parseFloat(formFourn.poidsKg) * parseInt(formFourn.prixUnitaireFcfa)))}</span>
+                    <span className="text-lg font-bold text-purple-900">{formaterFCFA(Math.round(poidsSelectionne * parseInt(formFourn.prixUnitaireFcfa)))}</span>
                   </div>
                 )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Nombre de sacs</label>
+                    <input type="number" min="0" value={formFourn.nombreSacs} onChange={e => setFormFourn(f => ({ ...f, nombreSacs: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="0" />
+                  </div>
+                  <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Date de vente *</label>
                     <input type="date" value={formFourn.dateVente} onChange={e => setFormFourn(f => ({ ...f, dateVente: e.target.value }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Date d'échéance règlement</label>
-                    <input type="date" value={formFourn.dateEcheanceReglement} onChange={e => setFormFourn(f => ({ ...f, dateEcheanceReglement: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" />
-                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Date d'échéance règlement</label>
+                  <input type="date" value={formFourn.dateEcheanceReglement} onChange={e => setFormFourn(f => ({ ...f, dateEcheanceReglement: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" />
                 </div>
 
                 <p className="text-xs text-gray-400 border-t border-gray-100 pt-3">
-                  Un lot est créé automatiquement depuis toutes les livraisons disponibles du fournisseur, puis lié à la vente.
+                  Un lot est créé depuis les livraisons sélectionnées, puis lié à la vente.
                 </p>
               </>)}
             </div>

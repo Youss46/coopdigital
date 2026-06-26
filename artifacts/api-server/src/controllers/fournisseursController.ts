@@ -376,6 +376,33 @@ export async function getRapportTypeFournisseur(req: Request, res: Response) {
 // ─── GET /fournisseurs/stock-disponible ───────────────────────────────────────
 // Retourne les fournisseurs ayant du stock non encore attribué à un lot.
 
+export async function getLivraisonsDisponiblesFournisseur(req: Request, res: Response) {
+  const cooperativeId = coopId(req);
+  const fournisseurId = parseInt(String(req.params["id"] ?? "0"));
+  if (!fournisseurId) { res.status(400).json({ erreur: "ID invalide" }); return; }
+
+  const [fourn] = await db.select({ id: fournisseursTable.id })
+    .from(fournisseursTable)
+    .where(and(eq(fournisseursTable.id, fournisseurId), eq(fournisseursTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!fourn) { res.status(403).json({ erreur: "Fournisseur introuvable ou non autorisé" }); return; }
+
+  const rows = await db.execute<{ id: number; date_livraison: string; poids_kg: string }>(sql`
+    SELECT l.id, l.date_livraison, l.poids_kg
+    FROM livraisons l
+    LEFT JOIN lot_livraisons ll ON ll.livraison_id = l.id
+    WHERE l.fournisseur_id = ${fournisseurId}
+      AND ll.livraison_id IS NULL
+    ORDER BY l.date_livraison DESC
+  `);
+
+  res.json(rows.rows.map(r => ({
+    id: r.id,
+    dateLivraison: r.date_livraison,
+    poidsKg: r.poids_kg,
+  })));
+}
+
 export async function getStockFournisseurs(req: Request, res: Response) {
   const cid = coopId(req);
 
@@ -420,21 +447,25 @@ export async function createVenteFournisseur(req: Request, res: Response) {
   const body = req.body as {
     fournisseurId?: unknown;
     exportateurId?: unknown;
-    poidsKg?: unknown;
+    livraisonIds?: unknown;
     prixUnitaireFcfa?: unknown;
     dateVente?: unknown;
     dateEcheanceReglement?: unknown;
+    nombreSacs?: unknown;
   };
 
-  const fournisseurId   = typeof body.fournisseurId   === "number" ? body.fournisseurId   : parseInt(String(body.fournisseurId   ?? "0"));
-  const exportateurId   = typeof body.exportateurId   === "number" ? body.exportateurId   : parseInt(String(body.exportateurId   ?? "0"));
-  const poidsKg         = typeof body.poidsKg         === "number" ? body.poidsKg         : parseFloat(String(body.poidsKg       ?? "0"));
+  const fournisseurId    = typeof body.fournisseurId   === "number" ? body.fournisseurId   : parseInt(String(body.fournisseurId   ?? "0"));
+  const exportateurId    = typeof body.exportateurId   === "number" ? body.exportateurId   : parseInt(String(body.exportateurId   ?? "0"));
   const prixUnitaireFcfa = typeof body.prixUnitaireFcfa === "number" ? body.prixUnitaireFcfa : parseInt(String(body.prixUnitaireFcfa ?? "0"));
   const dateVente        = typeof body.dateVente === "string" ? body.dateVente : "";
   const dateEcheance     = typeof body.dateEcheanceReglement === "string" && body.dateEcheanceReglement ? body.dateEcheanceReglement : null;
+  const nombreSacs       = typeof body.nombreSacs === "number" && body.nombreSacs > 0 ? body.nombreSacs : null;
+  const livraisonIds: number[] = Array.isArray(body.livraisonIds)
+    ? (body.livraisonIds as unknown[]).map(id => parseInt(String(id))).filter(id => id > 0)
+    : [];
 
-  if (!fournisseurId || !exportateurId || poidsKg <= 0 || prixUnitaireFcfa <= 0 || !dateVente) {
-    res.status(400).json({ erreur: "fournisseurId, exportateurId, poidsKg, prixUnitaireFcfa et dateVente sont requis" });
+  if (!fournisseurId || !exportateurId || livraisonIds.length === 0 || prixUnitaireFcfa <= 0 || !dateVente) {
+    res.status(400).json({ erreur: "fournisseurId, exportateurId, livraisonIds (tableau non vide), prixUnitaireFcfa et dateVente sont requis" });
     return;
   }
 
@@ -449,17 +480,18 @@ export async function createVenteFournisseur(req: Request, res: Response) {
     return;
   }
 
-  // 2. Récupérer les livraisons non encore en lot
-  const livraisonsDispos = await db.execute<{ id: number; poids_kg: string }>(sql`
+  // 2. Vérifier que toutes les livraisons sélectionnées appartiennent au fournisseur et n'ont pas de lot
+  const livraisonsValidees = await db.execute<{ id: number; poids_kg: string }>(sql`
     SELECT l.id, l.poids_kg
     FROM livraisons l
     LEFT JOIN lot_livraisons ll ON ll.livraison_id = l.id
-    WHERE l.fournisseur_id = ${fournisseurId}
+    WHERE l.id = ANY(${sql.raw(`ARRAY[${livraisonIds.join(",")}]::int[]`)})
+      AND l.fournisseur_id = ${fournisseurId}
       AND ll.livraison_id IS NULL
   `);
 
-  if (livraisonsDispos.rows.length === 0) {
-    res.status(400).json({ erreur: "Aucune livraison disponible (non encore en lot) pour ce fournisseur" });
+  if (livraisonsValidees.rows.length !== livraisonIds.length) {
+    res.status(400).json({ erreur: "Certaines livraisons sont invalides, déjà en lot, ou n'appartiennent pas à ce fournisseur" });
     return;
   }
 
@@ -474,14 +506,14 @@ export async function createVenteFournisseur(req: Request, res: Response) {
     return;
   }
 
-  const livraisonIds = livraisonsDispos.rows.map(r => r.id);
-  const poidsTotalKg = livraisonsDispos.rows.reduce((s, r) => s + parseFloat(r.poids_kg), 0);
+  const poidsTotalKg = livraisonsValidees.rows.reduce((s, r) => s + parseFloat(r.poids_kg), 0);
 
   // 4. Créer le lot
   const [lot] = await db.insert(lotsTable).values({
     cooperativeId,
     poidsTotalKg: String(poidsTotalKg),
     entrepot: `Stock ${fourn.nom}${fourn.prenoms ? " " + fourn.prenoms : ""}`,
+    nombreSacs: nombreSacs,
   }).returning();
 
   if (!lot) {
@@ -500,14 +532,14 @@ export async function createVenteFournisseur(req: Request, res: Response) {
     .orderBy(desc(campagnesTable.dateOuverture))
     .limit(1);
 
-  const montantTotalFcfa = Math.round(poidsKg * prixUnitaireFcfa);
+  const montantTotalFcfa = Math.round(poidsTotalKg * prixUnitaireFcfa);
 
   // 7. Créer la vente
   const [vente] = await db.insert(ventesExportateursTable).values({
     exportateurId,
     lotId: lot.id,
     campagneId: campagneActive?.id ?? null,
-    poidsKg: String(poidsKg),
+    poidsKg: String(poidsTotalKg),
     prixUnitaireFcfa,
     montantTotalFcfa,
     dateVente,
@@ -534,7 +566,7 @@ export async function createVenteFournisseur(req: Request, res: Response) {
     venteId: vente!.id,
     lotId: lot.id,
     montantTotalFcfa,
-    poidsKg,
+    poidsKg: poidsTotalKg,
     exportateurNom: exp.nom,
     fournisseurNom: `${fourn.nom}${fourn.prenoms ? " " + fourn.prenoms : ""}`,
     nbLivraisons: livraisonIds.length,
