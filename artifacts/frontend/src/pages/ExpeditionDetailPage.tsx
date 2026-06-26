@@ -211,6 +211,7 @@ export default function ExpeditionDetailPage() {
     : niveauAlerteSacs;
 
   const lots = Array.isArray(exp.lots) ? exp.lots as Record<string, unknown>[] : [];
+  const lotsNonMembres = exp.lotsNonMembres === true;
   const historique = Array.isArray(exp.historique) ? exp.historique as Record<string, unknown>[] : [];
   const documents = Array.isArray(exp.documents) ? exp.documents as Record<string, unknown>[] : [];
 
@@ -534,35 +535,37 @@ export default function ExpeditionDetailPage() {
           <CardTitle className="text-sm flex items-center gap-2">
             <FileText className="h-4 w-4" /> Documents
             <div className="ml-auto flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 h-7 text-xs border-blue-700 text-blue-700 hover:bg-blue-50"
-                disabled={downloadingEudr}
-                onClick={async () => {
-                  setDownloadingEudr(true);
-                  try {
-                    const res = await fetch(`${BASE}/api/expeditions/${id}/eudr/pdf`, {
-                      headers: token ? { Authorization: `Bearer ${token}` } : {},
-                    });
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `rapport-eudr-${String(exp.numeroExpedition ?? id)}.pdf`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  } catch {
-                    toast({ title: "Erreur", description: "Impossible de générer le rapport EUDR.", variant: "destructive" });
-                  } finally {
-                    setDownloadingEudr(false);
-                  }
-                }}
-              >
-                <Download className="h-3 w-3" />
-                {downloadingEudr ? "Génération…" : "Rapport EUDR"}
-              </Button>
+              {!lotsNonMembres && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-7 text-xs border-blue-700 text-blue-700 hover:bg-blue-50"
+                  disabled={downloadingEudr}
+                  onClick={async () => {
+                    setDownloadingEudr(true);
+                    try {
+                      const res = await fetch(`${BASE}/api/expeditions/${id}/eudr/pdf`, {
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      });
+                      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `rapport-eudr-${String(exp.numeroExpedition ?? id)}.pdf`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch {
+                      toast({ title: "Erreur", description: "Impossible de générer le rapport EUDR.", variant: "destructive" });
+                    } finally {
+                      setDownloadingEudr(false);
+                    }
+                  }}
+                >
+                  <Download className="h-3 w-3" />
+                  {downloadingEudr ? "Génération…" : "Rapport EUDR"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

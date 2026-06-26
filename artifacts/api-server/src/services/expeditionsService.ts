@@ -1,4 +1,4 @@
-import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable } from "@workspace/db";
+import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, lotLivraisonsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable } from "@workspace/db";
 import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
 import { proposerEcriture } from "./comptabiliteService";
 import { notifExpeditionArriveePort, notifExpeditionLitige } from "./notificationService.js";
@@ -151,7 +151,22 @@ export async function getExpedition(cooperativeId: number, expeditionId: number)
     .where(eq(expeditionHistoriqueTable.expeditionId, expeditionId))
     .orderBy(desc(expeditionHistoriqueTable.dateChangement));
 
-  return { ...exp, lots, historique };
+  // Détecte si TOUS les lots rattachés proviennent de fournisseurs externes (pas de membres)
+  const lotIds = lots.map(l => l.lotId).filter((id): id is number => id !== null && id !== undefined);
+  let lotsNonMembres = false;
+  if (lotIds.length > 0) {
+    const [membreCheck] = await db
+      .select({ nb: count() })
+      .from(lotLivraisonsTable)
+      .innerJoin(livraisonsTable, eq(livraisonsTable.id, lotLivraisonsTable.livraisonId))
+      .where(and(
+        inArray(lotLivraisonsTable.lotId, lotIds),
+        sql`${livraisonsTable.membreId} IS NOT NULL`,
+      ));
+    lotsNonMembres = (membreCheck?.nb ?? 0) === 0;
+  }
+
+  return { ...exp, lots, historique, lotsNonMembres };
 }
 
 // ── Lots disponibles pour rattachement ──────────────────────────────────────

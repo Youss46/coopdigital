@@ -1864,6 +1864,10 @@ export async function generateRapportEudrPdf(expeditionId: number, cooperativeId
   const totalNonVerifies  = lotsRendus.reduce((s, l) => s + l.nbNonVerifies, 0);
   const conforme          = totalLots > 0 && lotsRendus.every(l => l.nbNonConformes === 0 && l.nbNonVerifies === 0);
 
+  if (totalProducteurs === 0) {
+    throw new Error("EUDR non applicable : les lots de cette expédition proviennent de fournisseurs externes et ne contiennent pas de producteurs membres.");
+  }
+
   // ── 5. Rendu PDF ──────────────────────────────────────────────────────────
   const { doc, endPromise } = makePdfDoc();
   const W    = PAGE_W - 2 * MARGIN;
