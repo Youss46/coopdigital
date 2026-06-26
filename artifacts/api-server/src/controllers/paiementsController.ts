@@ -498,9 +498,17 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
 
     // Pré-vérification compte Mobile Marchand (avant la transaction)
     if (isMobileMarchand && cooperativeId) {
+      const operateurLabel: Record<string, string> = {
+        orange_money: "Orange Money",
+        mtn_momo:     "MTN MoMo",
+        wave:         "Wave",
+      };
+      const label = operateurLabel[mode] ?? mode;
+
       const [compteMobile] = await db
         .select({
-          id:             comptesMobilesMarchandsTable.id,
+          id:              comptesMobilesMarchandsTable.id,
+          nom:             comptesMobilesMarchandsTable.nom,
           soldeActuelFcfa: comptesMobilesMarchandsTable.soldeActuelFcfa,
         })
         .from(comptesMobilesMarchandsTable)
@@ -514,11 +522,17 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         .limit(1);
 
       if (!compteMobile) {
-        res.status(422).json({ erreur: "Aucun compte valide n'a été trouvé pour ce mode de paiement." });
+        res.status(422).json({
+          erreur: `Aucun compte Mobile Marchand ${label} actif n'est configuré. Créez un compte dans la page Caisse avant de valider des paiements ${label}.`,
+        });
         return;
       }
-      if (parseFloat(String(compteMobile.soldeActuelFcfa)) < row.paiement.montantFcfa) {
-        res.status(422).json({ erreur: "Fonds insuffisants sur le compte pour effectuer ce paiement." });
+
+      const soldeMobile = parseFloat(String(compteMobile.soldeActuelFcfa));
+      if (soldeMobile < row.paiement.montantFcfa) {
+        res.status(422).json({
+          erreur: `Solde ${label} insuffisant (compte « ${compteMobile.nom} »). Disponible : ${soldeMobile.toLocaleString("fr-FR")} FCFA, requis : ${row.paiement.montantFcfa.toLocaleString("fr-FR")} FCFA.`,
+        });
         return;
       }
     }
