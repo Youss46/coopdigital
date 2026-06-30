@@ -2,7 +2,7 @@ import { useState } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import {
   CalendarDays, Plus, CheckCircle2, Clock, Loader2, AlertTriangle,
-  XCircle, BarChart3, FileText, Download, RefreshCw,
+  XCircle, BarChart3, FileText, Download, RefreshCw, Archive, RotateCcw,
 } from "lucide-react";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -39,16 +39,22 @@ const BTN =
 type Tab = "campagnes" | "cloture" | "bilans";
 
 function StatutBadge({ statut }: { statut: string }) {
-  return statut === "ouverte" ? (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-      <CheckCircle2 className="w-3 h-3" /> En cours
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-      <Clock className="w-3 h-3" /> Clôturée
-    </span>
-  );
-}
+    if (statut === "ouverte") return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+        <CheckCircle2 className="w-3 h-3" /> En cours
+      </span>
+    );
+    if (statut === "archivee") return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+        <Archive className="w-3 h-3" /> Archivée
+      </span>
+    );
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+        <Clock className="w-3 h-3" /> Clôturée
+      </span>
+    );
+  }
 
 const fmt = (n: string | number | null | undefined) =>
   Number(n ?? 0).toLocaleString("fr-FR");
@@ -177,6 +183,9 @@ export default function CampagnesPage() {
   const [rattachPending, setRattachPending] = useState(false);
   const [rattachMsg, setRattachMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [downloadingBilans, setDownloadingBilans] = useState<Set<number>>(new Set());
+    const [rouvrirId, setRouvrirId] = useState<number | null>(null);
+    const [rouvrirMotif, setRouvrirMotif] = useState("");
+    const [rouvrirPending, setRouvrirPending] = useState(false);
 
   async function downloadBilan(campagneId: number, libelle: string) {
     if (downloadingBilans.has(campagneId)) return;
@@ -197,7 +206,35 @@ export default function CampagnesPage() {
     }
   }
 
-  const createMut = useCreateCampagne();
+  async function handleRouvrir() {
+      if (!rouvrirId) return;
+      if (rouvrirMotif.trim().length < 10) {
+        toast({ title: "Motif trop court (10 caractères minimum)", variant: "destructive" });
+        return;
+      }
+      setRouvrirPending(true);
+      try {
+        const BASE = import.meta.env.VITE_API_URL ?? "";
+        const tok = localStorage.getItem("coop_token") ?? "";
+        const r = await fetch(`${BASE}/api/campagnes/${rouvrirId}/rouvrir`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ motif: rouvrirMotif }),
+        });
+        const data = await r.json() as { erreur?: string };
+        if (!r.ok) throw new Error(data.erreur ?? `Erreur ${r.status}`);
+        await queryClient.invalidateQueries(getListCampagnesQueryOptions());
+        toast({ title: "Campagne réouverte avec succès" });
+        setRouvrirId(null);
+        setRouvrirMotif("");
+      } catch (err) {
+        toast({ title: err instanceof Error ? err.message : "Erreur inconnue", variant: "destructive" });
+      } finally {
+        setRouvrirPending(false);
+      }
+    }
+
+    const createMut = useCreateCampagne();
   const cloturerMut = useCloturerCampagne();
 
   function handleField<K extends keyof CampagneInput>(k: K, v: CampagneInput[K]) {
@@ -409,8 +446,8 @@ export default function CampagnesPage() {
               <div className="absolute left-2 top-0 bottom-0 w-px bg-gray-200" />
               {(campagnes ?? []).map((c, i) => (
                 <div key={c.id} className="relative mb-4">
-                  <div className={`absolute -left-4 top-4 w-4 h-4 rounded-full border-2 ${c.statut === "ouverte" ? "bg-green-500 border-green-600" : "bg-gray-300 border-gray-400"}`} />
-                  <div className={`rounded-xl border p-4 ${c.statut === "ouverte" ? "border-green-200 bg-green-50" : "border-gray-200 bg-white"}`}>
+                  <div className={`absolute -left-4 top-4 w-4 h-4 rounded-full border-2 ${c.statut === "ouverte" ? "bg-green-500 border-green-600" : c.statut === "archivee" ? "bg-purple-400 border-purple-500" : "bg-gray-300 border-gray-400"}`} />
+                  <div className={`rounded-xl border p-4 ${c.statut === "ouverte" ? "border-green-200 bg-green-50" : c.statut === "archivee" ? "border-purple-100 bg-purple-50/30" : "border-gray-200 bg-white"}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-semibold text-gray-900 text-sm">{c.libelle}</div>
@@ -429,12 +466,18 @@ export default function CampagnesPage() {
                           </button>
                         )}
                         {c.statut === "fermee" && peutVoirBilan && (
-                          <button onClick={() => setTab("bilans")}
-                            className={`${BTN} bg-gray-50 text-gray-600 hover:bg-gray-100 text-xs px-3 py-1.5`}>
-                            <BarChart3 className="w-3.5 h-3.5" /> Bilan
-                          </button>
-                        )}
-                      </div>
+                            <button onClick={() => setTab("bilans")}
+                              className={`${BTN} bg-gray-50 text-gray-600 hover:bg-gray-100 text-xs px-3 py-1.5`}>
+                              <BarChart3 className="w-3.5 h-3.5" /> Bilan
+                            </button>
+                          )}
+                          {c.statut === "fermee" && utilisateur?.role === "pca" && (
+                            <button onClick={() => { setRouvrirId(c.id); setRouvrirMotif(""); }}
+                              className={`${BTN} bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs px-3 py-1.5`}>
+                              <RotateCcw className="w-3.5 h-3.5" /> Réouvrir
+                            </button>
+                          )}
+                        </div>
                     </div>
                   </div>
                 </div>
@@ -450,7 +493,57 @@ export default function CampagnesPage() {
         </div>
       )}
 
-      {/* ── ONGLET 2 : CLÔTURE ────────────────────────────── */}
+      {/* ── Modal réouverture campagne ───────────────────── */}
+        {rouvrirId != null && (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                  <RotateCcw className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-gray-900">Réouvrir la campagne</h2>
+                  <p className="text-xs text-gray-500">Un motif détaillé est obligatoire</p>
+                </div>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p className="text-xs text-amber-700">
+                  La réouverture remet la campagne en statut actif. Les opérations redeviennent possibles.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Motif <span className="text-red-500">*</span>
+                  <span className="text-gray-400 font-normal"> (10 caractères min.)</span>
+                </label>
+                <textarea
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white resize-none"
+                  rows={3}
+                  placeholder="Ex : Erreur de saisie détectée sur plusieurs livraisons..."
+                  value={rouvrirMotif}
+                  onChange={e => setRouvrirMotif(e.target.value)}
+                />
+                <div className="text-right text-xs text-gray-400 mt-0.5">{rouvrirMotif.length} / 10 min.</div>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => { setRouvrirId(null); setRouvrirMotif(""); }}
+                  className={`${BTN} bg-gray-100 text-gray-700 hover:bg-gray-200`}
+                >Annuler</button>
+                <button
+                  onClick={() => void handleRouvrir()}
+                  disabled={rouvrirMotif.trim().length < 10 || rouvrirPending}
+                  className={`${BTN} bg-amber-600 text-white hover:bg-amber-700`}
+                >
+                  {rouvrirPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                  Réouvrir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+              {/* ── ONGLET 2 : CLÔTURE ────────────────────────────── */}
       {tab === "cloture" && (
         <div className="space-y-5">
           {!active ? (

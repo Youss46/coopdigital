@@ -408,3 +408,34 @@ export async function rattacherLivraisons(req: Request, res: Response) {
   const count = (result as { rowCount?: number }).rowCount ?? 0;
   return res.json({ rattachées: count, campagneId });
 }
+
+  export async function rouvrirCampagne(req: Request, res: Response) {
+    if (req.user?.role !== "pca") {
+      return res.status(403).json({ erreur: "Seul le PCA peut réouvrir une campagne." });
+    }
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const id = parseInt(String(req.params["id"] ?? "0"));
+    const { motif } = req.body as { motif?: string };
+
+    if (!motif || motif.trim().length < 10) {
+      return res.status(400).json({ erreur: "Un motif de réouverture est obligatoire (10 caractères minimum)." });
+    }
+
+    const campagne = await db.query.campagnesTable.findFirst({
+      where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)),
+    });
+    if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
+    if (campagne.statut === "ouverte") return res.status(400).json({ erreur: "Cette campagne est déjà ouverte." });
+    if (campagne.statut === "archivee") return res.status(400).json({ erreur: "Une campagne archivée ne peut pas être réouverte. Les données sont verrouillées." });
+
+    const [updated] = await db
+      .update(campagnesTable)
+      .set({ statut: "ouverte", dateFermeture: null })
+      .where(and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)))
+      .returning();
+
+    req.log.info({ campagneId: id, cooperativeId, motif }, "Campagne réouverte");
+    return res.json({ ...updated, motif });
+  }
+  

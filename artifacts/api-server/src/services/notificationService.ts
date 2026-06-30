@@ -436,7 +436,23 @@ export async function upsertPreferencesNotifications(
   }
 }
 
-// ─── Count par module (pour badges sidebar) ───────────────────────────────────
+// ─── Helper : admins d'une coopérative ────────────────────────────────────────
+
+  export async function getUsersAdminCooperative(cooperativeId: number): Promise<number[]> {
+    const users = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.cooperativeId, cooperativeId),
+          eq(usersTable.actif, true),
+          inArray(usersTable.role, ["pca", "directeur"] as UserRole[]),
+        ),
+      );
+    return users.map((u) => u.id);
+  }
+
+  // ─── Count par module (pour badges sidebar) ───────────────────────────────────
 
 export async function countNonLuesParModule(userId: number): Promise<Record<string, number>> {
   const rows = await db

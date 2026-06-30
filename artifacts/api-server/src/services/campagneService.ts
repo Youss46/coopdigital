@@ -8,6 +8,7 @@ import { eq, and, sql, desc, ne, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { recalculerTous } from "./scoringService";
 import { archiverCampagne } from "./archiveService";
+import { creerNotification, getUsersAdminCooperative } from "./notificationService";
 
 export interface ResultatVerification {
   code: string;
@@ -405,9 +406,32 @@ export async function cloturerCampagne(cooperativeId: number, campagneId: number
   );
 
   // Scoring final de tous les membres — fire-and-forget (non bloquant)
-  recalculerTous(cooperativeId, campagneId).catch((err) =>
-    logger.warn({ err, campagneId }, "Erreur scoring post-clôture (non bloquant)"),
-  );
+    // Notifie les admins une fois le scoring terminé
+    recalculerTous(cooperativeId, campagneId)
+      .then(async (result) => {
+        try {
+          const userIds = await getUsersAdminCooperative(cooperativeId);
+          if (userIds.length > 0) {
+            const nb = (result as { nbTraites?: number } | undefined)?.nbTraites;
+            const nbStr = nb != null ? ` ${nb} membre(s) mis à jour.` : "";
+            await creerNotification(cooperativeId, userIds, {
+              type:         "cloture_campagne",
+              gravite:      "info",
+              titre:        "Scoring membres terminé",
+              message:      `Le scoring de fin de campagne est terminé.${nbStr}`,
+              lien:         "/scoring",
+              lienLibelle:  "Voir les scores",
+              sourceModule: "campagnes",
+              sourceId:     campagneId,
+            });
+          }
+        } catch (notifErr) {
+          logger.warn({ notifErr, campagneId }, "Erreur notification scoring post-clôture");
+        }
+      })
+      .catch((err) =>
+        logger.warn({ err, campagneId }, "Erreur scoring post-clôture (non bloquant)"),
+      );
 
   return bilanData;
 }
