@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLogin } from "@workspace/api-client-react";
+import { useCountUp } from "@/hooks/use-count-up";
 import { Eye, EyeOff } from "lucide-react";
 
 const slides = [
@@ -31,6 +32,55 @@ const slides = [
 const TRANSITION_MS = 900;
 const SLIDE_DURATION_MS = 5500;
 
+type Periode = "matin" | "jour" | "soir";
+
+function getPeriodeJour(): Periode {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 11) return "matin";
+  if (h >= 11 && h < 18) return "jour";
+  return "soir";
+}
+
+const GRADIENT_THEMES: Record<
+  Periode,
+  { bgBase: string; overlayBottom: string; overlayRight: string; barBg: string }
+> = {
+  matin: {
+    bgBase: "#2b1f0a",
+    overlayBottom:
+      "linear-gradient(to top, rgba(61,42,10,0.95), rgba(196,150,42,0.28), transparent)",
+    overlayRight: "linear-gradient(to right, rgba(61,42,10,0.25), transparent)",
+    barBg: "#2b1f0a",
+  },
+  jour: {
+    bgBase: "#0d2b1a",
+    overlayBottom:
+      "linear-gradient(to top, rgba(10,31,18,0.95), rgba(13,43,26,0.3), transparent)",
+    overlayRight: "linear-gradient(to right, rgba(13,43,26,0.2), transparent)",
+    barBg: "#0d2b1a",
+  },
+  soir: {
+    bgBase: "#050f09",
+    overlayBottom:
+      "linear-gradient(to top, rgba(3,10,6,0.97), rgba(8,20,14,0.42), transparent)",
+    overlayRight: "linear-gradient(to right, rgba(5,14,9,0.3), transparent)",
+    barBg: "#050f09",
+  },
+};
+
+const NB_FEUILLES = 12;
+
+function genererFeuilles() {
+  return Array.from({ length: NB_FEUILLES }, (_, i) => ({
+    id: i,
+    left: Math.random() * 100,
+    duration: 9 + Math.random() * 7,
+    delay: Math.random() * 10,
+    size: 14 + Math.random() * 10,
+    opacity: 0.5 + Math.random() * 0.35,
+  }));
+}
+
 export default function Login() {
   const [, navigate] = useLocation();
   const { login } = useAuth();
@@ -44,6 +94,18 @@ export default function Login() {
   const [motDePasse, setMotDePasse] = useState("");
   const [afficherMdp, setAfficherMdp] = useState(false);
   const [erreur, setErreur] = useState("");
+
+  const [periode, setPeriode] = useState<Periode>(() => getPeriodeJour());
+  const [feuilles] = useState(genererFeuilles);
+  const theme = GRADIENT_THEMES[periode];
+
+  const livraisonsAffiche = useCountUp("1 245", 1400);
+  const membresAffiche = useCountUp("586", 1400);
+
+  useEffect(() => {
+    const t = setInterval(() => setPeriode(getPeriodeJour()), 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const goTo = useCallback((index: number) => {
     if (index === currentRef.current || crossingRef.current) return;
@@ -113,114 +175,167 @@ export default function Login() {
     <div className="min-h-screen flex">
 
       {/* ── HERO CARROUSEL ── */}
-      <div className="hidden lg:flex lg:w-3/5 relative overflow-hidden bg-[#0d2b1a]">
+      <div
+        className="hidden lg:flex lg:flex-col lg:w-3/5 relative overflow-hidden"
+        style={{ backgroundColor: theme.bgBase, transition: "background-color 1.5s ease" }}
+      >
 
-        {/* Barres de progression */}
-        <div className="absolute top-0 left-0 right-0 z-30 flex gap-1 p-3">
-          {slides.map((_, i) => (
+        <div className="relative flex-1 overflow-hidden">
+
+          {/* Barres de progression */}
+          <div className="absolute top-0 left-0 right-0 z-30 flex gap-1 p-3">
+            {slides.map((_, i) => (
+              <div
+                key={i}
+                className="flex-1 h-0.5 bg-white/25 rounded-full overflow-hidden"
+              >
+                {i === current && (
+                  <div
+                    key={`progress-${slideKey}`}
+                    className="h-full bg-[#c4962a] hero-progress"
+                  />
+                )}
+                {i < current && (
+                  <div className="h-full bg-white/60 w-full" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Logo */}
+          <div className="absolute top-7 left-8 z-30 flex items-center gap-3">
+            <img
+              src="/logo-192.png"
+              alt="CoopDigital"
+              className="w-12 h-12 rounded-xl shadow-lg"
+            />
+            <div>
+              <p className="text-white font-bold text-xl leading-none">CoopDigital</p>
+              <p className="text-white/60 text-sm">by M15 Tech</p>
+            </div>
+          </div>
+
+          {/* Slides empilées — cross-fade */}
+          {slides.map((s, i) => (
             <div
               key={i}
-              className="flex-1 h-0.5 bg-white/25 rounded-full overflow-hidden"
+              className="absolute inset-0"
+              style={{
+                opacity: i === current ? 1 : 0,
+                transition: `opacity ${TRANSITION_MS}ms ease-in-out`,
+                zIndex: i === current ? 2 : 1,
+              }}
             >
-              {i === current && (
-                <div
-                  key={`progress-${slideKey}`}
-                  className="h-full bg-[#c4962a] hero-progress"
-                />
-              )}
-              {i < current && (
-                <div className="h-full bg-white/60 w-full" />
-              )}
+              {/* Image Ken Burns — remontée via key pour redémarrer l'animation */}
+              <img
+                key={i === current ? `kb-${slideKey}` : `idle-${i}`}
+                src={s.image}
+                alt={s.titre}
+                className="w-full h-full object-cover hero-ken-burns"
+              />
+              {/* Dégradé bas — teinte dynamique selon l'heure */}
+              <div
+                className="absolute inset-0"
+                style={{ backgroundImage: theme.overlayBottom, transition: "background-image 1.5s ease" }}
+              />
+              {/* Dégradé côté gauche léger */}
+              <div
+                className="absolute inset-0"
+                style={{ backgroundImage: theme.overlayRight, transition: "background-image 1.5s ease" }}
+              />
             </div>
           ))}
-        </div>
 
-        {/* Logo */}
-        <div className="absolute top-7 left-8 z-30 flex items-center gap-3">
-          <img
-            src="/logo-192.png"
-            alt="CoopDigital"
-            className="w-12 h-12 rounded-xl shadow-lg"
-          />
-          <div>
-            <p className="text-white font-bold text-xl leading-none">CoopDigital</p>
-            <p className="text-white/60 text-sm">by M15 Tech</p>
-          </div>
-        </div>
-
-        {/* Slides empilées — cross-fade */}
-        {slides.map((s, i) => (
-          <div
-            key={i}
-            className="absolute inset-0"
-            style={{
-              opacity: i === current ? 1 : 0,
-              transition: `opacity ${TRANSITION_MS}ms ease-in-out`,
-              zIndex: i === current ? 2 : 1,
-            }}
-          >
-            {/* Image Ken Burns — remontée via key pour redémarrer l'animation */}
-            <img
-              key={i === current ? `kb-${slideKey}` : `idle-${i}`}
-              src={s.image}
-              alt={s.titre}
-              className="w-full h-full object-cover hero-ken-burns"
-            />
-            {/* Dégradé bas */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0a1f12]/95 via-[#0d2b1a]/30 to-transparent" />
-            {/* Dégradé côté gauche léger */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#0d2b1a]/20 to-transparent" />
-          </div>
-        ))}
-
-        {/* Texte — remonté via key pour stagger */}
-        <div
-          key={`text-${slideKey}`}
-          className="absolute bottom-0 left-0 right-0 z-10 p-10"
-        >
-          {/* Badge stat */}
-          <div className="hero-anim-badge inline-flex items-center gap-2 bg-[#c4962a]/90 backdrop-blur-sm text-white px-4 py-1.5 rounded-full text-sm font-semibold mb-5">
-            <span>📊</span>
-            <span>{slide.stat}</span>
-          </div>
-
-          {/* Titre */}
-          <h2 className="hero-anim-title text-white text-3xl font-bold leading-tight mb-3 drop-shadow-lg">
-            {slide.titre}
-          </h2>
-
-          {/* Citation */}
-          <p className="hero-anim-cite text-white/80 text-lg leading-relaxed mb-8 max-w-lg">
-            "{slide.citation}"
-          </p>
-
-          {/* Navigation */}
-          <div className="hero-anim-nav flex items-center gap-3">
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => goTo(i)}
-                className={`transition-all duration-400 rounded-full ${
-                  i === current
-                    ? "w-8 h-3 bg-[#c4962a]"
-                    : "w-3 h-3 bg-white/40 hover:bg-white/75"
-                }`}
-              />
+          {/* Particules — feuilles de cacao qui tombent doucement */}
+          <div className="absolute inset-0 z-[4] pointer-events-none overflow-hidden" aria-hidden="true">
+            {feuilles.map((f) => (
+              <span
+                key={f.id}
+                className="hero-leaf select-none"
+                style={{
+                  left: `${f.left}%`,
+                  animationDuration: `${f.duration}s`,
+                  animationDelay: `${f.delay}s`,
+                  fontSize: `${f.size}px`,
+                  opacity: f.opacity,
+                }}
+              >
+                🍃
+              </span>
             ))}
+          </div>
 
-            <div className="ml-auto flex gap-2">
-              <button
-                onClick={() => goTo((current - 1 + slides.length) % slides.length)}
-                className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/35 border border-white/20 text-white text-xl flex items-center justify-center transition-all backdrop-blur-sm"
-              >
-                ‹
-              </button>
-              <button
-                onClick={() => goTo((current + 1) % slides.length)}
-                className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/35 border border-white/20 text-white text-xl flex items-center justify-center transition-all backdrop-blur-sm"
-              >
-                ›
-              </button>
+          {/* Texte — remonté via key pour stagger */}
+          <div
+            key={`text-${slideKey}`}
+            className="absolute bottom-0 left-0 right-0 z-10 p-10"
+          >
+            {/* Badge stat */}
+            <div className="hero-anim-badge inline-flex items-center gap-2 bg-[#c4962a]/90 backdrop-blur-sm text-white px-4 py-1.5 rounded-full text-sm font-semibold mb-5">
+              <span>📊</span>
+              <span>{slide.stat}</span>
+            </div>
+
+            {/* Titre */}
+            <h2 className="hero-anim-title text-white text-3xl font-bold leading-tight mb-3 drop-shadow-lg">
+              {slide.titre}
+            </h2>
+
+            {/* Citation */}
+            <p className="hero-anim-cite text-white/80 text-lg leading-relaxed mb-8 max-w-lg">
+              "{slide.citation}"
+            </p>
+
+            {/* Navigation */}
+            <div className="hero-anim-nav flex items-center gap-3">
+              {slides.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => goTo(i)}
+                  className={`transition-all duration-400 rounded-full ${
+                    i === current
+                      ? "w-8 h-3 bg-[#c4962a]"
+                      : "w-3 h-3 bg-white/40 hover:bg-white/75"
+                  }`}
+                />
+              ))}
+
+              <div className="ml-auto flex gap-2">
+                <button
+                  onClick={() => goTo((current - 1 + slides.length) % slides.length)}
+                  className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/35 border border-white/20 text-white text-xl flex items-center justify-center transition-all backdrop-blur-sm"
+                >
+                  ‹
+                </button>
+                <button
+                  onClick={() => goTo((current + 1) % slides.length)}
+                  className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/35 border border-white/20 text-white text-xl flex items-center justify-center transition-all backdrop-blur-sm"
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bandeau de statistiques — compteurs animés */}
+        <div
+          className="relative z-20 flex items-center justify-center gap-10 px-10 py-5 border-t border-white/10"
+          style={{ backgroundColor: theme.barBg, transition: "background-color 1.5s ease" }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🚚</span>
+            <div>
+              <p className="text-white text-2xl font-bold leading-none tabular-nums">{livraisonsAffiche}</p>
+              <p className="text-white/60 text-xs mt-1">livraisons enregistrées ce mois</p>
+            </div>
+          </div>
+          <div className="w-px h-10 bg-white/15" />
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🌱</span>
+            <div>
+              <p className="text-white text-2xl font-bold leading-none tabular-nums">{membresAffiche}</p>
+              <p className="text-white/60 text-xs mt-1">producteurs membres</p>
             </div>
           </div>
         </div>
@@ -387,6 +502,26 @@ export default function Login() {
         }
         .hero-anim-nav {
           animation: heroRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both;
+        }
+
+        /* ── Particules : feuilles de cacao qui tombent ──────────────── */
+        @keyframes heroLeafFall {
+          0%   { top: -10%; transform: translateX(0px) rotate(0deg); opacity: 0; }
+          10%  { opacity: 0.85; }
+          50%  { transform: translateX(18px) rotate(160deg); }
+          90%  { opacity: 0.6; }
+          100% { top: 110%; transform: translateX(-14px) rotate(340deg); opacity: 0; }
+        }
+        .hero-leaf {
+          position: absolute;
+          top: -10%;
+          animation-name: heroLeafFall;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
+          will-change: top, transform, opacity;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .hero-leaf { display: none; }
         }
       `}</style>
     </div>
