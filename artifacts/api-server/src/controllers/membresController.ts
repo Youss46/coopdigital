@@ -1063,3 +1063,80 @@ export async function updateCarteStatut(req: Request, res: Response): Promise<vo
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
+
+const TRANCHES_AGE = [
+  { cle: "moins_25", label: "Moins de 25 ans", min: 0, max: 24 },
+  { cle: "25_34", label: "25–34 ans", min: 25, max: 34 },
+  { cle: "35_44", label: "35–44 ans", min: 35, max: 44 },
+  { cle: "45_54", label: "45–54 ans", min: 45, max: 54 },
+  { cle: "55_64", label: "55–64 ans", min: 55, max: 64 },
+  { cle: "65_plus", label: "65 ans et plus", min: 65, max: 200 },
+] as const;
+
+export async function getRepartitionMembres(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+
+  try {
+    const membres = await db
+      .select({ sexe: membresTable.sexe, dateNaissance: membresTable.dateNaissance })
+      .from(membresTable)
+      .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif")));
+
+    const total = membres.length;
+    let hommes = 0;
+    let femmes = 0;
+    let sexeNonRenseigne = 0;
+    let sommeAges = 0;
+    let nbAgesConnus = 0;
+    let ageNonRenseigne = 0;
+
+    const tranches = TRANCHES_AGE.map((t) => ({ cle: t.cle, label: t.label, count: 0 }));
+
+    const aujourdHui = new Date();
+
+    for (const m of membres) {
+      if (m.sexe === "M") hommes++;
+      else if (m.sexe === "F") femmes++;
+      else sexeNonRenseigne++;
+
+      if (!m.dateNaissance) {
+        ageNonRenseigne++;
+        continue;
+      }
+      const naissance = new Date(m.dateNaissance);
+      let age = aujourdHui.getFullYear() - naissance.getFullYear();
+      const moisDiff = aujourdHui.getMonth() - naissance.getMonth();
+      if (moisDiff < 0 || (moisDiff === 0 && aujourdHui.getDate() < naissance.getDate())) {
+        age--;
+      }
+      if (isNaN(age) || age < 0 || age > 130) {
+        ageNonRenseigne++;
+        continue;
+      }
+      sommeAges += age;
+      nbAgesConnus++;
+      const tranche = tranches.find((_, i) => age >= TRANCHES_AGE[i]!.min && age <= TRANCHES_AGE[i]!.max);
+      if (tranche) tranche.count++;
+    }
+
+    res.json({
+      total,
+      genre: {
+        hommes,
+        femmes,
+        nonRenseigne: sexeNonRenseigne,
+        pourcentageFemmes: total > 0 ? Math.round((femmes / total) * 1000) / 10 : 0,
+        pourcentageHommes: total > 0 ? Math.round((hommes / total) * 1000) / 10 : 0,
+      },
+      age: {
+        moyenne: nbAgesConnus > 0 ? Math.round((sommeAges / nbAgesConnus) * 10) / 10 : null,
+        nonRenseigne: ageNonRenseigne,
+        tranches,
+      },
+    });
+  } catch (err) {
+    req.log.error({ err }, "Erreur getRepartitionMembres");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}

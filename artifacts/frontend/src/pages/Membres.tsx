@@ -7,12 +7,15 @@ import {
   UserPlus, Search, Eye, FileDown, Loader2, Check,
   Building2, User, AlertTriangle, CheckCircle,
   XCircle, Clock, MapPin, ClipboardList, Users,
+  PieChart, List,
 } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { RepartitionMembres } from "@/components/membres/RepartitionMembres";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -325,6 +328,18 @@ export default function Membres() {
         </div>
       </div>
 
+      <Tabs defaultValue="liste">
+        <TabsList>
+          <TabsTrigger value="liste" className="flex items-center gap-1.5">
+            <List size={14} /> Liste
+          </TabsTrigger>
+          <TabsTrigger value="repartition" className="flex items-center gap-1.5">
+            <PieChart size={14} /> Répartition
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="liste" className="space-y-5 mt-4">
+
       {/* ── Tabs délégué ─────────────────────────────────────────────────────── */}
       {estDelegue && (
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
@@ -526,6 +541,13 @@ export default function Membres() {
           </table>
         </div>
       )}
+
+        </TabsContent>
+
+        <TabsContent value="repartition" className="mt-4">
+          <RepartitionMembres />
+        </TabsContent>
+      </Tabs>
 
       {/* ── Modal rejet ──────────────────────────────────────────────────────── */}
       {modalRejet && (
