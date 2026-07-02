@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLogin } from "@workspace/api-client-react";
-import { useCountUp } from "@/hooks/use-count-up";
 import { Eye, EyeOff } from "lucide-react";
 
 const slides = [
@@ -43,28 +42,25 @@ function getPeriodeJour(): Periode {
 
 const GRADIENT_THEMES: Record<
   Periode,
-  { bgBase: string; overlayBottom: string; overlayRight: string; barBg: string }
+  { bgBase: string; overlayBottom: string; overlayRight: string }
 > = {
   matin: {
     bgBase: "#2b1f0a",
     overlayBottom:
       "linear-gradient(to top, rgba(61,42,10,0.95), rgba(196,150,42,0.28), transparent)",
     overlayRight: "linear-gradient(to right, rgba(61,42,10,0.25), transparent)",
-    barBg: "#2b1f0a",
   },
   jour: {
     bgBase: "#0d2b1a",
     overlayBottom:
       "linear-gradient(to top, rgba(10,31,18,0.95), rgba(13,43,26,0.3), transparent)",
     overlayRight: "linear-gradient(to right, rgba(13,43,26,0.2), transparent)",
-    barBg: "#0d2b1a",
   },
   soir: {
     bgBase: "#050f09",
     overlayBottom:
       "linear-gradient(to top, rgba(3,10,6,0.97), rgba(8,20,14,0.42), transparent)",
     overlayRight: "linear-gradient(to right, rgba(5,14,9,0.3), transparent)",
-    barBg: "#050f09",
   },
 };
 
@@ -98,9 +94,6 @@ export default function Login() {
   const [periode, setPeriode] = useState<Periode>(() => getPeriodeJour());
   const [feuilles] = useState(genererFeuilles);
   const theme = GRADIENT_THEMES[periode];
-
-  const livraisonsAffiche = useCountUp("1 245", 1400);
-  const membresAffiche = useCountUp("586", 1400);
 
   useEffect(() => {
     const t = setInterval(() => setPeriode(getPeriodeJour()), 5 * 60 * 1000);
@@ -314,28 +307,6 @@ export default function Login() {
                   ›
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bandeau de statistiques — compteurs animés */}
-        <div
-          className="relative z-20 flex items-center justify-center gap-10 px-10 py-5 border-t border-white/10"
-          style={{ backgroundColor: theme.barBg, transition: "background-color 1.5s ease" }}
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🚚</span>
-            <div>
-              <p className="text-white text-2xl font-bold leading-none tabular-nums">{livraisonsAffiche}</p>
-              <p className="text-white/60 text-xs mt-1">livraisons enregistrées ce mois</p>
-            </div>
-          </div>
-          <div className="w-px h-10 bg-white/15" />
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🌱</span>
-            <div>
-              <p className="text-white text-2xl font-bold leading-none tabular-nums">{membresAffiche}</p>
-              <p className="text-white/60 text-xs mt-1">producteurs membres</p>
             </div>
           </div>
         </div>
