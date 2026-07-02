@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { useCreateMembre, type MembreInput } from "@workspace/api-client-react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
-  UserPlus, Search, Eye, FileDown, Loader2,
+  UserPlus, Search, Eye, FileDown, Loader2, Check,
   Building2, User, AlertTriangle, CheckCircle,
   XCircle, Clock, MapPin, ClipboardList, Users,
 } from "lucide-react";
@@ -49,7 +49,15 @@ const apiFetch = (url: string, opts?: RequestInit) =>
 function badgeStatutMembre(s: string | null | undefined) {
   switch (s) {
     case "actif":      return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700"><CheckCircle size={10} />Actif</span>;
-    case "en_attente": return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700"><Clock size={10} />En attente</span>;
+    case "en_attente": return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-500 opacity-75 motion-reduce:hidden" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-yellow-500" />
+        </span>
+        <Clock size={10} />En attente
+      </span>
+    );
     case "rejete":     return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700"><XCircle size={10} />Rejeté</span>;
     case "suspendu":   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">Suspendu</span>;
     default:           return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">{s ?? "—"}</span>;
@@ -521,8 +529,8 @@ export default function Membres() {
 
       {/* ── Modal rejet ──────────────────────────────────────────────────────── */}
       {modalRejet && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95 fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
             <div className="px-6 py-5 border-b border-gray-100">
               <h3 className="font-bold text-gray-900">Rejeter la demande</h3>
               <p className="text-sm text-gray-500 mt-1">{modalRejet.nom}</p>
@@ -551,8 +559,8 @@ export default function Membres() {
 
       {/* ── Modal nouveau membre ─────────────────────────────────────────────── */}
       {modalOuvert && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95 fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-gray-900">{estDelegue ? "Soumettre une demande" : "Nouveau membre"}</h3>
@@ -726,9 +734,15 @@ export default function Membres() {
                   Annuler
                 </button>
                 <button type="submit" disabled={mutation.isPending}
-                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
-                  style={{ backgroundColor: "#1a4731" }}>
-                  {mutation.isPending ? "Enregistrement…" : estDelegue ? "Soumettre la demande →" : "Créer le membre →"}
+                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-90 flex items-center justify-center gap-2 transition-colors duration-200"
+                  style={{ backgroundColor: mutation.isError ? "#b91c1c" : "#1a4731" }}>
+                  {mutation.isPending && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />}
+                  {mutation.isSuccess && !mutation.isPending && <Check size={16} />}
+                  {mutation.isPending
+                    ? "Enregistrement…"
+                    : mutation.isError
+                      ? "Réessayer"
+                      : estDelegue ? "Soumettre la demande →" : "Créer le membre →"}
                 </button>
               </div>
             </form>

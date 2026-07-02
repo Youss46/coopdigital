@@ -12,7 +12,7 @@ import {
   getGetScoringResumeQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { PlusCircle, TrendingDown, Banknote, Clock, FileDown, CloudOff, HandCoins } from "lucide-react";
+import { PlusCircle, TrendingDown, Banknote, Clock, FileDown, CloudOff, HandCoins, Loader2, Check } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
@@ -252,11 +252,17 @@ export default function Avances() {
                   <td className="px-4 py-3 text-right font-semibold text-amber-700">{formaterFCFA(a.soldeRestantFcfa)}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs hidden sm:table-cell">{a.dateEcheance ? formaterDate(a.dateEcheance) : "—"}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       a.statut === "rembourse" ? "bg-green-100 text-green-700"
                       : a.statut === "en_retard" ? "bg-red-100 text-red-700"
                       : "bg-amber-100 text-amber-700"
                     }`}>
+                      {a.statut === "en_retard" && (
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75 motion-reduce:hidden" />
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
+                        </span>
+                      )}
                       {a.statut === "en_cours" ? "En cours" : a.statut === "rembourse" ? "Remboursé" : "En retard"}
                     </span>
                   </td>
@@ -288,8 +294,8 @@ export default function Avances() {
 
       {/* Modal octroyer */}
       {modalOuvert && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-in zoom-in-95 fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-bold text-gray-900">Octroyer une avance</h3>
               <button onClick={() => { setModalOuvert(false); setMembreSearch(""); setMembreDropdownOuvert(false); }} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
@@ -435,10 +441,12 @@ export default function Avances() {
                 <button
                   type="submit"
                   disabled={mutation.isPending}
-                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
-                  style={{ backgroundColor: "#c4962a" }}
+                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-90 flex items-center justify-center gap-2 transition-colors duration-200"
+                  style={{ backgroundColor: mutation.isError ? "#b91c1c" : "#c4962a" }}
                 >
-                  {mutation.isPending ? "Enregistrement…" : "Octroyer l'avance"}
+                  {mutation.isPending && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />}
+                  {mutation.isSuccess && !mutation.isPending && <Check size={16} />}
+                  {mutation.isPending ? "Enregistrement…" : mutation.isError ? "Réessayer" : "Octroyer l'avance"}
                 </button>
               </div>
             </form>
@@ -448,8 +456,8 @@ export default function Avances() {
 
       {/* Modal remboursement */}
       {modalRemboursement && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95 fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-bold text-gray-900">Rembourser une avance</h3>
               <button
@@ -492,10 +500,12 @@ export default function Avances() {
                   type="button"
                   onClick={confirmerRemboursement}
                   disabled={mutationRembourser.isPending || !montantRemboursement}
-                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
-                  style={{ backgroundColor: "#1a4731" }}
+                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-90 flex items-center justify-center gap-2 transition-colors duration-200"
+                  style={{ backgroundColor: mutationRembourser.isError ? "#b91c1c" : "#1a4731" }}
                 >
-                  {mutationRembourser.isPending ? "Enregistrement…" : "Confirmer"}
+                  {mutationRembourser.isPending && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />}
+                  {mutationRembourser.isSuccess && !mutationRembourser.isPending && <Check size={16} />}
+                  {mutationRembourser.isPending ? "Enregistrement…" : mutationRembourser.isError ? "Réessayer" : "Confirmer"}
                 </button>
               </div>
             </div>
