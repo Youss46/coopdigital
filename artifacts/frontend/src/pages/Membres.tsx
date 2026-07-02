@@ -6,8 +6,10 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   UserPlus, Search, Eye, FileDown, Loader2,
   Building2, User, AlertTriangle, CheckCircle,
-  XCircle, Clock, MapPin, ClipboardList,
+  XCircle, Clock, MapPin, ClipboardList, Users,
 } from "lucide-react";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -402,13 +404,14 @@ export default function Membres() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {isLoadingCurrent ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>{Array.from({ length: 6 }).map((_, j) => (
-                    <td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td>
-                  ))}</tr>
-                ))
+                <TableSkeleton colonnes={7} lignes={6} />
               ) : membres.length === 0 ? (
-                <tr><td colSpan={7} className="text-center text-gray-400 py-12">Aucun membre trouvé</td></tr>
+                <EmptyState
+                  colSpan={7}
+                  icone={Users}
+                  titre="Aucun membre trouvé"
+                  description="Ajoutez un membre ou ajustez vos filtres de recherche."
+                />
               ) : membres.map((m) => (
                 <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-900">
@@ -478,13 +481,14 @@ export default function Membres() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {demandesLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <tr key={i}>{Array.from({ length: 6 }).map((_, j) => (
-                    <td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td>
-                  ))}</tr>
-                ))
+                <TableSkeleton colonnes={6} lignes={4} />
               ) : membres.length === 0 ? (
-                <tr><td colSpan={6} className="text-center text-gray-400 py-12">Aucune demande soumise</td></tr>
+                <EmptyState
+                  colSpan={6}
+                  icone={ClipboardList}
+                  titre="Aucune demande soumise"
+                  description="Les nouvelles demandes d'adhésion apparaîtront ici."
+                />
               ) : membres.map((m) => (
                 <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-900">{m.prenoms} {m.nom}</td>

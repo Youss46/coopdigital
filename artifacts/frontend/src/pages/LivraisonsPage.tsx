@@ -7,6 +7,8 @@ import {
   Scale, Banknote, TrendingDown, ArrowDownCircle, FileDown,
   Warehouse, ChevronDown, MapPin, User, Printer,
 } from "lucide-react";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const ROLES_CREER = ["pca", "directeur", "delegue", "magasinier"];
 const ROLES_VOIR_DELEGUES = ["pca", "directeur", "magasinier", "comptable", "auditeur"];
@@ -163,15 +165,16 @@ export default function LivraisonsPage() {
 
       {/* Liste */}
       {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="animate-spin text-gray-300" size={32} />
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <table className="w-full"><tbody><TableSkeleton colonnes={4} lignes={6} /></tbody></table>
         </div>
       ) : filtres.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl border border-gray-100">
-          <Package size={40} className="mx-auto text-gray-200 mb-3" />
-          <p className="text-gray-400 text-sm">
-            {recherche ? "Aucun résultat pour cette recherche" : "Aucune livraison enregistrée"}
-          </p>
+        <div className="bg-white rounded-xl border border-gray-100">
+          <EmptyState
+            icone={Package}
+            titre={recherche ? "Aucun résultat pour cette recherche" : "Aucune livraison enregistrée"}
+            description={!recherche ? "Les livraisons pesées apparaîtront ici." : undefined}
+          />
           {!recherche && peutCreer && (
             <Link href="/livraisons/nouvelle">
               <a className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-white px-4 py-2 rounded-lg"

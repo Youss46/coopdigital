@@ -69,7 +69,7 @@ import PendingOpsPage from "@/pages/PendingOpsPage";
 import ArchivesPage from "@/pages/ArchivesPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/sonner";
 import { OnlineToast } from "@/components/OfflineIndicator";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import PdfViewerModal from "@/components/PdfViewerModal";
@@ -307,7 +307,19 @@ function App() {
           <AuthProvider>
             <OnlineToast />
             <AppRoutes />
-            <Toaster />
+            <Toaster
+              position="top-right"
+              richColors
+              closeButton
+              toastOptions={{
+                classNames: {
+                  success: "!border-l-4 !border-l-emerald-500",
+                  error: "!border-l-4 !border-l-red-500",
+                  warning: "!border-l-4 !border-l-amber-500",
+                  info: "!border-l-4 !border-l-blue-500",
+                },
+              }}
+            />
             <PdfViewerModal />
           </AuthProvider>
         </WouterRouter>

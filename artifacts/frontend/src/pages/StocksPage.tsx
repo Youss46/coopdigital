@@ -13,7 +13,9 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
-import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle, PackageCheck, Clock, ArrowRight } from "lucide-react";
+import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle, PackageCheck, Clock, ArrowRight, Boxes } from "lucide-react";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -315,12 +317,15 @@ export default function StocksPage() {
         <div className="space-y-3">
           {isLoading ? (
             [1, 2].map((i) => (
-              <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse h-24" />
+              <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse h-24" style={{ animationDelay: `${i * 100}ms` }} />
             ))
           ) : entrepots.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-              <Warehouse size={40} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500">Aucun entrepôt configuré</p>
+            <div className="bg-white rounded-xl border border-gray-200">
+              <EmptyState
+                icone={Warehouse}
+                titre="Aucun entrepôt configuré"
+                description="Créez un entrepôt pour commencer à suivre vos stocks."
+              />
             </div>
           ) : (
             entrepots.map((e) => {
@@ -395,11 +400,12 @@ export default function StocksPage() {
                 </thead>
                 <tbody>
                   {mouvements.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                        Aucun mouvement enregistré
-                      </td>
-                    </tr>
+                    <EmptyState
+                      colSpan={6}
+                      icone={Boxes}
+                      titre="Aucun mouvement enregistré"
+                      description="Les entrées et sorties de stock apparaîtront ici."
+                    />
                   ) : (
                     mouvements.map((m) => {
                       const estSurbrillance = filtreTransfert

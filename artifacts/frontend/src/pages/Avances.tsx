@@ -12,7 +12,9 @@ import {
   getGetScoringResumeQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { PlusCircle, TrendingDown, Banknote, Clock, FileDown, CloudOff } from "lucide-react";
+import { PlusCircle, TrendingDown, Banknote, Clock, FileDown, CloudOff, HandCoins } from "lucide-react";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import { queueOp } from "@/lib/idb";
@@ -233,11 +235,14 @@ export default function Avances() {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 5 }).map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td>)}</tr>
-              ))
+              <TableSkeleton colonnes={7} lignes={5} />
             ) : avances.length === 0 ? (
-              <tr><td colSpan={7} className="text-center text-gray-400 py-12">Aucune avance</td></tr>
+              <EmptyState
+                colSpan={7}
+                icone={HandCoins}
+                titre="Aucune avance"
+                description="Les avances octroyées aux membres apparaîtront ici."
+              />
             ) : (
               avances.map((a) => (
                 <tr key={a.id} className="hover:bg-gray-50">
