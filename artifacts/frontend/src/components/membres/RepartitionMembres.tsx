@@ -101,7 +101,11 @@ export function RepartitionMembres() {
         <h3 className="text-sm font-semibold text-gray-900 mb-3">Répartition par genre</h3>
         {total > 0 ? (
           <>
-            <div className="flex h-4 w-full rounded-full overflow-hidden bg-gray-100">
+            <div
+              className="flex h-4 w-full rounded-full overflow-hidden bg-gray-100"
+              role="img"
+              aria-label={`Hommes ${genre.pourcentageHommes}%, Femmes ${genre.pourcentageFemmes}%`}
+            >
               <div
                 className="bg-blue-500 transition-all duration-700 ease-out"
                 style={{ width: monte ? `${genre.pourcentageHommes}%` : "0%" }}
