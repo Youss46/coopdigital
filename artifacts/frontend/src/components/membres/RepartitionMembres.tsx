@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Users, UserRound, Loader2 } from "lucide-react";
 
@@ -31,6 +32,14 @@ export function RepartitionMembres() {
       return r.json();
     },
   });
+
+  const [monte, setMonte] = useState(false);
+  useEffect(() => {
+    if (!data) return;
+    setMonte(false);
+    const t = setTimeout(() => setMonte(true), 30);
+    return () => clearTimeout(t);
+  }, [data]);
 
   if (isLoading) {
     return (
@@ -93,8 +102,16 @@ export function RepartitionMembres() {
         {total > 0 ? (
           <>
             <div className="flex h-4 w-full rounded-full overflow-hidden bg-gray-100">
-              <div className="bg-blue-500" style={{ width: `${genre.pourcentageHommes}%` }} title={`Hommes ${genre.pourcentageHommes}%`} />
-              <div className="bg-pink-500" style={{ width: `${genre.pourcentageFemmes}%` }} title={`Femmes ${genre.pourcentageFemmes}%`} />
+              <div
+                className="bg-blue-500 transition-all duration-700 ease-out"
+                style={{ width: monte ? `${genre.pourcentageHommes}%` : "0%" }}
+                title={`Hommes ${genre.pourcentageHommes}%`}
+              />
+              <div
+                className="bg-pink-500 transition-all duration-700 ease-out"
+                style={{ width: monte ? `${genre.pourcentageFemmes}%` : "0%" }}
+                title={`Femmes ${genre.pourcentageFemmes}%`}
+              />
             </div>
             <div className="flex items-center gap-4 mt-3 text-xs text-gray-600">
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Hommes — {genre.hommes} ({genre.pourcentageHommes}%)</span>
@@ -119,8 +136,8 @@ export function RepartitionMembres() {
                 <span className="w-16 text-xs text-gray-600 font-medium flex-shrink-0">{t.label}</span>
                 <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
                   <div
-                    className="h-full rounded-full"
-                    style={{ width: `${(t.count / maxTranche) * 100}%`, backgroundColor: "#1a4731" }}
+                    className="h-full rounded-full transition-all duration-700 ease-out"
+                    style={{ width: monte ? `${(t.count / maxTranche) * 100}%` : "0%", backgroundColor: "#1a4731" }}
                   />
                 </div>
                 <span className="w-10 text-xs text-gray-500 text-right flex-shrink-0">{t.count}</span>
