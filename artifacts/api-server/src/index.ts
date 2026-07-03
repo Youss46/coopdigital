@@ -1,3 +1,13 @@
+import { webcrypto } from "node:crypto";
+
+// Polyfill défensif : @simplewebauthn/server exige `globalThis.crypto` (WebCrypto),
+// disponible nativement à partir de Node 20+. Certains environnements de build/déploiement
+// (Railway, etc.) peuvent exécuter une version de Node plus ancienne ou une config qui ne
+// l'expose pas globalement — ce polyfill garantit sa présence quel que soit l'environnement.
+if (typeof globalThis.crypto === "undefined") {
+  (globalThis as unknown as { crypto: Crypto }).crypto = webcrypto as unknown as Crypto;
+}
+
 import app from "./app";
 import { logger } from "./lib/logger";
 import cron from "node-cron";
