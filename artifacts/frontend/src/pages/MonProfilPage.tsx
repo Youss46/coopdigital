@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import BiometrieSection from "@/components/BiometrieSection";
+import PhotoCropDialog from "@/components/PhotoCropDialog";
 import { UserRound, Camera, Trash2, Loader2 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -9,19 +10,21 @@ import { useSaveAuthPhoto, ApiError } from "@workspace/api-client-react";
 
 const MAX_BYTES = 300 * 1024;
 
-async function resizeAndCompressPhoto(file: File): Promise<string> {
-  const raw = await new Promise<string>((resolve, reject) => {
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
 
+async function compressDataUrl(dataUrl: string): Promise<string> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const el = new Image();
     el.onload = () => resolve(el);
     el.onerror = reject;
-    el.src = raw;
+    el.src = dataUrl;
   });
 
   let bestUrl: string | null = null;
@@ -57,6 +60,7 @@ export default function MonProfilPage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   const savePhoto = useSaveAuthPhoto({
     mutation: {
@@ -89,9 +93,19 @@ export default function MonProfilPage() {
       return;
     }
 
+    try {
+      const rawDataUrl = await readFileAsDataUrl(file);
+      setCropSrc(rawDataUrl);
+    } catch {
+      toast({ title: "Erreur lors du chargement de l'image", variant: "destructive" });
+    }
+  }
+
+  async function handleCropConfirm(croppedDataUrl: string) {
+    setCropSrc(null);
     setIsUploading(true);
     try {
-      const dataUrl = await resizeAndCompressPhoto(file);
+      const dataUrl = await compressDataUrl(croppedDataUrl);
       savePhoto.mutate({ data: { photoDataUrl: dataUrl } });
     } catch {
       setIsUploading(false);
@@ -183,6 +197,13 @@ export default function MonProfilPage() {
       </div>
 
       <BiometrieSection />
+
+      <PhotoCropDialog
+        open={cropSrc !== null}
+        imageSrc={cropSrc}
+        onCancel={() => setCropSrc(null)}
+        onConfirm={(dataUrl) => void handleCropConfirm(dataUrl)}
+      />
     </div>
   );
 }
