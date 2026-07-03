@@ -13,7 +13,8 @@ import { drawHeader, drawFooter } from "./pdfHeaderService";
 export type AuditAction =
   | "CREATE" | "UPDATE" | "DELETE"
   | "LOGIN" | "LOGOUT"
-  | "EXPORT" | "PRINT" | "VALIDATE" | "REJECT" | "CONFIG_CHANGE";
+  | "EXPORT" | "PRINT" | "VALIDATE" | "REJECT" | "CONFIG_CHANGE"
+  | "WEBAUTHN_REGISTER" | "WEBAUTHN_DELETE";
 
 export interface AuditLogParams {
   action:        AuditAction;

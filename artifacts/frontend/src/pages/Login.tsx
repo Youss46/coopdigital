@@ -2,7 +2,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLogin } from "@workspace/api-client-react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Fingerprint } from "lucide-react";
+import { authentificateurPlateformeDisponible, connexionBiometrique } from "@/lib/webauthn";
+
+const DERNIER_EMAIL_KEY = "coop_last_email";
 
 const slides = [
   {
@@ -86,10 +89,12 @@ export default function Login() {
   const crossingRef = useRef(false);
   const currentRef = useRef(0);
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => localStorage.getItem(DERNIER_EMAIL_KEY) ?? "");
   const [motDePasse, setMotDePasse] = useState("");
   const [afficherMdp, setAfficherMdp] = useState(false);
   const [erreur, setErreur] = useState("");
+  const [biometrieSupportee, setBiometrieSupportee] = useState(false);
+  const [biometrieEnCours, setBiometrieEnCours] = useState(false);
 
   const [periode, setPeriode] = useState<Periode>(() => getPeriodeJour());
   const [feuilles] = useState(genererFeuilles);
@@ -119,25 +124,61 @@ export default function Login() {
     return () => clearInterval(timer);
   }, [goTo]);
 
+  useEffect(() => {
+    void authentificateurPlateformeDisponible().then(setBiometrieSupportee);
+  }, []);
+
+  const traiterConnexionReussie = useCallback((data: {
+    utilisateur: { id: number; nom: string; prenoms: string; role: string; cooperativeId?: number | null; motDePasseTemporaire?: boolean };
+    token: string;
+  }, emailConnecte: string) => {
+    if (data.utilisateur.role === "agent_terrain") {
+      setErreur("__AGENT_TERRAIN__");
+      return;
+    }
+    localStorage.setItem(DERNIER_EMAIL_KEY, emailConnecte);
+    login(data.token, {
+      id: data.utilisateur.id,
+      nom: data.utilisateur.nom,
+      prenoms: data.utilisateur.prenoms,
+      role: data.utilisateur.role,
+      cooperativeId: data.utilisateur.cooperativeId ?? null,
+    });
+    if (data.utilisateur.motDePasseTemporaire) {
+      navigate("/changer-mot-de-passe");
+    } else {
+      navigate("/dashboard");
+    }
+  }, [login, navigate]);
+
+  const handleBiometricLogin = async () => {
+    if (!email) {
+      setErreur("Veuillez saisir votre adresse email pour la connexion biométrique");
+      return;
+    }
+    setErreur("");
+    setBiometrieEnCours(true);
+    try {
+      const data = await connexionBiometrique(email);
+      traiterConnexionReussie(data, email);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (message.toLowerCase().includes("cancel") || message.toLowerCase().includes("annul")) {
+        // L'utilisateur a annulé la demande biométrique — pas d'erreur affichée
+      } else if (message) {
+        setErreur(message);
+      } else {
+        setErreur("Authentification biométrique impossible sur cet appareil");
+      }
+    } finally {
+      setBiometrieEnCours(false);
+    }
+  };
+
   const mutation = useLogin({
     mutation: {
       onSuccess: (data) => {
-        if (data.utilisateur.role === "agent_terrain") {
-          setErreur("__AGENT_TERRAIN__");
-          return;
-        }
-        login(data.token, {
-          id: data.utilisateur.id,
-          nom: data.utilisateur.nom,
-          prenoms: data.utilisateur.prenoms,
-          role: data.utilisateur.role,
-          cooperativeId: data.utilisateur.cooperativeId ?? null,
-        });
-        if (data.utilisateur.motDePasseTemporaire) {
-          navigate("/changer-mot-de-passe");
-        } else {
-          navigate("/dashboard");
-        }
+        traiterConnexionReussie(data, email);
       },
       onError: (err: unknown) => {
         const status = (err as { response?: { status?: number } })?.response?.status;
@@ -417,6 +458,35 @@ export default function Login() {
                 </>
               )}
             </button>
+
+            {biometrieSupportee && (
+              <>
+                <div className="flex items-center gap-3 my-1">
+                  <div className="flex-1 h-px bg-gray-200" />
+                  <span className="text-xs text-gray-400 font-medium">OU</span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleBiometricLogin}
+                  disabled={biometrieEnCours || mutation.isPending}
+                  className="w-full py-3.5 border-2 border-[#1a4731] text-[#1a4731] font-bold text-base rounded-xl transition-all hover:bg-[#1a4731]/5 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {biometrieEnCours ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-[#1a4731]/30 border-t-[#1a4731] rounded-full animate-spin" />
+                      <span>Vérification biométrique...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Fingerprint size={20} />
+                      <span>Empreinte digitale / Face ID</span>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
           </form>
 
           <div className="mt-6 text-center">
