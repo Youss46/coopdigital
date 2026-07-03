@@ -43,6 +43,7 @@ import PcaDashboardPage from "@/pages/PcaDashboardPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import NotificationsPreferencesPage from "@/pages/NotificationsPreferencesPage";
 import ParametresPage from "@/pages/ParametresPage";
+import MonProfilPage from "@/pages/MonProfilPage";
 import TransportPage from "@/pages/TransportPage";
 import EquipementsPage from "@/pages/EquipementsPage";
 import PrevisionsPage from "@/pages/PrevisionsPage";
@@ -80,9 +81,10 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { estConnecte } = useAuth();
+function ProtectedRoute({ component: Component, roles }: { component: React.ComponentType; roles?: string[] }) {
+  const { estConnecte, utilisateur } = useAuth();
   if (!estConnecte) return <Redirect to="/login" />;
+  if (roles && !roles.includes(utilisateur?.role ?? "")) return <Redirect to="/dashboard" />;
   return (
     <Layout>
       <Component />
@@ -219,7 +221,10 @@ function AppRoutes() {
         <ProtectedRoute component={NotificationsPage} />
       </Route>
       <Route path="/parametres">
-        <ProtectedRoute component={ParametresPage} />
+        <ProtectedRoute component={ParametresPage} roles={["pca", "directeur"]} />
+      </Route>
+      <Route path="/mon-profil">
+        <ProtectedRoute component={MonProfilPage} />
       </Route>
       <Route path="/transport">
         <ProtectedRoute component={TransportPage} />

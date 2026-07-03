@@ -46,7 +46,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import BiometrieSection from "@/components/BiometrieSection";
 import {
   Upload,
   Save,
@@ -61,7 +60,6 @@ import {
   Image as ImageIcon,
   Loader2,
   FileDown,
-  Fingerprint,
 } from "lucide-react";
 
 // ── Composant aperçu en-tête PDF ──────────────────────────────────────────────
@@ -574,10 +572,6 @@ export default function ParametresPage() {
             <FolderOpen className="w-4 h-4" />
             Documents officiels
           </TabsTrigger>
-          <TabsTrigger value="securite" className="flex items-center gap-2">
-            <Fingerprint className="w-4 h-4" />
-            Sécurité
-          </TabsTrigger>
         </TabsList>
 
         {/* ── Onglet 1 : Identité ─────────────────────────────────────── */}
@@ -999,11 +993,6 @@ export default function ParametresPage() {
               </div>
             )}
           </div>
-        </TabsContent>
-
-        {/* ── Onglet 5 : Sécurité ─────────────────────────────────────── */}
-        <TabsContent value="securite" className="space-y-6">
-          <BiometrieSection />
         </TabsContent>
       </Tabs>
 

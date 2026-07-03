@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   QrCode,
+  UserRound,
   Warehouse,
   Building2,
   Receipt,
@@ -278,6 +279,14 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
             </p>
           </div>
         </div>
+        <Link
+          href="/mon-profil"
+          onClick={onClose}
+          className="flex items-center gap-2 text-green-300 hover:text-white text-xs w-full transition-colors py-1"
+        >
+          <UserRound size={14} />
+          <span>Mon profil</span>
+        </Link>
         <button
           onClick={onLogout}
           className="flex items-center gap-2 text-green-300 hover:text-white text-xs w-full transition-colors py-1"
