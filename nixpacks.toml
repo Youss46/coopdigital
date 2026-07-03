@@ -1,2 +1,5 @@
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
 [phases.install]
 cmds = ["npm install -g pnpm@10 --quiet", "NODE_ENV=development pnpm install --no-frozen-lockfile"]
