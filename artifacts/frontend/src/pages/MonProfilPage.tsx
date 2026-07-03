@@ -5,9 +5,8 @@ import { UserRound, Camera, Trash2, Loader2 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useSaveAuthPhoto } from "@workspace/api-client-react";
+import { useSaveAuthPhoto, ApiError } from "@workspace/api-client-react";
 
-const MAX_DIM = 400;
 const MAX_BYTES = 300 * 1024;
 
 async function resizeAndCompressPhoto(file: File): Promise<string> {
@@ -25,25 +24,32 @@ async function resizeAndCompressPhoto(file: File): Promise<string> {
     el.src = raw;
   });
 
-  const scale  = Math.min(1, MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight));
-  const width  = Math.round(img.naturalWidth  * scale);
-  const height = Math.round(img.naturalHeight * scale);
+  let bestUrl: string | null = null;
 
-  const canvas = document.createElement("canvas");
-  canvas.width  = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(img, 0, 0, width, height);
+  // Réduit progressivement la dimension max si la compression seule ne suffit pas
+  // à passer sous la cible, afin de garantir que le serveur n'ait jamais à rejeter la photo.
+  for (const maxDim of [400, 300, 220, 160]) {
+    const scale  = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+    const width  = Math.max(1, Math.round(img.naturalWidth  * scale));
+    const height = Math.max(1, Math.round(img.naturalHeight * scale));
 
-  for (const quality of [0.90, 0.80, 0.70, 0.60]) {
-    const jpegUrl = canvas.toDataURL("image/jpeg", quality);
-    const jpegBytes = Math.ceil((jpegUrl.split(",")[1]?.length ?? 0) * 0.75);
-    if (jpegBytes <= MAX_BYTES || quality === 0.60) {
-      return jpegUrl;
+    const canvas = document.createElement("canvas");
+    canvas.width  = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0, width, height);
+
+    for (const quality of [0.90, 0.80, 0.70, 0.60]) {
+      const jpegUrl = canvas.toDataURL("image/jpeg", quality);
+      const jpegBytes = Math.ceil((jpegUrl.split(",")[1]?.length ?? 0) * 0.75);
+      bestUrl = jpegUrl;
+      if (jpegBytes <= MAX_BYTES) {
+        return jpegUrl;
+      }
     }
   }
 
-  return canvas.toDataURL("image/jpeg", 0.60);
+  return bestUrl!;
 }
 
 export default function MonProfilPage() {
@@ -55,11 +61,18 @@ export default function MonProfilPage() {
   const savePhoto = useSaveAuthPhoto({
     mutation: {
       onSuccess: (res) => {
-        updatePhotoUrl(res.data.photoUrl ?? null);
-        toast({ title: res.data.photoUrl ? "Photo de profil mise à jour" : "Photo de profil supprimée" });
+        updatePhotoUrl(res.photoUrl ?? null);
+        toast({ title: res.photoUrl ? "Photo de profil mise à jour" : "Photo de profil supprimée" });
       },
-      onError: () => {
-        toast({ title: "Erreur lors de l'enregistrement de la photo", variant: "destructive" });
+      onError: (err) => {
+        const detail = err instanceof ApiError && err.data && typeof err.data === "object" && "erreur" in err.data
+          ? String((err.data as { erreur?: string }).erreur)
+          : undefined;
+        toast({
+          title: "Erreur lors de l'enregistrement de la photo",
+          description: detail,
+          variant: "destructive",
+        });
       },
       onSettled: () => setIsUploading(false),
     },
