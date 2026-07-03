@@ -60,7 +60,8 @@ export async function getRegistrationOptions(req: Request, res: Response): Promi
     res.json(options);
   } catch (err) {
     req.log.error({ err }, "Erreur génération options WebAuthn (inscription)");
-    res.status(500).json({ erreur: "Erreur interne" });
+    const detail = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ erreur: `Erreur interne : ${detail}` });
   }
 }
 
@@ -115,7 +116,8 @@ export async function verifyRegistration(req: Request, res: Response): Promise<v
     res.json({ message: "Authentification biométrique activée avec succès" });
   } catch (err) {
     req.log.error({ err }, "Erreur vérification WebAuthn (inscription)");
-    res.status(500).json({ erreur: "Erreur interne" });
+    const detail = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ erreur: `Erreur interne : ${detail}` });
   }
 }
 
@@ -250,7 +252,8 @@ export async function verifyAuthentication(req: Request, res: Response): Promise
     });
   } catch (err) {
     req.log.error({ err }, "Erreur vérification WebAuthn (connexion)");
-    res.status(500).json({ erreur: "Erreur interne" });
+    const detail = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ erreur: `Erreur interne : ${detail}` });
   }
 }
 
@@ -273,7 +276,8 @@ export async function listCredentials(req: Request, res: Response): Promise<void
     res.json({ credentials });
   } catch (err) {
     req.log.error({ err }, "Erreur listage des identifiants biométriques");
-    res.status(500).json({ erreur: "Erreur interne" });
+    const detail = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ erreur: `Erreur interne : ${detail}` });
   }
 }
 
@@ -305,6 +309,7 @@ export async function deleteCredential(req: Request, res: Response): Promise<voi
     res.json({ message: "Identifiant biométrique supprimé" });
   } catch (err) {
     req.log.error({ err }, "Erreur suppression identifiant biométrique");
-    res.status(500).json({ erreur: "Erreur interne" });
+    const detail = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ erreur: `Erreur interne : ${detail}` });
   }
 }
