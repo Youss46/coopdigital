@@ -28,7 +28,24 @@ async function parseErreur(r: Response): Promise<string> {
 }
 
 export function biometrieDisponible(): boolean {
-  return browserSupportsWebAuthn();
+  if (!browserSupportsWebAuthn()) return false;
+  if (!window.isSecureContext) return false;
+  if (typeof window.crypto === "undefined" || typeof window.crypto.subtle === "undefined") return false;
+  return true;
+}
+
+function traduireErreurNavigateur(err: unknown): string {
+  const brut = err instanceof Error ? err.message : String(err);
+  if (/crypto api/i.test(brut)) {
+    return "Votre navigateur ne prend pas en charge cette fonctionnalité. Ouvrez cette page directement dans Chrome ou Safari à jour (pas depuis WhatsApp ou une autre application), puis réessayez.";
+  }
+  if (/publickeycredential|not supported|notsupportederror/i.test(brut)) {
+    return "L'authentification biométrique n'est pas prise en charge par cet appareil ou ce navigateur.";
+  }
+  if (/notallowederror/i.test(brut)) {
+    return "Opération annulée ou refusée sur cet appareil.";
+  }
+  return brut;
 }
 
 export async function authentificateurPlateformeDisponible(): Promise<boolean> {
@@ -48,7 +65,12 @@ export async function enregistrerBiometrie(nomAppareil?: string): Promise<void> 
   if (!optionsRes.ok) throw new WebAuthnError(await parseErreur(optionsRes));
   const options = await optionsRes.json();
 
-  const attestation = await startRegistration({ optionsJSON: options });
+  let attestation;
+  try {
+    attestation = await startRegistration({ optionsJSON: options });
+  } catch (err) {
+    throw new WebAuthnError(traduireErreurNavigateur(err));
+  }
 
   const verifyRes = await fetch(`${BASE}/api/auth/webauthn/register/verify`, {
     method: "POST",
@@ -79,7 +101,12 @@ export async function connexionBiometrique(email: string): Promise<ConnexionBiom
   if (!optionsRes.ok) throw new WebAuthnError(await parseErreur(optionsRes));
   const options = await optionsRes.json();
 
-  const assertion = await startAuthentication({ optionsJSON: options });
+  let assertion;
+  try {
+    assertion = await startAuthentication({ optionsJSON: options });
+  } catch (err) {
+    throw new WebAuthnError(traduireErreurNavigateur(err));
+  }
 
   const verifyRes = await fetch(`${BASE}/api/auth/webauthn/login/verify`, {
     method: "POST",
