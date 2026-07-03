@@ -65,6 +65,47 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /auth/photo:
+    put:
+      operationId: saveAuthPhoto
+      tags: [auth]
+      summary: Enregistrer ou supprimer la photo de profil de l'utilisateur connecté
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                photoDataUrl:
+                  type: ["string", "null"]
+                  description: "Data URL base64 de l'image, ou null pour supprimer la photo"
+      responses:
+        "200":
+          description: Photo enregistrée
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [photoUrl]
+                properties:
+                  photoUrl:
+                    type: ["string", "null"]
+        "400":
+          description: Photo invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Non authentifié
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /membres:
     get:
       operationId: getMembres
@@ -6550,6 +6591,8 @@ components:
           type: ["integer", "null"]
         motDePasseTemporaire:
           type: boolean
+        photoUrl:
+          type: ["string", "null"]
 
     Membre:
       type: object

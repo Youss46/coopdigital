@@ -414,6 +414,13 @@
       "when": 1783108800000,
       "tag": "0058_webauthn_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1783108801000,
+      "tag": "0059_users_photo_url",
+      "breakpoints": true
     }
   ]
 }

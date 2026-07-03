@@ -276,6 +276,8 @@ import type {
   ResultatVerifications,
   ResumeMembre,
   SaisirPrixInput,
+  SaveAuthPhoto200,
+  SaveAuthPhotoBody,
   ScoreMembreDetail,
   SearchFournisseursParams,
   SignalerRefusInput,
@@ -492,6 +494,77 @@ export const useLogin = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getLoginMutationOptions(options));
+    }
+
+export const getSaveAuthPhotoUrl = () => {
+
+
+
+
+  return `/api/auth/photo`
+}
+
+/**
+ * @summary Enregistrer ou supprimer la photo de profil de l'utilisateur connecté
+ */
+export const saveAuthPhoto = async (saveAuthPhotoBody: SaveAuthPhotoBody, options?: RequestInit): Promise<SaveAuthPhoto200> => {
+
+  return customFetch<SaveAuthPhoto200>(getSaveAuthPhotoUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      saveAuthPhotoBody,)
+  }
+);}
+
+
+
+
+export const getSaveAuthPhotoMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveAuthPhoto>>, TError,{data: BodyType<SaveAuthPhotoBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveAuthPhoto>>, TError,{data: BodyType<SaveAuthPhotoBody>}, TContext> => {
+
+const mutationKey = ['saveAuthPhoto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveAuthPhoto>>, {data: BodyType<SaveAuthPhotoBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveAuthPhoto(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveAuthPhotoMutationResult = NonNullable<Awaited<ReturnType<typeof saveAuthPhoto>>>
+    export type SaveAuthPhotoMutationBody = BodyType<SaveAuthPhotoBody>
+    export type SaveAuthPhotoMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Enregistrer ou supprimer la photo de profil de l'utilisateur connecté
+ */
+export const useSaveAuthPhoto = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveAuthPhoto>>, TError,{data: BodyType<SaveAuthPhotoBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveAuthPhoto>>,
+        TError,
+        {data: BodyType<SaveAuthPhotoBody>},
+        TContext
+      > => {
+      return useMutation(getSaveAuthPhotoMutationOptions(options));
     }
 
 export const getGetMembresUrl = (params?: GetMembresParams,) => {

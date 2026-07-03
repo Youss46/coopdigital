@@ -32,6 +32,7 @@ export const usersTable = pgTable("users", {
   zoneVillages: text("zone_villages"),
   actif: boolean("actif").notNull().default(true),
   motDePasseTemporaire: boolean("mot_de_passe_temporaire").notNull().default(false),
+  photoUrl: text("photo_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

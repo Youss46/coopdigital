@@ -52,6 +52,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
 import { OfflineBanner } from "./OfflineIndicator";
@@ -264,12 +265,12 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
       {/* User info */}
       <div className="px-4 py-4 border-t border-green-800">
         <div className="flex items-center gap-3 mb-3">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-            style={{ backgroundColor: "#c4962a" }}
-          >
-            {utilisateur?.nom?.[0]?.toUpperCase() ?? "U"}
-          </div>
+          <Avatar className="w-8 h-8 flex-shrink-0">
+            <AvatarImage src={utilisateur?.photoUrl ?? undefined} alt="Photo de profil" />
+            <AvatarFallback className="text-sm font-bold text-white" style={{ backgroundColor: "#c4962a" }}>
+              {utilisateur?.nom?.[0]?.toUpperCase() ?? "U"}
+            </AvatarFallback>
+          </Avatar>
           <div className="overflow-hidden">
             <p className="text-white text-sm font-medium truncate">
               {utilisateur?.prenoms} {utilisateur?.nom}

@@ -32,8 +32,21 @@ export const LoginResponse = zod.object({
   "prenoms": zod.string(),
   "role": zod.string(),
   "cooperativeId": zod.number().nullish(),
-  "motDePasseTemporaire": zod.boolean().optional()
+  "motDePasseTemporaire": zod.boolean().optional(),
+  "photoUrl": zod.string().nullish()
 })
+})
+
+
+/**
+ * @summary Enregistrer ou supprimer la photo de profil de l'utilisateur connecté
+ */
+export const SaveAuthPhotoBody = zod.object({
+  "photoDataUrl": zod.string().nullish().describe('Data URL base64 de l\'image, ou null pour supprimer la photo')
+})
+
+export const SaveAuthPhotoResponse = zod.object({
+  "photoUrl": zod.string().nullable()
 })
 
 

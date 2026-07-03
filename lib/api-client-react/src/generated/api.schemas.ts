@@ -630,6 +630,8 @@ export interface UserProfile {
   /** @nullable */
   cooperativeId?: number | null;
   motDePasseTemporaire?: boolean;
+  /** @nullable */
+  photoUrl?: string | null;
 }
 
 export interface AuthResponse {
@@ -4291,6 +4293,19 @@ export interface AlertesPrevisions {
   alertes?: AlerteItem[];
   campagne_active_id?: number | null;
 }
+
+export type SaveAuthPhotoBody = {
+  /**
+     * Data URL base64 de l'image, ou null pour supprimer la photo
+     * @nullable
+     */
+  photoDataUrl?: string | null;
+};
+
+export type SaveAuthPhoto200 = {
+  /** @nullable */
+  photoUrl: string | null;
+};
 
 export type GetMembresParams = {
 page?: number;

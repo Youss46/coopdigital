@@ -25,6 +25,7 @@ interface Utilisateur {
   prenoms: string;
   role: string;
   cooperativeId: number | null;
+  photoUrl?: string | null;
 }
 
 interface AuthContextType {
@@ -33,6 +34,7 @@ interface AuthContextType {
   login: (token: string, utilisateur: Utilisateur) => void;
   logout: () => void;
   estConnecte: boolean;
+  updatePhotoUrl: (photoUrl: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -58,8 +60,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUtilisateur(null);
   };
 
+  const updatePhotoUrl = (photoUrl: string | null) => {
+    setUtilisateur((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, photoUrl };
+      localStorage.setItem(USER_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ utilisateur, token, login, logout, estConnecte: !!token }}>
+    <AuthContext.Provider value={{ utilisateur, token, login, logout, estConnecte: !!token, updatePhotoUrl }}>
       {children}
     </AuthContext.Provider>
   );

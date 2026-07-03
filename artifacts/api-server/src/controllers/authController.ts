@@ -111,10 +111,52 @@ export async function login(req: Request, res: Response): Promise<void> {
         role:                  user.role,
         cooperativeId:         user.cooperativeId ?? null,
         motDePasseTemporaire:  user.motDePasseTemporaire ?? false,
+        photoUrl:              user.photoUrl ?? null,
       },
     });
   } catch (err) {
     req.log.error({ err }, "Erreur lors de la connexion");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── PUT /auth/photo ────────────────────────────────────────────────────────
+// Accepte { photoDataUrl: string } (data URL base64) et sauvegarde dans users.photo_url
+
+export async function savePhoto(req: Request, res: Response): Promise<void> {
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ erreur: "Non authentifié" }); return; }
+
+  const { photoDataUrl } = req.body as { photoDataUrl?: string | null };
+
+  if (photoDataUrl === null) {
+    try {
+      await db.update(usersTable).set({ photoUrl: null }).where(eq(usersTable.id, userId));
+      res.json({ photoUrl: null });
+    } catch (err) {
+      req.log.error({ err }, "Erreur suppression photo de profil");
+      const detail = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ erreur: `Erreur interne : ${detail}` });
+    }
+    return;
+  }
+
+  if (!photoDataUrl || !photoDataUrl.startsWith("data:image/")) {
+    res.status(400).json({ erreur: "Format de photo invalide (data URL attendue)" });
+    return;
+  }
+
+  if (photoDataUrl.length > 500_000) {
+    res.status(400).json({ erreur: "Photo trop volumineuse (max ~350 Ko)" });
+    return;
+  }
+
+  try {
+    await db.update(usersTable).set({ photoUrl: photoDataUrl }).where(eq(usersTable.id, userId));
+    res.json({ photoUrl: photoDataUrl });
+  } catch (err) {
+    req.log.error({ err }, "Erreur enregistrement photo de profil");
+    const detail = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ erreur: `Erreur interne : ${detail}` });
   }
 }
