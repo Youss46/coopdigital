@@ -170,13 +170,13 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
 
   const archive = archives.find(a => a.campagneId === selected);
 
-  const { data: livraisons, isLoading: loadLiv } = useQuery<unknown>({
+  const { data: livraisons, isLoading: loadLiv } = useQuery({
     queryKey: ["archive-livraisons", selected, searchLiv],
     queryFn: () => apiFetch(`/api/archives/${selected}/livraisons?limit=100&search=${encodeURIComponent(searchLiv)}`),
     enabled: !!selected && subTab === "livraisons",
   });
 
-  const { data: membres, isLoading: loadMbr } = useQuery<unknown>({
+  const { data: membres, isLoading: loadMbr } = useQuery({
     queryKey: ["archive-membres", selected, searchMbr],
     queryFn: () => apiFetch(`/api/archives/${selected}/membres?limit=100&search=${encodeURIComponent(searchMbr)}`),
     enabled: !!selected && subTab === "membres",
@@ -187,22 +187,21 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-gray-700">Campagne :</label>
-          <select
-            value={selected ?? ""}
-            onChange={e => { setSelected(Number(e.target.value)); setSubTab("resume"); }}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-          >
-            {archives.map(a => (
-              <option key={a.campagneId} value={a.campagneId}>
-                {a.campagne?.libelle ?? `Campagne ${a.campagneId}`}
-              </option>
-            ))}
-          </select>
-        </div>
+    <div>
+      {/* Sélecteur de campagne */}
+      <div className="flex items-center gap-3 mb-5">
+        <label className="text-sm font-medium text-gray-700">Campagne :</label>
+        <select
+          value={selected ?? ""}
+          onChange={e => { setSelected(Number(e.target.value)); setSubTab("resume"); }}
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+        >
+          {archives.map(a => (
+            <option key={a.campagneId} value={a.campagneId}>
+              {a.campagne?.libelle ?? `Campagne ${a.campagneId}`}
+            </option>
+          ))}
+        </select>
       </div>
 
       {archive && (
@@ -221,12 +220,10 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
           </div>
 
           {/* Sous-onglets */}
-          <div className="flex gap-1 mb-5 border-b border-gray-200 pb-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
+          <div className="flex gap-1 mb-5 border-b border-gray-200 pb-2">
             {(["resume","membres","livraisons","financier","tracabilite"] as const).map(t => (
               <TabBtn key={t} active={subTab === t} onClick={() => setSubTab(t)}>
-                <span className="shrink-0 whitespace-nowrap">
-                  {{ resume:"📊 Résumé", membres:"👥 Membres", livraisons:"📦 Livraisons", financier:"💰 Financier", tracabilite:"🌿 Traçabilité" }[t]}
-                </span>
+                {{ resume:"📊 Résumé", membres:"👥 Membres", livraisons:"📦 Livraisons", financier:"💰 Financier", tracabilite:"🌿 Traçabilité" }[t]}
               </TabBtn>
             ))}
           </div>
@@ -234,7 +231,7 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
           {/* Résumé */}
           {subTab === "resume" && (
             <div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                 <KpiCard label="Tonnage collecté"     value={fmtT(archive.tonnageTotalKg)}        sub={`${fmtNum(archive.nbLivraisons)} livraisons`} />
                 <KpiCard label="CA ventes"            value={fmtM(archive.caVentesFcfa)}           sub={`Prix vente moy : ${fmtK(archive.prixVenteMoyenKgFcfa)}`} />
                 <KpiCard label="Marge nette"          value={fmtM(archive.margeNetteFcfa)}         sub={`${fmtK(archive.margeKgFcfa)}/kg`} />
@@ -272,12 +269,12 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {(membres as { membres: {
+                      {((membres as { membres: {
                         id: number; nom: string; prenoms: string; village: string;
                         section: string; delegue_nom: string; tonnage_livre_kg: string;
                         montant_percu_fcfa: number; score_campagne: string;
                         niveau_campagne: string; certifie: boolean;
-                      }[] } | null)?.membres?.map(m => (
+                      }[] }) | null)?.membres?.map(m => (
                         <tr key={m.id} className="hover:bg-gray-50">
                           <td className="px-3 py-2 font-medium">{m.nom} {m.prenoms}</td>
                           <td className="px-3 py-2 text-gray-600">{m.village || "—"}</td>
@@ -326,11 +323,11 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {(livraisons as { livraisons: {
+                      {((livraisons as { livraisons: {
                         id: number; date_livraison: string; fournisseur_nom: string;
                         fournisseur_type: string; zone: string; delegue_nom: string;
                         poids_net_kg: string; prix_unitaire_fcfa: number; montant_net_fcfa: number;
-                      }[] } | null)?.livraisons?.map(l => (
+                      }[] }) | null)?.livraisons?.map(l => (
                         <tr key={l.id} className="hover:bg-gray-50">
                           <td className="px-3 py-2 text-gray-500">{fmtDate(l.date_livraison)}</td>
                           <td className="px-3 py-2 font-medium">{l.fournisseur_nom || "—"}</td>

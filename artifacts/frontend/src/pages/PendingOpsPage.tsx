@@ -140,7 +140,7 @@ export default function PendingOpsPage() {
           <ArrowLeft size={15} />
           Tableau de bord
         </button>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between flex-wrap gap-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <CloudOff size={22} className="text-amber-500" />
@@ -173,8 +173,8 @@ export default function PendingOpsPage() {
       </div>
 
       {/* Onglets */}
-      <div className="bg-gray-100 p-1 rounded-xl flex gap-1 overflow-x-auto">
-        <button className={`${tabClass("pending")} whitespace-nowrap shrink-0`} onClick={() => setTab("pending")}>
+      <div className="bg-gray-100 p-1 rounded-xl flex gap-1">
+        <button className={tabClass("pending")} onClick={() => setTab("pending")}>
           En attente
           {pendingOps.length > 0 && (
             <span className="ml-1.5 bg-amber-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5">
@@ -182,7 +182,7 @@ export default function PendingOpsPage() {
             </span>
           )}
         </button>
-        <button className={`${tabClass("error")} whitespace-nowrap shrink-0`} onClick={() => setTab("error")}>
+        <button className={tabClass("error")} onClick={() => setTab("error")}>
           Échecs
           {errorOps.length > 0 && (
             <span className="ml-1.5 bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5">
@@ -190,7 +190,7 @@ export default function PendingOpsPage() {
             </span>
           )}
         </button>
-        <button className={`${tabClass("synced")} whitespace-nowrap shrink-0`} onClick={() => setTab("synced")}>
+        <button className={tabClass("synced")} onClick={() => setTab("synced")}>
           Synchronisées
           {syncedOps.length > 0 && (
             <span className="ml-1.5 bg-green-600 text-white text-xs font-bold rounded-full px-1.5 py-0.5">

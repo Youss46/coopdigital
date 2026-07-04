@@ -165,7 +165,7 @@ export default function StocksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gestion des stocks</h1>
           <p className="text-gray-500 text-sm mt-1">Suivi des entrepôts et mouvements de cacao</p>
@@ -296,7 +296,7 @@ export default function StocksPage() {
       })()}
 
       {/* Onglets */}
-      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto whitespace-nowrap">
+      <div className="flex gap-1 border-b border-gray-200">
         {(["entrepots", "journal"] as const).map((o) => (
           <button
             key={o}

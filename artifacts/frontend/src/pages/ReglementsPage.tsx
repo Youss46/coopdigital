@@ -625,11 +625,9 @@ export default function ReglementsPage() {
   return (
     <div className="space-y-5">
       {/* ── En-tête ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Règlements</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Validation des paiements producteurs</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Règlements</h1>
+        <p className="text-gray-500 text-sm mt-0.5">Validation des paiements producteurs</p>
       </div>
 
       {/* ── Carte solde caisse (délégué uniquement) ── */}
@@ -789,7 +787,7 @@ export default function ReglementsPage() {
       </div>
 
       {/* ── Filtres ── */}
-      <div className="flex flex-col sm:flex-row gap-3 overflow-x-auto pb-1">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -894,7 +892,7 @@ function StatCard({
   subCls: string;
 }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-xl p-4 flex flex-col gap-2 overflow-hidden">
+    <div className="bg-white border border-gray-100 rounded-xl p-4 flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${bg}`}>
           {icon}

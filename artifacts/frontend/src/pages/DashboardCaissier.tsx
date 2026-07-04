@@ -333,7 +333,7 @@ export default function DashboardCaissier() {
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-7">
 
       {/* ── En-tête ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="rounded-xl p-2.5 bg-pink-50">
             <LayoutDashboard size={22} className="text-pink-600" />
@@ -373,11 +373,11 @@ export default function DashboardCaissier() {
 
       {/* ── KPIs ligne 1 : vue trésorerie ── */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map(i => <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse h-24" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <CarteKpi
             titre="Trésorerie totale"
             valeur={formaterFCFA(totalTresorerie)}
@@ -416,7 +416,7 @@ export default function DashboardCaissier() {
 
       {/* ── KPIs ligne 2 : activité du jour ── */}
       {!loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <CarteKpi
             titre="Entrées du jour"
             valeur={formaterFCFA(entreesJour)}
@@ -525,7 +525,7 @@ export default function DashboardCaissier() {
             Aucun compte mobile enregistré
           </div>
         ) : (
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 sm:grid-cols-3">
             {comptesMobile.filter(c => c.actif).map(c => (
               <WidgetMobile key={c.id} compte={c} onNavigate={() => navigate("/mobile-marchand")} />
             ))}

@@ -1430,7 +1430,7 @@ export default function CaissePage() {
   return (
     <div className="px-4 py-6 sm:p-6 max-w-7xl mx-auto">
       {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
             <Wallet size={20} className="text-white" />

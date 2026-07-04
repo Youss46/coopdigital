@@ -293,7 +293,7 @@ export default function Membres() {
     <div className="space-y-5">
 
       {/* ── En-tête ──────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
             {estDelegue ? `Mes membres${delegueCourant?.zoneNom ? ` — ${delegueCourant.zoneNom}` : ""}` : "Membres"}
@@ -302,7 +302,7 @@ export default function Membres() {
             {afficheDemandes ? `${demandesData?.total ?? 0} demandes` : `${data?.total ?? 0} membres${estDelegue ? " actifs dans votre zone" : ""}`}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           {peutExporter && !estDelegue && (
             <button onClick={handleExportPdf} disabled={exportPending}
               className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-60">
@@ -340,12 +340,12 @@ export default function Membres() {
 
         <TabsContent value="liste" className="space-y-5 mt-4">
 
-      {/* ── TABS délégué ─────────────────────────────────────────────────────── */}
+      {/* ── Tabs délégué ─────────────────────────────────────────────────────── */}
       {estDelegue && (
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-full sm:w-fit overflow-x-auto scrollbar-hide">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
           {([["membres", <ClipboardList size={14} />, "Mes membres"], ["demandes", <Clock size={14} />, "Mes demandes"]] as const).map(([key, icon, label]) => (
             <button key={key} onClick={() => setOnglet(key as "membres" | "demandes")}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${onglet === key ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${onglet === key ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
               {icon}{label}
             </button>
           ))}
@@ -373,7 +373,7 @@ export default function Membres() {
 
       {/* ── Filtres ───────────────────────────────────────────────────────────── */}
       {!afficheDemandes && (
-        <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3">
           <div className="relative flex-1 min-w-0" style={{ minWidth: "160px" }}>
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="search" placeholder="Rechercher nom, téléphone…" value={recherche}
@@ -382,9 +382,9 @@ export default function Membres() {
           </div>
 
           {!estDelegue && (
-            <div className="flex flex-col sm:flex-row gap-3">
+            <>
               <select value={filtreStatutMembre} onChange={(e) => setFiltreStatutMembre(e.target.value)}
-                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none w-full sm:w-auto">
+                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none">
                 <option value="">Tous statuts</option>
                 <option value="en_attente">⏳ En attente</option>
                 <option value="actif">✅ Actif</option>
@@ -392,7 +392,7 @@ export default function Membres() {
                 <option value="suspendu">⏸ Suspendu</option>
               </select>
               <select value={filtreDelegueId ?? ""} onChange={(e) => setFiltreDelegueId(e.target.value ? parseInt(e.target.value) : undefined)}
-                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none w-full sm:w-auto">
+                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none">
                 <option value="">Tous les délégués</option>
                 {delegues.map((d) => (
                   <option key={d.id} value={d.id}>{d.nom} {d.prenoms}{d.zoneNom ? ` — ${d.zoneNom}` : ""}</option>
@@ -400,12 +400,12 @@ export default function Membres() {
               </select>
               <select value={filtreRattachement}
                 onChange={(e) => { setFiltreRattachement(e.target.value as "" | "delegue" | "base_centrale"); setFiltreDelegueId(undefined); }}
-                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none w-full sm:w-auto">
+                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none">
                 <option value="">Tous rattachements</option>
                 <option value="delegue">Délégué de localité</option>
                 <option value="base_centrale">🏢 Base centrale</option>
               </select>
-            </div>
+            </>
           )}
         </div>
       )}
@@ -413,7 +413,7 @@ export default function Membres() {
       {/* ── TABLE — Mes membres / direction ──────────────────────────────────── */}
       {!afficheDemandes && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-          <table className="w-full text-sm min-w-[800px]">
+          <table className="w-full text-sm min-w-[560px]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Nom & Prénoms</th>

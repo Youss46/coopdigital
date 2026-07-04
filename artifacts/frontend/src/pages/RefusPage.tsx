@@ -377,15 +377,13 @@ export default function RefusPage() {
       )}
 
       {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-            <PackageX className="w-5 h-5 text-red-600" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Stocks refoulés</h1>
-            <p className="text-sm text-gray-500">Lots refusés par les exportateurs</p>
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+          <PackageX className="w-5 h-5 text-red-600" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Stocks refoulés</h1>
+          <p className="text-sm text-gray-500">Lots refusés par les exportateurs</p>
         </div>
       </div>
 
@@ -401,12 +399,12 @@ export default function RefusPage() {
       </div>
 
       {/* Filtre */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex gap-2">
         {[{ v: "en_attente", l: "En attente" }, { v: "traite", l: "Traités" }, { v: "", l: "Tous" }].map(({ v, l }) => (
           <button
             key={v}
             onClick={() => setFiltreStatut(v)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               filtreStatut === v ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >

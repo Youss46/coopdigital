@@ -111,7 +111,7 @@ function DashboardRT() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse h-24" />
           ))}
@@ -141,7 +141,7 @@ function DashboardRT() {
         <p className="text-gray-500 text-sm mt-1">EUDR · Parcelles · Missions terrain</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <CarteKpi
           titre="Conformité EUDR"
           valeur={`${s.tauxEudrConforme} %`}
@@ -233,7 +233,7 @@ function DashboardRT() {
 
       {/* ── Alertes couverture GPS par section ───────────────────────────────── */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
           <h2 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
             <AlertTriangle size={15} className={hasAlertes ? "text-amber-500" : "text-gray-400"} />
             Alertes couverture GPS
@@ -505,7 +505,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpiChargement ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse h-24" />

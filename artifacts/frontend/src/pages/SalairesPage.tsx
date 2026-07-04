@@ -133,8 +133,8 @@ export default function SalairesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="p-2 bg-green-100 rounded-lg w-fit">
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-green-100 rounded-lg">
           <Banknote className="h-6 w-6 text-green-700" />
         </div>
         <div>
@@ -244,7 +244,7 @@ function TabPersonnel() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Personnel actif", value: list.filter((p: Personnel) => p.statut === "actif").length, color: "text-green-700" },
           { label: "CDI", value: list.filter((p: Personnel) => p.typeContrat === "cdi" && p.statut === "actif").length, color: "text-blue-700" },
@@ -647,7 +647,7 @@ function TabPaie() {
       </div>
 
       {/* KPI */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Brouillons", value: nbBrouillons, color: "text-gray-600" },
           { label: "Validés", value: nbValides, color: "text-blue-700" },
@@ -856,7 +856,7 @@ function TabMasse() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "Personnel actif", value: rapport.nbPersonnelActifs },
               { label: "Bulletins générés", value: rapport.nbBulletins },
@@ -1263,6 +1263,7 @@ function PersonnelModal({
                 <option value="orange_money">Orange Money</option>
                 <option value="mtn_momo">MTN MoMo</option>
                 <option value="virement">Virement bancaire</option>
+                <option value="banque">Compte Banque</option>
               </select>
             </Field>
             {(form.modePaiement === "orange_money" || form.modePaiement === "mtn_momo") && (
@@ -1275,7 +1276,7 @@ function PersonnelModal({
                 />
               </Field>
             )}
-            {form.modePaiement === "virement" && (
+            {(form.modePaiement === "virement" || form.modePaiement === "banque") && (
               <Field label="RIB Bancaire">
                 <input
                   className={INPUT_CLS}

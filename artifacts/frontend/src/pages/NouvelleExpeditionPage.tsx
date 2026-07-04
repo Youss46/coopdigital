@@ -261,20 +261,18 @@ export default function NouvelleExpeditionPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/expeditions")} className="gap-1">
-            <ArrowLeft className="h-4 w-4" /> Retour
-          </Button>
-          <div className="flex items-center gap-3">
-            <Ship className="h-5 w-5 text-green-700" />
-            <h1 className="text-xl font-bold text-gray-900">Nouvelle expédition</h1>
-          </div>
-        </div>
-        <span className="sm:ml-auto text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full font-mono font-semibold w-fit">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/expeditions")} className="gap-1">
+          <ArrowLeft className="h-4 w-4" /> Retour
+        </Button>
+        <Ship className="h-5 w-5 text-green-700" />
+        <h1 className="text-xl font-bold text-gray-900">Nouvelle expédition</h1>
+        <span className="ml-auto text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full font-mono font-semibold">
           {prochainNumero ? prochainNumero.numero : "N° …"}
         </span>
       </div>
+
+      {/* SÉLECTION DES LOTS */}
       <Card className="border-green-200">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -412,7 +410,7 @@ export default function NouvelleExpeditionPage() {
 
           {typeVehicule === "propre" ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Véhicule *</Label>
                   <Select value={vehiculeId} onValueChange={setVehiculeId}>
@@ -458,7 +456,7 @@ export default function NouvelleExpeditionPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Immatriculation *</Label>
                 <Input value={immatriculationLibre} onChange={e => setImmatriculationLibre(e.target.value)} placeholder="CI-1234-AB" />
@@ -490,7 +488,7 @@ export default function NouvelleExpeditionPage() {
           <CardTitle className="text-base">📦 Chargement</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Date de départ *</Label>
               <Input type="datetime-local" value={dateDepart} onChange={e => setDateDepart(e.target.value)} />
@@ -560,7 +558,7 @@ export default function NouvelleExpeditionPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Numéro du certificat</Label>
               <Input
@@ -596,7 +594,7 @@ export default function NouvelleExpeditionPage() {
           <CardTitle className="text-base">🚢 Destination</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Port *</Label>
               <Select value={port} onValueChange={setPort}>

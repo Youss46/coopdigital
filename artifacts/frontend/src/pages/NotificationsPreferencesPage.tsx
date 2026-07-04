@@ -134,7 +134,10 @@ export default function NotificationsPreferencesPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex items-center gap-3">
+        <Link href="/notifications" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100">
+          <ArrowLeft size={18} />
+        </Link>
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#1a4731" }}>
             <Bell className="w-5 h-5 text-white" />

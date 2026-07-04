@@ -109,14 +109,14 @@ export default function LivraisonsPage() {
   return (
     <div className="space-y-5">
       {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Livraisons</h1>
           <p className="text-gray-500 text-sm mt-0.5">Historique des pesées de cacao</p>
         </div>
         {peutCreer && (
           <Link href="/livraisons/nouvelle">
-            <a className="flex items-center justify-center gap-2 text-sm font-medium text-white px-4 py-2.5 rounded-xl w-full sm:w-auto"
+            <a className="flex items-center gap-2 text-sm font-medium text-white px-4 py-2.5 rounded-xl"
                style={{ backgroundColor: "#1a4731" }}>
               <Plus size={15} />
               Nouvelle livraison

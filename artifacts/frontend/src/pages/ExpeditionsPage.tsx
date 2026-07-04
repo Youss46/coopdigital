@@ -121,7 +121,7 @@ export default function ExpeditionsPage() {
   return (
     <div className="p-4 sm:p-6 space-y-5">
       {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
             <Ship className="h-5 w-5 sm:h-6 sm:w-6 text-green-700" />
@@ -132,15 +132,15 @@ export default function ExpeditionsPage() {
           </div>
         </div>
         <Link href="/expeditions/nouvelle">
-          <Button className="bg-green-700 hover:bg-green-800 gap-1.5 text-xs sm:text-sm px-3 sm:px-4 w-full sm:w-auto">
+          <Button className="bg-green-700 hover:bg-green-800 gap-1.5 text-xs sm:text-sm px-3 sm:px-4 flex-shrink-0">
             <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span>Nouvelle expédition</span>
+            <span className="hidden xs:inline">Nouvelle </span>expédition
           </Button>
         </Link>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Card className="border-blue-200 bg-blue-50">
           <CardContent className="p-3 sm:p-4">
             <p className="text-xl sm:text-2xl font-bold text-blue-700">{stats?.enCours ?? "—"}</p>

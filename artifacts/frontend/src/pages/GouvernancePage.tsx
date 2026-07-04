@@ -100,12 +100,12 @@ function ModalPlanifierAG({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-4">
-        <div className="px-6 py-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-bold text-gray-900 text-lg">Planifier une assemblée générale</h3>
-          <button onClick={onClose} className="self-end sm:self-auto"><X size={16} className="text-gray-400" /></button>
+          <button onClick={onClose}><X size={16} className="text-gray-400" /></button>
         </div>
         <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Type d'AG</label>
               <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
@@ -251,9 +251,9 @@ function ModalConvoquer({ ag, onClose }: { ag: AssembleeGenerale; onClose: () =>
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        <div className="px-6 py-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h3 className="font-bold text-gray-900 text-lg">Envoyer les convocations</h3>
-          <button onClick={onClose} className="self-end sm:self-auto"><X size={16} className="text-gray-400" /></button>
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-bold text-gray-900">Envoyer les convocations</h3>
+          <button onClick={onClose}><X size={16} className="text-gray-400" /></button>
         </div>
         <div className="px-6 py-5 space-y-4">
           <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
@@ -311,9 +311,9 @@ function ModalVote({ agId, point, onClose }: { agId: number; point: PointOrdreDu
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
-        <div className="px-6 py-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-bold text-gray-900">Enregistrer le vote</h3>
-          <button onClick={onClose} className="self-end sm:self-auto"><X size={16} className="text-gray-400" /></button>
+          <button onClick={onClose}><X size={16} className="text-gray-400" /></button>
         </div>
         <div className="px-6 py-5 space-y-3">
           <div>
@@ -321,7 +321,7 @@ function ModalVote({ agId, point, onClose }: { agId: number; point: PointOrdreDu
             <input value={form.intituleResolution} onChange={(e) => setForm((f) => ({ ...f, intituleResolution: e.target.value }))}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {[
               { k: "nbPour",        label: "Pour",        cls: "text-green-700" },
               { k: "nbContre",      label: "Contre",      cls: "text-red-700"   },
@@ -410,11 +410,11 @@ function OngletAGs({ ags }: { ags: AgListItem[] }) {
   const actives   = ags.filter((a) => a.statut === "ouverte");
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="space-y-5">
       {peutPlanifier && (
         <div className="flex justify-end">
           <button onClick={() => setShowModal(true)}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 text-sm text-white rounded-lg w-full sm:w-auto"
+            className="flex items-center gap-1.5 px-4 py-2 text-sm text-white rounded-lg"
             style={{ backgroundColor: VERT }}>
             <Plus size={14} /> Planifier une AG
           </button>
@@ -437,7 +437,7 @@ function OngletAGs({ ags }: { ags: AgListItem[] }) {
       {/* Prochaine AG */}
       {prochaine && (
         <div className="bg-white rounded-2xl border-2 border-blue-200 p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-4">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Calendar size={16} className="text-blue-600" />
@@ -451,17 +451,17 @@ function OngletAGs({ ags }: { ags: AgListItem[] }) {
               </p>
               <p className="text-sm text-gray-500">{prochaine.nbMembresConvoques} membres convoqués</p>
             </div>
-            <div className="flex flex-col gap-2 w-full sm:w-auto">
+            <div className="flex flex-col gap-2">
               {peutConvoquer && (
                 <button onClick={() => setConvoquerAg(prochaine as AssembleeGenerale)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50">
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50">
                   <Send size={13} /> Envoyer convocations
                 </button>
               )}
               {peutPlanifier && (
                 <button onClick={() => mutOuvrir.mutate({ id: prochaine.id })}
                   disabled={mutOuvrir.isPending}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-white rounded-lg"
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm text-white rounded-lg"
                   style={{ backgroundColor: VERT }}>
                   <Play size={13} /> Ouvrir la séance
                 </button>
@@ -853,10 +853,10 @@ export default function GouvernancePage() {
         <p className="text-sm text-gray-500 mt-1">Assemblées générales, présences, votes et procès-verbaux</p>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 overflow-x-auto w-full sm:w-fit scrollbar-hide">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
         {tabs.map(({ id, label, icon }) => (
           <button key={id} onClick={() => setOnglet(id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               onglet === id ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}>
             {icon} {label}

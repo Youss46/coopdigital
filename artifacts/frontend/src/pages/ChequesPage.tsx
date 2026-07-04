@@ -167,7 +167,7 @@ export default function ChequesPage() {
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
       {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <CheckSquare className="text-emerald-600" size={24} />
@@ -180,7 +180,7 @@ export default function ChequesPage() {
         {peutCreer && (
           <button
             onClick={() => setModalCreer(true)}
-            className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 w-full sm:w-auto"
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700"
           >
             <Plus size={16} /> Nouveau chèque
           </button>
@@ -188,7 +188,7 @@ export default function ChequesPage() {
       </div>
 
       {/* Cartes KPI */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiCard label="Chèques en cours" value={chequesEmis.length} unit="chèque(s)" color="amber" icon={Clock} />
         <KpiCard label="Montant en cours" value={totalEmis} unit="FCFA" color="amber" isMontant />
         <KpiCard label="Encaissés" value={chequesEncaisse.length} unit="chèque(s)" color="green" icon={CheckCircle2} />
@@ -207,12 +207,12 @@ export default function ChequesPage() {
       )}
 
       {/* Filtres */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="flex gap-2 flex-wrap">
         {FILTRES.map(f => (
           <button
             key={f.key}
             onClick={() => setFiltreStatut(f.key)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
               filtreStatut === f.key
                 ? "bg-emerald-600 text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -239,7 +239,7 @@ export default function ChequesPage() {
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[800px]">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 text-xs uppercase tracking-wide">
                   <th className="px-4 py-3 text-left">N° Chèque</th>

@@ -144,7 +144,7 @@ export default function FormationsRsePage() {
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-emerald-100 rounded-lg">
             <GraduationCap className="w-6 h-6 text-emerald-700" />
@@ -157,7 +157,7 @@ export default function FormationsRsePage() {
         {peutCreer && (
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium w-full sm:w-auto"
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium"
           >
             <Plus className="w-4 h-4" /> Ajouter une formation
           </button>
@@ -165,12 +165,12 @@ export default function FormationsRsePage() {
       </div>
 
       {/* Filtre campagne */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex items-center gap-3">
         <label className="text-sm font-medium text-gray-700">Campagne :</label>
         <select
           value={campagneId ?? ""}
           onChange={(e) => setCampagneId(e.target.value ? parseInt(e.target.value) : undefined)}
-          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full sm:w-auto"
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
           <option value="">Toutes les campagnes</option>
           {campagnes.map((c) => (
@@ -216,7 +216,7 @@ export default function FormationsRsePage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1000px]">
+            <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   {["Titre", "Thématique", "Date", "Lieu", "Formateur", "Participants", "Femmes", "Jours", "Financement", ""].map((h) => (

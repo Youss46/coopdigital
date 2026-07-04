@@ -380,7 +380,7 @@ function DetailModal({
       <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-4 px-4 pb-4 overflow-y-auto">
         <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden my-auto">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50 gap-3">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
             <div className="flex items-center gap-3">
               <QrCode size={20} className="text-[#1a4731]" />
               <h2 className="font-bold text-gray-900">Détail du lot</h2>

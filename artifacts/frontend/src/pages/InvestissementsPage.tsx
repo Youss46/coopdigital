@@ -171,9 +171,9 @@ function ModalNouveauProjet({
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="p-6 border-b flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-800">Nouveau projet</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl self-end sm:self-auto">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
@@ -195,7 +195,7 @@ function ModalNouveauProjet({
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1">Catégorie</label>
               <select
@@ -221,7 +221,7 @@ function ModalNouveauProjet({
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1">Montant estimé (FCFA) *</label>
               <MoneyInput
@@ -244,7 +244,7 @@ function ModalNouveauProjet({
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1">Date début prévue</label>
               <input
@@ -692,7 +692,7 @@ export default function InvestissementsPage() {
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
         {/* En-tête */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Investissements</h1>
             <p className="text-sm text-gray-500 mt-0.5">Suivi des projets d'investissement de la coopérative</p>
@@ -700,7 +700,7 @@ export default function InvestissementsPage() {
           {canCreate && (
             <button
               onClick={() => setShowNouveauProjet(true)}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 w-full sm:w-auto"
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
             >
               + Nouveau projet
             </button>
@@ -709,7 +709,7 @@ export default function InvestissementsPage() {
 
         {/* KPIs */}
         {bord && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-xl border p-4">
               <p className="text-xs text-gray-500 font-medium">Projets actifs</p>
               <p className="text-2xl font-bold text-gray-800 mt-1">{bord.nb_projets}</p>

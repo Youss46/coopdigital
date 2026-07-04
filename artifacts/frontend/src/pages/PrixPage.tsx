@@ -457,11 +457,11 @@ function OngletEvolution() {
       </div>
 
       {/* Tableau comparatif campagnes */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900">Comparaison par campagne</h3>
         </div>
-        <table className="w-full text-sm min-w-[600px]">
+        <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500">
               <th className="px-4 py-3 text-left">Campagne</th>
@@ -800,18 +800,16 @@ export default function PrixPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Suivi des Prix</h1>
-          <p className="text-sm text-gray-500 mt-1">Prix bord champ, marges, tendances et alertes</p>
-        </div>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Suivi des Prix</h1>
+        <p className="text-sm text-gray-500 mt-1">Prix bord champ, marges, tendances et alertes</p>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-full sm:w-fit flex-nowrap overflow-x-auto">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit flex-wrap">
         {tabs.map(({ id, label, icon, badge }) => (
           <button key={id} onClick={() => setOnglet(id)}
-            className={`relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+            className={`relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               onglet === id ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}>
             {icon} {label}

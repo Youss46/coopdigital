@@ -521,9 +521,9 @@ export default function AuditPage() {
   return (
     <div className="px-4 md:px-6 py-6 max-w-7xl mx-auto">
       {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#1a4731" }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#1a4731" }}>
             <ScrollText className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -531,19 +531,19 @@ export default function AuditPage() {
             <p className="text-sm text-gray-500">Traçabilité inaltérable de toutes les opérations</p>
           </div>
         </div>
-        <div className="hidden md:flex items-center gap-2 text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 whitespace-nowrap">
+        <div className="hidden md:flex items-center gap-2 text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
           <Shield size={13} />
           Signé SHA-256 · FCFA
         </div>
       </div>
 
       {/* Onglets */}
-      <div className="flex overflow-x-auto pb-1 sm:pb-0 gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-full sm:w-fit whitespace-nowrap shrink-0">
+      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
         {TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setOnglet(tab)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               onglet === tab
                 ? "bg-white text-[#1a4731] shadow-sm"
                 : "text-gray-500 hover:text-gray-700"

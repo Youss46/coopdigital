@@ -2,7 +2,7 @@ import { useState } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import {
   CalendarDays, Plus, CheckCircle2, Clock, Loader2, AlertTriangle,
-  XCircle, BarChart3, FileText, Download, RefreshCw, RotateCcw,
+  XCircle, BarChart3, FileText, Download, RefreshCw, Archive, RotateCcw,
 } from "lucide-react";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -42,6 +42,11 @@ function StatutBadge({ statut }: { statut: string }) {
     if (statut === "ouverte") return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
         <CheckCircle2 className="w-3 h-3" /> En cours
+      </span>
+    );
+    if (statut === "archivee") return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+        <Archive className="w-3 h-3" /> Archivée
       </span>
     );
     return (
@@ -316,9 +321,9 @@ export default function CampagnesPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
             <CalendarDays className="w-5 h-5 text-green-600" />
           </div>
           <div>
@@ -327,30 +332,28 @@ export default function CampagnesPage() {
           </div>
         </div>
         {tab === "campagnes" && peutCreer && (
-          <button onClick={() => setShowForm(v => !v)} className={`${BTN} bg-green-600 text-white hover:bg-green-700 w-full sm:w-auto justify-center`}>
+          <button onClick={() => setShowForm(v => !v)} className={`${BTN} bg-green-600 text-white hover:bg-green-700`}>
             <Plus className="w-4 h-4" /> Nouvelle campagne
           </button>
         )}
       </div>
 
       {/* Tabs */}
-      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-max sm:w-full min-w-full">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              disabled={t.disabled}
-              onClick={() => setTab(t.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0
-                ${tab === t.id ? "bg-white text-green-700 shadow-sm" : "text-gray-600 hover:text-gray-900"}
-                ${t.disabled ? "opacity-40 cursor-not-allowed" : ""}`}
-            >
-              <t.icon className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline truncate">{t.label}</span>
-              <span className="sm:hidden truncate">{t.labelMobile}</span>
-            </button>
-          ))}
-        </div>
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            disabled={t.disabled}
+            onClick={() => setTab(t.id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors
+              ${tab === t.id ? "bg-white text-green-700 shadow-sm" : "text-gray-600 hover:text-gray-900"}
+              ${t.disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+          >
+            <t.icon className="w-4 h-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">{t.label}</span>
+            <span className="sm:hidden truncate">{t.labelMobile}</span>
+          </button>
+        ))}
       </div>
 
       {/* ── ONGLET 1 : CAMPAGNES ───────────────────────────── */}
@@ -443,8 +446,8 @@ export default function CampagnesPage() {
               <div className="absolute left-2 top-0 bottom-0 w-px bg-gray-200" />
               {(campagnes ?? []).map((c, i) => (
                 <div key={c.id} className="relative mb-4">
-                  <div className={`absolute -left-4 top-4 w-4 h-4 rounded-full border-2 ${c.statut === "ouverte" ? "bg-green-500 border-green-600" : "bg-gray-300 border-gray-400"}`} />
-                  <div className={`rounded-xl border p-4 ${c.statut === "ouverte" ? "border-green-200 bg-green-50" : "border-gray-200 bg-white"}`}>
+                  <div className={`absolute -left-4 top-4 w-4 h-4 rounded-full border-2 ${c.statut === "ouverte" ? "bg-green-500 border-green-600" : c.statut === "archivee" ? "bg-purple-400 border-purple-500" : "bg-gray-300 border-gray-400"}`} />
+                  <div className={`rounded-xl border p-4 ${c.statut === "ouverte" ? "border-green-200 bg-green-50" : c.statut === "archivee" ? "border-purple-100 bg-purple-50/30" : "border-gray-200 bg-white"}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-semibold text-gray-900 text-sm">{c.libelle}</div>

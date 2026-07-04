@@ -536,11 +536,11 @@ function Reconciliation() {
             <p>Aucun relevé importé. Commencez par importer un relevé dans l'onglet "Importer".</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
             <div className="px-5 py-3 bg-gray-50 border-b">
               <p className="text-sm font-semibold text-gray-700">Relevés importés ({releves.length})</p>
             </div>
-            <table className="w-full text-sm min-w-[600px]">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-xs text-gray-500 border-t">
                   <th className="text-left px-5 py-2 font-medium">Banque / Compte</th>
@@ -585,7 +585,7 @@ function Reconciliation() {
 
       {/* Tableau lignes du relevé sélectionné */}
       {selectedId && (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="px-5 py-3 bg-gray-50 border-b flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-700">
               {loadingDetail ? "Chargement…" : `Lignes du relevé (${lignesFiltrees.length})`}
@@ -608,7 +608,7 @@ function Reconciliation() {
             <p className="text-center py-8 text-gray-400 text-sm">Aucune ligne.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[800px]">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-xs text-gray-500">
                     <th className="text-left px-4 py-2 font-medium">Date</th>
@@ -699,22 +699,20 @@ export default function ReconciliationPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-            <GitMerge size={20} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Réconciliation bancaire</h1>
-            <p className="text-sm text-gray-400">Rapprochement relevés bancaires / écritures comptables</p>
-          </div>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+          <GitMerge size={20} className="text-white" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Réconciliation bancaire</h1>
+          <p className="text-sm text-gray-400">Rapprochement relevés bancaires / écritures comptables</p>
         </div>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-full sm:w-fit overflow-x-auto">
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0 ${tab === t.id ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.id ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
             {t.label}
           </button>
         ))}

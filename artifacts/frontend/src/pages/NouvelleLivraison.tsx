@@ -295,18 +295,16 @@ export default function NouvelleLivraison() {
 
   return (
     <div className="max-w-xl mx-auto space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-        <div>
-          <button
-            onClick={() => navigate("/livraisons")}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-3 transition-colors"
-          >
-            <ArrowLeft size={15} />
-            Retour aux livraisons
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900">Nouvelle livraison</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Enregistrer une livraison de cacao</p>
-        </div>
+      <div>
+        <button
+          onClick={() => navigate("/livraisons")}
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-3 transition-colors"
+        >
+          <ArrowLeft size={15} />
+          Retour aux livraisons
+        </button>
+        <h1 className="text-2xl font-bold text-gray-900">Nouvelle livraison</h1>
+        <p className="text-gray-500 text-sm mt-0.5">Enregistrer une livraison de cacao</p>
       </div>
 
       {/* Campagne active */}
@@ -449,7 +447,7 @@ export default function NouvelleLivraison() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
                 {doublePeseeRequise ? "1ère pesée (kg) *" : "Poids brut (kg) *"}
@@ -489,7 +487,7 @@ export default function NouvelleLivraison() {
 
           {/* 2ème pesée */}
           {(doublePeseeRequise || doublePeseeRenseignee) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   2ème pesée (kg) {doublePeseeRequise ? "*" : ""}
@@ -533,7 +531,7 @@ export default function NouvelleLivraison() {
           )}
 
           {/* Taux d'humidité */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Taux d'humidité (%)</label>
               <input
@@ -564,7 +562,7 @@ export default function NouvelleLivraison() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Poids net (kg)</label>
               <div className="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2.5 text-sm font-semibold" style={{ color: "#1a4731" }}>
@@ -655,7 +653,7 @@ export default function NouvelleLivraison() {
           {showOptions && (
             <div className="space-y-3 pt-1">
               {/* section options — entrepôt maintenant toujours visible ci-dessus */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Mode de paiement</label>
                   <select

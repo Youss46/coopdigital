@@ -131,7 +131,7 @@ function WidgetCaisse({ caisses, onNavigate }: { caisses: CaisseRow[]; onNavigat
         <ChevronRight size={16} className="text-gray-400 group-hover:text-amber-500 transition" />
       </div>
 
-      <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="px-5 py-4 grid grid-cols-3 gap-4">
         <div>
           <p className="text-xs text-gray-400 mb-0.5">Solde actuel</p>
           <p className={`text-lg font-bold ${soldeInsuffisant ? "text-red-600" : "text-gray-900"}`}>
@@ -229,7 +229,7 @@ export default function DashboardDelegue() {
     staleTime: 60_000,
   });
 
-  const prenom = utilisateur?.prenoms ?? utilisateur?.nom ?? "Délégué";
+  const prenom = utilisateur?.prenom ?? utilisateur?.nom ?? "Délégué";
 
   const presets: { key: Preset; label: string }[] = [
     { key: "mois",      label: "Ce mois" },

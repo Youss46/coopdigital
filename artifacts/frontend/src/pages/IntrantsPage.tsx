@@ -105,12 +105,12 @@ function ModalNouvelIntrant({ onClose, categorieOptions }: { onClose: () => void
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-4 border-b border-gray-100 gap-3">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h3 className="font-bold text-gray-900">Nouvel intrant</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 self-end sm:self-auto"><X size={18} /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
               <input required value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })}
@@ -258,15 +258,15 @@ function ModalModifierIntrant({
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-4 border-b border-gray-100 gap-3">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h3 className="font-bold text-gray-900">Modifier l'intrant</h3>
             <p className="text-xs text-gray-500 mt-0.5">{intrant.nom}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 self-end sm:self-auto"><X size={18} /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
               <input required value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })}
@@ -363,15 +363,15 @@ function ModalAppro({ intrantId, intrantNom, unite, onClose }: { intrantId: numb
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-4 border-b border-gray-100 gap-3">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h3 className="font-bold text-gray-900">Approvisionnement</h3>
             <p className="text-xs text-gray-500">{intrantNom}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 self-end sm:self-auto"><X size={18} /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Date *</label>
               <input type="date" required value={form.dateAppro} onChange={(e) => setForm({ ...form, dateAppro: e.target.value })}
@@ -1155,28 +1155,26 @@ export default function IntrantsPage() {
   ];
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="space-y-5">
       <div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#f0f8f4" }}>
-              <Sprout size={20} style={{ color: "#1a4731" }} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Intrants</h1>
-              <p className="text-gray-500 text-sm">Gestion des intrants agricoles et distributions aux membres</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#f0f8f4" }}>
+            <Sprout size={20} style={{ color: "#1a4731" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Intrants</h1>
+            <p className="text-gray-500 text-sm">Gestion des intrants agricoles et distributions aux membres</p>
           </div>
         </div>
       </div>
 
       {/* Onglets */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-full overflow-x-auto scrollbar-hide">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-full overflow-x-auto">
         {onglets.map(({ id, label, badge }) => (
           <button
             key={id}
             onClick={() => setOnglet(id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
               onglet === id ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}
           >

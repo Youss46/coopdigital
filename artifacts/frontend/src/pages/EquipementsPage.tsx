@@ -237,7 +237,7 @@ function OngletInventaire() {
   return (
     <div className="space-y-4">
       {/* Filtres */}
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-center sm:justify-between">
+      <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-wrap gap-2">
           <Input
             placeholder="Rechercher..."

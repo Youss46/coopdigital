@@ -122,11 +122,9 @@ export default function MonProfilPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Mon profil</h1>
-          <p className="text-sm text-gray-500">Vos informations personnelles et vos paramètres de connexion.</p>
-        </div>
+      <div>
+        <h1 className="text-xl font-bold text-gray-900">Mon profil</h1>
+        <p className="text-sm text-gray-500">Vos informations personnelles et vos paramètres de connexion.</p>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -134,7 +132,7 @@ export default function MonProfilPage() {
           <UserRound className="w-4 h-4" /> Informations
         </h2>
 
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 mb-5">
+        <div className="flex items-center gap-4 mb-5">
           <div className="relative">
             <Avatar className="w-20 h-20">
               <AvatarImage src={utilisateur?.photoUrl ?? undefined} alt="Photo de profil" />

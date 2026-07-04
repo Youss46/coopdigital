@@ -251,7 +251,7 @@ function DonsRecusMembre({ membreId }: { membreId: number }) {
   return (
     <div className="divide-y">
       {/* Total */}
-      <div className="px-5 py-4 bg-green-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div className="px-5 py-4 bg-green-50 flex items-center justify-between">
         <div className="flex items-center gap-2 text-green-700">
           <Gift size={16} />
           <span className="text-sm font-semibold">Total dons reçus</span>
@@ -582,7 +582,7 @@ export default function MembreFiche() {
       </button>
 
       {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 flex items-start gap-6">
         <div
           className="w-16 h-16 rounded-xl flex items-center justify-center text-white text-2xl font-bold flex-shrink-0"
           style={{ backgroundColor: "#1a4731" }}
@@ -591,12 +591,12 @@ export default function MembreFiche() {
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-gray-900">{membre.nom} {membre.prenoms}</h1>
             {peutModifier && (
               <button
                 onClick={openEditModal}
-                className="w-fit flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 rounded-md px-2 py-0.5 hover:bg-blue-50 transition-colors"
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 rounded-md px-2 py-0.5 hover:bg-blue-50 transition-colors"
               >
                 <Edit3 size={11} />Modifier
               </button>
@@ -880,12 +880,12 @@ export default function MembreFiche() {
       {/* Onglets */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* Tab bar */}
-        <div className="flex border-b border-gray-100 overflow-x-auto scrollbar-hide">
+        <div className="flex border-b border-gray-100">
           {TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-5 py-3 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-5 py-3 text-sm font-medium transition-colors ${
                 activeTab === tab
                   ? "border-b-2 border-green-600 text-green-700"
                   : "text-gray-500 hover:text-gray-700"

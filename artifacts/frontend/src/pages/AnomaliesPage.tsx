@@ -514,13 +514,11 @@ export default function AnomaliesPage() {
   return (
     <div className="space-y-5">
       {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="flex items-center gap-3">
-          <ShieldAlert className="w-6 h-6 text-red-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Anomalies</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Détection et traitement des opérations suspectes</p>
-          </div>
+      <div className="flex items-center gap-3">
+        <ShieldAlert className="w-6 h-6 text-red-600" />
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Anomalies</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Détection et traitement des opérations suspectes</p>
         </div>
       </div>
 

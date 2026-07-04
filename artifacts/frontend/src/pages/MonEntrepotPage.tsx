@@ -46,7 +46,6 @@ interface Mouvement {
 interface Transfert {
   id: number; numeroTransfert: string; statut: string;
   poidsDepart_kg: string | null; poidsArrivee_kg: string | null; ecartKg: string | null;
-  motifEcart: string | null;
   dateDepart: string | null; dateArrivee: string | null; datePrevue: string | null;
   typeVehicule: string | null; immatriculation: string | null;
   nomChauffeur: string | null; notes: string | null; createdAt: string;
@@ -159,13 +158,11 @@ export default function MonEntrepotPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Warehouse className="w-5 h-5 text-green-700" /> Mon entrepôt
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{entrepot.nom}{entrepot.zoneNom ? ` — ${entrepot.zoneNom}` : ""}</p>
-        </div>
+      <div>
+        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <Warehouse className="w-5 h-5 text-green-700" /> Mon entrepôt
+        </h1>
+        <p className="text-sm text-gray-500 mt-0.5">{entrepot.nom}{entrepot.zoneNom ? ` — ${entrepot.zoneNom}` : ""}</p>
       </div>
 
       {/* Carte stock principal */}
@@ -274,14 +271,14 @@ export default function MonEntrepotPage() {
       </button>
 
       {/* Onglets */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
         {[
           { key: "stock", label: "Aperçu" },
           { key: "mouvements", label: "Mouvements" },
           { key: "transferts", label: "Mes transferts" },
         ].map(o => (
           <button key={o.key} onClick={() => setOnglet(o.key as typeof onglet)}
-            className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap px-4 ${onglet === o.key ? "bg-white shadow text-gray-900" : "text-gray-500"}`}>
+            className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${onglet === o.key ? "bg-white shadow text-gray-900" : "text-gray-500"}`}>
             {o.label}
           </button>
         ))}
@@ -388,7 +385,7 @@ export default function MonEntrepotPage() {
               Stock disponible : <strong className="text-gray-800">{kg(entrepot.stockActuelKg)}</strong>
             </p>
             <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Poids à transférer (kg) *</label>
                   <input type="number" step="0.01" placeholder="0.00"
