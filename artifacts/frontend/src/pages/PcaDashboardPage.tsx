@@ -582,65 +582,81 @@ export default function PcaDashboardPage() {
           <Star className="w-4 h-4 text-amber-500" />
           <h2 className="font-bold text-gray-900">Comparaison des campagnes</h2>
         </div>
-        <div className="overflow-x-auto overflow-y-hidden">
-          <table className="w-full text-sm min-w-[600px]">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="text-left px-6 py-3 font-semibold text-gray-600">Indicateur</th>
+        {(() => {
+          const indicateurs: { label: string; key: (r: ComparaisonRow) => string }[] = [
+            { label: "Tonnage (T)", key: (r) => `${r.tonnage_t.toLocaleString("fr-FR")} T` },
+            { label: "CA ventes (FCFA)", key: (r) => fmt(r.ca_fcfa) },
+            { label: "Marge nette (FCFA)", key: (r) => fmt(r.marge_nette_fcfa) },
+            { label: "Marge/T (FCFA)", key: (r) => `${r.marge_kg_fcfa.toLocaleString("fr-FR")} FCFA` },
+            { label: "Membres actifs", key: (r) => r.nb_membres_actifs.toLocaleString("fr-FR") },
+            { label: "Taux remboursement avances", key: (r) => `${r.taux_remboursement_avances_pct}%` },
+          ];
+          return (
+            <>
+              {/* Mobile : une carte par campagne, indicateurs empilés verticalement */}
+              <div className="sm:hidden divide-y divide-gray-100">
                 {comparaison.map(c => (
-                  <th key={c.campagne_id} className={`text-right px-4 py-3 font-semibold ${c.statut === "ouverte" ? "text-green-700" : "text-gray-600"}`}>
-                    {c.campagne_libelle}
-                    {c.statut === "ouverte" && (
-                      <span className="ml-1 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">
-                        En cours
-                      </span>
-                    )}
-                  </th>
+                  <div key={c.campagne_id} className="px-4 py-3">
+                    <div className={`flex items-center gap-2 mb-2 font-semibold ${c.statut === "ouverte" ? "text-green-700" : "text-gray-700"}`}>
+                      <span>{c.campagne_libelle}</span>
+                      {c.statut === "ouverte" && (
+                        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">
+                          En cours
+                        </span>
+                      )}
+                    </div>
+                    <dl className="divide-y divide-gray-50">
+                      {indicateurs.map(({ label, key }) => (
+                        <div key={label} className="flex items-center justify-between gap-3 py-2">
+                          <dt className="text-sm text-gray-500">{label}</dt>
+                          <dd className={`text-sm font-mono text-right ${c.statut === "ouverte" ? "font-bold text-green-800" : "text-gray-700"}`}>
+                            {key(c)}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
                 ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {[
-                {
-                  label: "Tonnage (T)",
-                  key: (r: ComparaisonRow) => `${r.tonnage_t.toLocaleString("fr-FR")} T`,
-                },
-                {
-                  label: "CA ventes (FCFA)",
-                  key: (r: ComparaisonRow) => fmt(r.ca_fcfa),
-                },
-                {
-                  label: "Marge nette (FCFA)",
-                  key: (r: ComparaisonRow) => fmt(r.marge_nette_fcfa),
-                },
-                {
-                  label: "Marge/T (FCFA)",
-                  key: (r: ComparaisonRow) => `${r.marge_kg_fcfa.toLocaleString("fr-FR")} FCFA`,
-                },
-                {
-                  label: "Membres actifs",
-                  key: (r: ComparaisonRow) => r.nb_membres_actifs.toLocaleString("fr-FR"),
-                },
-                {
-                  label: "Taux remboursement avances",
-                  key: (r: ComparaisonRow) => `${r.taux_remboursement_avances_pct}%`,
-                },
-              ].map(({ label, key }) => (
-                <tr key={label} className="hover:bg-gray-50/50">
-                  <td className="px-6 py-3 font-medium text-gray-700">{label}</td>
-                  {comparaison.map(c => (
-                    <td
-                      key={c.campagne_id}
-                      className={`text-right px-4 py-3 font-mono ${c.statut === "ouverte" ? "font-bold text-green-800" : "text-gray-600"}`}
-                    >
-                      {key(c)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </div>
+
+              {/* Desktop / tablette : tableau comparatif */}
+              <div className="hidden sm:block overflow-x-auto overflow-y-hidden">
+                <table className="w-full text-sm min-w-[600px]">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="text-left px-6 py-3 font-semibold text-gray-600">Indicateur</th>
+                      {comparaison.map(c => (
+                        <th key={c.campagne_id} className={`text-right px-4 py-3 font-semibold ${c.statut === "ouverte" ? "text-green-700" : "text-gray-600"}`}>
+                          {c.campagne_libelle}
+                          {c.statut === "ouverte" && (
+                            <span className="ml-1 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">
+                              En cours
+                            </span>
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {indicateurs.map(({ label, key }) => (
+                      <tr key={label} className="hover:bg-gray-50/50">
+                        <td className="px-6 py-3 font-medium text-gray-700">{label}</td>
+                        {comparaison.map(c => (
+                          <td
+                            key={c.campagne_id}
+                            className={`text-right px-4 py-3 font-mono ${c.statut === "ouverte" ? "font-bold text-green-800" : "text-gray-600"}`}
+                          >
+                            {key(c)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* ── Section 6 : Accès rapide ─────────────────────────────────────────── */}
