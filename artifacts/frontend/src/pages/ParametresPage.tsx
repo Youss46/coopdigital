@@ -527,12 +527,12 @@ export default function ParametresPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Paramètres</h1>
           <p className="text-gray-500 text-sm mt-1">Configuration de la coopérative</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
             onClick={() => void handleDownloadPdf()}
@@ -1057,7 +1057,7 @@ export default function ParametresPage() {
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Date du document</Label>
                 <Input
