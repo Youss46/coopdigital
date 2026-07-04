@@ -198,7 +198,7 @@ export async function getComparatifCampagnes(req: Request, res: Response): Promi
         c.annee_debut                                               AS "anneeDebut",
         c.annee_fin                                                 AS "anneeFin",
         c.statut,
-        COALESCE(SUM(l.poids_net_kg), 0)::int                      AS "tonnageKg",
+        COALESCE(SUM(COALESCE(l.poids_net_kg, l.poids_kg)), 0)::int AS "tonnageKg",
         COUNT(DISTINCT l.membre_id)::int                            AS "membresActifs",
         COALESCE(SUM(CASE WHEN e.compte_credit = '701' THEN e.montant_fcfa ELSE 0 END), 0)::int AS "caVentesFcfa",
         COALESCE(SUM(CASE WHEN e.compte_debit  = '601' THEN e.montant_fcfa ELSE 0 END), 0)::int AS "coutAchatsFcfa",
