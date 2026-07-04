@@ -392,7 +392,7 @@ function SidePanel({
 }) {
   const ha = parseFloat(String(parcelle.superficieCalculeeHa ?? parcelle.superficieDeclareeHa ?? 0));
   return (
-    <div className="absolute top-0 right-0 h-full w-80 bg-white shadow-xl z-10 flex flex-col border-l border-gray-200">
+    <div className="absolute top-0 right-0 h-full w-full max-w-[calc(100%-16px)] sm:w-80 sm:max-w-none bg-white shadow-xl z-10 flex flex-col border-l border-gray-200">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <h3 className="font-semibold text-sm text-gray-800">{parcelle.codeParcelle ?? "Parcelle"}</h3>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -911,7 +911,7 @@ function OngletConformite({ stats, isLoading }: { stats: ConformiteStats | undef
       )}
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Conformes", value: stats.nb_conformes, color: "green", sub: `${pctConformes}%` },
           { label: "Non conformes", value: stats.nb_non_conformes, color: "red", sub: "" },
@@ -1374,7 +1374,7 @@ function OngletCarteGlobale() {
       </div>
 
       {/* Statistiques de couverture */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
         <StatCouverture
           label="Couverture GPS parcelles"
           value={`${pctCouverture}%`}
@@ -1768,7 +1768,7 @@ export default function ParcellePage() {
   ];
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       {/* En-tête */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -1787,15 +1787,15 @@ export default function ParcellePage() {
       </div>
 
       {/* Onglets */}
-      <div className="border-b border-gray-200">
-        <nav className="flex gap-1">
+      <div className="border-b border-gray-200 overflow-x-auto">
+        <nav className="flex gap-1 min-w-max">
           {tabs.map(t => {
             const Icon = t.icon;
             return (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap shrink-0 transition-colors ${
                   tab === t.id
                     ? "border-green-600 text-green-700"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
