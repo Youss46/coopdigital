@@ -585,8 +585,8 @@ export default function PcaDashboardPage() {
         {(() => {
           const indicateurs: { label: string; key: (r: ComparaisonRow) => string }[] = [
             { label: "Tonnage (T)", key: (r) => `${r.tonnage_t.toLocaleString("fr-FR")} T` },
-            { label: "CA ventes (FCFA)", key: (r) => fmt(r.ca_fcfa) },
-            { label: "Marge nette (FCFA)", key: (r) => fmt(r.marge_nette_fcfa) },
+            { label: "CA ventes (FCFA)", key: (r) => fmtFull(r.ca_fcfa) },
+            { label: "Marge nette (FCFA)", key: (r) => fmtFull(r.marge_nette_fcfa) },
             { label: "Marge/T (FCFA)", key: (r) => `${r.marge_kg_fcfa.toLocaleString("fr-FR")} FCFA` },
             { label: "Membres actifs", key: (r) => r.nb_membres_actifs.toLocaleString("fr-FR") },
             { label: "Taux remboursement avances", key: (r) => `${r.taux_remboursement_avances_pct}%` },
