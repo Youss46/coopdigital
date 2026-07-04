@@ -206,6 +206,10 @@ export async function getComparatifCampagnes(req: Request, res: Response): Promi
       FROM campagnes c
       LEFT JOIN livraisons l
         ON l.campagne_id = c.id
+        AND (
+          EXISTS (SELECT 1 FROM membres m WHERE m.id = l.membre_id AND m.cooperative_id = c.cooperative_id)
+          OR EXISTS (SELECT 1 FROM fournisseurs f WHERE f.id = l.fournisseur_id AND f.cooperative_id = c.cooperative_id)
+        )
       LEFT JOIN ecritures_comptables e
         ON e.cooperative_id = c.cooperative_id
         AND e.exercice = c.annee_debut
