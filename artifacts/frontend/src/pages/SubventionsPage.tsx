@@ -99,8 +99,8 @@ function ModalCreerSubvention({ bailleurs, onClose }: { bailleurs: Bailleur[]; o
           <button onClick={onClose}><X size={16} className="text-gray-400" /></button>
         </div>
         <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">Bailleur *</label>
               <select value={form.bailleurId} onChange={(e) => set("bailleurId", e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
@@ -121,7 +121,7 @@ function ModalCreerSubvention({ bailleurs, onClose }: { bailleurs: Bailleur[]; o
                 <option value="actif">Actif</option>
               </select>
             </div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">Libellé *</label>
               <input value={form.libelle} onChange={(e) => set("libelle", e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Description du projet subventionné" />
@@ -173,7 +173,7 @@ function ModalCreerSubvention({ bailleurs, onClose }: { bailleurs: Bailleur[]; o
                 <option value="annuel">Annuel</option>
               </select>
             </div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">Conditions d'utilisation</label>
               <textarea value={form.conditions} onChange={(e) => set("conditions", e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" rows={2} />
@@ -461,7 +461,7 @@ function OngletOverview({ subventions, bailleurs }: {
   return (
     <div className="space-y-5">
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
         {kpis.map(({ label, value, color }) => (
           <div key={label} className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-xs text-gray-500 mb-1">{label}</p>
@@ -504,8 +504,8 @@ function OngletOverview({ subventions, bailleurs }: {
       )}
 
       {/* Tableau subventions */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm" style={{ minWidth: 700 }}>
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500">
               <th className="px-4 py-3 text-left">Bailleur</th>
@@ -606,8 +606,8 @@ function OngletBudget({ subventions }: { subventions: SubventionAvecBailleur[] }
           </div>
 
           {/* Tableau postes */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+            <table className="w-full text-sm" style={{ minWidth: 620 }}>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500">
                   <th className="px-4 py-3 text-left">Poste budgétaire</th>
@@ -710,8 +710,8 @@ function OngletTranches({ subventions }: { subventions: SubventionAvecBailleur[]
           const badge = TRANCHE_BADGE[t.statut] ?? TRANCHE_BADGE.attendue;
           return (
             <div key={t.id} className="bg-white rounded-xl border border-gray-200 px-5 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.cls}`}>
                     {badge.icon} {badge.label}
                   </div>
@@ -720,12 +720,12 @@ function OngletTranches({ subventions }: { subventions: SubventionAvecBailleur[]
                 </div>
                 {peutEnregistrer && t.statut === "attendue" && (
                   <button onClick={() => setModalTranche(t)}
-                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 self-start sm:self-auto">
                     <CheckCircle2 size={13} /> Confirmer réception
                   </button>
                 )}
               </div>
-              <div className="mt-2 flex gap-6 text-xs text-gray-500">
+              <div className="mt-2 flex gap-6 text-xs text-gray-500 flex-wrap">
                 {t.datePrevue  && <span>Date prévue : <strong>{DATE_FR(t.datePrevue)}</strong></span>}
                 {t.dateRecue   && <span>Date reçue : <strong>{DATE_FR(t.dateRecue)}</strong></span>}
                 {t.referenceVirement && <span>Réf. virement : <strong>{t.referenceVirement}</strong></span>}
@@ -807,7 +807,7 @@ function OngletRapports({ subventions }: { subventions: SubventionAvecBailleur[]
       {showForm && selectedId && (
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-3">
           <h4 className="font-semibold text-sm text-gray-700">Générer un nouveau rapport</h4>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Période *</label>
               <input value={formRapport.periode} onChange={(e) => setFormRapport((f) => ({ ...f, periode: e.target.value }))}
@@ -844,13 +844,13 @@ function OngletRapports({ subventions }: { subventions: SubventionAvecBailleur[]
           const badge = RAPPORT_BADGE[r.statut] ?? RAPPORT_BADGE.brouillon;
           return (
             <div key={r.id} className="bg-white rounded-xl border border-gray-200 px-5 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.cls}`}>{badge.label}</span>
                   <span className="font-semibold text-sm text-gray-900">{r.periode ?? "—"}</span>
                   <span className="text-xs text-gray-500 capitalize">{r.typeRapport ?? "—"}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {r.dateSoumission && <span className="text-xs text-gray-400">Soumis le {DATE_FR(r.dateSoumission)}</span>}
                   {r.statut === "brouillon" && peutGenerer && selectedId && (
                     <button
@@ -868,7 +868,7 @@ function OngletRapports({ subventions }: { subventions: SubventionAvecBailleur[]
                 const coop = (r.contenuJson as Record<string, { tonnageTotalKg?: number; nbMembresActifs?: number } | undefined>)["donneesCoopDigital"];
                 if (!coop) return null;
                 return (
-                  <div className="mt-3 flex gap-4 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                  <div className="mt-3 flex gap-4 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 flex-wrap">
                     <span>Données CoopDigital intégrées :</span>
                     <span>Tonnage : <strong>{FCFA(coop.tonnageTotalKg)}</strong> kg</span>
                     <span>Membres actifs : <strong>{coop.nbMembresActifs ?? 0}</strong></span>
@@ -911,10 +911,10 @@ export default function SubventionsPage() {
         <p className="text-sm text-gray-500 mt-1">Gestion des subventions, tranches et rapports bailleurs</p>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-full sm:w-fit overflow-x-auto">
         {tabs.map(({ id, label }) => (
           <button key={id} onClick={() => setOnglet(id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 transition-colors ${
               onglet === id ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}>
             {label}
