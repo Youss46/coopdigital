@@ -170,13 +170,13 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
 
   const archive = archives.find(a => a.campagneId === selected);
 
-  const { data: livraisons, isLoading: loadLiv } = useQuery({
+  const { data: livraisons, isLoading: loadLiv } = useQuery<unknown>({
     queryKey: ["archive-livraisons", selected, searchLiv],
     queryFn: () => apiFetch(`/api/archives/${selected}/livraisons?limit=100&search=${encodeURIComponent(searchLiv)}`),
     enabled: !!selected && subTab === "livraisons",
   });
 
-  const { data: membres, isLoading: loadMbr } = useQuery({
+  const { data: membres, isLoading: loadMbr } = useQuery<unknown>({
     queryKey: ["archive-membres", selected, searchMbr],
     queryFn: () => apiFetch(`/api/archives/${selected}/membres?limit=100&search=${encodeURIComponent(searchMbr)}`),
     enabled: !!selected && subTab === "membres",
@@ -272,12 +272,12 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {((membres as { membres: {
+                      {(membres as { membres: {
                         id: number; nom: string; prenoms: string; village: string;
                         section: string; delegue_nom: string; tonnage_livre_kg: string;
                         montant_percu_fcfa: number; score_campagne: string;
                         niveau_campagne: string; certifie: boolean;
-                      }[] }) | null)?.membres?.map(m => (
+                      }[] } | null)?.membres?.map(m => (
                         <tr key={m.id} className="hover:bg-gray-50">
                           <td className="px-3 py-2 font-medium">{m.nom} {m.prenoms}</td>
                           <td className="px-3 py-2 text-gray-600">{m.village || "—"}</td>
@@ -326,11 +326,11 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {((livraisons as { livraisons: {
+                      {(livraisons as { livraisons: {
                         id: number; date_livraison: string; fournisseur_nom: string;
                         fournisseur_type: string; zone: string; delegue_nom: string;
                         poids_net_kg: string; prix_unitaire_fcfa: number; montant_net_fcfa: number;
-                      }[] }) | null)?.livraisons?.map(l => (
+                      }[] } | null)?.livraisons?.map(l => (
                         <tr key={l.id} className="hover:bg-gray-50">
                           <td className="px-3 py-2 text-gray-500">{fmtDate(l.date_livraison)}</td>
                           <td className="px-3 py-2 font-medium">{l.fournisseur_nom || "—"}</td>

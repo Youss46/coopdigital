@@ -46,6 +46,7 @@ interface Mouvement {
 interface Transfert {
   id: number; numeroTransfert: string; statut: string;
   poidsDepart_kg: string | null; poidsArrivee_kg: string | null; ecartKg: string | null;
+  motifEcart: string | null;
   dateDepart: string | null; dateArrivee: string | null; datePrevue: string | null;
   typeVehicule: string | null; immatriculation: string | null;
   nomChauffeur: string | null; notes: string | null; createdAt: string;

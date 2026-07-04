@@ -1263,7 +1263,6 @@ function PersonnelModal({
                 <option value="orange_money">Orange Money</option>
                 <option value="mtn_momo">MTN MoMo</option>
                 <option value="virement">Virement bancaire</option>
-                <option value="banque">Compte Banque</option>
               </select>
             </Field>
             {(form.modePaiement === "orange_money" || form.modePaiement === "mtn_momo") && (
@@ -1276,7 +1275,7 @@ function PersonnelModal({
                 />
               </Field>
             )}
-            {(form.modePaiement === "virement" || form.modePaiement === "banque") && (
+            {form.modePaiement === "virement" && (
               <Field label="RIB Bancaire">
                 <input
                   className={INPUT_CLS}

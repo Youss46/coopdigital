@@ -238,7 +238,7 @@ export default function EntrepotsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
       setShowCreer(false);
-      setFormCreer({ delegueId: "", nom: "", zoneNom: "", zoneType: "village", capaciteMaxKg: "", seuilAlerteKg: "", adresse: "" });
+      setFormCreer({ delegueId: "", nom: "", zoneNom: "", zoneType: "village", capaciteMaxKg: "", seuilAlerteKg: "", capaciteSacs: "", adresse: "" });
       toast({ title: "Entrepôt créé" });
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),

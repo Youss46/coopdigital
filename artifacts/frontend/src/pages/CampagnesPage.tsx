@@ -2,7 +2,7 @@ import { useState } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import {
   CalendarDays, Plus, CheckCircle2, Clock, Loader2, AlertTriangle,
-  XCircle, BarChart3, FileText, Download, RefreshCw, Archive, RotateCcw,
+  XCircle, BarChart3, FileText, Download, RefreshCw, RotateCcw,
 } from "lucide-react";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -42,11 +42,6 @@ function StatutBadge({ statut }: { statut: string }) {
     if (statut === "ouverte") return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
         <CheckCircle2 className="w-3 h-3" /> En cours
-      </span>
-    );
-    if (statut === "archivee") return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-        <Archive className="w-3 h-3" /> Archivée
       </span>
     );
     return (
@@ -448,8 +443,8 @@ export default function CampagnesPage() {
               <div className="absolute left-2 top-0 bottom-0 w-px bg-gray-200" />
               {(campagnes ?? []).map((c, i) => (
                 <div key={c.id} className="relative mb-4">
-                  <div className={`absolute -left-4 top-4 w-4 h-4 rounded-full border-2 ${c.statut === "ouverte" ? "bg-green-500 border-green-600" : c.statut === "archivee" ? "bg-purple-400 border-purple-500" : "bg-gray-300 border-gray-400"}`} />
-                  <div className={`rounded-xl border p-4 ${c.statut === "ouverte" ? "border-green-200 bg-green-50" : c.statut === "archivee" ? "border-purple-100 bg-purple-50/30" : "border-gray-200 bg-white"}`}>
+                  <div className={`absolute -left-4 top-4 w-4 h-4 rounded-full border-2 ${c.statut === "ouverte" ? "bg-green-500 border-green-600" : "bg-gray-300 border-gray-400"}`} />
+                  <div className={`rounded-xl border p-4 ${c.statut === "ouverte" ? "border-green-200 bg-green-50" : "border-gray-200 bg-white"}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-semibold text-gray-900 text-sm">{c.libelle}</div>
