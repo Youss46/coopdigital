@@ -187,21 +187,22 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
   }
 
   return (
-    <div>
-      {/* Sélecteur de campagne */}
-      <div className="flex items-center gap-3 mb-5">
-        <label className="text-sm font-medium text-gray-700">Campagne :</label>
-        <select
-          value={selected ?? ""}
-          onChange={e => { setSelected(Number(e.target.value)); setSubTab("resume"); }}
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-        >
-          {archives.map(a => (
-            <option key={a.campagneId} value={a.campagneId}>
-              {a.campagne?.libelle ?? `Campagne ${a.campagneId}`}
-            </option>
-          ))}
-        </select>
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-gray-700">Campagne :</label>
+          <select
+            value={selected ?? ""}
+            onChange={e => { setSelected(Number(e.target.value)); setSubTab("resume"); }}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+          >
+            {archives.map(a => (
+              <option key={a.campagneId} value={a.campagneId}>
+                {a.campagne?.libelle ?? `Campagne ${a.campagneId}`}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {archive && (
@@ -220,10 +221,12 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
           </div>
 
           {/* Sous-onglets */}
-          <div className="flex gap-1 mb-5 border-b border-gray-200 pb-2">
+          <div className="flex gap-1 mb-5 border-b border-gray-200 pb-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
             {(["resume","membres","livraisons","financier","tracabilite"] as const).map(t => (
               <TabBtn key={t} active={subTab === t} onClick={() => setSubTab(t)}>
-                {{ resume:"📊 Résumé", membres:"👥 Membres", livraisons:"📦 Livraisons", financier:"💰 Financier", tracabilite:"🌿 Traçabilité" }[t]}
+                <span className="shrink-0 whitespace-nowrap">
+                  {{ resume:"📊 Résumé", membres:"👥 Membres", livraisons:"📦 Livraisons", financier:"💰 Financier", tracabilite:"🌿 Traçabilité" }[t]}
+                </span>
               </TabBtn>
             ))}
           </div>
@@ -231,7 +234,7 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
           {/* Résumé */}
           {subTab === "resume" && (
             <div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                 <KpiCard label="Tonnage collecté"     value={fmtT(archive.tonnageTotalKg)}        sub={`${fmtNum(archive.nbLivraisons)} livraisons`} />
                 <KpiCard label="CA ventes"            value={fmtM(archive.caVentesFcfa)}           sub={`Prix vente moy : ${fmtK(archive.prixVenteMoyenKgFcfa)}`} />
                 <KpiCard label="Marge nette"          value={fmtM(archive.margeNetteFcfa)}         sub={`${fmtK(archive.margeKgFcfa)}/kg`} />

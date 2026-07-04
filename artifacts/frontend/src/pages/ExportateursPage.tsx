@@ -102,7 +102,7 @@ export default function ExportateursPage() {
           </button>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
             <div>
               <h2 className="text-xl font-bold text-gray-900">{fiche.exportateur.nom}</h2>
               <p className="text-gray-500 text-sm mt-0.5">{fiche.exportateur.ville ?? ""} {fiche.exportateur.contact ? `• ${fiche.exportateur.contact}` : ""}</p>
@@ -110,7 +110,7 @@ export default function ExportateursPage() {
                 <p className="text-xs text-gray-400 mt-0.5">Agrément : {fiche.exportateur.agrementNumero}</p>
               )}
             </div>
-            <div className="text-right">
+            <div className="sm:text-right">
               <p className="text-2xl font-bold text-gray-900">{formaterFCFA(fiche.soldeTotalDuFcfa)}</p>
               <p className="text-xs text-gray-400">Solde dû total</p>
             </div>
@@ -121,7 +121,7 @@ export default function ExportateursPage() {
             <p className="text-gray-400 text-sm">Aucune vente enregistrée</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[600px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="text-left px-3 py-2 font-medium text-gray-500">Date</th>
@@ -263,16 +263,16 @@ export default function ExportateursPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Exportateurs</h1>
           <p className="text-gray-500 text-sm mt-1">Gestion des acheteurs et créances</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           {peutCreer && (
             <button
               onClick={() => setModalExp(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg"
+              className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg w-full sm:w-auto"
               style={{ backgroundColor: "#1a4731" }}
             >
               <PlusCircle size={15} />

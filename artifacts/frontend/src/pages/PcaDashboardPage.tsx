@@ -265,7 +265,7 @@ export default function PcaDashboardPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-900">Tableau de bord PCA</h1>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -279,7 +279,7 @@ export default function PcaDashboardPage() {
         <button
           onClick={charger}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           Actualiser
@@ -582,8 +582,8 @@ export default function PcaDashboardPage() {
           <Star className="w-4 h-4 text-amber-500" />
           <h2 className="font-bold text-gray-900">Comparaison des campagnes</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto overflow-y-hidden">
+          <table className="w-full text-sm min-w-[600px]">
             <thead>
               <tr className="bg-gray-50">
                 <th className="text-left px-6 py-3 font-semibold text-gray-600">Indicateur</th>

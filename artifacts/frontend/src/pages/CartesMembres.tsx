@@ -98,18 +98,20 @@ export default function CartesMembres() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* En-tête */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-          <CreditCard className="w-5 h-5 text-green-700" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cartes Membres</h1>
-          <p className="text-sm text-gray-500">Gérez et émettez les cartes d'adhérent</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+            <CreditCard className="w-5 h-5 text-green-700" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Cartes Membres</h1>
+            <p className="text-sm text-gray-500">Gérez et émettez les cartes d'adhérent</p>
+          </div>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total membres", value: stats.total, icon: Users, color: "text-gray-700", bg: "bg-gray-50" },
           { label: "Cartes émises", value: stats.emises, icon: CreditCard, color: "text-blue-700", bg: "bg-blue-50" },
@@ -191,15 +193,15 @@ export default function CartesMembres() {
                             <img
                               src={c.photoUrl}
                               alt={c.nom}
-                              className="w-9 h-9 rounded-full object-cover border border-gray-100"
+                              className="w-9 h-9 rounded-full object-cover border border-gray-100 flex-shrink-0"
                             />
                           ) : (
-                            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center font-bold text-green-700 text-sm">
+                            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center font-bold text-green-700 text-sm flex-shrink-0">
                               {c.nom[0]}{(c.prenoms[0] ?? "")}
                             </div>
                           )}
-                          <div>
-                            <div className="font-medium text-gray-900">{c.nom} {c.prenoms}</div>
+                          <div className="min-w-0">
+                            <div className="font-medium text-gray-900 truncate">{c.nom} {c.prenoms}</div>
                             <div className="text-xs text-gray-400">{c.telephone}</div>
                           </div>
                         </div>

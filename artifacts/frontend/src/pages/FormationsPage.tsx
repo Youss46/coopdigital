@@ -523,22 +523,24 @@ function OngletSessions() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input value={filtre} onChange={(e) => setFiltre(e.target.value)}
             placeholder="Rechercher une session…"
             className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
         </div>
-        <button onClick={() => refetch()} className="p-2 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-700">
-          <RefreshCw className="w-4 h-4" />
-        </button>
-        {canPlanifier && (
-          <button onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-medium">
-            <Plus className="w-4 h-4" />Planifier
+        <div className="flex items-center gap-2 ml-auto">
+          <button onClick={() => refetch()} className="p-2 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-700">
+            <RefreshCw className="w-4 h-4" />
           </button>
-        )}
+          {canPlanifier && (
+            <button onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-medium whitespace-nowrap">
+              <Plus className="w-4 h-4" />Planifier
+            </button>
+          )}
+        </div>
       </div>
 
       {isLoading ? (

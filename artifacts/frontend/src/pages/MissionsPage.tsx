@@ -186,7 +186,7 @@ function ModalCreerAgent({ onClose, onSuccess }: ModalAgentProps) {
             </div>
 
             <div className="px-6 py-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Prénom(s) *</label>
                   <input required value={form.prenoms}
@@ -252,7 +252,7 @@ function ModalCreerAgent({ onClose, onSuccess }: ModalAgentProps) {
                 </div>
               )}
 
-              <div className="flex gap-3 pt-1">
+              <div className="flex flex-col sm:flex-row gap-3 pt-1">
                 <button type="button" onClick={onClose}
                   className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
                   Annuler
@@ -407,7 +407,7 @@ export default function MissionsPage() {
     <div className="space-y-5">
 
       {/* ── En-tête ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           {!estAgent && (
             <button onClick={() => navigate("/membres")}
@@ -428,7 +428,7 @@ export default function MissionsPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {peutCreerAgent && !estAgent && (
             <button onClick={() => { setVue("agents"); }}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${vue === "agents" ? "text-white" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}
@@ -480,7 +480,7 @@ export default function MissionsPage() {
               )}
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {agents.map((a) => (
                 <div key={a.id} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
@@ -546,7 +546,7 @@ export default function MissionsPage() {
               )}
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {missions.map((m) => {
                 const progression = m.objectifParcelles ? Math.round(((m.parcellesCollectees ?? 0) / m.objectifParcelles) * 100) : 0;
                 return (

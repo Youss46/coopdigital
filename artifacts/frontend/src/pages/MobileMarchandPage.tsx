@@ -105,7 +105,7 @@ export default function MobileMarchandPage() {
   return (
     <div className="px-4 py-4 sm:px-0 sm:py-0">
       {/* Header */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex-1 min-w-0">
           <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">Comptes Mobiles Marchands</h1>
           <p className="text-sm text-gray-500 mt-0.5">{comptes.length} compte(s) enregistré(s)</p>
@@ -473,7 +473,7 @@ function ModalCompte({ compte, onClose, onSave }: {
 
           {err && <p className="text-xs text-red-500">{err}</p>}
 
-          <div className="flex gap-2 pt-1">
+          <div className="flex flex-col sm:flex-row gap-2 pt-1">
             <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
               Annuler
             </button>
@@ -573,7 +573,7 @@ function ModalMouvement({ compteId: _, onClose, onSave }: {
 
           {err && <p className="text-xs text-red-500">{err}</p>}
 
-          <div className="flex gap-2 pt-1">
+          <div className="flex flex-col sm:flex-row gap-2 pt-1">
             <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
               Annuler
             </button>

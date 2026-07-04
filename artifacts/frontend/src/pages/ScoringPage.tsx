@@ -112,7 +112,7 @@ function ClassementTab({ campagneId }: { campagneId: number }) {
           <h3 className="text-center text-sm font-semibold text-yellow-800 uppercase tracking-wider mb-6">
             🏆 Podium Campagne
           </h3>
-          <div className="flex items-end justify-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center sm:items-end justify-center gap-4">
             {podiumOrder.map((e, i) => {
               if (!e) return <div key={i} className="w-28" />;
               const heights = ["h-20", "h-28", "h-16"];
@@ -141,7 +141,7 @@ function ClassementTab({ campagneId }: { campagneId: number }) {
       )}
 
       {/* Barre d'outils */}
-      <div className="flex flex-wrap gap-3 items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="flex gap-3 flex-wrap">
           <input
             value={recherche}
@@ -162,7 +162,7 @@ function ClassementTab({ campagneId }: { campagneId: number }) {
             <option value="non_classe">Non classé</option>
           </select>
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-center sm:items-end gap-2">
           <button
             onClick={handleRecalc}
             disabled={recalc.isPending || campagneId === 0}
@@ -196,9 +196,9 @@ function ClassementTab({ campagneId }: { campagneId: number }) {
                 <th className="px-4 py-3 text-center">Score</th>
                 <th className="px-4 py-3 text-center">Niveau</th>
                 <th className="px-4 py-3 text-right">Volume (kg)</th>
-                <th className="px-4 py-3 text-center">Qualité</th>
-                <th className="px-4 py-3 text-center">Régularité</th>
-                <th className="px-4 py-3 text-center">Remboursement</th>
+                <th className="px-4 py-3 text-center hidden sm:table-cell">Qualité</th>
+                <th className="px-4 py-3 text-center hidden sm:table-cell">Régularité</th>
+                <th className="px-4 py-3 text-center hidden md:table-cell">Remboursement</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -227,9 +227,9 @@ function ClassementTab({ campagneId }: { campagneId: number }) {
                   <td className="px-4 py-3 text-right font-medium">
                     {Number(e.tonnage ?? 0).toLocaleString("fr-CI")}
                   </td>
-                  <td className="px-4 py-3 text-center">{Math.round(Number(e.score_qualite ?? 0))}</td>
-                  <td className="px-4 py-3 text-center">{Math.round(Number(e.score_regularite ?? 0))}</td>
-                  <td className="px-4 py-3 text-center">{Math.round(Number(e.score_remboursement ?? 0))}</td>
+                  <td className="px-4 py-3 text-center hidden sm:table-cell">{Math.round(Number(e.score_qualite ?? 0))}</td>
+                  <td className="px-4 py-3 text-center hidden sm:table-cell">{Math.round(Number(e.score_regularite ?? 0))}</td>
+                  <td className="px-4 py-3 text-center hidden md:table-cell">{Math.round(Number(e.score_remboursement ?? 0))}</td>
                 </tr>
               ))}
             </tbody>
@@ -289,7 +289,7 @@ function FicheScoreTab({ campagneId }: { campagneId: number }) {
         <select
           value={membreId ?? ""}
           onChange={e => setMembreId(e.target.value ? Number(e.target.value) : null)}
-          className="border rounded-lg px-3 py-2 text-sm w-80"
+          className="border rounded-lg px-3 py-2 text-sm w-full sm:w-80"
         >
           <option value="">— Choisir un membre —</option>
           {liste.map(e => (
@@ -466,7 +466,7 @@ function ConfigTab({ campagneId }: { campagneId: number }) {
   if (isLoading) return <div className="text-center py-12 text-gray-400">Chargement…</div>;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
       {/* Poids */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6">
         <h3 className="text-sm font-semibold text-gray-700 mb-4">Poids des composantes</h3>

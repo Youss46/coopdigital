@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, Ship, MapPin, CheckCircle2,
   ChevronRight, FileText, Users, Leaf, AlertCircle,
-  Plus, Unlink, Link, Download,
+  Plus, Unlink, Link, Download, Clock
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -111,7 +111,7 @@ export default function ExpeditionDetailPage() {
   const [nombreSacsRefoul, setNombreSacsRefoul] = useState("");
   const [motifRefoulement, setMotifRefoulement] = useState("");
 
-  const { data: exp, isLoading } = useQuery<Record<string, unknown>>({
+  const { data: exp, isLoading } = useQuery<Record<string, any>>({
     queryKey: ["expedition", id],
     queryFn: () => apiFetch(`/api/expeditions/${id}`, token),
     enabled: !!id,
@@ -157,7 +157,7 @@ export default function ExpeditionDetailPage() {
 
   const receptionMutation = useMutation({
     mutationFn: (body: unknown) => apiPut(`/api/expeditions/${id}/reception`, token, body),
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       const d = data as { statut: string; ecartKg: number; tauxEcartPct: number; niveauAlerte: string };
       const msg = d.niveauAlerte === "litige"
         ? `🔴 LITIGE détecté — écart de ${Math.abs(d.ecartKg).toFixed(0)} kg (${d.tauxEcartPct.toFixed(2)}%)`
@@ -210,32 +210,36 @@ export default function ExpeditionDetailPage() {
     ? niveauAlertePoids
     : niveauAlerteSacs;
 
-  const lots = Array.isArray(exp.lots) ? exp.lots as Record<string, unknown>[] : [];
+  const lots = Array.isArray(exp.lots) ? exp.lots as any[] : [];
   const lotsNonMembres = exp.lotsNonMembres === true;
-  const historique = Array.isArray(exp.historique) ? exp.historique as Record<string, unknown>[] : [];
-  const documents = Array.isArray(exp.documents) ? exp.documents as Record<string, unknown>[] : [];
+  const historique = Array.isArray(exp.historique) ? exp.historique as any[] : [];
+  const documents = Array.isArray(exp.documents) ? exp.documents as any[] : [];
 
   const STEPS = ["Préparation", "Chargé", "En transit", "Port", "Réceptionné"];
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       {/* En-tête */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/expeditions")} className="gap-1">
-          <ArrowLeft className="h-4 w-4" /> Retour
-        </Button>
-        <Ship className="h-5 w-5 text-green-700" />
-        <h1 className="text-xl font-bold text-gray-900 font-mono">{String(exp.numeroExpedition ?? "")}</h1>
-        <span className={`ml-2 text-sm font-semibold ${cfg.color}`}>{cfg.label}</span>
-        <Badge variant="outline" className="ml-auto">
-          {String(exp.typeVehicule ?? "") === "propre" ? "🚛 Camion propre" : "🔑 Location"}
-        </Badge>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/expeditions")} className="gap-1">
+            <ArrowLeft className="h-4 w-4" /> Retour
+          </Button>
+          <Ship className="h-5 w-5 text-green-700" />
+          <h1 className="text-xl font-bold text-gray-900 font-mono">{String(exp.numeroExpedition ?? "")}</h1>
+        </div>
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <span className={`text-sm font-semibold ${cfg.color}`}>{cfg.label}</span>
+          <Badge variant="outline">
+            {String(exp.typeVehicule ?? "") === "propre" ? "🚛 Camion propre" : "🔑 Location"}
+          </Badge>
+        </div>
       </div>
 
       {/* Barre de progression */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between relative">
+        <CardContent className="p-4 overflow-x-auto">
+          <div className="flex items-center justify-between relative min-w-[500px]">
             <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200 z-0" />
             {STEPS.map((step, i) => {
               const done   = i < cfg.step;
@@ -244,7 +248,7 @@ export default function ExpeditionDetailPage() {
               return (
                 <div key={step} className="flex flex-col items-center z-10 gap-1">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 ${
-                    final  ? (statut === "litige" ? "bg-red-500 border-red-500 text-white" : "bg-green-500 border-green-500 text-white")
+                    final  ? (statut === "litige" ? "bg-red-50 border-red-500 text-white" : "bg-green-500 border-green-500 text-white")
                     : done   ? "bg-green-500 border-green-500 text-white"
                     : active ? "bg-orange-500 border-orange-500 text-white animate-pulse"
                     : "bg-white border-gray-300 text-gray-400"
@@ -260,7 +264,7 @@ export default function ExpeditionDetailPage() {
       </Card>
 
       {/* Infos principales */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-gray-500 font-normal">Véhicule & Chauffeur</CardTitle>
@@ -347,7 +351,7 @@ export default function ExpeditionDetailPage() {
             </CardHeader>
             <CardContent>
               {phytoNumero ? (
-                <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
                   <div>
                     <span className="text-gray-500 text-xs">Numéro</span>
                     <div className="font-mono font-semibold">{phytoNumero}</div>
@@ -407,8 +411,8 @@ export default function ExpeditionDetailPage() {
 
         {/* Lots déjà rattachés */}
         {lots.length > 0 && (
-          <CardContent className="p-0">
-            <table className="w-full text-xs">
+          <CardContent className="p-0 overflow-x-auto">
+            <table className="w-full text-xs min-w-[600px]">
               <thead>
                 <tr className="border-b bg-gray-50 text-gray-500">
                   <th className="px-3 py-2 text-left">Lot #</th>
@@ -481,49 +485,51 @@ export default function ExpeditionDetailPage() {
                 Aucun lot disponible (tous déjà rattachés ou aucun lot en stock/transit).
               </p>
             ) : (
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b bg-green-50 text-gray-500">
-                    <th className="px-3 py-2 text-left">Lot #</th>
-                    <th className="px-3 py-2 text-right">Poids (kg)</th>
-                    <th className="px-3 py-2 text-left">Entrepôt</th>
-                    <th className="px-3 py-2 text-left">Statut</th>
-                    <th className="px-3 py-2 text-left">Date</th>
-                    <th className="px-3 py-2" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {lotsDisponibles.map(lot => (
-                    <tr key={lot.id} className="hover:bg-green-50">
-                      <td className="px-3 py-2 font-mono font-semibold text-blue-700">#{lot.id}</td>
-                      <td className="px-3 py-2 text-right font-medium">
-                        {parseFloat(lot.poidsTotalKg).toLocaleString("fr-FR")}
-                      </td>
-                      <td className="px-3 py-2 text-gray-600">{lot.entrepot ?? "—"}</td>
-                      <td className="px-3 py-2">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          lot.statut === "en_stock" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
-                        }`}>
-                          {lot.statut === "en_stock" ? "En stock" : "Transit"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-gray-400">
-                        {new Date(lot.dateCreation).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <Button
-                          size="sm"
-                          className="h-6 text-xs bg-green-700 hover:bg-green-800 gap-1"
-                          disabled={rattacherMutation.isPending}
-                          onClick={() => rattacherMutation.mutate(lot.id)}
-                        >
-                          <Link className="h-3 w-3" /> Rattacher
-                        </Button>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs min-w-[500px]">
+                  <thead>
+                    <tr className="border-b bg-green-50 text-gray-500">
+                      <th className="px-3 py-2 text-left">Lot #</th>
+                      <th className="px-3 py-2 text-right">Poids (kg)</th>
+                      <th className="px-3 py-2 text-left">Entrepôt</th>
+                      <th className="px-3 py-2 text-left">Statut</th>
+                      <th className="px-3 py-2 text-left">Date</th>
+                      <th className="px-3 py-2" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y">
+                    {lotsDisponibles.map(lot => (
+                      <tr key={lot.id} className="hover:bg-green-50">
+                        <td className="px-3 py-2 font-mono font-semibold text-blue-700">#{lot.id}</td>
+                        <td className="px-3 py-2 text-right font-medium">
+                          {parseFloat(lot.poidsTotalKg).toLocaleString("fr-FR")}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">{lot.entrepot ?? "—"}</td>
+                        <td className="px-3 py-2">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            lot.statut === "en_stock" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+                          }`}>
+                            {lot.statut === "en_stock" ? "En stock" : "Transit"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-gray-400">
+                          {new Date(lot.dateCreation).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Button
+                            size="sm"
+                            className="h-6 text-xs bg-green-700 hover:bg-green-800 gap-1"
+                            disabled={rattacherMutation.isPending}
+                            onClick={() => rattacherMutation.mutate(lot.id)}
+                          >
+                            <Link className="h-3 w-3" /> Rattacher
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </CardContent>
         )}
@@ -533,334 +539,334 @@ export default function ExpeditionDetailPage() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Documents
-            <div className="ml-auto flex gap-2">
-              {!lotsNonMembres && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 h-7 text-xs border-blue-700 text-blue-700 hover:bg-blue-50"
-                  disabled={downloadingEudr}
-                  onClick={async () => {
-                    setDownloadingEudr(true);
-                    try {
-                      const res = await fetch(`${BASE}/api/expeditions/${id}/eudr/pdf`, {
-                        headers: token ? { Authorization: `Bearer ${token}` } : {},
-                      });
-                      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                      const blob = await res.blob();
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `rapport-eudr-${String(exp.numeroExpedition ?? id)}.pdf`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    } catch {
-                      toast({ title: "Erreur", description: "Impossible de générer le rapport EUDR.", variant: "destructive" });
-                    } finally {
-                      setDownloadingEudr(false);
-                    }
-                  }}
-                >
-                  <Download className="h-3 w-3" />
-                  {downloadingEudr ? "Génération…" : "Rapport EUDR"}
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 h-7 text-xs border-green-700 text-green-700 hover:bg-green-50"
-                disabled={downloadingBL}
-                onClick={async () => {
-                  setDownloadingBL(true);
-                  try {
-                    const res = await fetch(`${BASE}/api/expeditions/${id}/bon-livraison`, {
-                      headers: token ? { Authorization: `Bearer ${token}` } : {},
-                    });
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `bon-livraison-${String(exp.numeroExpedition ?? id)}.pdf`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  } catch {
-                    toast({ title: "Erreur", description: "Impossible de générer le bon de livraison.", variant: "destructive" });
-                  } finally {
-                    setDownloadingBL(false);
-                  }
-                }}
-              >
-                <Download className="h-3 w-3" />
-                {downloadingBL ? "Génération…" : "Bon de livraison"}
-              </Button>
-              {exp.poidsRecuPortKg && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 h-7 text-xs border-blue-700 text-blue-700 hover:bg-blue-50"
-                  disabled={downloadingConstat}
-                  onClick={async () => {
-                    setDownloadingConstat(true);
-                    try {
-                      const res = await fetch(`${BASE}/api/expeditions/${id}/constat-reception`, {
-                        headers: token ? { Authorization: `Bearer ${token}` } : {},
-                      });
-                      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                      const blob = await res.blob();
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `constat-reception-${String(exp.numeroExpedition ?? id)}.pdf`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    } catch {
-                      toast({ title: "Erreur", description: "Impossible de générer le constat de réception.", variant: "destructive" });
-                    } finally {
-                      setDownloadingConstat(false);
-                    }
-                  }}
-                >
-                  <Download className="h-3 w-3" />
-                  {downloadingConstat ? "Génération…" : "Constat de réception"}
-                </Button>
-              )}
-            </div>
+            <FileText className="h-4 w-4 text-blue-600" />
+            Documents d'expédition
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          {documents.length === 0 ? (
-            <p className="text-xs text-gray-400">Aucun document joint. Téléchargez le bon de livraison via le bouton ci-dessus.</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {documents.map((d, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs text-green-700">
-                  <CheckCircle2 className="h-3 w-3" /> {String(d.type ?? "")}
-                </div>
-              ))}
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={async () => {
+                setDownloadingBL(true);
+                try {
+                  const res = await fetch(`${BASE}/api/expeditions/${id}/bon-livraison`, { headers: { Authorization: `Bearer ${token}` } });
+                  if (!res.ok) throw new Error();
+                  const blob = await res.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement("a"); a.href = url; a.download = `BL-${exp.numeroExpedition}.pdf`; a.click();
+                } catch { toast({ title: "Erreur", description: "Impossible de générer le bon de livraison", variant: "destructive" }); }
+                finally { setDownloadingBL(false); }
+              }}
+              disabled={downloadingBL}
+            >
+              <Download className={`h-4 w-4 ${downloadingBL ? "animate-bounce" : ""}`} />
+              Bon de Livraison (BL)
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={async () => {
+                setDownloadingEudr(true);
+                try {
+                  const res = await fetch(`${BASE}/api/expeditions/${id}/certificat-eudr`, { headers: { Authorization: `Bearer ${token}` } });
+                  if (!res.ok) throw new Error();
+                  const blob = await res.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement("a"); a.href = url; a.download = `EUDR-${exp.numeroExpedition}.pdf`; a.click();
+                } catch { toast({ title: "Erreur", description: "Impossible de générer le certificat EUDR", variant: "destructive" }); }
+                finally { setDownloadingEudr(false); }
+              }}
+              disabled={downloadingEudr}
+            >
+              <Download className={`h-4 w-4 ${downloadingEudr ? "animate-bounce" : ""}`} />
+              Certificat EUDR
+            </Button>
+            {statut === "litige" && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="gap-2"
+                onClick={async () => {
+                  setDownloadingConstat(true);
+                  try {
+                    const res = await fetch(`${BASE}/api/expeditions/${id}/constat-litige`, { headers: { Authorization: `Bearer ${token}` } });
+                    if (!res.ok) throw new Error();
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a"); a.href = url; a.download = `CONSTAT-${exp.numeroExpedition}.pdf`; a.click();
+                  } catch { toast({ title: "Erreur", description: "Impossible de générer le constat", variant: "destructive" }); }
+                  finally { setDownloadingConstat(false); }
+                }}
+                disabled={downloadingConstat}
+              >
+                <AlertCircle className="h-4 w-4" />
+                Constat de litige
+              </Button>
+            )}
+          </div>
+          {documents.length > 0 && (
+            <div className="pt-2 border-t space-y-2">
+              <p className="text-xs font-medium text-gray-500">Autres pièces jointes ({documents.length}) :</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {documents.map((doc, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-xs">
+                    <span className="truncate flex-1">{String(doc.nomFichier)}</span>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => window.open(String(doc.url), "_blank")}>
+                      <Download className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Formulaire réception port */}
-      {showReception && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base text-blue-800">⚓ Saisir la réception au port</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Poids reçu au port (kg) *</Label>
-                <Input
-                  type="number"
-                  value={poidsRecu}
-                  onChange={e => setPoidsRecu(e.target.value)}
-                  placeholder="18 465"
-                />
-              </div>
-              <div>
-                <Label>Nombre de sacs reçus</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={nombreSacsRecu}
-                  onChange={e => setNombreSacsRecu(e.target.value)}
-                  placeholder="Ex : 320"
-                />
-              </div>
-              <div>
-                <Label>N° récépissé port *</Label>
-                <Input value={recepisse} onChange={e => setRecepisse(e.target.value)} placeholder="REC-2025-..." />
-              </div>
-              <div>
-                <Label>Réceptionnaire *</Label>
-                <Input value={receptionnaire} onChange={e => setReceptionnaire(e.target.value)} placeholder="Nom du réceptionnaire" />
-              </div>
-              <div>
-                <Label>Frais transport (FCFA)</Label>
-                <Input type="number" value={fraisTransport} onChange={e => setFraisTransport(e.target.value)} placeholder="50000" />
-              </div>
-            </div>
-
-            {/* Section stock refoulé */}
-            <div className="border border-orange-200 rounded-lg p-4 bg-orange-50 space-y-3">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="hasRefoulement"
-                  checked={hasRefoulement}
-                  onChange={e => { setHasRefoulement(e.target.checked); if (!e.target.checked) { setPoidsRefoul(""); setNombreSacsRefoul(""); setMotifRefoulement(""); }}}
-                  className="w-4 h-4 accent-orange-600"
-                />
-                <label htmlFor="hasRefoulement" className="text-sm font-medium text-orange-800">
-                  📦 Stock refoulé (refus partiel à l'arrivée)
-                </label>
-              </div>
-              {hasRefoulement && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs text-orange-700">Quantité refoulée (kg) *</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={poidsRefoul}
-                      onChange={e => setPoidsRefoul(e.target.value)}
-                      placeholder="Ex : 500"
-                      className="border-orange-300"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-orange-700">Nombre de sacs refoulés</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={nombreSacsRefoul}
-                      onChange={e => setNombreSacsRefoul(e.target.value)}
-                      placeholder="Ex : 10"
-                      className="border-orange-300"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs text-orange-700">Motif du refus *</Label>
-                    <Input
-                      value={motifRefoulement}
-                      onChange={e => setMotifRefoulement(e.target.value)}
-                      placeholder="Ex : Taux d'humidité trop élevé, moisissures…"
-                      className="border-orange-300"
-                    />
-                  </div>
-                  {poidsRefoul && poidsRecu && (
-                    <div className="col-span-2 text-xs text-orange-700 bg-orange-100 rounded p-2">
-                      Quantité acceptée = {(parseFloat(poidsRecu) - parseFloat(poidsRefoul)).toLocaleString("fr-FR")} kg
-                      {" "}(reçu {parseFloat(poidsRecu).toLocaleString("fr-FR")} − refoulé {parseFloat(poidsRefoul).toLocaleString("fr-FR")})
-                    </div>
-                  )}
+      {/* Historique */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Clock className="h-4 w-4 text-gray-400" />
+            Historique du suivi
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {historique.map((h, i) => (
+              <div key={i} className="flex gap-3 text-xs">
+                <div className="w-20 shrink-0 text-gray-400 text-[10px] pt-0.5">
+                  {new Date(String(h.dateAction)).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </div>
-              )}
-            </div>
-
-            {/* Prévisualisation écart */}
-            {(tauxEcart !== null || tauxEcartSacs !== null) && (
-              <div className={`rounded-lg p-4 border ${
-                niveauAlerte === "acceptable"  ? "bg-green-50 border-green-300"
-                : niveauAlerte === "a_justifier" ? "bg-orange-50 border-orange-300"
-                : "bg-red-50 border-red-300"
-              }`}>
-                <div className="font-semibold mb-3">
-                  {niveauAlerte === "acceptable"  ? "✅ Réception conforme"
-                  : niveauAlerte === "a_justifier" ? "⚠️ Écart à justifier"
-                  : "🔴 LITIGE — Direction sera notifiée"}
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-700">{STATUT_CONFIG[String(h.statut)]?.label ?? String(h.statut)}</div>
+                  {h.notes && <div className="text-gray-500 italic mt-0.5">"{String(h.notes)}"</div>}
+                  {h.utilisateurNom && <div className="text-gray-400 mt-0.5">Par {String(h.utilisateurNom)}</div>}
                 </div>
-                {tauxEcart !== null && (
-                  <div className="grid grid-cols-3 gap-2 text-sm mb-2">
-                    <div><span className="text-gray-500">Poids chargé :</span> <strong>{poidsCharge.toLocaleString("fr-FR")} kg</strong></div>
-                    <div><span className="text-gray-500">Poids reçu :</span> <strong>{parseFloat(poidsRecu || "0").toLocaleString("fr-FR")} kg</strong></div>
-                    <div><span className="text-gray-500">Écart :</span> <strong className={niveauAlertePoids !== "acceptable" ? "text-red-600" : ""}>{ecartKg !== null ? `${ecartKg.toFixed(1)} kg (${tauxEcart.toFixed(2)}%)` : "—"}</strong></div>
-                  </div>
-                )}
-                {tauxEcartSacs !== null && sacsCharges !== null && (
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div><span className="text-gray-500">Sacs chargés :</span> <strong>{sacsCharges} sacs</strong></div>
-                    <div><span className="text-gray-500">Sacs reçus :</span> <strong>{nombreSacsRecu} sacs</strong></div>
-                    <div><span className="text-gray-500">Écart :</span> <strong className={niveauAlerteSacs !== "acceptable" ? "text-red-600" : ""}>{ecartSacs !== null ? `${ecartSacs > 0 ? "-" : "+"}${Math.abs(ecartSacs)} sac(s) (${tauxEcartSacs.toFixed(2)}%)` : "—"}</strong></div>
-                  </div>
-                )}
               </div>
-            )}
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-            {(niveauAlerte === "a_justifier" || niveauAlerte === "litige") && (
-              <div>
-                <Label>Motif de l'écart *</Label>
-                <Select value={motifEcart || undefined} onValueChange={setMotifEcart}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner…" /></SelectTrigger>
-                  <SelectContent>
-                    {MOTIFS_ECART.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="flex gap-3 justify-end">
-              <Button variant="outline" onClick={() => setShowReception(false)}>Annuler</Button>
+      {/* Actions de transition */}
+      {transition && !showReception && (
+        <Card className="border-green-200 bg-green-50 shadow-md">
+          <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-center sm:text-left">
+              <p className="text-sm font-semibold text-green-800">Prêt pour l'étape suivante ?</p>
+              <p className="text-xs text-green-600">L'expédition passera au statut <strong>{STATUT_CONFIG[transition.next]?.label ?? transition.next}</strong>.</p>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
               <Button
-                className="bg-blue-700 hover:bg-blue-800"
-                disabled={
-                  receptionMutation.isPending ||
-                  !poidsRecu || !recepisse || !receptionnaire ||
-                  (hasRefoulement && (!poidsRefoul || !motifRefoulement))
-                }
-                onClick={() => receptionMutation.mutate({
-                  poidsRecuPortKg:    parseFloat(poidsRecu),
-                  nombreSacsRecuPort: nombreSacsRecu ? parseInt(nombreSacsRecu, 10) : undefined,
-                  numeroRecepissePort: recepisse,
-                  nomReceptionnaire:  receptionnaire,
-                  motifEcart:         motifEcart || undefined,
-                  fraisTransportFcfa: fraisTransport ? parseInt(fraisTransport, 10) : undefined,
-                  ...(hasRefoulement && poidsRefoul ? {
-                    poidsRefuleKg:      parseFloat(poidsRefoul),
-                    nombreSacsRefoules: nombreSacsRefoul ? parseInt(nombreSacsRefoul, 10) : undefined,
-                    motifRefus:         motifRefoulement || undefined,
-                  } : {}),
-                })}
+                className="bg-green-700 hover:bg-green-800 text-white flex-1 sm:flex-none"
+                onClick={() => {
+                  if (transition.next === "reception") setShowReception(true);
+                  else statutMutation.mutate({ statut: transition.next });
+                }}
+                disabled={statutMutation.isPending}
               >
-                {receptionMutation.isPending ? "Enregistrement…" : "Confirmer la réception →"}
+                {transition.label}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Actions */}
-      {transition && !showReception && (
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="p-4 flex items-center justify-between">
-            <p className="text-sm text-green-700">Prochaine étape disponible</p>
-            <Button
-              className="bg-green-700 hover:bg-green-800 gap-2"
-              disabled={statutMutation.isPending}
-              onClick={() => {
-                if (transition.next === "reception") {
-                  setShowReception(true);
-                } else {
-                  statutMutation.mutate({ statut: transition.next, notes });
-                }
-              }}
-            >
-              {transition.label} <ChevronRight className="h-4 w-4" />
-            </Button>
+      {/* Formulaire de réception port */}
+      {showReception && (
+        <Card className="border-orange-300 bg-orange-50 shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2 text-orange-800">
+              <CheckCircle2 className="h-5 w-5" />
+              Réception au port
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="bg-white p-4 rounded-xl border border-orange-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="space-y-1.5">
+                <Label htmlFor="poidsRecu" className="text-orange-700">Poids net reçu (kg) *</Label>
+                <Input
+                  id="poidsRecu"
+                  type="number"
+                  step="0.5"
+                  value={poidsRecu}
+                  onChange={(e) => setPoidsRecu(e.target.value)}
+                  className="bg-orange-50/30 border-orange-200 focus-visible:ring-orange-400 font-bold"
+                  placeholder="Ex: 34500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sacsRecu" className="text-orange-700">Nombre de sacs reçus *</Label>
+                <Input
+                  id="sacsRecu"
+                  type="number"
+                  value={nombreSacsRecu}
+                  onChange={(e) => setNombreSacsRecu(e.target.value)}
+                  className="bg-orange-50/30 border-orange-200 focus-visible:ring-orange-400"
+                  placeholder="Ex: 500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="recepisse" className="text-orange-700">N° Récépissé port *</Label>
+                <Input
+                  id="recepisse"
+                  value={recepisse}
+                  onChange={(e) => setRecepisse(e.target.value)}
+                  className="bg-orange-50/30 border-orange-200 focus-visible:ring-orange-400 font-mono"
+                  placeholder="REC-XXXXXX"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="receptionnaire" className="text-orange-700">Réceptionné par *</Label>
+                <Input
+                  id="receptionnaire"
+                  value={receptionnaire}
+                  onChange={(e) => setReceptionnaire(e.target.value)}
+                  className="bg-orange-50/30 border-orange-200 focus-visible:ring-orange-400"
+                  placeholder="Nom de l'agent"
+                />
+              </div>
+            </div>
+
+            {/* Calcul de l'écart dynamique */}
+            {(ecartKg !== null || ecartSacs !== null) && (
+              <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-center gap-4 transition-colors ${
+                niveauAlerte === "litige" ? "bg-red-50 border-red-200"
+                : niveauAlerte === "a_justifier" ? "bg-amber-50 border-orange-200"
+                : "bg-green-50 border-green-200"
+              }`}>
+                <div className={`p-2 rounded-full ${
+                  niveauAlerte === "litige" ? "bg-red-100 text-red-600"
+                  : niveauAlerte === "a_justifier" ? "bg-amber-100 text-orange-600"
+                  : "bg-green-100 text-green-600"
+                }`}>
+                  {niveauAlerte === "litige" ? <AlertCircle className="h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />}
+                </div>
+                <div className="flex-1 text-center md:text-left">
+                  <p className="text-sm font-bold uppercase tracking-wide">
+                    {niveauAlerte === "litige" ? "⚠️ Litige détecté"
+                    : niveauAlerte === "a_justifier" ? "🔍 Écart à justifier"
+                    : "✅ Réception conforme"}
+                  </p>
+                  <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-1 text-xs">
+                    {ecartKg !== null && (
+                      <span>Poids : <strong>{ecartKg > 0 ? "+" : ""}{(-ecartKg).toFixed(1)} kg</strong> ({(tauxEcart ?? 0).toFixed(2)}%)</span>
+                    )}
+                    {ecartSacs !== null && (
+                      <span>Sacs : <strong>{ecartSacs > 0 ? "+" : ""}{-ecartSacs} sacs</strong> ({(tauxEcartSacs ?? 0).toFixed(2)}%)</span>
+                    )}
+                  </div>
+                </div>
+                {niveauAlerte !== "acceptable" && (
+                  <div className="w-full md:w-64">
+                    <Label className="text-[10px] text-gray-500 mb-1 block">Motif de l'écart *</Label>
+                    <Select value={motifEcart} onValueChange={setMotifEcart}>
+                      <SelectTrigger className="h-8 text-xs bg-white">
+                        <SelectValue placeholder="Choisir un motif" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MOTIFS_ECART.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Section Refoulement / Tri */}
+            <div className="pt-4 border-t border-orange-200">
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="checkbox"
+                  id="refoulement"
+                  checked={hasRefoulement}
+                  onChange={(e) => setHasRefoulement(e.target.checked)}
+                  className="h-4 w-4 text-orange-600 rounded"
+                />
+                <Label htmlFor="refoulement" className="text-orange-800 font-semibold cursor-pointer">Y a-t-il eu un refoulement partiel ? (produit non conforme)</Label>
+              </div>
+
+              {hasRefoulement && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-orange-100/50 rounded-lg border border-orange-200 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Poids refoulé (kg)</Label>
+                    <Input type="number" value={poidsRefoul} onChange={(e) => setPoidsRefoul(e.target.value)} className="h-8 text-sm" placeholder="Kg" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Sacs refoulés</Label>
+                    <Input type="number" value={nombreSacsRefoul} onChange={(e) => setNombreSacsRefoul(e.target.value)} className="h-8 text-sm" placeholder="Nombre" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Motif refoulement</Label>
+                    <Input value={motifRefoulement} onChange={(e) => setMotifRefoulement(e.target.value)} className="h-8 text-sm" placeholder="Ex: Hors-normes" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="frais">Frais de transport réels (FCFA)</Label>
+                <Input
+                  id="frais"
+                  type="number"
+                  value={fraisTransport}
+                  onChange={(e) => setFraisTransport(e.target.value)}
+                  className="bg-white"
+                  placeholder="Optionnel"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="notes">Notes & observations</Label>
+                <Textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="bg-white h-20"
+                  placeholder="Observations éventuelles sur la réception..."
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <Button variant="ghost" onClick={() => setShowReception(false)} className="flex-1 text-gray-500">Annuler</Button>
+              <Button
+                className="flex-[2] bg-orange-600 hover:bg-orange-700 text-white font-bold h-12 shadow-lg"
+                disabled={!poidsRecu || !nombreSacsRecu || !recepisse || !receptionnaire || (niveauAlerte !== "acceptable" && !motifEcart) || receptionMutation.isPending}
+                onClick={() => {
+                  receptionMutation.mutate({
+                    poidsRecuPortKg: parseFloat(poidsRecu),
+                    nombreSacsRecuPort: parseInt(nombreSacsRecu),
+                    numeroRecepissePort: recepisse,
+                    nomReceptionnaire: receptionnaire,
+                    motifEcart: niveauAlerte !== "acceptable" ? motifEcart : undefined,
+                    notes,
+                    fraisTransportFcfa: fraisTransport ? parseFloat(fraisTransport) : undefined,
+                    refoulement: hasRefoulement ? {
+                      poidsKg: parseFloat(poidsRefoul),
+                      nombreSacs: parseInt(nombreSacsRefoul),
+                      motif: motifRefoulement
+                    } : undefined
+                  });
+                }}
+              >
+                {receptionMutation.isPending ? "Traitement en cours..." : "CONFIRMER LA RÉCEPTION ET CLÔTURER"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Historique */}
-      {historique.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Historique</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {historique.map((h, i) => (
-              <div key={i} className="flex items-start gap-3 text-sm">
-                <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5 shrink-0" />
-                <div>
-                  <div className="font-medium">
-                    {STATUT_CONFIG[String(h.statutPrecedent ?? "")]?.label ?? String(h.statutPrecedent ?? "")}
-                    {h.statutPrecedent ? <span className="text-gray-400"> → </span> : null}
-                    {STATUT_CONFIG[String(h.statutNouveau ?? "")]?.label ?? String(h.statutNouveau ?? "")}
-                  </div>
-                  {h.notes && <div className="text-gray-500 text-xs">{String(h.notes)}</div>}
-                  <div className="text-gray-400 text-xs">
-                    {new Date(String(h.dateChangement)).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      {/* Bouton retour en bas de page pour mobile */}
+      <div className="sm:hidden pt-4 pb-8">
+        <Button variant="outline" className="w-full gap-2" onClick={() => navigate("/expeditions")}>
+          <ArrowLeft className="h-4 w-4" /> Retour à la liste
+        </Button>
+      </div>
     </div>
   );
 }

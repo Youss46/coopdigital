@@ -195,7 +195,7 @@ function OngletConfiguration() {
         </p>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {updatedAt && modifiePar ? (
           <p className="text-xs text-gray-400">
             Modifié le {new Date(updatedAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
@@ -204,7 +204,7 @@ function OngletConfiguration() {
         <button
           onClick={handleSave}
           disabled={isPending}
-          className="px-5 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50"
+          className="w-full sm:w-auto px-5 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50"
           style={{ backgroundColor: VERT }}
         >
           {isPending ? "Enregistrement…" : "Enregistrer la configuration"}
@@ -269,7 +269,7 @@ function ModalModifierValider({ ecriture, onClose, onDone }: { ecriture: Ecritur
               onChange={(e) => setForm({ ...form, libelle: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Compte débit</label>
               <input
@@ -471,7 +471,7 @@ function OngletEnAttente() {
       {/* Filtres */}
       <div className="flex flex-wrap gap-3 mb-5">
         <select
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+          className="flex-1 sm:flex-none border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
           value={filtreStatut}
           onChange={(e) => setFiltreStatut(e.target.value)}
         >
@@ -482,7 +482,7 @@ function OngletEnAttente() {
           <option value="modifiee">Modifiées</option>
         </select>
         <select
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+          className="flex-1 sm:flex-none border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
           value={filtreSource}
           onChange={(e) => setFiltreSource(e.target.value)}
         >
@@ -491,13 +491,13 @@ function OngletEnAttente() {
             <option key={k} value={k}>{v}</option>
           ))}
         </select>
-        <input type="date" className="border border-gray-200 rounded-lg px-3 py-2 text-sm" value={filtreDebut} onChange={(e) => setFiltreDebut(e.target.value)} />
-        <input type="date" className="border border-gray-200 rounded-lg px-3 py-2 text-sm" value={filtreFin} onChange={(e) => setFiltreFin(e.target.value)} />
+        <input type="date" className="flex-1 sm:flex-none border border-gray-200 rounded-lg px-3 py-2 text-sm" value={filtreDebut} onChange={(e) => setFiltreDebut(e.target.value)} />
+        <input type="date" className="flex-1 sm:flex-none border border-gray-200 rounded-lg px-3 py-2 text-sm" value={filtreFin} onChange={(e) => setFiltreFin(e.target.value)} />
 
         {filtreStatut === "en_attente" && nbEnAttente > 0 && (
           <button
             onClick={() => setConfirmerValiderTout(true)}
-            className="ml-auto flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium"
+            className="w-full sm:w-auto sm:ml-auto flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium"
             style={{ backgroundColor: VERT }}
           >
             <CheckCheck size={15} />
@@ -515,9 +515,9 @@ function OngletEnAttente() {
           <p className="text-gray-500 text-sm">Aucune écriture trouvée</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[1000px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   {["Date", "Module", "Libellé", "Débit", "Crédit", "Montant", "Statut", "Actions"].map((h) => (

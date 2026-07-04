@@ -456,18 +456,18 @@ export default function MissionDetailPage() {
     <div className="space-y-5">
 
       {/* ── En-tête ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="flex items-start gap-3">
           <button onClick={() => navigate("/missions")}
             className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mt-1">
             <ChevronLeft size={16} />Missions
           </button>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <h1 className="text-xl font-bold text-gray-900">{mission.titre}</h1>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${mStatut.color}`}>{mStatut.label}</span>
+              <span className={`w-fit px-2.5 py-0.5 rounded-full text-xs font-medium ${mStatut.color}`}>{mStatut.label}</span>
             </div>
-            <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-500 mt-1">
               <span className="flex items-center gap-1"><MapPin size={13} />{mission.zoneNom} ({mission.zoneType})</span>
               <span className="flex items-center gap-1"><Calendar size={13} />{new Date(mission.datePrevue).toLocaleDateString("fr-FR")}</span>
               {stats && <span className="flex items-center gap-1"><Users size={13} />{stats.total} membres</span>}
@@ -476,17 +476,17 @@ export default function MissionDetailPage() {
         </div>
 
         {/* Actions mission */}
-        <div className="flex items-center gap-2 flex-wrap justify-end">
+        <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end w-full sm:w-auto">
           {/* Toggle liste / carte */}
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm w-full sm:w-auto">
             <button
               onClick={() => setVue("liste")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${vue === "liste" ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-500 hover:bg-gray-50"}`}>
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 transition-colors ${vue === "liste" ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-500 hover:bg-gray-50"}`}>
               <List size={14} />Liste
             </button>
             <button
               onClick={() => setVue("carte")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors border-l border-gray-200 ${vue === "carte" ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-500 hover:bg-gray-50"}`}>
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 transition-colors border-l border-gray-200 ${vue === "carte" ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-500 hover:bg-gray-50"}`}>
               <Map size={14} />Carte GPS
             </button>
           </div>
@@ -494,22 +494,23 @@ export default function MissionDetailPage() {
             <button
               onClick={handleExportGeoJSON}
               title="Télécharger les polygones GPS de cette mission en GeoJSON EUDR"
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-green-600 text-green-700 text-sm rounded-lg hover:bg-green-50 transition-colors"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 border border-green-600 text-green-700 text-sm rounded-lg hover:bg-green-50 transition-colors"
             >
               <Download size={14} />
-              GeoJSON
+              <span className="sm:hidden">GeoJSON</span>
+              <span className="hidden sm:inline">GeoJSON</span>
             </button>
           )}
           {estAgent && mission.statut === "planifiee" && (
             <button onClick={() => demarrer.mutate()} disabled={demarrer.isPending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-              {demarrer.isPending ? "…" : "Démarrer la mission"}
+              className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              {demarrer.isPending ? "…" : "Démarrer"}
             </button>
           )}
           {estAgent && mission.statut === "en_cours" && (
             <button onClick={() => soumettre.mutate()} disabled={soumettre.isPending}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50">
-              {soumettre.isPending ? "…" : "Soumettre pour validation"}
+              className="flex-1 sm:flex-none px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50">
+              {soumettre.isPending ? "…" : "Soumettre"}
             </button>
           )}
           {/* Boutons RT : lot valider / rejeter toutes les collectes */}

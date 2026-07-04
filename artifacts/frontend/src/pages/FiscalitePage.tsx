@@ -116,7 +116,7 @@ function ModalPaiement({ decl, onClose, onDone }: { decl: Declaration; onClose: 
           </div>
         </div>
         <div className="flex gap-3 p-5 pt-0">
-          <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Annuler</button>
+          <button onClick={onClose} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Annuler</button>
           <button onClick={submit} disabled={loading}
             className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700">
             {loading ? "Enregistrement…" : "Confirmer le paiement"}
@@ -284,11 +284,11 @@ function TableauBordFiscal() {
 
       {/* Calendrier */}
       <div className="bg-white rounded-xl border border-gray-100 p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
           <h3 className="font-semibold text-gray-800 flex items-center gap-2">
             <Calendar size={16} className="text-green-600" /> Calendrier des échéances (3 prochains mois)
           </h3>
-          <button onClick={charger} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+          <button onClick={charger} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 w-fit">
             <RefreshCw size={12} /> Actualiser
           </button>
         </div>
@@ -364,9 +364,9 @@ function Declarations() {
   return (
     <div>
       {/* Barre actions */}
-      <div className="flex flex-wrap gap-3 mb-5 items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center flex-wrap gap-3 mb-5">
         <select value={filtreStatut} onChange={e => setFiltreStatut(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-full sm:w-auto">
           <option value="">Tous les statuts</option>
           <option value="a_payer">À payer</option>
           <option value="en_retard">En retard</option>
@@ -374,7 +374,7 @@ function Declarations() {
           <option value="exonere">Exonéré</option>
         </select>
         <select value={filtreType} onChange={e => setFiltreType(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-full sm:w-auto">
           <option value="">Tous les types</option>
           <option value="cnps">CNPS</option>
           <option value="its">ITS</option>
@@ -382,11 +382,11 @@ function Declarations() {
           <option value="fpc">FPC</option>
           <option value="impot_societes">IS</option>
         </select>
-        <button onClick={charger} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+        <button onClick={charger} className="flex items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 w-full sm:w-auto">
           <RefreshCw size={14} /> Actualiser
         </button>
         <button onClick={() => setModalGenerer(true)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 ml-auto">
+          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 w-full sm:w-auto sm:ml-auto">
           <Plus size={14} /> Générer déclarations
         </button>
       </div>
@@ -405,64 +405,66 @@ function Declarations() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-gray-500 text-xs">
-                  <th className="text-left px-4 py-3 font-medium">Période</th>
-                  <th className="text-left px-4 py-3 font-medium">Type</th>
-                  <th className="text-right px-4 py-3 font-medium">Base imposable</th>
-                  <th className="text-right px-4 py-3 font-medium">Montant dû</th>
-                  <th className="text-center px-4 py-3 font-medium">Échéance</th>
-                  <th className="text-center px-4 py-3 font-medium">Statut</th>
-                  <th className="text-right px-4 py-3 font-medium">Pénalité</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {declarations.map((d, i) => {
-                  const enRetard   = d.statut === "en_retard";
-                  const penalite   = parseFloat(d.penalite_retard_fcfa);
-                  return (
-                    <tr key={d.id} className={`border-t border-gray-50 ${i % 2 === 1 ? "bg-gray-50/50" : ""} ${enRetard ? "bg-red-50/30" : ""}`}>
-                      <td className="px-4 py-3 font-medium text-gray-800">{d.periode}</td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-gray-600">{d.libelle}</span>
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-500 text-xs">
-                        {d.base_imposable_fcfa ? FCFA(d.base_imposable_fcfa) : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-800">
-                        {FCFA(d.montant_calcule_fcfa)}
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs text-gray-500">
-                        {d.date_echeance ? new Date(d.date_echeance + "T00:00:00").toLocaleDateString("fr-FR") : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <StatutBadge statut={d.statut} joursRetard={d.jours_retard} />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {penalite > 0 ? (
-                          <span className="text-xs font-medium text-red-600">{FCFA(penalite)}</span>
-                        ) : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        {d.statut !== "paye" && d.statut !== "exonere" && (
-                          <button onClick={() => setModalPayer(d)}
-                            className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium whitespace-nowrap">
-                            <CheckCircle2 size={12} /> Payer
-                          </button>
-                        )}
-                        {d.statut === "paye" && (
-                          <span className="flex items-center gap-1 text-xs text-green-600">
-                            <CheckCircle2 size={12} /> {d.date_paiement ? new Date(d.date_paiement + "T00:00:00").toLocaleDateString("fr-FR") : "Payé"}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[800px]">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 text-xs">
+                    <th className="text-left px-4 py-3 font-medium">Période</th>
+                    <th className="text-left px-4 py-3 font-medium">Type</th>
+                    <th className="text-right px-4 py-3 font-medium">Base imposable</th>
+                    <th className="text-right px-4 py-3 font-medium">Montant dû</th>
+                    <th className="text-center px-4 py-3 font-medium">Échéance</th>
+                    <th className="text-center px-4 py-3 font-medium">Statut</th>
+                    <th className="text-right px-4 py-3 font-medium">Pénalité</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {declarations.map((d, i) => {
+                    const enRetard   = d.statut === "en_retard";
+                    const penalite   = parseFloat(d.penalite_retard_fcfa);
+                    return (
+                      <tr key={d.id} className={`border-t border-gray-50 ${i % 2 === 1 ? "bg-gray-50/50" : ""} ${enRetard ? "bg-red-50/30" : ""}`}>
+                        <td className="px-4 py-3 font-medium text-gray-800">{d.periode}</td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-gray-600">{d.libelle}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-500 text-xs">
+                          {d.base_imposable_fcfa ? FCFA(d.base_imposable_fcfa) : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-800">
+                          {FCFA(d.montant_calcule_fcfa)}
+                        </td>
+                        <td className="px-4 py-3 text-center text-xs text-gray-500">
+                          {d.date_echeance ? new Date(d.date_echeance + "T00:00:00").toLocaleDateString("fr-FR") : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <StatutBadge statut={d.statut} joursRetard={d.jours_retard} />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {penalite > 0 ? (
+                            <span className="text-xs font-medium text-red-600">{FCFA(penalite)}</span>
+                          ) : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          {d.statut !== "paye" && d.statut !== "exonere" && (
+                            <button onClick={() => setModalPayer(d)}
+                              className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium whitespace-nowrap">
+                              <CheckCircle2 size={12} /> Payer
+                            </button>
+                          )}
+                          {d.statut === "paye" && (
+                            <span className="flex items-center gap-1 text-xs text-green-600">
+                              <CheckCircle2 size={12} /> {d.date_paiement ? new Date(d.date_paiement + "T00:00:00").toLocaleDateString("fr-FR") : "Payé"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )
       )}
@@ -555,7 +557,7 @@ function RapportAnnuel() {
       {!loading && rapport && (
         <>
           {/* KPIs */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             {[
               { label: "Total déclaré", val: FCFA(rapport.totalCalcule), color: "bg-blue-600",  icon: Calculator },
               { label: "Total payé",    val: FCFA(rapport.totalPaye),    color: "bg-green-600", icon: CheckCircle2 },
@@ -576,64 +578,66 @@ function RapportAnnuel() {
             <div className="px-5 py-3 border-b bg-gray-50">
               <h3 className="font-semibold text-gray-700 text-sm">Détail par type de taxe — Exercice {annee}</h3>
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-gray-500 text-xs border-t">
-                  <th className="text-left px-5 py-3 font-medium">Taxe</th>
-                  <th className="text-center px-4 py-3 font-medium">Périodicité</th>
-                  <th className="text-center px-4 py-3 font-medium">Déclarations</th>
-                  <th className="text-right px-4 py-3 font-medium">Montant déclaré</th>
-                  <th className="text-right px-4 py-3 font-medium">Montant payé</th>
-                  <th className="text-right px-4 py-3 font-medium">Pénalités</th>
-                  <th className="text-center px-4 py-3 font-medium">Conformité</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rapport.lignes.map((l, i) => {
-                  const calcule  = parseFloat(l.montant_calcule_total);
-                  const paye     = parseFloat(l.montant_paye_total);
-                  const penalite = parseFloat(l.penalite_total);
-                  const conforme = calcule === 0 || paye >= calcule;
-                  return (
-                    <tr key={i} className={`border-t border-gray-50 ${i % 2 === 1 ? "bg-gray-50/50" : ""}`}>
-                      <td className="px-5 py-3 font-medium text-gray-800">
-                        {categories[l.type_taxe] ?? l.libelle}
-                        <p className="text-xs text-gray-400 font-normal">{l.libelle}</p>
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs text-gray-500 capitalize">{l.periodicite}</td>
-                      <td className="px-4 py-3 text-center text-gray-600">{l.nb_declarations}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-800">{FCFA(calcule)}</td>
-                      <td className="px-4 py-3 text-right text-gray-600">{FCFA(paye)}</td>
-                      <td className="px-4 py-3 text-right">
-                        {penalite > 0 ? <span className="text-red-600 font-medium">{FCFA(penalite)}</span> : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {calcule === 0 ? (
-                          <span className="text-xs text-gray-400">N/A</span>
-                        ) : conforme ? (
-                          <span className="text-xs text-green-600 font-medium">✓ Conforme</span>
-                        ) : (
-                          <span className="text-xs text-red-600 font-medium">✗ Incomplet</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-gray-200 bg-green-50">
-                  <td colSpan={3} className="px-5 py-3 font-bold text-gray-800">TOTAL</td>
-                  <td className="px-4 py-3 text-right font-bold text-gray-800">{FCFA(rapport.totalCalcule)}</td>
-                  <td className="px-4 py-3 text-right font-bold text-green-700">{FCFA(rapport.totalPaye)}</td>
-                  <td className="px-4 py-3 text-right font-bold text-red-600">{rapport.totalPenalite > 0 ? FCFA(rapport.totalPenalite) : "—"}</td>
-                  <td className="px-4 py-3 text-center">
-                    {rapport.totalCalcule > 0 && rapport.totalPaye >= rapport.totalCalcule && (
-                      <span className="text-xs text-green-700 font-bold">✓ Tout payé</span>
-                    )}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[900px]">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 text-xs border-t">
+                    <th className="text-left px-5 py-3 font-medium">Taxe</th>
+                    <th className="text-center px-4 py-3 font-medium">Périodicité</th>
+                    <th className="text-center px-4 py-3 font-medium">Déclarations</th>
+                    <th className="text-right px-4 py-3 font-medium">Montant déclaré</th>
+                    <th className="text-right px-4 py-3 font-medium">Montant payé</th>
+                    <th className="text-right px-4 py-3 font-medium">Pénalités</th>
+                    <th className="text-center px-4 py-3 font-medium">Conformité</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rapport.lignes.map((l, i) => {
+                    const calcule  = parseFloat(l.montant_calcule_total);
+                    const paye     = parseFloat(l.montant_paye_total);
+                    const penalite = parseFloat(l.penalite_total);
+                    const conforme = calcule === 0 || paye >= calcule;
+                    return (
+                      <tr key={i} className={`border-t border-gray-50 ${i % 2 === 1 ? "bg-gray-50/50" : ""}`}>
+                        <td className="px-5 py-3 font-medium text-gray-800">
+                          {categories[l.type_taxe] ?? l.libelle}
+                          <p className="text-xs text-gray-400 font-normal">{l.libelle}</p>
+                        </td>
+                        <td className="px-4 py-3 text-center text-xs text-gray-500 capitalize">{l.periodicite}</td>
+                        <td className="px-4 py-3 text-center text-gray-600">{l.nb_declarations}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-800">{FCFA(calcule)}</td>
+                        <td className="px-4 py-3 text-right text-gray-600">{FCFA(paye)}</td>
+                        <td className="px-4 py-3 text-right">
+                          {penalite > 0 ? <span className="text-red-600 font-medium">{FCFA(penalite)}</span> : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {calcule === 0 ? (
+                            <span className="text-xs text-gray-400">N/A</span>
+                          ) : conforme ? (
+                            <span className="text-xs text-green-600 font-medium">✓ Conforme</span>
+                          ) : (
+                            <span className="text-xs text-red-600 font-medium">✗ Incomplet</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-gray-200 bg-green-50">
+                    <td colSpan={3} className="px-5 py-3 font-bold text-gray-800">TOTAL</td>
+                    <td className="px-4 py-3 text-right font-bold text-gray-800">{FCFA(rapport.totalCalcule)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-green-700">{FCFA(rapport.totalPaye)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-red-600">{rapport.totalPenalite > 0 ? FCFA(rapport.totalPenalite) : "—"}</td>
+                    <td className="px-4 py-3 text-center">
+                      {rapport.totalCalcule > 0 && rapport.totalPaye >= rapport.totalCalcule && (
+                        <span className="text-xs text-green-700 font-bold">✓ Tout payé</span>
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
 
           <p className="text-xs text-gray-400 mt-3 text-center">
@@ -658,7 +662,7 @@ export default function FiscalitePage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
         <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
           <Calculator size={20} className="text-white" />
         </div>
@@ -668,10 +672,10 @@ export default function FiscalitePage() {
         </div>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit overflow-x-auto max-w-full">
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.id ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0 ${tab === t.id ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
             {t.label}
           </button>
         ))}

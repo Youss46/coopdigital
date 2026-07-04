@@ -243,7 +243,7 @@ function TabFlotte() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap justify-between items-start gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Flotte de véhicules</h2>
           <p className="text-sm text-gray-500">{vehicules.length} véhicule{vehicules.length !== 1 ? "s" : ""} enregistré{vehicules.length !== 1 ? "s" : ""}</p>
@@ -470,7 +470,7 @@ function TabChauffeurs() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap justify-between items-start gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Chauffeurs</h2>
           <p className="text-sm text-gray-500">{chauffeurs.length} chauffeur{chauffeurs.length !== 1 ? "s" : ""}</p>

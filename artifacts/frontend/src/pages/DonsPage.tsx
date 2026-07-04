@@ -590,10 +590,10 @@ export default function DonsPage() {
         </div>
 
         {/* Onglets */}
-        <div className="flex gap-1 border-b mb-6 overflow-x-auto">
+        <div className="flex gap-1 border-b mb-6 overflow-x-auto w-full sm:w-fit">
           {TABS.map((t) => (
             <button key={t} onClick={() => setActiveTab(t)}
-              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap shrink-0 border-b-2 transition-colors ${
                 activeTab === t
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"

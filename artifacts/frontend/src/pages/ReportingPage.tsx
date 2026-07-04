@@ -93,7 +93,7 @@ function TabDashboard() {
   return (
     <div className="space-y-8">
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="CA Ventes cacao"
           value={FCFA(marge?.caVentesFcfa ?? 0)}
@@ -254,9 +254,9 @@ function TabEtatsFinanciers() {
         <SectionTitre titre={`Bilan OHADA ${ANNEE}`} description="Actif et passif consolidés" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Tableau actif */}
-          <div>
+          <div className="overflow-x-auto">
             <h3 className="text-sm font-semibold text-green-700 mb-2 uppercase tracking-wide">Actif</h3>
-            <table className="w-full text-xs">
+            <table className="w-full text-xs min-w-[300px]">
               <thead>
                 <tr className="bg-green-50">
                   <th className="text-left p-2 font-semibold text-gray-600">Compte</th>
@@ -278,9 +278,9 @@ function TabEtatsFinanciers() {
             </table>
           </div>
           {/* Tableau passif */}
-          <div>
+          <div className="overflow-x-auto">
             <h3 className="text-sm font-semibold text-amber-700 mb-2 uppercase tracking-wide">Passif</h3>
-            <table className="w-full text-xs">
+            <table className="w-full text-xs min-w-[300px]">
               <thead>
                 <tr className="bg-amber-50">
                   <th className="text-left p-2 font-semibold text-gray-600">Compte</th>
@@ -325,9 +325,9 @@ function TabEtatsFinanciers() {
       <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
         <SectionTitre titre="Compte de résultat OHADA" description={`Exercice ${ANNEE}`} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
+          <div className="overflow-x-auto">
             <h3 className="text-sm font-semibold text-green-700 mb-2 uppercase tracking-wide">Produits</h3>
-            <table className="w-full text-xs">
+            <table className="w-full text-xs min-w-[300px]">
               <tbody>
                 {produits.map((p, i) => (
                   <tr key={i} className={i % 2 === 0 ? "bg-green-50" : "bg-white"}>
@@ -342,9 +342,9 @@ function TabEtatsFinanciers() {
               </tbody>
             </table>
           </div>
-          <div>
+          <div className="overflow-x-auto">
             <h3 className="text-sm font-semibold text-red-700 mb-2 uppercase tracking-wide">Charges</h3>
-            <table className="w-full text-xs">
+            <table className="w-full text-xs min-w-[300px]">
               <tbody>
                 {charges.map((c, i) => (
                   <tr key={i} className={i % 2 === 0 ? "bg-red-50" : "bg-white"}>
@@ -368,7 +368,7 @@ function TabEtatsFinanciers() {
       {/* Flux de trésorerie */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
         <SectionTitre titre="Flux de trésorerie" description={`Exercice ${ANNEE}`} />
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
           <div className="bg-green-50 rounded-lg p-4">
             <p className="text-xs text-gray-500">Encaissements exportateurs</p>
             <p className="text-xl font-bold text-green-700 mt-1">{FCFA(flux?.encaissementsExportateursFcfa ?? 0)}</p>
@@ -477,7 +477,7 @@ function TabRapports() {
         Téléchargez vos rapports financiers au format PDF. Les données sont générées à la demande depuis la comptabilité.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {rapports.map((r) => (
           <div
             key={r.cle}

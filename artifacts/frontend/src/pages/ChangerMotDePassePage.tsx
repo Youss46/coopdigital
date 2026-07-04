@@ -66,7 +66,7 @@ export default function ChangerMotDePassePage() {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 sm:p-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-[#1a4731]/10 rounded-2xl mb-4">
             <Lock size={28} className="text-[#1a4731]" />
