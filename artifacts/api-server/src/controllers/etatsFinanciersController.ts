@@ -193,28 +193,38 @@ export async function getComparatifCampagnes(req: Request, res: Response): Promi
 
     const rows = await db.execute(sql`
       SELECT
-        c.id                                                        AS "campagneId",
+        c.id                                    AS "campagneId",
         c.libelle,
-        c.annee_debut                                               AS "anneeDebut",
-        c.annee_fin                                                 AS "anneeFin",
+        c.annee_debut                           AS "anneeDebut",
+        c.annee_fin                             AS "anneeFin",
         c.statut,
-        COALESCE(SUM(COALESCE(l.poids_net_kg, l.poids_kg)), 0)::int AS "tonnageKg",
-        COUNT(DISTINCT l.membre_id)::int                            AS "membresActifs",
-        COALESCE(SUM(CASE WHEN e.compte_credit = '701' THEN e.montant_fcfa ELSE 0 END), 0)::int AS "caVentesFcfa",
-        COALESCE(SUM(CASE WHEN e.compte_debit  = '601' THEN e.montant_fcfa ELSE 0 END), 0)::int AS "coutAchatsFcfa",
-        COALESCE(SUM(CASE WHEN e.compte_debit IN ('621','641','661') THEN e.montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
+        COALESCE(lv."tonnageKg", 0)::int         AS "tonnageKg",
+        COALESCE(lv."membresActifs", 0)::int     AS "membresActifs",
+        COALESCE(ec."caVentesFcfa", 0)::int      AS "caVentesFcfa",
+        COALESCE(ec."coutAchatsFcfa", 0)::int    AS "coutAchatsFcfa",
+        COALESCE(ec."chargesFcfa", 0)::int       AS "chargesFcfa"
       FROM campagnes c
-      LEFT JOIN livraisons l
-        ON l.campagne_id = c.id
-        AND (
-          EXISTS (SELECT 1 FROM membres m WHERE m.id = l.membre_id AND m.cooperative_id = c.cooperative_id)
-          OR EXISTS (SELECT 1 FROM fournisseurs f WHERE f.id = l.fournisseur_id AND f.cooperative_id = c.cooperative_id)
-        )
-      LEFT JOIN ecritures_comptables e
-        ON e.cooperative_id = c.cooperative_id
-        AND e.exercice = c.annee_debut
+      LEFT JOIN LATERAL (
+        SELECT
+          SUM(COALESCE(l.poids_net_kg, l.poids_kg)) AS "tonnageKg",
+          COUNT(DISTINCT l.membre_id)               AS "membresActifs"
+        FROM livraisons l
+        WHERE l.campagne_id = c.id
+          AND (
+            EXISTS (SELECT 1 FROM membres m WHERE m.id = l.membre_id AND m.cooperative_id = c.cooperative_id)
+            OR EXISTS (SELECT 1 FROM fournisseurs f WHERE f.id = l.fournisseur_id AND f.cooperative_id = c.cooperative_id)
+          )
+      ) lv ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          SUM(CASE WHEN e.compte_credit = '701' THEN e.montant_fcfa ELSE 0 END)                  AS "caVentesFcfa",
+          SUM(CASE WHEN e.compte_debit  = '601' THEN e.montant_fcfa ELSE 0 END)                  AS "coutAchatsFcfa",
+          SUM(CASE WHEN e.compte_debit IN ('621','641','661') THEN e.montant_fcfa ELSE 0 END)    AS "chargesFcfa"
+        FROM ecritures_comptables e
+        WHERE e.cooperative_id = c.cooperative_id
+          AND e.exercice = c.annee_debut
+      ) ec ON true
       WHERE c.cooperative_id = ${cooperativeId}
-      GROUP BY c.id, c.libelle, c.annee_debut, c.annee_fin, c.statut
       ORDER BY c.annee_debut DESC
       LIMIT 6
     `);
