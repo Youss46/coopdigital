@@ -1604,6 +1604,7 @@ export const PersonnelModePaiement = {
   mtn_momo: 'mtn_momo',
   virement: 'virement',
   especes: 'especes',
+  banque: 'banque',
 } as const;
 
 export type PersonnelStatut = typeof PersonnelStatut[keyof typeof PersonnelStatut];
@@ -1661,6 +1662,7 @@ export const CreatePersonnelInputModePaiement = {
   mtn_momo: 'mtn_momo',
   virement: 'virement',
   especes: 'especes',
+  banque: 'banque',
 } as const;
 
 export interface CreatePersonnelInput {
@@ -1698,6 +1700,7 @@ export const UpdatePersonnelInputModePaiement = {
   mtn_momo: 'mtn_momo',
   virement: 'virement',
   especes: 'especes',
+  banque: 'banque',
 } as const;
 
 export type UpdatePersonnelInputStatut = typeof UpdatePersonnelInputStatut[keyof typeof UpdatePersonnelInputStatut];
@@ -1931,6 +1934,7 @@ export type CampagneStatut = typeof CampagneStatut[keyof typeof CampagneStatut];
 export const CampagneStatut = {
   ouverte: 'ouverte',
   fermee: 'fermee',
+  archivee: 'archivee',
 } as const;
 
 export interface Campagne {

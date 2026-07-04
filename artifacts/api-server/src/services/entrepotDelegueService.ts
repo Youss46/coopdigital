@@ -349,7 +349,7 @@ async function verifierAlerteStock(entrepotId: number, cooperativeId: number) {
   const pct = capacite > 0 ? Math.round((stock / capacite) * 100) : 0;
   const poidsStr = `${stock.toLocaleString("fr-FR")} kg`;
 
-  await creerNotification(cooperativeId, {
+  await creerNotification(cooperativeId, [e.delegueId], {
     type: "stock_faible",
     titre: `⚠️ Entrepôt ${e.nom} à ${pct}% de capacité`,
     message: `Stock actuel : ${poidsStr}. Un transfert vers le magasin central est recommandé.`,
@@ -358,7 +358,7 @@ async function verifierAlerteStock(entrepotId: number, cooperativeId: number) {
     gravite: "attention",
     sourceModule: "entrepots",
     sourceId: entrepotId,
-  }, e.delegueId);
+  });
 
   await notifierParRole(cooperativeId, ["directeur", "pca"], {
     type: "stock_faible",
@@ -631,7 +631,7 @@ export async function confirmerArrivee(
       logger.error({ err, transfertId }, "Erreur création entrée automatique stock central (non bloquant)");
     }
 
-    await creerNotification(cooperativeId, {
+    await creerNotification(cooperativeId, [t.delegueId], {
       type: "transfert_confirme",
       titre: `✅ Transfert ${t.numeroTransfert} confirmé`,
       message: `${data.poidsArrivee_kg.toLocaleString("fr-FR")} kg reçus au magasin central.`,
@@ -640,7 +640,7 @@ export async function confirmerArrivee(
       gravite: "info",
       sourceModule: "entrepots",
       sourceId: transfertId,
-    }, t.delegueId);
+    });
   }
 
   logger.info({ transfertId, statutFinal, ecartKg, pctEcart }, "Arrivée transfert confirmée");

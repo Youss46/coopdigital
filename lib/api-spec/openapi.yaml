@@ -7885,7 +7885,7 @@ components:
           type: ["string", "null"]
         modePaiement:
           type: string
-          enum: [orange_money, mtn_momo, virement, especes]
+          enum: [orange_money, mtn_momo, virement, especes, banque]
         telephonePaiement:
           type: ["string", "null"]
         ribBanque:
@@ -7929,7 +7929,7 @@ components:
           type: string
         modePaiement:
           type: string
-          enum: [orange_money, mtn_momo, virement, especes]
+          enum: [orange_money, mtn_momo, virement, especes, banque]
         telephonePaiement:
           type: string
         ribBanque:
@@ -7963,7 +7963,7 @@ components:
           type: string
         modePaiement:
           type: string
-          enum: [orange_money, mtn_momo, virement, especes]
+          enum: [orange_money, mtn_momo, virement, especes, banque]
         telephonePaiement:
           type: string
         ribBanque:
@@ -8284,7 +8284,7 @@ components:
           format: date
         statut:
           type: string
-          enum: [ouverte, fermee]
+          enum: [ouverte, fermee, archivee]
         tonnageCibleKg:
           type: ["string", "null"]
         createdAt:

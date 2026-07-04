@@ -1548,7 +1548,7 @@ export const GetPersonnelResponseItem = zod.object({
   "sursalaireFcfa": zod.number(),
   "numeroCnps": zod.string().nullish(),
   "numeroCni": zod.string().nullish(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes', 'banque']),
   "telephonePaiement": zod.string().nullish(),
   "ribBanque": zod.string().nullish(),
   "statut": zod.enum(['actif', 'suspendu', 'sorti']),
@@ -1573,7 +1573,7 @@ export const CreatePersonnelBody = zod.object({
   "sursalaireFcfa": zod.number().optional(),
   "numeroCnps": zod.string().optional(),
   "numeroCni": zod.string().optional(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']).optional(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes', 'banque']).optional(),
   "telephonePaiement": zod.string().optional(),
   "ribBanque": zod.string().optional()
 })
@@ -1600,7 +1600,7 @@ export const GetPersonnelByIdResponse = zod.object({
   "sursalaireFcfa": zod.number(),
   "numeroCnps": zod.string().nullish(),
   "numeroCni": zod.string().nullish(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes', 'banque']),
   "telephonePaiement": zod.string().nullish(),
   "ribBanque": zod.string().nullish(),
   "statut": zod.enum(['actif', 'suspendu', 'sorti']),
@@ -1628,7 +1628,7 @@ export const UpdatePersonnelBody = zod.object({
   "sursalaireFcfa": zod.number().optional(),
   "numeroCnps": zod.string().optional(),
   "numeroCni": zod.string().optional(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']).optional(),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes', 'banque']).optional(),
   "telephonePaiement": zod.string().optional(),
   "ribBanque": zod.string().optional(),
   "statut": zod.enum(['actif', 'suspendu', 'sorti']).optional()
@@ -1648,7 +1648,7 @@ export const UpdatePersonnelResponse = zod.object({
   "sursalaireFcfa": zod.number(),
   "numeroCnps": zod.string().nullish(),
   "numeroCni": zod.string().nullish(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes', 'banque']),
   "telephonePaiement": zod.string().nullish(),
   "ribBanque": zod.string().nullish(),
   "statut": zod.enum(['actif', 'suspendu', 'sorti']),
@@ -1678,7 +1678,7 @@ export const ArchiverPersonnelResponse = zod.object({
   "sursalaireFcfa": zod.number(),
   "numeroCnps": zod.string().nullish(),
   "numeroCni": zod.string().nullish(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes', 'banque']),
   "telephonePaiement": zod.string().nullish(),
   "ribBanque": zod.string().nullish(),
   "statut": zod.enum(['actif', 'suspendu', 'sorti']),
@@ -1709,7 +1709,7 @@ export const GetPersonnelHistoriqueResponse = zod.object({
   "sursalaireFcfa": zod.number(),
   "numeroCnps": zod.string().nullish(),
   "numeroCni": zod.string().nullish(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes', 'banque']),
   "telephonePaiement": zod.string().nullish(),
   "ribBanque": zod.string().nullish(),
   "statut": zod.enum(['actif', 'suspendu', 'sorti']),
@@ -1875,7 +1875,7 @@ export const GetBulletinByIdResponse = zod.object({
   "sursalaireFcfa": zod.number(),
   "numeroCnps": zod.string().nullish(),
   "numeroCni": zod.string().nullish(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes']),
+  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'virement', 'especes', 'banque']),
   "telephonePaiement": zod.string().nullish(),
   "ribBanque": zod.string().nullish(),
   "statut": zod.enum(['actif', 'suspendu', 'sorti']),
@@ -2151,7 +2151,7 @@ export const GetCampagneActiveResponse = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee']),
+  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -2173,7 +2173,7 @@ export const GetComparaisonCampagnesResponseItem = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee']),
+  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }),
@@ -2227,7 +2227,7 @@ export const ListCampagnesResponseItem = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee']),
+  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -2262,7 +2262,7 @@ export const GetCampagneResponse = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee']),
+  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -2287,7 +2287,7 @@ export const FermerCampagneResponse = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee']),
+  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -2352,7 +2352,7 @@ export const CloturerCampagneResponse = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee']),
+  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }),
@@ -2410,7 +2410,7 @@ export const GetBilanCampagneResponse = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee']),
+  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }),
@@ -6853,7 +6853,7 @@ export const ListPrevisionsCampagnesResponseItem = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee']),
+  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })

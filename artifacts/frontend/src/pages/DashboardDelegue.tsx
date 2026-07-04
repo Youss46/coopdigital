@@ -229,7 +229,7 @@ export default function DashboardDelegue() {
     staleTime: 60_000,
   });
 
-  const prenom = utilisateur?.prenom ?? utilisateur?.nom ?? "Délégué";
+  const prenom = utilisateur?.prenoms ?? utilisateur?.nom ?? "Délégué";
 
   const presets: { key: Preset; label: string }[] = [
     { key: "mois",      label: "Ce mois" },

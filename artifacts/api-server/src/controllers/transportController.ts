@@ -40,7 +40,7 @@ function toDateStr(d: Date | null | undefined): string | null | undefined {
 
 type DrizzleVehicule = Awaited<ReturnType<typeof getVehicules>>[number];
 type DrizzleChauffeur = Awaited<ReturnType<typeof getChauffeurs>>[number];
-type DrizzleMission = Awaited<ReturnType<typeof getMissions>>[number];
+type DrizzleMission = Awaited<ReturnType<typeof getMissions>>[number]["mission"];
 
 function mapVehicule(v: DrizzleVehicule) {
   return {
@@ -404,7 +404,7 @@ export async function handleGetMissions(req: Request, res: Response): Promise<vo
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
     const statut = typeof req.query["statut"] === "string" ? req.query["statut"] : undefined;
     const list = await getMissions(cooperativeId, statut);
-    res.json({ missions: list.map(mapMission) });
+    res.json({ missions: list.map((row) => mapMission(row.mission)) });
   } catch (err) {
     req.log.error({ err }, "Erreur getMissions");
     res.status(500).json({ erreur: "Erreur interne" });

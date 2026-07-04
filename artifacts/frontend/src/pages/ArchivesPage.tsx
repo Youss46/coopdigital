@@ -14,6 +14,21 @@ const apiFetch = async (url: string) => {
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface ArchiveMembreRow {
+  id: number; nom: string; prenoms: string; village: string;
+  section: string; delegue_nom: string; tonnage_livre_kg: string;
+  montant_percu_fcfa: number; score_campagne: string;
+  niveau_campagne: string; certifie: boolean;
+}
+interface ArchiveMembresResponse { membres: ArchiveMembreRow[]; total: number }
+
+interface ArchiveLivraisonRow {
+  id: number; date_livraison: string; fournisseur_nom: string;
+  fournisseur_type: string; zone: string; delegue_nom: string;
+  poids_net_kg: string; prix_unitaire_fcfa: number; montant_net_fcfa: number;
+}
+interface ArchiveLivraisonsResponse { livraisons: ArchiveLivraisonRow[]; total: number }
+
 interface ArchiveItem {
   id: number;
   campagneId: number;
@@ -170,13 +185,13 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
 
   const archive = archives.find(a => a.campagneId === selected);
 
-  const { data: livraisons, isLoading: loadLiv } = useQuery({
+  const { data: livraisons, isLoading: loadLiv } = useQuery<ArchiveLivraisonsResponse>({
     queryKey: ["archive-livraisons", selected, searchLiv],
     queryFn: () => apiFetch(`/api/archives/${selected}/livraisons?limit=100&search=${encodeURIComponent(searchLiv)}`),
     enabled: !!selected && subTab === "livraisons",
   });
 
-  const { data: membres, isLoading: loadMbr } = useQuery({
+  const { data: membres, isLoading: loadMbr } = useQuery<ArchiveMembresResponse>({
     queryKey: ["archive-membres", selected, searchMbr],
     queryFn: () => apiFetch(`/api/archives/${selected}/membres?limit=100&search=${encodeURIComponent(searchMbr)}`),
     enabled: !!selected && subTab === "membres",
@@ -269,12 +284,7 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {((membres as { membres: {
-                        id: number; nom: string; prenoms: string; village: string;
-                        section: string; delegue_nom: string; tonnage_livre_kg: string;
-                        montant_percu_fcfa: number; score_campagne: string;
-                        niveau_campagne: string; certifie: boolean;
-                      }[] }) | null)?.membres?.map(m => (
+                      {membres?.membres?.map(m => (
                         <tr key={m.id} className="hover:bg-gray-50">
                           <td className="px-3 py-2 font-medium">{m.nom} {m.prenoms}</td>
                           <td className="px-3 py-2 text-gray-600">{m.village || "—"}</td>
@@ -292,9 +302,9 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
                       ))}
                     </tbody>
                   </table>
-                  {(membres as { total?: number } | null)?.total != null && (
+                  {membres?.total != null && (
                     <p className="text-xs text-gray-400 mt-2 text-right">
-                      {(membres as { total: number }).total} membres — affichage des 100 premiers
+                      {membres.total} membres — affichage des 100 premiers
                     </p>
                   )}
                 </div>
@@ -323,11 +333,7 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {((livraisons as { livraisons: {
-                        id: number; date_livraison: string; fournisseur_nom: string;
-                        fournisseur_type: string; zone: string; delegue_nom: string;
-                        poids_net_kg: string; prix_unitaire_fcfa: number; montant_net_fcfa: number;
-                      }[] }) | null)?.livraisons?.map(l => (
+                      {livraisons?.livraisons?.map(l => (
                         <tr key={l.id} className="hover:bg-gray-50">
                           <td className="px-3 py-2 text-gray-500">{fmtDate(l.date_livraison)}</td>
                           <td className="px-3 py-2 font-medium">{l.fournisseur_nom || "—"}</td>
@@ -343,9 +349,9 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
                       ))}
                     </tbody>
                   </table>
-                  {(livraisons as { total?: number } | null)?.total != null && (
+                  {livraisons?.total != null && (
                     <p className="text-xs text-gray-400 mt-2 text-right">
-                      {(livraisons as { total: number }).total} livraisons — affichage des 100 premières
+                      {livraisons.total} livraisons — affichage des 100 premières
                     </p>
                   )}
                 </div>

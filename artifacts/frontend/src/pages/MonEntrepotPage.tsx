@@ -49,6 +49,7 @@ interface Transfert {
   dateDepart: string | null; dateArrivee: string | null; datePrevue: string | null;
   typeVehicule: string | null; immatriculation: string | null;
   nomChauffeur: string | null; notes: string | null; createdAt: string;
+  motifEcart: string | null;
 }
 
 const MOTIF_LABEL: Record<string, string> = {

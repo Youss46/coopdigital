@@ -12,16 +12,18 @@ import { logger } from "../lib/logger";
 
 // ─── Types internes ───────────────────────────────────────────────────────────
 
-interface RowMembresStats { total: string; femmes: string; certifies: string }
-interface RowLotsStats { total: string; vendus: string; refoules: string; tonnage_refoule: string }
-interface RowParcellesStats { total: string; conformes: string }
+interface RowMembresStats { [key: string]: unknown; total: string; femmes: string; certifies: string }
+interface RowLotsStats { [key: string]: unknown; total: string; vendus: string; refoules: string; tonnage_refoule: string }
+interface RowParcellesStats { [key: string]: unknown; total: string; conformes: string }
 interface RowLivraison {
+  [key: string]: unknown;
   livraison_id: number; fournisseur_id: number; fournisseur_nom: string;
   fournisseur_type: string; poids_net_kg: string; prix_unitaire_fcfa: number;
   montant_brut_fcfa: number; avance_deduite_fcfa: number; montant_net_fcfa: number;
   date_livraison: string; delegue_nom: string; zone: string; created_at: Date;
 }
 interface RowMembreSnapshot {
+  [key: string]: unknown;
   membre_id: number; nom: string; prenoms: string; village: string; section: string;
   delegue_nom: string; tonnage_livre_kg: string; montant_percu_fcfa: string;
   nb_livraisons: number; certifie: boolean; score_global: string; niveau: string;
@@ -393,14 +395,14 @@ export async function verifierIntegrite(cooperativeId: number, campagneId: numbe
   });
   if (!archive) throw new Error("Archive introuvable");
 
-  const [nbLiv] = await db.execute<{ count: string }>(sql`
+  const [nbLiv] = (await db.execute<{ count: string }>(sql`
     SELECT COUNT(*) AS count FROM archive_livraisons
     WHERE cooperative_id = ${cooperativeId} AND campagne_id = ${campagneId}
-  `);
-  const [nbMbr] = await db.execute<{ count: string }>(sql`
+  `)).rows;
+  const [nbMbr] = (await db.execute<{ count: string }>(sql`
     SELECT COUNT(*) AS count FROM archive_membres_snapshot
     WHERE cooperative_id = ${cooperativeId} AND campagne_id = ${campagneId}
-  `);
+  `)).rows;
 
   const dataToHash = JSON.stringify({
     campagneId,

@@ -496,7 +496,9 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
       : [];
 
     // Membres uniques
-    const membreIds = [...new Set(livraisons.map((l) => l.membreId))];
+    const membreIds = [...new Set(livraisons.map((l) => l.membreId))].filter(
+      (mid): mid is number => mid != null,
+    );
     const membres = membreIds.length
       ? await db.select().from(membresTable).where(inArray(membresTable.id, membreIds))
       : [];

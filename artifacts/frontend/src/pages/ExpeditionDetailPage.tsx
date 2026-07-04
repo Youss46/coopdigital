@@ -267,9 +267,9 @@ export default function ExpeditionDetailPage() {
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <div className="font-semibold">{String(exp.immatriculation ?? "—")}</div>
-            {exp.nomChauffeur && <div className="text-gray-600">🧑 {String(exp.nomChauffeur)}</div>}
-            {exp.telephoneChauffeur && <div className="text-gray-500">📞 {String(exp.telephoneChauffeur)}</div>}
-            {exp.transporteur && <div className="text-gray-600">🏢 {String(exp.transporteur)}</div>}
+            {Boolean(exp.nomChauffeur) && <div className="text-gray-600">🧑 {String(exp.nomChauffeur)}</div>}
+            {Boolean(exp.telephoneChauffeur) && <div className="text-gray-500">📞 {String(exp.telephoneChauffeur)}</div>}
+            {Boolean(exp.transporteur) && <div className="text-gray-600">🏢 {String(exp.transporteur)}</div>}
           </CardContent>
         </Card>
         <Card>
@@ -280,9 +280,9 @@ export default function ExpeditionDetailPage() {
             <div className="font-semibold flex items-center gap-1">
               <MapPin className="h-3 w-3" /> Port de {String(exp.port ?? "—")}
             </div>
-            {exp.exportateurNom && <div className="text-gray-600">🤝 {String(exp.exportateurNom)}</div>}
-            {exp.entrepotDestination && <div className="text-gray-500">🏭 {String(exp.entrepotDestination)}</div>}
-            {exp.heureEstimeeArrivee && (
+            {Boolean(exp.exportateurNom) && <div className="text-gray-600">🤝 {String(exp.exportateurNom)}</div>}
+            {Boolean(exp.entrepotDestination) && <div className="text-gray-500">🏭 {String(exp.entrepotDestination)}</div>}
+            {Boolean(exp.heureEstimeeArrivee) && (
               <div className="text-gray-500">⏱ Prévu : {new Date(String(exp.heureEstimeeArrivee)).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
             )}
           </CardContent>
@@ -293,9 +293,9 @@ export default function ExpeditionDetailPage() {
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <div className="font-semibold text-lg">{poidsCharge > 0 ? `${poidsCharge.toLocaleString("fr-FR")} kg` : "—"}</div>
-            {exp.nombreSacs && <div className="text-gray-600">📦 {String(exp.nombreSacs)} sacs</div>}
-            {exp.lieuDepart && <div className="text-gray-500">📍 Départ : {String(exp.lieuDepart)}</div>}
-            {exp.dateDepart && <div className="text-gray-500">🕐 {new Date(String(exp.dateDepart)).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>}
+            {Boolean(exp.nombreSacs) && <div className="text-gray-600">📦 {String(exp.nombreSacs)} sacs</div>}
+            {Boolean(exp.lieuDepart) && <div className="text-gray-500">📍 Départ : {String(exp.lieuDepart)}</div>}
+            {Boolean(exp.dateDepart) && <div className="text-gray-500">🕐 {new Date(String(exp.dateDepart)).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>}
           </CardContent>
         </Card>
         <Card>
@@ -595,7 +595,7 @@ export default function ExpeditionDetailPage() {
                 <Download className="h-3 w-3" />
                 {downloadingBL ? "Génération…" : "Bon de livraison"}
               </Button>
-              {exp.poidsRecuPortKg && (
+              {Boolean(exp.poidsRecuPortKg) && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -851,7 +851,7 @@ export default function ExpeditionDetailPage() {
                     {h.statutPrecedent ? <span className="text-gray-400"> → </span> : null}
                     {STATUT_CONFIG[String(h.statutNouveau ?? "")]?.label ?? String(h.statutNouveau ?? "")}
                   </div>
-                  {h.notes && <div className="text-gray-500 text-xs">{String(h.notes)}</div>}
+                  {Boolean(h.notes) && <div className="text-gray-500 text-xs">{String(h.notes)}</div>}
                   <div className="text-gray-400 text-xs">
                     {new Date(String(h.dateChangement)).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </div>
