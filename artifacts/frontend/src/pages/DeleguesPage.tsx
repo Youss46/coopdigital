@@ -82,14 +82,14 @@ export default function DeleguesPage() {
   const totalDu = delegues.reduce((s, d) => s + d.paiementsDifferes.montantTotal, 0);
 
   return (
-    <div style={{ padding: "24px 32px", maxWidth: 1100, margin: "0 auto" }}>
+    <div className="p-4 sm:p-6 md:px-8" style={{ maxWidth: 1100, margin: "0 auto" }}>
       <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#111", marginBottom: 4 }}>Délégués Localité</h1>
           <p style={{ color: "#6b7280", fontSize: ".9rem" }}>Gestion des caisses et suivi des paiements différés</p>
         </div>
 
         {/* KPI */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+        <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: 16, marginBottom: 24 }}>
           {[
             { label: "Délégués actifs", val: delegues.filter(d => d.actif).length, color: "#16a34a" },
             { label: "Total en caisse", val: `${totalSoldes.toLocaleString("fr-FR")} FCFA`, color: "#2563eb" },
@@ -103,9 +103,9 @@ export default function DeleguesPage() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "#f3f4f6", borderRadius: 10, padding: 4, width: "fit-content" }}>
+        <div className="overflow-x-auto" style={{ display: "flex", gap: 4, marginBottom: 20, background: "#f3f4f6", borderRadius: 10, padding: 4, width: "fit-content", maxWidth: "100%" }}>
           {(["liste", "differes"] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)} style={{ padding: "6px 18px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: ".85rem", cursor: "pointer", background: tab === t ? "#fff" : "transparent", color: tab === t ? "#111" : "#6b7280", boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>
+            <button key={t} onClick={() => setTab(t)} style={{ padding: "6px 18px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: ".85rem", cursor: "pointer", background: tab === t ? "#fff" : "transparent", color: tab === t ? "#111" : "#6b7280", boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,.1)" : "none", whiteSpace: "nowrap" }}>
               {t === "liste" ? "Liste des délégués" : `Paiements différés${totalDifferes > 0 ? ` (${totalDifferes})` : ""}`}
             </button>
           ))}
@@ -113,13 +113,13 @@ export default function DeleguesPage() {
 
         {/* Tab: liste */}
         {tab === "liste" && (
-          <div style={{ display: "grid", gridTemplateColumns: selectedId ? "1fr 380px" : "1fr", gap: 20 }}>
+          <div className={`grid grid-cols-1 ${selectedId ? "lg:grid-cols-[1fr_380px]" : ""}`} style={{ gap: 20 }}>
             <div>
               {isLoading ? (
                 <div style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Chargement…</div>
               ) : (
-                <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <div className="overflow-x-auto" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 620 }}>
                     <thead>
                       <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                         {["Délégué", "Section", "Collectes", "Solde caisse", "Différés", "Actions"].map((h) => (
@@ -220,14 +220,14 @@ export default function DeleguesPage() {
 
         {/* Tab: différés */}
         {tab === "differes" && (
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+          <div className="overflow-x-auto" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12 }}>
             {differes.length === 0 ? (
               <div style={{ padding: "48px 24px", textAlign: "center", color: "#9ca3af" }}>
                 <div style={{ fontSize: "2rem", marginBottom: 8 }}>✅</div>
                 <div style={{ fontWeight: 700 }}>Aucun paiement en attente</div>
               </div>
             ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560 }}>
                 <thead>
                   <tr style={{ background: "#fef2f2", borderBottom: "1px solid #fecaca" }}>
                     {["Date", "Planteur", "Délégué", "Section", "Montant dû"].map((h) => (
