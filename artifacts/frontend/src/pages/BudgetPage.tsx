@@ -154,9 +154,9 @@ function OngletHypotheses({
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
           <h3 className="font-semibold text-gray-900">Hypothèses de campagne</h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Barre de complétion */}
             {aDesData && (
               <div className="flex items-center gap-2">
@@ -218,7 +218,7 @@ function OngletHypotheses({
         </div>
 
         {(tonnage > 0 || pxAchat > 0 || pxVente > 0) && (
-          <div className="mt-6 grid grid-cols-3 gap-4">
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-green-50 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Marge brute estimée</p>
               <p className="text-lg font-bold text-green-700">{FCFA((pxVente - pxAchat) * tonnage)}</p>
@@ -434,7 +434,8 @@ function OngletBudgetDetail({ data, budgetId, campagneId }: { data: BudgetDetail
                 </span>
               </div>
             </div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm" style={{ minWidth: 480 }}>
               <tbody className="divide-y divide-gray-50">
                 {rows.map((l) => {
                   const pct  = parseFloat(l.ecart_pct ?? "0");
@@ -465,11 +466,12 @@ function OngletBudgetDetail({ data, budgetId, campagneId }: { data: BudgetDetail
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         );
       })}
 
-      <div className="bg-gray-900 rounded-xl p-5 flex items-center justify-between">
+      <div className="bg-gray-900 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <span className="text-white font-bold text-sm">RÉSULTAT (Recettes − Charges)</span>
         <div className="flex gap-6 text-right">
           <div>
@@ -535,12 +537,12 @@ function OngletSuivi({ budgetId }: { budgetId: number }) {
               const reel = parseFloat(l.montant_realise_fcfa      ?? "0");
               const pct  = prev > 0 ? ((reel - prev) / prev) * 100 : 0;
               return (
-                <div key={l.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+                <div key={l.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white rounded-lg px-3 py-2">
                   <div>
                     <span className="text-sm font-medium text-gray-900">{l.libelle}</span>
                     <span className="text-xs text-gray-400 ml-2">{CAT_LABELS[l.categorie] ?? l.categorie}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-sm">
+                  <div className="flex items-center gap-3 text-sm flex-wrap">
                     <span className="text-gray-500">Prévu : {FCFA(prev)}</span>
                     <span className="font-semibold text-gray-900">Réalisé : {FCFA(reel)}</span>
                     <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
@@ -618,7 +620,7 @@ function OngletSuivi({ budgetId }: { budgetId: number }) {
       )}
 
       {r && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-xs text-gray-500 mb-1">Budget total prévisionnel</p>
             <p className="text-xl font-bold text-gray-900">{FCFA(r.totalPrev)}</p>
@@ -732,12 +734,12 @@ export default function BudgetPage() {
         <p className="text-sm text-gray-500 mt-1">{campagne?.nom ?? ""} — Gestion et suivi budgétaire</p>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-full sm:w-fit overflow-x-auto">
         {tabs.map(({ id, label }) => (
           <button
             key={id}
             onClick={() => setOnglet(id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 transition-colors ${
               onglet === id ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}
           >
