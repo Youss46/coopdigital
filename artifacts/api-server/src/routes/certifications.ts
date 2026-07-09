@@ -22,6 +22,7 @@ import {
   handleValiderMembre,
   handleDeleteMissionEnquete,
   handleGetAgentsDisponibles,
+  handleRapportPdfEnquete,
 } from "../controllers/missionsEnqueteController";
 
 const router = Router();
@@ -69,5 +70,6 @@ router.get("/enquetes/:id",                                   requireRole(ROLES_
 router.patch("/enquetes/:id/statut",                          requireRole(ROLES_WRITE), handleUpdateStatut);
 router.delete("/enquetes/:id",                                requireRole(["pca", "directeur"]), handleDeleteMissionEnquete);
 router.post("/enquetes/:id/membres/:membreId/valider",        requireRole(ROLES_WRITE), handleValiderMembre);
+router.get("/enquetes/:id/rapport.pdf",                       requireRole(ROLES_READ),  handleRapportPdfEnquete);
 
 export default router;

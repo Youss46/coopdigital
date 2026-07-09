@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import * as svc from "../services/missionsEnqueteService.js";
+import { generateRapportEnquete } from "../services/enqueteRapportService.js";
 
 function coopId(req: Request): number | null { return req.user?.cooperativeId ?? null; }
 function userId(req: Request): number | null { return req.user?.id ?? null; }
@@ -83,6 +84,25 @@ export async function handleDeleteMissionEnquete(req: Request, res: Response): P
     if (!ok) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
     res.status(204).end();
   } catch (err) { req.log.error({ err }, "deleteMissionEnquete"); res.status(500).json({ erreur: "Erreur interne" }); }
+}
+
+export async function handleRapportPdfEnquete(req: Request, res: Response): Promise<void> {
+  const cid = coopId(req); const id = parseId(req);
+  if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  if (!id)  { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    const buf = await generateRapportEnquete(cid, id);
+    if (!buf) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
+    res.set({
+      "Content-Type":        "application/pdf",
+      "Content-Disposition": `attachment; filename="rapport-enquete-${id}.pdf"`,
+      "Content-Length":      String(buf.length),
+    });
+    res.end(buf);
+  } catch (err) {
+    req.log.error({ err }, "handleRapportPdfEnquete");
+    res.status(500).json({ erreur: "Erreur génération PDF" });
+  }
 }
 
 export async function handleGetAgentsDisponibles(req: Request, res: Response): Promise<void> {

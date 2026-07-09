@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ClipboardList, ArrowLeft, Users, Calendar, CheckCircle, Clock,
   AlertTriangle, Loader2, ChevronDown, ChevronUp, User,
-  CheckCheck, BarChart2, FileText, UserCheck,
+  CheckCheck, BarChart2, FileText, UserCheck, Download,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -235,13 +235,20 @@ export default function MissionEnqueteDetailPage() {
                 )}
               </div>
             </div>
-            {canValidate && mission.statut === "soumise" && (
-              <button onClick={() => statutMutation.mutate("validee")}
-                disabled={statutMutation.isPending}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-                <CheckCircle size={15} />{statutMutation.isPending ? "…" : "Valider la mission"}
-              </button>
-            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <a href={`/api/enquetes/${missionId}/rapport.pdf`}
+                target="_blank" rel="noreferrer"
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                <Download size={15} />Rapport PDF
+              </a>
+              {canValidate && mission.statut === "soumise" && (
+                <button onClick={() => statutMutation.mutate("validee")}
+                  disabled={statutMutation.isPending}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                  <CheckCircle size={15} />{statutMutation.isPending ? "…" : "Valider la mission"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
