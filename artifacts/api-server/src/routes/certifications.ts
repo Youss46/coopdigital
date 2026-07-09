@@ -28,7 +28,7 @@ function requireRole(roles: string[]) {
   };
 }
 
-const ROLES_READ  = ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"];
+const ROLES_READ  = ["pca", "directeur", "responsable_tracabilite"];
 const ROLES_WRITE = ["pca", "directeur", "responsable_tracabilite"];
 
 // Certifications coopérative

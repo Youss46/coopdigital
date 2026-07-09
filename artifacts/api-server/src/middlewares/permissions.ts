@@ -378,6 +378,17 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     rapport_eudr: ["pca", "directeur", "responsable_tracabilite", "auditeur"],
   },
 
+  // MODULE CERTIFICATIONS — accès restreint PCA / Directeur / Responsable Traçabilité
+  certifications: {
+    lire:            ["pca", "directeur", "responsable_tracabilite"],
+    creer:           ["pca", "directeur", "responsable_tracabilite"],
+    modifier:        ["pca", "directeur", "responsable_tracabilite"],
+    supprimer:       ["pca", "directeur"],
+    evaluer_membres: ["pca", "directeur", "responsable_tracabilite"],
+    creer_audit:     ["pca", "directeur", "responsable_tracabilite"],
+    exporter_rapport:["pca", "directeur", "responsable_tracabilite"],
+  },
+
   // MODULE — PLANIFICATION DES COLLECTES
   planning_collecte: {
     voir:        ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
