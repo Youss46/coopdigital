@@ -19,6 +19,7 @@ import {
   handleListMissionsEnquete,
   handleCreateMissionEnquete,
   handleGetMissionEnquete,
+  handleUpdateMissionEnquete,
   handleUpdateStatut,
   handleValiderMembre,
   handleDeleteMissionEnquete,
@@ -69,6 +70,7 @@ router.get("/enquetes/agents",                                requireRole(ROLES_
 router.get("/enquetes",                                       requireRole(ROLES_READ),  handleListMissionsEnquete);
 router.post("/enquetes",                                      requireRole(ROLES_WRITE), handleCreateMissionEnquete);
 router.get("/enquetes/:id",                                   requireRole(ROLES_READ),  handleGetMissionEnquete);
+router.patch("/enquetes/:id",                                 requireRole(ROLES_WRITE), handleUpdateMissionEnquete);
 router.patch("/enquetes/:id/statut",                          requireRole(ROLES_WRITE), handleUpdateStatut);
 router.delete("/enquetes/:id",                                requireRole(["pca", "directeur"]), handleDeleteMissionEnquete);
 router.post("/enquetes/:id/membres/:membreId/valider",        requireRole(ROLES_WRITE), handleValiderMembre);

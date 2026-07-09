@@ -4,6 +4,8 @@ import {
 } from "@workspace/db";
 import { and, eq, desc, sql, inArray } from "drizzle-orm";
 import { CRITERES_PAR_TYPE } from "./certificationService.js";
+import { creerNotification } from "./notificationService.js";
+import { envoyerPushNotification } from "./pushService.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,6 +72,30 @@ export async function getMissionEnquete(cooperativeId: number, missionId: number
   return mission ?? null;
 }
 
+async function notifierAgentAssignation(
+  cooperativeId: number,
+  agentId: number,
+  missionId: number,
+  titreMission: string,
+) {
+  const payload = {
+    type: "mission_assignee" as const,
+    titre: "Mission d'enquête assignée",
+    message: `Vous avez été assigné à la mission « ${titreMission} ».`,
+    lien: `/enquetes`,
+    lienLibelle: "Voir mes missions",
+    gravite: "info" as const,
+    sourceModule: "enquetes",
+    sourceId: missionId,
+  };
+  await creerNotification(cooperativeId, [agentId], payload);
+  envoyerPushNotification(agentId, {
+    title: payload.titre,
+    body: payload.message,
+    url: payload.lien,
+  }).catch(() => undefined);
+}
+
 export async function createMissionEnquete(cooperativeId: number, creePar: number, data: {
   titre: string; certificationId: number; datePrevue: string;
   agentId?: number; instructions?: string; membreIds: number[];
@@ -86,7 +112,38 @@ export async function createMissionEnquete(cooperativeId: number, creePar: numbe
       membreIds.map(membreId => ({ missionId: mission.id, membreId })),
     );
   }
+
+  if (data.agentId) {
+    await notifierAgentAssignation(cooperativeId, data.agentId, mission.id, mission.titre);
+  }
+
   return mission;
+}
+
+export async function updateMissionEnquete(cooperativeId: number, missionId: number, data: {
+  titre?: string; datePrevue?: string; agentId?: number | null; instructions?: string | null;
+}) {
+  const [before] = await db
+    .select({ agentId: missionsEnqueteTable.agentId, titre: missionsEnqueteTable.titre })
+    .from(missionsEnqueteTable)
+    .where(and(eq(missionsEnqueteTable.id, missionId), eq(missionsEnqueteTable.cooperativeId, cooperativeId)));
+
+  if (!before) return null;
+
+  const [updated] = await db
+    .update(missionsEnqueteTable)
+    .set({ ...data, updatedAt: new Date() })
+    .where(and(eq(missionsEnqueteTable.id, missionId), eq(missionsEnqueteTable.cooperativeId, cooperativeId)))
+    .returning();
+
+  const titreFinal = updated.titre;
+  const newAgent   = data.agentId;
+
+  if (newAgent && newAgent !== before.agentId) {
+    await notifierAgentAssignation(cooperativeId, newAgent, missionId, titreFinal);
+  }
+
+  return updated;
 }
 
 export async function updateMissionStatut(cooperativeId: number, missionId: number, statut: string) {

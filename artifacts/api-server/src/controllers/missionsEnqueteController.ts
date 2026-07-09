@@ -50,6 +50,20 @@ export async function handleGetMissionEnquete(req: Request, res: Response): Prom
   } catch (err) { req.log.error({ err }, "getMissionEnquete"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
+export async function handleUpdateMissionEnquete(req: Request, res: Response): Promise<void> {
+  const cid = coopId(req); const id = parseId(req);
+  if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  if (!id)  { res.status(400).json({ erreur: "ID invalide" }); return; }
+  const { titre, datePrevue, agentId, instructions } = req.body as {
+    titre?: string; datePrevue?: string; agentId?: number | null; instructions?: string | null;
+  };
+  try {
+    const updated = await svc.updateMissionEnquete(cid, id, { titre, datePrevue, agentId, instructions });
+    if (!updated) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
+    res.json(updated);
+  } catch (err) { req.log.error({ err }, "updateMissionEnquete"); res.status(500).json({ erreur: "Erreur interne" }); }
+}
+
 export async function handleUpdateStatut(req: Request, res: Response): Promise<void> {
   const cid = coopId(req); const id = parseId(req);
   if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
