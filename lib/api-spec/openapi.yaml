@@ -5919,6 +5919,27 @@ paths:
             application/json:
               schema: { type: object }
 
+  /certifications/{id}/rapport-pdf:
+    get:
+      operationId: getRapportPdfCertification
+      summary: Télécharger le rapport PDF de conformité d'une certification
+      tags: [Certifications]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Fichier PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Certification introuvable
+
 components:
   schemas:
 

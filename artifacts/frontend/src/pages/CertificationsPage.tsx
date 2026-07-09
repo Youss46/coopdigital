@@ -436,8 +436,18 @@ function DetailPanel({ certif, onClose, canWrite, onEdit }: {
   const nonConformes = membres.filter(m => m.statutConformite === "non_conforme").length;
   const tauxConf     = membres.length > 0 ? Math.round(certifies / membres.length * 100) : 0;
 
-  function downloadPdf() {
-    window.open(`${BASE}/api/certifications/${certif.id}/rapport-pdf?token=${getToken()}`, "_blank");
+  async function downloadPdf() {
+    try {
+      const r = await fetch(`${BASE}/api/certifications/${certif.id}/rapport-pdf`, { headers: authHeader() });
+      if (!r.ok) throw new Error(`${r.status}`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `conformite-${certif.type}-${certif.id}.pdf`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      alert("Erreur lors du téléchargement du rapport PDF.");
+    }
   }
 
   // Calcul critères globaux

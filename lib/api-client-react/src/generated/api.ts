@@ -22650,3 +22650,80 @@ export function useGetMembreCertification<TData = Awaited<ReturnType<typeof getM
 
 
 
+export const getGetRapportPdfCertificationUrl = (id: number,) => {
+
+
+
+
+  return `/api/certifications/${id}/rapport-pdf`
+}
+
+/**
+ * @summary Télécharger le rapport PDF de conformité d'une certification
+ */
+export const getRapportPdfCertification = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetRapportPdfCertificationUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRapportPdfCertificationQueryKey = (id: number,) => {
+    return [
+    `/api/certifications/${id}/rapport-pdf`
+    ] as const;
+    }
+
+
+export const getGetRapportPdfCertificationQueryOptions = <TData = Awaited<ReturnType<typeof getRapportPdfCertification>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRapportPdfCertification>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRapportPdfCertificationQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRapportPdfCertification>>> = ({ signal }) => getRapportPdfCertification(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRapportPdfCertification>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRapportPdfCertificationQueryResult = NonNullable<Awaited<ReturnType<typeof getRapportPdfCertification>>>
+export type GetRapportPdfCertificationQueryError = ErrorType<void>
+
+
+/**
+ * @summary Télécharger le rapport PDF de conformité d'une certification
+ */
+
+export function useGetRapportPdfCertification<TData = Awaited<ReturnType<typeof getRapportPdfCertification>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRapportPdfCertification>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRapportPdfCertificationQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+

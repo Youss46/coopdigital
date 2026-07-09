@@ -7313,3 +7313,11 @@ export const GetMembreCertificationResponse = zod.object({
 }).passthrough()
 
 
+/**
+ * @summary Télécharger le rapport PDF de conformité d'une certification
+ */
+export const GetRapportPdfCertificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+

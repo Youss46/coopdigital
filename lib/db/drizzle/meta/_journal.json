@@ -428,6 +428,13 @@
       "when": 1783195201000,
       "tag": "0060_certifications",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1783195202000,
+      "tag": "0061_certifications_membres",
+      "breakpoints": true
     }
   ]
 }
