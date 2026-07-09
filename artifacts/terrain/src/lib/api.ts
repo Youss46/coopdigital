@@ -1,8 +1,8 @@
 import { getToken, clearAuth } from "./auth";
-import { queueOp, queueGpsOp, type PendingOpType, type GpsOp } from "./idb";
+import { queueOp, queueGpsOp, queueEnqueteOp, type PendingOpType, type GpsOp } from "./idb";
 import type {
   CollecteInput, PaiementInput, AvanceInput,
-  MissionTerrain, MissionDetail, StatsAgent, GpsCollecteInput, MessageMission,
+  MissionTerrain, MissionDetail, StatsAgent, GpsCollecteInput, MessageMission, EnqueteOp,
 } from "./types";
 
 const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api/terrain`;
@@ -145,6 +145,38 @@ export async function syncGpsOps(ops: GpsOp[]): Promise<{ succes: string[]; eche
     data: { missionId: op.missionId, membreId: op.membreId, ...op.data },
   }));
   return apiPost<{ succes: string[]; echecs: Array<{ localId: string; erreur: string }> }>("/sync", { operations });
+}
+
+export async function soumettreEnqueteOffline(
+  missionId: number,
+  membreId: number,
+  reponses: EnqueteOp["reponses"],
+  notesAgent?: string,
+): Promise<void> {
+  await queueEnqueteOp({
+    localId: crypto.randomUUID(),
+    missionId,
+    membreId,
+    reponses,
+    notesAgent,
+  });
+}
+
+export async function syncEnqueteOps(
+  ops: EnqueteOp[],
+): Promise<{ succes: string[]; echecs: Array<{ localId: string; erreur: string }> }> {
+  if (ops.length === 0) return { succes: [], echecs: [] };
+  const operations = ops.map((op) => ({
+    localId: op.localId,
+    missionId: op.missionId,
+    membreId: op.membreId,
+    reponses: op.reponses,
+    notesAgent: op.notesAgent,
+  }));
+  return apiPost<{ succes: string[]; echecs: Array<{ localId: string; erreur: string }> }>(
+    "/enquetes/sync",
+    { operations },
+  );
 }
 
 export async function getMessages(missionId: number): Promise<MessageMission[]> {

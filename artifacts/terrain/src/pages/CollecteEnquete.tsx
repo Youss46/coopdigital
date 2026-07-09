@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useLocation } from "wouter";
-import { apiGet } from "../lib/api";
+import { apiGet, soumettreEnqueteOffline } from "../lib/api";
 import { useOffline } from "../contexts/OfflineContext";
 import type { EnqueteDetail } from "../lib/types";
 
@@ -13,7 +13,7 @@ export default function CollecteEnquete() {
   const missionId = Number(id);
   const mId = Number(membreId);
   const [, navigate] = useLocation();
-  const { isOnline } = useOffline();
+  const { isOnline, triggerSync } = useOffline();
 
   const [mission, setMission] = useState<EnqueteDetail | null>(null);
   const [reponses, setReponses] = useState<Record<string, Reponse>>({});
@@ -22,6 +22,7 @@ export default function CollecteEnquete() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [savedOffline, setSavedOffline] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,6 +45,13 @@ export default function CollecteEnquete() {
     setSubmitting(true);
     setErreur(null);
     try {
+      if (!isOnline) {
+        await soumettreEnqueteOffline(missionId, mId, reponses, notesAgent || undefined);
+        setSavedOffline(true);
+        setTimeout(() => navigate(`/enquetes/${missionId}`), 2000);
+        return;
+      }
+
       const token = localStorage.getItem("coop_token") ?? "";
       const r = await fetch(
         `${import.meta.env.VITE_API_URL ?? ""}/api/terrain/enquetes/${missionId}/membres/${mId}`,
@@ -57,9 +65,20 @@ export default function CollecteEnquete() {
       setSubmitted(true);
       setTimeout(() => navigate(`/enquetes/${missionId}`), 1500);
     } catch (e) {
+      if (!isOnline) {
+        try {
+          await soumettreEnqueteOffline(missionId, mId, reponses, notesAgent || undefined);
+          setSavedOffline(true);
+          setTimeout(() => navigate(`/enquetes/${missionId}`), 2000);
+          return;
+        } catch {
+          /* fall through to error */
+        }
+      }
       setErreur(e instanceof Error ? e.message : "Erreur lors de l'envoi");
     } finally {
       setSubmitting(false);
+      if (isOnline) triggerSync();
     }
   }
 
@@ -76,6 +95,18 @@ export default function CollecteEnquete() {
   const totalCriteres = criteres.length;
   const reponsesRenseignees = Object.values(reponses).filter(r => r.valeur !== "na").length;
   const score = totalCriteres > 0 ? Math.round((Object.values(reponses).filter(r => r.valeur === "oui").length / Math.max(1, Object.values(reponses).filter(r => r.valeur !== "na").length)) * 100) : 0;
+
+  if (savedOffline) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+        <div style={{ fontSize: 60 }}>📥</div>
+        <div style={{ color: "#fbbf24", fontSize: 18, fontWeight: 700 }}>Enregistré hors ligne</div>
+        <div style={{ color: "#94a3b8", fontSize: 13, textAlign: "center", maxWidth: 280 }}>
+          Les réponses seront synchronisées automatiquement à la reconnexion.
+        </div>
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
@@ -100,6 +131,11 @@ export default function CollecteEnquete() {
             <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>{membre?.prenoms} {membre?.nom}</div>
             <div style={{ fontSize: 12, color: "#64748b" }}>{mission.titre}</div>
           </div>
+          {!isOnline && (
+            <div style={{ marginLeft: "auto", background: "#78350f33", color: "#fbbf24", fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, border: "1px solid #78350f" }}>
+              HORS LIGNE
+            </div>
+          )}
         </div>
         {/* Progression générale */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -202,6 +238,12 @@ export default function CollecteEnquete() {
               </div>
             </div>
 
+            {!isOnline && (
+              <div style={{ background: "#78350f22", border: "1px solid #78350f55", borderRadius: 8, padding: "10px 14px", marginBottom: 10, fontSize: 13, color: "#fde68a" }}>
+                📵 Hors connexion — les réponses seront enregistrées localement et synchronisées à la reconnexion.
+              </div>
+            )}
+
             <button onClick={() => setStep(totalCriteres - 1)} style={{
               width: "100%", padding: 14, borderRadius: 10, border: "1px solid #334155",
               background: "#1e293b", color: "#94a3b8", cursor: "pointer", fontSize: 14, marginBottom: 10,
@@ -211,14 +253,15 @@ export default function CollecteEnquete() {
 
             {erreur && <div style={{ background: "#7f1d1d22", color: "#fca5a5", padding: 12, borderRadius: 8, marginBottom: 10, fontSize: 13 }}>⚠ {erreur}</div>}
 
-            <button onClick={submit} disabled={submitting || !isOnline}
+            <button onClick={submit} disabled={submitting}
               style={{
                 width: "100%", padding: 16, borderRadius: 10, border: "none",
-                background: !isOnline ? "#334155" : "#16a34a", color: !isOnline ? "#64748b" : "#fff",
-                cursor: (!isOnline || submitting) ? "default" : "pointer", fontSize: 15, fontWeight: 700,
+                background: submitting ? "#334155" : isOnline ? "#16a34a" : "#b45309",
+                color: submitting ? "#64748b" : "#fff",
+                cursor: submitting ? "default" : "pointer", fontSize: 15, fontWeight: 700,
                 opacity: submitting ? 0.7 : 1,
               }}>
-              {!isOnline ? "🔌 Connexion requise" : submitting ? "Envoi en cours…" : "✅ Valider et envoyer"}
+              {submitting ? "Enregistrement…" : isOnline ? "✅ Valider et envoyer" : "📥 Enregistrer hors ligne"}
             </button>
           </div>
         )}

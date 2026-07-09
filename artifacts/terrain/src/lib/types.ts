@@ -206,6 +206,21 @@ export interface PrixActuel {
   campagneId: number | null;
 }
 
+// ─── Offline enquête ops ──────────────────────────────────────────────────────
+
+export interface EnqueteOp {
+  localId: string;
+  missionId: number;
+  membreId: number;
+  reponses: Record<string, { valeur: "oui" | "non" | "na"; commentaire?: string }>;
+  notesAgent?: string;
+  timestamp: number;
+  status: "pending" | "synced" | "error";
+  tentatives?: number;
+  errorMsg?: string;
+  syncedAt?: number;
+}
+
 // ─── Missions d'enquête ────────────────────────────────────────────────────────
 
 export interface MissionEnquete {

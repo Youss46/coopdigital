@@ -1,4 +1,4 @@
-import type { PendingOp, CollecteInput, PaiementInput, AvanceInput, GpsCollecteInput, PrixActuel, Fournisseur, MissionTerrain, MissionDetail } from "./types";
+import type { PendingOp, CollecteInput, PaiementInput, AvanceInput, GpsCollecteInput, PrixActuel, Fournisseur, MissionTerrain, MissionDetail, EnqueteOp } from "./types";
 
 export interface GpsOp {
   localId: string;
@@ -13,7 +13,7 @@ export interface GpsOp {
 export type PendingOpType = "collecte" | "paiement" | "avance" | "gps_collecte";
 
 const DB_NAME = "coopdigital-terrain";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let _db: IDBDatabase | null = null;
 
@@ -39,6 +39,11 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains("pending_gps")) {
         const gpsStore = db.createObjectStore("pending_gps", { keyPath: "localId" });
         gpsStore.createIndex("status", "status");
+      }
+      if (!db.objectStoreNames.contains("pending_enquetes")) {
+        const enqStore = db.createObjectStore("pending_enquetes", { keyPath: "localId" });
+        enqStore.createIndex("status", "status");
+        enqStore.createIndex("timestamp", "timestamp");
       }
     };
 
@@ -89,8 +94,8 @@ export async function getPendingOps(): Promise<PendingOp[]> {
 }
 
 export async function getPendingCount(): Promise<number> {
-  const [regularOps, gpsOps] = await Promise.all([getPendingOps(), getPendingGpsOps()]);
-  return regularOps.length + gpsOps.length;
+  const [regularOps, gpsOps, enqOps] = await Promise.all([getPendingOps(), getPendingGpsOps(), getPendingEnqueteOps()]);
+  return regularOps.length + gpsOps.length + enqOps.length;
 }
 
 export async function markOpSynced(localId: string): Promise<void> {
@@ -322,6 +327,85 @@ export async function getCachedMissions(): Promise<MissionTerrain[]> {
     const req = store.getAll();
     req.onsuccess = () => resolve(req.result as MissionTerrain[]);
     req.onerror = () => reject(req.error);
+  });
+}
+
+// ─── Pending enquête ops ───────────────────────────────────────────────────────
+
+export async function queueEnqueteOp(op: Omit<EnqueteOp, "timestamp" | "status">): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_enquetes", "readwrite", db);
+    const record: EnqueteOp = { ...op, timestamp: Date.now(), status: "pending" };
+    const req = store.put(record);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getPendingEnqueteOps(): Promise<EnqueteOp[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_enquetes", "readonly", db);
+    const idx = store.index("status");
+    const req = idx.getAll("pending");
+    req.onsuccess = () => resolve((req.result as EnqueteOp[]).sort((a, b) => a.timestamp - b.timestamp));
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getAllEnqueteOps(): Promise<EnqueteOp[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_enquetes", "readonly", db);
+    const req = store.getAll();
+    req.onsuccess = () => resolve((req.result as EnqueteOp[]).sort((a, b) => b.timestamp - a.timestamp).slice(0, 50));
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function markEnqueteOpSynced(localId: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_enquetes", "readwrite", db);
+    const getReq = store.get(localId);
+    getReq.onsuccess = () => {
+      const op = getReq.result as EnqueteOp;
+      if (op) { op.status = "synced"; op.syncedAt = Date.now(); const p = store.put(op); p.onsuccess = () => resolve(); p.onerror = () => reject(p.error); }
+      else resolve();
+    };
+    getReq.onerror = () => reject(getReq.error);
+  });
+}
+
+export async function markEnqueteOpError(localId: string, erreur: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_enquetes", "readwrite", db);
+    const getReq = store.get(localId);
+    getReq.onsuccess = () => {
+      const op = getReq.result as EnqueteOp;
+      if (op) { op.status = "error"; op.errorMsg = erreur; const p = store.put(op); p.onsuccess = () => resolve(); p.onerror = () => reject(p.error); }
+      else resolve();
+    };
+    getReq.onerror = () => reject(getReq.error);
+  });
+}
+
+export async function incrementEnqueteTentatives(localId: string): Promise<number> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pending_enquetes", "readwrite", db);
+    const getReq = store.get(localId);
+    getReq.onsuccess = () => {
+      const op = getReq.result as EnqueteOp | undefined;
+      if (op) {
+        const next = (op.tentatives ?? 0) + 1;
+        op.tentatives = next;
+        const p = store.put(op); p.onsuccess = () => resolve(next); p.onerror = () => reject(p.error);
+      } else resolve(0);
+    };
+    getReq.onerror = () => reject(getReq.error);
   });
 }
 

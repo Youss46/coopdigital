@@ -119,6 +119,31 @@ export async function soumettreReponses(
     .where(eq(missionsEnqueteTable.id, missionId));
 }
 
+export async function syncReponsesBatch(
+  agentId: number,
+  operations: Array<{
+    localId: string;
+    missionId: number;
+    membreId: number;
+    reponses: ReponsesCriteres;
+    notesAgent?: string;
+  }>,
+): Promise<{ succes: string[]; echecs: Array<{ localId: string; erreur: string }> }> {
+  const succes: string[] = [];
+  const echecs: Array<{ localId: string; erreur: string }> = [];
+
+  for (const op of operations) {
+    try {
+      await soumettreReponses(op.missionId, agentId, op.membreId, op.reponses, op.notesAgent);
+      succes.push(op.localId);
+    } catch (err) {
+      echecs.push({ localId: op.localId, erreur: err instanceof Error ? err.message : "Erreur" });
+    }
+  }
+
+  return { succes, echecs };
+}
+
 export async function soumettreEnqueteMission(missionId: number, agentId: number) {
   const [mission] = await db
     .select()

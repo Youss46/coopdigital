@@ -59,6 +59,31 @@ export async function soumettreReponsesHandler(req: Request, res: Response): Pro
   }
 }
 
+export async function syncEnquetesHandler(req: Request, res: Response): Promise<void> {
+  if (!requireAgent(req, res)) return;
+  const { id } = req.agent!;
+  const { operations } = req.body as {
+    operations: Array<{
+      localId: string;
+      missionId: number;
+      membreId: number;
+      reponses: Record<string, { valeur: "oui" | "non" | "na"; commentaire?: string }>;
+      notesAgent?: string;
+    }>;
+  };
+  if (!Array.isArray(operations)) {
+    res.status(400).json({ erreur: "operations manquantes" });
+    return;
+  }
+  try {
+    const result = await svc.syncReponsesBatch(id, operations);
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "syncEnquetes");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 export async function soumettreEnqueteHandler(req: Request, res: Response): Promise<void> {
   if (!requireAgent(req, res)) return;
   const { id } = req.agent!;

@@ -31,6 +31,7 @@ import {
   getEnqueteDetailHandler,
   soumettreReponsesHandler,
   soumettreEnqueteHandler,
+  syncEnquetesHandler,
 } from "../controllers/enqueteAgentController.js";
 
 const router = Router();
@@ -67,6 +68,7 @@ router.get("/terrain/historique", terrainAuthMiddleware, getHistoriqueAgentHandl
 // Missions d'enquête (agent terrain)
 router.get("/terrain/enquetes",                              terrainAuthMiddleware, getEnquetesAgentHandler);
 router.get("/terrain/enquetes/:id",                          terrainAuthMiddleware, getEnqueteDetailHandler);
+router.post("/terrain/enquetes/sync",                        terrainAuthMiddleware, syncEnquetesHandler);
 router.post("/terrain/enquetes/:id/membres/:membreId",       terrainAuthMiddleware, soumettreReponsesHandler);
 router.post("/terrain/enquetes/:id/soumettre",               terrainAuthMiddleware, soumettreEnqueteHandler);
 

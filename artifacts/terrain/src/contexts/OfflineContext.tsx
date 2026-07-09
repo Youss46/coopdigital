@@ -6,8 +6,9 @@ import {
   getPendingOps, getPendingCount,
   markOpSyncedWithTs, markOpError, incrementTentatives,
   getPendingGpsOps, markGpsOpSynced, markGpsOpError, incrementGpsTentatives,
+  getPendingEnqueteOps, markEnqueteOpSynced, markEnqueteOpError, incrementEnqueteTentatives,
 } from "../lib/idb";
-import { syncOps, syncGpsOps } from "../lib/api";
+import { syncOps, syncGpsOps, syncEnqueteOps } from "../lib/api";
 
 export interface SyncResult {
   succes: number;
@@ -44,8 +45,10 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
   const triggerSync = useCallback(async () => {
     if (syncingRef.current || !navigator.onLine) return;
-    const [ops, gpsOps] = await Promise.all([getPendingOps(), getPendingGpsOps()]);
-    if (ops.length === 0 && gpsOps.length === 0) return;
+    const [ops, gpsOps, enqOps] = await Promise.all([
+      getPendingOps(), getPendingGpsOps(), getPendingEnqueteOps(),
+    ]);
+    if (ops.length === 0 && gpsOps.length === 0 && enqOps.length === 0) return;
 
     syncingRef.current = true;
     setSyncStatus("syncing");
@@ -72,6 +75,16 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
         for (const { localId } of gpsResult.echecs) {
           const t = await incrementGpsTentatives(localId);
           if (t >= 3) await markGpsOpError(localId);
+          nbEchecs++;
+        }
+      }
+
+      if (enqOps.length > 0) {
+        const enqResult = await syncEnqueteOps(enqOps);
+        for (const localId of enqResult.succes) { await markEnqueteOpSynced(localId); nbSucces++; }
+        for (const { localId, erreur } of enqResult.echecs) {
+          const t = await incrementEnqueteTentatives(localId);
+          if (t >= 3) await markEnqueteOpError(localId, `Échec définitif (${t} tentatives) : ${erreur}`);
           nbEchecs++;
         }
       }
