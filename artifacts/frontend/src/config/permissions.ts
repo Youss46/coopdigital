@@ -228,4 +228,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir:  ["pca", "directeur", "comptable", "auditeur"],
     creer: ["pca", "directeur"],
   },
+
+  certifications: {
+    lire:              ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    creer:             ["pca", "directeur", "responsable_tracabilite"],
+    modifier:          ["pca", "directeur", "responsable_tracabilite"],
+    supprimer:         ["pca", "directeur"],
+    evaluer_membres:   ["pca", "directeur", "responsable_tracabilite"],
+    creer_audit:       ["pca", "directeur", "responsable_tracabilite"],
+    exporter_rapport:  ["pca", "directeur", "responsable_tracabilite", "auditeur"],
+  },
 };

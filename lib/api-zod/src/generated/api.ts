@@ -7192,6 +7192,14 @@ export const DeleteCertificationParams = zod.object({
 
 
 /**
+ * @summary Critères par type de certification
+ */
+export const GetCertificationsCriteresResponse = zod.object({
+
+}).passthrough()
+
+
+/**
  * @summary Historique d'audit d'une certification
  */
 export const GetAuditsCertificationParams = zod.object({
@@ -7210,5 +7218,98 @@ export const GetAuditsCertificationResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 })
 export const GetAuditsCertificationResponse = zod.array(GetAuditsCertificationResponseItem)
+
+
+/**
+ * @summary Créer un audit pour une certification
+ */
+export const CreateAuditCertificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateAuditCertificationBody = zod.object({
+  "action": zod.string(),
+  "ancienStatut": zod.string().nullish(),
+  "nouveauStatut": zod.string().nullish(),
+  "notes": zod.string().nullish()
+})
+
+
+/**
+ * @summary Liste des membres évalués pour une certification
+ */
+export const ListMembresCertificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListMembresCertificationResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "certificationId": zod.number(),
+  "membreId": zod.number(),
+  "criteresValides": zod.array(zod.string()).optional(),
+  "score": zod.number(),
+  "scoreMax": zod.number(),
+  "statutConformite": zod.enum(['certifie', 'en_cours', 'non_conforme']),
+  "primeFcfaHa": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "evaluePar": zod.number().nullish(),
+  "dateEvaluation": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "membreNom": zod.string().optional(),
+  "membreSection": zod.string().nullish(),
+  "membreTelephone": zod.string().nullish()
+})
+export const ListMembresCertificationResponse = zod.array(ListMembresCertificationResponseItem)
+
+
+/**
+ * @summary Évaluer ou mettre à jour la conformité d'un membre
+ */
+export const EvaluerMembreCertificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EvaluerMembreCertificationBody = zod.object({
+  "membreId": zod.number(),
+  "criteresValides": zod.array(zod.string()),
+  "primeFcfaHa": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "dateEvaluation": zod.coerce.date().nullish()
+})
+
+export const EvaluerMembreCertificationResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "certificationId": zod.number(),
+  "membreId": zod.number(),
+  "criteresValides": zod.array(zod.string()).optional(),
+  "score": zod.number(),
+  "scoreMax": zod.number(),
+  "statutConformite": zod.enum(['certifie', 'en_cours', 'non_conforme']),
+  "primeFcfaHa": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "evaluePar": zod.number().nullish(),
+  "dateEvaluation": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "membreNom": zod.string().optional(),
+  "membreSection": zod.string().nullish(),
+  "membreTelephone": zod.string().nullish()
+})
+
+
+/**
+ * @summary Conformité d'un membre pour une certification
+ */
+export const GetMembreCertificationParams = zod.object({
+  "id": zod.coerce.number(),
+  "membreId": zod.coerce.number()
+})
+
+export const GetMembreCertificationResponse = zod.object({
+
+}).passthrough()
 
 

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useGetDashboard, useGetDashboardLivraisons, useGetDashboardAvancesRetard } from "@workspace/api-client-react";
-import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation, Settings, CalendarDays } from "lucide-react";
+import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation, Settings, CalendarDays, Award, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Redirect } from "wouter";
 import { CarteKpi } from "@/components/CarteKpi";
@@ -404,6 +404,103 @@ function DashboardRT() {
           </button>
         )}
       </div>
+
+      <BlocCertificationsRT />
+    </div>
+  );
+}
+
+function BlocCertificationsRT() {
+  const [, navigate] = useLocation();
+
+  interface StatsCertif {
+    total: number; actives: number; aRenouveler: number;
+    prochesExpiration: { id: number; type: string; dateExpiration: string | null; numeroCertificat: string | null }[];
+  }
+
+  const LABELS: Record<string, string> = {
+    rainforest_alliance: "Rainforest Alliance", fairtrade: "Fairtrade",
+    bio: "Bio", eudr: "EUDR", utz: "UTZ", autre: "Autre",
+  };
+
+  const { data: stats, isLoading } = useQuery<StatsCertif>({
+    queryKey: ["dashboard-certifications-rt"],
+    queryFn: async () => {
+      const r = await apiFetch("/api/certifications/stats");
+      if (!r.ok) throw new Error("err");
+      return r.json() as Promise<StatsCertif>;
+    },
+  });
+
+  if (isLoading) return null;
+  if (!stats || stats.total === 0) return null;
+
+  const in90Days = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+  const urgentes = (stats.prochesExpiration ?? []).filter(c => c.dateExpiration && c.dateExpiration <= in90Days);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+        <h2 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+          <Award size={15} className="text-green-600" />
+          Certifications
+          <span className="text-xs font-normal text-gray-400">({stats.actives} active{stats.actives !== 1 ? "s" : ""})</span>
+        </h2>
+        <button onClick={() => navigate("/certifications")} className="text-xs text-green-700 hover:underline">
+          Voir tout →
+        </button>
+      </div>
+
+      {urgentes.length > 0 && (
+        <div className="px-5 py-3 bg-amber-50 border-b border-amber-100">
+          <p className="text-xs font-semibold text-amber-700 flex items-center gap-1 mb-2">
+            <AlertTriangle size={12} />
+            {urgentes.length} certification{urgentes.length > 1 ? "s" : ""} expir{urgentes.length > 1 ? "ent" : "e"} dans ≤ 90 jours
+          </p>
+          <div className="space-y-1">
+            {urgentes.slice(0, 3).map(c => {
+              const days = c.dateExpiration
+                ? Math.round((new Date(c.dateExpiration).getTime() - Date.now()) / 86_400_000)
+                : null;
+              return (
+                <div key={c.id} className="flex items-center justify-between text-xs">
+                  <span className="text-amber-800">{LABELS[c.type] ?? c.type}{c.numeroCertificat ? ` — ${c.numeroCertificat}` : ""}</span>
+                  <span className={`font-medium ${days !== null && days <= 30 ? "text-red-700" : "text-amber-700"}`}>
+                    J-{days}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 divide-x divide-gray-100 text-center py-3">
+        <div>
+          <p className="text-lg font-bold text-gray-900">{stats.actives}</p>
+          <p className="text-[11px] text-gray-400">Actives</p>
+        </div>
+        <div>
+          <p className={`text-lg font-bold ${stats.aRenouveler > 0 ? "text-amber-600" : "text-gray-900"}`}>{stats.aRenouveler}</p>
+          <p className="text-[11px] text-gray-400">À renouveler</p>
+        </div>
+        <div>
+          <p className="text-lg font-bold text-gray-900">{stats.total}</p>
+          <p className="text-[11px] text-gray-400">Total</p>
+        </div>
+      </div>
+
+      {stats.aRenouveler > 0 && (
+        <div className="px-5 pb-3">
+          <button
+            onClick={() => navigate("/certifications")}
+            className="w-full flex items-center justify-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg py-2 hover:bg-amber-100 transition-colors"
+          >
+            <RefreshCw size={12} />
+            Gérer les renouvellements
+          </button>
+        </div>
+      )}
     </div>
   );
 }

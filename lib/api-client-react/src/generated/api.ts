@@ -63,6 +63,7 @@ import type {
   CategorieEquipement,
   CategorieIntrant,
   Certification,
+  CertificationMembre,
   Chauffeur,
   CloturerAgInput,
   ComparaisonBilanCampagne,
@@ -85,6 +86,7 @@ import type {
   CountEcrituresEnAttente200,
   CountRefusEnAttente200,
   CreancesSummary,
+  CreateAuditCertificationBody,
   CreateAvancePersonnelInput,
   CreateBalance201,
   CreateBalanceBody,
@@ -126,6 +128,7 @@ import type {
   EntretienVehicule,
   Equipement,
   ErrorResponse,
+  EvaluerMembreBody,
   EvolutionScore,
   ExpedierLotInput,
   ExportateurDetail,
@@ -152,6 +155,7 @@ import type {
   GetBalancesAlertes200,
   GetBilanParams,
   GetBulletinsParams,
+  GetCertificationsCriteres200,
   GetChauffeurs200,
   GetComparaisonCampagnesParams,
   GetCompteResultatParams,
@@ -168,6 +172,7 @@ import type {
   GetLivraisonsParams,
   GetLotsParams,
   GetMargeCollecteParams,
+  GetMembreCertification200,
   GetMembresParams,
   GetMissions200,
   GetMissionsParams,
@@ -22188,6 +22193,83 @@ export const useDeleteCertification = <TError = ErrorType<unknown>,
       return useMutation(getDeleteCertificationMutationOptions(options));
     }
 
+export const getGetCertificationsCriteresUrl = () => {
+
+
+
+
+  return `/api/certifications/criteres`
+}
+
+/**
+ * @summary Critères par type de certification
+ */
+export const getCertificationsCriteres = async ( options?: RequestInit): Promise<GetCertificationsCriteres200> => {
+
+  return customFetch<GetCertificationsCriteres200>(getGetCertificationsCriteresUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCertificationsCriteresQueryKey = () => {
+    return [
+    `/api/certifications/criteres`
+    ] as const;
+    }
+
+
+export const getGetCertificationsCriteresQueryOptions = <TData = Awaited<ReturnType<typeof getCertificationsCriteres>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCertificationsCriteres>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCertificationsCriteresQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCertificationsCriteres>>> = ({ signal }) => getCertificationsCriteres({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCertificationsCriteres>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCertificationsCriteresQueryResult = NonNullable<Awaited<ReturnType<typeof getCertificationsCriteres>>>
+export type GetCertificationsCriteresQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Critères par type de certification
+ */
+
+export function useGetCertificationsCriteres<TData = Awaited<ReturnType<typeof getCertificationsCriteres>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCertificationsCriteres>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCertificationsCriteresQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetAuditsCertificationUrl = (id: number,) => {
 
 
@@ -22253,6 +22335,309 @@ export function useGetAuditsCertification<TData = Awaited<ReturnType<typeof getA
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetAuditsCertificationQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateAuditCertificationUrl = (id: number,) => {
+
+
+
+
+  return `/api/certifications/${id}/audits`
+}
+
+/**
+ * @summary Créer un audit pour une certification
+ */
+export const createAuditCertification = async (id: number,
+    createAuditCertificationBody: CreateAuditCertificationBody, options?: RequestInit): Promise<AuditCertification> => {
+
+  return customFetch<AuditCertification>(getCreateAuditCertificationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createAuditCertificationBody,)
+  }
+);}
+
+
+
+
+export const getCreateAuditCertificationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAuditCertification>>, TError,{id: number;data: BodyType<CreateAuditCertificationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAuditCertification>>, TError,{id: number;data: BodyType<CreateAuditCertificationBody>}, TContext> => {
+
+const mutationKey = ['createAuditCertification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAuditCertification>>, {id: number;data: BodyType<CreateAuditCertificationBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createAuditCertification(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAuditCertificationMutationResult = NonNullable<Awaited<ReturnType<typeof createAuditCertification>>>
+    export type CreateAuditCertificationMutationBody = BodyType<CreateAuditCertificationBody>
+    export type CreateAuditCertificationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Créer un audit pour une certification
+ */
+export const useCreateAuditCertification = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAuditCertification>>, TError,{id: number;data: BodyType<CreateAuditCertificationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAuditCertification>>,
+        TError,
+        {id: number;data: BodyType<CreateAuditCertificationBody>},
+        TContext
+      > => {
+      return useMutation(getCreateAuditCertificationMutationOptions(options));
+    }
+
+export const getListMembresCertificationUrl = (id: number,) => {
+
+
+
+
+  return `/api/certifications/${id}/membres`
+}
+
+/**
+ * @summary Liste des membres évalués pour une certification
+ */
+export const listMembresCertification = async (id: number, options?: RequestInit): Promise<CertificationMembre[]> => {
+
+  return customFetch<CertificationMembre[]>(getListMembresCertificationUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMembresCertificationQueryKey = (id: number,) => {
+    return [
+    `/api/certifications/${id}/membres`
+    ] as const;
+    }
+
+
+export const getListMembresCertificationQueryOptions = <TData = Awaited<ReturnType<typeof listMembresCertification>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMembresCertification>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMembresCertificationQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMembresCertification>>> = ({ signal }) => listMembresCertification(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMembresCertification>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMembresCertificationQueryResult = NonNullable<Awaited<ReturnType<typeof listMembresCertification>>>
+export type ListMembresCertificationQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des membres évalués pour une certification
+ */
+
+export function useListMembresCertification<TData = Awaited<ReturnType<typeof listMembresCertification>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMembresCertification>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMembresCertificationQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getEvaluerMembreCertificationUrl = (id: number,) => {
+
+
+
+
+  return `/api/certifications/${id}/membres`
+}
+
+/**
+ * @summary Évaluer ou mettre à jour la conformité d'un membre
+ */
+export const evaluerMembreCertification = async (id: number,
+    evaluerMembreBody: EvaluerMembreBody, options?: RequestInit): Promise<CertificationMembre> => {
+
+  return customFetch<CertificationMembre>(getEvaluerMembreCertificationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      evaluerMembreBody,)
+  }
+);}
+
+
+
+
+export const getEvaluerMembreCertificationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof evaluerMembreCertification>>, TError,{id: number;data: BodyType<EvaluerMembreBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof evaluerMembreCertification>>, TError,{id: number;data: BodyType<EvaluerMembreBody>}, TContext> => {
+
+const mutationKey = ['evaluerMembreCertification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof evaluerMembreCertification>>, {id: number;data: BodyType<EvaluerMembreBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  evaluerMembreCertification(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EvaluerMembreCertificationMutationResult = NonNullable<Awaited<ReturnType<typeof evaluerMembreCertification>>>
+    export type EvaluerMembreCertificationMutationBody = BodyType<EvaluerMembreBody>
+    export type EvaluerMembreCertificationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Évaluer ou mettre à jour la conformité d'un membre
+ */
+export const useEvaluerMembreCertification = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof evaluerMembreCertification>>, TError,{id: number;data: BodyType<EvaluerMembreBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof evaluerMembreCertification>>,
+        TError,
+        {id: number;data: BodyType<EvaluerMembreBody>},
+        TContext
+      > => {
+      return useMutation(getEvaluerMembreCertificationMutationOptions(options));
+    }
+
+export const getGetMembreCertificationUrl = (id: number,
+    membreId: number,) => {
+
+
+
+
+  return `/api/certifications/${id}/membres/${membreId}`
+}
+
+/**
+ * @summary Conformité d'un membre pour une certification
+ */
+export const getMembreCertification = async (id: number,
+    membreId: number, options?: RequestInit): Promise<GetMembreCertification200> => {
+
+  return customFetch<GetMembreCertification200>(getGetMembreCertificationUrl(id,membreId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMembreCertificationQueryKey = (id: number,
+    membreId: number,) => {
+    return [
+    `/api/certifications/${id}/membres/${membreId}`
+    ] as const;
+    }
+
+
+export const getGetMembreCertificationQueryOptions = <TData = Awaited<ReturnType<typeof getMembreCertification>>, TError = ErrorType<unknown>>(id: number,
+    membreId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMembreCertification>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMembreCertificationQueryKey(id,membreId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMembreCertification>>> = ({ signal }) => getMembreCertification(id,membreId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id && membreId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMembreCertification>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMembreCertificationQueryResult = NonNullable<Awaited<ReturnType<typeof getMembreCertification>>>
+export type GetMembreCertificationQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Conformité d'un membre pour une certification
+ */
+
+export function useGetMembreCertification<TData = Awaited<ReturnType<typeof getMembreCertification>>, TError = ErrorType<unknown>>(
+ id: number,
+    membreId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMembreCertification>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMembreCertificationQueryOptions(id,membreId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

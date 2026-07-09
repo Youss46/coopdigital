@@ -1,9 +1,10 @@
 import {
   pgTable, serial, integer, varchar, numeric, date, text,
-  timestamp,
+  timestamp, boolean, jsonb,
 } from "drizzle-orm/pg-core";
 import { cooperativesTable } from "./cooperatives";
 import { usersTable } from "./users";
+import { membresTable } from "./membres";
 
 export const certificationsTable = pgTable("certifications", {
   id:                    serial("id").primaryKey(),
@@ -38,5 +39,25 @@ export const auditsCertificationsTable = pgTable("audits_certifications", {
   createdAt:       timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const certificationsMembresTable = pgTable("certifications_membres", {
+  id:                  serial("id").primaryKey(),
+  cooperativeId:       integer("cooperative_id").notNull().references(() => cooperativesTable.id),
+  certificationId:     integer("certification_id").notNull().references(() => certificationsTable.id, { onDelete: "cascade" }),
+  membreId:            integer("membre_id").notNull().references(() => membresTable.id, { onDelete: "cascade" }),
+  // Critères cochés (JSON array de noms de critères)
+  criteresValides:     jsonb("criteres_valides").$type<string[]>().default([]),
+  score:               integer("score").notNull().default(0),
+  scoreMax:            integer("score_max").notNull().default(0),
+  // statut_conformite: certifie | en_cours | non_conforme
+  statutConformite:    varchar("statut_conformite", { length: 30 }).notNull().default("non_conforme"),
+  primeFcfaHa:         numeric("prime_fcfa_ha", { precision: 10, scale: 2 }),
+  notes:               text("notes"),
+  evaluePar:           integer("evalue_par").references(() => usersTable.id),
+  dateEvaluation:      date("date_evaluation", { mode: "string" }),
+  createdAt:           timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:           timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type Certification = typeof certificationsTable.$inferSelect;
 export type AuditCertification = typeof auditsCertificationsTable.$inferSelect;
+export type CertificationMembre = typeof certificationsMembresTable.$inferSelect;

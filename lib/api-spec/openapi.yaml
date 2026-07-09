@@ -5808,6 +5808,18 @@ paths:
         "204":
           description: Supprimé
 
+  /certifications/criteres:
+    get:
+      operationId: getCertificationsCriteres
+      summary: Critères par type de certification
+      tags: [Certifications]
+      responses:
+        "200":
+          description: Map type → liste de critères
+          content:
+            application/json:
+              schema: { type: object }
+
   /certifications/{id}/audits:
     get:
       operationId: getAuditsCertification
@@ -5826,6 +5838,86 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/AuditCertification" }
+    post:
+      operationId: createAuditCertification
+      summary: Créer un audit pour une certification
+      tags: [Certifications]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAuditCertificationBody" }
+      responses:
+        "201":
+          description: Audit créé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditCertification" }
+
+  /certifications/{id}/membres:
+    get:
+      operationId: listMembresCertification
+      summary: Liste des membres évalués pour une certification
+      tags: [Certifications]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Membres évalués
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CertificationMembre" }
+    post:
+      operationId: evaluerMembreCertification
+      summary: Évaluer ou mettre à jour la conformité d'un membre
+      tags: [Certifications]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EvaluerMembreBody" }
+      responses:
+        "200":
+          description: Évaluation enregistrée
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CertificationMembre" }
+
+  /certifications/{id}/membres/{membreId}:
+    get:
+      operationId: getMembreCertification
+      summary: Conformité d'un membre pour une certification
+      tags: [Certifications]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: membreId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Conformité membre
+          content:
+            application/json:
+              schema: { type: object }
 
 components:
   schemas:
@@ -11024,6 +11116,47 @@ components:
         notes: { type: ["string", "null"] }
         faitPar: { type: ["integer", "null"] }
         createdAt: { type: string, format: date-time }
+
+    CertificationMembre:
+      type: object
+      required: [id, cooperativeId, certificationId, membreId, score, scoreMax, statutConformite, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        cooperativeId: { type: integer }
+        certificationId: { type: integer }
+        membreId: { type: integer }
+        criteresValides: { type: array, items: { type: string } }
+        score: { type: integer }
+        scoreMax: { type: integer }
+        statutConformite: { type: string, enum: [certifie, en_cours, non_conforme] }
+        primeFcfaHa: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        evaluePar: { type: ["integer", "null"] }
+        dateEvaluation: { type: ["string", "null"], format: date }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        membreNom: { type: string }
+        membreSection: { type: ["string", "null"] }
+        membreTelephone: { type: ["string", "null"] }
+
+    EvaluerMembreBody:
+      type: object
+      required: [membreId, criteresValides]
+      properties:
+        membreId: { type: integer }
+        criteresValides: { type: array, items: { type: string } }
+        primeFcfaHa: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        dateEvaluation: { type: string, format: date, nullable: true }
+
+    CreateAuditCertificationBody:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string }
+        ancienStatut: { type: string, nullable: true }
+        nouveauStatut: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
 
     StatsCertifications:
       type: object

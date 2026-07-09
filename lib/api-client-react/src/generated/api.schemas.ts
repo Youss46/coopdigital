@@ -4397,6 +4397,56 @@ export interface AuditCertification {
   createdAt: string;
 }
 
+export type CertificationMembreStatutConformite = typeof CertificationMembreStatutConformite[keyof typeof CertificationMembreStatutConformite];
+
+
+export const CertificationMembreStatutConformite = {
+  certifie: 'certifie',
+  en_cours: 'en_cours',
+  non_conforme: 'non_conforme',
+} as const;
+
+export interface CertificationMembre {
+  id: number;
+  cooperativeId: number;
+  certificationId: number;
+  membreId: number;
+  criteresValides?: string[];
+  score: number;
+  scoreMax: number;
+  statutConformite: CertificationMembreStatutConformite;
+  /** @nullable */
+  primeFcfaHa?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  evaluePar?: number | null;
+  /** @nullable */
+  dateEvaluation?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  membreNom?: string;
+  /** @nullable */
+  membreSection?: string | null;
+  /** @nullable */
+  membreTelephone?: string | null;
+}
+
+export interface EvaluerMembreBody {
+  membreId: number;
+  criteresValides: string[];
+  primeFcfaHa?: string | null;
+  notes?: string | null;
+  dateEvaluation?: string | null;
+}
+
+export interface CreateAuditCertificationBody {
+  action: string;
+  ancienStatut?: string | null;
+  nouveauStatut?: string | null;
+  notes?: string | null;
+}
+
 export type StatsCertificationsParType = { [key: string]: unknown };
 
 export interface StatsCertifications {
@@ -4943,4 +4993,8 @@ export type GetTableauAmortissement200 = {
 export type GetProjectionTresorerieParams = {
 jours?: number;
 };
+
+export type GetCertificationsCriteres200 = { [key: string]: unknown };
+
+export type GetMembreCertification200 = { [key: string]: unknown };
 

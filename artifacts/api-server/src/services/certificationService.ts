@@ -1,23 +1,58 @@
-import { db, certificationsTable, auditsCertificationsTable, membresTable } from "@workspace/db";
-import { eq, and, desc, gte, lte, sql, count } from "drizzle-orm";
+import { db, certificationsTable, auditsCertificationsTable, certificationsMembresTable, membresTable } from "@workspace/db";
+import { eq, and, desc, lte, sql, count } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { notifierParRole } from "./notificationService.js";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Critères par type de certification ──────────────────────────────────────
 
-export type CertifType =
-  | "rainforest_alliance"
-  | "fairtrade"
-  | "bio"
-  | "eudr"
-  | "utz"
-  | "autre";
+export const CRITERES_PAR_TYPE: Record<string, string[]> = {
+  rainforest_alliance: [
+    "Gestion durable des terres",
+    "Biodiversité et écosystèmes",
+    "Protection des ressources en eau",
+    "Conditions de travail équitables",
+    "Sécurité et santé des travailleurs",
+    "Droits des communautés locales",
+    "Traçabilité et gestion de la chaîne d'approvisionnement",
+  ],
+  fairtrade: [
+    "Commerce équitable et prix minimum",
+    "Prime Fairtrade utilisée correctement",
+    "Droits des travailleurs respectés",
+  ],
+  bio: [
+    "Absence de pesticides chimiques",
+    "Fertilisation organique uniquement",
+    "Rotation des cultures respectée",
+    "Zone tampon avec parcelles conventionnelles",
+    "Traçabilité des intrants biologiques",
+  ],
+  eudr: [
+    "Géolocalisation GPS des parcelles complète",
+    "Déforestation zéro après 2020 prouvée",
+    "Conformité réglementaire pays d'origine",
+    "Diligence raisonnée documentée",
+  ],
+  utz: [
+    "Bonnes pratiques agricoles",
+    "Traçabilité interne",
+    "Gestion environnementale de base",
+  ],
+  autre: [
+    "Critère personnalisé 1",
+    "Critère personnalisé 2",
+  ],
+};
 
-export type CertifStatut =
-  | "actif"
-  | "suspendu"
-  | "expire"
-  | "renouvellement_en_cours";
+function calculerStatutConformite(score: number, scoreMax: number): string {
+  if (scoreMax === 0) return "non_conforme";
+  const pct = score / scoreMax;
+  if (pct >= 0.8) return "certifie";
+  if (pct >= 0.5) return "en_cours";
+  return "non_conforme";
+}
+
+// ─── Types entrée ─────────────────────────────────────────────────────────────
 
 export interface CreateCertificationInput {
   type: string;
@@ -34,34 +69,42 @@ export interface CreateCertificationInput {
 
 export interface UpdateCertificationInput extends Partial<CreateCertificationInput> {}
 
-// ─── Lecture ──────────────────────────────────────────────────────────────────
+export interface EvaluerMembreInput {
+  membreId: number;
+  criteresValides: string[];
+  primeFcfaHa?: string | null;
+  notes?: string | null;
+  dateEvaluation?: string | null;
+}
+
+export interface CreateAuditInput {
+  action: string;
+  ancienStatut?: string | null;
+  nouveauStatut?: string | null;
+  notes?: string | null;
+}
+
+// ─── Certifications coopérative — Lecture ─────────────────────────────────────
 
 export async function listCertifications(cooperativeId: number) {
-  const rows = await db
+  return db
     .select()
     .from(certificationsTable)
     .where(eq(certificationsTable.cooperativeId, cooperativeId))
     .orderBy(desc(certificationsTable.createdAt));
-
-  return rows;
 }
 
 export async function getCertification(cooperativeId: number, id: number) {
   const [row] = await db
     .select()
     .from(certificationsTable)
-    .where(
-      and(
-        eq(certificationsTable.cooperativeId, cooperativeId),
-        eq(certificationsTable.id, id),
-      ),
-    )
+    .where(and(eq(certificationsTable.cooperativeId, cooperativeId), eq(certificationsTable.id, id)))
     .limit(1);
   return row ?? null;
 }
 
 export async function getAuditsCertification(cooperativeId: number, certificationId: number) {
-  const rows = await db
+  return db
     .select()
     .from(auditsCertificationsTable)
     .where(
@@ -71,104 +114,73 @@ export async function getAuditsCertification(cooperativeId: number, certificatio
       ),
     )
     .orderBy(desc(auditsCertificationsTable.createdAt));
-  return rows;
 }
 
-// ─── Stats & Dashboard ────────────────────────────────────────────────────────
+// ─── Stats dashboard ──────────────────────────────────────────────────────────
 
 export async function getStatsCertifications(cooperativeId: number) {
   const all = await listCertifications(cooperativeId);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const in60Days = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
+  const today    = new Date().toISOString().slice(0, 10);
+  const in90Days = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
 
-  const total      = all.length;
-  const actives    = all.filter(c => c.statut === "actif").length;
-  const expirees   = all.filter(c => c.statut === "expire").length;
-  const suspendues = all.filter(c => c.statut === "suspendu").length;
+  const total       = all.length;
+  const actives     = all.filter(c => c.statut === "actif").length;
+  const expirees    = all.filter(c => c.statut === "expire").length;
+  const suspendues  = all.filter(c => c.statut === "suspendu").length;
   const aRenouveler = all.filter(c =>
-    c.statut === "actif" &&
-    c.dateExpiration &&
-    c.dateExpiration >= today &&
-    c.dateExpiration <= in60Days,
+    c.statut === "actif" && c.dateExpiration &&
+    c.dateExpiration >= today && c.dateExpiration <= in90Days,
   ).length;
 
-  // Membres certifiés (champ membre.certification non nul)
   const [res] = await db
     .select({ nb: count() })
-    .from(membresTable)
-    .where(
-      and(
-        eq(membresTable.cooperativeId, cooperativeId),
-        sql`${membresTable.certification} IS NOT NULL AND ${membresTable.certification} <> ''`,
-      ),
-    );
+    .from(certificationsMembresTable)
+    .where(and(
+      eq(certificationsMembresTable.cooperativeId, cooperativeId),
+      eq(certificationsMembresTable.statutConformite, "certifie"),
+    ));
   const nbMembresCertifies = Number(res?.nb ?? 0);
 
   const parType: Record<string, number> = {};
-  for (const c of all) {
-    parType[c.type] = (parType[c.type] ?? 0) + 1;
-  }
+  for (const c of all) parType[c.type] = (parType[c.type] ?? 0) + 1;
 
   return {
-    total,
-    actives,
-    expirees,
-    suspendues,
-    aRenouveler,
-    nbMembresCertifies,
-    parType,
+    total, actives, expirees, suspendues, aRenouveler, nbMembresCertifies, parType,
     prochesExpiration: all
-      .filter(c => c.statut === "actif" && c.dateExpiration && c.dateExpiration >= today && c.dateExpiration <= in60Days)
+      .filter(c => c.statut === "actif" && c.dateExpiration && c.dateExpiration >= today && c.dateExpiration <= in90Days)
       .sort((a, b) => (a.dateExpiration ?? "").localeCompare(b.dateExpiration ?? "")),
   };
 }
 
-// ─── Création ─────────────────────────────────────────────────────────────────
+// ─── Certifications coopérative — Création / MAJ / Suppression ───────────────
 
-export async function createCertification(
-  cooperativeId: number,
-  data: CreateCertificationInput,
-  userId: number,
-) {
-  const [row] = await db
-    .insert(certificationsTable)
-    .values({
-      cooperativeId,
-      type:                  data.type,
-      nomCertificateur:      data.nomCertificateur   ?? null,
-      numeroCertificat:      data.numeroCertificat   ?? null,
-      dateObtention:         data.dateObtention      ?? null,
-      dateExpiration:        data.dateExpiration     ?? null,
-      statut:                data.statut             ?? "actif",
-      superficieCertifieeHa: data.superficieCertifieeHa ?? null,
-      nbMembresCouVerts:     data.nbMembresCouVerts  ?? 0,
-      lienDocument:          data.lienDocument       ?? null,
-      notes:                 data.notes              ?? null,
-      creePar:               userId,
-    })
-    .returning();
+export async function createCertification(cooperativeId: number, data: CreateCertificationInput, userId: number) {
+  const [row] = await db.insert(certificationsTable).values({
+    cooperativeId,
+    type:                  data.type,
+    nomCertificateur:      data.nomCertificateur   ?? null,
+    numeroCertificat:      data.numeroCertificat   ?? null,
+    dateObtention:         data.dateObtention      ?? null,
+    dateExpiration:        data.dateExpiration     ?? null,
+    statut:                data.statut             ?? "actif",
+    superficieCertifieeHa: data.superficieCertifieeHa ?? null,
+    nbMembresCouVerts:     data.nbMembresCouVerts  ?? 0,
+    lienDocument:          data.lienDocument       ?? null,
+    notes:                 data.notes              ?? null,
+    creePar:               userId,
+  }).returning();
 
   await db.insert(auditsCertificationsTable).values({
-    certificationId: row!.id,
-    cooperativeId,
-    action:         "creation",
-    nouveauStatut:  row!.statut,
-    notes:          `Certification ${data.type} créée`,
-    faitPar:        userId,
+    certificationId: row!.id, cooperativeId,
+    action: "creation", nouveauStatut: row!.statut,
+    notes: `Certification ${data.type} créée`, faitPar: userId,
   });
 
   return row!;
 }
 
-// ─── Mise à jour ──────────────────────────────────────────────────────────────
-
-export async function updateCertification(
-  cooperativeId: number,
-  id: number,
-  data: UpdateCertificationInput,
-  userId: number,
-) {
+export async function updateCertification(cooperativeId: number, id: number, data: UpdateCertificationInput, userId: number) {
   const existing = await getCertification(cooperativeId, id);
   if (!existing) throw new Error("Certification introuvable");
 
@@ -187,31 +199,23 @@ export async function updateCertification(
       ...(data.notes             !== undefined && { notes:                 data.notes }),
       updatedAt: new Date(),
     })
-    .where(
-      and(
-        eq(certificationsTable.cooperativeId, cooperativeId),
-        eq(certificationsTable.id, id),
-      ),
-    )
+    .where(and(eq(certificationsTable.cooperativeId, cooperativeId), eq(certificationsTable.id, id)))
     .returning();
 
   const statutChange = data.statut && data.statut !== existing.statut;
+  const action = statutChange
+    ? (data.statut === "renouvellement_en_cours" ? "renouvellement" : data.statut === "suspendu" ? "suspension" : "modification")
+    : "modification";
+
   await db.insert(auditsCertificationsTable).values({
-    certificationId: id,
-    cooperativeId,
-    action:         statutChange ? (data.statut === "renouvellement_en_cours" ? "renouvellement" : data.statut === "suspendu" ? "suspension" : "modification") : "modification",
-    ancienStatut:   existing.statut,
-    nouveauStatut:  updated!.statut,
-    notes:          data.notes ?? null,
-    faitPar:        userId,
+    certificationId: id, cooperativeId, action,
+    ancienStatut: existing.statut, nouveauStatut: updated!.statut,
+    notes: data.notes ?? null, faitPar: userId,
   });
 
-  // Notification si expiration proche
-  if (data.statut === "actif" && updated!.dateExpiration) {
-    const daysLeft = Math.round(
-      (new Date(updated!.dateExpiration).getTime() - Date.now()) / 86_400_000,
-    );
-    if (daysLeft <= 60 && daysLeft > 0) {
+  if (updated!.statut === "actif" && updated!.dateExpiration) {
+    const daysLeft = Math.round((new Date(updated!.dateExpiration).getTime() - Date.now()) / 86_400_000);
+    if (daysLeft <= 90 && daysLeft > 0) {
       await notifierParRole(cooperativeId, ["pca", "directeur", "responsable_tracabilite"], {
         type:         "certification_expiration",
         gravite:      daysLeft <= 30 ? "critique" : "attention",
@@ -228,75 +232,193 @@ export async function updateCertification(
   return updated!;
 }
 
-// ─── Suppression ──────────────────────────────────────────────────────────────
-
-export async function deleteCertification(
-  cooperativeId: number,
-  id: number,
-  userId: number,
-): Promise<void> {
+export async function deleteCertification(cooperativeId: number, id: number, userId: number): Promise<void> {
   const existing = await getCertification(cooperativeId, id);
   if (!existing) throw new Error("Certification introuvable");
 
-  await db.insert(auditsCertificationsTable).values({
-    certificationId: id,
-    cooperativeId,
-    action:        "suppression",
-    ancienStatut:  existing.statut,
-    notes:         "Certification supprimée",
-    faitPar:       userId,
-  });
+  await db.delete(certificationsMembresTable)
+    .where(and(eq(certificationsMembresTable.cooperativeId, cooperativeId), eq(certificationsMembresTable.certificationId, id)));
 
-  await db
-    .delete(certificationsTable)
-    .where(
-      and(
-        eq(certificationsTable.cooperativeId, cooperativeId),
-        eq(certificationsTable.id, id),
-      ),
-    );
+  await db.delete(certificationsTable)
+    .where(and(eq(certificationsTable.cooperativeId, cooperativeId), eq(certificationsTable.id, id)));
 
   logger.info({ id, cooperativeId, userId }, "Certification supprimée");
 }
 
-// ─── Vérification automatique des expirations ────────────────────────────────
+// ─── Audit — Création manuelle ────────────────────────────────────────────────
+
+export async function createAudit(cooperativeId: number, certificationId: number, data: CreateAuditInput, userId: number) {
+  const certif = await getCertification(cooperativeId, certificationId);
+  if (!certif) throw new Error("Certification introuvable");
+
+  const [audit] = await db.insert(auditsCertificationsTable).values({
+    certificationId, cooperativeId,
+    action:        data.action,
+    ancienStatut:  data.ancienStatut  ?? null,
+    nouveauStatut: data.nouveauStatut ?? null,
+    notes:         data.notes         ?? null,
+    faitPar:       userId,
+  }).returning();
+
+  if (data.nouveauStatut && data.nouveauStatut !== certif.statut) {
+    await db.update(certificationsTable)
+      .set({ statut: data.nouveauStatut, updatedAt: new Date() })
+      .where(and(eq(certificationsTable.cooperativeId, cooperativeId), eq(certificationsTable.id, certificationId)));
+  }
+
+  return audit!;
+}
+
+// ─── Conformité membres ───────────────────────────────────────────────────────
+
+export async function listMembresCertification(cooperativeId: number, certificationId: number) {
+  const rows = await db
+    .select({
+      cm: certificationsMembresTable,
+      membre: {
+        id:        membresTable.id,
+        nom:       membresTable.nom,
+        prenoms:   membresTable.prenoms,
+        section:   membresTable.section,
+        telephone: membresTable.telephone,
+      },
+    })
+    .from(certificationsMembresTable)
+    .innerJoin(membresTable, eq(membresTable.id, certificationsMembresTable.membreId))
+    .where(and(
+      eq(certificationsMembresTable.cooperativeId, cooperativeId),
+      eq(certificationsMembresTable.certificationId, certificationId),
+    ))
+    .orderBy(desc(certificationsMembresTable.updatedAt));
+
+  return rows.map(r => ({
+    ...r.cm,
+    membreNom:       `${r.membre.prenoms} ${r.membre.nom}`,
+    membreSection:   r.membre.section,
+    membreTelephone: r.membre.telephone,
+  }));
+}
+
+export async function getMembreCertification(cooperativeId: number, certificationId: number, membreId: number) {
+  const [row] = await db
+    .select()
+    .from(certificationsMembresTable)
+    .where(and(
+      eq(certificationsMembresTable.cooperativeId, cooperativeId),
+      eq(certificationsMembresTable.certificationId, certificationId),
+      eq(certificationsMembresTable.membreId, membreId),
+    ))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function evaluerMembre(cooperativeId: number, certificationId: number, data: EvaluerMembreInput, userId: number) {
+  const certif = await getCertification(cooperativeId, certificationId);
+  if (!certif) throw new Error("Certification introuvable");
+
+  const criteresPossibles = CRITERES_PAR_TYPE[certif.type] ?? [];
+  const criteresValides   = (data.criteresValides ?? []).filter(c => criteresPossibles.includes(c));
+  const score             = criteresValides.length;
+  const scoreMax          = criteresPossibles.length;
+  const statut            = calculerStatutConformite(score, scoreMax);
+
+  const existing = await getMembreCertification(cooperativeId, certificationId, data.membreId);
+
+  if (existing) {
+    const [updated] = await db
+      .update(certificationsMembresTable)
+      .set({
+        criteresValides, score, scoreMax, statutConformite: statut,
+        primeFcfaHa:    data.primeFcfaHa    ?? null,
+        notes:          data.notes          ?? null,
+        evaluePar:      userId,
+        dateEvaluation: data.dateEvaluation ?? new Date().toISOString().slice(0, 10),
+        updatedAt:      new Date(),
+      })
+      .where(and(
+        eq(certificationsMembresTable.cooperativeId, cooperativeId),
+        eq(certificationsMembresTable.certificationId, certificationId),
+        eq(certificationsMembresTable.membreId, data.membreId),
+      ))
+      .returning();
+    return updated!;
+  }
+
+  const [created] = await db.insert(certificationsMembresTable).values({
+    cooperativeId, certificationId, membreId: data.membreId,
+    criteresValides, score, scoreMax, statutConformite: statut,
+    primeFcfaHa:    data.primeFcfaHa    ?? null,
+    notes:          data.notes          ?? null,
+    evaluePar:      userId,
+    dateEvaluation: data.dateEvaluation ?? new Date().toISOString().slice(0, 10),
+  }).returning();
+  return created!;
+}
+
+export async function getStatsMembresConformite(cooperativeId: number, certificationId: number) {
+  const membres      = await listMembresCertification(cooperativeId, certificationId);
+  const certifies    = membres.filter(m => m.statutConformite === "certifie").length;
+  const enCours      = membres.filter(m => m.statutConformite === "en_cours").length;
+  const nonConformes = membres.filter(m => m.statutConformite === "non_conforme").length;
+  const total        = membres.length;
+  const tauxConformite = total > 0 ? Math.round((certifies / total) * 100) : 0;
+  return { certifies, enCours, nonConformes, total, tauxConformite };
+}
+
+// ─── Vérification auto des expirations (cron nightly) ────────────────────────
 
 export async function verifierExpirationsCertifications(): Promise<void> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today    = new Date().toISOString().slice(0, 10);
+  const in90Days = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
 
-  // Marquer les certifications expirées
   const expired = await db
     .update(certificationsTable)
     .set({ statut: "expire", updatedAt: new Date() })
-    .where(
-      and(
-        eq(certificationsTable.statut, "actif"),
-        sql`${certificationsTable.dateExpiration} IS NOT NULL`,
-        lte(certificationsTable.dateExpiration, today),
-      ),
-    )
+    .where(and(
+      eq(certificationsTable.statut, "actif"),
+      sql`${certificationsTable.dateExpiration} IS NOT NULL`,
+      lte(certificationsTable.dateExpiration, today),
+    ))
     .returning();
 
   for (const cert of expired) {
     logger.info({ id: cert.id, cooperativeId: cert.cooperativeId }, "Certification expirée automatiquement");
     await db.insert(auditsCertificationsTable).values({
-      certificationId: cert.id,
-      cooperativeId:   cert.cooperativeId,
-      action:         "expiration",
-      ancienStatut:   "actif",
-      nouveauStatut:  "expire",
-      notes:          "Expiration automatique détectée",
-      faitPar:        null,
+      certificationId: cert.id, cooperativeId: cert.cooperativeId,
+      action: "expiration", ancienStatut: "actif", nouveauStatut: "expire",
+      notes: "Expiration automatique détectée", faitPar: null,
     });
     await notifierParRole(cert.cooperativeId, ["pca", "directeur", "responsable_tracabilite"], {
-      type:         "certification_expiration",
-      gravite:      "critique",
-      titre:        `Certification ${cert.type} expirée`,
-      message:      `La certification ${cert.type} (${cert.numeroCertificat ?? "sans numéro"}) a expiré le ${cert.dateExpiration}.`,
-      lien:         `/certifications/${cert.id}`,
-      lienLibelle:  "Voir la certification",
-      sourceModule: "certifications",
-      sourceId:     cert.id,
+      type: "certification_expiration", gravite: "critique",
+      titre:   `Certification ${cert.type} expirée`,
+      message: `La certification ${cert.type} (${cert.numeroCertificat ?? "sans numéro"}) a expiré le ${cert.dateExpiration}.`,
+      lien: `/certifications/${cert.id}`, lienLibelle: "Voir la certification",
+      sourceModule: "certifications", sourceId: cert.id,
     });
   }
+
+  const prochaines = await db
+    .select()
+    .from(certificationsTable)
+    .where(and(
+      eq(certificationsTable.statut, "actif"),
+      sql`${certificationsTable.dateExpiration} IS NOT NULL`,
+      sql`${certificationsTable.dateExpiration} > ${today}`,
+      lte(certificationsTable.dateExpiration, in90Days),
+    ));
+
+  for (const cert of prochaines) {
+    const daysLeft = Math.round((new Date(cert.dateExpiration!).getTime() - Date.now()) / 86_400_000);
+    if ([90, 60, 30, 14, 7].includes(daysLeft)) {
+      await notifierParRole(cert.cooperativeId, ["pca", "directeur", "responsable_tracabilite"], {
+        type: "certification_expiration", gravite: daysLeft <= 30 ? "critique" : "attention",
+        titre:   `Certification ${cert.type} expire dans ${daysLeft} jours`,
+        message: `La certification ${cert.type} (${cert.numeroCertificat ?? "sans numéro"}) expire le ${cert.dateExpiration}.`,
+        lien: `/certifications/${cert.id}`, lienLibelle: "Voir la certification",
+        sourceModule: "certifications", sourceId: cert.id,
+      });
+    }
+  }
+
+  logger.info({ expired: expired.length, prochaines: prochaines.length }, "Vérification expirations certifications terminée");
 }
