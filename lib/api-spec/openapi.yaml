@@ -5762,7 +5762,7 @@ paths:
   /certifications/{id}:
     get:
       operationId: getCertification
-      summary: Détail d'une certification
+      summary: Détail d'une certification (enrichi avec critères, stats membres, tonnage campagne)
       tags: [Certifications]
       parameters:
         - in: path
@@ -5771,10 +5771,10 @@ paths:
           schema: { type: integer }
       responses:
         "200":
-          description: Certification
+          description: Certification enrichie
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Certification" }
+              schema: { $ref: "#/components/schemas/CertificationDetail" }
     put:
       operationId: updateCertification
       summary: Mettre à jour une certification
@@ -11094,6 +11094,32 @@ components:
         creePar: { type: ["integer", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
+    CertificationDetail:
+      allOf:
+        - $ref: "#/components/schemas/Certification"
+        - type: object
+          properties:
+            criteresType:
+              type: array
+              items: { type: string }
+            statsMembres:
+              type: object
+              properties:
+                certifies: { type: integer }
+                enCours: { type: integer }
+                nonConformes: { type: integer }
+                total: { type: integer }
+                tauxConformite: { type: integer }
+            tonnageCampagne:
+              type: object
+              nullable: true
+              properties:
+                campagneId: { type: integer }
+                campagneLibelle: { type: string }
+                tonnageTotalKg: { type: number }
+                nbMembresAvecLivraison: { type: integer }
+                primeTotaleEstimeeFcfa: { type: number }
 
     CreateCertificationBody:
       type: object

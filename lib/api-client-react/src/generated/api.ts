@@ -63,6 +63,7 @@ import type {
   CategorieEquipement,
   CategorieIntrant,
   Certification,
+  CertificationDetail,
   CertificationMembre,
   Chauffeur,
   CloturerAgInput,
@@ -21983,11 +21984,11 @@ export const getGetCertificationUrl = (id: number,) => {
 }
 
 /**
- * @summary Détail d'une certification
+ * @summary Détail d'une certification (enrichi avec critères, stats membres, tonnage campagne)
  */
-export const getCertification = async (id: number, options?: RequestInit): Promise<Certification> => {
+export const getCertification = async (id: number, options?: RequestInit): Promise<CertificationDetail> => {
 
-  return customFetch<Certification>(getGetCertificationUrl(id),
+  return customFetch<CertificationDetail>(getGetCertificationUrl(id),
   {
     ...options,
     method: 'GET'
@@ -22030,7 +22031,7 @@ export type GetCertificationQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Détail d'une certification
+ * @summary Détail d'une certification (enrichi avec critères, stats membres, tonnage campagne)
  */
 
 export function useGetCertification<TData = Awaited<ReturnType<typeof getCertification>>, TError = ErrorType<unknown>>(

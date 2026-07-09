@@ -7119,7 +7119,7 @@ export const CreateCertificationBody = zod.object({
 
 
 /**
- * @summary Détail d'une certification
+ * @summary Détail d'une certification (enrichi avec critères, stats membres, tonnage campagne)
  */
 export const GetCertificationParams = zod.object({
   "id": zod.coerce.number()
@@ -7141,7 +7141,23 @@ export const GetCertificationResponse = zod.object({
   "creePar": zod.number().nullish(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
-})
+}).and(zod.object({
+  "criteresType": zod.array(zod.string()).optional(),
+  "statsMembres": zod.object({
+  "certifies": zod.number().optional(),
+  "enCours": zod.number().optional(),
+  "nonConformes": zod.number().optional(),
+  "total": zod.number().optional(),
+  "tauxConformite": zod.number().optional()
+}).optional(),
+  "tonnageCampagne": zod.object({
+  "campagneId": zod.number().optional(),
+  "campagneLibelle": zod.string().optional(),
+  "tonnageTotalKg": zod.number().optional(),
+  "nbMembresAvecLivraison": zod.number().optional(),
+  "primeTotaleEstimeeFcfa": zod.number().optional()
+}).nullish()
+}))
 
 
 /**

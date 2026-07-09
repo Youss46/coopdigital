@@ -1,5 +1,5 @@
-import { db, certificationsTable, auditsCertificationsTable, certificationsMembresTable, membresTable } from "@workspace/db";
-import { eq, and, desc, lte, sql, count } from "drizzle-orm";
+import { db, certificationsTable, auditsCertificationsTable, certificationsMembresTable, membresTable, campagnesTable, livraisonsTable } from "@workspace/db";
+import { eq, and, desc, lte, sql, count, inArray, sum } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { notifierParRole } from "./notificationService.js";
 
@@ -288,6 +288,7 @@ export async function listMembresCertification(cooperativeId: number, certificat
     .where(and(
       eq(certificationsMembresTable.cooperativeId, cooperativeId),
       eq(certificationsMembresTable.certificationId, certificationId),
+      eq(membresTable.cooperativeId, cooperativeId),   // guard multi-tenant sur le membre
     ))
     .orderBy(desc(certificationsMembresTable.updatedAt));
 
@@ -315,6 +316,14 @@ export async function getMembreCertification(cooperativeId: number, certificatio
 export async function evaluerMembre(cooperativeId: number, certificationId: number, data: EvaluerMembreInput, userId: number) {
   const certif = await getCertification(cooperativeId, certificationId);
   if (!certif) throw new Error("Certification introuvable");
+
+  // Guard IDOR : vérifier que le membre appartient bien à la même coopérative
+  const [membreOwnership] = await db
+    .select({ id: membresTable.id })
+    .from(membresTable)
+    .where(and(eq(membresTable.id, data.membreId), eq(membresTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!membreOwnership) throw new Error("Membre introuvable ou hors coopérative");
 
   const criteresPossibles = CRITERES_PAR_TYPE[certif.type] ?? [];
   const criteresValides   = (data.criteresValides ?? []).filter(c => criteresPossibles.includes(c));
@@ -421,4 +430,56 @@ export async function verifierExpirationsCertifications(): Promise<void> {
   }
 
   logger.info({ expired: expired.length, prochaines: prochaines.length }, "Vérification expirations certifications terminée");
+}
+
+// ─── Tonnage & primes — campagne active ──────────────────────────────────────
+
+export async function getTonnageCampagneCertification(cooperativeId: number, certificationId: number) {
+  // 1. Campagne active
+  const [campagne] = await db
+    .select({ id: campagnesTable.id, libelle: campagnesTable.libelle })
+    .from(campagnesTable)
+    .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
+    .limit(1);
+  if (!campagne) return null;
+
+  // 2. Membres certifiés pour cette certification
+  const certifies = await db
+    .select({ membreId: certificationsMembresTable.membreId, primeFcfaHa: certificationsMembresTable.primeFcfaHa })
+    .from(certificationsMembresTable)
+    .where(and(
+      eq(certificationsMembresTable.cooperativeId, cooperativeId),
+      eq(certificationsMembresTable.certificationId, certificationId),
+      eq(certificationsMembresTable.statutConformite, "certifie"),
+    ));
+  if (certifies.length === 0) return { campagneId: campagne.id, campagneLibelle: campagne.libelle, tonnageTotalKg: 0, nbMembresAvecLivraison: 0, primeTotaleEstimeeFcfa: 0 };
+
+  const membreIds = certifies.map(c => c.membreId);
+
+  // 3. Somme du tonnage livré par ces membres durant la campagne active
+  const [tonnageRow] = await db
+    .select({
+      tonnageTotalKg: sum(livraisonsTable.poidsKg),
+      nbMembres: count(livraisonsTable.membreId),
+    })
+    .from(livraisonsTable)
+    .where(and(
+      eq(livraisonsTable.campagneId, campagne.id),
+      inArray(livraisonsTable.membreId, membreIds),
+    ));
+
+  const tonnageTotalKg = parseFloat(tonnageRow?.tonnageTotalKg ?? "0") || 0;
+  const nbMembresAvecLivraison = Number(tonnageRow?.nbMembres ?? 0);
+
+  // 4. Prime totale estimée = somme(prime_fcfa_ha) pour les certifiés (si renseignée)
+  const primeTotaleEstimeeFcfa = certifies
+    .reduce((acc, c) => acc + (c.primeFcfaHa ? parseFloat(c.primeFcfaHa) : 0), 0);
+
+  return {
+    campagneId: campagne.id,
+    campagneLibelle: campagne.libelle,
+    tonnageTotalKg,
+    nbMembresAvecLivraison,
+    primeTotaleEstimeeFcfa,
+  };
 }

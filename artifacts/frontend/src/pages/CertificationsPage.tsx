@@ -412,6 +412,19 @@ function DetailPanel({ certif, onClose, canWrite, onEdit }: {
   const TypeIcon = typeInfo.icon;
   const daysLeft = getDaysLeft(certif.dateExpiration);
 
+  interface TonnageCampagne {
+    campagneId: number; campagneLibelle: string;
+    tonnageTotalKg: number; nbMembresAvecLivraison: number; primeTotaleEstimeeFcfa: number;
+  }
+  interface CertifDetail { tonnageCampagne: TonnageCampagne | null; }
+
+  const { data: detail } = useQuery<CertifDetail>({
+    queryKey: ["certif-detail", certif.id],
+    queryFn: () => apiFetch(`/api/certifications/${certif.id}`),
+  });
+
+  const tonnage = detail?.tonnageCampagne ?? null;
+
   const { data: criteres = [] } = useQuery<string[]>({
     queryKey: ["certif-criteres", certif.type],
     queryFn: async () => {
@@ -544,6 +557,33 @@ function DetailPanel({ certif, onClose, canWrite, onEdit }: {
                   <FileText size={14} />Voir le document
                 </a>
               )}
+              {/* Tonnage & primes — campagne active */}
+              {tonnage && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2">
+                    Campagne active — {tonnage.campagneLibelle}
+                  </p>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <p className="text-lg font-bold text-green-800">
+                        {(tonnage.tonnageTotalKg / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} t
+                      </p>
+                      <p className="text-[11px] text-green-600">Tonnage certifiés</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-green-800">{tonnage.nbMembresAvecLivraison}</p>
+                      <p className="text-[11px] text-green-600">Membres livreurs</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-green-800">
+                        {tonnage.primeTotaleEstimeeFcfa.toLocaleString("fr-FR")} F
+                      </p>
+                      <p className="text-[11px] text-green-600">Prime estimée</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Critères de la certification */}
               {criteres.length > 0 && (
                 <div>

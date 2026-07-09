@@ -4335,6 +4335,28 @@ export interface Certification {
   updatedAt: string;
 }
 
+export type CertificationDetailStatsMembres = {
+  certifies?: number;
+  enCours?: number;
+  nonConformes?: number;
+  total?: number;
+  tauxConformite?: number;
+};
+
+export type CertificationDetailTonnageCampagne = {
+  campagneId?: number;
+  campagneLibelle?: string;
+  tonnageTotalKg?: number;
+  nbMembresAvecLivraison?: number;
+  primeTotaleEstimeeFcfa?: number;
+} | null;
+
+export type CertificationDetail = Certification & {
+  criteresType?: string[];
+  statsMembres?: CertificationDetailStatsMembres;
+  tonnageCampagne?: CertificationDetailTonnageCampagne;
+};
+
 export type CreateCertificationBodyStatut = typeof CreateCertificationBodyStatut[keyof typeof CreateCertificationBodyStatut];
 
 

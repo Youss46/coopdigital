@@ -12,6 +12,7 @@ import {
   getMembreCertification,
   evaluerMembre,
   getStatsMembresConformite,
+  getTonnageCampagneCertification,
   CRITERES_PAR_TYPE,
 } from "../services/certificationService";
 
@@ -45,9 +46,10 @@ export async function handleGetCertification(req: Request, res: Response): Promi
   try {
     const cert = await getCertification(cid, id);
     if (!cert) { res.status(404).json({ erreur: "Certification introuvable" }); return; }
-    const criteres = CRITERES_PAR_TYPE[cert.type] ?? [];
-    const statsM   = await getStatsMembresConformite(cid, id);
-    res.json({ ...cert, criteresType: criteres, statsMembres: statsM });
+    const criteres       = CRITERES_PAR_TYPE[cert.type] ?? [];
+    const statsM         = await getStatsMembresConformite(cid, id);
+    const tonnageCampagne = await getTonnageCampagneCertification(cid, id);
+    res.json({ ...cert, criteresType: criteres, statsMembres: statsM, tonnageCampagne: tonnageCampagne ?? null });
   } catch (err) { req.log.error({ err }, "handleGetCertification"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
