@@ -801,6 +801,7 @@ export default function CertificationsPage() {
   const canDelete = usePermission("certifications", "supprimer");
 
   const [showCreate, setShowCreate] = useState(false);
+  const [createInitialType, setCreateInitialType] = useState<string>("rainforest_alliance");
   const [editing, setEditing] = useState<Certification | null>(null);
   const [detail, setDetail] = useState<Certification | null>(null);
   const [filterStatut, setFilterStatut] = useState<string>("all");
@@ -925,6 +926,69 @@ export default function CertificationsPage() {
         </div>
       )}
 
+      {/* ─── Vue canonique : 4 certifications principales toujours visibles ───── */}
+      <div>
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">Certifications principales</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { value: "rainforest_alliance", label: "Rainforest Alliance", icon: Leaf,        color: "text-green-600",  bg: "bg-green-50",   border: "border-green-200" },
+            { value: "fairtrade",           label: "Fairtrade",           icon: Star,        color: "text-blue-600",   bg: "bg-blue-50",    border: "border-blue-200" },
+            { value: "bio",                 label: "Agriculture Bio",     icon: ShieldCheck,  color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
+            { value: "eudr",                label: "EUDR",                icon: Globe,       color: "text-orange-600", bg: "bg-orange-50",  border: "border-orange-200" },
+          ].map(t => {
+            const Icon = t.icon;
+            const existing = certifications.filter(c => c.type === t.value);
+            const first = existing[0];
+            const statutInfo = first ? getStatutInfo(first.statut) : null;
+            const StatutIcon = statutInfo?.icon;
+            const daysLeft = first ? getDaysLeft(first.dateExpiration) : null;
+            return (
+              <div
+                key={t.value}
+                onClick={() => first && setDetail(first)}
+                className={`bg-white rounded-xl border ${t.border} p-4 flex flex-col gap-3 ${first ? "cursor-pointer hover:shadow-md transition-shadow" : "opacity-90"}`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded-lg ${t.bg}`}><Icon size={18} className={t.color} /></div>
+                  <span className={`text-sm font-semibold ${t.color}`}>{t.label}</span>
+                </div>
+                {first && statutInfo && StatutIcon ? (
+                  <>
+                    <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full border w-fit ${statutInfo.cls}`}>
+                      <StatutIcon size={11} />{statutInfo.label}
+                    </div>
+                    {first.dateExpiration && (
+                      <p className={`text-xs ${daysLeft !== null && daysLeft <= 30 ? "text-red-600 font-semibold" : daysLeft !== null && daysLeft <= 90 ? "text-amber-600" : "text-gray-500"}`}>
+                        Expire : {fmtDate(first.dateExpiration)}{daysLeft !== null && daysLeft >= 0 ? ` (J-${daysLeft})` : ""}
+                      </p>
+                    )}
+                    {existing.length > 1 && (
+                      <p className="text-xs text-gray-400">{existing.length} certifications</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-400 flex-1">Non démarrée</p>
+                    {canWrite && (
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          setCreateInitialType(t.value);
+                          setShowCreate(true);
+                        }}
+                        className={`flex items-center justify-center gap-1 text-xs border rounded-lg py-1.5 font-medium ${t.color} border-current hover:opacity-80 transition-opacity`}
+                      >
+                        <Plus size={12} />Initier
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Filtres */}
       <div className="flex flex-wrap gap-3 items-center">
         <select className="border rounded-lg px-3 py-2 text-sm" value={filterStatut} onChange={e => setFilterStatut(e.target.value)}>
@@ -1038,7 +1102,7 @@ export default function CertificationsPage() {
       )}
 
       {/* Formulaires */}
-      {showCreate && <CertifForm onSubmit={data => createMut.mutate(data)} onCancel={() => setShowCreate(false)} loading={createMut.isPending} />}
+      {showCreate && <CertifForm initial={{ type: createInitialType }} onSubmit={data => createMut.mutate(data)} onCancel={() => setShowCreate(false)} loading={createMut.isPending} />}
       {editing && (
         <CertifForm
           initial={{ type: editing.type, nomCertificateur: editing.nomCertificateur ?? "", numeroCertificat: editing.numeroCertificat ?? "", dateObtention: editing.dateObtention ?? "", dateExpiration: editing.dateExpiration ?? "", statut: editing.statut, superficieCertifieeHa: editing.superficieCertifieeHa ?? "", nbMembresCouVerts: editing.nbMembresCouVerts?.toString() ?? "", lienDocument: editing.lienDocument ?? "", notes: editing.notes ?? "" }}
