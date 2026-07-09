@@ -181,3 +181,13 @@ export async function telechargerRecuLivraison(livraisonId: number): Promise<voi
 export async function getHistoriqueAgent(): Promise<MissionTerrain[]> {
   return apiGet<MissionTerrain[]>("/agent/historique");
 }
+
+// ─── Missions d'enquête ────────────────────────────────────────────────────────
+
+export async function getEnquetes(): Promise<import("./types").MissionEnquete[]> {
+  return apiGet<import("./types").MissionEnquete[]>("/enquetes");
+}
+
+export async function getEnqueteDetail(id: number): Promise<import("./types").EnqueteDetail> {
+  return apiGet<import("./types").EnqueteDetail>(`/enquetes/${id}`);
+}

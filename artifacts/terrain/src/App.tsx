@@ -18,6 +18,9 @@ import MissionsAgent from "./pages/MissionsAgent";
 import MissionDetail from "./pages/MissionDetail";
 import CollecteGps from "./pages/CollecteGps";
 import HistoriqueAgent from "./pages/HistoriqueAgent";
+import EnquetesAgent from "./pages/EnquetesAgent";
+import MissionEnqueteDetail from "./pages/MissionEnqueteDetail";
+import CollecteEnquete from "./pages/CollecteEnquete";
 
 function AgentTerrainRoutes() {
   return (
@@ -26,6 +29,9 @@ function AgentTerrainRoutes() {
       <Route path="/missions" component={MissionsAgent} />
       <Route path="/missions/:id/parcelle/:membreId" component={CollecteGps} />
       <Route path="/missions/:id" component={MissionDetail} />
+      <Route path="/enquetes" component={EnquetesAgent} />
+      <Route path="/enquetes/:id/membres/:membreId" component={CollecteEnquete} />
+      <Route path="/enquetes/:id" component={MissionEnqueteDetail} />
       <Route path="/historique" component={HistoriqueAgent} />
       <Route><Redirect to="/" /></Route>
     </Switch>

@@ -324,3 +324,13 @@ export async function getCachedMissions(): Promise<MissionTerrain[]> {
     req.onerror = () => reject(req.error);
   });
 }
+
+// ─── Cache missions d'enquête ──────────────────────────────────────────────────
+
+export async function cacheEnquetes(enquetes: import("./types").MissionEnquete[]): Promise<void> {
+  await setCache("enquetes_list", enquetes);
+}
+
+export async function getCachedEnquetes(): Promise<import("./types").MissionEnquete[]> {
+  return (await getCache<import("./types").MissionEnquete[]>("enquetes_list")) ?? [];
+}

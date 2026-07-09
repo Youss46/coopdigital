@@ -57,3 +57,4 @@ export * from "./entrepots_delegues";
 export * from "./system";
 export * from "./webauthn";
 export * from "./certifications";
+export * from "./missionsEnquete";

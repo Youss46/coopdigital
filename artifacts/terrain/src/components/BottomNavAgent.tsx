@@ -2,8 +2,9 @@ import { Link, useLocation } from "wouter";
 
 const ITEMS = [
   { path: "/",          icon: "🏠", label: "Accueil"   },
-  { path: "/missions",  icon: "📍", label: "Missions"  },
-  { path: "/historique", icon: "📋", label: "Historique" },
+  { path: "/missions",  icon: "📍", label: "Mapping"   },
+  { path: "/enquetes",  icon: "📋", label: "Enquêtes"  },
+  { path: "/historique", icon: "🕐", label: "Historique" },
 ];
 
 export default function BottomNavAgent() {

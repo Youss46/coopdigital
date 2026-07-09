@@ -26,6 +26,12 @@ import {
   getStatsAgentHandler,
   getHistoriqueAgentHandler,
 } from "../controllers/missionsAgentController.js";
+import {
+  getEnquetesAgentHandler,
+  getEnqueteDetailHandler,
+  soumettreReponsesHandler,
+  soumettreEnqueteHandler,
+} from "../controllers/enqueteAgentController.js";
 
 const router = Router();
 
@@ -57,6 +63,12 @@ router.post("/terrain/messages/:missionId", terrainAuthMiddleware, sendMessageHa
 router.get("/terrain/agent/stats", terrainAuthMiddleware, getStatsAgentHandler);
 router.get("/terrain/agent/historique", terrainAuthMiddleware, getHistoriqueAgentHandler);
 router.get("/terrain/historique", terrainAuthMiddleware, getHistoriqueAgentHandler);
+
+// Missions d'enquête (agent terrain)
+router.get("/terrain/enquetes",                              terrainAuthMiddleware, getEnquetesAgentHandler);
+router.get("/terrain/enquetes/:id",                          terrainAuthMiddleware, getEnqueteDetailHandler);
+router.post("/terrain/enquetes/:id/membres/:membreId",       terrainAuthMiddleware, soumettreReponsesHandler);
+router.post("/terrain/enquetes/:id/soumettre",               terrainAuthMiddleware, soumettreEnqueteHandler);
 
 // Reçus PDF (délégué)
 router.get("/terrain/recu/livraison/:id", terrainAuthMiddleware, delegueOnly, getTerrainRecuLivraison);

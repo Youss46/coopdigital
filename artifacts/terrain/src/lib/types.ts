@@ -205,3 +205,41 @@ export interface PrixActuel {
   prixBordChampFcfa: number;
   campagneId: number | null;
 }
+
+// ─── Missions d'enquête ────────────────────────────────────────────────────────
+
+export interface MissionEnquete {
+  id: number;
+  titre: string;
+  certificationId: number;
+  certType: string;
+  datePrevue: string;
+  statut: string;
+  objectifMembres: number | null;
+  membresTotal: number;
+  membresProgres: number;
+}
+
+export interface EnqueteMembre {
+  membreId: number;
+  statut: string;
+  reponses: Record<string, { valeur: "oui" | "non" | "na"; commentaire?: string }> | null;
+  notesAgent: string | null;
+  dateCollecte: string | null;
+  nom: string;
+  prenoms: string;
+  code: string | null;
+  village: string | null;
+}
+
+export interface EnqueteDetail {
+  id: number;
+  titre: string;
+  certificationId: number;
+  certType: string;
+  datePrevue: string;
+  statut: string;
+  instructions: string | null;
+  criteres: string[];
+  membres: EnqueteMembre[];
+}

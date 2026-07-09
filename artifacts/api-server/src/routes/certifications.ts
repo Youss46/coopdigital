@@ -14,6 +14,15 @@ import {
   handleGetCriteres,
   handleRapportPdf,
 } from "../controllers/certificationsController";
+import {
+  handleListMissionsEnquete,
+  handleCreateMissionEnquete,
+  handleGetMissionEnquete,
+  handleUpdateStatut,
+  handleValiderMembre,
+  handleDeleteMissionEnquete,
+  handleGetAgentsDisponibles,
+} from "../controllers/missionsEnqueteController";
 
 const router = Router();
 
@@ -51,5 +60,14 @@ router.get("/certifications/:id/rapport-pdf", requireRole(ROLES_READ), handleRap
 router.get("/certifications/:id/membres",           requireRole(ROLES_READ),  handleListMembresCertification);
 router.get("/certifications/:id/membres/:membreId", requireRole(ROLES_READ),  handleGetMembreCertification);
 router.post("/certifications/:id/membres",          requireRole(ROLES_WRITE), handleEvaluerMembre);
+
+// Missions d'enquête
+router.get("/enquetes/agents",                                requireRole(ROLES_READ),  handleGetAgentsDisponibles);
+router.get("/enquetes",                                       requireRole(ROLES_READ),  handleListMissionsEnquete);
+router.post("/enquetes",                                      requireRole(ROLES_WRITE), handleCreateMissionEnquete);
+router.get("/enquetes/:id",                                   requireRole(ROLES_READ),  handleGetMissionEnquete);
+router.patch("/enquetes/:id/statut",                          requireRole(ROLES_WRITE), handleUpdateStatut);
+router.delete("/enquetes/:id",                                requireRole(["pca", "directeur"]), handleDeleteMissionEnquete);
+router.post("/enquetes/:id/membres/:membreId/valider",        requireRole(ROLES_WRITE), handleValiderMembre);
 
 export default router;

@@ -229,6 +229,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     creer: ["pca", "directeur"],
   },
 
+  missions_enquete: {
+    lire:     ["pca", "directeur", "responsable_tracabilite"],
+    creer:    ["pca", "directeur", "responsable_tracabilite"],
+    modifier: ["pca", "directeur", "responsable_tracabilite"],
+    valider:  ["pca", "directeur", "responsable_tracabilite"],
+    supprimer:["pca", "directeur"],
+  },
+
   certifications: {
     lire:              ["pca", "directeur", "responsable_tracabilite"],
     creer:             ["pca", "directeur", "responsable_tracabilite"],
