@@ -89,6 +89,18 @@ export async function handleValiderMembre(req: Request, res: Response): Promise<
   } catch (err) { req.log.error({ err }, "validerEnqueteMembre"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
+export async function handleRejeterMembre(req: Request, res: Response): Promise<void> {
+  const cid = coopId(req); const id = parseId(req); const membreId = parseId(req, "membreId");
+  if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  if (!id || !membreId) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  const { commentaireRt } = req.body as { commentaireRt?: string };
+  if (!commentaireRt?.trim()) { res.status(400).json({ erreur: "Un motif de rejet est requis" }); return; }
+  try {
+    const result = await svc.rejeterEnqueteMembre(cid, id, membreId, commentaireRt.trim());
+    res.json(result);
+  } catch (err) { req.log.error({ err }, "rejeterMembre"); res.status(500).json({ erreur: err instanceof Error ? err.message : "Erreur interne" }); }
+}
+
 export async function handleDeleteMissionEnquete(req: Request, res: Response): Promise<void> {
   const cid = coopId(req); const id = parseId(req);
   if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }

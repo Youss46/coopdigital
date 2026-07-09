@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ClipboardList, ArrowLeft, Users, Calendar, CheckCircle, Clock,
   AlertTriangle, Loader2, ChevronDown, ChevronUp, User,
-  CheckCheck, BarChart2, FileText, UserCheck, Download,
+  CheckCheck, BarChart2, FileText, UserCheck, Download, XCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -36,6 +36,8 @@ interface EnqueteMembre {
   scoreCalcule: number | null;
   statutConformite: string | null;
   notesAgent: string | null;
+  commentaireRt: string | null;
+  dateRejet: string | null;
   dateCollecte: string | null;
   membreNom: string;
   membrePrenom: string;
@@ -70,24 +72,71 @@ const STATUT_COLLECTE: Record<string, { label: string; color: string }> = {
   a_faire:  { label: "À faire",   color: "#6b7280" },
   collecte: { label: "Collecté",  color: "#3b82f6" },
   valide:   { label: "Validé",    color: "#22c55e" },
+  rejete:   { label: "Refusé",    color: "#ef4444" },
 };
+
+// ── Modal de rejet ─────────────────────────────────────────────────────────────
+
+function RejetModal({ onConfirm, onCancel, loading }: {
+  onConfirm: (motif: string) => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const [motif, setMotif] = useState("");
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: "100%", maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <XCircle size={20} style={{ color: "#ef4444" }} />
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111827" }}>Refuser cette collecte</h3>
+        </div>
+        <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 14px" }}>
+          L'agent devra recommencer la collecte pour ce membre. Indiquez un motif clair.
+        </p>
+        <textarea
+          autoFocus
+          value={motif}
+          onChange={e => setMotif(e.target.value)}
+          rows={3}
+          placeholder="Ex : Réponses incomplètes, incohérence sur les critères eau…"
+          style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: "10px 12px", fontSize: 13, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }}
+        />
+        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+          <button onClick={onCancel} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "1px solid #d1d5db", background: "#fff", color: "#374151", cursor: "pointer", fontSize: 13 }}>
+            Annuler
+          </button>
+          <button
+            onClick={() => motif.trim() && onConfirm(motif.trim())}
+            disabled={!motif.trim() || loading}
+            style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: motif.trim() && !loading ? "#ef4444" : "#f87171", color: "#fff", cursor: motif.trim() && !loading ? "pointer" : "default", fontSize: 13, fontWeight: 600 }}>
+            {loading ? "Envoi…" : "Refuser"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Composant détail membre ────────────────────────────────────────────────────
 
-function MembreEnqueteCard({ m, canValidate, onValider }: {
+function MembreEnqueteCard({ m, canValidate, onValider, onRejeter }: {
   m: EnqueteMembre;
   canValidate: boolean;
   onValider: (membreId: number) => void;
+  onRejeter: (membreId: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const sc = STATUT_COLLECTE[m.statut] ?? STATUT_COLLECTE["a_faire"]!;
   const conf = m.statutConformite ? (STATUT_CONFORMITE_CONFIG[m.statutConformite] ?? null) : null;
-
   const criteres = m.reponses ? Object.entries(m.reponses) : [];
-  const nb = { oui: criteres.filter(([, r]) => r.valeur === "oui").length, non: criteres.filter(([, r]) => r.valeur === "non").length, na: criteres.filter(([, r]) => r.valeur === "na").length };
+  const nb = {
+    oui: criteres.filter(([, r]) => r.valeur === "oui").length,
+    non: criteres.filter(([, r]) => r.valeur === "non").length,
+    na:  criteres.filter(([, r]) => r.valeur === "na").length,
+  };
 
   return (
-    <div style={{ background: "#fff", border: "1px solid #f1f5f9", borderRadius: 10, overflow: "hidden" }}>
+    <div style={{ background: "#fff", border: `1px solid ${m.statut === "rejete" ? "#fecaca" : "#f1f5f9"}`, borderRadius: 10, overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
         <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <User size={18} style={{ color: "#6b7280" }} />
@@ -96,7 +145,7 @@ function MembreEnqueteCard({ m, canValidate, onValider }: {
           <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{m.membrePrenom} {m.membreNom}</div>
           <div style={{ fontSize: 12, color: "#6b7280" }}>{m.membreCode ?? "—"} · {m.membreVillage ?? "—"}</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: sc.color, background: `${sc.color}18`, padding: "2px 8px", borderRadius: 4 }}>
             {sc.label}
           </span>
@@ -111,12 +160,18 @@ function MembreEnqueteCard({ m, canValidate, onValider }: {
             </span>
           )}
           {m.statut === "collecte" && canValidate && (
-            <button onClick={e => { e.stopPropagation(); onValider(m.membreId); }}
-              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-              <CheckCheck size={13} />Valider
-            </button>
+            <>
+              <button onClick={e => { e.stopPropagation(); onValider(m.membreId); }}
+                style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                <CheckCheck size={13} />Valider
+              </button>
+              <button onClick={e => { e.stopPropagation(); onRejeter(m.membreId); }}
+                style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#fff", color: "#ef4444", border: "1px solid #fca5a5", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                <XCircle size={13} />Refuser
+              </button>
+            </>
           )}
-          {m.statut !== "a_faire" && (
+          {(m.statut !== "a_faire") && (
             <button onClick={() => setOpen(!open)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
               {open ? <ChevronUp size={16} style={{ color: "#6b7280" }} /> : <ChevronDown size={16} style={{ color: "#6b7280" }} />}
             </button>
@@ -124,7 +179,15 @@ function MembreEnqueteCard({ m, canValidate, onValider }: {
         </div>
       </div>
 
-      {open && m.reponses && (
+      {/* Aperçu motif de rejet même en fermé */}
+      {m.statut === "rejete" && m.commentaireRt && (
+        <div style={{ background: "#fef2f2", borderTop: "1px solid #fecaca", padding: "8px 16px", fontSize: 12, color: "#991b1b", display: "flex", gap: 8, alignItems: "flex-start" }}>
+          <XCircle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span><strong>Motif de refus :</strong> {m.commentaireRt}</span>
+        </div>
+      )}
+
+      {open && (
         <div style={{ borderTop: "1px solid #f8fafc", padding: "12px 16px", background: "#fafafa" }}>
           {m.notesAgent && (
             <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 6, padding: "8px 12px", marginBottom: 12, fontSize: 12, color: "#92400e" }}>
@@ -136,27 +199,34 @@ function MembreEnqueteCard({ m, canValidate, onValider }: {
               Collecté le {new Date(m.dateCollecte).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
             </div>
           )}
-          <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-            <span style={{ fontSize: 12, background: "#dcfce7", color: "#166534", padding: "3px 10px", borderRadius: 4 }}>✓ {nb.oui} Oui</span>
-            <span style={{ fontSize: 12, background: "#fee2e2", color: "#991b1b", padding: "3px 10px", borderRadius: 4 }}>✗ {nb.non} Non</span>
-            {nb.na > 0 && <span style={{ fontSize: 12, background: "#f3f4f6", color: "#6b7280", padding: "3px 10px", borderRadius: 4 }}>— {nb.na} N/A</span>}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {criteres.map(([critere, rep]) => (
-              <div key={critere} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12 }}>
-                <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: "50%",
-                  background: rep.valeur === "oui" ? "#dcfce7" : rep.valeur === "non" ? "#fee2e2" : "#f3f4f6",
-                  color: rep.valeur === "oui" ? "#166534" : rep.valeur === "non" ? "#991b1b" : "#6b7280",
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 }}>
-                  {rep.valeur === "oui" ? "✓" : rep.valeur === "non" ? "✗" : "—"}
-                </span>
-                <div style={{ flex: 1 }}>
-                  <span style={{ color: "#374151" }}>{critere}</span>
-                  {rep.commentaire && <div style={{ color: "#6b7280", fontStyle: "italic", marginTop: 2 }}>{rep.commentaire}</div>}
-                </div>
+          {m.reponses && criteres.length > 0 && (
+            <>
+              <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+                <span style={{ fontSize: 12, background: "#dcfce7", color: "#166534", padding: "3px 10px", borderRadius: 4 }}>✓ {nb.oui} Oui</span>
+                <span style={{ fontSize: 12, background: "#fee2e2", color: "#991b1b", padding: "3px 10px", borderRadius: 4 }}>✗ {nb.non} Non</span>
+                {nb.na > 0 && <span style={{ fontSize: 12, background: "#f3f4f6", color: "#6b7280", padding: "3px 10px", borderRadius: 4 }}>— {nb.na} N/A</span>}
               </div>
-            ))}
-          </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {criteres.map(([critere, rep]) => (
+                  <div key={critere} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12 }}>
+                    <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: "50%",
+                      background: rep.valeur === "oui" ? "#dcfce7" : rep.valeur === "non" ? "#fee2e2" : "#f3f4f6",
+                      color: rep.valeur === "oui" ? "#166534" : rep.valeur === "non" ? "#991b1b" : "#6b7280",
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 }}>
+                      {rep.valeur === "oui" ? "✓" : rep.valeur === "non" ? "✗" : "—"}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ color: "#374151" }}>{critere}</span>
+                      {rep.commentaire && <div style={{ color: "#6b7280", fontStyle: "italic", marginTop: 2 }}>{rep.commentaire}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {!m.reponses && m.statut === "rejete" && (
+            <div style={{ fontSize: 12, color: "#6b7280", fontStyle: "italic" }}>Réponses effacées après le refus — l'agent doit recommencer.</div>
+          )}
         </div>
       )}
     </div>
@@ -171,6 +241,7 @@ export default function MissionEnqueteDetailPage() {
   const missionId = Number(params?.id);
   const qc = useQueryClient();
   const [filterStatut, setFilterStatut] = useState("tous");
+  const [rejetMembreId, setRejetMembreId] = useState<number | null>(null);
 
   const { data: mission, isLoading } = useQuery<MissionDetail>({
     queryKey: ["enquete", missionId],
@@ -181,6 +252,15 @@ export default function MissionEnqueteDetailPage() {
   const validerMutation = useMutation({
     mutationFn: (membreId: number) => apiPost(`/api/enquetes/${missionId}/membres/${membreId}/valider`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["enquete", missionId] }),
+  });
+
+  const rejeterMutation = useMutation({
+    mutationFn: ({ membreId, commentaireRt }: { membreId: number; commentaireRt: string }) =>
+      apiPost(`/api/enquetes/${missionId}/membres/${membreId}/rejeter`, { commentaireRt }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["enquete", missionId] });
+      setRejetMembreId(null);
+    },
   });
 
   const statutMutation = useMutation({
@@ -203,10 +283,11 @@ export default function MissionEnqueteDetailPage() {
   const membres = mission.membres ?? [];
   const filtered = membres.filter(m => filterStatut === "tous" || m.statut === filterStatut);
 
-  const total = membres.length;
-  const collectes = membres.filter(m => m.statut !== "a_faire").length;
-  const valides = membres.filter(m => m.statut === "valide").length;
-  const pct = total > 0 ? Math.round((collectes / total) * 100) : 0;
+  const total    = membres.length;
+  const collectes = membres.filter(m => m.statut !== "a_faire" && m.statut !== "rejete").length;
+  const valides  = membres.filter(m => m.statut === "valide").length;
+  const rejetes  = membres.filter(m => m.statut === "rejete").length;
+  const pct      = total > 0 ? Math.round((collectes / total) * 100) : 0;
   const certifies = membres.filter(m => m.statutConformite === "certifie").length;
 
   return (
@@ -260,13 +341,21 @@ export default function MissionEnqueteDetailPage() {
           </div>
         )}
 
+        {/* Alerte collectes refusées */}
+        {rejetes > 0 && (
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#991b1b", display: "flex", gap: 8 }}>
+            <XCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span><strong>{rejetes} collecte{rejetes > 1 ? "s" : ""} refusée{rejetes > 1 ? "s" : ""}</strong> — l'agent doit recommencer ces enquêtes.</span>
+          </div>
+        )}
+
         {/* Stats */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
           {[
-            { label: "Membres", value: total, color: "#6b7280" },
-            { label: "Collectés", value: collectes, color: "#3b82f6" },
-            { label: "Validés", value: valides, color: "#22c55e" },
-            { label: "Certifiables", value: certifies, color: "#16a34a" },
+            { label: "Membres",     value: total,    color: "#6b7280" },
+            { label: "Collectés",   value: collectes, color: "#3b82f6" },
+            { label: "Validés",     value: valides,  color: "#22c55e" },
+            { label: "Certifiables",value: certifies, color: "#16a34a" },
           ].map(s => (
             <div key={s.label} style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", border: "1px solid #f1f5f9", textAlign: "center" }}>
               <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -287,18 +376,19 @@ export default function MissionEnqueteDetailPage() {
         </div>
 
         {/* Filtres membres */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
           {[
-            { key: "tous", label: "Tous" },
+            { key: "tous",    label: "Tous" },
             { key: "a_faire", label: "À faire" },
-            { key: "collecte", label: "Collectés" },
-            { key: "valide", label: "Validés" },
+            { key: "collecte",label: "Collectés" },
+            { key: "valide",  label: "Validés" },
+            { key: "rejete",  label: "Refusés" },
           ].map(f => (
             <button key={f.key} onClick={() => setFilterStatut(f.key)} style={{
               padding: "6px 12px", borderRadius: 6, border: "1px solid",
-              borderColor: filterStatut === f.key ? "#16a34a" : "#e5e7eb",
-              background: filterStatut === f.key ? "#f0fdf4" : "#fff",
-              color: filterStatut === f.key ? "#16a34a" : "#6b7280",
+              borderColor: filterStatut === f.key ? (f.key === "rejete" ? "#ef4444" : "#16a34a") : "#e5e7eb",
+              background: filterStatut === f.key ? (f.key === "rejete" ? "#fef2f2" : "#f0fdf4") : "#fff",
+              color: filterStatut === f.key ? (f.key === "rejete" ? "#ef4444" : "#16a34a") : "#6b7280",
               fontSize: 12, cursor: "pointer", fontWeight: filterStatut === f.key ? 600 : 400,
             }}>{f.label} ({membres.filter(m => f.key === "tous" || m.statut === f.key).length})</button>
           ))}
@@ -312,11 +402,24 @@ export default function MissionEnqueteDetailPage() {
             </div>
           )}
           {filtered.map(m => (
-            <MembreEnqueteCard key={m.id} m={m} canValidate={canValidate}
-              onValider={(mid) => validerMutation.mutate(mid)} />
+            <MembreEnqueteCard
+              key={m.id} m={m}
+              canValidate={canValidate}
+              onValider={(mid) => validerMutation.mutate(mid)}
+              onRejeter={(mid) => setRejetMembreId(mid)}
+            />
           ))}
         </div>
       </div>
+
+      {/* Modal de rejet */}
+      {rejetMembreId !== null && (
+        <RejetModal
+          loading={rejeterMutation.isPending}
+          onCancel={() => setRejetMembreId(null)}
+          onConfirm={(motif) => rejeterMutation.mutate({ membreId: rejetMembreId, commentaireRt: motif })}
+        />
+      )}
     </div>
   );
 }

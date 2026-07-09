@@ -240,6 +240,7 @@ export interface EnqueteMembre {
   statut: string;
   reponses: Record<string, { valeur: "oui" | "non" | "na"; commentaire?: string }> | null;
   notesAgent: string | null;
+  commentaireRt: string | null;
   dateCollecte: string | null;
   nom: string;
   prenoms: string;

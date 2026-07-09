@@ -16,6 +16,7 @@ export default function CollecteEnquete() {
   const { isOnline, triggerSync } = useOffline();
 
   const [mission, setMission] = useState<EnqueteDetail | null>(null);
+  const [commentaireRt, setCommentaireRt] = useState<string | null>(null);
   const [reponses, setReponses] = useState<Record<string, Reponse>>({});
   const [notesAgent, setNotesAgent] = useState("");
   const [step, setStep] = useState(0);
@@ -29,9 +30,10 @@ export default function CollecteEnquete() {
     apiGet<EnqueteDetail>(`/enquetes/${missionId}`)
       .then(data => {
         setMission(data);
+        const membre = data.membres.find(m => m.membreId === mId);
+        if (membre?.commentaireRt) setCommentaireRt(membre.commentaireRt);
         const init: Record<string, Reponse> = {};
         data.criteres.forEach(c => { init[c] = { valeur: "na" }; });
-        const membre = data.membres.find(m => m.membreId === mId);
         if (membre?.reponses) {
           Object.assign(init, membre.reponses);
         }
@@ -124,6 +126,18 @@ export default function CollecteEnquete() {
   return (
     <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", flexDirection: "column" }}>
       {/* Header */}
+      {/* Bandeau de rejet RT */}
+      {commentaireRt && (
+        <div style={{ background: "#7f1d1d", borderBottom: "1px solid #991b1b", padding: "10px 16px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>⚠</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#fca5a5", marginBottom: 2 }}>Collecte refusée par le responsable</div>
+            <div style={{ fontSize: 12, color: "#fecaca" }}>Motif : {commentaireRt}</div>
+            <div style={{ fontSize: 11, color: "#f87171", marginTop: 4 }}>Recommencez depuis le début.</div>
+          </div>
+        </div>
+      )}
+
       <div style={{ background: "#1e293b", borderBottom: "1px solid #334155", padding: "12px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
           <button onClick={() => navigate(`/enquetes/${missionId}`)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>←</button>

@@ -38,6 +38,8 @@ export const enqueteMembresTable = pgTable("enquete_membres", {
   // 'certifie' | 'en_cours' | 'non_conforme'
   notesAgent: text("notes_agent"),
   dateCollecte: timestamp("date_collecte", { withTimezone: true }),
+  commentaireRt: text("commentaire_rt"),
+  dateRejet: timestamp("date_rejet", { withTimezone: true }),
 });
 
 export type MissionEnquete = typeof missionsEnqueteTable.$inferSelect;

@@ -168,6 +168,8 @@ export async function getMembresEnquete(cooperativeId: number, missionId: number
       scoreCalcule:     enqueteMembresTable.scoreCalcule,
       statutConformite: enqueteMembresTable.statutConformite,
       notesAgent:       enqueteMembresTable.notesAgent,
+      commentaireRt:    enqueteMembresTable.commentaireRt,
+      dateRejet:        enqueteMembresTable.dateRejet,
       dateCollecte:     enqueteMembresTable.dateCollecte,
       membreNom:        membresTable.nom,
       membrePrenom:     membresTable.prenoms,
@@ -246,6 +248,48 @@ export async function validerEnqueteMembre(
     .update(missionsEnqueteTable)
     .set({ membresCollectes: sql`membres_collectes + 1`, updatedAt: new Date() })
     .where(eq(missionsEnqueteTable.id, missionId));
+
+  return { ok: true };
+}
+
+export async function rejeterEnqueteMembre(
+  cooperativeId: number,
+  missionId: number,
+  membreId: number,
+  commentaireRt: string,
+) {
+  const [mission] = await db
+    .select({ agentId: missionsEnqueteTable.agentId, titre: missionsEnqueteTable.titre })
+    .from(missionsEnqueteTable)
+    .where(and(eq(missionsEnqueteTable.id, missionId), eq(missionsEnqueteTable.cooperativeId, cooperativeId)));
+
+  if (!mission) throw new Error("Mission introuvable");
+
+  const [row] = await db
+    .update(enqueteMembresTable)
+    .set({ statut: "rejete", commentaireRt, dateRejet: new Date(), reponses: null, scoreCalcule: null, statutConformite: null })
+    .where(and(eq(enqueteMembresTable.missionId, missionId), eq(enqueteMembresTable.membreId, membreId)))
+    .returning({ id: enqueteMembresTable.id });
+
+  if (!row) throw new Error("Membre non trouvé dans la mission");
+
+  if (mission.agentId) {
+    await creerNotification(cooperativeId, [mission.agentId], {
+      type: "mission_parcelle_rejetee",
+      titre: "Collecte refusée — correction requise",
+      message: `La collecte pour ce membre dans « ${mission.titre} » a été refusée. Motif : ${commentaireRt}`,
+      lien: `/enquetes`,
+      lienLibelle: "Reprendre la mission",
+      gravite: "attention",
+      sourceModule: "enquetes",
+      sourceId: missionId,
+    });
+    envoyerPushNotification(mission.agentId, {
+      title: "Collecte refusée",
+      body: `Motif : ${commentaireRt}`,
+      url: `/enquetes`,
+    }).catch(() => undefined);
+  }
 
   return { ok: true };
 }

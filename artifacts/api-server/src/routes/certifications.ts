@@ -22,6 +22,7 @@ import {
   handleUpdateMissionEnquete,
   handleUpdateStatut,
   handleValiderMembre,
+  handleRejeterMembre,
   handleDeleteMissionEnquete,
   handleGetAgentsDisponibles,
   handleRapportPdfEnquete,
@@ -74,6 +75,7 @@ router.patch("/enquetes/:id",                                 requireRole(ROLES_
 router.patch("/enquetes/:id/statut",                          requireRole(ROLES_WRITE), handleUpdateStatut);
 router.delete("/enquetes/:id",                                requireRole(["pca", "directeur"]), handleDeleteMissionEnquete);
 router.post("/enquetes/:id/membres/:membreId/valider",        requireRole(ROLES_WRITE), handleValiderMembre);
+router.post("/enquetes/:id/membres/:membreId/rejeter",        requireRole(ROLES_WRITE), handleRejeterMembre);
 router.get("/enquetes/:id/rapport.pdf",                       requireRole(ROLES_READ),  handleRapportPdfEnquete);
 
 export default router;

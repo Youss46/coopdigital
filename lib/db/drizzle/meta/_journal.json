@@ -442,6 +442,13 @@
       "when": 1783195203000,
       "tag": "0062_missions_enquete",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1783632413012,
+      "tag": "0063_enquete_rejet",
+      "breakpoints": true
     }
   ]
 }
