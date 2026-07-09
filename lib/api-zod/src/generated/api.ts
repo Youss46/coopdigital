@@ -7045,3 +7045,170 @@ export const GetAlertesPrevisionsResponse = zod.object({
 })
 
 
+/**
+ * @summary Statistiques des certifications
+ */
+export const GetStatsCertificationsResponse = zod.object({
+  "total": zod.number().optional(),
+  "actives": zod.number().optional(),
+  "expirees": zod.number().optional(),
+  "suspendues": zod.number().optional(),
+  "aRenouveler": zod.number().optional(),
+  "nbMembresCertifies": zod.number().optional(),
+  "parType": zod.object({
+
+}).passthrough().optional(),
+  "prochesExpiration": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "type": zod.string(),
+  "nomCertificateur": zod.string().nullish(),
+  "numeroCertificat": zod.string().nullish(),
+  "dateObtention": zod.coerce.date().nullish(),
+  "dateExpiration": zod.coerce.date().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'expire', 'renouvellement_en_cours']),
+  "superficieCertifieeHa": zod.string().nullish(),
+  "nbMembresCouVerts": zod.number().nullish(),
+  "lienDocument": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "creePar": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})).optional()
+})
+
+
+/**
+ * @summary Liste des certifications
+ */
+export const ListCertificationsResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "type": zod.string(),
+  "nomCertificateur": zod.string().nullish(),
+  "numeroCertificat": zod.string().nullish(),
+  "dateObtention": zod.coerce.date().nullish(),
+  "dateExpiration": zod.coerce.date().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'expire', 'renouvellement_en_cours']),
+  "superficieCertifieeHa": zod.string().nullish(),
+  "nbMembresCouVerts": zod.number().nullish(),
+  "lienDocument": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "creePar": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListCertificationsResponse = zod.array(ListCertificationsResponseItem)
+
+
+/**
+ * @summary Créer une certification
+ */
+export const CreateCertificationBody = zod.object({
+  "type": zod.string(),
+  "nomCertificateur": zod.string().nullish(),
+  "numeroCertificat": zod.string().nullish(),
+  "dateObtention": zod.coerce.date().nullish(),
+  "dateExpiration": zod.coerce.date().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'expire', 'renouvellement_en_cours']).optional(),
+  "superficieCertifieeHa": zod.string().nullish(),
+  "nbMembresCouVerts": zod.number().nullish(),
+  "lienDocument": zod.string().nullish(),
+  "notes": zod.string().nullish()
+})
+
+
+/**
+ * @summary Détail d'une certification
+ */
+export const GetCertificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCertificationResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "type": zod.string(),
+  "nomCertificateur": zod.string().nullish(),
+  "numeroCertificat": zod.string().nullish(),
+  "dateObtention": zod.coerce.date().nullish(),
+  "dateExpiration": zod.coerce.date().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'expire', 'renouvellement_en_cours']),
+  "superficieCertifieeHa": zod.string().nullish(),
+  "nbMembresCouVerts": zod.number().nullish(),
+  "lienDocument": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "creePar": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Mettre à jour une certification
+ */
+export const UpdateCertificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateCertificationBody = zod.object({
+  "type": zod.string().optional(),
+  "nomCertificateur": zod.string().nullish(),
+  "numeroCertificat": zod.string().nullish(),
+  "dateObtention": zod.coerce.date().nullish(),
+  "dateExpiration": zod.coerce.date().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'expire', 'renouvellement_en_cours']).optional(),
+  "superficieCertifieeHa": zod.string().nullish(),
+  "nbMembresCouVerts": zod.number().nullish(),
+  "lienDocument": zod.string().nullish(),
+  "notes": zod.string().nullish()
+})
+
+export const UpdateCertificationResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "type": zod.string(),
+  "nomCertificateur": zod.string().nullish(),
+  "numeroCertificat": zod.string().nullish(),
+  "dateObtention": zod.coerce.date().nullish(),
+  "dateExpiration": zod.coerce.date().nullish(),
+  "statut": zod.enum(['actif', 'suspendu', 'expire', 'renouvellement_en_cours']),
+  "superficieCertifieeHa": zod.string().nullish(),
+  "nbMembresCouVerts": zod.number().nullish(),
+  "lienDocument": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "creePar": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Supprimer une certification
+ */
+export const DeleteCertificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Historique d'audit d'une certification
+ */
+export const GetAuditsCertificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetAuditsCertificationResponseItem = zod.object({
+  "id": zod.number(),
+  "certificationId": zod.number(),
+  "cooperativeId": zod.number(),
+  "action": zod.string(),
+  "ancienStatut": zod.string().nullish(),
+  "nouveauStatut": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "faitPar": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const GetAuditsCertificationResponse = zod.array(GetAuditsCertificationResponseItem)
+
+

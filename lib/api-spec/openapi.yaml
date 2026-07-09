@@ -5718,6 +5718,115 @@ paths:
               schema: { $ref: "#/components/schemas/AlertesPrevisions" }
 
 
+  /certifications/stats:
+    get:
+      operationId: getStatsCertifications
+      summary: Statistiques des certifications
+      tags: [Certifications]
+      responses:
+        "200":
+          description: Statistiques
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatsCertifications" }
+
+  /certifications:
+    get:
+      operationId: listCertifications
+      summary: Liste des certifications
+      tags: [Certifications]
+      responses:
+        "200":
+          description: Liste des certifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Certification" }
+    post:
+      operationId: createCertification
+      summary: Créer une certification
+      tags: [Certifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCertificationBody" }
+      responses:
+        "201":
+          description: Certification créée
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Certification" }
+
+  /certifications/{id}:
+    get:
+      operationId: getCertification
+      summary: Détail d'une certification
+      tags: [Certifications]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Certification
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Certification" }
+    put:
+      operationId: updateCertification
+      summary: Mettre à jour une certification
+      tags: [Certifications]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateCertificationBody" }
+      responses:
+        "200":
+          description: Certification mise à jour
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Certification" }
+    delete:
+      operationId: deleteCertification
+      summary: Supprimer une certification
+      tags: [Certifications]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Supprimé
+
+  /certifications/{id}/audits:
+    get:
+      operationId: getAuditsCertification
+      summary: Historique d'audit d'une certification
+      tags: [Certifications]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Historique
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AuditCertification" }
+
 components:
   schemas:
 
@@ -10852,4 +10961,81 @@ components:
           type: array
           items: { $ref: "#/components/schemas/AlerteItem" }
         campagne_active_id: { type: integer, nullable: true }
+
+    Certification:
+      type: object
+      required: [id, cooperativeId, type, statut, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        cooperativeId: { type: integer }
+        type: { type: string }
+        nomCertificateur: { type: ["string", "null"] }
+        numeroCertificat: { type: ["string", "null"] }
+        dateObtention: { type: ["string", "null"], format: date }
+        dateExpiration: { type: ["string", "null"], format: date }
+        statut: { type: string, enum: [actif, suspendu, expire, renouvellement_en_cours] }
+        superficieCertifieeHa: { type: ["string", "null"] }
+        nbMembresCouVerts: { type: ["integer", "null"] }
+        lienDocument: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        creePar: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateCertificationBody:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string }
+        nomCertificateur: { type: string, nullable: true }
+        numeroCertificat: { type: string, nullable: true }
+        dateObtention: { type: string, format: date, nullable: true }
+        dateExpiration: { type: string, format: date, nullable: true }
+        statut: { type: string, enum: [actif, suspendu, expire, renouvellement_en_cours] }
+        superficieCertifieeHa: { type: string, nullable: true }
+        nbMembresCouVerts: { type: integer, nullable: true }
+        lienDocument: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    UpdateCertificationBody:
+      type: object
+      properties:
+        type: { type: string }
+        nomCertificateur: { type: string, nullable: true }
+        numeroCertificat: { type: string, nullable: true }
+        dateObtention: { type: string, format: date, nullable: true }
+        dateExpiration: { type: string, format: date, nullable: true }
+        statut: { type: string, enum: [actif, suspendu, expire, renouvellement_en_cours] }
+        superficieCertifieeHa: { type: string, nullable: true }
+        nbMembresCouVerts: { type: integer, nullable: true }
+        lienDocument: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    AuditCertification:
+      type: object
+      required: [id, certificationId, cooperativeId, action, createdAt]
+      properties:
+        id: { type: integer }
+        certificationId: { type: integer }
+        cooperativeId: { type: integer }
+        action: { type: string }
+        ancienStatut: { type: ["string", "null"] }
+        nouveauStatut: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        faitPar: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    StatsCertifications:
+      type: object
+      properties:
+        total: { type: integer }
+        actives: { type: integer }
+        expirees: { type: integer }
+        suspendues: { type: integer }
+        aRenouveler: { type: integer }
+        nbMembresCertifies: { type: integer }
+        parType: { type: object }
+        prochesExpiration:
+          type: array
+          items: { $ref: "#/components/schemas/Certification" }
 

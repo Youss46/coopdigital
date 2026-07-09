@@ -39,6 +39,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   // ── Traçabilité ──────────────────────────────────────────────────────────────
   { href: "/tracabilite",            label: "Traçabilité",               roles: ["pca","directeur","responsable_tracabilite","auditeur"],                      category: "Traçabilité" },
   { href: "/parcelles",              label: "Parcelles & EUDR",          roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],           category: "Traçabilité", showEudrAlerteBadge: true },
+  { href: "/certifications",         label: "Certifications",            roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],           category: "Traçabilité" },
   { href: "/missions",               label: "Missions terrain",          roles: ["responsable_tracabilite"],                                                   category: "Traçabilité" },
 
   // ── Stocks ───────────────────────────────────────────────────────────────────

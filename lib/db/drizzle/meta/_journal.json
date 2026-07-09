@@ -421,6 +421,13 @@
       "when": 1783108801000,
       "tag": "0059_users_photo_url",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1783195201000,
+      "tag": "0060_certifications",
+      "breakpoints": true
     }
   ]
 }

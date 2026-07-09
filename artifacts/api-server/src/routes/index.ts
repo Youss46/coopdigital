@@ -63,6 +63,7 @@ import financesRouter from "./finances";
 import expeditionsRouter from "./expeditions";
 import entrepotsDeleguesRouter from "./entrepots_delegues";
 import archivesRouter from "./archives";
+import certificationsRouter from "./certifications";
 
 const router: IRouter = Router();
 
@@ -134,5 +135,6 @@ router.use(missionsRouter);
 router.use(financesRouter);
 router.use(expeditionsRouter);
 router.use(archivesRouter);
+router.use(certificationsRouter);
 
 export default router;

@@ -4298,6 +4298,118 @@ export interface AlertesPrevisions {
   campagne_active_id?: number | null;
 }
 
+export type CertificationStatut = typeof CertificationStatut[keyof typeof CertificationStatut];
+
+
+export const CertificationStatut = {
+  actif: 'actif',
+  suspendu: 'suspendu',
+  expire: 'expire',
+  renouvellement_en_cours: 'renouvellement_en_cours',
+} as const;
+
+export interface Certification {
+  id: number;
+  cooperativeId: number;
+  type: string;
+  /** @nullable */
+  nomCertificateur?: string | null;
+  /** @nullable */
+  numeroCertificat?: string | null;
+  /** @nullable */
+  dateObtention?: string | null;
+  /** @nullable */
+  dateExpiration?: string | null;
+  statut: CertificationStatut;
+  /** @nullable */
+  superficieCertifieeHa?: string | null;
+  /** @nullable */
+  nbMembresCouVerts?: number | null;
+  /** @nullable */
+  lienDocument?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  creePar?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateCertificationBodyStatut = typeof CreateCertificationBodyStatut[keyof typeof CreateCertificationBodyStatut];
+
+
+export const CreateCertificationBodyStatut = {
+  actif: 'actif',
+  suspendu: 'suspendu',
+  expire: 'expire',
+  renouvellement_en_cours: 'renouvellement_en_cours',
+} as const;
+
+export interface CreateCertificationBody {
+  type: string;
+  nomCertificateur?: string | null;
+  numeroCertificat?: string | null;
+  dateObtention?: string | null;
+  dateExpiration?: string | null;
+  statut?: CreateCertificationBodyStatut;
+  superficieCertifieeHa?: string | null;
+  nbMembresCouVerts?: number | null;
+  lienDocument?: string | null;
+  notes?: string | null;
+}
+
+export type UpdateCertificationBodyStatut = typeof UpdateCertificationBodyStatut[keyof typeof UpdateCertificationBodyStatut];
+
+
+export const UpdateCertificationBodyStatut = {
+  actif: 'actif',
+  suspendu: 'suspendu',
+  expire: 'expire',
+  renouvellement_en_cours: 'renouvellement_en_cours',
+} as const;
+
+export interface UpdateCertificationBody {
+  type?: string;
+  nomCertificateur?: string | null;
+  numeroCertificat?: string | null;
+  dateObtention?: string | null;
+  dateExpiration?: string | null;
+  statut?: UpdateCertificationBodyStatut;
+  superficieCertifieeHa?: string | null;
+  nbMembresCouVerts?: number | null;
+  lienDocument?: string | null;
+  notes?: string | null;
+}
+
+export interface AuditCertification {
+  id: number;
+  certificationId: number;
+  cooperativeId: number;
+  action: string;
+  /** @nullable */
+  ancienStatut?: string | null;
+  /** @nullable */
+  nouveauStatut?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  faitPar?: number | null;
+  createdAt: string;
+}
+
+export type StatsCertificationsParType = { [key: string]: unknown };
+
+export interface StatsCertifications {
+  total?: number;
+  actives?: number;
+  expirees?: number;
+  suspendues?: number;
+  aRenouveler?: number;
+  nbMembresCertifies?: number;
+  parType?: StatsCertificationsParType;
+  prochesExpiration?: Certification[];
+}
+
 export type SaveAuthPhotoBody = {
   /**
      * Data URL base64 de l'image, ou null pour supprimer la photo
