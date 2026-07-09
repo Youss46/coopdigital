@@ -13,6 +13,7 @@ import {
   evaluerMembre,
   getStatsMembresConformite,
   getTonnageCampagneCertification,
+  getDashboardCertifications,
   CRITERES_PAR_TYPE,
 } from "../services/certificationService";
 
@@ -37,6 +38,13 @@ export async function handleGetStatsCertifications(req: Request, res: Response):
   if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
   try { res.json(await getStatsCertifications(cid)); }
   catch (err) { req.log.error({ err }, "handleGetStatsCertifications"); res.status(500).json({ erreur: "Erreur interne" }); }
+}
+
+export async function handleGetDashboardCertifications(req: Request, res: Response): Promise<void> {
+  const cid = coopId(req);
+  if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  try { res.json(await getDashboardCertifications(cid)); }
+  catch (err) { req.log.error({ err }, "handleGetDashboardCertifications"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleGetCertification(req: Request, res: Response): Promise<void> {

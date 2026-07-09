@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import {
   handleListCertifications,
   handleGetStatsCertifications,
+  handleGetDashboardCertifications,
   handleGetCertification,
   handleGetAuditsCertification,
   handleCreateCertification,
@@ -44,6 +45,7 @@ const ROLES_WRITE = ["pca", "directeur", "responsable_tracabilite"];
 // Certifications coopérative
 router.get("/certifications/criteres",      requireRole(ROLES_READ),  handleGetCriteres);
 router.get("/certifications/stats",         requireRole(ROLES_READ),  handleGetStatsCertifications);
+router.get("/certifications/dashboard",     requireRole(ROLES_READ),  handleGetDashboardCertifications);
 router.get("/certifications",               requireRole(ROLES_READ),  handleListCertifications);
 router.get("/certifications/:id",           requireRole(ROLES_READ),  handleGetCertification);
 router.post("/certifications",              requireRole(ROLES_WRITE), handleCreateCertification);

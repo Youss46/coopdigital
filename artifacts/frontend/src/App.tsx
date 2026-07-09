@@ -71,6 +71,7 @@ import ArchivesPage from "@/pages/ArchivesPage";
 import CertificationsPage from "@/pages/CertificationsPage";
 import MissionsEnquetePage from "@/pages/MissionsEnquetePage";
 import MissionEnqueteDetailPage from "@/pages/MissionEnqueteDetailPage";
+import CertificationsDashboardPage from "@/pages/CertificationsDashboardPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/sonner";
@@ -297,6 +298,9 @@ function AppRoutes() {
       </Route>
       <Route path="/archives">
         <ProtectedRoute component={ArchivesPage} />
+      </Route>
+      <Route path="/certifications/tableau-de-bord">
+        <ProtectedRoute component={CertificationsDashboardPage} />
       </Route>
       <Route path="/certifications">
         <ProtectedRoute component={CertificationsPage} />

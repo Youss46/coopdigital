@@ -1,5 +1,5 @@
-import { db, certificationsTable, auditsCertificationsTable, certificationsMembresTable, membresTable, campagnesTable, livraisonsTable } from "@workspace/db";
-import { eq, and, desc, lte, sql, count, inArray, sum } from "drizzle-orm";
+import { db, certificationsTable, auditsCertificationsTable, certificationsMembresTable, membresTable, campagnesTable, livraisonsTable, missionsEnqueteTable } from "@workspace/db";
+import { eq, and, desc, lte, sql, count, inArray, sum, ne } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { notifierParRole } from "./notificationService.js";
 
@@ -430,6 +430,128 @@ export async function verifierExpirationsCertifications(): Promise<void> {
   }
 
   logger.info({ expired: expired.length, prochaines: prochaines.length }, "Vérification expirations certifications terminée");
+}
+
+// ─── Dashboard consolidé ──────────────────────────────────────────────────────
+
+export async function getDashboardCertifications(cooperativeId: number) {
+  const today    = new Date().toISOString().slice(0, 10);
+  const in90Days = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+
+  // 1. Toutes les certifications de la coop
+  const certs = await listCertifications(cooperativeId);
+
+  // 2. Stats conformité membres par certification (agrégées en une query)
+  const membresStats = await db
+    .select({
+      certificationId:  certificationsMembresTable.certificationId,
+      statutConformite: certificationsMembresTable.statutConformite,
+      nb:               count(),
+    })
+    .from(certificationsMembresTable)
+    .where(eq(certificationsMembresTable.cooperativeId, cooperativeId))
+    .groupBy(certificationsMembresTable.certificationId, certificationsMembresTable.statutConformite);
+
+  // 3. Missions en cours par certification (une query)
+  const missionsStats = await db
+    .select({
+      certificationId: missionsEnqueteTable.certificationId,
+      nb:              count(),
+    })
+    .from(missionsEnqueteTable)
+    .where(and(
+      eq(missionsEnqueteTable.cooperativeId, cooperativeId),
+      ne(missionsEnqueteTable.statut, "validee"),
+    ))
+    .groupBy(missionsEnqueteTable.certificationId);
+
+  // 4. Campagne active pour tonnage
+  const [campagne] = await db
+    .select({ id: campagnesTable.id, libelle: campagnesTable.libelle })
+    .from(campagnesTable)
+    .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
+    .limit(1);
+
+  // 5. Tonnage par certification (si campagne active)
+  let tonnageParCertif: Record<number, number> = {};
+  if (campagne) {
+    // Récupérer tous les membres certifiés avec leur certificationId
+    const certifies = await db
+      .select({ certificationId: certificationsMembresTable.certificationId, membreId: certificationsMembresTable.membreId })
+      .from(certificationsMembresTable)
+      .where(and(
+        eq(certificationsMembresTable.cooperativeId, cooperativeId),
+        eq(certificationsMembresTable.statutConformite, "certifie"),
+      ));
+
+    if (certifies.length > 0) {
+      const allMembreIds = [...new Set(certifies.map(c => c.membreId))];
+      const [tonnageRow] = await db
+        .select({ membreId: livraisonsTable.membreId, tonnage: sum(livraisonsTable.poidsKg) })
+        .from(livraisonsTable)
+        .where(and(eq(livraisonsTable.campagneId, campagne.id), inArray(livraisonsTable.membreId, allMembreIds)))
+        .groupBy(livraisonsTable.membreId)
+        .limit(1);
+      // Accumulate tonnage per certification
+      const tonnageParMembre: Record<number, number> = {};
+      const rows = await db
+        .select({ membreId: livraisonsTable.membreId, tonnage: sum(livraisonsTable.poidsKg) })
+        .from(livraisonsTable)
+        .where(and(eq(livraisonsTable.campagneId, campagne.id), inArray(livraisonsTable.membreId, allMembreIds)))
+        .groupBy(livraisonsTable.membreId);
+      for (const r of rows) if (r.membreId !== null) tonnageParMembre[r.membreId] = parseFloat(r.tonnage ?? "0") || 0;
+      for (const c of certifies) {
+        tonnageParCertif[c.certificationId] = (tonnageParCertif[c.certificationId] ?? 0) + (tonnageParMembre[c.membreId] ?? 0);
+      }
+      void tonnageRow;
+    }
+  }
+
+  // 6. Construire les stats par certification
+  const membresMap: Record<number, Record<string, number>> = {};
+  for (const row of membresStats) {
+    if (!membresMap[row.certificationId]) membresMap[row.certificationId] = {};
+    membresMap[row.certificationId]![row.statutConformite ?? "non_conforme"] = Number(row.nb);
+  }
+  const missionsMap: Record<number, number> = {};
+  for (const row of missionsStats) missionsMap[row.certificationId] = Number(row.nb);
+
+  const parCertification = certs.map(c => {
+    const m = membresMap[c.id] ?? {};
+    const certifies2  = m["certifie"]      ?? 0;
+    const enCours     = m["en_cours"]      ?? 0;
+    const nonConf     = m["non_conforme"]  ?? 0;
+    const totalMembres = certifies2 + enCours + nonConf;
+    const tauxConformite = totalMembres > 0 ? Math.round((certifies2 / totalMembres) * 100) : 0;
+    const daysLeft = c.dateExpiration
+      ? Math.round((new Date(c.dateExpiration).getTime() - Date.now()) / 86_400_000)
+      : null;
+    return {
+      id: c.id, type: c.type, statut: c.statut,
+      nomCertificateur: c.nomCertificateur, numeroCertificat: c.numeroCertificat,
+      dateExpiration: c.dateExpiration, daysLeft,
+      membres: { certifies: certifies2, enCours, nonConformes: nonConf, total: totalMembres, tauxConformite },
+      tonnageKg: tonnageParCertif[c.id] ?? 0,
+      missionsEnCours: missionsMap[c.id] ?? 0,
+      campagne: campagne ?? null,
+    };
+  });
+
+  // 7. KPIs globaux
+  const totalActives        = certs.filter(c => c.statut === "actif").length;
+  const totalExpirees       = certs.filter(c => c.statut === "expire").length;
+  const totalARenouveler    = certs.filter(c => c.statut === "actif" && c.dateExpiration && c.dateExpiration >= today && c.dateExpiration <= in90Days).length;
+  const totalMembresCertifies = Object.values(membresMap).reduce((acc, m) => acc + (m["certifie"] ?? 0), 0);
+  const prochesExpiration   = certs
+    .filter(c => c.statut === "actif" && c.dateExpiration && c.dateExpiration >= today && c.dateExpiration <= in90Days)
+    .sort((a, b) => (a.dateExpiration ?? "").localeCompare(b.dateExpiration ?? ""));
+
+  return {
+    kpis: { total: certs.length, actives: totalActives, expirees: totalExpirees, aRenouveler: totalARenouveler, membresCertifies: totalMembresCertifies },
+    parCertification,
+    prochesExpiration,
+    campagne: campagne ?? null,
+  };
 }
 
 // ─── Tonnage & primes — campagne active ──────────────────────────────────────
