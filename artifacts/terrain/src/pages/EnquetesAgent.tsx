@@ -11,6 +11,7 @@ const STATUT_LABEL: Record<string, { label: string; color: string }> = {
   planifiee: { label: "Planifiée", color: "#6366f1" },
   en_cours:  { label: "En cours",  color: "#f59e0b" },
   soumise:   { label: "Soumise",   color: "#3b82f6" },
+  validee:   { label: "Validée",   color: "#22c55e" },
 };
 
 const TYPE_LABEL: Record<string, string> = {

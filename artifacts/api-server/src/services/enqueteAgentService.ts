@@ -32,7 +32,7 @@ export async function getEnquetesAgent(agentId: number, cooperativeId: number) {
     .where(and(
       eq(missionsEnqueteTable.cooperativeId, cooperativeId),
       eq(missionsEnqueteTable.agentId, agentId),
-      inArray(missionsEnqueteTable.statut, ["planifiee", "en_cours", "soumise"]),
+      inArray(missionsEnqueteTable.statut, ["planifiee", "en_cours", "soumise", "validee"]),
     ))
     .orderBy(desc(missionsEnqueteTable.datePrevue));
 

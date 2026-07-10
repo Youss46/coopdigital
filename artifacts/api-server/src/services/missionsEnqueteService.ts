@@ -249,6 +249,22 @@ export async function validerEnqueteMembre(
     .set({ membresCollectes: sql`membres_collectes + 1`, updatedAt: new Date() })
     .where(eq(missionsEnqueteTable.id, missionId));
 
+  // Si tous les membres sont validés, passer la mission à "validee"
+  const [counts] = await db
+    .select({
+      total:   sql<number>`count(*)::int`,
+      valides: sql<number>`sum(case when statut = 'valide' then 1 else 0 end)::int`,
+    })
+    .from(enqueteMembresTable)
+    .where(eq(enqueteMembresTable.missionId, missionId));
+
+  if (counts && counts.total > 0 && counts.valides >= counts.total) {
+    await db
+      .update(missionsEnqueteTable)
+      .set({ statut: "validee", updatedAt: new Date() })
+      .where(eq(missionsEnqueteTable.id, missionId));
+  }
+
   return { ok: true };
 }
 
