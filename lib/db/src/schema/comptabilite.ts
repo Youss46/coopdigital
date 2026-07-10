@@ -84,6 +84,7 @@ export const configComptableTable = pgTable("config_comptable", {
   autoBanque:          boolean("auto_banque").notNull().default(false),
   autoSubventions:     boolean("auto_subventions").notNull().default(false),
   autoMobileMarchand:  boolean("auto_mobile_marchand").notNull().default(false),
+  autoPrimes:          boolean("auto_primes").notNull().default(false),
   modifiePar:          integer("modifie_par"),
   updatedAt:           timestamp("updated_at", { withTimezone: true }),
 });

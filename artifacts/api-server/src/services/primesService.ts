@@ -1,7 +1,8 @@
 import { db, primesReceptionsTable, primesDistributionsTable, primesMembresTable, membresTable, livraisonsTable, avancesTable, campagnesTable, exportateursTable, usersTable } from "@workspace/db";
 // Note: campagnesTable.cooperativeId and exportateursTable.cooperativeId are validated in creerDistribution and createReception
-import { eq, and, desc, sql, sum, inArray, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, sum, inArray, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { generateEcrituresPrimeReception, generateEcrituresPrimePaiement } from "./comptabiliteService";
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,17 @@ export async function listReceptions(cooperativeId: number, campagneId?: number)
 }
 
 export async function createReception(cooperativeId: number, data: CreateReceptionInput, userId: number) {
+  // Nom de l'exportateur pour le libellé de l'écriture
+  let exportateurNom: string | null = null;
+  if (data.exportateurId) {
+    const [exp] = await db
+      .select({ nom: exportateursTable.nom })
+      .from(exportateursTable)
+      .where(and(eq(exportateursTable.id, data.exportateurId), eq(exportateursTable.cooperativeId, cooperativeId)))
+      .limit(1);
+    exportateurNom = exp?.nom ?? null;
+  }
+
   const [rec] = await db.insert(primesReceptionsTable).values({
     cooperativeId,
     campagneId: data.campagneId ?? null,
@@ -82,6 +94,16 @@ export async function createReception(cooperativeId: number, data: CreateRecepti
     notes: data.notes ?? null,
     createdBy: userId,
   }).returning();
+
+  // Écriture OHADA : Débit 521 Banque / Crédit 7588 Autres produits (fire-and-forget)
+  generateEcrituresPrimeReception(cooperativeId, {
+    receptionId: rec.id,
+    montantFcfa: rec.montantTotalFcfa,
+    typePrimeLabel: TYPE_PRIME_LABELS[rec.typePrime] ?? rec.typePrime,
+    exportateurNom,
+    date: rec.dateReception,
+  }).catch(err => logger.error({ err }, "Erreur écriture prime réception"));
+
   return rec;
 }
 
@@ -247,9 +269,8 @@ export async function creerDistribution(cooperativeId: number, data: CreateDistr
     }).returning();
 
     // 5. Créer les allocations par membre
-    const allocations = livraisons
-      .filter(l => l.membreId !== null)
-      .map(l => {
+    const livraisionsFiltrees = livraisons.filter(l => l.membreId !== null);
+    const allocations = livraisionsFiltrees.map(l => {
         const tonnage = parseFloat(String(l.totalKg ?? 0));
         const pct = tonnageTotalKg > 0 ? tonnage / tonnageTotalKg : 0;
         // montantBrut = part proportionnelle du montant APRÈS déduction globale des frais
@@ -270,6 +291,23 @@ export async function creerDistribution(cooperativeId: number, data: CreateDistr
           statut: "en_attente" as const,
         };
       });
+
+    // Fix arrondi : affecter le résidu (quelques FCFA) au membre avec le plus grand tonnage
+    if (allocations.length > 0) {
+      const totalAlloue = allocations.reduce((s, a) => s + a.montantBrutFcfa, 0);
+      const residuel = montantDistrib - totalAlloue;
+      if (residuel !== 0) {
+        const idxMax = allocations.reduce(
+          (maxI, a, i, arr) => parseFloat(a.tonnageKg) > parseFloat(arr[maxI].tonnageKg) ? i : maxI,
+          0,
+        );
+        const a = allocations[idxMax];
+        a.montantBrutFcfa += residuel;
+        // Re-cap la déduction d'avances au nouveau montant brut (évite over-repayment si résidu négatif)
+        a.deductionAvancesFcfa = Math.min(a.deductionAvancesFcfa, Math.max(0, a.montantBrutFcfa));
+        a.montantNetFcfa = Math.max(0, a.montantBrutFcfa - a.deductionAvancesFcfa);
+      }
+    }
 
     if (allocations.length > 0) {
       await tx.insert(primesMembresTable).values(allocations);
@@ -356,20 +394,32 @@ export async function validerDistribution(cooperativeId: number, id: number, use
 }
 
 export async function payerMembre(cooperativeId: number, primeMembreId: number, data: PayerMembreInput, userId: number) {
-  const [pm] = await db
-    .select()
-    .from(primesMembresTable)
-    .where(and(eq(primesMembresTable.id, primeMembreId), eq(primesMembresTable.cooperativeId, cooperativeId)))
-    .limit(1);
+  const [[pm], [membreRow]] = await Promise.all([
+    db.select()
+      .from(primesMembresTable)
+      .where(and(eq(primesMembresTable.id, primeMembreId), eq(primesMembresTable.cooperativeId, cooperativeId)))
+      .limit(1),
+    // Pré-chargé après la vérification pm, mais on fait les deux en parallèle
+    // (sera ignoré si pm est null)
+    db.select({ id: primesMembresTable.id, membreId: primesMembresTable.membreId })
+      .from(primesMembresTable)
+      .where(eq(primesMembresTable.id, primeMembreId))
+      .limit(1),
+  ]);
   if (!pm) throw new Error("Allocation introuvable");
   if (pm.statut === "paye") throw new Error("Déjà payé");
 
   // Vérifier que la distribution est validée
-  const [dist] = await db
-    .select({ statut: primesDistributionsTable.statut })
-    .from(primesDistributionsTable)
-    .where(eq(primesDistributionsTable.id, pm.distributionId))
-    .limit(1);
+  const [[dist], [membre]] = await Promise.all([
+    db.select({ statut: primesDistributionsTable.statut })
+      .from(primesDistributionsTable)
+      .where(eq(primesDistributionsTable.id, pm.distributionId))
+      .limit(1),
+    db.select({ nom: membresTable.nom })
+      .from(membresTable)
+      .where(eq(membresTable.id, pm.membreId))
+      .limit(1),
+  ]);
   if (!dist || dist.statut === "brouillon") throw new Error("La distribution doit être validée avant paiement");
 
   const [updated] = await db
@@ -385,6 +435,22 @@ export async function payerMembre(cooperativeId: number, primeMembreId: number, 
     })
     .where(eq(primesMembresTable.id, primeMembreId))
     .returning();
+
+  // Réduire le solde des avances si une déduction a été appliquée
+  if (pm.deductionAvancesFcfa > 0) {
+    await reduireAvances(pm.membreId, pm.deductionAvancesFcfa);
+  }
+
+  // Écriture OHADA : Débit 6018 / Crédit 521 ou 571 (fire-and-forget)
+  if (pm.montantNetFcfa > 0) {
+    generateEcrituresPrimePaiement(cooperativeId, {
+      primeMembreId: pm.id,
+      membreNom: membre?.nom ?? `Membre #${pm.membreId}`,
+      montantFcfa: pm.montantNetFcfa,
+      modePaiement: data.modePaiement,
+      date: data.datePaiement,
+    }).catch(err => logger.error({ err }, "Erreur écriture prime paiement"));
+  }
 
   // Si tous les membres sont payés → distribution = payee
   await syncStatutDistribution(pm.distributionId);
@@ -405,6 +471,20 @@ export async function payerBulk(
   if (!dist) throw new Error("Distribution introuvable");
   if (dist.statut === "brouillon") throw new Error("Veuillez d'abord valider la distribution");
 
+  // Récupérer les membres non encore payés AVANT le bulk update (pour les effets de bord)
+  const membresEnAttente = await db
+    .select({
+      pm: primesMembresTable,
+      membreNom: membresTable.nom,
+    })
+    .from(primesMembresTable)
+    .innerJoin(membresTable, eq(membresTable.id, primesMembresTable.membreId))
+    .where(and(
+      eq(primesMembresTable.distributionId, distributionId),
+      eq(primesMembresTable.statut, "en_attente"),
+    ));
+
+  // Paiement en masse
   await db
     .update(primesMembresTable)
     .set({
@@ -421,7 +501,67 @@ export async function payerBulk(
       )
     );
 
+  // Effets de bord : réduction avances + écritures comptables (fire-and-forget groupé)
+  const sideEffects = membresEnAttente.map(async ({ pm, membreNom }) => {
+    if (pm.deductionAvancesFcfa > 0) {
+      await reduireAvances(pm.membreId, pm.deductionAvancesFcfa);
+    }
+    if (pm.montantNetFcfa > 0) {
+      await generateEcrituresPrimePaiement(cooperativeId, {
+        primeMembreId: pm.id,
+        membreNom: membreNom ?? `Membre #${pm.membreId}`,
+        montantFcfa: pm.montantNetFcfa,
+        modePaiement: data.modePaiement,
+        date: data.datePaiement,
+      });
+    }
+  });
+  Promise.allSettled(sideEffects).then(results => {
+    results.forEach((r, i) => {
+      if (r.status === "rejected") {
+        const { pm } = membresEnAttente[i];
+        logger.error({ err: r.reason, primeMembreId: pm.id, membreId: pm.membreId },
+          "Erreur effet de bord payerBulk (avance/écriture)");
+      }
+    });
+  });
+
   await syncStatutDistribution(distributionId);
+}
+
+/**
+ * Réduit le solde restant des avances actives d'un membre, en commençant par les plus anciennes.
+ * Appelé lors du paiement effectif pour refléter la déduction déjà calculée à la création
+ * de la distribution.
+ */
+async function reduireAvances(membreId: number, montantDeduction: number) {
+  if (montantDeduction <= 0) return;
+
+  const avancesActives = await db
+    .select({ id: avancesTable.id, solde: avancesTable.soldeRestantFcfa })
+    .from(avancesTable)
+    .where(and(
+      eq(avancesTable.membreId, membreId),
+      sql`${avancesTable.statut} IN ('en_cours', 'en_retard')`,
+      lt(sql`0`, avancesTable.soldeRestantFcfa),
+    ))
+    .orderBy(avancesTable.id); // plus ancienne d'abord
+
+  let restant = montantDeduction;
+  for (const avance of avancesActives) {
+    if (restant <= 0) break;
+    const solde = avance.solde ?? 0;
+    const reduction = Math.min(solde, restant);
+    const nouveauSolde = solde - reduction;
+    await db
+      .update(avancesTable)
+      .set({
+        soldeRestantFcfa: nouveauSolde,
+        ...(nouveauSolde <= 0 ? { statut: "rembourse" as const } : {}),
+      })
+      .where(eq(avancesTable.id, avance.id));
+    restant -= reduction;
+  }
 }
 
 async function syncStatutDistribution(distributionId: number) {

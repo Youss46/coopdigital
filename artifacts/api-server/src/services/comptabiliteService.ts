@@ -16,7 +16,9 @@ export type SourceEcriture =
   | "encaissement" | "salaire" | "stock" | "don"
   // Sources granulaires (contrôle par module)
   | "emprunt" | "transport" | "investissement" | "maintenance" | "intrant"
-  | "amortissement" | "caisse" | "banque" | "subvention" | "mobile_marchand";
+  | "amortissement" | "caisse" | "banque" | "subvention" | "mobile_marchand"
+  // Primes exportateurs / redistribution producteurs
+  | "prime_reception" | "prime_paiement";
 
 interface ProposerEcriturePayload {
   source: SourceEcriture;
@@ -49,6 +51,8 @@ const AUTO_KEY_MAP: Record<SourceEcriture, keyof typeof configComptableTable.$in
   banque:           "autoBanque",
   subvention:       "autoSubventions",
   mobile_marchand:  "autoMobileMarchand",
+  prime_reception:  "autoPrimes",
+  prime_paiement:   "autoPrimes",
 };
 
 // Mapping vers les valeurs d'enum PostgreSQL existantes
@@ -72,6 +76,8 @@ const DB_SOURCE_MAP: Record<SourceEcriture, "livraison" | "vente" | "avance" | "
   banque:          "paiement",
   subvention:      "encaissement",
   mobile_marchand: "paiement",
+  prime_reception: "encaissement",
+  prime_paiement:  "paiement",
 };
 
 async function getConfigComptable(cooperativeId: number) {
@@ -324,4 +330,76 @@ export async function insererEcrituresSalaireDirectes(cooperativeId: number, par
     taches.push(inserer(`Cotisations CNPS salarié – ${personnelNom}`, "431", "421", cotisationsSalarieFcfa));
   }
   await Promise.all(taches);
+}
+
+// ─── Primes exportateurs / redistribution producteurs ─────────────────────────
+
+/**
+ * Réception d'une prime de l'exportateur.
+ * SYSCOHADA : Débit 521 Banque / Crédit 7588 Autres produits d'exploitation divers
+ */
+export async function generateEcrituresPrimeReception(
+  cooperativeId: number,
+  params: {
+    receptionId: number;
+    montantFcfa: number;
+    typePrimeLabel: string;
+    exportateurNom: string | null;
+    date: string;
+  },
+) {
+  const { receptionId, montantFcfa, typePrimeLabel, exportateurNom, date } = params;
+  const libelle = exportateurNom
+    ? `Prime ${typePrimeLabel} – ${exportateurNom}`
+    : `Prime ${typePrimeLabel}`;
+
+  await proposerEcriture(cooperativeId, {
+    source: "prime_reception",
+    sourceId: receptionId,
+    libelle,
+    compteDebit: "521",
+    compteCredit: "7588",
+    montantFcfa,
+    date,
+    numeroPiece: `PRM-REC-${receptionId}`,
+  });
+}
+
+/**
+ * Modes de paiement gérés en trésorerie caisse/mobile (→ 571).
+ * Tout autre mode est considéré banque (→ 521).
+ */
+const MODES_CAISSE = new Set([
+  "caisse", "especes", "espèces",
+  "orange_money", "mtn_momo", "wave", "moov_money", "mobile_money",
+]);
+
+/**
+ * Paiement d'une prime à un producteur (complément prix d'achat cacao).
+ * SYSCOHADA : Débit 6018 Complément d'achat / Crédit 521 Banque ou 571 Caisse/Mobile
+ */
+export async function generateEcrituresPrimePaiement(
+  cooperativeId: number,
+  params: {
+    primeMembreId: number;
+    membreNom: string;
+    montantFcfa: number;
+    modePaiement: string;
+    date: string;
+  },
+) {
+  const { primeMembreId, membreNom, montantFcfa, modePaiement, date } = params;
+  // Espèces / mobile-money → 571 Caisse ; virement / chèque → 521 Banque
+  const compteCredit = MODES_CAISSE.has(modePaiement.toLowerCase()) ? "571" : "521";
+
+  await proposerEcriture(cooperativeId, {
+    source: "prime_paiement",
+    sourceId: primeMembreId,
+    libelle: `Prime producteur – ${membreNom}`,
+    compteDebit: "6018",
+    compteCredit,
+    montantFcfa,
+    date,
+    numeroPiece: `PRM-PAY-${primeMembreId}`,
+  });
 }
