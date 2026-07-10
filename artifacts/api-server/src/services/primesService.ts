@@ -1,4 +1,4 @@
-import { db, primesReceptionsTable, primesDistributionsTable, primesMembresTable, membresTable, livraisonsTable, avancesTable, campagnesTable, exportateursTable, usersTable } from "@workspace/db";
+import { db, primesReceptionsTable, primesDistributionsTable, primesMembresTable, membresTable, livraisonsTable, avancesTable, campagnesTable, exportateursTable, usersTable, certificationsTable, certificationsMembresTable } from "@workspace/db";
 // Note: campagnesTable.cooperativeId and exportateursTable.cooperativeId are validated in creerDistribution and createReception
 import { eq, and, desc, sql, sum, inArray, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -207,7 +207,48 @@ export async function creerDistribution(cooperativeId: number, data: CreateDistr
     if (!expCheck) throw new Error("Exportateur introuvable ou hors périmètre");
   }
 
-  // 2. Calculer tonnage par membre (livraisons de la campagne)
+  // 2a. Si prime de certification, restreindre aux membres certifiés (statut_conformite = 'certifie')
+  const PRIME_TO_CERTIF_TYPE: Record<string, string> = {
+    certification_ra:        "rainforest_alliance",
+    certification_fairtrade: "fairtrade",
+    certification_bio:       "bio",
+  };
+  const certifType = PRIME_TO_CERTIF_TYPE[reception.typePrime];
+  let certifiedMemberIds: number[] | null = null;
+
+  if (certifType) {
+    // Trouver les certifications actives de ce type pour la coopérative
+    const certifs = await db
+      .select({ id: certificationsTable.id })
+      .from(certificationsTable)
+      .where(and(
+        eq(certificationsTable.cooperativeId, cooperativeId),
+        eq(certificationsTable.type, certifType),
+      ));
+
+    if (certifs.length === 0) {
+      throw new Error(`Aucune certification ${reception.typePrime} trouvée pour cette coopérative`);
+    }
+
+    const certifIds = certifs.map(c => c.id);
+
+    // Membres ayant statut_conformite = 'certifie' pour au moins une de ces certifications
+    const certifiedRows = await db
+      .select({ membreId: certificationsMembresTable.membreId })
+      .from(certificationsMembresTable)
+      .where(and(
+        inArray(certificationsMembresTable.certificationId, certifIds),
+        eq(certificationsMembresTable.statutConformite, "certifie"),
+      ));
+
+    certifiedMemberIds = [...new Set(certifiedRows.map(r => r.membreId))];
+
+    if (certifiedMemberIds.length === 0) {
+      throw new Error(`Aucun membre certifié (${reception.typePrime}) trouvé — distribution impossible`);
+    }
+  }
+
+  // 2b. Calculer tonnage par membre (livraisons de la campagne)
   const livraisons = await db
     .select({
       membreId: livraisonsTable.membreId,
@@ -223,11 +264,21 @@ export async function creerDistribution(cooperativeId: number, data: CreateDistr
         sql`${livraisonsTable.membreId} IN (
           SELECT id FROM membres WHERE cooperative_id = ${cooperativeId}
         )`,
+        // Pour les primes de certification : restreindre aux membres certifiés
+        ...(certifiedMemberIds
+          ? [inArray(livraisonsTable.membreId, certifiedMemberIds)]
+          : []),
       )
     )
     .groupBy(livraisonsTable.membreId);
 
-  if (livraisons.length === 0) throw new Error("Aucune livraison trouvée pour cette campagne");
+  if (livraisons.length === 0) {
+    throw new Error(
+      certifiedMemberIds
+        ? "Aucune livraison trouvée pour les membres certifiés sur cette campagne"
+        : "Aucune livraison trouvée pour cette campagne"
+    );
+  }
 
   const tonnageTotalKg = livraisons.reduce((acc, l) => acc + parseFloat(String(l.totalKg ?? 0)), 0);
   if (tonnageTotalKg === 0) throw new Error("Tonnage total nul");
