@@ -868,19 +868,17 @@ export async function debiterCaisseParResponsable(
 // N'exige pas de session ouverte (session_id nullable depuis la migration).
 // L'écriture comptable est gérée séparément par generateEcrituresSalaire.
 
-// ─── Débit compte Mobile Marchand pour paiement d'une prime ──────────────────
-// Cherche le compte actif par opérateur + coopérative. Ne lève pas d'exception
-// si le compte est absent ou insuffisant (warning logs) — le débit est quand
-// même enregistré même si le solde passe négatif, cohérent avec le pattern
-// paiements producteurs.
+// ─── Vérification compte Mobile Marchand avant paiement de prime ─────────────
+// Lève une exception claire si le compte est absent ou le solde insuffisant.
 
-export async function debiterCompteMobilePourPrime(
+export async function verifierCompteMobilePourPrime(
   cooperativeId: number,
   operateur: string,
   montantFcfa: number,
-  primeMembreId: number,
-  userId: number,
-): Promise<{ nouveauSolde: number; alerte?: string }> {
+): Promise<void> {
+  const LABELS: Record<string, string> = { orange_money: "Orange Money", mtn_momo: "MTN MoMo", wave: "Wave" };
+  const label = LABELS[operateur] ?? operateur;
+
   const [compte] = await db
     .select()
     .from(comptesMobilesMarchandsTable)
@@ -892,16 +890,54 @@ export async function debiterCompteMobilePourPrime(
     .limit(1);
 
   if (!compte) {
-    logger.warn({ cooperativeId, operateur, primeMembreId }, "Aucun compte Mobile Marchand actif trouvé pour débit prime — débit ignoré");
-    return { nouveauSolde: 0 };
+    throw new Error(`Aucun compte ${label} actif n'est configuré pour cette coopérative. Créez un compte Mobile Marchand dans la page Caisse.`);
+  }
+
+  const solde = parseFloat(compte.soldeActuelFcfa as string);
+  if (solde < Math.round(montantFcfa)) {
+    throw new Error(
+      `Solde ${label} insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA, requis : ${Math.round(montantFcfa).toLocaleString("fr-FR")} FCFA`,
+    );
+  }
+}
+
+// ─── Débit compte Mobile Marchand pour paiement d'une prime ──────────────────
+// Suppose que verifierCompteMobilePourPrime a déjà été appelée. Lève une
+// exception si le compte est introuvable ou si le solde est devenu insuffisant
+// entre la vérification et le débit.
+
+export async function debiterCompteMobilePourPrime(
+  cooperativeId: number,
+  operateur: string,
+  montantFcfa: number,
+  primeMembreId: number,
+  userId: number,
+): Promise<{ nouveauSolde: number; alerte?: string }> {
+  const LABELS: Record<string, string> = { orange_money: "Orange Money", mtn_momo: "MTN MoMo", wave: "Wave" };
+  const label = LABELS[operateur] ?? operateur;
+
+  const [compte] = await db
+    .select()
+    .from(comptesMobilesMarchandsTable)
+    .where(and(
+      eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
+      eq(comptesMobilesMarchandsTable.operateur, operateur as "wave" | "orange_money" | "mtn_momo"),
+      eq(comptesMobilesMarchandsTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!compte) {
+    throw new Error(`Aucun compte ${label} actif n'est configuré pour cette coopérative.`);
   }
 
   const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
-  if (soldeActuel < montantFcfa) {
-    logger.warn({ cooperativeId, operateur, primeMembreId, soldeActuel, montantFcfa }, "Solde Mobile Marchand insuffisant — débit quand même enregistré");
+  if (soldeActuel < Math.round(montantFcfa)) {
+    throw new Error(
+      `Solde ${label} insuffisant. Disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA, requis : ${Math.round(montantFcfa).toLocaleString("fr-FR")} FCFA`,
+    );
   }
 
-  const nouveauSolde = soldeActuel - montantFcfa;
+  const nouveauSolde = soldeActuel - Math.round(montantFcfa);
   const today = new Date().toISOString().slice(0, 10);
 
   await db.transaction(async (tx) => {
@@ -910,7 +946,7 @@ export async function debiterCompteMobilePourPrime(
       cooperativeId,
       type:           "debit",
       motif:          "paiement_prime",
-      montantFcfa:    montantFcfa.toString(),
+      montantFcfa:    Math.round(montantFcfa).toString(),
       libelle:        `Prime producteur PRM-PAY-${primeMembreId}`,
       reference:      `PRM-PAY-${primeMembreId}`,
       dateOperation:  today,
@@ -928,7 +964,7 @@ export async function debiterCompteMobilePourPrime(
   const seuilMini = parseFloat(compte.soldeMiniAlerteFcfa as string);
   let alerte: string | undefined;
   if (seuilMini > 0 && nouveauSolde < seuilMini) {
-    alerte = `⚠️ Compte ${operateur} sous le seuil minimum (${nouveauSolde.toLocaleString("fr-FR")} FCFA)`;
+    alerte = `⚠️ Compte ${label} sous le seuil minimum (${nouveauSolde.toLocaleString("fr-FR")} FCFA)`;
     logger.warn({ cooperativeId, operateur, nouveauSolde, seuilMini }, "Compte Mobile Marchand sous seuil minimum après paiement prime");
   }
 

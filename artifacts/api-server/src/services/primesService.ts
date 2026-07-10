@@ -3,7 +3,7 @@ import { db, primesReceptionsTable, primesDistributionsTable, primesMembresTable
 import { eq, and, desc, sql, sum, inArray, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { generateEcrituresPrimeReception, generateEcrituresPrimePaiement } from "./comptabiliteService";
-import { verifierCaisseCentrale, debiterCaissePourPrimeMembre, debiterCompteMobilePourPrime } from "./caisseService";
+import { verifierCaisseCentrale, debiterCaissePourPrimeMembre, verifierCompteMobilePourPrime, debiterCompteMobilePourPrime } from "./caisseService";
 
 /** Modes qui déclenchent un débit de la caisse centrale physique. */
 const MODES_ESPECES = new Set(["especes", "espèces", "caisse"]);
@@ -433,18 +433,24 @@ export async function payerMembre(cooperativeId: number, primeMembreId: number, 
   const modeEstEspeces = MODES_ESPECES.has(modeNorm);
   const modeEstMobile  = MODES_MOBILE_MARCHAND.has(modeNorm);
 
-  // ── 1. Guard caisse espèces ────────────────────────────────────────────────
-  // Vérification AVANT toute modification : lève une exception claire si bloquant.
-  if (modeEstEspeces && pm.montantNetFcfa > 0) {
-    await verifierCaisseCentrale(cooperativeId, pm.montantNetFcfa);
+  // ── 1. Guards AVANT toute modification ────────────────────────────────────
+  // Lève une exception immédiate si le compte/la caisse est absent(e) ou
+  // le solde insuffisant — le membre reste 'en_attente', aucune incohérence.
+  if (pm.montantNetFcfa > 0) {
+    if (modeEstEspeces) await verifierCaisseCentrale(cooperativeId, pm.montantNetFcfa);
+    if (modeEstMobile)  await verifierCompteMobilePourPrime(cooperativeId, modeNorm, pm.montantNetFcfa);
   }
 
-  // ── 2. Débit caisse AVANT le changement de statut ─────────────────────────
-  // Ordre intentionnel : si le débit échoue (caisse fermée entre-temps, etc.),
-  // le membre reste 'en_attente' — aucune incohérence comptable.
-  if (modeEstEspeces && pm.montantNetFcfa > 0) {
-    const { alerte } = await debiterCaissePourPrimeMembre(userId, cooperativeId, pm.montantNetFcfa, pm.id);
-    if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte caisse après paiement prime");
+  // ── 2. Débits AVANT le changement de statut ───────────────────────────────
+  if (pm.montantNetFcfa > 0) {
+    if (modeEstEspeces) {
+      const { alerte } = await debiterCaissePourPrimeMembre(userId, cooperativeId, pm.montantNetFcfa, pm.id);
+      if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte caisse après paiement prime");
+    }
+    if (modeEstMobile) {
+      const { alerte } = await debiterCompteMobilePourPrime(cooperativeId, modeNorm, pm.montantNetFcfa, pm.id, userId);
+      if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte compte mobile après paiement prime");
+    }
   }
 
   // ── 3. Marquer le membre comme payé ───────────────────────────────────────
@@ -465,14 +471,6 @@ export async function payerMembre(cooperativeId: number, primeMembreId: number, 
   // ── 4. Réduire les avances (après paiement effectif) ──────────────────────
   if (pm.deductionAvancesFcfa > 0) {
     await reduireAvances(pm.membreId, pm.deductionAvancesFcfa);
-  }
-
-  // ── 4b. Débit compte Mobile Marchand ──────────────────────────────────────
-  if (modeEstMobile && pm.montantNetFcfa > 0) {
-    const { alerte } = await debiterCompteMobilePourPrime(
-      cooperativeId, modeNorm, pm.montantNetFcfa, pm.id, userId,
-    );
-    if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte compte mobile après paiement prime");
   }
 
   // ── 5. Écriture OHADA : Débit 6018 / Crédit 554/571/521 (fire-and-forget) ─
@@ -518,16 +516,14 @@ export async function payerBulk(
       eq(primesMembresTable.statut, "en_attente"),
     ));
 
-  // Guard caisse espèces — vérifier le total AVANT toute modification
+  // Guards AVANT toute modification — vérifie compte + solde sur le total global
   const modeNormBulk   = data.modePaiement.toLowerCase();
   const modeEstEspeces = MODES_ESPECES.has(modeNormBulk);
   const modeEstMobile  = MODES_MOBILE_MARCHAND.has(modeNormBulk);
-  if (modeEstEspeces) {
-    const totalEspeces = membresEnAttente.reduce((s, { pm }) => s + pm.montantNetFcfa, 0);
-    if (totalEspeces > 0) {
-      // Lève une exception claire si la caisse est fermée ou le solde insuffisant
-      await verifierCaisseCentrale(cooperativeId, totalEspeces);
-    }
+  const totalNet = membresEnAttente.reduce((s, { pm }) => s + pm.montantNetFcfa, 0);
+  if (totalNet > 0) {
+    if (modeEstEspeces) await verifierCaisseCentrale(cooperativeId, totalNet);
+    if (modeEstMobile)  await verifierCompteMobilePourPrime(cooperativeId, modeNormBulk, totalNet);
   }
 
   // Paiement en masse
