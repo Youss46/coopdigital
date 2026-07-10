@@ -58,3 +58,4 @@ export * from "./system";
 export * from "./webauthn";
 export * from "./certifications";
 export * from "./missionsEnquete";
+export * from "./primes";

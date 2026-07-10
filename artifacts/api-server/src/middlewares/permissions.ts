@@ -389,6 +389,15 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     exporter_rapport:["pca", "directeur", "responsable_tracabilite"],
   },
 
+  // MODULE PRIMES & REDISTRIBUTION
+  primes: {
+    lire:    ["pca", "directeur", "comptable", "auditeur"],
+    creer:   ["pca", "directeur", "comptable"],
+    modifier:["pca", "directeur", "comptable"],
+    valider: ["pca", "directeur"],
+    payer:   ["pca", "directeur", "comptable", "caissier"],
+  },
+
   // MODULE — PLANIFICATION DES COLLECTES
   planning_collecte: {
     voir:        ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
