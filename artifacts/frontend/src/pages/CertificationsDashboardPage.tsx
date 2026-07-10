@@ -200,7 +200,7 @@ export default function CertificationsDashboardPage() {
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 20px" }}>
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div className="flex flex-wrap items-start justify-between gap-3" style={{ marginBottom: 24 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#111827" }}>
             Tableau de bord — Certifications
@@ -209,7 +209,7 @@ export default function CertificationsDashboardPage() {
             Vue synthétique de la conformité par type de certification
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="flex flex-wrap gap-2">
           <button onClick={() => refetch()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "#374151" }}>
             <RefreshCw size={14} />Actualiser
           </button>
@@ -223,7 +223,7 @@ export default function CertificationsDashboardPage() {
       </div>
 
       {isLoading || !data ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 28 }}>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" style={{ marginBottom: 28 }}>
           {[...Array(4)].map((_, i) => (
             <div key={i} style={{ background: "#f3f4f6", borderRadius: 12, height: 80, animation: "pulse 1.5s infinite" }} />
           ))}
@@ -231,7 +231,7 @@ export default function CertificationsDashboardPage() {
       ) : (
         <>
           {/* KPI Cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 28 }}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" style={{ marginBottom: 28 }}>
             <KpiCard label="Certifications actives"  value={data.kpis.actives}           color="#16a34a" Icon={CheckCircle}   />
             <KpiCard label="Membres certifiés"        value={data.kpis.membresCertifies}  color="#2563eb" Icon={Users}         />
             <KpiCard label="À renouveler (90 jours)"  value={data.kpis.aRenouveler}      color="#d97706" Icon={AlertTriangle} sub={data.kpis.aRenouveler > 0 ? "Action requise" : undefined} />
@@ -295,7 +295,7 @@ export default function CertificationsDashboardPage() {
           )}
 
           {/* Liens rapides bottom */}
-          <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
+          <div className="flex flex-wrap gap-3" style={{ marginTop: 28 }}>
             <Link href="/enquetes" style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, fontSize: 13, textDecoration: "none", color: "#374151", fontWeight: 500 }}>
               <ClipboardList size={14} color="#2563eb" />Voir toutes les missions d'enquête
             </Link>
