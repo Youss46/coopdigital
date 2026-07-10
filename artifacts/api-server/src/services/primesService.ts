@@ -3,10 +3,13 @@ import { db, primesReceptionsTable, primesDistributionsTable, primesMembresTable
 import { eq, and, desc, sql, sum, inArray, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { generateEcrituresPrimeReception, generateEcrituresPrimePaiement } from "./comptabiliteService";
-import { verifierCaisseCentrale, debiterCaissePourPrimeMembre } from "./caisseService";
+import { verifierCaisseCentrale, debiterCaissePourPrimeMembre, debiterCompteMobilePourPrime } from "./caisseService";
 
 /** Modes qui déclenchent un débit de la caisse centrale physique. */
 const MODES_ESPECES = new Set(["especes", "espèces", "caisse"]);
+
+/** Modes qui déclenchent un débit du compte Mobile Marchand correspondant. */
+const MODES_MOBILE_MARCHAND = new Set(["orange_money", "mtn_momo", "wave", "moov_money"]);
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 
@@ -426,7 +429,9 @@ export async function payerMembre(cooperativeId: number, primeMembreId: number, 
   ]);
   if (!dist || dist.statut === "brouillon") throw new Error("La distribution doit être validée avant paiement");
 
-  const modeEstEspeces = MODES_ESPECES.has(data.modePaiement.toLowerCase());
+  const modeNorm       = data.modePaiement.toLowerCase();
+  const modeEstEspeces = MODES_ESPECES.has(modeNorm);
+  const modeEstMobile  = MODES_MOBILE_MARCHAND.has(modeNorm);
 
   // ── 1. Guard caisse espèces ────────────────────────────────────────────────
   // Vérification AVANT toute modification : lève une exception claire si bloquant.
@@ -460,6 +465,14 @@ export async function payerMembre(cooperativeId: number, primeMembreId: number, 
   // ── 4. Réduire les avances (après paiement effectif) ──────────────────────
   if (pm.deductionAvancesFcfa > 0) {
     await reduireAvances(pm.membreId, pm.deductionAvancesFcfa);
+  }
+
+  // ── 4b. Débit compte Mobile Marchand ──────────────────────────────────────
+  if (modeEstMobile && pm.montantNetFcfa > 0) {
+    const { alerte } = await debiterCompteMobilePourPrime(
+      cooperativeId, modeNorm, pm.montantNetFcfa, pm.id, userId,
+    );
+    if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte compte mobile après paiement prime");
   }
 
   // ── 5. Écriture OHADA : Débit 6018 / Crédit 554/571/521 (fire-and-forget) ─
@@ -506,7 +519,9 @@ export async function payerBulk(
     ));
 
   // Guard caisse espèces — vérifier le total AVANT toute modification
-  const modeEstEspeces = MODES_ESPECES.has(data.modePaiement.toLowerCase());
+  const modeNormBulk   = data.modePaiement.toLowerCase();
+  const modeEstEspeces = MODES_ESPECES.has(modeNormBulk);
+  const modeEstMobile  = MODES_MOBILE_MARCHAND.has(modeNormBulk);
   if (modeEstEspeces) {
     const totalEspeces = membresEnAttente.reduce((s, { pm }) => s + pm.montantNetFcfa, 0);
     if (totalEspeces > 0) {
@@ -552,6 +567,17 @@ export async function payerBulk(
           })
           .catch(err =>
             logger.error({ err, primeMembreId: pm.id }, "Erreur débit caisse bulk"),
+          );
+      }
+
+      // 2b. Débit compte Mobile Marchand
+      if (modeEstMobile) {
+        await debiterCompteMobilePourPrime(cooperativeId, modeNormBulk, pm.montantNetFcfa, pm.id, userId)
+          .then(({ alerte }) => {
+            if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte compte mobile bulk");
+          })
+          .catch(err =>
+            logger.error({ err, primeMembreId: pm.id }, "Erreur débit mobile bulk"),
           );
       }
 

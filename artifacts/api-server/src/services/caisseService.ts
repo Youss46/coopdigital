@@ -868,6 +868,73 @@ export async function debiterCaisseParResponsable(
 // N'exige pas de session ouverte (session_id nullable depuis la migration).
 // L'écriture comptable est gérée séparément par generateEcrituresSalaire.
 
+// ─── Débit compte Mobile Marchand pour paiement d'une prime ──────────────────
+// Cherche le compte actif par opérateur + coopérative. Ne lève pas d'exception
+// si le compte est absent ou insuffisant (warning logs) — le débit est quand
+// même enregistré même si le solde passe négatif, cohérent avec le pattern
+// paiements producteurs.
+
+export async function debiterCompteMobilePourPrime(
+  cooperativeId: number,
+  operateur: string,
+  montantFcfa: number,
+  primeMembreId: number,
+  userId: number,
+): Promise<{ nouveauSolde: number; alerte?: string }> {
+  const [compte] = await db
+    .select()
+    .from(comptesMobilesMarchandsTable)
+    .where(and(
+      eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
+      eq(comptesMobilesMarchandsTable.operateur, operateur as "wave" | "orange_money" | "mtn_momo"),
+      eq(comptesMobilesMarchandsTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!compte) {
+    logger.warn({ cooperativeId, operateur, primeMembreId }, "Aucun compte Mobile Marchand actif trouvé pour débit prime — débit ignoré");
+    return { nouveauSolde: 0 };
+  }
+
+  const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
+  if (soldeActuel < montantFcfa) {
+    logger.warn({ cooperativeId, operateur, primeMembreId, soldeActuel, montantFcfa }, "Solde Mobile Marchand insuffisant — débit quand même enregistré");
+  }
+
+  const nouveauSolde = soldeActuel - montantFcfa;
+  const today = new Date().toISOString().slice(0, 10);
+
+  await db.transaction(async (tx) => {
+    await tx.insert(mouvementsMobileMarchandTable).values({
+      compteId:       compte.id,
+      cooperativeId,
+      type:           "debit",
+      motif:          "paiement_prime",
+      montantFcfa:    montantFcfa.toString(),
+      libelle:        `Prime producteur PRM-PAY-${primeMembreId}`,
+      reference:      `PRM-PAY-${primeMembreId}`,
+      dateOperation:  today,
+      soldeApresFcfa: nouveauSolde.toString(),
+      enregistrePar:  userId,
+    });
+    await tx
+      .update(comptesMobilesMarchandsTable)
+      .set({ soldeActuelFcfa: nouveauSolde.toString() })
+      .where(eq(comptesMobilesMarchandsTable.id, compte.id));
+  });
+
+  logger.info({ cooperativeId, operateur, primeMembreId, montantFcfa, nouveauSolde }, "Compte Mobile Marchand débité (prime membre)");
+
+  const seuilMini = parseFloat(compte.soldeMiniAlerteFcfa as string);
+  let alerte: string | undefined;
+  if (seuilMini > 0 && nouveauSolde < seuilMini) {
+    alerte = `⚠️ Compte ${operateur} sous le seuil minimum (${nouveauSolde.toLocaleString("fr-FR")} FCFA)`;
+    logger.warn({ cooperativeId, operateur, nouveauSolde, seuilMini }, "Compte Mobile Marchand sous seuil minimum après paiement prime");
+  }
+
+  return { nouveauSolde, alerte };
+}
+
 // ─── Débit caisse centrale pour paiement d'une prime à un membre ─────────────
 // Cible la caisse de type "centrale" de la coopérative (pas la caisse du délégué).
 
