@@ -1462,8 +1462,8 @@ export default function MembreFiche() {
                 const meta  = CERTIF_TYPE_META[c.type] ?? CERTIF_TYPE_META.autre!;
                 const conf  = CONFORMITE_META[c.statutConformite] ?? { label: c.statutConformite, cls: "bg-gray-100 text-gray-600" };
                 const Icon  = meta.Icon;
-                const pct   = c.scoreMax > 0 ? Math.round((c.score / c.scoreMax) * 100) : 0;
-                const barColor = pct >= 80 ? "#16a34a" : pct >= 50 ? "#ca8a04" : "#ef4444";
+                const pct   = Math.min(100, Math.round(c.score)); // score est déjà en %
+                const barColor = pct >= 70 ? "#16a34a" : pct >= 40 ? "#ca8a04" : "#ef4444";
                 const criteres: string[] = Array.isArray(c.criteresValides) ? c.criteresValides : [];
                 return (
                   <div key={c.id} className={`rounded-xl border ${meta.border} overflow-hidden`}>
@@ -1487,7 +1487,7 @@ export default function MembreFiche() {
                         <div>
                           <div className="flex justify-between text-xs text-gray-500 mb-1">
                             <span>Score de conformité</span>
-                            <span className="font-semibold">{c.score}/{c.scoreMax} ({pct}%)</span>
+                            <span className="font-semibold">{pct}% · {c.scoreMax} critère{c.scoreMax > 1 ? "s" : ""} actif{c.scoreMax > 1 ? "s" : ""}</span>
                           </div>
                           <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                             <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
