@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
-  Award, Leaf, Star, ShieldCheck, Globe, FileText,
+  Award, Leaf, Star, ShieldCheck, FileText,
   CheckCircle, AlertTriangle, XCircle, Clock, Users,
   TrendingUp, ClipboardList, ChevronRight, RefreshCw,
 } from "lucide-react";
@@ -45,7 +45,6 @@ const TYPE_META: Record<string, { label: string; Icon: React.ElementType; color:
   rainforest_alliance: { label: "Rainforest Alliance", Icon: Leaf,       color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0" },
   fairtrade:           { label: "Fairtrade",           Icon: Star,       color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
   bio:                 { label: "Agriculture Bio",     Icon: ShieldCheck, color: "#059669", bg: "#ecfdf5", border: "#6ee7b7" },
-  eudr:                { label: "EUDR",                Icon: Globe,      color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
   utz:                 { label: "UTZ",                 Icon: Award,      color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" },
   autre:               { label: "Autre",               Icon: FileText,   color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
 };

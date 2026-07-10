@@ -27,12 +27,6 @@ export const CRITERES_PAR_TYPE: Record<string, string[]> = {
     "Zone tampon avec parcelles conventionnelles",
     "Traçabilité des intrants biologiques",
   ],
-  eudr: [
-    "Géolocalisation GPS des parcelles complète",
-    "Déforestation zéro après 2020 prouvée",
-    "Conformité réglementaire pays d'origine",
-    "Diligence raisonnée documentée",
-  ],
   utz: [
     "Bonnes pratiques agricoles",
     "Traçabilité interne",

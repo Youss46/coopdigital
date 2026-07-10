@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Award, Plus, CheckCircle, AlertTriangle, Clock, XCircle,
   RefreshCw, FileText, Users, ChevronRight, Trash2, Edit2,
-  ShieldCheck, Leaf, Globe, Star, BarChart2, X, Download,
+  ShieldCheck, Leaf, Star, BarChart2, X, Download,
   ClipboardCheck, CalendarDays,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -108,7 +108,6 @@ const TYPES_CERTIF = [
   { value: "rainforest_alliance", label: "Rainforest Alliance", icon: Leaf,       color: "text-green-600",  bg: "bg-green-50",  border: "border-green-200" },
   { value: "fairtrade",           label: "Fairtrade",           icon: Star,       color: "text-blue-600",   bg: "bg-blue-50",   border: "border-blue-200" },
   { value: "bio",                 label: "Agriculture Bio",     icon: ShieldCheck, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
-  { value: "eudr",                label: "EUDR",                icon: Globe,      color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
   { value: "utz",                 label: "UTZ",                 icon: Award,      color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-200" },
   { value: "autre",               label: "Autre",               icon: FileText,   color: "text-gray-600",   bg: "bg-gray-50",   border: "border-gray-200" },
 ];
@@ -825,7 +824,7 @@ export default function CertificationsPage() {
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Award className="text-green-600" size={26} />Certifications
           </h1>
-          <p className="text-gray-500 text-sm mt-0.5">Rainforest Alliance, Fairtrade, Bio, EUDR et autres certifications</p>
+          <p className="text-gray-500 text-sm mt-0.5">Rainforest Alliance, Fairtrade, Bio, UTZ et autres certifications</p>
         </div>
         {canWrite && (
           <button onClick={() => setShowCreate(true)}
@@ -886,12 +885,11 @@ export default function CertificationsPage() {
       {/* ─── Vue canonique : 4 certifications principales toujours visibles ───── */}
       <div>
         <h2 className="text-sm font-semibold text-gray-700 mb-3">Certifications principales</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {[
             { value: "rainforest_alliance", label: "Rainforest Alliance", icon: Leaf,        color: "text-green-600",  bg: "bg-green-50",   border: "border-green-200" },
             { value: "fairtrade",           label: "Fairtrade",           icon: Star,        color: "text-blue-600",   bg: "bg-blue-50",    border: "border-blue-200" },
             { value: "bio",                 label: "Agriculture Bio",     icon: ShieldCheck,  color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
-            { value: "eudr",                label: "EUDR",                icon: Globe,       color: "text-orange-600", bg: "bg-orange-50",  border: "border-orange-200" },
           ].map(t => {
             const Icon = t.icon;
             const existing = certifications.filter(c => c.type === t.value);

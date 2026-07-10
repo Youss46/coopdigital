@@ -54,7 +54,6 @@ const TYPE_LABEL: Record<string, string> = {
   rainforest_alliance: "Rainforest Alliance",
   fairtrade: "Fairtrade",
   bio: "Agriculture Bio",
-  eudr: "EUDR",
 };
 
 function StatutBadge({ statut }: { statut: string }) {
