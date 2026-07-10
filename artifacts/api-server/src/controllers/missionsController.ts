@@ -1181,7 +1181,7 @@ export async function createAgentTerrain(req: Request, res: Response): Promise<v
         nom,
         prenoms,
         email,
-        telephone: telephone ?? null,
+        telephone: telephone ? telephone.trim().replace(/\s+/g, "") : null,
         passwordHash,
         role: "agent_terrain",
         cooperativeId,

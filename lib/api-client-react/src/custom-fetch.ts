@@ -169,6 +169,7 @@ function buildErrorMessage(response: Response, data: unknown): string {
   const title = getStringField(data, "title");
   const detail = getStringField(data, "detail");
   const message =
+    getStringField(data, "erreur") ??
     getStringField(data, "message") ??
     getStringField(data, "error_description") ??
     getStringField(data, "error");

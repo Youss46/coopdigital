@@ -94,7 +94,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
         nom,
         prenoms,
         email,
-        telephone: telephone ?? null,
+        telephone: telephone ? telephone.trim().replace(/\s+/g, "") : null,
         passwordHash,
         role,
         cooperativeId,
@@ -226,10 +226,16 @@ export async function resetUserPassword(req: Request, res: Response): Promise<vo
     }
 
     const passwordHash = await bcrypt.hash(parse.data.nouveauMotDePasse, 10);
-    await db
+    const [updated] = await db
       .update(usersTable)
       .set({ passwordHash, motDePasseTemporaire: true })
-      .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)));
+      .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)))
+      .returning({ id: usersTable.id });
+
+    if (!updated) {
+      res.status(404).json({ erreur: "Compte introuvable ou accès non autorisé" });
+      return;
+    }
 
     res.json({ message: "Mot de passe réinitialisé avec succès" });
   } catch (err) {

@@ -25,10 +25,11 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
   const secret = process.env["JWT_SECRET"];
   if (!secret) throw new Error("JWT_SECRET non configuré");
 
+  const tel = telephone.trim().replace(/\s+/g, "");
   const [user] = await db
     .select()
     .from(usersTable)
-    .where(and(eq(usersTable.telephone, telephone), eq(usersTable.actif, true)))
+    .where(and(eq(usersTable.telephone, tel), eq(usersTable.actif, true)))
     .limit(1);
 
   if (!user || (user.role !== "delegue" && user.role !== "agent_terrain")) return null;
