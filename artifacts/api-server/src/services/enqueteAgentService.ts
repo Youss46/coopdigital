@@ -1,7 +1,7 @@
 import {
   db, missionsEnqueteTable, enqueteMembresTable, membresTable, certificationsTable,
 } from "@workspace/db";
-import { and, eq, desc, sql } from "drizzle-orm";
+import { and, eq, desc, sql, inArray } from "drizzle-orm";
 import { CRITERES_PAR_TYPE } from "./certificationService.js";
 import type { ReponsesCriteres } from "./missionsEnqueteService.js";
 
@@ -32,7 +32,7 @@ export async function getEnquetesAgent(agentId: number, cooperativeId: number) {
     .where(and(
       eq(missionsEnqueteTable.cooperativeId, cooperativeId),
       eq(missionsEnqueteTable.agentId, agentId),
-      sql`(statut IN ('planifiee', 'en_cours', 'soumise'))`,
+      inArray(missionsEnqueteTable.statut, ["planifiee", "en_cours", "soumise"]),
     ))
     .orderBy(desc(missionsEnqueteTable.datePrevue));
 
