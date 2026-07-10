@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearch } from "wouter";
+import { useSearch, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Award, Plus, CheckCircle, AlertTriangle, Clock, XCircle,
@@ -637,12 +637,12 @@ function DetailPanel({ certif, onClose, canWrite, onEdit }: {
               </div>
 
               {canWrite && (
-                <button
-                  onClick={() => setEvalMembre({ membreId: 0, nom: "Nouveau membre", existing: null })}
+                <Link
+                  href={`/enquetes?certifId=${certif.id}&nouveau=1`}
                   className="w-full flex items-center justify-center gap-2 text-sm border-2 border-dashed border-green-300 text-green-700 rounded-lg py-3 hover:bg-green-50 transition-colors"
                 >
-                  <Plus size={16} />Évaluer un membre
-                </button>
+                  <Plus size={16} />Créer une mission d'enquête
+                </Link>
               )}
 
               {membres.length === 0 ? (
@@ -735,101 +735,6 @@ function DetailPanel({ certif, onClose, canWrite, onEdit }: {
           onSaved={() => { void refetchMembres(); qc.invalidateQueries({ queryKey: ["certifications-stats"] }).catch(() => {}); }}
         />
       )}
-
-      {evalMembre && evalMembre.membreId === 0 && (
-        <NouvelleEvalForm
-          certif={certif}
-          criteres={criteres}
-          onClose={() => setEvalMembre(null)}
-          onSaved={() => { void refetchMembres(); qc.invalidateQueries({ queryKey: ["certifications-stats"] }).catch(() => {}); }}
-        />
-      )}
-    </div>
-  );
-}
-
-// ─── Formulaire Nouvelle évaluation (sélection du membre) ────────────────────
-
-function NouvelleEvalForm({ certif, criteres, onClose, onSaved }: {
-  certif: Certification;
-  criteres: string[];
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  interface MembreOption { id: number; nom: string; prenom: string; }
-  const { toast } = useToast();
-  const [membreId, setMembreId] = useState<number | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [notes, setNotes] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const { data: membresData } = useQuery<{ membres: MembreOption[]; total: number }>({
-    queryKey: ["membres-list"],
-    queryFn: () => apiFetch("/api/membres?statut=actif&limit=100"),
-  });
-  const membres = membresData?.membres ?? [];
-
-  const toggle = (c: string) => setSelected(prev => { const n = new Set(prev); n.has(c) ? n.delete(c) : n.add(c); return n; });
-  const score = selected.size;
-  const pct = criteres.length > 0 ? Math.round(score / criteres.length * 100) : 0;
-  const statut = pct >= 80 ? "certifie" : pct >= 50 ? "en_cours" : "non_conforme";
-  const confInfo = STATUT_CONFORMITE_LABELS[statut] ?? STATUT_CONFORMITE_LABELS["non_conforme"]!;
-
-  async function handleSubmit() {
-    if (!membreId) { toast({ title: "Sélectionnez un membre", variant: "destructive" }); return; }
-    setLoading(true);
-    try {
-      await apiPost(`/api/certifications/${certif.id}/membres`, {
-        membreId, criteresValides: Array.from(selected), notes: notes || null,
-        dateEvaluation: new Date().toISOString().slice(0, 10),
-      });
-      toast({ title: "Évaluation enregistrée" });
-      onSaved(); onClose();
-    } catch {
-      toast({ title: "Erreur", variant: "destructive" });
-    } finally { setLoading(false); }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
-        <div className="p-5 border-b flex items-center justify-between">
-          <h4 className="font-semibold text-gray-900 flex items-center gap-2"><ClipboardCheck size={16} />Nouvelle évaluation</h4>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-        </div>
-        <div className="p-5 space-y-4 overflow-y-auto flex-1">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Membre *</label>
-            <select className="w-full border rounded-lg px-3 py-2 text-sm" value={membreId ?? ""} onChange={e => setMembreId(parseInt(e.target.value) || null)}>
-              <option value="">— Sélectionner un membre —</option>
-              {membres.map((m: MembreOption) => <option key={m.id} value={m.id}>{m.prenom} {m.nom}</option>)}
-            </select>
-          </div>
-          <div className={`flex items-center justify-between px-4 py-3 rounded-lg border text-sm font-medium ${confInfo.cls}`}>
-            <span>Score : {score}/{criteres.length} ({pct}%)</span>
-            <span>{confInfo.label}</span>
-          </div>
-          <div className="space-y-2">
-            {criteres.map(crit => (
-              <label key={crit} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer ${selected.has(crit) ? "bg-green-50 border-green-300" : "bg-gray-50 border-gray-200"}`}>
-                <input type="checkbox" checked={selected.has(crit)} onChange={() => toggle(crit)} className="accent-green-600 w-4 h-4" />
-                <span className={`text-sm ${selected.has(crit) ? "text-green-800 font-medium" : "text-gray-700"}`}>{crit}</span>
-              </label>
-            ))}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-            <textarea rows={2} className="w-full border rounded-lg px-3 py-2 text-sm" value={notes} onChange={e => setNotes(e.target.value)} />
-          </div>
-        </div>
-        <div className="p-5 border-t flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border rounded-lg">Annuler</button>
-          <button onClick={() => void handleSubmit()} disabled={loading || !membreId}
-            className="px-4 py-2 text-sm text-white bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50 flex items-center gap-2">
-            {loading && <RefreshCw size={14} className="animate-spin" />}Enregistrer
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

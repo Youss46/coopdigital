@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ClipboardList, Plus, Eye, Clock, CheckCircle, Users, Calendar,
@@ -69,15 +69,16 @@ function StatutBadge({ statut }: { statut: string }) {
 
 // ── Formulaire création ────────────────────────────────────────────────────────
 
-function NouvelleEnqueteForm({ certifications, agents, membres, onClose, onCreated }: {
+function NouvelleEnqueteForm({ certifications, agents, membres, onClose, onCreated, initialCertifId }: {
   certifications: Certification[];
   agents: Agent[];
   membres: Membre[];
   onClose: () => void;
   onCreated: () => void;
+  initialCertifId?: string;
 }) {
   const [form, setForm] = useState({
-    titre: "", certificationId: "", datePrevue: "", agentId: "", instructions: "",
+    titre: "", certificationId: initialCertifId ?? "", datePrevue: "", agentId: "", instructions: "",
   });
   const [selectedMembres, setSelectedMembres] = useState<number[]>([]);
   const [search, setSearch] = useState("");
@@ -206,7 +207,12 @@ function NouvelleEnqueteForm({ certifications, agents, membres, onClose, onCreat
 
 export default function MissionsEnquetePage() {
   const { utilisateur: user } = useAuth();
-  const [showForm, setShowForm] = useState(false);
+  const search_ = useSearch();
+  const urlParams = new URLSearchParams(search_);
+  const urlCertifId = urlParams.get("certifId") ?? undefined;
+  const urlNouveau  = urlParams.get("nouveau") === "1";
+
+  const [showForm, setShowForm] = useState(urlNouveau);
   const [filterStatut, setFilterStatut] = useState<string>("tous");
   const [search, setSearch] = useState("");
 
@@ -225,10 +231,11 @@ export default function MissionsEnquetePage() {
     queryFn: () => apiFetch("/api/enquetes/agents"),
   });
 
-  const { data: membres = [] } = useQuery<Membre[]>({
+  const { data: membresData } = useQuery<{ membres: Membre[]; total: number }>({
     queryKey: ["membres", "liste"],
-    queryFn: () => apiFetch("/api/membres?limit=500"),
+    queryFn: () => apiFetch("/api/membres?limit=100"),
   });
+  const membres = membresData?.membres ?? [];
 
   const filtered = enquetes.filter(e => {
     const matchStatut = filterStatut === "tous" || e.statut === filterStatut;
@@ -372,7 +379,8 @@ export default function MissionsEnquetePage() {
         <NouvelleEnqueteForm
           certifications={certifications.filter(c => c.statut !== "expire")}
           agents={agents}
-          membres={membres as Membre[]}
+          membres={membres}
+          initialCertifId={urlCertifId}
           onClose={() => setShowForm(false)}
           onCreated={() => refetch()}
         />

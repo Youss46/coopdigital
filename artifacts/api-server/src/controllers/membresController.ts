@@ -117,7 +117,7 @@ export async function listMembres(req: Request, res: Response): Promise<void> {
 
   try {
     const page = Math.max(1, parseInt(String(req.query["page"] ?? "1")));
-    const limit = Math.min(100, Math.max(1, parseInt(String(req.query["limit"] ?? "20"))));
+    const limit = Math.min(500, Math.max(1, parseInt(String(req.query["limit"] ?? "20"))));
     const search = String(req.query["search"] ?? "").trim();
     const statut = req.query["statut"] as string | undefined;
     const statutMembre = req.query["statut_membre"] as string | undefined;
