@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useLocation } from "wouter";
-import { apiGet, soumettreEnqueteOffline } from "../lib/api";
+import { apiGet, apiPost, soumettreEnqueteOffline } from "../lib/api";
 import { useOffline } from "../contexts/OfflineContext";
 import type { EnqueteDetail } from "../lib/types";
 
@@ -54,16 +54,7 @@ export default function CollecteEnquete() {
         return;
       }
 
-      const token = localStorage.getItem("coop_token") ?? "";
-      const r = await fetch(
-        `${import.meta.env.VITE_API_URL ?? ""}/api/terrain/enquetes/${missionId}/membres/${mId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ reponses, notesAgent: notesAgent || undefined }),
-        },
-      );
-      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error((b as { erreur?: string }).erreur ?? "Erreur"); }
+      await apiPost(`/enquetes/${missionId}/membres/${mId}`, { reponses, notesAgent: notesAgent || undefined });
       setSubmitted(true);
       setTimeout(() => navigate(`/enquetes/${missionId}`), 1500);
     } catch (e) {
