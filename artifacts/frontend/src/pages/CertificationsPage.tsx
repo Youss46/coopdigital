@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Award, Plus, CheckCircle, AlertTriangle, Clock, XCircle,
@@ -856,6 +857,16 @@ export default function CertificationsPage() {
     queryKey: ["certifications"],
     queryFn: () => apiFetch("/api/certifications"),
   });
+
+  // Auto-ouvre le panneau détail si ?id=X est présent dans l'URL (lien depuis le tableau de bord)
+  const search = useSearch();
+  useEffect(() => {
+    if (!certifications.length) return;
+    const idParam = new URLSearchParams(search).get("id");
+    if (!idParam) return;
+    const found = certifications.find(c => c.id === Number(idParam));
+    if (found) setDetail(found);
+  }, [certifications, search]);
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["certifications"] });

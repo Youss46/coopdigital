@@ -105,7 +105,7 @@ function CertifCard({ c }: { c: CertifDashItem }) {
   const expired      = c.statut === "expire";
 
   return (
-    <Link href={`/certifications/${c.id}`} style={{ textDecoration: "none" }}>
+    <Link href={`/certifications?id=${c.id}`} style={{ textDecoration: "none" }}>
       <div style={{
         background: "#fff", border: `1px solid ${expired ? "#fecaca" : urgentExpiry ? "#fde68a" : meta.border}`,
         borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 14,
@@ -254,7 +254,7 @@ export default function CertificationsDashboardPage() {
                     ? Math.round((new Date(c.dateExpiration).getTime() - Date.now()) / 86_400_000)
                     : null;
                   return (
-                    <Link key={c.id} href={`/certifications/${c.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, color: "#374151", textDecoration: "none", padding: "6px 10px", background: "#fff8", borderRadius: 8 }}>
+                    <Link key={c.id} href={`/certifications?id=${c.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, color: "#374151", textDecoration: "none", padding: "6px 10px", background: "#fff8", borderRadius: 8 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <meta.Icon size={13} color={meta.color} />
                         <span style={{ fontWeight: 600 }}>{meta.label}</span>
