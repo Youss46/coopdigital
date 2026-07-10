@@ -7,17 +7,32 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-const BASE = "";
+const BASE = import.meta.env.VITE_API_URL ?? "";
 function getToken() { return localStorage.getItem("coop_token") ?? ""; }
 function authHeader() { return { Authorization: `Bearer ${getToken()}` }; }
 async function apiFetch<T>(path: string): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { headers: authHeader() });
-  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error((b as { erreur?: string }).erreur ?? `${r.status}`); }
+  if (!r.ok) {
+    const text = await r.text().catch(() => "");
+    // Détecter HTML (route inconnue ou erreur Vercel/proxy) → message lisible
+    if (text.trimStart().startsWith("<")) {
+      throw new Error(`HTTP ${r.status} — la route ${path} est introuvable sur le serveur (réponse HTML reçue)`);
+    }
+    const b = JSON.parse(text || "{}") as { erreur?: string };
+    throw new Error(b.erreur ?? `HTTP ${r.status}`);
+  }
   return r.json() as Promise<T>;
 }
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(body) });
-  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error((b as { erreur?: string }).erreur ?? `${r.status}`); }
+  if (!r.ok) {
+    const text = await r.text().catch(() => "");
+    if (text.trimStart().startsWith("<")) {
+      throw new Error(`HTTP ${r.status} — la route ${path} est introuvable sur le serveur (réponse HTML reçue)`);
+    }
+    const b = JSON.parse(text || "{}") as { erreur?: string };
+    throw new Error(b.erreur ?? `HTTP ${r.status}`);
+  }
   return r.json() as Promise<T>;
 }
 
@@ -270,6 +285,7 @@ export default function MissionsEnquetePage() {
   const { data: certifications = [] } = useQuery<Certification[]>({
     queryKey: ["certifications"],
     queryFn: () => apiFetch("/api/certifications"),
+    staleTime: 60_000,
   });
 
 

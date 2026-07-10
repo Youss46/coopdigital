@@ -23,9 +23,9 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   const token = authHeader.slice(7);
-  const secret = process.env["JWT_SECRET"];
+  const secret = process.env["JWT_SECRET"] ?? process.env["SESSION_SECRET"];
   if (!secret) {
-    req.log.error("JWT_SECRET non configuré");
+    req.log.error("JWT_SECRET et SESSION_SECRET non configurés");
     res.status(500).json({ erreur: "Erreur de configuration du serveur" });
     return;
   }

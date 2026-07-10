@@ -42,10 +42,10 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   const { email, motDePasse } = parse.data;
-  const secret = process.env["JWT_SECRET"];
+  const secret = process.env["JWT_SECRET"] ?? process.env["SESSION_SECRET"];
 
   if (!secret) {
-    req.log.error("JWT_SECRET non configuré");
+    req.log.error("JWT_SECRET et SESSION_SECRET non configurés");
     res.status(500).json({ erreur: "Erreur de configuration du serveur" });
     return;
   }

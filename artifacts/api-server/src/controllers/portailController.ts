@@ -41,7 +41,7 @@ export async function connexionPortail(req: Request, res: Response): Promise<voi
     return;
   }
 
-  const secret = process.env["JWT_SECRET"];
+  const secret = process.env["JWT_SECRET"] ?? process.env["SESSION_SECRET"];
   if (!secret) {
     req.log.error("JWT_SECRET non configuré");
     res.status(500).json({ erreur: "Erreur serveur" });

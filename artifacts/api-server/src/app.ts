@@ -64,6 +64,11 @@ app.get("/api/healthz", (_req, res) => {
 
 app.use("/api", router);
 
+// 404 JSON — toujours retourner JSON, jamais la page HTML par défaut d'Express
+app.use((req: Request, res: Response) => {
+  res.status(404).json({ erreur: `Route introuvable : ${req.method} ${req.url}` });
+});
+
 // Gestionnaire d'erreur global — retourne JSON au lieu du HTML par défaut d'Express
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {

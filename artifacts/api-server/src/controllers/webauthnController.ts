@@ -158,7 +158,7 @@ export async function verifyAuthentication(req: Request, res: Response): Promise
   const { email, response } = req.body as { email?: string; response?: AuthenticationResponseJSON };
   if (!email || !response) { res.status(400).json({ erreur: "Données invalides" }); return; }
 
-  const secret = process.env["JWT_SECRET"];
+  const secret = process.env["JWT_SECRET"] ?? process.env["SESSION_SECRET"];
   if (!secret) {
     req.log.error("JWT_SECRET non configuré");
     res.status(500).json({ erreur: "Erreur de configuration du serveur" });

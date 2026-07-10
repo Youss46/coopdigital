@@ -23,7 +23,7 @@ export function portailAuthMiddleware(req: Request, res: Response, next: NextFun
   }
 
   const token = authHeader.slice(7);
-  const secret = process.env["JWT_SECRET"];
+  const secret = process.env["JWT_SECRET"] ?? process.env["SESSION_SECRET"];
   if (!secret) {
     req.log.error("JWT_SECRET non configuré");
     res.status(500).json({ erreur: "Erreur de configuration du serveur" });
