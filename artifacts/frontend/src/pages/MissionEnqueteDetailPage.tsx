@@ -252,6 +252,26 @@ export default function MissionEnqueteDetailPage() {
   const qc = useQueryClient();
   const [filterStatut, setFilterStatut] = useState("tous");
   const [rejetMembreId, setRejetMembreId] = useState<number | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  async function telechargerPdf() {
+    setPdfLoading(true);
+    try {
+      const r = await fetch(`${BASE}/api/enquetes/${missionId}/rapport.pdf`, { headers: authHeader() });
+      if (!r.ok) throw new Error(`Erreur ${r.status}`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rapport-mission-${missionId}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (e) {
+      alert(`Impossible de télécharger le rapport : ${(e as Error).message}`);
+    } finally {
+      setPdfLoading(false);
+    }
+  }
 
   const { data: mission, isLoading, isError, error } = useQuery<MissionDetail>({
     queryKey: ["enquete", missionId],
@@ -343,11 +363,11 @@ export default function MissionEnqueteDetailPage() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <a href={`/api/enquetes/${missionId}/rapport.pdf`}
-                target="_blank" rel="noreferrer"
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-                <Download size={15} />Rapport PDF
-              </a>
+              <button onClick={telechargerPdf} disabled={pdfLoading}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: pdfLoading ? "default" : "pointer" }}>
+                {pdfLoading ? <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> : <Download size={15} />}
+                {pdfLoading ? "Génération…" : "Rapport PDF"}
+              </button>
               {canValidate && mission.statut === "soumise" && (
                 <button onClick={() => statutMutation.mutate("validee")}
                   disabled={statutMutation.isPending}
