@@ -9,7 +9,7 @@ import { verifierCaisseCentrale, debiterCaissePourPrimeMembre, debiterCompteMobi
 const MODES_ESPECES = new Set(["especes", "espèces", "caisse"]);
 
 /** Modes qui déclenchent un débit du compte Mobile Marchand correspondant. */
-const MODES_MOBILE_MARCHAND = new Set(["orange_money", "mtn_momo", "wave", "moov_money"]);
+const MODES_MOBILE_MARCHAND = new Set(["orange_money", "mtn_momo", "wave"]);
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 

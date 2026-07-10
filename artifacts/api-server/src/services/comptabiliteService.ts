@@ -375,7 +375,7 @@ const MODES_CAISSE = new Set(["caisse", "especes", "espèces"]);
  * SYSCOHADA 554 : Porte-monnaie électronique (Orange Money, MTN MoMo, Wave, etc.)
  */
 const MODES_MOBILE_MARCHAND = new Set([
-  "orange_money", "mtn_momo", "wave", "moov_money", "mobile_money", "mobile_marchand",
+  "orange_money", "mtn_momo", "wave", "mobile_money", "mobile_marchand",
 ]);
 
 /**
