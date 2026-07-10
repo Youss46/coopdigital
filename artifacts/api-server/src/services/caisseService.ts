@@ -890,7 +890,7 @@ export async function verifierCompteMobilePourPrime(
     .limit(1);
 
   if (!compte) {
-    throw new Error(`Aucun compte ${label} actif n'est configuré pour cette coopérative. Créez un compte Mobile Marchand dans la page Caisse.`);
+    throw new Error(`Aucun compte ${label} actif n'est configuré pour cette coopérative. Créez un compte Mobile Marchand dans la page Mobile Marchands.`);
   }
 
   const solde = parseFloat(compte.soldeActuelFcfa as string);
@@ -927,7 +927,7 @@ export async function debiterCompteMobilePourPrime(
     .limit(1);
 
   if (!compte) {
-    throw new Error(`Aucun compte ${label} actif n'est configuré pour cette coopérative.`);
+    throw new Error(`Aucun compte ${label} actif n'est configuré pour cette coopérative. Créez un compte Mobile Marchand dans la page Mobile Marchands.`);
   }
 
   const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
