@@ -211,7 +211,7 @@ export async function creerDistribution(cooperativeId: number, data: CreateDistr
   const livraisons = await db
     .select({
       membreId: livraisonsTable.membreId,
-      totalKg: sum(livraisonsTable.poidsNetKg),
+      totalKg: sum(livraisonsTable.poidsKg),
     })
     .from(livraisonsTable)
     .where(
