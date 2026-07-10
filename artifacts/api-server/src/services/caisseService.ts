@@ -839,6 +839,44 @@ export async function debiterCaisseParResponsable(
 // N'exige pas de session ouverte (session_id nullable depuis la migration).
 // L'écriture comptable est gérée séparément par generateEcrituresSalaire.
 
+// ─── Débit caisse pour paiement d'une prime à un membre ──────────────────────
+
+export async function debiterCaissePourPrimeMembre(
+  userId: number,
+  cooperativeId: number,
+  montantFcfa: number,
+  primeMembreId: number,
+): Promise<{ nouveauSolde: number; alerte?: string }> {
+  const [caisse] = await db
+    .select()
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, userId),
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!caisse) {
+    throw new Error("Aucune caisse ne vous est assignée. Contactez votre administrateur.");
+  }
+
+  const result = await enregistrerMouvement(caisse.id, {
+    type: "sortie",
+    motif: "paiement_prime",
+    montantFcfa,
+    libelle: `Prime producteur PRM-PAY-${primeMembreId}`,
+    referenceOperation: `PRM-PAY-${primeMembreId}`,
+    userId,
+  });
+
+  logger.info(
+    { userId, primeMembreId, montantFcfa, nouveauSolde: result.soldeActuel },
+    "Caisse débitée (prime membre)",
+  );
+  return { nouveauSolde: result.soldeActuel, alerte: result.alerte };
+}
+
 export async function debitCaisseForSalaire(
   caisseId: number,
   cooperativeId: number,

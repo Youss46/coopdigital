@@ -3,6 +3,10 @@ import { db, primesReceptionsTable, primesDistributionsTable, primesMembresTable
 import { eq, and, desc, sql, sum, inArray, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { generateEcrituresPrimeReception, generateEcrituresPrimePaiement } from "./comptabiliteService";
+import { verifierCaisseEspeces, debiterCaissePourPrimeMembre } from "./caisseService";
+
+/** Modes qui déclenchent un débit de la caisse centrale physique. */
+const MODES_ESPECES = new Set(["especes", "espèces", "caisse"]);
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 
@@ -422,6 +426,23 @@ export async function payerMembre(cooperativeId: number, primeMembreId: number, 
   ]);
   if (!dist || dist.statut === "brouillon") throw new Error("La distribution doit être validée avant paiement");
 
+  const modeEstEspeces = MODES_ESPECES.has(data.modePaiement.toLowerCase());
+
+  // ── 1. Guard caisse espèces ────────────────────────────────────────────────
+  // Vérification AVANT toute modification : lève une exception claire si bloquant.
+  if (modeEstEspeces && pm.montantNetFcfa > 0) {
+    await verifierCaisseEspeces(userId, cooperativeId, pm.montantNetFcfa);
+  }
+
+  // ── 2. Débit caisse AVANT le changement de statut ─────────────────────────
+  // Ordre intentionnel : si le débit échoue (caisse fermée entre-temps, etc.),
+  // le membre reste 'en_attente' — aucune incohérence comptable.
+  if (modeEstEspeces && pm.montantNetFcfa > 0) {
+    const { alerte } = await debiterCaissePourPrimeMembre(userId, cooperativeId, pm.montantNetFcfa, pm.id);
+    if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte caisse après paiement prime");
+  }
+
+  // ── 3. Marquer le membre comme payé ───────────────────────────────────────
   const [updated] = await db
     .update(primesMembresTable)
     .set({
@@ -436,12 +457,12 @@ export async function payerMembre(cooperativeId: number, primeMembreId: number, 
     .where(eq(primesMembresTable.id, primeMembreId))
     .returning();
 
-  // Réduire le solde des avances si une déduction a été appliquée
+  // ── 4. Réduire les avances (après paiement effectif) ──────────────────────
   if (pm.deductionAvancesFcfa > 0) {
     await reduireAvances(pm.membreId, pm.deductionAvancesFcfa);
   }
 
-  // Écriture OHADA : Débit 6018 / Crédit 521 ou 571 (fire-and-forget)
+  // ── 5. Écriture OHADA : Débit 6018 / Crédit 554/571/521 (fire-and-forget) ─
   if (pm.montantNetFcfa > 0) {
     generateEcrituresPrimePaiement(cooperativeId, {
       primeMembreId: pm.id,
@@ -484,6 +505,16 @@ export async function payerBulk(
       eq(primesMembresTable.statut, "en_attente"),
     ));
 
+  // Guard caisse espèces — vérifier le total AVANT toute modification
+  const modeEstEspeces = MODES_ESPECES.has(data.modePaiement.toLowerCase());
+  if (modeEstEspeces) {
+    const totalEspeces = membresEnAttente.reduce((s, { pm }) => s + pm.montantNetFcfa, 0);
+    if (totalEspeces > 0) {
+      // Lève une exception claire si la caisse est fermée ou le solde insuffisant
+      await verifierCaisseEspeces(userId, cooperativeId, totalEspeces);
+    }
+  }
+
   // Paiement en masse
   await db
     .update(primesMembresTable)
@@ -501,30 +532,39 @@ export async function payerBulk(
       )
     );
 
-  // Effets de bord : réduction avances + écritures comptables (fire-and-forget groupé)
-  const sideEffects = membresEnAttente.map(async ({ pm, membreNom }) => {
+  // ── Effets financiers : séquentiels et awaités ────────────────────────────
+  // Avances + débit caisse : opérations financières → awaited, erreur loguée.
+  // Écritures OHADA : fire-and-forget (comptabilité non bloquante).
+  for (const { pm, membreNom } of membresEnAttente) {
+    // 1. Réduire les avances
     if (pm.deductionAvancesFcfa > 0) {
-      await reduireAvances(pm.membreId, pm.deductionAvancesFcfa);
+      await reduireAvances(pm.membreId, pm.deductionAvancesFcfa).catch(err =>
+        logger.error({ err, primeMembreId: pm.id }, "Erreur réduction avance bulk"),
+      );
     }
+
     if (pm.montantNetFcfa > 0) {
-      await generateEcrituresPrimePaiement(cooperativeId, {
+      // 2. Débit caisse (espèces uniquement) — la vérification totale a déjà eu lieu
+      if (modeEstEspeces) {
+        await debiterCaissePourPrimeMembre(userId, cooperativeId, pm.montantNetFcfa, pm.id)
+          .then(({ alerte }) => {
+            if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte caisse bulk");
+          })
+          .catch(err =>
+            logger.error({ err, primeMembreId: pm.id }, "Erreur débit caisse bulk"),
+          );
+      }
+
+      // 3. Écriture OHADA (fire-and-forget)
+      generateEcrituresPrimePaiement(cooperativeId, {
         primeMembreId: pm.id,
         membreNom: membreNom ?? `Membre #${pm.membreId}`,
         montantFcfa: pm.montantNetFcfa,
         modePaiement: data.modePaiement,
         date: data.datePaiement,
-      });
+      }).catch(err => logger.error({ err, primeMembreId: pm.id }, "Erreur écriture prime bulk"));
     }
-  });
-  Promise.allSettled(sideEffects).then(results => {
-    results.forEach((r, i) => {
-      if (r.status === "rejected") {
-        const { pm } = membresEnAttente[i];
-        logger.error({ err: r.reason, primeMembreId: pm.id, membreId: pm.membreId },
-          "Erreur effet de bord payerBulk (avance/écriture)");
-      }
-    });
-  });
+  }
 
   await syncStatutDistribution(distributionId);
 }
