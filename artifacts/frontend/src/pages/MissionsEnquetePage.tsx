@@ -68,9 +68,8 @@ function StatutBadge({ statut }: { statut: string }) {
 
 // ── Formulaire création ────────────────────────────────────────────────────────
 
-function NouvelleEnqueteForm({ certifications, agents, onClose, onCreated, initialCertifId }: {
+function NouvelleEnqueteForm({ certifications, onClose, onCreated, initialCertifId }: {
   certifications: Certification[];
-  agents: Agent[];
   onClose: () => void;
   onCreated: () => void;
   initialCertifId?: string;
@@ -82,6 +81,13 @@ function NouvelleEnqueteForm({ certifications, agents, onClose, onCreated, initi
   const [search, setSearch] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
   const qc = useQueryClient();
+
+  // Agents chargés au montage du formulaire (pas au chargement de la page)
+  const { data: agents = [], isLoading: agentsLoading } = useQuery<Agent[]>({
+    queryKey: ["agents-terrain"],
+    queryFn: () => apiFetch("/api/missions/agents-terrain"),
+    staleTime: 60_000,
+  });
 
   const { data: searchResult, isFetching } = useQuery<{ membres: Membre[]; total: number }>({
     queryKey: ["membres-enquete-search", search],
@@ -141,8 +147,9 @@ function NouvelleEnqueteForm({ certifications, agents, onClose, onCreated, initi
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>Agent terrain assigné</label>
               <select value={form.agentId} onChange={e => setForm(f => ({ ...f, agentId: e.target.value }))}
-                style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: "9px 12px", fontSize: 14, boxSizing: "border-box" }}>
-                <option value="">— Non assigné —</option>
+                disabled={agentsLoading}
+                style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: "9px 12px", fontSize: 14, boxSizing: "border-box", opacity: agentsLoading ? 0.6 : 1 }}>
+                <option value="">{agentsLoading ? "Chargement…" : "— Non assigné —"}</option>
                 {agents.map(a => <option key={a.id} value={a.id}>{a.prenoms} {a.nom}</option>)}
               </select>
             </div>
@@ -250,10 +257,6 @@ export default function MissionsEnquetePage() {
     queryFn: () => apiFetch("/api/certifications"),
   });
 
-  const { data: agents = [] } = useQuery<Agent[]>({
-    queryKey: ["agents-terrain"],
-    queryFn: () => apiFetch("/api/missions/agents-terrain"),
-  });
 
 
   const filtered = enquetes.filter(e => {
@@ -397,7 +400,6 @@ export default function MissionsEnquetePage() {
       {showForm && (
         <NouvelleEnqueteForm
           certifications={certifications.filter(c => c.statut !== "expire")}
-          agents={agents}
           initialCertifId={urlCertifId}
           onClose={() => setShowForm(false)}
           onCreated={() => { void refetch(); }}
