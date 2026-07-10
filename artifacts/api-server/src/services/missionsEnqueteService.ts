@@ -306,5 +306,10 @@ export async function getAgentsDisponibles(cooperativeId: number) {
   return db
     .select({ id: usersTable.id, nom: usersTable.nom, prenoms: usersTable.prenoms })
     .from(usersTable)
-    .where(and(eq(usersTable.cooperativeId, cooperativeId), eq(usersTable.role, "agent_terrain")));
+    .where(and(
+      eq(usersTable.cooperativeId, cooperativeId),
+      eq(usersTable.role, "agent_terrain"),
+      eq(usersTable.actif, true),
+    ))
+    .orderBy(usersTable.nom);
 }

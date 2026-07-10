@@ -226,8 +226,8 @@ export default function MissionsEnquetePage() {
   });
 
   const { data: agents = [] } = useQuery<Agent[]>({
-    queryKey: ["agents-disponibles"],
-    queryFn: () => apiFetch("/api/enquetes/agents"),
+    queryKey: ["agents-terrain"],
+    queryFn: () => apiFetch("/api/missions/agents-terrain"),
   });
 
   const { data: membresData } = useQuery<{ membres: Membre[]; total: number }>({
