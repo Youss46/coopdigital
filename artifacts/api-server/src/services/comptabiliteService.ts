@@ -366,17 +366,25 @@ export async function generateEcrituresPrimeReception(
 }
 
 /**
- * Modes de paiement gérés en trésorerie caisse/mobile (→ 571).
- * Tout autre mode est considéré banque (→ 521).
+ * Modes de paiement en espèces / caisse physique (→ 571 Caisse).
  */
-const MODES_CAISSE = new Set([
-  "caisse", "especes", "espèces",
-  "orange_money", "mtn_momo", "wave", "moov_money", "mobile_money",
+const MODES_CAISSE = new Set(["caisse", "especes", "espèces"]);
+
+/**
+ * Modes de paiement via porte-monnaie électronique mobile marchand (→ 554).
+ * SYSCOHADA 554 : Porte-monnaie électronique (Orange Money, MTN MoMo, Wave, etc.)
+ */
+const MODES_MOBILE_MARCHAND = new Set([
+  "orange_money", "mtn_momo", "wave", "moov_money", "mobile_money", "mobile_marchand",
 ]);
 
 /**
  * Paiement d'une prime à un producteur (complément prix d'achat cacao).
- * SYSCOHADA : Débit 6018 Complément d'achat / Crédit 521 Banque ou 571 Caisse/Mobile
+ * SYSCOHADA :
+ *   Débit 6018 Complément d'achat
+ *   Crédit 554 Porte-monnaie électronique  (mobile money)
+ *         571 Caisse                        (espèces)
+ *         521 Banque                        (virement, chèque, etc.)
  */
 export async function generateEcrituresPrimePaiement(
   cooperativeId: number,
@@ -389,8 +397,10 @@ export async function generateEcrituresPrimePaiement(
   },
 ) {
   const { primeMembreId, membreNom, montantFcfa, modePaiement, date } = params;
-  // Espèces / mobile-money → 571 Caisse ; virement / chèque → 521 Banque
-  const compteCredit = MODES_CAISSE.has(modePaiement.toLowerCase()) ? "571" : "521";
+  const mode = modePaiement.toLowerCase();
+  const compteCredit = MODES_MOBILE_MARCHAND.has(mode) ? "554"
+    : MODES_CAISSE.has(mode) ? "571"
+    : "521";
 
   await proposerEcriture(cooperativeId, {
     source: "prime_paiement",
