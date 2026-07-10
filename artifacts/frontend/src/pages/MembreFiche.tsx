@@ -26,7 +26,7 @@ import {
   ArrowLeft, MapPin, Phone, Users, Leaf, Calendar, TrendingDown,
   Coins, Loader2, ChevronDown, ChevronUp, UserCheck, UserX, Gift,
   GraduationCap, Award, Download, Building2, User, Edit3, AlertTriangle,
-  Satellite, CheckCircle2, XCircle, CreditCard,
+  Satellite, CheckCircle2, XCircle, CreditCard, Star, ShieldCheck, BadgeCheck, ClipboardX,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
@@ -295,6 +295,37 @@ const INPUT_CLS =
 const BTN_CLS =
   "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors";
 
+// ── Certifications membre ─────────────────────────────────────────────────────
+
+interface MembreCertifRow {
+  id: number;
+  certificationId: number;
+  type: string;
+  nomCertificateur: string | null;
+  dateExpiration: string | null;
+  certifStatut: string;
+  statutConformite: string;
+  score: number;
+  scoreMax: number;
+  dateEvaluation: string | null;
+  criteresValides: string[];
+  notes: string | null;
+}
+
+const CERTIF_TYPE_META: Record<string, { label: string; Icon: typeof Leaf; color: string; bg: string; border: string }> = {
+  rainforest_alliance: { label: "Rainforest Alliance", Icon: Leaf,        color: "text-green-700",   bg: "bg-green-50",   border: "border-green-200" },
+  fairtrade:           { label: "Fairtrade",           Icon: Star,        color: "text-blue-700",    bg: "bg-blue-50",    border: "border-blue-200" },
+  bio:                 { label: "Agriculture Bio",     Icon: ShieldCheck, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
+  utz:                 { label: "UTZ",                 Icon: Award,       color: "text-purple-700",  bg: "bg-purple-50",  border: "border-purple-200" },
+  autre:               { label: "Autre",               Icon: Award,       color: "text-gray-700",    bg: "bg-gray-50",    border: "border-gray-200" },
+};
+
+const CONFORMITE_META: Record<string, { label: string; cls: string }> = {
+  certifie:      { label: "Certifié",      cls: "bg-green-100 text-green-700" },
+  en_cours:      { label: "En cours",      cls: "bg-blue-100 text-blue-700" },
+  non_conforme:  { label: "Non conforme",  cls: "bg-red-100 text-red-700" },
+};
+
 function formaterFCFA(montant: number) {
   return new Intl.NumberFormat("fr-FR").format(montant) + " FCFA";
 }
@@ -302,7 +333,7 @@ function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const TABS = ["Avances", "Livraisons", "Impayées", "Parts sociales", "Score", "Dons reçus", "Formations", "Parcelles GPS"] as const;
+const TABS = ["Avances", "Livraisons", "Impayées", "Parts sociales", "Score", "Dons reçus", "Formations", "Parcelles GPS", "Certifications"] as const;
 type Tab = (typeof TABS)[number];
 
 const NIVEAUX_SCORE: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
@@ -349,6 +380,18 @@ export default function MembreFiche() {
   const impayeesParams = { statut: "en_attente" as ListPaiementsStatut, membre_id: id };
   const { data: paiementsImpayees = [], isLoading: impayeesLoading } = useListPaiements(impayeesParams, {
     query: { queryKey: getListPaiementsQueryKey(impayeesParams), enabled: !!id && activeTab === "Impayées" },
+  });
+
+  const { data: certifsMembre = [] } = useQuery<MembreCertifRow[]>({
+    queryKey: ["membre-certifications", id],
+    queryFn: async () => {
+      const r = await fetch(`${BASE_FICHE}/api/membres/${id}/certifications`, {
+        headers: { Authorization: `Bearer ${tokFn()}` },
+      });
+      if (!r.ok) return [];
+      return r.json() as Promise<MembreCertifRow[]>;
+    },
+    enabled: !!id && activeTab === "Certifications",
   });
 
   const { data: parcellesGps = [] } = useQuery<ParcelleGps[]>({
@@ -1404,6 +1447,83 @@ export default function MembreFiche() {
                 </>
               );
             })()}
+          </div>
+        )}
+        {/* Certifications */}
+        {activeTab === "Certifications" && (
+          <div className="p-5 space-y-4">
+            {certifsMembre.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-400">
+                <ClipboardX size={32} className="opacity-40" />
+                <p className="text-sm">Aucune évaluation de certification enregistrée pour ce membre.</p>
+              </div>
+            ) : (
+              certifsMembre.map(c => {
+                const meta  = CERTIF_TYPE_META[c.type] ?? CERTIF_TYPE_META.autre!;
+                const conf  = CONFORMITE_META[c.statutConformite] ?? { label: c.statutConformite, cls: "bg-gray-100 text-gray-600" };
+                const Icon  = meta.Icon;
+                const pct   = c.scoreMax > 0 ? Math.round((c.score / c.scoreMax) * 100) : 0;
+                const barColor = pct >= 80 ? "#16a34a" : pct >= 50 ? "#ca8a04" : "#ef4444";
+                const criteres: string[] = Array.isArray(c.criteresValides) ? c.criteresValides : [];
+                return (
+                  <div key={c.id} className={`rounded-xl border ${meta.border} overflow-hidden`}>
+                    {/* En-tête */}
+                    <div className={`flex items-center justify-between px-4 py-3 ${meta.bg}`}>
+                      <div className="flex items-center gap-2">
+                        <Icon size={16} className={meta.color} />
+                        <span className={`text-sm font-semibold ${meta.color}`}>{meta.label}</span>
+                        {c.nomCertificateur && (
+                          <span className="text-xs text-gray-500">· {c.nomCertificateur}</span>
+                        )}
+                      </div>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${conf.cls}`}>
+                        {conf.label}
+                      </span>
+                    </div>
+                    {/* Corps */}
+                    <div className="px-4 py-3 bg-white space-y-3">
+                      {/* Barre de score */}
+                      {c.scoreMax > 0 && (
+                        <div>
+                          <div className="flex justify-between text-xs text-gray-500 mb-1">
+                            <span>Score de conformité</span>
+                            <span className="font-semibold">{c.score}/{c.scoreMax} ({pct}%)</span>
+                          </div>
+                          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                          </div>
+                        </div>
+                      )}
+                      {/* Critères validés */}
+                      {criteres.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-600 mb-1.5">Critères validés</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {criteres.map(cr => (
+                              <span key={cr} className="inline-flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">
+                                <BadgeCheck size={10} />{cr}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {/* Meta */}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                        {c.dateEvaluation && (
+                          <span>Évalué le {formaterDate(c.dateEvaluation)}</span>
+                        )}
+                        {c.dateExpiration && (
+                          <span>Expiration certif. : {formaterDate(c.dateExpiration)}</span>
+                        )}
+                      </div>
+                      {c.notes && (
+                        <p className="text-xs text-gray-500 italic border-t border-gray-100 pt-2">{c.notes}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
       </div>

@@ -19,6 +19,7 @@ import {
   getMembreCartePdf,
   updateCarteStatut,
   getRepartitionMembres,
+  getMembreCertifications,
 } from "../controllers/membresController";
 
 const router: IRouter = Router();
@@ -32,7 +33,8 @@ router.get("/membres/repartition",   checkPermission("membres", "lire"),     get
 router.get("/membres",               checkPermission("membres", "lire"),     listMembres);
 router.post("/membres",              checkPermission("membres", "creer"),    auditMiddleware("membres", "CREATE", { entiteType: "membre" }), createMembre);
 router.get("/membres/qr/:token",     checkPermission("membres", "lire"),     getMembreByQr);
-router.get("/membres/:id/historique",checkPermission("membres", "lire"),     getMembreHistorique);
+router.get("/membres/:id/historique",     checkPermission("membres", "lire"), getMembreHistorique);
+router.get("/membres/:id/certifications", checkPermission("membres", "lire"), getMembreCertifications);
 router.get("/membres/:id/carte-pdf", checkPermission("membres", "lire"),     getMembreCartePdf);
 router.patch("/membres/:id/carte-statut", checkPermission("membres", "modifier"), updateCarteStatut);
 router.get("/membres/:id",           checkPermission("membres", "lire"),     getMembreById);

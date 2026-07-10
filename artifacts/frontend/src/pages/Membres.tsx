@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ElementType } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import { useLocation } from "wouter";
 import { useCreateMembre, type MembreInput } from "@workspace/api-client-react";
@@ -7,7 +7,7 @@ import {
   UserPlus, Search, Eye, FileDown, Loader2, Check,
   Building2, User, AlertTriangle, CheckCircle,
   XCircle, Clock, MapPin, ClipboardList, Users,
-  PieChart, List,
+  PieChart, List, Leaf, Star, ShieldCheck, Award,
 } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -39,6 +39,7 @@ interface MembreRow {
   superficieHa: string; codeMembre?: string;
   demandeParDelegueId?: number | null;
   motifRejet?: string | null; createdAt?: string | null;
+  certificationsBadges?: string[] | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -48,6 +49,33 @@ const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const apiFetch = (url: string, opts?: RequestInit) =>
   fetch(`${BASE}${url}`, { ...opts, headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) } });
+
+// ── Icônes certifications ─────────────────────────────────────────────────────
+
+const CERTIF_ICONS: Record<string, { Icon: ElementType; color: string; label: string }> = {
+  rainforest_alliance: { Icon: Leaf,        color: "#16a34a", label: "Rainforest Alliance" },
+  fairtrade:           { Icon: Star,        color: "#2563eb", label: "Fairtrade" },
+  bio:                 { Icon: ShieldCheck, color: "#059669", label: "Agriculture Bio" },
+  utz:                 { Icon: Award,       color: "#7c3aed", label: "UTZ" },
+};
+
+function badgesCertifications(types: string[] | null | undefined) {
+  if (!types || types.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+      {types.map(type => {
+        const meta = CERTIF_ICONS[type];
+        if (!meta) return null;
+        const { Icon, color, label } = meta;
+        return (
+          <span key={type} title={label} style={{ color }} className="inline-flex">
+            <Icon size={11} />
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 function badgeStatutMembre(s: string | null | undefined) {
   switch (s) {
@@ -441,6 +469,7 @@ export default function Membres() {
                     <span className="text-gray-500 font-normal text-xs mr-1">{m.sexe === "M" ? "M." : m.sexe === "F" ? "Mme" : ""}</span>
                     {m.nom} {m.prenoms}
                     {m.codeMembre && <div className="text-xs text-green-700 font-mono font-semibold mt-0.5">{m.codeMembre}</div>}
+                    {badgesCertifications(m.certificationsBadges)}
                   </td>
                   <td className="px-4 py-3 text-gray-600">{m.telephone}</td>
                   <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{m.village ?? "—"}</td>

@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 
-import { db, membresTable, livraisonsTable, campagnesTable, fournisseursTable, usersTable } from "@workspace/db";
-import { eq, and, or, ilike, sql, desc, notInArray, asc } from "drizzle-orm";
+import { db, membresTable, livraisonsTable, campagnesTable, fournisseursTable, usersTable, certificationsMembresTable, certificationsTable } from "@workspace/db";
+import { eq, and, or, ilike, sql, desc, notInArray, asc, inArray } from "drizzle-orm";
 import { CreateMembreBody, UpdateMembreBody } from "@workspace/api-zod";
 import { computeCodeMembre } from "../services/portailService";
 import { generateListeMembres } from "../services/pdfService";
@@ -186,9 +186,76 @@ export async function listMembres(req: Request, res: Response): Promise<void> {
       db.select({ count: sql<number>`count(*)::int` }).from(membresTable).where(where),
     ]);
 
-    res.json({ membres: membres.map(enrichMembre), total: count, page, limit });
+    // Certifications actives par membre (badges liste)
+    const membreIds = membres.map(m => m.id);
+    const certifRows = membreIds.length > 0
+      ? await db
+          .select({ membreId: certificationsMembresTable.membreId, type: certificationsTable.type })
+          .from(certificationsMembresTable)
+          .innerJoin(certificationsTable, eq(certificationsTable.id, certificationsMembresTable.certificationId))
+          .where(and(
+            inArray(certificationsMembresTable.membreId, membreIds),
+            eq(certificationsMembresTable.statutConformite, "certifie"),
+            eq(certificationsMembresTable.cooperativeId, cooperativeId),
+          ))
+      : [];
+    const certifsByMembre = new Map<number, string[]>();
+    for (const c of certifRows) {
+      const arr = certifsByMembre.get(c.membreId) ?? [];
+      if (!arr.includes(c.type)) arr.push(c.type);
+      certifsByMembre.set(c.membreId, arr);
+    }
+
+    res.json({ membres: membres.map(m => ({ ...enrichMembre(m), certificationsBadges: certifsByMembre.get(m.id) ?? [] })), total: count, page, limit });
   } catch (err) {
     req.log.error({ err }, "Erreur listMembres");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ── Certifications d'un membre ────────────────────────────────────────────────
+
+export async function getMembreCertifications(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  const id = parseInt(String(req.params["id"]));
+  if (!id) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    // Vérifier que le membre appartient à la coopérative + règle délégué
+    const [membre] = await db.select({ delegueId: membresTable.delegueId })
+      .from(membresTable)
+      .where(and(eq(membresTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
+      .limit(1);
+    if (!membre) { res.status(404).json({ erreur: "Membre introuvable" }); return; }
+    if (req.user?.role === "delegue" && req.user?.id && membre.delegueId !== req.user.id) {
+      res.status(403).json({ erreur: "Ce membre n'est pas dans votre zone" }); return;
+    }
+
+    const rows = await db
+      .select({
+        id: certificationsMembresTable.id,
+        certificationId: certificationsMembresTable.certificationId,
+        type: certificationsTable.type,
+        nomCertificateur: certificationsTable.nomCertificateur,
+        dateExpiration: certificationsTable.dateExpiration,
+        certifStatut: certificationsTable.statut,
+        statutConformite: certificationsMembresTable.statutConformite,
+        score: certificationsMembresTable.score,
+        scoreMax: certificationsMembresTable.scoreMax,
+        dateEvaluation: certificationsMembresTable.dateEvaluation,
+        criteresValides: certificationsMembresTable.criteresValides,
+        notes: certificationsMembresTable.notes,
+      })
+      .from(certificationsMembresTable)
+      .innerJoin(certificationsTable, eq(certificationsTable.id, certificationsMembresTable.certificationId))
+      .where(and(
+        eq(certificationsMembresTable.membreId, id),
+        eq(certificationsMembresTable.cooperativeId, cooperativeId),
+      ))
+      .orderBy(desc(certificationsMembresTable.updatedAt));
+    res.json(rows);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getMembreCertifications");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
