@@ -90,16 +90,18 @@ function NouvelleEnqueteForm({ certifications, onClose, onCreated, initialCertif
   }, [search]);
 
   // Agents : bon endpoint enquêtes (pas GPS missions)
-  const { data: agents = [], isLoading: agentsLoading, isError: agentsError } = useQuery<Agent[]>({
+  const { data: agents = [], isLoading: agentsLoading, isError: agentsError, error: agentsErr } = useQuery<Agent[], Error>({
     queryKey: ["enquetes-agents"],
     queryFn: () => apiFetch("/api/enquetes/agents"),
     staleTime: 60_000,
+    retry: 0,
   });
 
-  const { data: searchResult, isFetching, isError: searchError } = useQuery<{ membres: Membre[]; total: number }>({
+  const { data: searchResult, isFetching, isError: searchError, error: searchErr } = useQuery<{ membres: Membre[]; total: number }, Error>({
     queryKey: ["membres-enquete-search", debouncedSearch],
     queryFn: () => apiFetch(`/api/membres?search=${encodeURIComponent(debouncedSearch)}&statut_membre=actif&limit=20`),
     enabled: debouncedSearch.length >= 2,
+    retry: 0,
   });
   const resultats = searchResult?.membres ?? [];
 
@@ -159,7 +161,7 @@ function NouvelleEnqueteForm({ certifications, onClose, onCreated, initialCertif
                 <option value="">{agentsLoading ? "Chargement…" : agentsError ? "Erreur de chargement" : "— Non assigné —"}</option>
                 {agents.map(a => <option key={a.id} value={a.id}>{a.prenoms} {a.nom}</option>)}
               </select>
-              {agentsError && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#dc2626" }}>Impossible de charger les agents (vérifiez vos permissions).</p>}
+              {agentsError && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#dc2626" }}>Erreur agents : {agentsErr?.message ?? "inconnue"}</p>}
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>Instructions pour l'agent</label>
@@ -203,7 +205,7 @@ function NouvelleEnqueteForm({ certifications, onClose, onCreated, initialCertif
                   <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Recherche…</div>
                 )}
                 {search.trim().length >= 2 && search.trim() === debouncedSearch && !isFetching && searchError && (
-                  <div style={{ padding: 16, textAlign: "center", color: "#dc2626", fontSize: 13 }}>Erreur lors de la recherche. Vérifiez vos permissions.</div>
+                  <div style={{ padding: 12, color: "#dc2626", fontSize: 12, fontFamily: "monospace", background: "#fef2f2", borderRadius: 6 }}>Erreur membres : {searchErr?.message ?? "inconnue"}</div>
                 )}
                 {search.trim().length >= 2 && search.trim() === debouncedSearch && !isFetching && !searchError && resultats.length === 0 && (
                   <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Aucun membre trouvé pour « {debouncedSearch} »</div>
