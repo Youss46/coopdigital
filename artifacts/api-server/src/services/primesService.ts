@@ -3,7 +3,7 @@ import { db, primesReceptionsTable, primesDistributionsTable, primesMembresTable
 import { eq, and, desc, sql, sum, inArray, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { generateEcrituresPrimeReception, generateEcrituresPrimePaiement } from "./comptabiliteService";
-import { verifierCaisseEspeces, debiterCaissePourPrimeMembre } from "./caisseService";
+import { verifierCaisseCentrale, debiterCaissePourPrimeMembre } from "./caisseService";
 
 /** Modes qui déclenchent un débit de la caisse centrale physique. */
 const MODES_ESPECES = new Set(["especes", "espèces", "caisse"]);
@@ -431,7 +431,7 @@ export async function payerMembre(cooperativeId: number, primeMembreId: number, 
   // ── 1. Guard caisse espèces ────────────────────────────────────────────────
   // Vérification AVANT toute modification : lève une exception claire si bloquant.
   if (modeEstEspeces && pm.montantNetFcfa > 0) {
-    await verifierCaisseEspeces(userId, cooperativeId, pm.montantNetFcfa);
+    await verifierCaisseCentrale(cooperativeId, pm.montantNetFcfa);
   }
 
   // ── 2. Débit caisse AVANT le changement de statut ─────────────────────────
@@ -511,7 +511,7 @@ export async function payerBulk(
     const totalEspeces = membresEnAttente.reduce((s, { pm }) => s + pm.montantNetFcfa, 0);
     if (totalEspeces > 0) {
       // Lève une exception claire si la caisse est fermée ou le solde insuffisant
-      await verifierCaisseEspeces(userId, cooperativeId, totalEspeces);
+      await verifierCaisseCentrale(cooperativeId, totalEspeces);
     }
   }
 

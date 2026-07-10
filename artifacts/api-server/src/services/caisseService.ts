@@ -794,6 +794,35 @@ export async function verifierCaisseEspeces(
   }
 }
 
+// ─── Vérification caisse centrale avant paiement de prime ────────────────────
+// Utilise la caisse de type "centrale" de la coopérative (pas celle du délégué).
+
+export async function verifierCaisseCentrale(
+  cooperativeId: number,
+  montantFcfa: number,
+): Promise<void> {
+  const [caisse] = await db
+    .select()
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.typeCaisse, "centrale"),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!caisse) {
+    throw new Error("Aucune caisse centrale n'est configurée pour cette coopérative. Créez une caisse centrale dans la page Caisse.");
+  }
+
+  const solde = parseFloat(caisse.soldeActuelFcfa as string);
+  if (solde < Math.round(montantFcfa)) {
+    throw new Error(
+      `Solde caisse centrale insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA, requis : ${Math.round(montantFcfa).toLocaleString("fr-FR")} FCFA`,
+    );
+  }
+}
+
 // ─── Débit caisse principale du délégué (paiement producteur web) ─────────────
 // Utilisé lors de la validation d'un règlement espèces depuis le portail web.
 // Différent de debiterCaisseDelegue (terrain) qui opère sur caisses_delegues.
@@ -839,7 +868,8 @@ export async function debiterCaisseParResponsable(
 // N'exige pas de session ouverte (session_id nullable depuis la migration).
 // L'écriture comptable est gérée séparément par generateEcrituresSalaire.
 
-// ─── Débit caisse pour paiement d'une prime à un membre ──────────────────────
+// ─── Débit caisse centrale pour paiement d'une prime à un membre ─────────────
+// Cible la caisse de type "centrale" de la coopérative (pas la caisse du délégué).
 
 export async function debiterCaissePourPrimeMembre(
   userId: number,
@@ -851,14 +881,14 @@ export async function debiterCaissePourPrimeMembre(
     .select()
     .from(caissesTable)
     .where(and(
-      eq(caissesTable.responsableId, userId),
       eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.typeCaisse, "centrale"),
       eq(caissesTable.actif, true),
     ))
     .limit(1);
 
   if (!caisse) {
-    throw new Error("Aucune caisse ne vous est assignée. Contactez votre administrateur.");
+    throw new Error("Aucune caisse centrale n'est configurée pour cette coopérative. Créez une caisse centrale dans la page Caisse.");
   }
 
   const result = await enregistrerMouvement(caisse.id, {
@@ -871,8 +901,8 @@ export async function debiterCaissePourPrimeMembre(
   });
 
   logger.info(
-    { userId, primeMembreId, montantFcfa, nouveauSolde: result.soldeActuel },
-    "Caisse débitée (prime membre)",
+    { userId, primeMembreId, montantFcfa, caisseId: caisse.id, nouveauSolde: result.soldeActuel },
+    "Caisse centrale débitée (prime membre)",
   );
   return { nouveauSolde: result.soldeActuel, alerte: result.alerte };
 }
