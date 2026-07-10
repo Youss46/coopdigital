@@ -1,6 +1,7 @@
 import { Switch, Route, Redirect, Router as WouterRouter } from "wouter";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
+import { EnqueteBadgeProvider } from "./contexts/EnqueteBadgeContext";
 import { usePushSubscription } from "./hooks/usePushSubscription";
 import OfflineBanner from "./components/OfflineBanner";
 import SystemBanner from "./components/SystemBanner";
@@ -66,7 +67,11 @@ function AppRoutes() {
   }
 
   if (user?.role === "agent_terrain") {
-    return <AgentTerrainRoutes />;
+    return (
+      <EnqueteBadgeProvider>
+        <AgentTerrainRoutes />
+      </EnqueteBadgeProvider>
+    );
   }
 
   return <DelegueRoutes />;
