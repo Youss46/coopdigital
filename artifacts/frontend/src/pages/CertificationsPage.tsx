@@ -763,10 +763,11 @@ function NouvelleEvalForm({ certif, criteres, onClose, onSaved }: {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { data: membres = [] } = useQuery<MembreOption[]>({
+  const { data: membresData } = useQuery<{ membres: MembreOption[]; total: number }>({
     queryKey: ["membres-list"],
-    queryFn: () => apiFetch("/api/membres?statut=actif&limit=500"),
+    queryFn: () => apiFetch("/api/membres?statut=actif&limit=100"),
   });
+  const membres = membresData?.membres ?? [];
 
   const toggle = (c: string) => setSelected(prev => { const n = new Set(prev); n.has(c) ? n.delete(c) : n.add(c); return n; });
   const score = selected.size;
