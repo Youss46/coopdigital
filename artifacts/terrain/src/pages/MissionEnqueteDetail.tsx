@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "wouter";
-import { apiGet } from "../lib/api";
+import { apiGet, apiPost } from "../lib/api";
 import { useOffline } from "../contexts/OfflineContext";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNavAgent from "../components/BottomNavAgent";
@@ -135,7 +135,10 @@ export default function MissionEnqueteDetail() {
 
         {/* Bouton soumettre */}
         {pct === 100 && mission.statut === "en_cours" && isOnline && (
-          <SoumettreButton missionId={missionId} />
+          <SoumettreButton
+            missionId={missionId}
+            onSuccess={() => setMission((m) => m ? { ...m, statut: "soumise" } : m)}
+          />
         )}
       </div>
 
@@ -144,20 +147,18 @@ export default function MissionEnqueteDetail() {
   );
 }
 
-function SoumettreButton({ missionId }: { missionId: number }) {
+function SoumettreButton({ missionId, onSuccess }: { missionId: number; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
   async function soumettre() {
     setLoading(true);
+    setErreur(null);
     try {
-      const token = localStorage.getItem("coop_token") ?? "";
-      const r = await fetch(`${import.meta.env.VITE_API_URL ?? ""}/api/terrain/enquetes/${missionId}/soumettre`, {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: "{}",
-      });
-      if (!r.ok) throw new Error((await r.json()).erreur ?? "Erreur");
+      await apiPost(`/enquetes/${missionId}/soumettre`, {});
       setDone(true);
+      onSuccess();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Erreur");
     } finally {
