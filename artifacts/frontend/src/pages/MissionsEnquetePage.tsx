@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -79,20 +79,27 @@ function NouvelleEnqueteForm({ certifications, onClose, onCreated, initialCertif
   });
   const [selectedMembres, setSelectedMembres] = useState<Membre[]>([]);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
   const qc = useQueryClient();
 
-  // Agents chargés au montage du formulaire (pas au chargement de la page)
-  const { data: agents = [], isLoading: agentsLoading } = useQuery<Agent[]>({
-    queryKey: ["agents-terrain"],
-    queryFn: () => apiFetch("/api/missions/agents-terrain"),
+  // Debounce : attend 400ms après la dernière frappe avant de lancer la requête
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Agents : bon endpoint enquêtes (pas GPS missions)
+  const { data: agents = [], isLoading: agentsLoading, isError: agentsError } = useQuery<Agent[]>({
+    queryKey: ["enquetes-agents"],
+    queryFn: () => apiFetch("/api/enquetes/agents"),
     staleTime: 60_000,
   });
 
-  const { data: searchResult, isFetching } = useQuery<{ membres: Membre[]; total: number }>({
-    queryKey: ["membres-enquete-search", search],
-    queryFn: () => apiFetch(`/api/membres?search=${encodeURIComponent(search)}&statut_membre=actif&limit=20`),
-    enabled: search.trim().length >= 2,
+  const { data: searchResult, isFetching, isError: searchError } = useQuery<{ membres: Membre[]; total: number }>({
+    queryKey: ["membres-enquete-search", debouncedSearch],
+    queryFn: () => apiFetch(`/api/membres?search=${encodeURIComponent(debouncedSearch)}&statut_membre=actif&limit=20`),
+    enabled: debouncedSearch.length >= 2,
   });
   const resultats = searchResult?.membres ?? [];
 
@@ -149,9 +156,10 @@ function NouvelleEnqueteForm({ certifications, onClose, onCreated, initialCertif
               <select value={form.agentId} onChange={e => setForm(f => ({ ...f, agentId: e.target.value }))}
                 disabled={agentsLoading}
                 style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: "9px 12px", fontSize: 14, boxSizing: "border-box", opacity: agentsLoading ? 0.6 : 1 }}>
-                <option value="">{agentsLoading ? "Chargement…" : "— Non assigné —"}</option>
+                <option value="">{agentsLoading ? "Chargement…" : agentsError ? "Erreur de chargement" : "— Non assigné —"}</option>
                 {agents.map(a => <option key={a.id} value={a.id}>{a.prenoms} {a.nom}</option>)}
               </select>
+              {agentsError && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#dc2626" }}>Impossible de charger les agents (vérifiez vos permissions).</p>}
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>Instructions pour l'agent</label>
@@ -190,13 +198,18 @@ function NouvelleEnqueteForm({ certifications, onClose, onCreated, initialCertif
                 {search.trim().length < 2 && (
                   <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Saisissez au moins 2 caractères pour rechercher un membre</div>
                 )}
-                {search.trim().length >= 2 && isFetching && (
+                {/* Debounce en cours ou fetch actif : l'input ne correspond pas encore au debouncedSearch */}
+                {search.trim().length >= 2 && (search.trim() !== debouncedSearch || isFetching) && (
                   <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Recherche…</div>
                 )}
-                {search.trim().length >= 2 && !isFetching && resultats.length === 0 && (
-                  <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Aucun membre trouvé</div>
+                {search.trim().length >= 2 && search.trim() === debouncedSearch && !isFetching && searchError && (
+                  <div style={{ padding: 16, textAlign: "center", color: "#dc2626", fontSize: 13 }}>Erreur lors de la recherche. Vérifiez vos permissions.</div>
                 )}
-                {resultats.map(m => {
+                {search.trim().length >= 2 && search.trim() === debouncedSearch && !isFetching && !searchError && resultats.length === 0 && (
+                  <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Aucun membre trouvé pour « {debouncedSearch} »</div>
+                )}
+                {/* Résultats masqués tant que le debounce n'a pas encore résolu */}
+                {search.trim() === debouncedSearch && resultats.map(m => {
                   const sel = selectedMembres.some(x => x.id === m.id);
                   return (
                     <div key={m.id} onClick={() => toggleMembre(m)} style={{
