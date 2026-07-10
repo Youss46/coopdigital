@@ -68,10 +68,9 @@ function StatutBadge({ statut }: { statut: string }) {
 
 // ── Formulaire création ────────────────────────────────────────────────────────
 
-function NouvelleEnqueteForm({ certifications, agents, membres, onClose, onCreated, initialCertifId }: {
+function NouvelleEnqueteForm({ certifications, agents, onClose, onCreated, initialCertifId }: {
   certifications: Certification[];
   agents: Agent[];
-  membres: Membre[];
   onClose: () => void;
   onCreated: () => void;
   initialCertifId?: string;
@@ -79,10 +78,17 @@ function NouvelleEnqueteForm({ certifications, agents, membres, onClose, onCreat
   const [form, setForm] = useState({
     titre: "", certificationId: initialCertifId ?? "", datePrevue: "", agentId: "", instructions: "",
   });
-  const [selectedMembres, setSelectedMembres] = useState<number[]>([]);
+  const [selectedMembres, setSelectedMembres] = useState<Membre[]>([]);
   const [search, setSearch] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
   const qc = useQueryClient();
+
+  const { data: searchResult, isFetching } = useQuery<{ membres: Membre[]; total: number }>({
+    queryKey: ["membres-enquete-search", search],
+    queryFn: () => apiFetch(`/api/membres?search=${encodeURIComponent(search)}&statut_membre=actif&limit=20`),
+    enabled: search.trim().length >= 2,
+  });
+  const resultats = searchResult?.membres ?? [];
 
   const mutation = useMutation({
     mutationFn: () => apiPost("/api/enquetes", {
@@ -91,18 +97,16 @@ function NouvelleEnqueteForm({ certifications, agents, membres, onClose, onCreat
       datePrevue: form.datePrevue,
       agentId: form.agentId ? Number(form.agentId) : undefined,
       instructions: form.instructions || undefined,
-      membreIds: selectedMembres,
+      membreIds: selectedMembres.map(m => m.id),
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["enquetes"] }); onCreated(); onClose(); },
     onError: (e: Error) => setErreur(e.message),
   });
 
-  const filteredMembres = membres.filter(m =>
-    `${m.nom} ${m.prenoms} ${m.codeProducteur ?? ""} ${m.village ?? ""}`.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const toggleMembre = (id: number) =>
-    setSelectedMembres(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleMembre = (m: Membre) =>
+    setSelectedMembres(prev =>
+      prev.some(x => x.id === m.id) ? prev.filter(x => x.id !== m.id) : [...prev, m],
+    );
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -157,17 +161,38 @@ function NouvelleEnqueteForm({ certifications, agents, membres, onClose, onCreat
                   <button onClick={() => setSelectedMembres([])} style={{ fontSize: 12, color: "#6b7280", background: "none", border: "none", cursor: "pointer" }}>Tout désélectionner</button>
                 )}
               </div>
+              {/* Tags membres sélectionnés */}
+              {selectedMembres.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                  {selectedMembres.map(m => (
+                    <span key={m.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, padding: "3px 10px", fontSize: 12, color: "#166534" }}>
+                      {m.prenoms} {m.nom}
+                      <button onClick={() => toggleMembre(m)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "#16a34a", fontSize: 14 }}>×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {/* Recherche serveur */}
               <div style={{ position: "relative", marginBottom: 8 }}>
                 <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un membre…"
+                <input value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Tapez au moins 2 lettres pour rechercher…"
                   style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 12px 8px 30px", fontSize: 13, boxSizing: "border-box" }} />
               </div>
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, maxHeight: 200, overflowY: "auto" }}>
-                {filteredMembres.length === 0 && <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Aucun membre trouvé</div>}
-                {filteredMembres.map(m => {
-                  const sel = selectedMembres.includes(m.id);
+                {search.trim().length < 2 && (
+                  <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Saisissez au moins 2 caractères pour rechercher un membre</div>
+                )}
+                {search.trim().length >= 2 && isFetching && (
+                  <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Recherche…</div>
+                )}
+                {search.trim().length >= 2 && !isFetching && resultats.length === 0 && (
+                  <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Aucun membre trouvé</div>
+                )}
+                {resultats.map(m => {
+                  const sel = selectedMembres.some(x => x.id === m.id);
                   return (
-                    <div key={m.id} onClick={() => toggleMembre(m.id)} style={{
+                    <div key={m.id} onClick={() => toggleMembre(m)} style={{
                       display: "flex", alignItems: "center", gap: 10, padding: "9px 12px",
                       cursor: "pointer", background: sel ? "#f0fdf4" : "#fff",
                       borderBottom: "1px solid #f1f5f9", transition: "background 0.1s",
@@ -230,11 +255,6 @@ export default function MissionsEnquetePage() {
     queryFn: () => apiFetch("/api/missions/agents-terrain"),
   });
 
-  const { data: membresData } = useQuery<{ membres: Membre[]; total: number }>({
-    queryKey: ["membres", "liste"],
-    queryFn: () => apiFetch("/api/membres?limit=100"),
-  });
-  const membres = membresData?.membres ?? [];
 
   const filtered = enquetes.filter(e => {
     const matchStatut = filterStatut === "tous" || e.statut === filterStatut;
@@ -378,10 +398,9 @@ export default function MissionsEnquetePage() {
         <NouvelleEnqueteForm
           certifications={certifications.filter(c => c.statut !== "expire")}
           agents={agents}
-          membres={membres}
           initialCertifId={urlCertifId}
           onClose={() => setShowForm(false)}
-          onCreated={() => refetch()}
+          onCreated={() => { void refetch(); }}
         />
       )}
     </div>
