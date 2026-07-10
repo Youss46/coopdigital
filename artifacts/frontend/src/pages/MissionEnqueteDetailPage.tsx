@@ -8,17 +8,27 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-const BASE = "";
+const BASE = import.meta.env.VITE_API_URL ?? "";
 function getToken() { return localStorage.getItem("coop_token") ?? ""; }
 function authHeader() { return { Authorization: `Bearer ${getToken()}` }; }
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { ...options, headers: { ...authHeader(), ...(options?.headers as Record<string,string> ?? {}) } });
-  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error((b as { erreur?: string }).erreur ?? `${r.status}`); }
+  if (!r.ok) {
+    const text = await r.text().catch(() => "");
+    if (text.trimStart().startsWith("<")) throw new Error(`HTTP ${r.status} — route introuvable (réponse HTML reçue)`);
+    const b = JSON.parse(text || "{}") as { erreur?: string };
+    throw new Error(b.erreur ?? `HTTP ${r.status}`);
+  }
   return r.json() as Promise<T>;
 }
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(body) });
-  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error((b as { erreur?: string }).erreur ?? `${r.status}`); }
+  if (!r.ok) {
+    const text = await r.text().catch(() => "");
+    if (text.trimStart().startsWith("<")) throw new Error(`HTTP ${r.status} — route introuvable (réponse HTML reçue)`);
+    const b = JSON.parse(text || "{}") as { erreur?: string };
+    throw new Error(b.erreur ?? `HTTP ${r.status}`);
+  }
   return r.json() as Promise<T>;
 }
 
@@ -243,10 +253,11 @@ export default function MissionEnqueteDetailPage() {
   const [filterStatut, setFilterStatut] = useState("tous");
   const [rejetMembreId, setRejetMembreId] = useState<number | null>(null);
 
-  const { data: mission, isLoading } = useQuery<MissionDetail>({
+  const { data: mission, isLoading, isError, error } = useQuery<MissionDetail>({
     queryKey: ["enquete", missionId],
     queryFn: () => apiFetch(`/api/enquetes/${missionId}`),
     enabled: !!missionId,
+    retry: 1,
   });
 
   const validerMutation = useMutation({
@@ -272,10 +283,25 @@ export default function MissionEnqueteDetailPage() {
 
   const canValidate = ["pca", "directeur", "responsable_tracabilite"].includes(user?.role ?? "");
 
-  if (isLoading || !mission) {
+  if (isLoading) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc" }}>
         <Loader2 size={28} style={{ animation: "spin 1s linear infinite", color: "#16a34a" }} />
+      </div>
+    );
+  }
+
+  if (isError || !mission) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f8fafc", gap: 16, padding: 24 }}>
+        <AlertTriangle size={32} style={{ color: "#ef4444" }} />
+        <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#111827" }}>Impossible de charger la mission</p>
+        <p style={{ margin: 0, fontSize: 13, color: "#6b7280", textAlign: "center", maxWidth: 340 }}>
+          {(error as Error)?.message ?? "Une erreur est survenue. Vérifiez votre connexion et réessayez."}
+        </p>
+        <Link href="/enquetes" style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, color: "#16a34a", fontSize: 13, textDecoration: "none", fontWeight: 600 }}>
+          <ArrowLeft size={14} />Retour aux missions
+        </Link>
       </div>
     );
   }
