@@ -60,3 +60,4 @@ pnpm-debug.log*
 # Builds applicatifs
 artifacts/*/dist/
 
+attached_assets/
