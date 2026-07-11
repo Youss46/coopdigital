@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import { db, missionsEnqueteTable, enqueteMembresTable, membresTable, usersTable, certificationsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
+import { getConfig } from "./configService.js";
 import { CRITERES_PAR_TYPE } from "./certificationService.js";
 import type { ReponsesCriteres } from "./missionsEnqueteService.js";
 
@@ -52,8 +53,9 @@ function couleurStatut(statut: string): string {
 function badge(doc: InstanceType<typeof PDFDocument>, x: number, y: number, label: string, couleur: string) {
   const w = doc.fontSize(7).widthOfString(label) + 10;
   doc.save()
+    .fillOpacity(0.13)
     .roundedRect(x, y - 1, w, 13, 3)
-    .fill(couleur + "22")
+    .fill(couleur)
     .restore();
   doc.font("Helvetica-Bold").fontSize(7).fillColor(couleur).text(label, x + 5, y + 1, { lineBreak: false });
   return w;
@@ -61,8 +63,9 @@ function badge(doc: InstanceType<typeof PDFDocument>, x: number, y: number, labe
 
 function sectionTitle(doc: InstanceType<typeof PDFDocument>, text: string, couleur: string) {
   doc.save()
+    .fillOpacity(0.1)
     .rect(ML, doc.y, W, 18)
-    .fill(couleur + "18")
+    .fill(couleur)
     .restore();
   doc.font("Helvetica-Bold").fontSize(9).fillColor(couleur)
     .text(text.toUpperCase(), ML + 8, doc.y + 4, { width: W - 16, lineBreak: false });
@@ -141,7 +144,10 @@ export async function generateRapportEnquete(
   const data = await fetchMissionData(cooperativeId, missionId);
   if (!data) return null;
 
-  const { mission, certif, membres } = data;
+  const [{ mission, certif, membres }, coopConfig] = await Promise.all([
+    Promise.resolve(data),
+    getConfig(cooperativeId),
+  ]);
   const certType    = certif?.type ?? "autre";
   const criteres    = CRITERES_PAR_TYPE[certType] ?? [];
   const certLabel   = CERT_TYPE_LABELS[certType] ?? certType;
@@ -168,8 +174,8 @@ export async function generateRapportEnquete(
     hauteur_reservee: 100,
   });
 
-  // Config couleur primary
-  const couleur = "#1a4731";
+  // Couleur primaire de la coopérative (cohérente avec le header)
+  const couleur = coopConfig?.couleurPrimaire || "#1a4731";
 
   // ── Titre mission ──────────────────────────────────────────────────────────
   doc.font("Helvetica-Bold").fontSize(14).fillColor(couleur)
@@ -228,7 +234,7 @@ export async function generateRapportEnquete(
 
   function statBox(label: string, value: string | number, clr: string, idx: number) {
     const bxX = ML + idx * statBoxW;
-    doc.save().roundedRect(bxX + 2, statY, statBoxW - 4, statBoxH, 4).fill(clr + "18").restore();
+    doc.save().fillOpacity(0.12).roundedRect(bxX + 2, statY, statBoxW - 4, statBoxH, 4).fill(clr).restore();
     doc.font("Helvetica-Bold").fontSize(20).fillColor(clr)
       .text(String(value), bxX + 2, statY + 4, { width: statBoxW - 4, align: "center", lineBreak: false });
     doc.font("Helvetica").fontSize(7).fillColor("#374151")
