@@ -203,7 +203,7 @@ export async function handleRapportPdf(req: Request, res: Response): Promise<voi
     doc.fontSize(12).font("Helvetica-Bold").text("Synthèse de conformité des membres");
     doc.moveDown(0.3);
     doc.fontSize(10).font("Helvetica").text(`Total évalués : ${membres.length}`);
-    doc.text(`Certifiés (≥80%) : ${certifies} (${taux}%)`);
+    doc.text(`Certifiés (>= 80%) : ${certifies} (${taux}%)`);
     doc.text(`En cours (50-79%) : ${enCours}`);
     doc.text(`Non conformes (<50%) : ${nonConformes}`);
     doc.moveDown();
