@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -583,8 +584,8 @@ export default function VentesPage() {
                       Prix unitaire (FCFA/kg) *
                       {prixActuel?.prixVenteExportFcfa && <span className="ml-1 text-green-600 font-normal text-xs">· suivi des prix</span>}
                     </label>
-                    <input type="number" value={form.prixUnitaireFcfa}
-                      onChange={e => setForm(f => ({ ...f, prixUnitaireFcfa: e.target.value }))}
+                    <MoneyInput value={form.prixUnitaireFcfa}
+                      onChange={v => setForm(f => ({ ...f, prixUnitaireFcfa: v }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="1 200" />
                   </div>
                 </div>
@@ -683,8 +684,8 @@ export default function VentesPage() {
                     Prix unitaire (FCFA/kg) *
                     {prixActuel?.prixVenteExportFcfa && <span className="ml-1 text-purple-600 font-normal text-xs">· suivi des prix</span>}
                   </label>
-                  <input type="number" value={formFourn.prixUnitaireFcfa}
-                    onChange={e => setFormFourn(f => ({ ...f, prixUnitaireFcfa: e.target.value }))}
+                  <MoneyInput value={formFourn.prixUnitaireFcfa}
+                    onChange={v => setFormFourn(f => ({ ...f, prixUnitaireFcfa: v }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="1 200" />
                 </div>
 

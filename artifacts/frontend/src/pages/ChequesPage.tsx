@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   CheckSquare, Plus, Loader2, X, CheckCircle2, XCircle, Clock,
   AlertTriangle, Ban, Building2, Calendar, Hash, User,
@@ -508,12 +509,11 @@ function ModalCreer({
         </Field>
         <Field label="Montant *">
           <div className="relative">
-            <input
-              type="number"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            <MoneyInput
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 pr-14"
               placeholder="0"
               value={form.montantFcfa || ""}
-              onChange={e => set("montantFcfa", parseInt(e.target.value) || 0)}
+              onChange={v => set("montantFcfa", parseInt(v) || 0)}
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">FCFA</span>
           </div>

@@ -1747,10 +1747,9 @@ function TabConfigPaie() {
         {form.cnpsSalarialeActif && (
           <div className="px-5 pb-4 flex items-center gap-3">
             <span className="text-xs text-gray-500">Plafond annuel :</span>
-            <input
-              type="number"
+            <MoneyInput
               value={form.cnpsPlafondAnnuel}
-              onChange={(e) => set("cnpsPlafondAnnuel", parseInt(e.target.value || "0"))}
+              onChange={(v) => set("cnpsPlafondAnnuel", parseInt(v || "0"))}
               disabled={mut.isPending || !canEdit}
               className="w-40 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-400"
             />
@@ -1828,12 +1827,9 @@ function TabConfigPaie() {
             utilisé comme base de calcul du bulletin (brut, cotisations, ancienneté).
           </p>
           <div className="flex items-center gap-3">
-            <input
-              type="number"
-              min="0"
-              step="1000"
+            <MoneyInput
               value={form.smigFcfa}
-              onChange={(e) => set("smigFcfa", parseInt(e.target.value || "0"))}
+              onChange={(v) => set("smigFcfa", parseInt(v || "0"))}
               disabled={mut.isPending || !canEdit}
               className="w-40 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-400"
             />

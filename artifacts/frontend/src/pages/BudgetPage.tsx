@@ -197,22 +197,32 @@ function OngletHypotheses({
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {[
-            { key: "tonnagePrevisionnelKg", label: "Tonnage prévisionnel (kg)", placeholder: "ex : 500000" },
-            { key: "prixAchatMoyenFcfa",    label: "Prix d'achat moyen estimé (FCFA/kg)", placeholder: "ex : 1200" },
-            { key: "prixVenteMoyenFcfa",    label: "Prix de vente moyen estimé (FCFA/kg)", placeholder: "ex : 1650" },
-            { key: "nbMembresActifs",        label: "Nombre de membres actifs estimé", placeholder: "ex : 250" },
-            { key: "nbLivraisonsEstimees",   label: "Nombre de livraisons estimées", placeholder: "ex : 800" },
-          ].map(({ key, label, placeholder }) => (
+            { key: "tonnagePrevisionnelKg", label: "Tonnage prévisionnel (kg)", placeholder: "ex : 500000", money: false },
+            { key: "prixAchatMoyenFcfa",    label: "Prix d'achat moyen estimé (FCFA/kg)", placeholder: "ex : 1200", money: true },
+            { key: "prixVenteMoyenFcfa",    label: "Prix de vente moyen estimé (FCFA/kg)", placeholder: "ex : 1650", money: true },
+            { key: "nbMembresActifs",        label: "Nombre de membres actifs estimé", placeholder: "ex : 250", money: false },
+            { key: "nbLivraisonsEstimees",   label: "Nombre de livraisons estimées", placeholder: "ex : 800", money: false },
+          ].map(({ key, label, placeholder, money }) => (
             <div key={key}>
               <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
-              <input
-                type="number"
-                value={form[key as keyof typeof form]}
-                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                disabled={!peutModifier}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 disabled:bg-gray-50"
-                placeholder={placeholder}
-              />
+              {money ? (
+                <MoneyInput
+                  value={form[key as keyof typeof form]}
+                  onChange={(v) => setForm((f) => ({ ...f, [key]: v }))}
+                  disabled={!peutModifier}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 disabled:bg-gray-50"
+                  placeholder={placeholder}
+                />
+              ) : (
+                <input
+                  type="number"
+                  value={form[key as keyof typeof form]}
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                  disabled={!peutModifier}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 disabled:bg-gray-50"
+                  placeholder={placeholder}
+                />
+              )}
             </div>
           ))}
         </div>

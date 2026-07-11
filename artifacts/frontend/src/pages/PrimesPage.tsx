@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   Award, Plus, TrendingUp, Users, CheckCircle, Clock,
   ChevronRight, X, AlertTriangle, Loader2, Download,
@@ -173,8 +174,8 @@ function ModalReception({ campagnes, exportateurs, onClose, onCreated }: {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Montant total reçu (FCFA) *</label>
-              <input type="number" min="0" value={form.montantTotalFcfa}
-                onChange={e => setForm(f => ({ ...f, montantTotalFcfa: e.target.value }))}
+              <MoneyInput value={form.montantTotalFcfa}
+                onChange={v => setForm(f => ({ ...f, montantTotalFcfa: v }))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
                 placeholder="Ex : 2 775 000" />
             </div>
@@ -293,8 +294,8 @@ function ModalDistribution({ receptions, campagnes, onClose, onCreated }: {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Frais de certification à déduire (FCFA)</label>
-              <input type="number" min="0" value={form.montantFraisFcfa}
-                onChange={e => setForm(f => ({ ...f, montantFraisFcfa: e.target.value }))}
+              <MoneyInput value={form.montantFraisFcfa}
+                onChange={v => setForm(f => ({ ...f, montantFraisFcfa: v }))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300" />
             </div>
             <div>
