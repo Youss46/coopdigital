@@ -256,8 +256,6 @@ export async function generateRapportEnquete(
   // ── Tableau des membres ────────────────────────────────────────────────────
   sectionTitle(doc, `Résultats par membre (${totalM})`, couleur);
 
-  await drawFooter(doc, cooperativeId, pageNum, totalPages);
-
   // Entête colonnes tableau
   const COL = {
     num:    { x: ML,       w: 22  },
@@ -295,6 +293,7 @@ export async function generateRapportEnquete(
 
     // Nouvelle page si besoin
     if (doc.y > 730) {
+      await drawFooter(doc, cooperativeId, pageNum, totalPages);
       pageNum++;
       doc.addPage();
       await drawHeader(doc, cooperativeId, { hauteur_reservee: 100 });
@@ -310,6 +309,7 @@ export async function generateRapportEnquete(
 
     // Guard: si trop grand pour la page, forcer saut
     if (rowY + rowH2 > 740) {
+      await drawFooter(doc, cooperativeId, pageNum, totalPages);
       pageNum++;
       doc.addPage();
       await drawHeader(doc, cooperativeId, { hauteur_reservee: 100 });
