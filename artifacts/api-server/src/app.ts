@@ -73,7 +73,8 @@ app.use((req: Request, res: Response) => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   logger.error({ err, url: req.url }, "Erreur non gérée");
-  res.status(500).json({ erreur: "Erreur interne du serveur" });
+  const message = err?.message || "Erreur interne du serveur";
+  res.status(500).json({ erreur: message });
 });
 
 export default app;
