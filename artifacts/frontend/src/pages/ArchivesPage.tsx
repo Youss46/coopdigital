@@ -79,7 +79,7 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors
+      className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0
         ${active ? "bg-emerald-700 text-white" : "text-gray-600 hover:bg-gray-100"}`}
     >
       {children}
@@ -103,47 +103,49 @@ function OngletListe({
   return (
     <div className="space-y-4">
       {archives.map(a => (
-        <div key={a.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg font-bold text-gray-900">
+        <div key={a.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+          {/* Header ligne : titre + badge + actions */}
+          <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="text-base font-bold text-gray-900 break-words">
                   📦 {a.campagne?.libelle ?? `Campagne ${a.campagneId}`}
                 </span>
-                <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full font-medium">
+                <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full font-medium shrink-0">
                   ARCHIVÉE
                 </span>
               </div>
-              <p className="text-sm text-gray-500 mb-3">
+              <p className="text-sm text-gray-500">
                 {fmtDate(a.dateOuverture)} → {fmtDate(a.dateCloture)} ({a.dureeJours} jours)
               </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <p className="text-xs text-gray-400">Tonnage collecté</p>
-                  <p className="font-semibold text-gray-800">{fmtT(a.tonnageTotalKg)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">CA ventes</p>
-                  <p className="font-semibold text-gray-800">{fmtM(a.caVentesFcfa)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">Membres actifs</p>
-                  <p className="font-semibold text-gray-800">{fmtNum(a.nbMembresActifs)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">Marge nette</p>
-                  <p className="font-semibold text-emerald-700">{fmtM(a.margeNetteFcfa)}</p>
-                </div>
-              </div>
             </div>
-            <div className="flex flex-col gap-2 items-end">
+            <div className="flex items-center gap-2 shrink-0">
               <IntegriteInline campagneId={a.campagneId} />
               <button
                 onClick={() => onConsulter(a)}
-                className="px-3 py-1.5 bg-emerald-700 text-white text-sm rounded-lg hover:bg-emerald-800"
+                className="px-3 py-1.5 bg-emerald-700 text-white text-sm rounded-lg hover:bg-emerald-800 shrink-0"
               >
                 📊 Consulter
               </button>
+            </div>
+          </div>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <p className="text-xs text-gray-400">Tonnage collecté</p>
+              <p className="font-semibold text-gray-800">{fmtT(a.tonnageTotalKg)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">CA ventes</p>
+              <p className="font-semibold text-gray-800">{fmtM(a.caVentesFcfa)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Membres actifs</p>
+              <p className="font-semibold text-gray-800">{fmtNum(a.nbMembresActifs)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Marge nette</p>
+              <p className="font-semibold text-emerald-700">{fmtM(a.margeNetteFcfa)}</p>
             </div>
           </div>
         </div>
@@ -236,7 +238,7 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
           </div>
 
           {/* Sous-onglets */}
-          <div className="flex gap-1 mb-5 border-b border-gray-200 pb-2">
+          <div className="flex gap-1 mb-5 border-b border-gray-200 pb-2 overflow-x-auto">
             {(["resume","membres","livraisons","financier","tracabilite"] as const).map(t => (
               <TabBtn key={t} active={subTab === t} onClick={() => setSubTab(t)}>
                 {{ resume:"📊 Résumé", membres:"👥 Membres", livraisons:"📦 Livraisons", financier:"💰 Financier", tracabilite:"🌿 Traçabilité" }[t]}
@@ -363,7 +365,7 @@ function OngletConsulter({ archives, initialCampagneId }: { archives: ArchiveIte
           {/* Financier */}
           {subTab === "financier" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-white border border-gray-200 rounded-xl p-4">
                   <h3 className="font-semibold text-gray-700 mb-3 text-sm">Compte de résultat</h3>
                   <div className="space-y-2 text-sm">
@@ -538,22 +540,24 @@ function OngletIntegrite({ archives }: { archives: ArchiveItem[] }) {
   return (
     <div className="space-y-4">
       {archives.map(a => (
-        <div key={a.id} className="bg-white border border-gray-200 rounded-xl p-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="font-semibold text-gray-800">
+        <div key={a.id} className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-gray-800 break-words">
                 {a.campagne?.libelle ?? `Campagne ${a.campagneId}`}
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
                 Archivée le {fmtDate(a.dateArchivage)} · Version CoopDigital {a.versionCoopdigital ?? "—"}
               </p>
               {a.checksum && (
-                <p className="text-xs text-gray-400 mt-1 font-mono">
+                <p className="text-xs text-gray-400 mt-1 font-mono break-all">
                   SHA-256 : {a.checksum.slice(0, 32)}…
                 </p>
               )}
             </div>
-            <IntegriteDetail campagneId={a.campagneId} />
+            <div className="shrink-0">
+              <IntegriteDetail campagneId={a.campagneId} />
+            </div>
           </div>
         </div>
       ))}
@@ -628,7 +632,7 @@ export default function ArchivesPage() {
       </div>
 
       {/* Onglets */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200 pb-2">
+      <div className="flex gap-1 mb-6 border-b border-gray-200 pb-2 overflow-x-auto">
         {TABS.map(t => (
           <TabBtn key={t.key} active={tab === t.key} onClick={() => setTab(t.key)}>
             {t.label}
