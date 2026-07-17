@@ -254,4 +254,13 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     valider: ["pca", "directeur"],
     payer:   ["pca", "directeur", "comptable", "caissier"],
   },
+
+  campagnes: {
+    lire:       ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "delegue", "auditeur"],
+    creer:      ["pca", "directeur"],
+    fermer:     ["pca", "directeur"],
+    verifier:   ["pca", "directeur", "comptable"],
+    cloturer:   ["pca", "directeur"],
+    voir_bilan: ["pca", "directeur", "comptable", "auditeur"],
+  },
 };
