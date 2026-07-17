@@ -402,10 +402,13 @@ export async function cloturerCampagne(cooperativeId: number, campagneId: number
     .set({ statut: "fermee", dateFermeture })
     .where(and(eq(campagnesTable.id, campagneId), eq(campagnesTable.cooperativeId, cooperativeId)));
 
-  // Archivage automatique — fire-and-forget (non bloquant, se fait après scoring)
-  archiverCampagne(cooperativeId, campagneId, userId).catch((err) =>
-    logger.warn({ err, campagneId }, "Erreur archivage post-clôture (non bloquant)"),
-  );
+  // Archivage automatique — bloquant pour garantir la présence dans les archives avant de retourner
+  try {
+    await archiverCampagne(cooperativeId, campagneId, userId);
+  } catch (err) {
+    logger.warn({ err, campagneId }, "Erreur archivage post-clôture");
+    // La campagne reste clôturée même si l'archivage échoue
+  }
 
   // Scoring final de tous les membres — fire-and-forget (non bloquant)
     // Notifie les admins une fois le scoring terminé
