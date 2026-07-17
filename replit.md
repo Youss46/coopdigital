@@ -1,71 +1,94 @@
 # CoopDigital
 
-Plateforme SaaS **multi-tenants** de gestion des coopératives cacaoyères en Côte d'Ivoire (langue française). Chaque coopérative est un tenant isolé. Couvre la gestion des membres (M01) et des avances & paiements (M04).
+Plateforme SaaS multi-tenants de gestion pour coopératives cacaoyères en Côte d'Ivoire.
 
-## Déploiement
+## Architecture
 
-- **Backend + BDD** : Railway (Express API + PostgreSQL)
-- **Frontend** : Vercel (build Vite statique)
+| Couche | Technologie | Déploiement |
+|--------|-------------|-------------|
+| Frontend principal | React 19 + Vite + Tailwind CSS v4 | Vercel |
+| Portail membre | React + Vite | Vercel |
+| Dashboard M15 | React + Vite | Vercel |
+| Agent terrain | React + Vite (PWA) | Vercel |
+| Backend API | Node.js 24 + Express 5 | Railway |
+| Base de données | PostgreSQL + Drizzle ORM | Railway |
 
-## Run & Operate
+Replit est utilisé comme **environnement de développement**. Le déploiement se fait via GitHub → Railway (API) / Vercel (frontends).
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000/8080)
-- `pnpm --filter @workspace/frontend run dev` — run the frontend Vite dev server
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` (Postgres), `JWT_SECRET` (for token signing — set via Replit Secrets)
+## Structure du monorepo (pnpm workspaces)
 
-## Stack
+```
+artifacts/
+  api-server/     # Backend Express — port 8080
+  frontend/       # Frontend principal
+  m15/            # Dashboard M15 Tech
+  portail/        # Portail membre
+  terrain/        # App agent terrain (PWA)
+  mockup-sandbox/ # Sandbox de design
+lib/
+  db/             # Schéma Drizzle ORM + migrations
+  api-spec/       # Spec OpenAPI (source de vérité)
+  api-client-react/ # Hooks React Query générés (Orval)
+  api-zod/        # Schémas Zod générés (Orval)
+```
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- Frontend: React + Vite + Tailwind CSS v4 (artifact at `/`)
-- API: Express 5 (artifact at `/api`)
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec) → React Query hooks + Zod schemas
-- Build: esbuild (CJS bundle)
+## Démarrage en développement
 
-## Where things live
+Les workflows Replit démarrent automatiquement les services. Pour les relancer manuellement :
 
-- `lib/db/src/schema/` — source of truth for all DB schemas (Drizzle)
-- `lib/api-spec/openapi.yaml` — source of truth for API contract (OpenAPI 3.1)
-- `lib/api-client-react/src/generated/` — generated React Query hooks (do not edit)
-- `lib/api-zod/src/generated/` — generated Zod schemas (do not edit)
-- `artifacts/api-server/src/` — Express routes, controllers, middlewares
-- `artifacts/frontend/src/` — React pages and components
-- `artifacts/api-server/db/seed.sql` — données de test (5 membres, 3 avances, 4 livraisons)
+```bash
+# Backend API (port 8080)
+pnpm --filter @workspace/api-server run dev
 
-## Architecture decisions
+# Frontend principal
+pnpm --filter @workspace/frontend run dev
 
-- **Contract-first API**: OpenAPI spec → codegen → typed hooks + validation. Any API change starts in `openapi.yaml`, then run codegen.
-- **JWT auth**: Token signé avec `JWT_SECRET` (8h expiry). Frontend stocke le token dans `localStorage`, injecté via `setAuthTokenGetter` dans le `customFetch` de l'API client.
-- **Déduction automatique des avances**: Lors d'une livraison, l'avance en cours du membre est automatiquement déduite du montant brut dans une transaction SQL atomique.
-- **Pas de `console.log` côté serveur**: Utiliser `req.log` dans les handlers et le singleton `logger` ailleurs (Pino).
-- **FCFA** : toutes les valeurs monétaires sont des entiers (centimes non utilisés).
+# Portail membre
+pnpm --filter @workspace/portail run dev
 
-## Product
+# Dashboard M15
+pnpm --filter @workspace/m15 run dev
 
-- **Connexion** : Login avec email + mot de passe, JWT 8h
-- **Dashboard** : KPIs (membres actifs, avances en cours, tonnage du mois, paiements), dernières livraisons, avances en retard
-- **Membres** : Liste paginée avec recherche/filtre, création de membre, fiche détaillée avec QR code et historique livraisons/avances
-- **Avances** : Liste, création, remboursement manuel, résumé encours
-- **Livraisons** : Saisie pesée avec déduction automatique d'avance et calcul du net en temps réel
+# Agent terrain
+pnpm --filter @workspace/terrain run dev
+```
+
+## Variables d'environnement (Replit dev)
+
+| Variable | Source | Notes |
+|----------|--------|-------|
+| `DATABASE_URL` | Injectée automatiquement par Replit | PostgreSQL Replit intégré |
+| `JWT_SECRET` | Secret Replit | Valeur dev distincte de la prod |
+| `VAPID_PUBLIC_KEY` | Env var partagée | Web Push notifications |
+| `VAPID_PRIVATE_KEY` | Env var partagée | Web Push notifications |
+| `VAPID_SUBJECT` | Env var partagée | Web Push notifications |
+| `ALLOWED_ORIGINS` | Env var partagée | Vide = toutes origines autorisées (dev) |
+
+## Base de données
+
+- **Développement** : PostgreSQL intégré Replit (DATABASE_URL auto-injectée)
+- **Production** : PostgreSQL Railway
+- Les migrations sont appliquées automatiquement au démarrage du serveur API (`runMigrations`)
+- Pour régénérer le schéma manuellement : `pnpm --filter @workspace/db run push` ⚠️ peut échouer sur Replit (voir note ci-dessous)
+
+> **Note** : `drizzle-kit push` peut échouer sur la DB Replit avec "type serial does not exist". Contourner en exécutant le SQL CREATE TABLE directement ou en laissant le serveur appliquer les migrations au démarrage.
+
+## Commandes utiles
+
+```bash
+# Vérification des types (tout le workspace)
+pnpm run typecheck
+
+# Régénérer hooks API et schémas Zod depuis la spec OpenAPI
+pnpm --filter @workspace/api-spec run codegen
+
+# Lancer les tests
+pnpm -r --if-present run test
+```
 
 ## User preferences
 
-_Ajouter ici les préférences explicites de l'utilisateur._
-
-## Gotchas
-
-- Le `codegen` doit être re-exécuté après chaque modification de `openapi.yaml`
-- `montantRembourse_fcfa` dans le schéma Drizzle utilise un underscore interne (colonne `montant_rembourse_fcfa`) — préférer l'import direct depuis `@workspace/db`
-- Le frontend utilise **wouter** (pas react-router-dom) pour le routing
-- `useAuth` est dans `@/contexts/AuthContext` (pas `@/hooks/useAuth` — ce chemin n'existe pas)
-- `UseQueryOptions` dans React Query v5 exige `queryKey` — utiliser les helpers `getGet*QueryKey()` générés par Orval quand on passe des options `enabled`
-- Seed admin : `admin@coopdigital.ci` / `Admin1234!`
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Langue : Français (interface et messages d'erreur)
+- Montants financiers en FCFA (entiers, pas de décimales)
+- Conventions comptables OHADA
+- Déploiement via GitHub (pas via Replit Deploy)
