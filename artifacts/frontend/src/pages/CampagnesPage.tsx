@@ -183,6 +183,29 @@ export default function CampagnesPage() {
   const [rattachPending, setRattachPending] = useState(false);
   const [rattachMsg, setRattachMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [downloadingBilans, setDownloadingBilans] = useState<Set<number>>(new Set());
+  const [archiverPending, setArchiverPending] = useState<Set<number>>(new Set());
+
+  async function handleArchiver(campagneId: number) {
+    if (archiverPending.has(campagneId)) return;
+    setArchiverPending(prev => new Set(prev).add(campagneId));
+    try {
+      const BASE = import.meta.env.VITE_API_URL ?? "";
+      const tok = localStorage.getItem("coop_token") ?? "";
+      const r = await fetch(`${BASE}/api/archives/${campagneId}/archiver`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tok}` },
+      });
+      const data = await r.json() as { erreur?: string };
+      if (!r.ok) throw new Error(data.erreur ?? `Erreur ${r.status}`);
+      await queryClient.invalidateQueries(getListCampagnesQueryOptions());
+      toast({ title: "Campagne archivée avec succès" });
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : "Erreur archivage", variant: "destructive" });
+    } finally {
+      setArchiverPending(prev => { const s = new Set(prev); s.delete(campagneId); return s; });
+    }
+  }
+
     const [rouvrirId, setRouvrirId] = useState<number | null>(null);
     const [rouvrirMotif, setRouvrirMotif] = useState("");
     const [rouvrirPending, setRouvrirPending] = useState(false);
@@ -486,6 +509,17 @@ export default function CampagnesPage() {
                             <button onClick={() => setTab("bilans")}
                               className={`${BTN} bg-gray-50 text-gray-600 hover:bg-gray-100 text-xs px-3 py-1.5`}>
                               <BarChart3 className="w-3.5 h-3.5" /> Bilan
+                            </button>
+                          )}
+                          {c.statut === "fermee" && (utilisateur?.role === "pca" || utilisateur?.role === "directeur") && (
+                            <button
+                              onClick={() => handleArchiver(c.id)}
+                              disabled={archiverPending.has(c.id)}
+                              className={`${BTN} bg-purple-50 text-purple-700 hover:bg-purple-100 text-xs px-3 py-1.5`}>
+                              {archiverPending.has(c.id)
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                : <Archive className="w-3.5 h-3.5" />}
+                              Archiver
                             </button>
                           )}
                           {c.statut === "fermee" && utilisateur?.role === "pca" && (
