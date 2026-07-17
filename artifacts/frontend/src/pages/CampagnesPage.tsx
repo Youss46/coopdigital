@@ -285,10 +285,16 @@ export default function CampagnesPage() {
     await refetchVerifs();
   }
 
+  // Normalise une chaîne de confirmation : trim, espaces multiples → un seul,
+  // tirets typographiques (–, —) → tiret ASCII (-).
+  function normalizeConfirm(s: string) {
+    return s.trim().replace(/\s+/g, " ").replace(/[\u2013\u2014]/g, "-");
+  }
+
   async function handleCloturer() {
     if (!active) return;
     const expected = `CLOTURER ${active.libelle}`;
-    if (confirmText !== expected) {
+    if (normalizeConfirm(confirmText) !== normalizeConfirm(expected)) {
       toast({ title: `Saisir exactement : ${expected}`, variant: "destructive" });
       return;
     }
@@ -682,7 +688,7 @@ export default function CampagnesPage() {
                           Annuler
                         </button>
                         <button
-                          disabled={confirmText !== `CLOTURER ${active.libelle}` || cloturerMut.isPending}
+                          disabled={normalizeConfirm(confirmText) !== normalizeConfirm(`CLOTURER ${active.libelle}`) || cloturerMut.isPending}
                           onClick={handleCloturer}
                           className={`${BTN} bg-red-600 text-white hover:bg-red-700`}>
                           {cloturerMut.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
