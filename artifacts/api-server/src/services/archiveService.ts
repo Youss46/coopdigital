@@ -90,7 +90,7 @@ export async function archiverCampagne(
   const parcellesRes = await db.execute<RowParcellesStats>(sql`
     SELECT
       COUNT(*)                                                         AS total,
-      COUNT(*) FILTER (WHERE p.statut_eudr = 'conforme')              AS conformes
+      COUNT(*) FILTER (WHERE p.eudr_statut = 'conforme')              AS conformes
     FROM parcelles p
     INNER JOIN membres m ON m.id = p.membre_id
     WHERE m.cooperative_id = ${cooperativeId}
