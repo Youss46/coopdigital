@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import {
   CalendarDays, Plus, CheckCircle2, Clock, Loader2, AlertTriangle,
@@ -170,9 +170,9 @@ export default function CampagnesPage() {
       query: { enabled: false, queryKey: getVerifierCampagneQueryKey(activeId) },
     });
 
-  const { data: bilanData, isLoading: bilanLoading, refetch: refetchBilan } =
+  const { data: bilanData, isLoading: bilanLoading, isError: bilanError, refetch: refetchBilan } =
     useGetBilanCampagne(activeId, {
-      query: { enabled: tab === "cloture" && !!activeId, queryKey: getGetBilanCampagneQueryKey(activeId) },
+      query: { enabled: tab === "cloture" && !!activeId, queryKey: getGetBilanCampagneQueryKey(activeId), retry: 1 },
     });
 
   const { data: comparaison, isLoading: comparaisonLoading } =
@@ -310,6 +310,17 @@ export default function CampagnesPage() {
   const okItems = verifs?.ok ?? [];
   const toutOk = verifs?.toutOk ?? false;
   const peutConfirmer = verifs != null && bloquants.length === 0;
+
+  // Relancer le chargement du bilan dès que les vérifications passent.
+  // La requête auto-fetch se déclenche à l'ouverture de l'onglet, mais si elle
+  // a échoué ou si activeId n'était pas encore disponible, elle ne se relance
+  // pas seule. On force un refetch quand peutConfirmer passe à true.
+  useEffect(() => {
+    if (peutConfirmer && !!activeId && !bilanData?.bilan && !bilanLoading) {
+      refetchBilan();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peutConfirmer, activeId]);
 
   const allTabs = [
     { id: "campagnes" as Tab, label: "Campagnes", labelMobile: "Camp.", icon: CalendarDays },
@@ -640,9 +651,15 @@ export default function CampagnesPage() {
                       </div>
                     </>
                   ) : (
-                    <div className="flex justify-center py-6">
-                      <button onClick={() => refetchBilan()} className={`${BTN} bg-gray-100 text-gray-700 hover:bg-gray-200`}>
-                        <RefreshCw className="w-4 h-4" /> Générer l'aperçu du bilan
+                    <div className="flex flex-col items-center gap-3 py-6">
+                      {bilanError && (
+                        <p className="text-sm text-red-600 text-center">
+                          Impossible de charger l'aperçu du bilan. Veuillez réessayer.
+                        </p>
+                      )}
+                      <button onClick={() => refetchBilan()} disabled={bilanLoading} className={`${BTN} bg-gray-100 text-gray-700 hover:bg-gray-200`}>
+                        {bilanLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                        {bilanError ? "Réessayer" : "Générer l'aperçu du bilan"}
                       </button>
                     </div>
                   )}
