@@ -3,9 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
+const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const apiFetch = async (url: string) => {
-  const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
+  const r = await fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } });
   if (!r.ok) {
     const e = await r.json().catch(() => ({ erreur: r.statusText }));
     throw new Error((e as { erreur?: string }).erreur ?? r.statusText);
