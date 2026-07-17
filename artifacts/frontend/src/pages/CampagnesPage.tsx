@@ -170,7 +170,7 @@ export default function CampagnesPage() {
       query: { enabled: false, queryKey: getVerifierCampagneQueryKey(activeId) },
     });
 
-  const { data: bilanData, isLoading: bilanLoading, isError: bilanError, refetch: refetchBilan } =
+  const { data: bilanData, isLoading: bilanLoading, isError: bilanError, error: bilanQueryError, refetch: refetchBilan } =
     useGetBilanCampagne(activeId, {
       query: { enabled: tab === "cloture" && !!activeId, queryKey: getGetBilanCampagneQueryKey(activeId), retry: 1 },
     });
@@ -654,7 +654,7 @@ export default function CampagnesPage() {
                     <div className="flex flex-col items-center gap-3 py-6">
                       {bilanError && (
                         <p className="text-sm text-red-600 text-center">
-                          Impossible de charger l'aperçu du bilan. Veuillez réessayer.
+                          {bilanQueryError?.message ?? "Impossible de charger l'aperçu du bilan."}
                         </p>
                       )}
                       <button onClick={() => refetchBilan()} disabled={bilanLoading} className={`${BTN} bg-gray-100 text-gray-700 hover:bg-gray-200`}>
