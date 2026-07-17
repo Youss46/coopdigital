@@ -296,9 +296,11 @@ export async function genererBilan(cooperativeId: number, campagneId: number, us
   const sal = salaires.rows[0] as Record<string, string>;
 
   const cotisations = await db.execute(sql`
-    SELECT COALESCE(SUM(montant_fcfa), 0) AS total
-    FROM cotisations
-    WHERE campagne_id = ${campagneId}
+    SELECT COALESCE(SUM(c.montant_fcfa), 0) AS total
+    FROM cotisations c
+    INNER JOIN membres m ON m.id = c.membre_id
+    WHERE m.cooperative_id = ${cooperativeId}
+      AND c.annee BETWEEN ${campagne.anneeDebut} AND ${campagne.anneeFin}
   `);
   const cot = cotisations.rows[0] as Record<string, string>;
 
