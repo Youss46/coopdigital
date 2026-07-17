@@ -602,9 +602,11 @@ export default function ArchivesPage() {
   const [tab, setTab] = useState<Tab>("liste");
   const [consulterCampagneId, setConsulterCampagneId] = useState<number | null>(null);
 
-  const { data: archives = [], isLoading } = useQuery<ArchiveItem[]>({
+  const { data: archives = [], isLoading, isError, error, refetch } = useQuery<ArchiveItem[]>({
     queryKey: ["archives"],
     queryFn: () => apiFetch("/api/archives") as Promise<ArchiveItem[]>,
+    refetchOnMount: "always",
+    retry: 1,
   });
 
   const TABS: { key: Tab; label: string }[] = [
@@ -638,6 +640,14 @@ export default function ArchivesPage() {
         <div className="text-center py-16 text-gray-400">
           <div className="animate-spin text-3xl mb-3">⏳</div>
           <p>Chargement des archives…</p>
+        </div>
+      ) : isError ? (
+        <div className="text-center py-16">
+          <p className="text-red-600 font-medium mb-2">Erreur lors du chargement des archives</p>
+          <p className="text-sm text-gray-500 mb-4">{error instanceof Error ? error.message : "Erreur inconnue"}</p>
+          <button onClick={() => refetch()} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
+            Réessayer
+          </button>
         </div>
       ) : (
         <>
