@@ -82,7 +82,7 @@ export async function archiverCampagne(
       COUNT(*)                                           AS total,
       COUNT(*) FILTER (WHERE statut = 'vendu')           AS vendus,
       COUNT(*) FILTER (WHERE statut = 'refoule')         AS refoules,
-      COALESCE(SUM(poids_net_kg) FILTER (WHERE statut = 'refoule'), 0) AS tonnage_refoule
+      COALESCE(SUM(poids_total_kg) FILTER (WHERE statut = 'refoule'), 0) AS tonnage_refoule
     FROM lots WHERE cooperative_id = ${cooperativeId} AND campagne_id = ${campagneId}
   `);
   const lotsStats = lotsRes.rows[0];
