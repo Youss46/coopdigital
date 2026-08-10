@@ -810,6 +810,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
 // 6. Reçu de paiement
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateRecuPaiement(paiementId: number, cooperativeId: number): Promise<Buffer> {
+  const validateurAlias = alias(usersTable, "validateur");
   const [row] = await db.select({
     id: paiementsTable.id,
     numeroRecu: paiementsTable.numeroRecu,
@@ -830,9 +831,14 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     membreTel: membresTable.telephone,
     livraisonDate: livraisonsTable.dateLivraison,
     livraisonRef: livraisonsTable.codeAchat,
+    // Agent validateur
+    validateurNom: validateurAlias.nom,
+    validateurPrenoms: validateurAlias.prenoms,
+    validateurRole: validateurAlias.role,
   }).from(paiementsTable)
     .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
     .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
+    .leftJoin(validateurAlias, eq(paiementsTable.validePar, validateurAlias.id))
     .where(eq(paiementsTable.id, paiementId));
   if (!row) throw new Error("Paiement introuvable");
 
@@ -890,6 +896,23 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
   const payStatutColor: Record<string, string> = { effectue: "#16a34a", confirme: "#16a34a", en_attente: "#f59e0b", echec: "#ef4444", rejete: "#ef4444" };
   doc.fontSize(9).font("Helvetica-Bold").fillColor(payStatutColor[row.statut] ?? GRIS)
     .text(`Statut : ${row.statut.replace(/_/g, " ").toUpperCase()}`, MARGIN, y);
+
+  // — Ligne "Validé par" si l'agent validateur est connu
+  if (row.validateurNom || row.validateurPrenoms) {
+    y += 14;
+    const roleStr = String(row.validateurRole ?? "");
+    const roleLabel = roleStr === "delegue" ? "Délégué"
+      : roleStr === "agent_terrain" ? "Agent terrain"
+      : roleStr === "directeur" ? "Directeur"
+      : roleStr === "comptable" ? "Comptable"
+      : roleStr === "pca" ? "PCA"
+      : roleStr || "Agent";
+    const validateurFullName = `${row.validateurPrenoms ?? ""} ${row.validateurNom ?? ""}`.trim();
+    doc.fontSize(9).font("Helvetica").fillColor(GRIS)
+      .text("Validé par : ", MARGIN, y, { continued: true })
+      .font("Helvetica-Bold").fillColor("black")
+      .text(`${validateurFullName} (${roleLabel})`);
+  }
 
   y = 700;
   doc.fontSize(8).fillColor(GRIS).font("Helvetica")
