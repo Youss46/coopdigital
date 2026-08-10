@@ -10,7 +10,7 @@ import {
   exportateursTable,
   parcellesTable,
 } from "@workspace/db";
-import { eq, inArray, sql, desc, and, or } from "drizzle-orm";
+import { eq, inArray, sql, desc, and, or, isNull, isNotNull } from "drizzle-orm";
 import { CreateLotBody, UpdateLotStatutBody } from "@workspace/api-zod";
 import { generateLotEudrPdf } from "../services/pdfService";
 
@@ -75,6 +75,66 @@ export async function listLots(req: Request, res: Response): Promise<void> {
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Erreur listLots");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function previewAutoLot(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  const body = req.body as { quantiteCibleKg?: number; pourFournisseurs?: boolean };
+  const quantiteCibleKg = Number(body.quantiteCibleKg);
+  if (!quantiteCibleKg || quantiteCibleKg <= 0) {
+    res.status(400).json({ erreur: "quantiteCibleKg doit être un nombre positif" });
+    return;
+  }
+  const pourFournisseurs = body.pourFournisseurs === true;
+
+  try {
+    // Livraisons disponibles (non encore dans un lot) pour cette coopérative, triées FIFO
+    const disponibles = await db
+      .select({ id: livraisonsTable.id, poidsKg: livraisonsTable.poidsKg })
+      .from(livraisonsTable)
+      .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+      .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+      .leftJoin(lotLivraisonsTable, eq(lotLivraisonsTable.livraisonId, livraisonsTable.id))
+      .where(
+        and(
+          isNull(lotLivraisonsTable.livraisonId),
+          pourFournisseurs
+            ? and(
+                isNotNull(livraisonsTable.fournisseurId),
+                eq(fournisseursTable.cooperativeId, cooperativeId),
+              )
+            : and(
+                isNotNull(livraisonsTable.membreId),
+                eq(membresTable.cooperativeId, cooperativeId),
+              ),
+        ),
+      )
+      .orderBy(livraisonsTable.dateLivraison); // FIFO — les plus anciennes en premier
+
+    // Sélection gloutonne jusqu'à atteindre la quantité cible
+    const selectedIds: number[] = [];
+    let cumul = 0;
+    for (const l of disponibles) {
+      if (cumul >= quantiteCibleKg) break;
+      selectedIds.push(l.id);
+      cumul += parseFloat(l.poidsKg);
+    }
+
+    res.json({
+      livraisonIds: selectedIds,
+      poidsTotalKg: Math.round(cumul * 100) / 100,
+      nbLivraisons: selectedIds.length,
+      surplusKg: Math.max(0, Math.round((cumul - quantiteCibleKg) * 100) / 100),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Erreur previewAutoLot");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

@@ -4,6 +4,7 @@ import { checkPermission } from "../middlewares/permissions";
 import {
   listLots,
   createLot,
+  previewAutoLot,
   getLotByQr,
   updateLotStatut,
   getLotTracabilite,
@@ -16,6 +17,7 @@ const router: IRouter = Router();
 router.use(authMiddleware);
 
 router.post("/lots/fusionner", checkPermission("tracabilite", "modifier_lot"), fusionnerLots);
+router.post("/lots/preview-auto", checkPermission("tracabilite", "creer_lot"), previewAutoLot);
 router.get("/lots", checkPermission("tracabilite", "lire"), listLots);
 router.post("/lots", checkPermission("tracabilite", "creer_lot"), createLot);
 router.get("/lots/qr/:code", checkPermission("tracabilite", "scanner_qr"), getLotByQr);

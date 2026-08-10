@@ -903,6 +903,8 @@ export default function TracabilitePage() {
   const [nombreSacsInput, setNombreSacsInput] = useState<string>("");
   const [lotDetail, setLotDetail] = useState<number | null>(null);
   const [showFusion, setShowFusion] = useState(false);
+  const [quantiteCibleInput, setQuantiteCibleInput] = useState<string>("");
+  const [autoSelectLoading, setAutoSelectLoading] = useState(false);
 
   const { data: lots = [], isLoading } = useGetLots({
     statut: (filtreStatut as LotStatut) || undefined,
@@ -976,6 +978,40 @@ export default function TracabilitePage() {
 
   const handleStatutChange = (id: number, statut: LotStatut) => {
     mutStatut.mutate({ id, data: { statut } });
+  };
+
+  const handleAutoSelect = async () => {
+    const cible = parseFloat(quantiteCibleInput);
+    if (!cible || cible <= 0 || !utilisateur?.cooperativeId) return;
+    setAutoSelectLoading(true);
+    try {
+      const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
+      const tok = localStorage.getItem("coop_token") ?? "";
+      const res = await fetch(`${BASE}/api/lots/preview-auto`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ quantiteCibleKg: cible, pourFournisseurs }),
+      });
+      const data = await res.json() as { erreur?: string; livraisonIds: number[]; poidsTotalKg: number; nbLivraisons: number; surplusKg: number };
+      if (!res.ok) {
+        toast({ title: "Erreur", description: data.erreur ?? "Impossible de calculer la sélection", variant: "destructive" });
+        return;
+      }
+      if (data.nbLivraisons === 0) {
+        toast({ title: "Aucune livraison disponible", description: "Il n'y a pas de livraisons non lotées pour atteindre cette quantité.", variant: "destructive" });
+        return;
+      }
+      setSelection(data.livraisonIds);
+      const surplusTxt = data.surplusKg > 0 ? ` (surplus : ${formaterPoids(data.surplusKg)})` : "";
+      toast({
+        title: `${data.nbLivraisons} livraison${data.nbLivraisons > 1 ? "s" : ""} sélectionnée${data.nbLivraisons > 1 ? "s" : ""}`,
+        description: `Poids total : ${formaterPoids(data.poidsTotalKg)}${surplusTxt}`,
+      });
+    } catch {
+      toast({ title: "Erreur réseau", description: "Impossible de joindre le serveur.", variant: "destructive" });
+    } finally {
+      setAutoSelectLoading(false);
+    }
   };
 
   const lotsEnStock = lots.filter((l) => l.statut === "en_stock");
@@ -1164,6 +1200,41 @@ export default function TracabilitePage() {
       {/* Onglet Créer un lot */}
       {onglet === "creer" && (
         <div className="space-y-4">
+          {/* Sélection automatique par quantité */}
+          <div className="bg-green-50 border border-green-200 rounded-xl p-5">
+            <h3 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+              <Scale size={16} className="text-[#1a4731]" />
+              Constituer un lot par quantité cible
+            </h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Indiquez la quantité souhaitée. Les livraisons disponibles seront sélectionnées automatiquement, des plus anciennes aux plus récentes.
+            </p>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Quantité cible (kg)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="100"
+                  value={quantiteCibleInput}
+                  onChange={(e) => setQuantiteCibleInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAutoSelect()}
+                  placeholder="ex : 45000"
+                  className="w-full border border-green-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 bg-white"
+                />
+              </div>
+              <button
+                onClick={handleAutoSelect}
+                disabled={!quantiteCibleInput || autoSelectLoading}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#1a4731] text-white hover:bg-green-900 disabled:opacity-40 transition-colors whitespace-nowrap"
+              >
+                {autoSelectLoading ? "Calcul…" : "Sélectionner auto."}
+              </button>
+            </div>
+          </div>
+
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h3 className="font-semibold text-gray-900 mb-4">Paramètres du lot</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
