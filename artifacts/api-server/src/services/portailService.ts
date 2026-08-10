@@ -162,6 +162,8 @@ export async function getProfilMembre(membreId: number) {
 
 // ─── Livraisons ───────────────────────────────────────────────────────────────
 
+const agentUserPortail = alias(usersTable, "agent_user_portail");
+
 export async function getLivraisonsMembre(membreId: number) {
   const rows = await db
     .select({
@@ -177,9 +179,13 @@ export async function getLivraisonsMembre(membreId: number) {
       montantNetFcfa: livraisonsTable.montantNetFcfa,
       campagneId: livraisonsTable.campagneId,
       campagneLibelle: campagnesTable.libelle,
+      agentNom: agentUserPortail.nom,
+      agentPrenoms: agentUserPortail.prenoms,
+      agentRole: agentUserPortail.role,
     })
     .from(livraisonsTable)
     .leftJoin(campagnesTable, eq(livraisonsTable.campagneId, campagnesTable.id))
+    .leftJoin(agentUserPortail, eq(livraisonsTable.agentId, agentUserPortail.id))
     .where(eq(livraisonsTable.membreId, membreId))
     .orderBy(desc(livraisonsTable.dateLivraison));
 

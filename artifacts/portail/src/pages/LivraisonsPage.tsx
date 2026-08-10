@@ -112,6 +112,16 @@ export default function LivraisonsPage() {
                     {l.campagneLibelle && (
                       <div className="text-xs text-green-600 font-medium mt-1">{l.campagneLibelle}</div>
                     )}
+                    {l.agentNom && (
+                      <div className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                        <span>👤</span>
+                        <span>
+                          {l.agentPrenoms} {l.agentNom}
+                          {l.agentRole === "peseur" && <span className="ml-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium">Peseur</span>}
+                          {l.agentRole === "delegue" && <span className="ml-1 px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-medium">Délégué</span>}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button

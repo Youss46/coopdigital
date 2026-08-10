@@ -54,6 +54,7 @@ export type Livraison = {
   montantBrutFcfa: number; avanceDeduiteFcfa: number;
   intrantsDeduitsFcfa: number; montantNetFcfa: number;
   campagneId: number | null; campagneLibelle: string | null;
+  agentNom: string | null; agentPrenoms: string | null; agentRole: string | null;
 };
 
 export type Avance = {
