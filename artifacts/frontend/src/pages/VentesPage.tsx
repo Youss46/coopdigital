@@ -118,6 +118,11 @@ export default function VentesPage() {
   const [formFourn, setFormFourn]             = useState(VENTE_FOURN_INIT);
   const [submittingFourn, setSubmittingFourn] = useState(false);
   const [selectedLivIds, setSelectedLivIds]   = useState<Set<number>>(new Set());
+  const [modeConstitution, setModeConstitution] = useState<"existant" | "auto">("existant");
+  const [quantiteCibleVente, setQuantiteCibleVente] = useState("");
+  const [autoPreview, setAutoPreview] = useState<{ livraisonIds: number[]; poidsTotalKg: number; nbLivraisons: number; surplusKg: number } | null>(null);
+  const [autoPreviewLoading, setAutoPreviewLoading] = useState(false);
+  const [submittingAuto, setSubmittingAuto] = useState(false);
 
   const { data: ventes = [], isLoading } = useGetVentes({}, {
     query: { queryKey: getGetVentesQueryKey({}) },
@@ -187,6 +192,9 @@ export default function VentesPage() {
     setFormFourn({ ...VENTE_FOURN_INIT, prixUnitaireFcfa: prixExport });
     setSourceStock("lots");
     setSelectedLivIds(new Set());
+    setModeConstitution("existant");
+    setQuantiteCibleVente("");
+    setAutoPreview(null);
     setModalVente(true);
   }
 
@@ -253,6 +261,82 @@ export default function VentesPage() {
       toast({ title: "Erreur", description: err instanceof Error ? err.message : "Erreur interne", variant: "destructive" });
     } finally {
       setSubmittingFourn(false);
+    }
+  }
+
+  async function handleAutoPreview() {
+    const cible = parseFloat(quantiteCibleVente);
+    if (!cible || cible <= 0) return;
+    setAutoPreviewLoading(true);
+    setAutoPreview(null);
+    try {
+      const tok = token ?? localStorage.getItem("coop_token") ?? "";
+      const res = await fetch(`${BASE}/api/lots/preview-auto`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ quantiteCibleKg: cible, pourFournisseurs: false }),
+      });
+      const data = await res.json() as { erreur?: string; livraisonIds: number[]; poidsTotalKg: number; nbLivraisons: number; surplusKg: number };
+      if (!res.ok) { toast({ title: "Erreur", description: data.erreur ?? "Impossible de calculer", variant: "destructive" }); return; }
+      if (data.nbLivraisons === 0) { toast({ title: "Stock insuffisant", description: "Aucune livraison disponible pour atteindre cette quantité.", variant: "destructive" }); return; }
+      setAutoPreview(data);
+      setForm(f => ({ ...f, poidsKg: data.poidsTotalKg.toFixed(2) }));
+    } catch {
+      toast({ title: "Erreur réseau", description: "Impossible de joindre le serveur.", variant: "destructive" });
+    } finally {
+      setAutoPreviewLoading(false);
+    }
+  }
+
+  async function handleSubmitVenteAuto() {
+    if (!autoPreview || autoPreview.nbLivraisons === 0) { toast({ title: "Prévisualisez d'abord la sélection", variant: "destructive" }); return; }
+    if (!form.exportateurId) { toast({ title: "Exportateur requis", variant: "destructive" }); return; }
+    if (!form.prixUnitaireFcfa || parseInt(form.prixUnitaireFcfa) <= 0) { toast({ title: "Prix unitaire requis", variant: "destructive" }); return; }
+    if (!form.dateVente) { toast({ title: "Date de vente requise", variant: "destructive" }); return; }
+    setSubmittingAuto(true);
+    try {
+      const tok = token ?? localStorage.getItem("coop_token") ?? "";
+      // 1. Créer le lot automatiquement
+      const lotRes = await fetch(`${BASE}/api/lots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ livraisonIds: autoPreview.livraisonIds }),
+      });
+      const lotData = await lotRes.json() as { id?: number; erreur?: string };
+      if (!lotRes.ok) throw new Error(lotData.erreur ?? `HTTP ${lotRes.status}`);
+      // 2. Enregistrer la vente avec le nouveau lot
+      const venteRes = await fetch(`${BASE}/api/ventes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({
+          exportateurId:         parseInt(form.exportateurId),
+          lotId:                 lotData.id,
+          poidsKg:               autoPreview.poidsTotalKg,
+          prixUnitaireFcfa:      parseInt(form.prixUnitaireFcfa),
+          nombreSacs:            form.nombreSacs ? parseInt(form.nombreSacs) : undefined,
+          dateVente:             form.dateVente,
+          dateEcheanceReglement: form.dateEcheanceReglement || undefined,
+        }),
+      });
+      const venteData = await venteRes.json() as { erreur?: string };
+      if (!venteRes.ok) throw new Error(venteData.erreur ?? `HTTP ${venteRes.status}`);
+      // Succès
+      qc.invalidateQueries({ queryKey: getGetVentesQueryKey({}) });
+      qc.invalidateQueries({ queryKey: getGetExportateursQueryKey() });
+      qc.invalidateQueries({ queryKey: ["ventes-lots-stock"] });
+      setModalVente(false);
+      setForm(VENTE_INIT);
+      setAutoPreview(null);
+      setQuantiteCibleVente("");
+      const exportNom = exportateurs.find(e => String(e.id) === form.exportateurId)?.nom ?? "";
+      toast({
+        title: "Lot constitué et vente enregistrée",
+        description: `LOT-${String(lotData.id).padStart(4, "0")} · ${autoPreview.poidsTotalKg.toLocaleString("fr-FR")} kg → ${exportNom}`,
+      });
+    } catch (err) {
+      toast({ title: "Erreur", description: err instanceof Error ? err.message : "Erreur interne", variant: "destructive" });
+    } finally {
+      setSubmittingAuto(false);
     }
   }
 
@@ -527,39 +611,98 @@ export default function VentesPage() {
               </div>
 
               {sourceStock === "lots" ? (<>
-                {/* Sélecteur de lot */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Lot à vendre</label>
-                  <select
-                    value={form.lotId}
-                    onChange={e => handleLotChange(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                {/* Sous-toggle : lot existant vs constitution auto */}
+                <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                  <button
+                    onClick={() => { setModeConstitution("existant"); setAutoPreview(null); }}
+                    className={`flex-1 py-2 text-xs font-medium transition ${modeConstitution === "existant" ? "bg-[#1a4731] text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
                   >
-                    <option value="">— Saisie libre (sans lot) —</option>
-                    {lotsEnStock.map(lot => (
-                      <option key={lot.id} value={String(lot.id)}>
-                        LOT-{String(lot.id).padStart(4,"0")} • {parseFloat(lot.poidsTotalKg).toLocaleString("fr-FR")} kg
-                        {lot.entrepot ? ` • ${lot.entrepot}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  {lotSelectionne && (
-                    <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-green-800 font-medium">LOT-{String(lotSelectionne.id).padStart(4,"0")}</span>
-                        <span className="text-green-700 font-bold">{parseFloat(lotSelectionne.poidsTotalKg).toLocaleString("fr-FR")} kg</span>
-                      </div>
-                      <p className="text-xs text-green-600 mt-0.5">
-                        {lotSelectionne.entrepot ? `📦 ${lotSelectionne.entrepot} • ` : ""}
-                        Créé le {formaterDate(lotSelectionne.dateCreation)}
-                        {lotSelectionne.nbLivraisons ? ` • ${lotSelectionne.nbLivraisons} livraison(s)` : ""}
-                      </p>
-                    </div>
-                  )}
-                  {lotsEnStock.length === 0 && (
-                    <p className="text-xs text-orange-600 mt-1">⚠️ Aucun lot en stock. Créez des lots depuis le module Traçabilité.</p>
-                  )}
+                    Lot existant
+                  </button>
+                  <button
+                    onClick={() => { setModeConstitution("auto"); setForm(f => ({ ...f, lotId: "" })); }}
+                    className={`flex-1 py-2 text-xs font-medium border-l border-gray-200 transition ${modeConstitution === "auto" ? "bg-[#1a4731] text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+                  >
+                    ⚡ Constituer automatiquement
+                  </button>
                 </div>
+
+                {modeConstitution === "existant" ? (
+                  /* Sélecteur de lot existant */
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Lot à vendre</label>
+                    <select
+                      value={form.lotId}
+                      onChange={e => handleLotChange(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                    >
+                      <option value="">— Saisie libre (sans lot) —</option>
+                      {lotsEnStock.map(lot => (
+                        <option key={lot.id} value={String(lot.id)}>
+                          LOT-{String(lot.id).padStart(4,"0")} • {parseFloat(lot.poidsTotalKg).toLocaleString("fr-FR")} kg
+                          {lot.entrepot ? ` • ${lot.entrepot}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    {lotSelectionne && (
+                      <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-green-800 font-medium">LOT-{String(lotSelectionne.id).padStart(4,"0")}</span>
+                          <span className="text-green-700 font-bold">{parseFloat(lotSelectionne.poidsTotalKg).toLocaleString("fr-FR")} kg</span>
+                        </div>
+                        <p className="text-xs text-green-600 mt-0.5">
+                          {lotSelectionne.entrepot ? `📦 ${lotSelectionne.entrepot} • ` : ""}
+                          Créé le {formaterDate(lotSelectionne.dateCreation)}
+                          {lotSelectionne.nbLivraisons ? ` • ${lotSelectionne.nbLivraisons} livraison(s)` : ""}
+                        </p>
+                      </div>
+                    )}
+                    {lotsEnStock.length === 0 && (
+                      <p className="text-xs text-orange-600 mt-1">⚠️ Aucun lot en stock. Créez des lots depuis le module Traçabilité.</p>
+                    )}
+                  </div>
+                ) : (
+                  /* Constitution automatique par quantité cible */
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Quantité cible (kg) *</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          step="100"
+                          value={quantiteCibleVente}
+                          onChange={e => { setQuantiteCibleVente(e.target.value); setAutoPreview(null); }}
+                          onKeyDown={e => e.key === "Enter" && handleAutoPreview()}
+                          placeholder="ex : 45000"
+                          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                        />
+                        <button
+                          onClick={handleAutoPreview}
+                          disabled={!quantiteCibleVente || autoPreviewLoading}
+                          className="px-3 py-2 text-xs font-semibold rounded-lg border border-[#1a4731] text-[#1a4731] hover:bg-green-50 disabled:opacity-40 whitespace-nowrap"
+                        >
+                          {autoPreviewLoading ? "Calcul…" : "Prévisualiser"}
+                        </button>
+                      </div>
+                    </div>
+                    {autoPreview && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-green-800 font-medium">
+                            {autoPreview.nbLivraisons} livraison{autoPreview.nbLivraisons > 1 ? "s" : ""} sélectionnée{autoPreview.nbLivraisons > 1 ? "s" : ""}
+                          </span>
+                          <span className="text-green-900 font-bold">{autoPreview.poidsTotalKg.toLocaleString("fr-FR")} kg</span>
+                        </div>
+                        {autoPreview.surplusKg > 0 && (
+                          <p className="text-xs text-amber-700">
+                            ⚠️ Surplus de {autoPreview.surplusKg.toLocaleString("fr-FR")} kg (dernière livraison non divisible)
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Exportateur */}
                 <div>
@@ -723,16 +866,23 @@ export default function VentesPage() {
 
             <div className="px-6 pb-5 flex gap-3 sticky bottom-0 bg-white border-t border-gray-100 pt-4">
               <button
-                onClick={() => { setModalVente(false); setForm(VENTE_INIT); setFormFourn(VENTE_FOURN_INIT); }}
+                onClick={() => { setModalVente(false); setForm(VENTE_INIT); setFormFourn(VENTE_FOURN_INIT); setAutoPreview(null); setQuantiteCibleVente(""); setModeConstitution("existant"); }}
                 className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Annuler
               </button>
               {sourceStock === "lots" ? (
-                <button onClick={handleSubmitVente} disabled={mutVente.isPending}
-                  className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium bg-green-700 hover:bg-green-800 disabled:opacity-50">
-                  {mutVente.isPending ? "Enregistrement…" : "Enregistrer la vente →"}
-                </button>
+                modeConstitution === "auto" ? (
+                  <button onClick={handleSubmitVenteAuto} disabled={submittingAuto || !autoPreview}
+                    className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium bg-[#1a4731] hover:bg-green-900 disabled:opacity-50">
+                    {submittingAuto ? "Création…" : "Constituer le lot et vendre →"}
+                  </button>
+                ) : (
+                  <button onClick={handleSubmitVente} disabled={mutVente.isPending}
+                    className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium bg-green-700 hover:bg-green-800 disabled:opacity-50">
+                    {mutVente.isPending ? "Enregistrement…" : "Enregistrer la vente →"}
+                  </button>
+                )
               ) : (
                 <button onClick={handleSubmitVenteFournisseur} disabled={submittingFourn}
                   className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium bg-purple-700 hover:bg-purple-800 disabled:opacity-50">
