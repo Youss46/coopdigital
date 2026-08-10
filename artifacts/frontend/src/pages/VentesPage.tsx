@@ -166,6 +166,22 @@ export default function VentesPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: stockDispo } = useQuery<{ poidsTotalKg: number; nbLivraisons: number }>({
+    queryKey: ["stock-dispo-auto", modeConstitution],
+    queryFn: async () => {
+      const tok = token ?? localStorage.getItem("coop_token") ?? "";
+      const res = await fetch(`${BASE}/api/lots/preview-auto`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ quantiteCibleKg: Number.MAX_SAFE_INTEGER, pourFournisseurs: false }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json() as Promise<{ poidsTotalKg: number; nbLivraisons: number }>;
+    },
+    enabled: modalVente && sourceStock === "lots" && modeConstitution === "auto",
+    staleTime: 30 * 1000,
+  });
+
   const mutVente = useCreateVente({
     mutation: {
       onSuccess: () => {
@@ -685,7 +701,21 @@ export default function VentesPage() {
                   /* Constitution automatique par quantité cible */
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Quantité cible (kg) *</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-medium text-gray-700">Quantité cible (kg) *</label>
+                        {stockDispo && (
+                          <span className="text-xs text-gray-500">
+                            Stock disponible :&nbsp;
+                            <span className="font-semibold text-gray-700">
+                              {stockDispo.poidsTotalKg.toLocaleString("fr-FR")} kg
+                            </span>
+                            &nbsp;({stockDispo.nbLivraisons} livraison{stockDispo.nbLivraisons !== 1 ? "s" : ""})
+                          </span>
+                        )}
+                        {!stockDispo && modeConstitution === "auto" && (
+                          <span className="text-xs text-gray-400 italic">Calcul du stock…</span>
+                        )}
+                      </div>
                       <div className="flex gap-2">
                         <input
                           type="number"
