@@ -1,5 +1,9 @@
 import { type Request, type Response } from "express";
-import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, fournisseursTable, lotLivraisonsTable, lotsTable, campagnesTable, entrepotsTable, mouvementsStockTable } from "@workspace/db";
+import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, fournisseursTable, lotLivraisonsTable, lotsTable, campagnesTable, entrepotsTable, mouvementsStockTable, usersTable } from "@workspace/db";
+import { alias } from "drizzle-orm/pg-core";
+
+// Alias pour la jointure agent saisie (évite conflit avec d'éventuels autres joins usersTable)
+const agentUserAlias = alias(usersTable, "agent_user");
 import { creerChequeDepuisLivraison } from "../services/chequesService.js";
 import { eq, and, desc, notInArray, or } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
@@ -52,10 +56,14 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
         membrePrenoms: membresTable.prenoms,
         fournisseurNom: fournisseursTable.nom,
         fournisseurPrenoms: fournisseursTable.prenoms,
+        agentNom: agentUserAlias.nom,
+        agentPrenoms: agentUserAlias.prenoms,
+        agentRole: agentUserAlias.role,
       })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+      .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
       .where(whereClause)
       .orderBy(desc(livraisonsTable.dateLivraison))
       .limit(limit);

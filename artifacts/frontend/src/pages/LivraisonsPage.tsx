@@ -49,7 +49,19 @@ interface Livraison {
   montantNetFcfa: number | null;
   dateLivraison: string;
   createdAt: string;
+  agentNom: string | null;
+  agentPrenoms: string | null;
+  agentRole: string | null;
 }
+
+const ROLE_SAISIE_LABEL: Record<string, { label: string; color: string; bg: string }> = {
+  peseur:        { label: "Peseur",        color: "#0369a1", bg: "#e0f2fe" },
+  delegue:       { label: "Délégué",       color: "#15803d", bg: "#dcfce7" },
+  agent_terrain: { label: "Agent terrain", color: "#065f46", bg: "#d1fae5" },
+  magasinier:    { label: "Magasinier",    color: "#c2410c", bg: "#ffedd5" },
+  directeur:     { label: "Directeur",     color: "#1a4731", bg: "#f0fdf4" },
+  pca:           { label: "PCA",           color: "#4c1d95", bg: "#ede9fe" },
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -76,6 +88,7 @@ export default function LivraisonsPage() {
   const voitDelegues = ROLES_VOIR_DELEGUES.includes(utilisateur?.role ?? "");
   const [recherche, setRecherche] = useState("");
   const [deleguesOuvert, setDeleguesOuvert] = useState(true);
+  const [filtreRole, setFiltreRole] = useState<"" | "peseur" | "delegue" | "agent_terrain">("");
 
   const { data: livraisons = [], isLoading } = useQuery<Livraison[]>({
     queryKey: ["livraisons-liste"],
@@ -93,6 +106,7 @@ export default function LivraisonsPage() {
   });
 
   const filtres = livraisons.filter((l) => {
+    if (filtreRole && l.agentRole !== filtreRole) return false;
     if (!recherche) return true;
     const r = recherche.toLowerCase();
     return (
@@ -161,6 +175,40 @@ export default function LivraisonsPage() {
           onChange={(e) => setRecherche(e.target.value)}
           className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
         />
+      </div>
+
+      {/* Filtre agent saisie */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-gray-400 font-medium flex items-center gap-1"><User size={11} /> Saisi par :</span>
+        {([
+          { value: "" as const,              label: "Tous" },
+          { value: "peseur" as const,        label: "Peseur" },
+          { value: "delegue" as const,       label: "Délégué" },
+          { value: "agent_terrain" as const, label: "Agent terrain" },
+        ] as const).map((opt) => {
+          const style = opt.value ? ROLE_SAISIE_LABEL[opt.value] : null;
+          const actif = filtreRole === opt.value;
+          return (
+            <button
+              key={opt.value}
+              onClick={() => setFiltreRole(opt.value)}
+              className="text-xs px-2.5 py-1 rounded-full font-medium border transition-all"
+              style={actif && style
+                ? { background: style.bg, color: style.color, borderColor: style.color }
+                : actif
+                  ? { background: "#1a4731", color: "#fff", borderColor: "#1a4731" }
+                  : { background: "#fff", color: "#6b7280", borderColor: "#e5e7eb" }
+              }
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+        {filtreRole && (
+          <span className="text-xs text-gray-400 ml-1">
+            — {filtres.length} livraison{filtres.length !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
 
       {/* Liste */}
@@ -323,7 +371,7 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
           <p className="text-sm font-semibold text-gray-900 truncate">
             {l.membreNom ?? l.fournisseurNom ?? "—"} {l.membrePrenoms ?? l.fournisseurPrenoms ?? ""}
           </p>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <span className="text-xs text-gray-400 flex items-center gap-1">
               <Calendar size={10} /> {fmtDate(l.dateLivraison)}
             </span>
@@ -331,6 +379,20 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
             <span className="text-xs text-gray-400 flex items-center gap-1">
               <Scale size={10} /> {poids.toFixed(1)} kg
             </span>
+            {l.agentRole && ROLE_SAISIE_LABEL[l.agentRole] && (
+              <>
+                <span className="text-xs text-gray-300">·</span>
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded font-medium"
+                  style={{
+                    background: ROLE_SAISIE_LABEL[l.agentRole]!.bg,
+                    color: ROLE_SAISIE_LABEL[l.agentRole]!.color,
+                  }}
+                >
+                  {ROLE_SAISIE_LABEL[l.agentRole]!.label}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -375,6 +437,29 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
               valueCls="font-bold text-green-700"
             />
           </div>
+          {l.agentNom && (
+            <div className="border-t border-gray-200 pt-1.5 mt-1.5 flex items-center justify-between text-xs">
+              <span className="text-gray-500 flex items-center gap-1">
+                <User size={11} /> Saisi par
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-gray-700 font-medium">
+                  {l.agentPrenoms} {l.agentNom}
+                </span>
+                {l.agentRole && ROLE_SAISIE_LABEL[l.agentRole] && (
+                  <span
+                    className="px-1.5 py-0.5 rounded font-medium"
+                    style={{
+                      background: ROLE_SAISIE_LABEL[l.agentRole]!.bg,
+                      color: ROLE_SAISIE_LABEL[l.agentRole]!.color,
+                    }}
+                  >
+                    {ROLE_SAISIE_LABEL[l.agentRole]!.label}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
           <div className="mt-2 flex gap-2">
             <button
               onClick={async () => {
