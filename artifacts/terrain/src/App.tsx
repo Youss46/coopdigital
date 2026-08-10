@@ -16,6 +16,7 @@ import ChangerMotDePasse from "./pages/ChangerMotDePasse";
 import PaiementsDifferes from "./pages/PaiementsDifferes";
 import Commissions from "./pages/Commissions";
 import AccueilAgent from "./pages/AccueilAgent";
+import AccueilPeseur from "./pages/AccueilPeseur";
 import MissionsAgent from "./pages/MissionsAgent";
 import MissionDetail from "./pages/MissionDetail";
 import CollecteGps from "./pages/CollecteGps";
@@ -56,6 +57,17 @@ function DelegueRoutes() {
   );
 }
 
+function PeseurRoutes() {
+  return (
+    <Switch>
+      <Route path="/" component={AccueilPeseur} />
+      <Route path="/collecte" component={CollecteFlow} />
+      <Route path="/historique" component={SyncHistorique} />
+      <Route><Redirect to="/" /></Route>
+    </Switch>
+  );
+}
+
 function AppRoutes() {
   const { isAuthenticated, user } = useAuth();
   usePushSubscription(isAuthenticated);
@@ -74,6 +86,10 @@ function AppRoutes() {
         <AgentTerrainRoutes />
       </EnqueteBadgeProvider>
     );
+  }
+
+  if (user?.role === "peseur") {
+    return <PeseurRoutes />;
   }
 
   return <DelegueRoutes />;

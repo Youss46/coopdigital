@@ -40,7 +40,8 @@ type UserRole =
   | "responsable_tracabilite"
   | "delegue"
   | "auditeur"
-  | "agent_terrain";
+  | "agent_terrain"
+  | "peseur";
 
 const ROLE_LABELS: Record<UserRole, string> = {
   pca: "PCA",
@@ -52,6 +53,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   delegue: "Délégué de localité",
   auditeur: "Auditeur",
   agent_terrain: "Agent terrain",
+  peseur: "Peseur",
 };
 
 const ROLE_BADGE_STYLE: Record<UserRole, { bg: string; text: string }> = {
@@ -64,6 +66,7 @@ const ROLE_BADGE_STYLE: Record<UserRole, { bg: string; text: string }> = {
   delegue: { bg: "#15803d", text: "#ffffff" },
   auditeur: { bg: "#a16207", text: "#ffffff" },
   agent_terrain: { bg: "#065f46", text: "#ffffff" },
+  peseur: { bg: "#0369a1", text: "#ffffff" },
 };
 
 // Rôles créables selon le rôle du demandeur
@@ -77,6 +80,7 @@ function getRolesCreables(requesterRole: string): UserRole[] {
     "responsable_tracabilite",
     "delegue",
     "agent_terrain",
+    "peseur",
     "auditeur",
   ];
   if (requesterRole === "pca") return all;
@@ -150,14 +154,14 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
   const TERRAIN_URL = "https://coopdigital.m15-edutech.ci";
 
   const partagerWhatsApp = useCallback(() => {
-    const isAgentTerrain = form.role === "agent_terrain";
-    const appUrl = isAgentTerrain
+    const isTerrainUser = form.role === "agent_terrain" || form.role === "peseur";
+    const appUrl = isTerrainUser
       ? TERRAIN_URL
       : window.location.origin + (import.meta.env.BASE_URL ?? "/");
     const ligne = (label: string, val: string) => `${label} : ${val}`;
 
     let msg: string;
-    if (isAgentTerrain) {
+    if (isTerrainUser) {
       msg = [
         `Bonjour ${form.prenoms || ""},`,
         "",
@@ -189,10 +193,10 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.role) return;
-    if (form.role === "agent_terrain" && !form.telephone.trim()) {
+    if ((form.role === "agent_terrain" || form.role === "peseur") && !form.telephone.trim()) {
       toast({
         title: "Champ obligatoire",
-        description: "Le numéro de téléphone est obligatoire pour un compte Agent terrain.",
+        description: "Le numéro de téléphone est obligatoire pour un compte Agent terrain ou Peseur.",
         variant: "destructive",
       });
       return;
@@ -249,7 +253,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
             <div className="mx-6 mb-4 rounded-xl border border-gray-100 bg-gray-50 divide-y divide-gray-100">
               <div className="px-4 py-3 flex items-center justify-between gap-2">
                 <div>
-                  {form.role === "agent_terrain" ? (
+                  {(form.role === "agent_terrain" || form.role === "peseur") ? (
                     <>
                       <p className="text-xs text-gray-400 mb-0.5">Numéro de téléphone</p>
                       <p className="text-sm font-medium text-gray-800 break-all">{form.telephone}</p>
@@ -380,10 +384,10 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
                 </select>
               </div>
 
-              {form.role === "agent_terrain" && (
+              {(form.role === "agent_terrain" || form.role === "peseur") && (
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Zone d'intervention <span className="text-gray-400">(optionnel)</span>
+                    Section / Zone <span className="text-gray-400">(optionnel)</span>
                   </label>
                   <input
                     type="text"
@@ -583,13 +587,13 @@ function ResetPasswordModal({ nom, prenoms, email, userId, role, telephone, onCl
   const TERRAIN_URL = "https://coopdigital.m15-edutech.ci";
 
   const partagerWhatsApp = useCallback(() => {
-    const isAgentTerrain = role === "agent_terrain";
-    const appUrl = isAgentTerrain
+    const isTerrainUser = role === "agent_terrain" || role === "peseur";
+    const appUrl = isTerrainUser
       ? TERRAIN_URL
       : window.location.origin + (import.meta.env.BASE_URL ?? "/");
 
     let msg: string;
-    if (isAgentTerrain) {
+    if (isTerrainUser) {
       msg = [
         `Bonjour ${prenoms},`,
         "",
@@ -652,7 +656,7 @@ function ResetPasswordModal({ nom, prenoms, email, userId, role, telephone, onCl
 
             <div className="mx-6 mb-4 rounded-xl border border-gray-100 bg-gray-50 divide-y divide-gray-100">
               <div className="px-4 py-3">
-                {role === "agent_terrain" ? (
+                {(role === "agent_terrain" || role === "peseur") ? (
                   <>
                     <p className="text-xs text-gray-400 mb-0.5">Numéro de téléphone</p>
                     <p className="text-sm font-medium text-gray-800 break-all">{telephone || "—"}</p>

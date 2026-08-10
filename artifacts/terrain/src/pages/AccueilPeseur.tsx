@@ -1,0 +1,139 @@
+import { useState } from "react";
+import { Link } from "wouter";
+import { useAuth } from "../contexts/AuthContext";
+import { useOffline } from "../contexts/OfflineContext";
+import BottomNavPeseur from "../components/BottomNavPeseur";
+
+export default function AccueilPeseur() {
+  const { user, logout } = useAuth();
+  const { isOnline, pendingCount } = useOffline();
+  const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
+
+  return (
+    <div className="t-app">
+      <header className="t-header">
+        <div style={{ flex: 1 }}>
+          <div className="t-header__title">Bonjour, {user?.nom} 👋</div>
+          <div className="t-header__sub">
+            {user?.section ? `Section : ${user.section}` : "Peseur"}
+          </div>
+        </div>
+        {pendingCount > 0 && (
+          <span className="t-header__badge">📴 {pendingCount}</span>
+        )}
+        <button
+          onClick={() => setConfirmDeconnexion(true)}
+          style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, color: "#fff", padding: "6px 12px", fontSize: ".8rem", fontWeight: 700, cursor: "pointer" }}
+        >
+          ⎋
+        </button>
+      </header>
+
+      <main className="t-main">
+        {/* Carte action principale */}
+        <Link href="/collecte">
+          <div className="t-card" style={{
+            marginBottom: 16,
+            background: "linear-gradient(135deg, #16a34a 0%, #15803d 100%)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+          }}>
+            <span style={{ fontSize: "2.5rem" }}>⚖️</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
+                Nouvelle collecte
+              </div>
+              <div style={{ fontSize: ".82rem", color: "rgba(255,255,255,.8)", marginTop: 2 }}>
+                Enregistrer la livraison d'un membre
+              </div>
+            </div>
+            <span style={{ marginLeft: "auto", fontSize: "1.4rem", color: "rgba(255,255,255,.7)" }}>›</span>
+          </div>
+        </Link>
+
+        {/* Synchronisation en attente */}
+        {pendingCount > 0 && (
+          <div className="t-card" style={{ marginBottom: 12, borderLeft: "3px solid #f59e0b", background: "#1e2d45" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: "1.4rem" }}>📴</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: ".9rem", color: "#f59e0b" }}>
+                  {pendingCount} opération{pendingCount > 1 ? "s" : ""} en attente
+                </div>
+                <div style={{ fontSize: ".78rem", color: "#94a3b8", marginTop: 2 }}>
+                  {isOnline
+                    ? "Synchronisation en cours…"
+                    : "Hors ligne — sera synchronisé à la reconnexion"}
+                </div>
+              </div>
+              <Link href="/historique" style={{ marginLeft: "auto", fontSize: ".78rem", color: "#3b82f6", fontWeight: 600 }}>
+                Voir →
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Statut connexion */}
+        {!isOnline && pendingCount === 0 && (
+          <div className="t-card" style={{ background: "#1e293b", borderLeft: "3px solid #f59e0b" }}>
+            <div style={{ fontSize: ".85rem", color: "#f59e0b" }}>
+              📡 Hors ligne — les collectes saisies seront synchronisées à la reconnexion.
+            </div>
+          </div>
+        )}
+
+        {/* Info rôle */}
+        <div className="t-card" style={{ marginBottom: 12, background: "#1e2d45" }}>
+          <div className="t-card__title" style={{ marginBottom: 8 }}>ℹ️ Votre espace</div>
+          <div style={{ fontSize: ".82rem", color: "#94a3b8", lineHeight: 1.6 }}>
+            En tant que <strong style={{ color: "#fff" }}>Peseur</strong>, vous pouvez enregistrer les livraisons
+            des membres. Les paiements et avances sont gérés par le délégué de votre localité.
+          </div>
+        </div>
+      </main>
+
+      {/* Modal déconnexion */}
+      {confirmDeconnexion && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setConfirmDeconnexion(false)}
+        >
+          <div
+            style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 320, boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f0f0f0" }}>
+              <div style={{ fontWeight: 700, fontSize: "1rem", color: "#111" }}>Déconnexion</div>
+            </div>
+            <div style={{ padding: "16px 24px" }}>
+              <div style={{ fontSize: ".9rem", color: "#555" }}>Voulez-vous vraiment vous déconnecter ?</div>
+              {pendingCount > 0 && (
+                <div style={{ marginTop: 8, fontSize: ".85rem", color: "#f59e0b" }}>
+                  ⚠️ {pendingCount} opération(s) en attente de synchronisation.
+                </div>
+              )}
+            </div>
+            <div style={{ padding: "0 24px 20px", display: "flex", gap: 12 }}>
+              <button
+                onClick={() => setConfirmDeconnexion(false)}
+                style={{ flex: 1, padding: "10px", border: "1px solid #e0e0e0", borderRadius: 10, fontSize: ".85rem", fontWeight: 600, cursor: "pointer", background: "#fff", color: "#333" }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={logout}
+                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 10, fontSize: ".85rem", fontWeight: 600, cursor: "pointer", background: "#dc2626", color: "#fff" }}
+              >
+                Déconnecter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <BottomNavPeseur />
+    </div>
+  );
+}

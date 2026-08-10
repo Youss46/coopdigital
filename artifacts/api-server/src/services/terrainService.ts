@@ -33,7 +33,7 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
     .where(and(eq(usersTable.telephone, tel), eq(usersTable.actif, true)))
     .limit(1);
 
-  if (!user || (user.role !== "delegue" && user.role !== "agent_terrain")) return null;
+  if (!user || (user.role !== "delegue" && user.role !== "agent_terrain" && user.role !== "peseur")) return null;
 
   const ok = await bcrypt.compare(motDePasse, user.passwordHash);
   if (!ok) return null;
