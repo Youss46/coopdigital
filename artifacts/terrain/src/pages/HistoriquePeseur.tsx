@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { getPeseurCollectes } from "../lib/api";
+import { getPeseurCollectes, telechargerRecuLivraison } from "../lib/api";
 import { useOffline } from "../contexts/OfflineContext";
 import type { PeseurCollecte } from "../lib/types";
 
@@ -28,6 +28,8 @@ export default function HistoriquePeseur() {
   const [loading, setLoading] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [fromCache, setFromCache] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [downloadErreur, setDownloadErreur] = useState<string | null>(null);
 
   const charger = useCallback(async () => {
     setLoading(true);
@@ -116,10 +118,20 @@ export default function HistoriquePeseur() {
           </div>
         )}
 
-        {/* Erreur */}
+        {/* Erreur chargement */}
         {erreur && (
           <div style={{ margin: "0 0 12px", padding: "10px 14px", background: "rgba(220,38,38,.12)", border: "1px solid rgba(220,38,38,.3)", borderRadius: 8, fontSize: ".85rem", color: "#f87171" }}>
             ⚠️ {erreur}
+          </div>
+        )}
+
+        {/* Erreur téléchargement reçu */}
+        {downloadErreur && (
+          <div
+            style={{ margin: "0 0 12px", padding: "10px 14px", background: "rgba(220,38,38,.12)", border: "1px solid rgba(220,38,38,.3)", borderRadius: 8, fontSize: ".85rem", color: "#f87171", cursor: "pointer" }}
+            onClick={() => setDownloadErreur(null)}
+          >
+            ⚠️ {downloadErreur} — appuyez pour fermer
           </div>
         )}
 
@@ -172,6 +184,35 @@ export default function HistoriquePeseur() {
                     }}>
                       {st.label}
                     </span>
+                    {isOnline && (
+                      <button
+                        disabled={downloadingId === c.id}
+                        onClick={async () => {
+                          setDownloadingId(c.id);
+                          setDownloadErreur(null);
+                          try {
+                            await telechargerRecuLivraison(c.id);
+                          } catch (e) {
+                            setDownloadErreur((e as Error).message || "Erreur téléchargement");
+                          }
+                          setDownloadingId(null);
+                        }}
+                        style={{
+                          marginTop: 2,
+                          background: downloadingId === c.id ? "rgba(255,255,255,.08)" : "rgba(99,210,132,.18)",
+                          border: "1px solid rgba(99,210,132,.35)",
+                          borderRadius: 8,
+                          color: downloadingId === c.id ? "var(--t-muted)" : "#63d284",
+                          fontSize: ".7rem",
+                          fontWeight: 700,
+                          padding: "4px 10px",
+                          cursor: downloadingId === c.id ? "default" : "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {downloadingId === c.id ? "…" : "📄 Reçu"}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

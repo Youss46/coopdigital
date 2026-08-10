@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { terrainAuthMiddleware, delegueOnly, collecteAllowed } from "../middlewares/terrainAuth.js";
+import { terrainAuthMiddleware, delegueOnly, collecteAllowed, peseurOrDelegueOnly } from "../middlewares/terrainAuth.js";
 import { getVapidPublicKey, subscribePush, unsubscribePush } from "../controllers/pushController.js";
 import {
   loginTerrainHandler,
@@ -81,8 +81,8 @@ router.post("/terrain/enquetes/sync",                        terrainAuthMiddlewa
 router.post("/terrain/enquetes/:id/membres/:membreId",       terrainAuthMiddleware, soumettreReponsesHandler);
 router.post("/terrain/enquetes/:id/soumettre",               terrainAuthMiddleware, soumettreEnqueteHandler);
 
-// Reçus PDF (délégué)
-router.get("/terrain/recu/livraison/:id", terrainAuthMiddleware, delegueOnly, getTerrainRecuLivraison);
+// Reçus PDF (délégué et peseur — le peseur ne voit que ses propres livraisons)
+router.get("/terrain/recu/livraison/:id", terrainAuthMiddleware, peseurOrDelegueOnly, getTerrainRecuLivraison);
 
 // Relevé commissions PDF (délégué)
 router.get("/terrain/commissions/releve", terrainAuthMiddleware, delegueOnly, getTerrainReleveCommissions);

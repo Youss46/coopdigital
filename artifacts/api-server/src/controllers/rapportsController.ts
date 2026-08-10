@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, campagnesTable, usersTable } from "@workspace/db";
+import { db, campagnesTable, usersTable, livraisonsTable, membresTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import {
   generateFicheMembre,
@@ -110,9 +110,32 @@ export async function getRecuLivraison(req: Request, res: Response): Promise<voi
 
 export async function getTerrainRecuLivraison(req: Request, res: Response): Promise<void> {
   const id = parseInt(String(req.params["id"] ?? "0"));
-  const cooperativeId = req.agent?.cooperativeId;
+  const agent = req.agent;
+  const cooperativeId = agent?.cooperativeId;
   if (!id) { res.status(400).json({ erreur: "ID livraison invalide" }); return; }
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+
+  // For peseur: verify ownership using the same join/fields as getPeseurCollectes history.
+  // Must check agentId (the field used when a peseur records a delivery) and scope to
+  // the agent's cooperative via membresTable (livraisons has no direct cooperativeId column).
+  if (agent?.role === "peseur") {
+    const [livraison] = await db
+      .select({ agentId: livraisonsTable.agentId })
+      .from(livraisonsTable)
+      .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+      .where(
+        and(
+          eq(livraisonsTable.id, id),
+          eq(membresTable.cooperativeId, cooperativeId),
+        ),
+      )
+      .limit(1);
+    if (!livraison) { res.status(404).json({ erreur: "Livraison introuvable" }); return; }
+    if (livraison.agentId !== agent.id) {
+      res.status(403).json({ erreur: "Accès non autorisé à cette livraison" }); return;
+    }
+  }
+
   try {
     const buffer = await generateRecuLivraison(id, cooperativeId);
     sendPdf(res, buffer, `recu_livraison_${id}.pdf`);
