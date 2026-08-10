@@ -17,6 +17,7 @@ import PaiementsDifferes from "./pages/PaiementsDifferes";
 import Commissions from "./pages/Commissions";
 import AccueilAgent from "./pages/AccueilAgent";
 import AccueilPeseur from "./pages/AccueilPeseur";
+import HistoriquePeseur from "./pages/HistoriquePeseur";
 import MissionsAgent from "./pages/MissionsAgent";
 import MissionDetail from "./pages/MissionDetail";
 import CollecteGps from "./pages/CollecteGps";
@@ -62,7 +63,7 @@ function PeseurRoutes() {
     <Switch>
       <Route path="/" component={AccueilPeseur} />
       <Route path="/collecte" component={CollecteFlow} />
-      <Route path="/historique" component={SyncHistorique} />
+      <Route path="/historique" component={HistoriquePeseur} />
       <Route><Redirect to="/" /></Route>
     </Switch>
   );

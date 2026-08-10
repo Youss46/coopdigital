@@ -647,6 +647,43 @@ export async function syncOperations(
   return { succes, echecs };
 }
 
+// ─── Historique collectes peseur ─────────────────────────────────────────
+
+export async function getPeseurCollectes(agentId: number, cooperativeId: number) {
+  const rows = await db
+    .select({
+      id: livraisonsTable.id,
+      dateLivraison: livraisonsTable.dateLivraison,
+      poidsKg: livraisonsTable.poidsKg,
+      montantNetFcfa: livraisonsTable.montantNetFcfa,
+      statutPaiement: livraisonsTable.statutPaiement,
+      membreNom: membresTable.nom,
+      membrePrenoms: membresTable.prenoms,
+      membreCode: membresTable.code,
+    })
+    .from(livraisonsTable)
+    .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+    .where(
+      and(
+        eq(livraisonsTable.agentId, agentId),
+        eq(membresTable.cooperativeId, cooperativeId),
+      ),
+    )
+    .orderBy(desc(livraisonsTable.dateLivraison), desc(livraisonsTable.id))
+    .limit(200);
+
+  return rows.map((r) => ({
+    id: r.id,
+    dateLivraison: r.dateLivraison,
+    poidsKg: toNum(r.poidsKg),
+    montantNetFcfa: r.montantNetFcfa,
+    statutPaiement: r.statutPaiement ?? "PAYÉ",
+    membreNom: r.membreNom ?? "—",
+    membrePrenoms: r.membrePrenoms ?? "",
+    membreCode: r.membreCode ?? "",
+  }));
+}
+
 // ─── Rapport journalier ──────────────────────────────────────────────────
 
 export async function envoyerRapportJournalier(agentId: number, cooperativeId: number) {

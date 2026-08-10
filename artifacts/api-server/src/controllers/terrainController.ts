@@ -204,6 +204,18 @@ export async function changePasswordHandler(req: Request, res: Response): Promis
   }
 }
 
+export async function getPeseurCollectesHandler(req: Request, res: Response): Promise<void> {
+  const { id, cooperativeId } = getAgent(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
+  try {
+    const collectes = await terrainService.getPeseurCollectes(id, cooperativeId);
+    res.json(collectes);
+  } catch (err) {
+    req.log.error({ err }, "Erreur historique collectes peseur");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 export async function postRapportHandler(req: Request, res: Response): Promise<void> {
   const { id, cooperativeId } = getAgent(req);
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }

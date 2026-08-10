@@ -209,6 +209,17 @@ export interface MissionDetail extends MissionTerrain {
   messages: MessageMission[];
 }
 
+export interface PeseurCollecte {
+  id: number;
+  dateLivraison: string;
+  poidsKg: number;
+  montantNetFcfa: number;
+  statutPaiement: string;
+  membreNom: string;
+  membrePrenoms: string;
+  membreCode: string;
+}
+
 export interface StatsAgent {
   parcellesMappees: number;
   missionsTerminees: number;

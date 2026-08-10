@@ -14,6 +14,7 @@ import {
   postSyncHandler,
   postRapportHandler,
   changePasswordHandler,
+  getPeseurCollectesHandler,
 } from "../controllers/terrainController.js";
 import { getTerrainRecuLivraison, getTerrainReleveCommissions } from "../controllers/rapportsController.js";
 import {
@@ -68,6 +69,9 @@ router.post("/terrain/messages/:missionId", terrainAuthMiddleware, sendMessageHa
 router.get("/terrain/agent/stats", terrainAuthMiddleware, getStatsAgentHandler);
 router.get("/terrain/agent/historique", terrainAuthMiddleware, getHistoriqueAgentHandler);
 router.get("/terrain/historique", terrainAuthMiddleware, getHistoriqueAgentHandler);
+
+// Routes peseur
+router.get("/terrain/peseur/collectes", terrainAuthMiddleware, getPeseurCollectesHandler);
 
 // Missions d'enquête (agent terrain)
 router.get("/terrain/enquetes",                              terrainAuthMiddleware, getEnquetesAgentHandler);

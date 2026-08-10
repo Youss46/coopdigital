@@ -1,9 +1,9 @@
 import { Link, useLocation } from "wouter";
 
 const ITEMS = [
-  { path: "/",          icon: "🏠", label: "Accueil"   },
-  { path: "/collecte",  icon: "⚖️", label: "Collecte"  },
-  { path: "/historique", icon: "🔄", label: "Sync"      },
+  { path: "/",           icon: "🏠", label: "Accueil"    },
+  { path: "/collecte",   icon: "⚖️", label: "Collecte"   },
+  { path: "/historique", icon: "📋", label: "Historique" },
 ];
 
 export default function BottomNavPeseur() {

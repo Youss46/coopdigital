@@ -242,6 +242,10 @@ export async function getHistoriqueAgent(): Promise<MissionTerrain[]> {
 
 // ─── Missions d'enquête ────────────────────────────────────────────────────────
 
+export async function getPeseurCollectes(): Promise<import("./types").PeseurCollecte[]> {
+  return apiGet<import("./types").PeseurCollecte[]>("/peseur/collectes");
+}
+
 export async function getEnquetes(): Promise<import("./types").MissionEnquete[]> {
   return apiGet<import("./types").MissionEnquete[]>("/enquetes");
 }

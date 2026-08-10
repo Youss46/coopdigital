@@ -84,6 +84,29 @@ export default function AccueilPeseur() {
           </div>
         )}
 
+        {/* Historique des collectes */}
+        <Link href="/historique">
+          <div className="t-card" style={{
+            marginBottom: 12,
+            background: "#1e2d45",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+          }}>
+            <span style={{ fontSize: "1.6rem" }}>📋</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: ".9rem", color: "#e2e8f0" }}>
+                Mes collectes
+              </div>
+              <div style={{ fontSize: ".78rem", color: "#94a3b8", marginTop: 2 }}>
+                Consulter l'historique de vos livraisons
+              </div>
+            </div>
+            <span style={{ fontSize: "1.2rem", color: "#64748b" }}>›</span>
+          </div>
+        </Link>
+
         {/* Info rôle */}
         <div className="t-card" style={{ marginBottom: 12, background: "#1e2d45" }}>
           <div className="t-card__title" style={{ marginBottom: 8 }}>ℹ️ Votre espace</div>
