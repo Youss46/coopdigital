@@ -247,6 +247,26 @@ export async function drawHeader(
       );
   }
 
+  // ── Coordonnées bancaires (optionnel) ────────────────────────────────────────
+  const bankParts: string[] = [];
+  if (config?.banquePrincipale)     bankParts.push(`Banque : ${config.banquePrincipale}`);
+  if (config?.numeroCompteBancaire) bankParts.push(`Cpte N° ${config.numeroCompteBancaire}`);
+  if (config?.iban)                 bankParts.push(`IBAN : ${config.iban}`);
+  const bankLine   = bankParts.join("  ·  ");
+  const hasBankLine = bankLine.length > 0;
+  // Décale le séparateur vers le bas quand les coordonnées bancaires sont présentes
+  const separatorY = hasBankLine ? 90 : 76;
+
+  if (hasBankLine) {
+    const hasAgrement = Boolean(config?.numeroAgrement && options.show_agrement !== false);
+    const bankY = currentY + (hasAgrement ? 12 : 2);
+    doc
+      .font("Helvetica")
+      .fontSize(7)
+      .fillColor("#666666")
+      .text(bankLine, infoX, bankY, { width: infoWidth, lineBreak: false });
+  }
+
   // ── Boîte titre document (droite) ────────────────────────────────────────────
   if (hasTitre) {
     const titreX = pageWidth - marginRight - titreBoxW + 8;
@@ -294,8 +314,8 @@ export async function drawHeader(
 
   // ── Ligne séparatrice ────────────────────────────────────────────────────────
   doc
-    .moveTo(marginLeft, 76)
-    .lineTo(pageWidth - marginRight, 76)
+    .moveTo(marginLeft, separatorY)
+    .lineTo(pageWidth - marginRight, separatorY)
     .strokeColor(couleur)
     .lineWidth(1)
     .stroke();
@@ -306,7 +326,7 @@ export async function drawHeader(
       .font("Helvetica")
       .fontSize(6)
       .fillColor("#cccccc")
-      .text("Powered by CoopDigital — M15 Tech", marginLeft, 80, {
+      .text("Powered by CoopDigital — M15 Tech", marginLeft, separatorY + 4, {
         width: contentWidth,
         align: "right",
         lineBreak: false,
@@ -315,7 +335,7 @@ export async function drawHeader(
 
   // ── Repositionne le curseur ───────────────────────────────────────────────────
   doc.x = marginLeft;
-  doc.y = options.hauteur_reservee ?? 96;
+  doc.y = options.hauteur_reservee ?? (hasBankLine ? 110 : 96);
 }
 
 // ── Pied de page ──────────────────────────────────────────────────────────────
