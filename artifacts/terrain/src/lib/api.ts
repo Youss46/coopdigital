@@ -101,8 +101,9 @@ export async function changerMotDePasse(nouveauMotDePasse: string) {
 
 export async function getCaisse() { return apiGet<import("./types").CaisseDelegue>("/caisse"); }
 
-export async function getMesCommissions() {
-  return apiGet<import("./types").CommissionResume>("/mes-commissions");
+export async function getMesCommissions(campagneId?: number) {
+  const qs = campagneId ? `?campagneId=${campagneId}` : "";
+  return apiGet<import("./types").CommissionResume>(`/mes-commissions${qs}`);
 }
 
 export async function getPaiementsDifferes() {

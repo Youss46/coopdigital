@@ -8,21 +8,42 @@ function fmt(n: number | string) {
 }
 
 function statutBadge(statut: string) {
-  if (statut === "payee") return { label: "Payée", bg: "#dcfce7", color: "#16a34a" };
+  if (statut === "payee" || statut === "payé") return { label: "Payée", bg: "#dcfce7", color: "#16a34a" };
   return { label: "En attente", bg: "#fef9c3", color: "#ca8a04" };
 }
 
 export default function Commissions() {
-  const [data, setData] = useState<CommissionResume | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [erreur, setErreur] = useState<string | null>(null);
+  const [data, setData]           = useState<CommissionResume | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [erreur, setErreur]       = useState<string | null>(null);
+  const [campagneId, setCampagneId] = useState<number | undefined>(undefined);
 
   useEffect(() => {
-    getMesCommissions()
-      .then(setData)
-      .catch((e: Error) => setErreur(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+    // Protection contre les réponses périmées : on associe un token à chaque requête.
+    // Si une nouvelle sélection déclenche un effet avant que la précédente réponde,
+    // on ignore le résultat de l'ancienne via le flag `cancelled`.
+    let cancelled = false;
+    setLoading(true);
+    setErreur(null);
+
+    getMesCommissions(campagneId)
+      .then((res) => {
+        if (!cancelled) setData(res);
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setErreur(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campagneId]);
+
+  // Campagnes disponibles — issues de la première réponse (sans filtre)
+  const campagnes = data?.campagnes ?? [];
 
   return (
     <div className="t-app">
@@ -30,11 +51,74 @@ export default function Commissions() {
         <Link href="/" style={{ color: "#fff", textDecoration: "none", fontSize: "1.3rem", marginRight: 8 }}>←</Link>
         <div style={{ flex: 1 }}>
           <div className="t-header__title">Mes commissions</div>
-          <div className="t-header__sub">Cumul et historique</div>
+          <div className="t-header__sub">
+            {campagneId && campagnes.length > 0
+              ? campagnes.find((c) => c.id === campagneId)?.libelle ?? "Campagne filtrée"
+              : "Toutes campagnes"}
+          </div>
         </div>
       </header>
 
       <main className="t-main" style={{ paddingBottom: 80 }}>
+
+        {/* ── Sélecteur de campagne ─────────────────────────────────── */}
+        {(campagnes.length > 0 || campagneId) && (
+          <div style={{ padding: "14px 16px 0" }}>
+            <div style={{ fontSize: ".72rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8 }}>
+              Filtrer par campagne
+            </div>
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+              {/* Bouton "Toutes" */}
+              <button
+                onClick={() => setCampagneId(undefined)}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 20,
+                  border: "1.5px solid",
+                  borderColor: campagneId === undefined ? "#2563eb" : "#cbd5e1",
+                  background: campagneId === undefined ? "#2563eb" : "#fff",
+                  color: campagneId === undefined ? "#fff" : "#374151",
+                  fontWeight: 700,
+                  fontSize: ".78rem",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                Toutes
+              </button>
+
+              {campagnes.map((c) => {
+                const active = campagneId === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setCampagneId(active ? undefined : c.id)}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 20,
+                      border: "1.5px solid",
+                      borderColor: active ? "#16a34a" : "#cbd5e1",
+                      background: active ? "#16a34a" : "#fff",
+                      color: active ? "#fff" : "#374151",
+                      fontWeight: 700,
+                      fontSize: ".78rem",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {c.libelle}
+                    {c.statut === "ouverte" && (
+                      <span style={{ marginLeft: 5, fontSize: ".65rem", opacity: .85 }}>●</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {loading && <div className="t-spinner" style={{ margin: "40px auto" }} />}
 
         {erreur && (
@@ -43,10 +127,10 @@ export default function Commissions() {
           </div>
         )}
 
-        {data && (
+        {!loading && data && (
           <>
-            {/* Résumé */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, padding: "16px 16px 0" }}>
+            {/* ── Résumé ────────────────────────────────────────────── */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, padding: "14px 16px 0" }}>
               <div style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: 14, padding: "14px 16px" }}>
                 <div style={{ fontSize: ".72rem", color: "#92400e", marginBottom: 4 }}>En attente</div>
                 <div style={{ fontWeight: 800, fontSize: "1.1rem", color: "#b45309" }}>
@@ -63,7 +147,14 @@ export default function Commissions() {
 
             <div style={{ margin: "12px 16px 0", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: ".72rem", color: "#64748b", marginBottom: 2 }}>Total cumulé ({data.nb} livraisons)</div>
+                <div style={{ fontSize: ".72rem", color: "#64748b", marginBottom: 2 }}>
+                  Total cumulé ({data.nb} livraison{data.nb > 1 ? "s" : ""})
+                  {campagneId && campagnes.find((c) => c.id === campagneId) && (
+                    <span style={{ marginLeft: 6, fontWeight: 700, color: "#16a34a" }}>
+                      — {campagnes.find((c) => c.id === campagneId)!.libelle}
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontWeight: 800, fontSize: "1.15rem", color: "#0f172a" }}>
                   {fmt(data.totalFcfa)} FCFA
                 </div>
@@ -71,10 +162,12 @@ export default function Commissions() {
               <span style={{ fontSize: "1.6rem" }}>🏅</span>
             </div>
 
-            {/* Historique récent */}
+            {/* ── Historique récent ──────────────────────────────────── */}
             {data.recentes.length > 0 ? (
               <>
-                <div className="t-section-title" style={{ marginTop: 20 }}>20 dernières commissions</div>
+                <div className="t-section-title" style={{ marginTop: 20 }}>
+                  {campagneId ? "Commissions de la campagne" : "20 dernières commissions"}
+                </div>
                 <div style={{ padding: "0 16px 16px" }}>
                   {data.recentes.map((c) => {
                     const badge = statutBadge(c.statut);
@@ -104,15 +197,21 @@ export default function Commissions() {
             ) : (
               <div style={{ textAlign: "center", padding: "40px 24px", color: "#94a3b8" }}>
                 <div style={{ fontSize: "2.5rem", marginBottom: 12 }}>📋</div>
-                <div style={{ fontWeight: 600 }}>Aucune commission enregistrée</div>
-                <div style={{ fontSize: ".85rem", marginTop: 6 }}>Vos commissions apparaîtront ici après chaque collecte.</div>
+                <div style={{ fontWeight: 600 }}>
+                  {campagneId ? "Aucune commission pour cette campagne" : "Aucune commission enregistrée"}
+                </div>
+                <div style={{ fontSize: ".85rem", marginTop: 6 }}>
+                  {campagneId
+                    ? "Essayez de sélectionner une autre campagne ou \"Toutes\"."
+                    : "Vos commissions apparaîtront ici après chaque collecte."}
+                </div>
               </div>
             )}
           </>
         )}
       </main>
 
-      {/* Bottom nav minimal avec retour */}
+      {/* Bottom nav */}
       <nav className="t-nav">
         <Link href="/" className="t-nav__item">
           <span className="t-nav__icon">🏠</span>

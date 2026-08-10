@@ -98,8 +98,17 @@ export async function payerCommissionsHandler(req: Request, res: Response): Prom
 
 export async function getMesCommissionsHandler(req: Request, res: Response): Promise<void> {
   const agent = req.agent!;
+  let campagneId: number | undefined;
+  if (req.query.campagneId !== undefined) {
+    const parsed = Number(req.query.campagneId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      res.status(400).json({ erreur: "campagneId doit être un entier positif" });
+      return;
+    }
+    campagneId = parsed;
+  }
   try {
-    const data = await commissionService.getResumeMesCommissions(agent.id);
+    const data = await commissionService.getResumeMesCommissions(agent.id, campagneId);
     res.json(data);
   } catch (err) {
     req.log.error({ err }, "getMesCommissions");

@@ -82,6 +82,14 @@ export interface CommissionResume {
     statut: string;
     createdAt: string;
   }>;
+  /** Campagnes ayant au moins une commission — utilisées pour le sélecteur de filtre */
+  campagnes: Array<{
+    id: number;
+    libelle: string;
+    anneeDebut: number;
+    anneeFin: number;
+    statut: string;
+  }>;
 }
 
 export interface CaisseDelegue {

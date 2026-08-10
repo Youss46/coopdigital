@@ -236,7 +236,19 @@ export async function getCommissionsDelegue(
 
 // ─── Résumé des commissions (pour l'accueil terrain délégué) ─────────────
 
-export async function getResumeMesCommissions(delegueId: number) {
+export async function getResumeMesCommissions(
+  delegueId: number,
+  campagneId?: number
+) {
+  // Filtre de base : toujours ce délégué, + campagne si fournie
+  const baseWhere = campagneId
+    ? and(
+        eq(commissionsDeleguesTable.delegueId, delegueId),
+        eq(commissionsDeleguesTable.campagneId, campagneId)
+      )
+    : eq(commissionsDeleguesTable.delegueId, delegueId);
+
+  // Totaux (filtrés)
   const [row] = await db
     .select({
       enAttente: sql<string>`COALESCE(SUM(CASE WHEN ${commissionsDeleguesTable.statut} = 'en_attente' THEN ${commissionsDeleguesTable.montantFcfa} ELSE 0 END), 0)`,
@@ -245,14 +257,32 @@ export async function getResumeMesCommissions(delegueId: number) {
       nb:        sql<number>`COUNT(*)`,
     })
     .from(commissionsDeleguesTable)
-    .where(eq(commissionsDeleguesTable.delegueId, delegueId));
+    .where(baseWhere);
 
+  // 20 dernières (filtrées)
   const recentes = await db
     .select()
     .from(commissionsDeleguesTable)
-    .where(eq(commissionsDeleguesTable.delegueId, delegueId))
+    .where(baseWhere)
     .orderBy(desc(commissionsDeleguesTable.createdAt))
     .limit(20);
+
+  // Liste des campagnes ayant au moins une commission pour ce délégué (pour le sélecteur)
+  const campagnesRows = await db
+    .selectDistinct({
+      id:      campagnesTable.id,
+      libelle: campagnesTable.libelle,
+      anneeDebut: campagnesTable.anneeDebut,
+      anneeFin:   campagnesTable.anneeFin,
+      statut:     campagnesTable.statut,
+    })
+    .from(commissionsDeleguesTable)
+    .innerJoin(
+      campagnesTable,
+      eq(campagnesTable.id, commissionsDeleguesTable.campagneId)
+    )
+    .where(eq(commissionsDeleguesTable.delegueId, delegueId))
+    .orderBy(desc(campagnesTable.anneeDebut));
 
   return {
     enAttenteFcfa: toNum(row?.enAttente),
@@ -260,6 +290,7 @@ export async function getResumeMesCommissions(delegueId: number) {
     totalFcfa:     toNum(row?.total),
     nb:            Number(row?.nb ?? 0),
     recentes,
+    campagnes: campagnesRows,
   };
 }
 
