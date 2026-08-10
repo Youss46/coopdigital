@@ -33,6 +33,7 @@ import {
   soumettreEnqueteHandler,
   syncEnquetesHandler,
 } from "../controllers/enqueteAgentController.js";
+import { getMesCommissionsHandler } from "../controllers/commissionController.js";
 
 const router = Router();
 
@@ -44,6 +45,9 @@ router.post("/terrain/auth/change-password", terrainAuthMiddleware, changePasswo
 router.get("/terrain/profil", terrainAuthMiddleware, getProfilHandler);
 router.get("/terrain/prix", terrainAuthMiddleware, getPrixHandler);
 router.post("/terrain/sync", terrainAuthMiddleware, postSyncHandler);
+
+// Commissions du délégué connecté
+router.get("/terrain/mes-commissions", terrainAuthMiddleware, delegueOnly, getMesCommissionsHandler);
 
 // Routes protégées délégué uniquement
 router.get("/terrain/fournisseurs", terrainAuthMiddleware, delegueOnly, getFournisseursHandler);

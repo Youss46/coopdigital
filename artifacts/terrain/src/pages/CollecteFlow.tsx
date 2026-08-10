@@ -397,6 +397,12 @@ export default function CollecteFlow() {
                   <span className="t-recap-row__label">{result.statutPaiement === "DIFFÉRÉ" ? "Net à payer" : "Net payé"}</span>
                   <span className="t-recap-row__value">{result.montantNetFcfa.toLocaleString("fr-FR")} FCFA</span>
                 </div>
+                {result.commissionFcfa != null && result.commissionFcfa > 0 && (
+                  <div className="t-recap-row" style={{ background: "#f0fdf4", borderRadius: 8, padding: "6px 0" }}>
+                    <span className="t-recap-row__label" style={{ color: "#16a34a" }}>🎯 Ma commission</span>
+                    <span className="t-recap-row__value" style={{ color: "#16a34a", fontWeight: 700 }}>+{result.commissionFcfa.toLocaleString("fr-FR")} FCFA</span>
+                  </div>
+                )}
                 {result.statutPaiement && (
                   <div className="t-recap-row">
                     <span className="t-recap-row__label">Statut</span>

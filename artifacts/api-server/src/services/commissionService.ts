@@ -1,0 +1,373 @@
+/**
+ * Service de gestion des commissions délégués.
+ *
+ * Option A : la commission est attribuée au délégué du membre (membres.delegue_id),
+ * quel que soit l'agent qui a saisi la livraison.
+ *
+ * Priorité de résolution du taux :
+ *   1. (cooperative_id + campagne_id + delegue_id) — taux personnalisé pour ce délégué cette campagne
+ *   2. (cooperative_id + campagne_id)              — taux campagne par défaut (delegue_id IS NULL)
+ *   3. (cooperative_id)                            — taux global de la coop (campagne_id IS NULL)
+ */
+
+import { db } from "@workspace/db";
+import {
+  tauxCommissionsDeleguesTable,
+  commissionsDeleguesTable,
+  caissesDeleguesTable,
+  mouvementsCaisseDelegueTable,
+  usersTable,
+  campagnesTable,
+} from "@workspace/db";
+import { and, eq, isNull, or, desc, inArray, sql } from "drizzle-orm";
+import { logger } from "../lib/logger.js";
+
+function toNum(v: unknown): number {
+  return Number(v ?? 0);
+}
+
+// ─── Résolution du taux actif ─────────────────────────────────────────────
+
+export async function getTauxActif(
+  cooperativeId: number,
+  campagneId: number | null | undefined,
+  delegueId: number
+): Promise<{ id: number; tauxFcfaParKg: number } | null> {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Chercher tous les taux actifs pour cette coopérative, non expirés
+  const candidats = await db
+    .select()
+    .from(tauxCommissionsDeleguesTable)
+    .where(
+      and(
+        eq(tauxCommissionsDeleguesTable.cooperativeId, cooperativeId),
+        eq(tauxCommissionsDeleguesTable.actif, true),
+        sql`${tauxCommissionsDeleguesTable.dateDebut} <= ${today}`,
+        or(
+          isNull(tauxCommissionsDeleguesTable.dateFin),
+          sql`${tauxCommissionsDeleguesTable.dateFin} >= ${today}`
+        )
+      )
+    );
+
+  // Priorité 1 : taux spécifique (coop + campagne + délégué)
+  if (campagneId) {
+    const exact = candidats.find(
+      (t) => t.campagneId === campagneId && t.delegueId === delegueId
+    );
+    if (exact) return { id: exact.id, tauxFcfaParKg: toNum(exact.tauxFcfaParKg) };
+
+    // Priorité 2 : taux campagne par défaut (coop + campagne, delegue_id NULL)
+    const parCampagne = candidats.find(
+      (t) => t.campagneId === campagneId && t.delegueId === null
+    );
+    if (parCampagne) return { id: parCampagne.id, tauxFcfaParKg: toNum(parCampagne.tauxFcfaParKg) };
+  }
+
+  // Priorité 3 : taux global coop (campagne_id NULL, delegue_id NULL)
+  const global = candidats.find(
+    (t) => t.campagneId === null && t.delegueId === null
+  );
+  if (global) return { id: global.id, tauxFcfaParKg: toNum(global.tauxFcfaParKg) };
+
+  return null;
+}
+
+// ─── Création d'une commission après livraison ────────────────────────────
+
+/**
+ * Appelé après chaque livraison terrain (fire-and-forget acceptable).
+ * Retourne le montant FCFA calculé, ou null si aucun taux configuré.
+ */
+export async function creerCommissionSiTaux(
+  livraisonId: number,
+  delegueId: number,
+  campagneId: number | null | undefined,
+  poidsKg: number,
+  cooperativeId: number
+): Promise<number | null> {
+  try {
+    const taux = await getTauxActif(cooperativeId, campagneId, delegueId);
+    if (!taux) return null;
+
+    const montant = Math.round(poidsKg * taux.tauxFcfaParKg * 100) / 100;
+    if (montant <= 0) return null;
+
+    await db.insert(commissionsDeleguesTable).values({
+      delegueId,
+      livraisonId,
+      campagneId: campagneId ?? undefined,
+      tauxFcfaParKg: String(taux.tauxFcfaParKg),
+      poidsKg: String(poidsKg),
+      montantFcfa: String(montant),
+      statut: "en_attente",
+    });
+
+    return montant;
+  } catch (err) {
+    logger.error({ err, livraisonId, delegueId }, "Erreur création commission délégué");
+    return null;
+  }
+}
+
+// ─── Paiement des commissions en lot ─────────────────────────────────────
+
+/**
+ * Verse les commissions en_attente d'un délégué via sa caisse.
+ * Si commissionIds est fourni, ne paye que celles-là ; sinon toutes.
+ */
+export async function payerCommissions(
+  delegueId: number,
+  cooperativeId: number,
+  commissionIds?: number[]
+): Promise<{ montantTotal: number; nb: number }> {
+  // Récupérer les commissions en attente
+  const whereClause = commissionIds?.length
+    ? and(
+        eq(commissionsDeleguesTable.delegueId, delegueId),
+        eq(commissionsDeleguesTable.statut, "en_attente"),
+        inArray(commissionsDeleguesTable.id, commissionIds)
+      )
+    : and(
+        eq(commissionsDeleguesTable.delegueId, delegueId),
+        eq(commissionsDeleguesTable.statut, "en_attente")
+      );
+
+  const commissions = await db
+    .select()
+    .from(commissionsDeleguesTable)
+    .where(whereClause);
+
+  if (commissions.length === 0) return { montantTotal: 0, nb: 0 };
+
+  const montantTotal = commissions.reduce((s, c) => s + toNum(c.montantFcfa), 0);
+
+  // Récupérer / créer la caisse du délégué
+  let [caisse] = await db
+    .select()
+    .from(caissesDeleguesTable)
+    .where(
+      and(
+        eq(caissesDeleguesTable.userId, delegueId),
+        eq(caissesDeleguesTable.cooperativeId, cooperativeId)
+      )
+    )
+    .limit(1);
+
+  if (!caisse) {
+    const [newCaisse] = await db
+      .insert(caissesDeleguesTable)
+      .values({ userId: delegueId, cooperativeId, solde: "0" })
+      .returning();
+    caisse = newCaisse;
+  }
+
+  const nouveauSolde = toNum(caisse.solde) + montantTotal;
+
+  // Mettre à jour la caisse
+  await db
+    .update(caissesDeleguesTable)
+    .set({ solde: String(nouveauSolde), updatedAt: new Date() })
+    .where(eq(caissesDeleguesTable.id, caisse.id));
+
+  // Créer le mouvement de caisse
+  const [mouvement] = await db
+    .insert(mouvementsCaisseDelegueTable)
+    .values({
+      caisseDelegueId: caisse.id,
+      type: "commission",
+      montantFcfa: String(montantTotal),
+      soldeApresFcfa: String(nouveauSolde),
+      note: `Versement de ${commissions.length} commission(s) — ${montantTotal.toLocaleString("fr-FR")} FCFA`,
+      createdById: delegueId,
+    })
+    .returning();
+
+  // Marquer les commissions comme payées
+  await db
+    .update(commissionsDeleguesTable)
+    .set({
+      statut: "payé",
+      datePaiement: new Date(),
+      mouvementId: mouvement.id,
+    })
+    .where(inArray(commissionsDeleguesTable.id, commissions.map((c) => c.id)));
+
+  return { montantTotal, nb: commissions.length };
+}
+
+// ─── Lecture des commissions d'un délégué (admin) ────────────────────────
+
+export async function getCommissionsDelegue(
+  delegueId: number,
+  cooperativeId: number,
+  campagneId?: number
+) {
+  const rows = await db
+    .select({
+      id:           commissionsDeleguesTable.id,
+      livraisonId:  commissionsDeleguesTable.livraisonId,
+      campagneId:   commissionsDeleguesTable.campagneId,
+      tauxFcfaParKg: commissionsDeleguesTable.tauxFcfaParKg,
+      poidsKg:      commissionsDeleguesTable.poidsKg,
+      montantFcfa:  commissionsDeleguesTable.montantFcfa,
+      statut:       commissionsDeleguesTable.statut,
+      datePaiement: commissionsDeleguesTable.datePaiement,
+      createdAt:    commissionsDeleguesTable.createdAt,
+    })
+    .from(commissionsDeleguesTable)
+    .where(
+      and(
+        eq(commissionsDeleguesTable.delegueId, delegueId),
+        campagneId ? eq(commissionsDeleguesTable.campagneId, campagneId) : undefined
+      )
+    )
+    .orderBy(desc(commissionsDeleguesTable.createdAt));
+
+  const totaux = {
+    enAttente: rows.filter((r) => r.statut === "en_attente").reduce((s, r) => s + toNum(r.montantFcfa), 0),
+    paye: rows.filter((r) => r.statut === "payé").reduce((s, r) => s + toNum(r.montantFcfa), 0),
+    total: rows.reduce((s, r) => s + toNum(r.montantFcfa), 0),
+  };
+
+  return { commissions: rows, totaux };
+}
+
+// ─── Résumé des commissions (pour l'accueil terrain délégué) ─────────────
+
+export async function getResumeMesCommissions(delegueId: number) {
+  const [row] = await db
+    .select({
+      enAttente: sql<string>`COALESCE(SUM(CASE WHEN ${commissionsDeleguesTable.statut} = 'en_attente' THEN ${commissionsDeleguesTable.montantFcfa} ELSE 0 END), 0)`,
+      paye:      sql<string>`COALESCE(SUM(CASE WHEN ${commissionsDeleguesTable.statut} = 'payé'     THEN ${commissionsDeleguesTable.montantFcfa} ELSE 0 END), 0)`,
+      total:     sql<string>`COALESCE(SUM(${commissionsDeleguesTable.montantFcfa}), 0)`,
+      nb:        sql<number>`COUNT(*)`,
+    })
+    .from(commissionsDeleguesTable)
+    .where(eq(commissionsDeleguesTable.delegueId, delegueId));
+
+  const recentes = await db
+    .select()
+    .from(commissionsDeleguesTable)
+    .where(eq(commissionsDeleguesTable.delegueId, delegueId))
+    .orderBy(desc(commissionsDeleguesTable.createdAt))
+    .limit(20);
+
+  return {
+    enAttenteFcfa: toNum(row?.enAttente),
+    payeFcfa:      toNum(row?.paye),
+    totalFcfa:     toNum(row?.total),
+    nb:            Number(row?.nb ?? 0),
+    recentes,
+  };
+}
+
+// ─── Gestion des taux (admin) ─────────────────────────────────────────────
+
+export async function listTaux(cooperativeId: number) {
+  const rows = await db
+    .select({
+      id:            tauxCommissionsDeleguesTable.id,
+      cooperativeId: tauxCommissionsDeleguesTable.cooperativeId,
+      campagneId:    tauxCommissionsDeleguesTable.campagneId,
+      delegueId:     tauxCommissionsDeleguesTable.delegueId,
+      tauxFcfaParKg: tauxCommissionsDeleguesTable.tauxFcfaParKg,
+      dateDebut:     tauxCommissionsDeleguesTable.dateDebut,
+      dateFin:       tauxCommissionsDeleguesTable.dateFin,
+      actif:         tauxCommissionsDeleguesTable.actif,
+      createdAt:     tauxCommissionsDeleguesTable.createdAt,
+      // Enrichissement : nom de la campagne
+      campagneLibelle: campagnesTable.libelle,
+      // Enrichissement : nom du délégué
+      delegueNom:    usersTable.nom,
+      deleguePrenoms: usersTable.prenoms,
+    })
+    .from(tauxCommissionsDeleguesTable)
+    .leftJoin(campagnesTable, eq(campagnesTable.id, tauxCommissionsDeleguesTable.campagneId))
+    .leftJoin(usersTable, eq(usersTable.id, tauxCommissionsDeleguesTable.delegueId))
+    .where(eq(tauxCommissionsDeleguesTable.cooperativeId, cooperativeId))
+    .orderBy(desc(tauxCommissionsDeleguesTable.createdAt));
+
+  return rows;
+}
+
+export async function upsertTaux(
+  cooperativeId: number,
+  data: {
+    id?: number;
+    campagneId?: number | null;
+    delegueId?: number | null;
+    tauxFcfaParKg: number;
+    dateDebut: string;
+    dateFin?: string | null;
+    actif?: boolean;
+  }
+) {
+  if (data.id) {
+    const [updated] = await db
+      .update(tauxCommissionsDeleguesTable)
+      .set({
+        campagneId:    data.campagneId ?? null,
+        delegueId:     data.delegueId ?? null,
+        tauxFcfaParKg: String(data.tauxFcfaParKg),
+        dateDebut:     data.dateDebut,
+        dateFin:       data.dateFin ?? null,
+        actif:         data.actif ?? true,
+        updatedAt:     new Date(),
+      })
+      .where(
+        and(
+          eq(tauxCommissionsDeleguesTable.id, data.id),
+          eq(tauxCommissionsDeleguesTable.cooperativeId, cooperativeId)
+        )
+      )
+      .returning();
+    return updated;
+  }
+
+  const [inserted] = await db
+    .insert(tauxCommissionsDeleguesTable)
+    .values({
+      cooperativeId,
+      campagneId:    data.campagneId ?? undefined,
+      delegueId:     data.delegueId ?? undefined,
+      tauxFcfaParKg: String(data.tauxFcfaParKg),
+      dateDebut:     data.dateDebut,
+      dateFin:       data.dateFin ?? undefined,
+      actif:         data.actif ?? true,
+    })
+    .returning();
+  return inserted;
+}
+
+export async function deleteTaux(id: number, cooperativeId: number) {
+  await db
+    .delete(tauxCommissionsDeleguesTable)
+    .where(
+      and(
+        eq(tauxCommissionsDeleguesTable.id, id),
+        eq(tauxCommissionsDeleguesTable.cooperativeId, cooperativeId)
+      )
+    );
+}
+
+// ─── Récapitulatif global pour la liste des délégués ─────────────────────
+
+export async function getRecapCommissionsParDelegue(cooperativeId: number) {
+  const rows = await db
+    .select({
+      delegueId:   commissionsDeleguesTable.delegueId,
+      enAttente:   sql<string>`COALESCE(SUM(CASE WHEN ${commissionsDeleguesTable.statut} = 'en_attente' THEN ${commissionsDeleguesTable.montantFcfa} ELSE 0 END), 0)`,
+      totalPaye:   sql<string>`COALESCE(SUM(CASE WHEN ${commissionsDeleguesTable.statut} = 'payé'     THEN ${commissionsDeleguesTable.montantFcfa} ELSE 0 END), 0)`,
+    })
+    .from(commissionsDeleguesTable)
+    .innerJoin(usersTable, eq(usersTable.id, commissionsDeleguesTable.delegueId))
+    .where(eq(usersTable.cooperativeId, cooperativeId))
+    .groupBy(commissionsDeleguesTable.delegueId);
+
+  return rows.reduce<Record<number, { enAttente: number; totalPaye: number }>>((acc, r) => {
+    acc[r.delegueId] = { enAttente: toNum(r.enAttente), totalPaye: toNum(r.totalPaye) };
+    return acc;
+  }, {});
+}

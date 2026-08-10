@@ -64,6 +64,24 @@ export interface CollecteResult {
   prixUnitaireFcfa: number;
   statutPaiement?: "PAYÉ" | "DIFFÉRÉ";
   soldeCaisseApres?: number;
+  /** Commission délégué calculée sur cette livraison (null si aucun taux configuré) */
+  commissionFcfa?: number | null;
+}
+
+export interface CommissionResume {
+  enAttenteFcfa: number;
+  payeFcfa: number;
+  totalFcfa: number;
+  nb: number;
+  recentes: Array<{
+    id: number;
+    livraisonId: number;
+    poidsKg: string;
+    montantFcfa: string;
+    tauxFcfaParKg: string;
+    statut: string;
+    createdAt: string;
+  }>;
 }
 
 export interface CaisseDelegue {

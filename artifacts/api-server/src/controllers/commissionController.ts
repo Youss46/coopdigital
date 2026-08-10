@@ -1,0 +1,108 @@
+import type { Request, Response } from "express";
+import * as commissionService from "../services/commissionService.js";
+
+// ─── Taux (admin) ─────────────────────────────────────────────────────────
+
+export async function listTauxHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const taux = await commissionService.listTaux(cooperativeId);
+    res.json(taux);
+  } catch (err) {
+    req.log.error({ err }, "listTaux");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function upsertTauxHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  const { id, campagneId, delegueId, tauxFcfaParKg, dateDebut, dateFin, actif } = req.body as {
+    id?: number;
+    campagneId?: number | null;
+    delegueId?: number | null;
+    tauxFcfaParKg: number;
+    dateDebut: string;
+    dateFin?: string | null;
+    actif?: boolean;
+  };
+  if (!tauxFcfaParKg || tauxFcfaParKg <= 0) {
+    res.status(400).json({ erreur: "tauxFcfaParKg doit être > 0" });
+    return;
+  }
+  if (!dateDebut) {
+    res.status(400).json({ erreur: "dateDebut est obligatoire" });
+    return;
+  }
+  try {
+    const row = await commissionService.upsertTaux(cooperativeId, {
+      id, campagneId, delegueId, tauxFcfaParKg, dateDebut, dateFin, actif,
+    });
+    res.status(id ? 200 : 201).json(row);
+  } catch (err) {
+    req.log.error({ err }, "upsertTaux");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function deleteTauxHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  const id = Number(req.params.tauxId);
+  if (!id) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    await commissionService.deleteTaux(id, cooperativeId);
+    res.status(204).end();
+  } catch (err) {
+    req.log.error({ err }, "deleteTaux");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── Commissions d'un délégué (admin) ────────────────────────────────────
+
+export async function getCommissionsDelegueHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  const delegueId = Number(req.params.agentId);
+  const campagneId = req.query.campagneId ? Number(req.query.campagneId) : undefined;
+  try {
+    const data = await commissionService.getCommissionsDelegue(delegueId, cooperativeId, campagneId);
+    res.json(data);
+  } catch (err) {
+    req.log.error({ err }, "getCommissionsDelegue");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function payerCommissionsHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  const delegueId = Number(req.params.agentId);
+  const { commissionIds } = req.body as { commissionIds?: number[] };
+  try {
+    const result = await commissionService.payerCommissions(delegueId, cooperativeId, commissionIds);
+    if (result.nb === 0) {
+      res.status(400).json({ erreur: "Aucune commission en attente à payer" });
+      return;
+    }
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "payerCommissions");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── Vue délégué terrain (mes commissions) ───────────────────────────────
+
+export async function getMesCommissionsHandler(req: Request, res: Response): Promise<void> {
+  const agent = req.agent!;
+  try {
+    const data = await commissionService.getResumeMesCommissions(agent.id);
+    res.json(data);
+  } catch (err) {
+    req.log.error({ err }, "getMesCommissions");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}

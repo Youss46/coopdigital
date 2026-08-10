@@ -5,6 +5,7 @@ import {
   caissesDeleguesTable, mouvementsCaisseDelegueTable,
 } from "@workspace/db";
 import { and, eq, sql, desc } from "drizzle-orm";
+import { creerCommissionSiTaux } from "./commissionService.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { logger } from "../lib/logger.js";
@@ -388,6 +389,24 @@ export async function enregistrerCollecte(
   // Entrée stock entrepôt délégué — poids BRUT (fire-and-forget — non bloquant)
   void entrerStockSiDelegue(agentId, cooperativeId, data.poidsBrutKg, livraison.id);
 
+  // Commission délégué — Option A : délégué du membre (membres.delegue_id)
+  const [membreDelegue] = await db
+    .select({ delegueId: membresTable.delegueId })
+    .from(membresTable)
+    .where(eq(membresTable.id, data.membreId))
+    .limit(1);
+
+  let commissionFcfa: number | null = null;
+  if (membreDelegue?.delegueId) {
+    commissionFcfa = await creerCommissionSiTaux(
+      livraison.id,
+      membreDelegue.delegueId,
+      prix.campagneId ?? null,
+      poidsNet,
+      cooperativeId
+    );
+  }
+
   return {
     livraisonId: livraison.id,
     ref: `LIV-${new Date().getFullYear()}-${String(livraison.id).padStart(4, "0")}`,
@@ -401,6 +420,7 @@ export async function enregistrerCollecte(
     prixUnitaireFcfa: prixUnitaire,
     statutPaiement,
     soldeCaisseApres: paiementImmediat ? (soldeCaisse - montantNet) : soldeCaisse,
+    commissionFcfa,
   };
 }
 

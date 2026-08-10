@@ -3,6 +3,35 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { MoneyInput } from "@/components/ui/money-input";
 
+// ─── Types commissions ─────────────────────────────────────────────────────
+interface TauxCommission {
+  id: number;
+  campagneId: number | null;
+  delegueId: number | null;
+  tauxFcfaParKg: string;
+  dateDebut: string;
+  dateFin: string | null;
+  actif: boolean;
+  campagneLibelle: string | null;
+  delegueNom: string | null;
+  deleguePrenoms: string | null;
+}
+
+interface CommissionDelegue {
+  id: number;
+  livraisonId: number;
+  poidsKg: string;
+  tauxFcfaParKg: string;
+  montantFcfa: string;
+  statut: string;
+  createdAt: string;
+}
+
+interface CommissionsData {
+  commissions: CommissionDelegue[];
+  totaux: { enAttente: number; paye: number; total: number };
+}
+
 const API = import.meta.env.VITE_API_URL ?? "";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -46,7 +75,13 @@ export default function DeleguesPage() {
   const [showAppro, setShowAppro] = useState<number | null>(null);
   const [montant, setMontant] = useState("");
   const [note, setNote] = useState("");
-  const [tab, setTab] = useState<"liste" | "differes">("liste");
+  const [tab, setTab] = useState<"liste" | "differes" | "commissions">("liste");
+
+  // ── État onglet Commissions ──────────────────────────────────────────────
+  const [commTab, setCommTab] = useState<"taux" | "pardelegue">("taux");
+  const [commDelegueId, setCommDelegueId] = useState<number | null>(null);
+  const [showTauxForm, setShowTauxForm] = useState(false);
+  const [editTaux, setEditTaux] = useState<Partial<TauxCommission> | null>(null);
 
   const { data: delegues = [], isLoading } = useQuery<Delegue[]>({
     queryKey: ["delegues"],
@@ -63,6 +98,59 @@ export default function DeleguesPage() {
     queryKey: ["paiements-differes-admin"],
     queryFn: () => apiFetch("/delegues/paiements-differes"),
     enabled: tab === "differes",
+  });
+
+  // ── Queries commissions ──────────────────────────────────────────────────
+  const { data: taux = [], isLoading: tauxLoading } = useQuery<TauxCommission[]>({
+    queryKey: ["commissions-taux"],
+    queryFn: () => apiFetch("/delegues/commissions/taux"),
+    enabled: tab === "commissions",
+  });
+
+  const { data: commissions } = useQuery<CommissionsData>({
+    queryKey: ["commissions-delegue", commDelegueId],
+    queryFn: () => apiFetch(`/delegues/${commDelegueId}/commissions`),
+    enabled: commDelegueId !== null && tab === "commissions" && commTab === "pardelegue",
+  });
+
+  // ── Mutations commissions ────────────────────────────────────────────────
+  const upsertTaux = useMutation({
+    mutationFn: (data: Partial<TauxCommission> & { tauxFcfaParKg: string; dateDebut: string }) =>
+      apiFetch("/delegues/commissions/taux", { method: "POST", body: JSON.stringify({
+        id: data.id,
+        campagneId: data.campagneId || null,
+        delegueId: data.delegueId || null,
+        tauxFcfaParKg: Number(data.tauxFcfaParKg),
+        dateDebut: data.dateDebut,
+        dateFin: data.dateFin || null,
+        actif: data.actif ?? true,
+      }) }),
+    onSuccess: () => {
+      toast({ title: editTaux?.id ? "Taux mis à jour" : "Taux créé avec succès" });
+      setShowTauxForm(false); setEditTaux(null);
+      qc.invalidateQueries({ queryKey: ["commissions-taux"] });
+    },
+    onError: (e) => toast({ title: (e as Error).message, variant: "destructive" }),
+  });
+
+  const deleteTaux = useMutation({
+    mutationFn: (id: number) => apiFetch(`/delegues/commissions/taux/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      toast({ title: "Taux supprimé" });
+      qc.invalidateQueries({ queryKey: ["commissions-taux"] });
+    },
+    onError: (e) => toast({ title: (e as Error).message, variant: "destructive" }),
+  });
+
+  const payerComm = useMutation({
+    mutationFn: (delegueId: number) =>
+      apiFetch<{ montantTotal: number; nb: number }>(`/delegues/${delegueId}/commissions/payer`, { method: "POST", body: JSON.stringify({}) }),
+    onSuccess: (data) => {
+      toast({ title: `${data.nb} commission(s) payées — ${data.montantTotal.toLocaleString("fr-FR")} FCFA versés en caisse` });
+      qc.invalidateQueries({ queryKey: ["commissions-delegue", commDelegueId] });
+      qc.invalidateQueries({ queryKey: ["delegues"] });
+    },
+    onError: (e) => toast({ title: (e as Error).message, variant: "destructive" }),
   });
 
   const appro = useMutation({
@@ -104,9 +192,13 @@ export default function DeleguesPage() {
 
         {/* Tabs */}
         <div className="overflow-x-auto" style={{ display: "flex", gap: 4, marginBottom: 20, background: "#f3f4f6", borderRadius: 10, padding: 4, width: "fit-content", maxWidth: "100%" }}>
-          {(["liste", "differes"] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)} style={{ padding: "6px 18px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: ".85rem", cursor: "pointer", background: tab === t ? "#fff" : "transparent", color: tab === t ? "#111" : "#6b7280", boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,.1)" : "none", whiteSpace: "nowrap" }}>
-              {t === "liste" ? "Liste des délégués" : `Paiements différés${totalDifferes > 0 ? ` (${totalDifferes})` : ""}`}
+          {([
+            { key: "liste", label: "Liste des délégués" },
+            { key: "differes", label: `Paiements différés${totalDifferes > 0 ? ` (${totalDifferes})` : ""}` },
+            { key: "commissions", label: "Commissions" },
+          ] as { key: "liste" | "differes" | "commissions"; label: string }[]).map(({ key, label }) => (
+            <button key={key} onClick={() => setTab(key)} style={{ padding: "6px 18px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: ".85rem", cursor: "pointer", background: tab === key ? "#fff" : "transparent", color: tab === key ? "#111" : "#6b7280", boxShadow: tab === key ? "0 1px 3px rgba(0,0,0,.1)" : "none", whiteSpace: "nowrap" }}>
+              {label}
             </button>
           ))}
         </div>
@@ -258,6 +350,232 @@ export default function DeleguesPage() {
             )}
           </div>
         )}
+
+        {/* Tab: commissions */}
+        {tab === "commissions" && (
+          <div>
+            {/* Sous-onglets */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "#f3f4f6", borderRadius: 10, padding: 4, width: "fit-content" }}>
+              {([{ key: "taux", label: "Taux configurés" }, { key: "pardelegue", label: "Par délégué" }] as const).map(({ key, label }) => (
+                <button key={key} onClick={() => setCommTab(key)} style={{ padding: "6px 16px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: ".85rem", cursor: "pointer", background: commTab === key ? "#fff" : "transparent", color: commTab === key ? "#111" : "#6b7280", boxShadow: commTab === key ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Sous-onglet Taux */}
+            {commTab === "taux" && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "1rem" }}>Taux de commission (FCFA/kg)</div>
+                    <div style={{ fontSize: ".82rem", color: "#6b7280" }}>Les taux s'appliquent au poids net collecté par le délégué responsable du membre.</div>
+                  </div>
+                  <button onClick={() => { setEditTaux({}); setShowTauxForm(true); }} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: ".85rem", cursor: "pointer" }}>
+                    + Nouveau taux
+                  </button>
+                </div>
+
+                {tauxLoading ? (
+                  <div style={{ padding: 32, textAlign: "center", color: "#9ca3af" }}>Chargement…</div>
+                ) : taux.length === 0 ? (
+                  <div style={{ padding: "48px 24px", textAlign: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12 }}>
+                    <div style={{ fontSize: "2rem", marginBottom: 8 }}>💡</div>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Aucun taux configuré</div>
+                    <div style={{ fontSize: ".85rem", color: "#6b7280" }}>Créez un taux pour activer le calcul automatique des commissions lors des collectes.</div>
+                  </div>
+                ) : (
+                  <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ background: "#f0fdf4", borderBottom: "1px solid #bbf7d0" }}>
+                          {["Taux (FCFA/kg)", "Campagne", "Délégué", "Début", "Fin", "Statut", ""].map((h) => (
+                            <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: ".78rem", fontWeight: 700, color: "#16a34a", textTransform: "uppercase", letterSpacing: ".05em" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {taux.map((t) => (
+                          <tr key={t.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                            <td style={{ padding: "10px 14px", fontWeight: 800, fontSize: "1rem", color: "#16a34a" }}>{Number(t.tauxFcfaParKg).toLocaleString("fr-FR")}</td>
+                            <td style={{ padding: "10px 14px", fontSize: ".85rem" }}>{t.campagneLibelle ?? <span style={{ color: "#9ca3af" }}>Toutes</span>}</td>
+                            <td style={{ padding: "10px 14px", fontSize: ".85rem" }}>
+                              {t.delegueNom ? `${t.delegueNom} ${t.deleguePrenoms ?? ""}` : <span style={{ color: "#9ca3af" }}>Tous</span>}
+                            </td>
+                            <td style={{ padding: "10px 14px", fontSize: ".83rem" }}>{new Date(t.dateDebut).toLocaleDateString("fr-FR")}</td>
+                            <td style={{ padding: "10px 14px", fontSize: ".83rem" }}>{t.dateFin ? new Date(t.dateFin).toLocaleDateString("fr-FR") : <span style={{ color: "#9ca3af" }}>—</span>}</td>
+                            <td style={{ padding: "10px 14px" }}>
+                              <span style={{ padding: "2px 8px", borderRadius: 12, fontSize: ".78rem", fontWeight: 700, background: t.actif ? "#dcfce7" : "#f3f4f6", color: t.actif ? "#16a34a" : "#9ca3af" }}>
+                                {t.actif ? "Actif" : "Inactif"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "10px 14px" }}>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <button onClick={() => { setEditTaux(t); setShowTauxForm(true); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontSize: ".78rem", cursor: "pointer", fontWeight: 600 }}>Modifier</button>
+                                <button onClick={() => { if (confirm("Supprimer ce taux ?")) deleteTaux.mutate(t.id); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #fca5a5", color: "#dc2626", background: "#fff", fontSize: ".78rem", cursor: "pointer", fontWeight: 600 }}>Supprimer</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sous-onglet Par délégué */}
+            {commTab === "pardelegue" && (
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Sélectionner un délégué</label>
+                  <select
+                    value={commDelegueId ?? ""}
+                    onChange={(e) => setCommDelegueId(e.target.value ? Number(e.target.value) : null)}
+                    style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem", minWidth: 260 }}
+                  >
+                    <option value="">— Choisir un délégué —</option>
+                    {delegues.map((d) => (
+                      <option key={d.id} value={d.id}>{d.nom} {d.prenoms} {d.section ? `— ${d.section}` : ""}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {commDelegueId && commissions && (
+                  <div>
+                    {/* KPI */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: 12, marginBottom: 20 }}>
+                      {[
+                        { label: "En attente", val: `${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA`, color: "#f59e0b" },
+                        { label: "Déjà payé", val: `${commissions.totaux.paye.toLocaleString("fr-FR")} FCFA`, color: "#16a34a" },
+                        { label: "Total cumulé", val: `${commissions.totaux.total.toLocaleString("fr-FR")} FCFA`, color: "#2563eb" },
+                      ].map((k) => (
+                        <div key={k.label} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px" }}>
+                          <div style={{ fontSize: ".78rem", color: "#6b7280", marginBottom: 4 }}>{k.label}</div>
+                          <div style={{ fontWeight: 800, fontSize: "1.05rem", color: k.color }}>{k.val}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {commissions.totaux.enAttente > 0 && (
+                      <div style={{ marginBottom: 16 }}>
+                        <button
+                          disabled={payerComm.isPending}
+                          onClick={() => { if (confirm(`Verser ${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA de commissions en caisse ?`)) payerComm.mutate(commDelegueId); }}
+                          style={{ padding: "10px 24px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: payerComm.isPending ? .6 : 1 }}
+                        >
+                          {payerComm.isPending ? "Versement…" : `💸 Payer ${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA en caisse`}
+                        </button>
+                        <span style={{ marginLeft: 10, fontSize: ".82rem", color: "#6b7280" }}>Les commissions seront créditées sur la caisse du délégué.</span>
+                      </div>
+                    )}
+
+                    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr style={{ background: "#fafafa", borderBottom: "1px solid #e5e7eb" }}>
+                            {["Date", "Livraison", "Poids (kg)", "Taux /kg", "Commission", "Statut"].map((h) => (
+                              <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: ".78rem", fontWeight: 700, color: "#374151", textTransform: "uppercase" }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {commissions.commissions.length === 0 ? (
+                            <tr><td colSpan={6} style={{ padding: "32px", textAlign: "center", color: "#9ca3af" }}>Aucune commission enregistrée</td></tr>
+                          ) : commissions.commissions.map((c) => (
+                            <tr key={c.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                              <td style={{ padding: "10px 14px", fontSize: ".83rem" }}>{new Date(c.createdAt).toLocaleDateString("fr-FR")}</td>
+                              <td style={{ padding: "10px 14px", fontSize: ".83rem", color: "#6b7280" }}>LIV-{c.livraisonId}</td>
+                              <td style={{ padding: "10px 14px", fontSize: ".85rem" }}>{Number(c.poidsKg).toFixed(1)}</td>
+                              <td style={{ padding: "10px 14px", fontSize: ".85rem" }}>{Number(c.tauxFcfaParKg).toLocaleString("fr-FR")}</td>
+                              <td style={{ padding: "10px 14px", fontWeight: 700, color: "#16a34a" }}>{Number(c.montantFcfa).toLocaleString("fr-FR")} FCFA</td>
+                              <td style={{ padding: "10px 14px" }}>
+                                <span style={{ padding: "2px 8px", borderRadius: 12, fontSize: ".78rem", fontWeight: 700, background: c.statut === "payé" ? "#dcfce7" : c.statut === "en_attente" ? "#fef3c7" : "#f3f4f6", color: c.statut === "payé" ? "#16a34a" : c.statut === "en_attente" ? "#d97706" : "#9ca3af" }}>
+                                  {c.statut === "en_attente" ? "En attente" : c.statut === "payé" ? "Payé" : c.statut}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+      {/* Modal formulaire taux */}
+      {showTauxForm && editTaux !== null && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 440 }}>
+            <div style={{ fontWeight: 800, fontSize: "1.05rem", marginBottom: 20 }}>
+              {editTaux.id ? "Modifier le taux" : "Nouveau taux de commission"}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Taux (FCFA par kg) *</label>
+                <input
+                  type="number" step="0.5" min="0"
+                  value={editTaux.tauxFcfaParKg ?? ""}
+                  onChange={(e) => setEditTaux({ ...editTaux, tauxFcfaParKg: e.target.value })}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".95rem" }}
+                  placeholder="Ex: 25"
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Délégué (laisser vide = tous)</label>
+                <select
+                  value={editTaux.delegueId ?? ""}
+                  onChange={(e) => setEditTaux({ ...editTaux, delegueId: e.target.value ? Number(e.target.value) : null })}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }}
+                >
+                  <option value="">— Tous les délégués —</option>
+                  {delegues.map((d) => <option key={d.id} value={d.id}>{d.nom} {d.prenoms}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Date de début *</label>
+                <input
+                  type="date"
+                  value={editTaux.dateDebut ?? ""}
+                  onChange={(e) => setEditTaux({ ...editTaux, dateDebut: e.target.value })}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Date de fin (optionnel)</label>
+                <input
+                  type="date"
+                  value={editTaux.dateFin ?? ""}
+                  onChange={(e) => setEditTaux({ ...editTaux, dateFin: e.target.value || null })}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  type="checkbox"
+                  id="taux-actif"
+                  checked={editTaux.actif ?? true}
+                  onChange={(e) => setEditTaux({ ...editTaux, actif: e.target.checked })}
+                />
+                <label htmlFor="taux-actif" style={{ fontWeight: 600, fontSize: ".85rem" }}>Taux actif</label>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={() => { setShowTauxForm(false); setEditTaux(null); }} style={{ flex: 1, padding: "10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", fontWeight: 600, cursor: "pointer" }}>Annuler</button>
+              <button
+                disabled={!editTaux.tauxFcfaParKg || !editTaux.dateDebut || upsertTaux.isPending}
+                onClick={() => upsertTaux.mutate(editTaux as Partial<TauxCommission> & { tauxFcfaParKg: string; dateDebut: string })}
+                style={{ flex: 2, padding: "10px", border: "none", borderRadius: 8, background: "#16a34a", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: (!editTaux.tauxFcfaParKg || !editTaux.dateDebut) ? .5 : 1 }}
+              >
+                {upsertTaux.isPending ? "Enregistrement…" : editTaux.id ? "Mettre à jour" : "Créer le taux"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal approvisionnement */}
       {showAppro !== null && (
