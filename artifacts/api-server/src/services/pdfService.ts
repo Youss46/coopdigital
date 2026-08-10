@@ -34,6 +34,7 @@ import {
   commissionsDeleguesTable,
 } from "@workspace/db";
 import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
 import { computeCodeMembre } from "./portailService";
 
@@ -677,6 +678,8 @@ export async function generatePvAg(params: {
 // 5. Reçu de livraison
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateRecuLivraison(livraisonId: number, cooperativeId: number): Promise<Buffer> {
+  const agentUserAlias = alias(usersTable, "agent_user");
+  const peseurUserAlias = alias(usersTable, "peseur_user");
   const [row] = await db.select({
     id: livraisonsTable.id,
     codeAchat: livraisonsTable.codeAchat,
@@ -698,8 +701,17 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     membreCni: membresTable.numeroCni,
     membreGroupement: membresTable.groupement,
     membreTel: membresTable.telephone,
+    agentId: livraisonsTable.agentId,
+    agentNom: agentUserAlias.nom,
+    agentPrenoms: agentUserAlias.prenoms,
+    agentRole: agentUserAlias.role,
+    peseurId: livraisonsTable.peseurId,
+    peseurNom: peseurUserAlias.nom,
+    peseurPrenoms: peseurUserAlias.prenoms,
   }).from(livraisonsTable)
     .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+    .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
+    .leftJoin(peseurUserAlias, eq(livraisonsTable.peseurId, peseurUserAlias.id))
     .where(eq(livraisonsTable.id, livraisonId));
   if (!row) throw new Error("Livraison introuvable");
 
@@ -756,6 +768,31 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
   const livStatutColor = (row.statutPaiement ?? "").toUpperCase().includes("PAY") ? "#16a34a" : "#f59e0b";
   doc.fontSize(9).font("Helvetica-Bold").fillColor(livStatutColor)
     .text(`Statut : ${row.statutPaiement ?? "À payer"}`, MARGIN, y);
+
+  // — Ligne "Pesé par" si un peseur distinct est enregistré
+  if (row.peseurId && (row.peseurNom || row.peseurPrenoms)) {
+    y += 14;
+    const peseurFullName = `${row.peseurPrenoms ?? ""} ${row.peseurNom ?? ""}`.trim();
+    doc.fontSize(9).font("Helvetica").fillColor(GRIS)
+      .text("Pesé par : ", MARGIN, y, { continued: true })
+      .font("Helvetica-Bold").fillColor("black")
+      .text(`${peseurFullName} (Peseur)`);
+  }
+  // — Ligne "Saisi par" pour l'agent créateur (délégué, agent terrain, etc.)
+  if (row.agentId && (row.agentNom || row.agentPrenoms)) {
+    y += 14;
+    const roleStr = String(row.agentRole ?? "");
+    const roleLabel = roleStr === "peseur" ? "Peseur"
+      : roleStr === "delegue" ? "Délégué"
+      : roleStr === "agent_terrain" ? "Agent terrain"
+      : roleStr === "directeur" ? "Directeur"
+      : roleStr || "Agent";
+    const agentFullName = `${row.agentPrenoms ?? ""} ${row.agentNom ?? ""}`.trim();
+    doc.fontSize(9).font("Helvetica").fillColor(GRIS)
+      .text("Saisi par : ", MARGIN, y, { continued: true })
+      .font("Helvetica-Bold").fillColor("black")
+      .text(`${agentFullName} (${roleLabel})`);
+  }
 
   y = 700;
   doc.fontSize(8).fillColor(GRIS).font("Helvetica")

@@ -8,8 +8,10 @@ import {
   intrantsTable,
   liberationsPartsTable,
   scoresMembreTable,
+  usersTable,
 } from "@workspace/db";
 import { eq, desc, and, sql, count } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import path from "path";
 import fs from "fs";
 import PDFDocument from "pdfkit";
@@ -315,6 +317,8 @@ export async function getScoreMembre(membreId: number) {
 // ─── PDF reçu livraison ───────────────────────────────────────────────────────
 
 export async function generateRecuLivraison(cooperativeId: number, membreId: number, livraisonId: number): Promise<Buffer> {
+  const agentUserAlias = alias(usersTable, "agent_user");
+  const peseurUserAlias = alias(usersTable, "peseur_user");
   const [liv] = await db
     .select({
       id: livraisonsTable.id,
@@ -333,10 +337,19 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
       membrePrenoms: membresTable.prenoms,
       dateAdhesion: membresTable.dateAdhesion,
       numeroMembre: membresTable.numeroMembre,
+      agentId: livraisonsTable.agentId,
+      agentNom: agentUserAlias.nom,
+      agentPrenoms: agentUserAlias.prenoms,
+      agentRole: agentUserAlias.role,
+      peseurId: livraisonsTable.peseurId,
+      peseurNom: peseurUserAlias.nom,
+      peseurPrenoms: peseurUserAlias.prenoms,
     })
     .from(livraisonsTable)
     .leftJoin(campagnesTable, eq(livraisonsTable.campagneId, campagnesTable.id))
     .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+    .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
+    .leftJoin(peseurUserAlias, eq(livraisonsTable.peseurId, peseurUserAlias.id))
     .where(and(eq(livraisonsTable.id, livraisonId), eq(livraisonsTable.membreId, membreId)));
 
   if (!liv) throw new Error("Livraison introuvable");
@@ -407,6 +420,30 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
   doc.fontSize(11).fillColor("white").font("Helvetica-Bold")
     .text("NET REÇU", 35, y + 5)
     .text(fmtFCFA(liv.montantNetFcfa), W / 2, y + 5, { align: "right", width: W / 2 - 35 });
+  y += 28;
+
+  // — Peseur / Agent saisie
+  if (liv.peseurId && (liv.peseurNom || liv.peseurPrenoms)) {
+    const peseurFullName = `${liv.peseurPrenoms ?? ""} ${liv.peseurNom ?? ""}`.trim();
+    doc.fontSize(8).fillColor("#6b7280").font("Helvetica")
+      .text("Pesé par : ", 30, y, { continued: true })
+      .font("Helvetica-Bold").fillColor("black")
+      .text(`${peseurFullName} (Peseur)`);
+    y += 12;
+  }
+  if (liv.agentId && (liv.agentNom || liv.agentPrenoms)) {
+    const roleStr = String(liv.agentRole ?? "");
+    const roleLabel = roleStr === "peseur" ? "Peseur"
+      : roleStr === "delegue" ? "Délégué"
+      : roleStr === "agent_terrain" ? "Agent terrain"
+      : roleStr === "directeur" ? "Directeur"
+      : roleStr || "Agent";
+    const agentFullName = `${liv.agentPrenoms ?? ""} ${liv.agentNom ?? ""}`.trim();
+    doc.fontSize(8).fillColor("#6b7280").font("Helvetica")
+      .text("Saisi par : ", 30, y, { continued: true })
+      .font("Helvetica-Bold").fillColor("black")
+      .text(`${agentFullName} (${roleLabel})`);
+  }
 
   doc.fontSize(7).fillColor("#9ca3af").font("Helvetica")
     .text(`Généré le ${fmtDate(new Date().toISOString())} — CoopDigital`, 30, doc.page.height - 25, {
