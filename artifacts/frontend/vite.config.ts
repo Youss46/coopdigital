@@ -81,7 +81,7 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//, /^\/(m15|portail|terrain)(\/|$)/],
         globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],
         globIgnores: ["**/hero/**"],
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
