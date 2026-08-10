@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
 import PDFDocument from "pdfkit";
 import { getKPIs, buildPrompt } from "../services/rapportIAService";
+import { drawHeader, drawFooter } from "../services/pdfHeaderService";
 import {
   generateFicheMembre,
   generateRapportMensuel,
@@ -431,28 +432,19 @@ export async function telechargerRapportIAPdf(req: Request, res: Response): Prom
   if (!contenu) { res.status(400).json({ erreur: "Contenu manquant" }); return; }
 
   try {
-    const doc = new PDFDocument({ margin: 56, size: "A4", bufferPages: true });
+    const MARGIN = 50;
+    const doc = new PDFDocument({ margin: MARGIN, size: "A4", bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on("data", (c: Buffer) => chunks.push(c));
 
-    const pageW = doc.page.width - 112; // usable width
+    const pageW = doc.page.width - MARGIN * 2;
     const VERT = "#1a4731";
     const GRIS = "#555555";
 
-    // ── Titre principal ──────────────────────────────────────────────────────
-    doc
-      .rect(0, 0, doc.page.width, 90)
-      .fill(VERT);
-    doc
-      .fillColor("white")
-      .font("Helvetica-Bold")
-      .fontSize(18)
-      .text(titre ?? "Rapport de gestion", 56, 28, { width: pageW })
-      .fontSize(10)
-      .font("Helvetica")
-      .text(`Généré par Claude Sonnet · ${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}`, 56, 58, { width: pageW });
-
-    doc.fillColor("#000000").moveDown(4);
+    // ── En-tête coopérative (logo + nom + ville) ──────────────────────────────
+    await drawHeader(doc, cooperativeId, {
+      titre_document: titre ?? "Rapport de gestion",
+    });
 
     // ── Parseur markdown simplifié ────────────────────────────────────────────
     const lines = contenu.split("\n");
@@ -508,17 +500,11 @@ export async function telechargerRapportIAPdf(req: Request, res: Response): Prom
       }
     }
 
-    // ── Numéros de page ───────────────────────────────────────────────────────
+    // ── Pieds de page (logo coop + numérotation) ──────────────────────────────
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
-      const savedMargin = doc.page.margins.bottom;
-      doc.page.margins.bottom = 0;
-      doc.fontSize(8).fillColor(GRIS)
-        .text(`Page ${i - range.start + 1} / ${range.count}`, 0, doc.page.height - 24, {
-          align: "center", width: doc.page.width,
-        });
-      doc.page.margins.bottom = savedMargin;
+      await drawFooter(doc, cooperativeId, i - range.start + 1, range.count);
     }
 
     doc.end();
