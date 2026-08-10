@@ -20,6 +20,7 @@ import {
   getCommissionsDelegueHandler,
   payerCommissionsHandler,
 } from "../controllers/commissionController.js";
+import { getAdminReleveCommissions } from "../controllers/rapportsController.js";
 
 const router = Router();
 
@@ -43,8 +44,9 @@ router.delete("/delegues/commissions/taux/:tauxId", authMiddleware, deleteTauxHa
 
 // ─── Routes paramétrées délégué (doivent rester APRÈS les routes spécifiques) ─
 router.get("/delegues/:agentId/caisse",             authMiddleware, getDetailCaisseHandler);
-router.get("/delegues/:agentId/commissions",        authMiddleware, getCommissionsDelegueHandler);
-router.post("/delegues/:agentId/commissions/payer", authMiddleware, payerCommissionsHandler);
+router.get("/delegues/:agentId/commissions",                authMiddleware, getCommissionsDelegueHandler);
+router.get("/delegues/:agentId/commissions/releve",         authMiddleware, getAdminReleveCommissions);
+router.post("/delegues/:agentId/commissions/payer",         authMiddleware, payerCommissionsHandler);
 router.post("/delegues/:agentId/approvisionner",    authMiddleware, approvisionnerHandler);
 router.post("/delegues/:agentId/alimenter",         authMiddleware, alimenterCaisseHandler);
 router.put("/delegues/:agentId/cloturer",           authMiddleware, cloturerJourneeHandler);

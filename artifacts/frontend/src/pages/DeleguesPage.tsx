@@ -82,6 +82,36 @@ export default function DeleguesPage() {
   const [commDelegueId, setCommDelegueId] = useState<number | null>(null);
   const [showTauxForm, setShowTauxForm] = useState(false);
   const [editTaux, setEditTaux] = useState<Partial<TauxCommission> | null>(null);
+  const [dlReleve, setDlReleve] = useState(false);
+  const [dlReleveErr, setDlReleveErr] = useState<string | null>(null);
+
+  async function telechargerReleve() {
+    if (!commDelegueId) return;
+    setDlReleve(true);
+    setDlReleveErr(null);
+    try {
+      const token = localStorage.getItem("coop_token");
+      const res = await fetch(`${API}/api/delegues/${commDelegueId}/commissions/releve`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error((b as { erreur?: string }).erreur ?? `Erreur ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `releve_commissions_delegue_${commDelegueId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    } catch (e) {
+      setDlReleveErr((e as Error).message);
+    } finally {
+      setDlReleve(false);
+    }
+  }
 
   const { data: delegues = [], isLoading } = useQuery<Delegue[]>({
     queryKey: ["delegues"],
@@ -457,18 +487,26 @@ export default function DeleguesPage() {
                       ))}
                     </div>
 
-                    {commissions.totaux.enAttente > 0 && (
-                      <div style={{ marginBottom: 16 }}>
+                    {/* Actions : paiement + téléchargement relevé */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
+                      {commissions.totaux.enAttente > 0 && (
                         <button
                           disabled={payerComm.isPending}
                           onClick={() => { if (confirm(`Verser ${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA de commissions en caisse ?`)) payerComm.mutate(commDelegueId); }}
-                          style={{ padding: "10px 24px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: payerComm.isPending ? .6 : 1 }}
+                          style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: payerComm.isPending ? .6 : 1, fontSize: ".88rem" }}
                         >
                           {payerComm.isPending ? "Versement…" : `💸 Payer ${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA en caisse`}
                         </button>
-                        <span style={{ marginLeft: 10, fontSize: ".82rem", color: "#6b7280" }}>Les commissions seront créditées sur la caisse du délégué.</span>
-                      </div>
-                    )}
+                      )}
+                      <button
+                        disabled={dlReleve}
+                        onClick={telechargerReleve}
+                        style={{ padding: "10px 20px", borderRadius: 8, border: "1.5px solid #2563eb", background: dlReleve ? "#eff6ff" : "#fff", color: "#2563eb", fontWeight: 700, cursor: dlReleve ? "not-allowed" : "pointer", fontSize: ".88rem" }}
+                      >
+                        {dlReleve ? "Génération…" : "📄 Télécharger le relevé PDF"}
+                      </button>
+                      {dlReleveErr && <span style={{ fontSize: ".8rem", color: "#dc2626" }}>⚠️ {dlReleveErr}</span>}
+                    </div>
 
                     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse" }}>

@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, campagnesTable } from "@workspace/db";
+import { db, campagnesTable, usersTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import {
   generateFicheMembre,
@@ -270,6 +270,47 @@ export async function getFluxTresoreiriePdf(req: Request, res: Response): Promis
   } catch (err) {
     req.log.error({ err }, "Erreur getFluxTresoreiriePdf");
     res.status(500).json({ erreur: "Erreur génération PDF flux de trésorerie" });
+  }
+}
+
+export async function getAdminReleveCommissions(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+
+  const delegueId = parseInt(String(req.params["agentId"] ?? "0"));
+  if (!delegueId) { res.status(400).json({ erreur: "ID délégué invalide" }); return; }
+
+  // Vérifier que le délégué appartient à la coopérative du responsable
+  const [delegue] = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(and(eq(usersTable.id, delegueId), eq(usersTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!delegue) { res.status(404).json({ erreur: "Délégué introuvable ou non autorisé" }); return; }
+
+  let campagneId: number | undefined;
+  if (req.query.campagneId !== undefined) {
+    const parsed = Number(req.query.campagneId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      res.status(400).json({ erreur: "campagneId doit être un entier positif" });
+      return;
+    }
+    const [campagne] = await db
+      .select({ id: campagnesTable.id })
+      .from(campagnesTable)
+      .where(and(eq(campagnesTable.id, parsed), eq(campagnesTable.cooperativeId, cooperativeId)))
+      .limit(1);
+    if (!campagne) { res.status(404).json({ erreur: "Campagne introuvable ou non autorisée" }); return; }
+    campagneId = parsed;
+  }
+
+  try {
+    const buffer = await generateReleveCommissions(delegueId, cooperativeId, campagneId);
+    const suffix = campagneId ? `_campagne_${campagneId}` : "_toutes";
+    sendPdf(res, buffer, `releve_commissions_delegue_${delegueId}${suffix}.pdf`);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getAdminReleveCommissions");
+    res.status(500).json({ erreur: "Erreur génération PDF relevé commissions" });
   }
 }
 
