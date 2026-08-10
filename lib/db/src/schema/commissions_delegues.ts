@@ -42,10 +42,13 @@ export const commissionsDeleguesTable = pgTable("commissions_delegues", {
   poidsKg:         numeric("poids_kg", { precision: 10, scale: 2 }).notNull(),
   montantFcfa:     numeric("montant_fcfa", { precision: 14, scale: 2 }).notNull(),
   // en_attente | payé | annulé
-  statut:          text("statut").notNull().default("en_attente"),
-  datePaiement:    timestamp("date_paiement", { withTimezone: true }),
-  mouvementId:     integer("mouvement_id").references(() => mouvementsCaisseDelegueTable.id),
-  createdAt:       timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  statut:             text("statut").notNull().default("en_attente"),
+  datePaiement:       timestamp("date_paiement", { withTimezone: true }),
+  mouvementId:        integer("mouvement_id").references(() => mouvementsCaisseDelegueTable.id),
+  // Moyen de paiement utilisé lors du versement (especes, virement, cheque, orange_money, mtn_momo, wave)
+  modePaiement:       text("moyen_paiement"),
+  referencePaiement:  text("reference_paiement"),
+  createdAt:          timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export type TauxCommission      = typeof tauxCommissionsDeleguesTable.$inferSelect;

@@ -14,8 +14,6 @@ import { db } from "@workspace/db";
 import {
   tauxCommissionsDeleguesTable,
   commissionsDeleguesTable,
-  caissesDeleguesTable,
-  mouvementsCaisseDelegueTable,
   usersTable,
   campagnesTable,
 } from "@workspace/db";
@@ -111,16 +109,32 @@ export async function creerCommissionSiTaux(
   }
 }
 
+// ─── Moyens de paiement acceptés ─────────────────────────────────────────
+
+export const MODES_PAIEMENT_COMMISSION = [
+  "especes",
+  "orange_money",
+  "mtn_momo",
+  "wave",
+  "virement",
+  "cheque",
+] as const;
+
+export type ModePaiementCommission = typeof MODES_PAIEMENT_COMMISSION[number];
+
 // ─── Paiement des commissions en lot ─────────────────────────────────────
 
 /**
- * Verse les commissions en_attente d'un délégué via sa caisse.
+ * Enregistre le paiement des commissions en_attente d'un délégué
+ * via le moyen de paiement choisi (espèces, virement, chèque, mobile money…).
  * Si commissionIds est fourni, ne paye que celles-là ; sinon toutes.
  */
 export async function payerCommissions(
   delegueId: number,
   cooperativeId: number,
-  commissionIds?: number[]
+  modePaiement: ModePaiementCommission,
+  commissionIds?: number[],
+  referencePaiement?: string
 ): Promise<{ montantTotal: number; nb: number }> {
   // Récupérer les commissions en attente
   const whereClause = commissionIds?.length
@@ -143,54 +157,14 @@ export async function payerCommissions(
 
   const montantTotal = commissions.reduce((s, c) => s + toNum(c.montantFcfa), 0);
 
-  // Récupérer / créer la caisse du délégué
-  let [caisse] = await db
-    .select()
-    .from(caissesDeleguesTable)
-    .where(
-      and(
-        eq(caissesDeleguesTable.userId, delegueId),
-        eq(caissesDeleguesTable.cooperativeId, cooperativeId)
-      )
-    )
-    .limit(1);
-
-  if (!caisse) {
-    const [newCaisse] = await db
-      .insert(caissesDeleguesTable)
-      .values({ userId: delegueId, cooperativeId, solde: "0" })
-      .returning();
-    caisse = newCaisse;
-  }
-
-  const nouveauSolde = toNum(caisse.solde) + montantTotal;
-
-  // Mettre à jour la caisse
-  await db
-    .update(caissesDeleguesTable)
-    .set({ solde: String(nouveauSolde), updatedAt: new Date() })
-    .where(eq(caissesDeleguesTable.id, caisse.id));
-
-  // Créer le mouvement de caisse
-  const [mouvement] = await db
-    .insert(mouvementsCaisseDelegueTable)
-    .values({
-      caisseDelegueId: caisse.id,
-      type: "commission",
-      montantFcfa: String(montantTotal),
-      soldeApresFcfa: String(nouveauSolde),
-      note: `Versement de ${commissions.length} commission(s) — ${montantTotal.toLocaleString("fr-FR")} FCFA`,
-      createdById: delegueId,
-    })
-    .returning();
-
-  // Marquer les commissions comme payées
+  // Marquer les commissions comme payées avec le moyen de paiement choisi
   await db
     .update(commissionsDeleguesTable)
     .set({
       statut: "payé",
       datePaiement: new Date(),
-      mouvementId: mouvement.id,
+      modePaiement,
+      referencePaiement: referencePaiement ?? null,
     })
     .where(inArray(commissionsDeleguesTable.id, commissions.map((c) => c.id)));
 

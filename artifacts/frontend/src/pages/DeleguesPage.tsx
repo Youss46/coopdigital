@@ -42,6 +42,15 @@ interface CommissionsData {
 
 const API = import.meta.env.VITE_API_URL ?? "";
 
+const MODES_PAIEMENT = [
+  { value: "especes",      label: "Espèces" },
+  { value: "orange_money", label: "Orange Money" },
+  { value: "mtn_momo",     label: "MTN Mobile Money" },
+  { value: "wave",         label: "Wave" },
+  { value: "virement",     label: "Virement bancaire" },
+  { value: "cheque",       label: "Chèque" },
+] as const;
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = localStorage.getItem("coop_token");
   const res = await fetch(`${API}/api${path}`, {
@@ -93,6 +102,15 @@ export default function DeleguesPage() {
   const [commCampagneId, setCommCampagneId] = useState<number | null>(null);
   const [dlReleve, setDlReleve] = useState(false);
   const [dlReleveErr, setDlReleveErr] = useState<string | null>(null);
+
+  // ── Modal paiement commission ────────────────────────────────────────────
+  const [showPayerModal, setShowPayerModal] = useState<{
+    delegueId: number;
+    montant: number;
+    commissionIds?: number[];
+  } | null>(null);
+  const [payerMode, setPayerMode] = useState<string>("especes");
+  const [payerRef, setPayerRef] = useState<string>("");
 
   async function telechargerReleve() {
     if (!commDelegueId) return;
@@ -192,13 +210,22 @@ export default function DeleguesPage() {
   });
 
   const payerComm = useMutation({
-    mutationFn: ({ delegueId, commissionIds }: { delegueId: number; commissionIds?: number[] }) =>
+    mutationFn: ({ delegueId, commissionIds, modePaiement, referencePaiement }: {
+      delegueId: number;
+      commissionIds?: number[];
+      modePaiement: string;
+      referencePaiement?: string;
+    }) =>
       apiFetch<{ montantTotal: number; nb: number }>(`/delegues/${delegueId}/commissions/payer`, {
         method: "POST",
-        body: JSON.stringify(commissionIds?.length ? { commissionIds } : {}),
+        body: JSON.stringify({ modePaiement, referencePaiement: referencePaiement || undefined, ...(commissionIds?.length ? { commissionIds } : {}) }),
       }),
     onSuccess: (data) => {
-      toast({ title: `${data.nb} commission(s) payées — ${data.montantTotal.toLocaleString("fr-FR")} FCFA versés en caisse` });
+      const modeLabel = MODES_PAIEMENT.find(m => m.value === payerMode)?.label ?? payerMode;
+      toast({ title: `${data.nb} commission(s) payées — ${data.montantTotal.toLocaleString("fr-FR")} FCFA (${modeLabel})` });
+      setShowPayerModal(null);
+      setPayerMode("especes");
+      setPayerRef("");
       qc.invalidateQueries({ queryKey: ["commissions-delegue"] });
       qc.invalidateQueries({ queryKey: ["delegues"] });
     },
@@ -537,17 +564,18 @@ export default function DeleguesPage() {
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
                       {commissions.totaux.enAttente > 0 && (
                         <button
-                          disabled={payerComm.isPending}
                           onClick={() => {
-                            const label = commCampagneId
-                              ? `Verser ${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA (campagne sélectionnée) en caisse ?`
-                              : `Verser ${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA de commissions en caisse ?`;
-                            if (confirm(label))
-                              payerComm.mutate({ delegueId: commDelegueId, commissionIds: commCampagneId ? pendingIds : undefined });
+                            setPayerMode("especes");
+                            setPayerRef("");
+                            setShowPayerModal({
+                              delegueId: commDelegueId,
+                              montant: commissions.totaux.enAttente,
+                              commissionIds: commCampagneId ? pendingIds : undefined,
+                            });
                           }}
-                          style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: payerComm.isPending ? .6 : 1, fontSize: ".88rem" }}
+                          style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: ".88rem" }}
                         >
-                          {payerComm.isPending ? "Versement…" : `💸 Payer ${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA en caisse`}
+                          💸 Payer {commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA
                         </button>
                       )}
                       <button
@@ -669,6 +697,71 @@ export default function DeleguesPage() {
       )}
 
       {/* Modal approvisionnement */}
+      {/* ── Modal paiement commission ───────────────────────────────────── */}
+      {showPayerModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 420, boxShadow: "0 8px 32px rgba(0,0,0,.18)" }}>
+            <div style={{ fontWeight: 800, fontSize: "1.1rem", marginBottom: 4 }}>Paiement de commissions</div>
+            <div style={{ fontSize: ".88rem", color: "#6b7280", marginBottom: 20 }}>
+              Montant à verser : <strong style={{ color: "#16a34a" }}>{showPayerModal.montant.toLocaleString("fr-FR")} FCFA</strong>
+              {showPayerModal.commissionIds && (
+                <span> ({showPayerModal.commissionIds.length} commission{showPayerModal.commissionIds.length > 1 ? "s" : ""} — campagne sélectionnée)</span>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Moyen de paiement</label>
+              <select
+                value={payerMode}
+                onChange={(e) => setPayerMode(e.target.value)}
+                style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".95rem", background: "#fff" }}
+              >
+                {MODES_PAIEMENT.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {(payerMode === "orange_money" || payerMode === "mtn_momo" || payerMode === "wave" || payerMode === "virement" || payerMode === "cheque") && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>
+                  {payerMode === "virement" ? "Référence virement" : payerMode === "cheque" ? "Numéro de chèque" : "Numéro de transaction"}
+                  <span style={{ fontWeight: 400, color: "#9ca3af" }}> (optionnel)</span>
+                </label>
+                <input
+                  type="text"
+                  value={payerRef}
+                  onChange={(e) => setPayerRef(e.target.value)}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".95rem" }}
+                  placeholder={payerMode === "virement" ? "Ex: VIR-2024-001" : payerMode === "cheque" ? "Ex: 0012345" : "Ex: CI240812XXXXX"}
+                />
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+              <button
+                onClick={() => { setShowPayerModal(null); setPayerMode("especes"); setPayerRef(""); }}
+                style={{ flex: 1, padding: "11px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", fontWeight: 600, cursor: "pointer", fontSize: ".9rem" }}
+              >
+                Annuler
+              </button>
+              <button
+                disabled={payerComm.isPending}
+                onClick={() => payerComm.mutate({
+                  delegueId: showPayerModal.delegueId,
+                  commissionIds: showPayerModal.commissionIds,
+                  modePaiement: payerMode,
+                  referencePaiement: payerRef || undefined,
+                })}
+                style={{ flex: 2, padding: "11px", border: "none", borderRadius: 8, background: "#16a34a", color: "#fff", fontWeight: 700, cursor: payerComm.isPending ? "not-allowed" : "pointer", opacity: payerComm.isPending ? .6 : 1, fontSize: ".9rem" }}
+              >
+                {payerComm.isPending ? "Paiement en cours…" : `✅ Confirmer le paiement`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAppro !== null && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 400 }}>

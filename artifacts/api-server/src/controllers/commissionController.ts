@@ -80,9 +80,25 @@ export async function payerCommissionsHandler(req: Request, res: Response): Prom
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
   const delegueId = Number(req.params.agentId);
-  const { commissionIds } = req.body as { commissionIds?: number[] };
+  const { commissionIds, modePaiement, referencePaiement } = req.body as {
+    commissionIds?: number[];
+    modePaiement: string;
+    referencePaiement?: string;
+  };
+
+  if (!modePaiement || !commissionService.MODES_PAIEMENT_COMMISSION.includes(modePaiement as commissionService.ModePaiementCommission)) {
+    res.status(400).json({ erreur: `modePaiement invalide. Valeurs acceptées : ${commissionService.MODES_PAIEMENT_COMMISSION.join(", ")}` });
+    return;
+  }
+
   try {
-    const result = await commissionService.payerCommissions(delegueId, cooperativeId, commissionIds);
+    const result = await commissionService.payerCommissions(
+      delegueId,
+      cooperativeId,
+      modePaiement as commissionService.ModePaiementCommission,
+      commissionIds,
+      referencePaiement
+    );
     if (result.nb === 0) {
       res.status(400).json({ erreur: "Aucune commission en attente à payer" });
       return;
