@@ -30,6 +30,8 @@ import {
   lotsTable,
   lotLivraisonsTable,
   traitementsRefusTable,
+  campagnesTable,
+  commissionsDeleguesTable,
 } from "@workspace/db";
 import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
@@ -3381,6 +3383,167 @@ export async function generateFluxTresoreiriePdf(cooperativeId: number, exercice
       `Document genere le ${formaterDate(new Date())} par CoopDigital.`,
       MARGIN, doc.y, { width: W },
     );
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Relevé PDF des commissions délégué (terrain)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateReleveCommissions(
+  delegueId: number,
+  cooperativeId: number,
+  campagneId?: number,
+): Promise<Buffer> {
+  // ── Données ──────────────────────────────────────────────────────────────
+  const [delegue] = await db
+    .select({ nom: usersTable.nom, prenoms: usersTable.prenoms, telephone: usersTable.telephone })
+    .from(usersTable)
+    .where(eq(usersTable.id, delegueId));
+  if (!delegue) throw new Error("Délégué introuvable");
+
+  let campagneLibelle: string | null = null;
+  if (campagneId) {
+    const [camp] = await db
+      .select({ libelle: campagnesTable.libelle })
+      .from(campagnesTable)
+      .where(eq(campagnesTable.id, campagneId));
+    campagneLibelle = camp?.libelle ?? null;
+  }
+
+  const whereClause = campagneId
+    ? and(
+        eq(commissionsDeleguesTable.delegueId, delegueId),
+        eq(commissionsDeleguesTable.campagneId, campagneId),
+      )
+    : eq(commissionsDeleguesTable.delegueId, delegueId);
+
+  const commissions = await db
+    .select()
+    .from(commissionsDeleguesTable)
+    .where(whereClause)
+    .orderBy(desc(commissionsDeleguesTable.createdAt));
+
+  // Totaux — seuls en_attente et payé comptent ; annulé est exclu des montants
+  let enAttenteTotal = 0;
+  let payeTotal = 0;
+  let annuleTotal = 0;
+  for (const c of commissions) {
+    const m = Number(c.montantFcfa ?? 0);
+    if (c.statut === "en_attente") enAttenteTotal += m;
+    else if (c.statut === "payé") payeTotal += m;
+    else if (c.statut === "annulé") annuleTotal += m;
+    // statuts inconnus ignorés
+  }
+  const grandTotal = enAttenteTotal + payeTotal;
+
+  // ── PDF ───────────────────────────────────────────────────────────────────
+  const ref = campagneLibelle
+    ? `COMM-${String(delegueId).padStart(4, "0")}-${campagneId}`
+    : `COMM-${String(delegueId).padStart(4, "0")}`;
+  const titreDoc = campagneLibelle
+    ? `Relevé des commissions — ${campagneLibelle}`
+    : "Relevé des commissions — Toutes campagnes";
+
+  const { doc, endPromise } = makePdfDoc();
+  await drawHeader(doc, cooperativeId, { titre_document: titreDoc, reference: ref });
+
+  let y = doc.y;
+
+  // Bloc délégué
+  doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 44).fill("#fffbeb").stroke("#fde68a");
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica").text("DÉLÉGUÉ", MARGIN + 8, y + 5);
+  const delegueNomComplet = `${delegue.prenoms ?? ""} ${delegue.nom ?? "—"}`.trim();
+  doc.fontSize(11).fillColor(VERT).font("Helvetica-Bold")
+    .text(delegueNomComplet, MARGIN + 8, y + 16);
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+    .text(
+      `Tél : ${delegue.telephone ?? "—"}   |   Généré le : ${formaterDate(new Date())}`,
+      MARGIN + 8, y + 30,
+    );
+  y += 52;
+
+  // Totaux récapitulatifs (annulé montré si > 0, exclu du total)
+  const totauxCols = annuleTotal > 0
+    ? [
+        { label: "En attente", val: formaterFCFA(enAttenteTotal), bg: "#fffbeb", col: "#b45309" },
+        { label: "Déjà payé",  val: formaterFCFA(payeTotal),      bg: "#f0fdf4", col: "#16a34a" },
+        { label: "Annulé",     val: formaterFCFA(annuleTotal),    bg: "#f1f5f9", col: "#64748b" },
+      ]
+    : [
+        { label: "En attente", val: formaterFCFA(enAttenteTotal), bg: "#fffbeb", col: "#b45309" },
+        { label: "Déjà payé",  val: formaterFCFA(payeTotal),      bg: "#f0fdf4", col: "#16a34a" },
+        { label: "Total net",  val: formaterFCFA(grandTotal),     bg: "#f0f9ff", col: "#0369a1" },
+      ];
+  const blockW = (PAGE_W - MARGIN * 2 - 16) / 3;
+  totauxCols.forEach((t, i) => {
+    const bx = MARGIN + i * (blockW + 8);
+    doc.rect(bx, y, blockW, 38).fill(t.bg);
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica").text(t.label, bx + 6, y + 6, { width: blockW - 12, lineBreak: false });
+    doc.fontSize(10).fillColor(t.col).font("Helvetica-Bold").text(t.val, bx + 6, y + 18, { width: blockW - 12, lineBreak: false });
+  });
+  y += 48;
+
+  if (commissions.length === 0) {
+    doc.fontSize(10).fillColor(GRIS).font("Helvetica").text("Aucune commission pour cette période.", MARGIN, y);
+  } else {
+    // En-tête du tableau
+    doc.fontSize(9).fillColor(VERT).font("Helvetica-Bold").text("DÉTAIL DES COMMISSIONS", MARGIN, y);
+    y += 14;
+
+    const colW = [80, 72, 76, 82, 90, 68]; // Date | Livraison | Poids kg | Taux FCFA/kg | Montant | Statut
+    const headers = ["Date", "Livraison #", "Poids (kg)", "Taux (FCFA/kg)", "Montant (FCFA)", "Statut"];
+    ligneTableau(doc, headers, colW, MARGIN, y, VERT);
+    y += 18;
+
+    for (const c of commissions) {
+      // Saut de page si nécessaire
+      if (y > 720) {
+        doc.addPage();
+        await drawHeader(doc, cooperativeId, { titre_document: `${titreDoc} (suite)`, reference: ref });
+        y = doc.y;
+      }
+      const rowBg = commissions.indexOf(c) % 2 === 0 ? "#f9fafb" : undefined;
+      const statut =
+        c.statut === "payé"    ? "Payée" :
+        c.statut === "annulé"  ? "Annulée" :
+        "En attente";
+      const cols = [
+        formaterDate(c.createdAt),
+        `#${c.livraisonId}`,
+        parseFloat(String(c.poidsKg)).toFixed(2),
+        formaterNombre(parseFloat(String(c.tauxFcfaParKg))),
+        formaterNombre(parseFloat(String(c.montantFcfa))),
+        statut,
+      ];
+      if (rowBg) doc.rect(MARGIN, y, colW.reduce((a, b) => a + b, 0), 15).fill(rowBg);
+      let cx = MARGIN;
+      cols.forEach((col, i) => {
+        const align = i >= 2 && i <= 4 ? "right" : "left";
+        doc.fontSize(8).fillColor("black").font("Helvetica")
+          .text(col, cx + 3, y + 3, { width: (colW[i] ?? 80) - 6, lineBreak: false, align });
+        cx += colW[i] ?? 80;
+      });
+      y += 15;
+    }
+
+    // Ligne de total en bas du tableau
+    y += 4;
+    const totalW = colW.reduce((a, b) => a + b, 0);
+    doc.rect(MARGIN, y, totalW, 22).fill(VERT);
+    doc.fontSize(9).fillColor("white").font("Helvetica-Bold")
+      .text(`TOTAL (${commissions.length} commission${commissions.length > 1 ? "s" : ""})`, MARGIN + 6, y + 7, {
+        width: totalW - colW[colW.length - 1]! - colW[colW.length - 2]! - 12,
+        lineBreak: false,
+      });
+    doc.text(formaterNombre(grandTotal), MARGIN + totalW - colW[colW.length - 1]! - colW[colW.length - 2]! - 6, y + 7, {
+      width: colW[colW.length - 2]! + colW[colW.length - 1]! - 6,
+      align: "right",
+      lineBreak: false,
+    });
+  }
 
   await addFooters(doc, cooperativeId);
   doc.end();

@@ -1,4 +1,6 @@
 import { type Request, type Response } from "express";
+import { db, campagnesTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
 import {
   generateFicheMembre,
   generateRapportMensuel,
@@ -13,6 +15,7 @@ import {
   generateRecuAvance,
   generateRecuIntrant,
   generateEtatPartsSociales,
+  generateReleveCommissions,
 } from "../services/pdfService";
 
 function sendPdf(res: Response, buffer: Buffer, filename: string): void {
@@ -267,5 +270,41 @@ export async function getFluxTresoreiriePdf(req: Request, res: Response): Promis
   } catch (err) {
     req.log.error({ err }, "Erreur getFluxTresoreiriePdf");
     res.status(500).json({ erreur: "Erreur génération PDF flux de trésorerie" });
+  }
+}
+
+export async function getTerrainReleveCommissions(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.agent?.cooperativeId;
+  const delegueId = req.agent?.id;
+  if (!cooperativeId || !delegueId) {
+    res.status(401).json({ erreur: "Non autorisé" });
+    return;
+  }
+  let campagneId: number | undefined;
+  if (req.query.campagneId !== undefined) {
+    const parsed = Number(req.query.campagneId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      res.status(400).json({ erreur: "campagneId doit être un entier positif" });
+      return;
+    }
+    // Vérifier que la campagne existe et appartient à la coopérative de l'agent
+    const [campagne] = await db
+      .select({ id: campagnesTable.id })
+      .from(campagnesTable)
+      .where(and(eq(campagnesTable.id, parsed), eq(campagnesTable.cooperativeId, cooperativeId)))
+      .limit(1);
+    if (!campagne) {
+      res.status(404).json({ erreur: "Campagne introuvable ou non autorisée" });
+      return;
+    }
+    campagneId = parsed;
+  }
+  try {
+    const buffer = await generateReleveCommissions(delegueId, cooperativeId, campagneId);
+    const suffix = campagneId ? `_campagne_${campagneId}` : "_toutes";
+    sendPdf(res, buffer, `releve_commissions${suffix}.pdf`);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getTerrainReleveCommissions");
+    res.status(500).json({ erreur: "Erreur génération PDF relevé commissions" });
   }
 }

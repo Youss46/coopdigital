@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { getMesCommissions } from "../lib/api";
+import { getMesCommissions, telechargerReleveCommissions } from "../lib/api";
 import type { CommissionResume } from "../lib/types";
 
 function fmt(n: number | string) {
@@ -13,10 +13,24 @@ function statutBadge(statut: string) {
 }
 
 export default function Commissions() {
-  const [data, setData]           = useState<CommissionResume | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [erreur, setErreur]       = useState<string | null>(null);
-  const [campagneId, setCampagneId] = useState<number | undefined>(undefined);
+  const [data, setData]               = useState<CommissionResume | null>(null);
+  const [loading, setLoading]         = useState(true);
+  const [erreur, setErreur]           = useState<string | null>(null);
+  const [campagneId, setCampagneId]   = useState<number | undefined>(undefined);
+  const [downloading, setDownloading] = useState(false);
+  const [dlErreur, setDlErreur]       = useState<string | null>(null);
+
+  async function handleTelecharger() {
+    setDownloading(true);
+    setDlErreur(null);
+    try {
+      await telechargerReleveCommissions(campagneId);
+    } catch (e) {
+      setDlErreur((e as Error).message);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   useEffect(() => {
     // Protection contre les réponses périmées : on associe un token à chaque requête.
@@ -161,6 +175,40 @@ export default function Commissions() {
               </div>
               <span style={{ fontSize: "1.6rem" }}>🏅</span>
             </div>
+
+            {/* ── Bouton téléchargement ─────────────────────────────── */}
+            {data.nb > 0 && (
+              <div style={{ padding: "12px 16px 0" }}>
+                <button
+                  onClick={handleTelecharger}
+                  disabled={downloading}
+                  style={{
+                    width: "100%",
+                    padding: "11px 0",
+                    borderRadius: 12,
+                    border: "1.5px solid #2563eb",
+                    background: downloading ? "#eff6ff" : "#2563eb",
+                    color: downloading ? "#2563eb" : "#fff",
+                    fontWeight: 700,
+                    fontSize: ".88rem",
+                    cursor: downloading ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                  }}
+                >
+                  {downloading ? (
+                    <><span className="t-spinner" style={{ width: 16, height: 16, borderWidth: 2, margin: 0 }} /> Génération…</>
+                  ) : (
+                    <>📄 Télécharger le relevé PDF{campagneId ? " de la campagne" : ""}</>
+                  )}
+                </button>
+                {dlErreur && (
+                  <div style={{ marginTop: 8, fontSize: ".8rem", color: "#dc2626" }}>⚠️ {dlErreur}</div>
+                )}
+              </div>
+            )}
 
             {/* ── Historique récent ──────────────────────────────────── */}
             {data.recentes.length > 0 ? (

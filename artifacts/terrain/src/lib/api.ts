@@ -106,6 +106,27 @@ export async function getMesCommissions(campagneId?: number) {
   return apiGet<import("./types").CommissionResume>(`/mes-commissions${qs}`);
 }
 
+export async function telechargerReleveCommissions(campagneId?: number): Promise<void> {
+  const token = getToken();
+  const qs = campagneId ? `?campagneId=${campagneId}` : "";
+  const res = await fetch(`${BASE}/commissions/releve${qs}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const suffix = campagneId ? `_campagne_${campagneId}` : "_toutes_campagnes";
+  a.download = `releve_commissions${suffix}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+}
+
 export async function getPaiementsDifferes() {
   return apiGet<import("./types").PaiementDiffere[]>("/paiements-differes");
 }
