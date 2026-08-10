@@ -300,7 +300,10 @@ export default function VentesPage() {
       const lotRes = await fetch(`${BASE}/api/lots`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-        body: JSON.stringify({ livraisonIds: autoPreview.livraisonIds }),
+        body: JSON.stringify({
+          livraisonIds: autoPreview.livraisonIds,
+          nombreSacs: form.nombreSacs ? parseInt(form.nombreSacs) : undefined,
+        }),
       });
       const lotData = await lotRes.json() as { id?: number; erreur?: string };
       if (!lotRes.ok) throw new Error(lotData.erreur ?? `HTTP ${lotRes.status}`);
