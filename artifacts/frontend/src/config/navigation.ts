@@ -90,6 +90,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   // ── Pilotage ─────────────────────────────────────────────────────────────────
   { href: "/previsions",             label: "Prévisions",                roles: ["pca","directeur","comptable","auditeur"],                                    category: "Pilotage" },
   { href: "/reporting",              label: "Reporting",                 roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],           category: "Pilotage" },
+  { href: "/rapport-gestion",        label: "Rapport de gestion IA",     roles: ["pca","directeur"],                                                          category: "Pilotage" },
   { href: "/anomalies",              label: "Anomalies",                 roles: ["pca","directeur","comptable","auditeur"],                                    category: "Pilotage", showAnomaliesBadge: true },
   { href: "/audit",                  label: "Journal d'audit",           roles: ["pca","directeur","auditeur"],                                               category: "Pilotage" },
 

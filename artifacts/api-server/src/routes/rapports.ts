@@ -14,6 +14,8 @@ import {
   getRecuAvance,
   getRecuIntrant,
   getEtatPartsSociales,
+  genererRapportIA,
+  telechargerRapportIAPdf,
 } from "../controllers/rapportsController";
 
 const router: IRouter = Router();
@@ -32,5 +34,8 @@ router.get("/rapports/recu/pesee/:id",      checkPermission("reporting", "genere
 router.get("/rapports/recu/avance/:id",     checkPermission("reporting", "generer_recu"),  getRecuAvance);
 router.get("/rapports/recu/intrant/:id",    checkPermission("reporting", "generer_recu"),  getRecuIntrant);
 router.get("/rapports/recu/parts/:id",      checkPermission("reporting", "generer_recu"),  getEtatPartsSociales);
+
+router.post("/rapports/ia/generer",  checkPermission("reporting", "generer_rapport_ia"), genererRapportIA);
+router.post("/rapports/ia/pdf",      checkPermission("reporting", "generer_rapport_ia"), telechargerRapportIAPdf);
 
 export default router;

@@ -1,6 +1,9 @@
 import { type Request, type Response } from "express";
 import { db, campagnesTable, usersTable, livraisonsTable, membresTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
+import Anthropic from "@anthropic-ai/sdk";
+import PDFDocument from "pdfkit";
+import { getKPIs, buildPrompt } from "../services/rapportIAService";
 import {
   generateFicheMembre,
   generateRapportMensuel,
@@ -370,5 +373,164 @@ export async function getTerrainReleveCommissions(req: Request, res: Response): 
   } catch (err) {
     req.log.error({ err }, "Erreur getTerrainReleveCommissions");
     res.status(500).json({ erreur: "Erreur génération PDF relevé commissions" });
+  }
+}
+
+// ─── Rapport de gestion IA — streaming SSE ────────────────────────────────────
+export async function genererRapportIA(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+
+  const { sections, campagneId } = req.body as { sections?: string[]; campagneId?: number };
+  if (!sections || sections.length === 0) {
+    res.status(400).json({ erreur: "Aucune section sélectionnée" }); return;
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  try {
+    const kpis = await getKPIs(cooperativeId, campagneId);
+    const { system, user } = buildPrompt(kpis, sections);
+
+    const anthropic = new Anthropic({ apiKey: process.env["ANTHROPIC_API_KEY"] });
+    const stream = anthropic.messages.stream({
+      model: "claude-sonnet-4-5",
+      max_tokens: 8192,
+      system,
+      messages: [{ role: "user", content: user }],
+    });
+
+    for await (const event of stream) {
+      if (
+        event.type === "content_block_delta" &&
+        event.delta.type === "text_delta"
+      ) {
+        res.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
+      }
+    }
+
+    res.write("data: [DONE]\n\n");
+    res.end();
+  } catch (err) {
+    req.log.error({ err }, "Erreur genererRapportIA");
+    res.write(`data: ${JSON.stringify({ erreur: "Erreur lors de la génération" })}\n\n`);
+    res.end();
+  }
+}
+
+// ─── Rapport de gestion IA — export PDF ──────────────────────────────────────
+export async function telechargerRapportIAPdf(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const { contenu, titre } = req.body as { contenu?: string; titre?: string };
+  if (!contenu) { res.status(400).json({ erreur: "Contenu manquant" }); return; }
+
+  try {
+    const doc = new PDFDocument({ margin: 56, size: "A4", bufferPages: true });
+    const chunks: Buffer[] = [];
+    doc.on("data", (c: Buffer) => chunks.push(c));
+
+    const pageW = doc.page.width - 112; // usable width
+    const VERT = "#1a4731";
+    const GRIS = "#555555";
+
+    // ── Titre principal ──────────────────────────────────────────────────────
+    doc
+      .rect(0, 0, doc.page.width, 90)
+      .fill(VERT);
+    doc
+      .fillColor("white")
+      .font("Helvetica-Bold")
+      .fontSize(18)
+      .text(titre ?? "Rapport de gestion", 56, 28, { width: pageW })
+      .fontSize(10)
+      .font("Helvetica")
+      .text(`Généré par Claude Sonnet · ${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}`, 56, 58, { width: pageW });
+
+    doc.fillColor("#000000").moveDown(4);
+
+    // ── Parseur markdown simplifié ────────────────────────────────────────────
+    const lines = contenu.split("\n");
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+      if (line.startsWith("## ")) {
+        doc.addPage();
+        doc.fillColor(VERT).font("Helvetica-Bold").fontSize(14)
+          .text(line.slice(3), { width: pageW });
+        doc.moveTo(56, doc.y + 4).lineTo(56 + pageW, doc.y + 4).strokeColor("#c6dfd2").lineWidth(1).stroke();
+        doc.moveDown(0.6);
+      } else if (line.startsWith("### ")) {
+        doc.fillColor(VERT).font("Helvetica-Bold").fontSize(11)
+          .text(line.slice(4), { width: pageW });
+        doc.moveDown(0.3);
+      } else if (line.startsWith("#### ")) {
+        doc.fillColor(GRIS).font("Helvetica-Bold").fontSize(10)
+          .text(line.slice(5), { width: pageW });
+        doc.moveDown(0.2);
+      } else if (line.startsWith("- ") || line.startsWith("* ")) {
+        doc.fillColor("#222222").font("Helvetica").fontSize(10)
+          .text(`• ${line.slice(2)}`, { width: pageW - 12, indent: 12 });
+        doc.moveDown(0.15);
+      } else if (/^\d+\.\s/.test(line)) {
+        doc.fillColor("#222222").font("Helvetica").fontSize(10)
+          .text(line, { width: pageW - 12, indent: 12 });
+        doc.moveDown(0.15);
+      } else if (line.startsWith("|")) {
+        // Table row — render as plain text
+        const cells = line.split("|").filter(c => c.trim() && !c.match(/^[-:\s]+$/));
+        if (cells.length) {
+          const isHeader = lines[lines.indexOf(raw) + 1]?.startsWith("|---") || lines[lines.indexOf(raw) + 1]?.startsWith("| ---");
+          doc.fillColor(isHeader ? VERT : "#222222")
+            .font(isHeader ? "Helvetica-Bold" : "Helvetica")
+            .fontSize(9)
+            .text(cells.map(c => c.trim()).join("   ·   "), { width: pageW });
+          doc.moveDown(0.2);
+        }
+      } else if (line.startsWith("---")) {
+        doc.moveTo(56, doc.y).lineTo(56 + pageW, doc.y).strokeColor("#e5e7eb").lineWidth(0.5).stroke();
+        doc.moveDown(0.4);
+      } else if (line.trim() === "") {
+        doc.moveDown(0.4);
+      } else {
+        // Inline bold/italic — strip markers, render plain
+        const clean = line
+          .replace(/\*\*(.+?)\*\*/g, "$1")
+          .replace(/\*(.+?)\*/g, "$1")
+          .replace(/__(.+?)__/g, "$1");
+        doc.fillColor("#222222").font("Helvetica").fontSize(10)
+          .text(clean, { width: pageW });
+        doc.moveDown(0.25);
+      }
+    }
+
+    // ── Numéros de page ───────────────────────────────────────────────────────
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      const savedMargin = doc.page.margins.bottom;
+      doc.page.margins.bottom = 0;
+      doc.fontSize(8).fillColor(GRIS)
+        .text(`Page ${i - range.start + 1} / ${range.count}`, 0, doc.page.height - 24, {
+          align: "center", width: doc.page.width,
+        });
+      doc.page.margins.bottom = savedMargin;
+    }
+
+    doc.end();
+    await new Promise<void>(resolve => doc.on("end", resolve));
+
+    const buffer = Buffer.concat(chunks);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="rapport_gestion.pdf"`);
+    res.setHeader("Content-Length", String(buffer.length));
+    res.end(buffer);
+  } catch (err) {
+    req.log.error({ err }, "Erreur telechargerRapportIAPdf");
+    res.status(500).json({ erreur: "Erreur génération PDF" });
   }
 }

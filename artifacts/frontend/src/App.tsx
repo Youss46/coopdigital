@@ -25,6 +25,7 @@ import CreancesPage from "@/pages/CreancesPage";
 import CommunicationPage from "@/pages/CommunicationPage";
 import SalairesPage from "@/pages/SalairesPage";
 import ReportingPage from "@/pages/ReportingPage";
+import RapportGestionPage from "@/pages/RapportGestionPage";
 import ComptabilitePage from "@/pages/ComptabilitePage";
 import ComptesPage from "@/pages/ComptesPage";
 import CampagnesPage from "@/pages/CampagnesPage";
@@ -170,6 +171,9 @@ function AppRoutes() {
       </Route>
       <Route path="/reporting">
         <ProtectedRoute component={ReportingPage} />
+      </Route>
+      <Route path="/rapport-gestion">
+        <ProtectedRoute component={RapportGestionPage} />
       </Route>
       <Route path="/comptabilite">
         <ProtectedRoute component={ComptabilitePage} />

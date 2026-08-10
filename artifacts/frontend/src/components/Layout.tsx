@@ -19,6 +19,7 @@ import {
   Receipt,
   MessageSquare,
   BarChart3,
+  Sparkles,
   ShieldCheck,
   Banknote,
   BookOpen,
@@ -131,6 +132,7 @@ const NAV_ICON_LIST: React.ElementType[] = [
   Package,        // /equipements
   TrendingUp,     // /previsions
   BarChart3,      // /reporting
+  Sparkles,       // /rapport-gestion
   ShieldAlert,    // /anomalies
   ScrollText,     // /audit
   Gavel,          // /gouvernance
