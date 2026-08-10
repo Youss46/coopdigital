@@ -14,6 +14,7 @@ import Bilan from "./pages/Bilan";
 import SyncHistorique from "./pages/SyncHistorique";
 import ChangerMotDePasse from "./pages/ChangerMotDePasse";
 import PaiementsDifferes from "./pages/PaiementsDifferes";
+import Commissions from "./pages/Commissions";
 import AccueilAgent from "./pages/AccueilAgent";
 import MissionsAgent from "./pages/MissionsAgent";
 import MissionDetail from "./pages/MissionDetail";
@@ -49,6 +50,7 @@ function DelegueRoutes() {
       <Route path="/bilan" component={Bilan} />
       <Route path="/historique" component={SyncHistorique} />
       <Route path="/paiements-differes" component={PaiementsDifferes} />
+      <Route path="/commissions" component={Commissions} />
       <Route><Redirect to="/" /></Route>
     </Switch>
   );

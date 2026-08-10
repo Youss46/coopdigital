@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { getProfil, getCaisse } from "../lib/api";
+import { getProfil, getCaisse, getMesCommissions } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useOffline } from "../contexts/OfflineContext";
 import OfflineBanner from "../components/OfflineBanner";
-import type { BilanJour, PrixActuel, CaisseDelegue } from "../lib/types";
+import type { BilanJour, PrixActuel, CaisseDelegue, CommissionResume } from "../lib/types";
 
 export default function Accueil() {
   const { user, logout } = useAuth();
@@ -12,6 +12,7 @@ export default function Accueil() {
   const [bilan, setBilan] = useState<BilanJour | null>(null);
   const [prix, setPrix] = useState<PrixActuel | null>(null);
   const [caisse, setCaisse] = useState<CaisseDelegue | null>(null);
+  const [commissions, setCommissions] = useState<CommissionResume | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
 
@@ -20,6 +21,7 @@ export default function Accueil() {
     Promise.all([
       getProfil().then((p) => { setBilan(p.statsJour); setPrix(p.prixActuel); }),
       getCaisse().then(setCaisse).catch(() => {}),
+      getMesCommissions().then(setCommissions).catch(() => {}),
     ])
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -94,6 +96,21 @@ export default function Accueil() {
               Votre caisse est vide. Contactez l'administration pour alimenter votre caisse avant de procéder aux paiements.
             </div>
           </div>
+        )}
+
+        {/* Widget commissions en attente */}
+        {commissions !== null && commissions.enAttenteFcfa > 0 && (
+          <Link href="/commissions" style={{ textDecoration: "none", display: "block", margin: "12px 16px 0" }}>
+            <div style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: 14, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: ".72rem", color: "#92400e", marginBottom: 2 }}>🏅 Commissions en attente</div>
+                <div style={{ fontWeight: 800, fontSize: "1rem", color: "#b45309" }}>
+                  {commissions.enAttenteFcfa.toLocaleString("fr-FR")} FCFA
+                </div>
+              </div>
+              <span style={{ color: "#b45309", fontSize: "1.1rem" }}>→</span>
+            </div>
+          </Link>
         )}
 
         {/* Stats du jour */}
