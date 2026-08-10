@@ -4,6 +4,14 @@ import { useToast } from "@/hooks/use-toast";
 import { MoneyInput } from "@/components/ui/money-input";
 
 // ─── Types commissions ─────────────────────────────────────────────────────
+interface Campagne {
+  id: number;
+  libelle: string;
+  anneeDebut: number;
+  anneeFin: number | null;
+  statut: string;
+}
+
 interface TauxCommission {
   id: number;
   campagneId: number | null;
@@ -82,6 +90,7 @@ export default function DeleguesPage() {
   const [commDelegueId, setCommDelegueId] = useState<number | null>(null);
   const [showTauxForm, setShowTauxForm] = useState(false);
   const [editTaux, setEditTaux] = useState<Partial<TauxCommission> | null>(null);
+  const [commCampagneId, setCommCampagneId] = useState<number | null>(null);
   const [dlReleve, setDlReleve] = useState(false);
   const [dlReleveErr, setDlReleveErr] = useState<string | null>(null);
 
@@ -91,7 +100,8 @@ export default function DeleguesPage() {
     setDlReleveErr(null);
     try {
       const token = localStorage.getItem("coop_token");
-      const res = await fetch(`${API}/api/delegues/${commDelegueId}/commissions/releve`, {
+      const qs = commCampagneId ? `?campagneId=${commCampagneId}` : "";
+      const res = await fetch(`${API}/api/delegues/${commDelegueId}/commissions/releve${qs}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) {
@@ -137,9 +147,18 @@ export default function DeleguesPage() {
     enabled: tab === "commissions",
   });
 
+  const { data: campagnes = [] } = useQuery<Campagne[]>({
+    queryKey: ["campagnes"],
+    queryFn: () => apiFetch("/campagnes"),
+    enabled: tab === "commissions" && commTab === "pardelegue",
+  });
+
   const { data: commissions } = useQuery<CommissionsData>({
-    queryKey: ["commissions-delegue", commDelegueId],
-    queryFn: () => apiFetch(`/delegues/${commDelegueId}/commissions`),
+    queryKey: ["commissions-delegue", commDelegueId, commCampagneId],
+    queryFn: () => {
+      const qs = commCampagneId ? `?campagneId=${commCampagneId}` : "";
+      return apiFetch(`/delegues/${commDelegueId}/commissions${qs}`);
+    },
     enabled: commDelegueId !== null && tab === "commissions" && commTab === "pardelegue",
   });
 
@@ -173,11 +192,14 @@ export default function DeleguesPage() {
   });
 
   const payerComm = useMutation({
-    mutationFn: (delegueId: number) =>
-      apiFetch<{ montantTotal: number; nb: number }>(`/delegues/${delegueId}/commissions/payer`, { method: "POST", body: JSON.stringify({}) }),
+    mutationFn: ({ delegueId, commissionIds }: { delegueId: number; commissionIds?: number[] }) =>
+      apiFetch<{ montantTotal: number; nb: number }>(`/delegues/${delegueId}/commissions/payer`, {
+        method: "POST",
+        body: JSON.stringify(commissionIds?.length ? { commissionIds } : {}),
+      }),
     onSuccess: (data) => {
       toast({ title: `${data.nb} commission(s) payées — ${data.montantTotal.toLocaleString("fr-FR")} FCFA versés en caisse` });
-      qc.invalidateQueries({ queryKey: ["commissions-delegue", commDelegueId] });
+      qc.invalidateQueries({ queryKey: ["commissions-delegue"] });
       qc.invalidateQueries({ queryKey: ["delegues"] });
     },
     onError: (e) => toast({ title: (e as Error).message, variant: "destructive" }),
@@ -457,28 +479,52 @@ export default function DeleguesPage() {
             {/* Sous-onglet Par délégué */}
             {commTab === "pardelegue" && (
               <div>
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Sélectionner un délégué</label>
-                  <select
-                    value={commDelegueId ?? ""}
-                    onChange={(e) => setCommDelegueId(e.target.value ? Number(e.target.value) : null)}
-                    style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem", minWidth: 260 }}
-                  >
-                    <option value="">— Choisir un délégué —</option>
-                    {delegues.map((d) => (
-                      <option key={d.id} value={d.id}>{d.nom} {d.prenoms} {d.section ? `— ${d.section}` : ""}</option>
-                    ))}
-                  </select>
+                {/* Sélecteurs délégué + campagne */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 16, alignItems: "flex-end" }}>
+                  <div>
+                    <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Délégué</label>
+                    <select
+                      value={commDelegueId ?? ""}
+                      onChange={(e) => { setCommDelegueId(e.target.value ? Number(e.target.value) : null); setCommCampagneId(null); }}
+                      style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem", minWidth: 240 }}
+                    >
+                      <option value="">— Choisir un délégué —</option>
+                      {delegues.map((d) => (
+                        <option key={d.id} value={d.id}>{d.nom} {d.prenoms} {d.section ? `— ${d.section}` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {commDelegueId && campagnes.length > 0 && (
+                    <div>
+                      <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Campagne</label>
+                      <select
+                        value={commCampagneId ?? ""}
+                        onChange={(e) => setCommCampagneId(e.target.value ? Number(e.target.value) : null)}
+                        style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem", minWidth: 200 }}
+                      >
+                        <option value="">— Toutes les campagnes —</option>
+                        {campagnes.map((c) => (
+                          <option key={c.id} value={c.id}>{c.libelle}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
-                {commDelegueId && commissions && (
+                {commDelegueId && commissions && (() => {
+                  // IDs en_attente de la vue courante (respecte le filtre campagne)
+                  const pendingIds = commissions.commissions
+                    .filter((c) => c.statut === "en_attente")
+                    .map((c) => c.id);
+                  return (
                   <div>
                     {/* KPI */}
                     <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: 12, marginBottom: 20 }}>
                       {[
-                        { label: "En attente", val: `${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA`, color: "#f59e0b" },
-                        { label: "Déjà payé", val: `${commissions.totaux.paye.toLocaleString("fr-FR")} FCFA`, color: "#16a34a" },
-                        { label: "Total cumulé", val: `${commissions.totaux.total.toLocaleString("fr-FR")} FCFA`, color: "#2563eb" },
+                        { label: commCampagneId ? "En attente (campagne)" : "En attente", val: `${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA`, color: "#f59e0b" },
+                        { label: commCampagneId ? "Payé (campagne)" : "Déjà payé", val: `${commissions.totaux.paye.toLocaleString("fr-FR")} FCFA`, color: "#16a34a" },
+                        { label: commCampagneId ? "Total (campagne)" : "Total cumulé", val: `${commissions.totaux.total.toLocaleString("fr-FR")} FCFA`, color: "#2563eb" },
                       ].map((k) => (
                         <div key={k.label} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px" }}>
                           <div style={{ fontSize: ".78rem", color: "#6b7280", marginBottom: 4 }}>{k.label}</div>
@@ -492,7 +538,13 @@ export default function DeleguesPage() {
                       {commissions.totaux.enAttente > 0 && (
                         <button
                           disabled={payerComm.isPending}
-                          onClick={() => { if (confirm(`Verser ${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA de commissions en caisse ?`)) payerComm.mutate(commDelegueId); }}
+                          onClick={() => {
+                            const label = commCampagneId
+                              ? `Verser ${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA (campagne sélectionnée) en caisse ?`
+                              : `Verser ${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA de commissions en caisse ?`;
+                            if (confirm(label))
+                              payerComm.mutate({ delegueId: commDelegueId, commissionIds: commCampagneId ? pendingIds : undefined });
+                          }}
                           style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: payerComm.isPending ? .6 : 1, fontSize: ".88rem" }}
                         >
                           {payerComm.isPending ? "Versement…" : `💸 Payer ${commissions.totaux.enAttente.toLocaleString("fr-FR")} FCFA en caisse`}
@@ -538,7 +590,8 @@ export default function DeleguesPage() {
                       </table>
                     </div>
                   </div>
-                )}
+                  );
+                })()}
               </div>
             )}
           </div>
