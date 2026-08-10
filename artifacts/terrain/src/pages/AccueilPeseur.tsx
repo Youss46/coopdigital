@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "../contexts/AuthContext";
 import { useOffline } from "../contexts/OfflineContext";
 import { getBilan } from "../lib/api";
@@ -18,16 +18,19 @@ function fmtFcfa(n: number): string {
 export default function AccueilPeseur() {
   const { user, logout } = useAuth();
   const { isOnline, pendingCount, syncStatus } = useOffline();
+  const [location] = useLocation();
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
   const [bilan, setBilan] = useState<BilanJour | null>(null);
 
-  // Charge le bilan à l'ouverture et après chaque sync réussie
+  // Rafraîchit le bilan à chaque fois que la route revient sur "/" (retour depuis collecte, historique…)
+  // et à chaque changement de connectivité
   useEffect(() => {
     if (isOnline) {
       getBilan().then(setBilan).catch(() => {});
     }
-  }, [isOnline]);
+  }, [location, isOnline]);
 
+  // Rafraîchit aussi après chaque sync réussie (collectes hors-ligne)
   useEffect(() => {
     if (syncStatus === "done" && isOnline) {
       getBilan().then(setBilan).catch(() => {});
