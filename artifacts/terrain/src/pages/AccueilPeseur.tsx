@@ -17,15 +17,22 @@ function fmtFcfa(n: number): string {
 
 export default function AccueilPeseur() {
   const { user, logout } = useAuth();
-  const { isOnline, pendingCount } = useOffline();
+  const { isOnline, pendingCount, syncStatus } = useOffline();
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
   const [bilan, setBilan] = useState<BilanJour | null>(null);
 
+  // Charge le bilan à l'ouverture et après chaque sync réussie
   useEffect(() => {
     if (isOnline) {
       getBilan().then(setBilan).catch(() => {});
     }
   }, [isOnline]);
+
+  useEffect(() => {
+    if (syncStatus === "done" && isOnline) {
+      getBilan().then(setBilan).catch(() => {});
+    }
+  }, [syncStatus, isOnline]);
 
   return (
     <div className="t-app">
