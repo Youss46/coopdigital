@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { terrainAuthMiddleware, delegueOnly } from "../middlewares/terrainAuth.js";
+import { terrainAuthMiddleware, delegueOnly, collecteAllowed } from "../middlewares/terrainAuth.js";
 import { getVapidPublicKey, subscribePush, unsubscribePush } from "../controllers/pushController.js";
 import {
   loginTerrainHandler,
@@ -53,10 +53,11 @@ router.get("/terrain/mes-commissions", terrainAuthMiddleware, delegueOnly, getMe
 // Routes protégées délégué uniquement
 router.get("/terrain/fournisseurs", terrainAuthMiddleware, delegueOnly, getFournisseursHandler);
 router.get("/terrain/fournisseur/:id/recap", terrainAuthMiddleware, delegueOnly, getFournisseurRecapHandler);
-router.post("/terrain/collecte", terrainAuthMiddleware, delegueOnly, postCollecteHandler);
+router.post("/terrain/collecte", terrainAuthMiddleware, collecteAllowed, postCollecteHandler);
 router.post("/terrain/paiement", terrainAuthMiddleware, delegueOnly, postPaiementHandler);
 router.post("/terrain/avance", terrainAuthMiddleware, delegueOnly, postAvanceHandler);
-router.get("/terrain/bilan-jour", terrainAuthMiddleware, delegueOnly, getBilanJourHandler);
+// Ouvert au délégué ET au peseur (le service filtre par agentId pour les collectes)
+router.get("/terrain/bilan-jour", terrainAuthMiddleware, getBilanJourHandler);
 router.post("/terrain/rapport-journalier", terrainAuthMiddleware, delegueOnly, postRapportHandler);
 
 // Routes agent terrain

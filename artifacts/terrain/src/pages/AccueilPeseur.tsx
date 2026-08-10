@@ -1,13 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useAuth } from "../contexts/AuthContext";
 import { useOffline } from "../contexts/OfflineContext";
+import { getBilan } from "../lib/api";
 import BottomNavPeseur from "../components/BottomNavPeseur";
+import type { BilanJour } from "../lib/types";
+
+function fmtPoids(kg: number): string {
+  if (kg >= 1000) return (kg / 1000).toFixed(2) + " T";
+  return kg.toFixed(1) + " kg";
+}
+
+function fmtFcfa(n: number): string {
+  return n.toLocaleString("fr-FR") + " FCFA";
+}
 
 export default function AccueilPeseur() {
   const { user, logout } = useAuth();
   const { isOnline, pendingCount } = useOffline();
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
+  const [bilan, setBilan] = useState<BilanJour | null>(null);
+
+  useEffect(() => {
+    if (isOnline) {
+      getBilan().then(setBilan).catch(() => {});
+    }
+  }, [isOnline]);
 
   return (
     <div className="t-app">
@@ -30,10 +48,52 @@ export default function AccueilPeseur() {
       </header>
 
       <main className="t-main">
-        {/* Carte action principale */}
+        {/* ── Bilan du jour ─────────────────────────────────────────────── */}
+        {bilan && (
+          <div className="t-card" style={{ marginBottom: 12 }}>
+            <div className="t-card__title" style={{ marginBottom: 10 }}>📊 Aujourd'hui</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#22c55e" }}>
+                  {bilan.collectes.nb}
+                </div>
+                <div style={{ fontSize: ".68rem", color: "#94a3b8", marginTop: 2 }}>
+                  Collecte{bilan.collectes.nb !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#3b82f6" }}>
+                  {fmtPoids(bilan.collectes.tonnage)}
+                </div>
+                <div style={{ fontSize: ".68rem", color: "#94a3b8", marginTop: 2 }}>
+                  Tonnage
+                </div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: ".95rem", fontWeight: 800, color: "#f59e0b", lineHeight: 1.3 }}>
+                  {bilan.collectes.valeur >= 1_000_000
+                    ? (bilan.collectes.valeur / 1_000_000).toFixed(1) + " M"
+                    : bilan.collectes.valeur >= 1_000
+                      ? (bilan.collectes.valeur / 1_000).toFixed(0) + " k"
+                      : bilan.collectes.valeur.toLocaleString("fr-FR")}
+                </div>
+                <div style={{ fontSize: ".68rem", color: "#94a3b8", marginTop: 2 }}>
+                  FCFA brut
+                </div>
+              </div>
+            </div>
+            {bilan.collectes.nb === 0 && (
+              <div style={{ textAlign: "center", color: "#64748b", fontSize: ".8rem", marginTop: 8 }}>
+                Aucune collecte enregistrée pour l'instant
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Action principale : nouvelle collecte ────────────────────── */}
         <Link href="/collecte">
           <div className="t-card" style={{
-            marginBottom: 16,
+            marginBottom: 12,
             background: "linear-gradient(135deg, #16a34a 0%, #15803d 100%)",
             cursor: "pointer",
             display: "flex",
@@ -53,7 +113,7 @@ export default function AccueilPeseur() {
           </div>
         </Link>
 
-        {/* Synchronisation en attente */}
+        {/* ── Opérations en attente de sync ────────────────────────────── */}
         {pendingCount > 0 && (
           <div className="t-card" style={{ marginBottom: 12, borderLeft: "3px solid #f59e0b", background: "#1e2d45" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -75,7 +135,7 @@ export default function AccueilPeseur() {
           </div>
         )}
 
-        {/* Statut connexion */}
+        {/* ── Hors ligne sans opérations en attente ────────────────────── */}
         {!isOnline && pendingCount === 0 && (
           <div className="t-card" style={{ background: "#1e293b", borderLeft: "3px solid #f59e0b" }}>
             <div style={{ fontSize: ".85rem", color: "#f59e0b" }}>
@@ -84,7 +144,7 @@ export default function AccueilPeseur() {
           </div>
         )}
 
-        {/* Historique des collectes */}
+        {/* ── Lien vers l'historique ────────────────────────────────────── */}
         <Link href="/historique">
           <div className="t-card" style={{
             marginBottom: 12,
@@ -106,18 +166,9 @@ export default function AccueilPeseur() {
             <span style={{ fontSize: "1.2rem", color: "#64748b" }}>›</span>
           </div>
         </Link>
-
-        {/* Info rôle */}
-        <div className="t-card" style={{ marginBottom: 12, background: "#1e2d45" }}>
-          <div className="t-card__title" style={{ marginBottom: 8 }}>ℹ️ Votre espace</div>
-          <div style={{ fontSize: ".82rem", color: "#94a3b8", lineHeight: 1.6 }}>
-            En tant que <strong style={{ color: "#fff" }}>Peseur</strong>, vous pouvez enregistrer les livraisons
-            des membres. Les paiements et avances sont gérés par le délégué de votre localité.
-          </div>
-        </div>
       </main>
 
-      {/* Modal déconnexion */}
+      {/* ── Modal déconnexion ─────────────────────────────────────────────── */}
       {confirmDeconnexion && (
         <div
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}

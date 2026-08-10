@@ -199,15 +199,6 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     modifier: ["pca", "directeur", "delegue"],
   },
 
-  campagnes: {
-    lire:       ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "delegue", "auditeur"],
-    creer:      ["pca", "directeur"],
-    fermer:     ["pca", "directeur"],
-    verifier:   ["pca", "directeur", "comptable"],
-    cloturer:   ["pca", "directeur"],
-    voir_bilan: ["pca", "directeur", "comptable", "auditeur"],
-  },
-
   audit: {
     voir_journal:           ["pca", "directeur", "auditeur"],
     voir_stats:             ["pca", "directeur"],

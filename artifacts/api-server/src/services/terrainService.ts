@@ -33,7 +33,8 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
     .where(and(eq(usersTable.telephone, tel), eq(usersTable.actif, true)))
     .limit(1);
 
-  if (!user || (user.role !== "delegue" && user.role !== "agent_terrain" && user.role !== "peseur")) return null;
+  const rolesAutorisés = ["delegue", "agent_terrain", "peseur"];
+  if (!user || !rolesAutorisés.includes(user.role as string)) return null;
 
   const ok = await bcrypt.compare(motDePasse, user.passwordHash);
   if (!ok) return null;
@@ -659,7 +660,7 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
       statutPaiement: livraisonsTable.statutPaiement,
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
-      membreCode: membresTable.code,
+      membreCode: membresTable.carteNumero,
     })
     .from(livraisonsTable)
     .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))

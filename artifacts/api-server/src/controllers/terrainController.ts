@@ -172,7 +172,9 @@ export async function postSyncHandler(req: Request, res: Response): Promise<void
   const role = req.agent!.role;
   const allowedTypes = role === "delegue"
     ? ["collecte", "paiement", "avance"]
-    : ["gps_collecte"];
+    : role === "peseur"
+      ? ["collecte"]
+      : ["gps_collecte"];
   const filtered = (operations as Array<{ type?: string }>).filter(
     (op) => allowedTypes.includes(op.type ?? ""),
   );

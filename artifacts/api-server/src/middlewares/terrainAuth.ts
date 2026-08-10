@@ -53,3 +53,13 @@ export function delegueOnly(req: Request, res: Response, next: NextFunction): vo
   }
   next();
 }
+
+/** Autorise délégué ET peseur (collecte de livraisons) */
+export function collecteAllowed(req: Request, res: Response, next: NextFunction): void {
+  const role = req.agent?.role;
+  if (role !== "delegue" && role !== "peseur") {
+    res.status(403).json({ erreur: "Réservé aux délégués et peseurs" });
+    return;
+  }
+  next();
+}
