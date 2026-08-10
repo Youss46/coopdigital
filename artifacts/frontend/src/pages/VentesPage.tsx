@@ -100,6 +100,13 @@ interface LivraisonDispo {
   poidsKg: string;
 }
 
+interface EntrepotItem {
+  id: number;
+  nom: string;
+  ville: string | null;
+  pourFournisseursExt: boolean;
+}
+
 export default function VentesPage() {
   const { token } = useAuth();
   const { toast } = useToast();
@@ -123,6 +130,7 @@ export default function VentesPage() {
   const [autoPreview, setAutoPreview] = useState<{ livraisonIds: number[]; poidsTotalKg: number; nbLivraisons: number; surplusKg: number } | null>(null);
   const [autoPreviewLoading, setAutoPreviewLoading] = useState(false);
   const [submittingAuto, setSubmittingAuto] = useState(false);
+  const [autoEntrepotId, setAutoEntrepotId] = useState("");
 
   const { data: ventes = [], isLoading } = useGetVentes({}, {
     query: { queryKey: getGetVentesQueryKey({}) },
@@ -138,6 +146,13 @@ export default function VentesPage() {
     queryKey: ["ventes-stock-fournisseurs"],
     queryFn:  () => apiFetch("/api/fournisseurs/stock-disponible", token),
     enabled:  modalVente && sourceStock === "fournisseur",
+  });
+
+  const { data: entrepotsMembres = [] } = useQuery<EntrepotItem[]>({
+    queryKey: ["ventes-entrepots"],
+    queryFn:  () => apiFetch("/api/entrepots", token),
+    enabled:  modalVente && sourceStock === "lots" && modeConstitution === "auto",
+    select:   (data) => data.filter(e => !e.pourFournisseursExt),
   });
 
   const { data: livraisonsDisposFourn = [] } = useQuery<LivraisonDispo[]>({
@@ -195,6 +210,7 @@ export default function VentesPage() {
     setModeConstitution("existant");
     setQuantiteCibleVente("");
     setAutoPreview(null);
+    setAutoEntrepotId("");
     setModalVente(true);
   }
 
@@ -303,6 +319,7 @@ export default function VentesPage() {
         body: JSON.stringify({
           livraisonIds: autoPreview.livraisonIds,
           nombreSacs: form.nombreSacs ? parseInt(form.nombreSacs) : undefined,
+          entrepot: entrepotsMembres.find(e => String(e.id) === autoEntrepotId)?.nom ?? undefined,
         }),
       });
       const lotData = await lotRes.json() as { id?: number; erreur?: string };
@@ -704,6 +721,23 @@ export default function VentesPage() {
                         )}
                       </div>
                     )}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Entrepôt de stockage (optionnel)
+                      </label>
+                      <select
+                        value={autoEntrepotId}
+                        onChange={e => setAutoEntrepotId(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+                      >
+                        <option value="">— Aucun entrepôt —</option>
+                        {entrepotsMembres.map(e => (
+                          <option key={e.id} value={String(e.id)}>
+                            {e.nom}{e.ville ? ` — ${e.ville}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 )}
 
@@ -869,7 +903,7 @@ export default function VentesPage() {
 
             <div className="px-6 pb-5 flex gap-3 sticky bottom-0 bg-white border-t border-gray-100 pt-4">
               <button
-                onClick={() => { setModalVente(false); setForm(VENTE_INIT); setFormFourn(VENTE_FOURN_INIT); setAutoPreview(null); setQuantiteCibleVente(""); setModeConstitution("existant"); }}
+                onClick={() => { setModalVente(false); setForm(VENTE_INIT); setFormFourn(VENTE_FOURN_INIT); setAutoPreview(null); setQuantiteCibleVente(""); setModeConstitution("existant"); setAutoEntrepotId(""); }}
                 className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Annuler
