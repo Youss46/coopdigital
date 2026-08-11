@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { getPrixActuel } from "./terrainService.js";
+import { generateEcrituresLivraison } from "./comptabiliteService.js";
 
 // ─── Génération numéro de session ─────────────────────────────────────────────
 async function generateNumeroSession(cooperativeId: number): Promise<string> {
@@ -427,6 +428,29 @@ export async function creerLivraisonDepuisSession(
 
     return { livraison: livraison!, paiement: paiement! };
   });
+
+  // Écritures OHADA — fire-and-forget, hors transaction
+  void (async () => {
+    try {
+      const [membre] = await db
+        .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
+        .from(membresTable)
+        .where(eq(membresTable.id, result.livraison.membreId!))
+        .limit(1);
+
+      await generateEcrituresLivraison(cooperativeId, {
+        livraisonId:      result.livraison.id,
+        membreNom:        membre ? `${membre.nom} ${membre.prenoms}` : "—",
+        montantBrutFcfa:  result.livraison.montantBrutFcfa,
+        avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
+        montantNetFcfa:   result.livraison.montantNetFcfa,
+        dateLivraison:    result.livraison.dateLivraison,
+      });
+    } catch (err) {
+      // Ne pas bloquer la réponse — l'écriture sera visible dans les anomalies comptables
+      console.error("[peseeSession] generateEcrituresLivraison failed", err);
+    }
+  })();
 
   return result;
 }
