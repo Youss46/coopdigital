@@ -60,3 +60,4 @@ export * from "./webauthn";
 export * from "./certifications";
 export * from "./missionsEnquete";
 export * from "./primes";
+export * from "./rapports_ia";

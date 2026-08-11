@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
-import { db, campagnesTable, usersTable, livraisonsTable, membresTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { db, campagnesTable, usersTable, livraisonsTable, membresTable, rapportsIaTable } from "@workspace/db";
+import { and, eq, desc } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
 import PDFDocument from "pdfkit";
 import {
@@ -410,12 +410,39 @@ export async function genererRapportIA(req: Request, res: Response): Promise<voi
       messages: [{ role: "user", content: user }],
     });
 
+    let contenuComplet = "";
     for await (const event of stream) {
       if (
         event.type === "content_block_delta" &&
         event.delta.type === "text_delta"
       ) {
+        contenuComplet += event.delta.text;
         res.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
+      }
+    }
+
+    // ── Sauvegarde automatique en base ────────────────────────────────────────
+    if (contenuComplet.trim()) {
+      try {
+        const titre = kpis.campagne
+          ? `Rapport de gestion — Campagne ${kpis.campagne.libelle}`
+          : "Rapport de gestion — Toutes campagnes";
+        const [saved] = await db
+          .insert(rapportsIaTable)
+          .values({
+            cooperativeId,
+            campagneId: kpis.campagne && campagneId ? campagneId : null,
+            titre,
+            sections,
+            contenu: contenuComplet,
+            generePar: req.user?.id ?? null,
+          })
+          .returning({ id: rapportsIaTable.id });
+        if (saved) {
+          res.write(`data: ${JSON.stringify({ saved: saved.id })}\n\n`);
+        }
+      } catch (saveErr) {
+        req.log.error({ err: saveErr }, "Erreur sauvegarde rapport IA");
       }
     }
 
@@ -842,5 +869,90 @@ export async function telechargerRapportIADocx(req: Request, res: Response): Pro
   } catch (err) {
     req.log.error({ err }, "Erreur telechargerRapportIADocx");
     res.status(500).json({ erreur: "Erreur génération Word" });
+  }
+}
+
+export async function listerRapportsIA(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+
+  let campagneFilter = eq(rapportsIaTable.cooperativeId, cooperativeId);
+  if (req.query["campagneId"] !== undefined) {
+    const parsed = Number(req.query["campagneId"]);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      res.status(400).json({ erreur: "campagneId doit être un entier positif" });
+      return;
+    }
+    campagneFilter = and(campagneFilter, eq(rapportsIaTable.campagneId, parsed))!;
+  }
+
+  try {
+    const rapports = await db
+      .select({
+        id: rapportsIaTable.id,
+        titre: rapportsIaTable.titre,
+        campagneId: rapportsIaTable.campagneId,
+        sections: rapportsIaTable.sections,
+        createdAt: rapportsIaTable.createdAt,
+        auteurNom: usersTable.nom,
+        auteurPrenom: usersTable.prenoms,
+      })
+      .from(rapportsIaTable)
+      .leftJoin(usersTable, eq(usersTable.id, rapportsIaTable.generePar))
+      .where(campagneFilter)
+      .orderBy(desc(rapportsIaTable.createdAt));
+    res.json(rapports);
+  } catch (err) {
+    req.log.error({ err }, "Erreur listerRapportsIA");
+    res.status(500).json({ erreur: "Erreur chargement historique" });
+  }
+}
+
+export async function getRapportIA(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  if (!id) { res.status(400).json({ erreur: "ID rapport invalide" }); return; }
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+
+  try {
+    const [rapport] = await db
+      .select({
+        id: rapportsIaTable.id,
+        titre: rapportsIaTable.titre,
+        campagneId: rapportsIaTable.campagneId,
+        sections: rapportsIaTable.sections,
+        contenu: rapportsIaTable.contenu,
+        createdAt: rapportsIaTable.createdAt,
+        auteurNom: usersTable.nom,
+        auteurPrenom: usersTable.prenoms,
+      })
+      .from(rapportsIaTable)
+      .leftJoin(usersTable, eq(usersTable.id, rapportsIaTable.generePar))
+      .where(and(eq(rapportsIaTable.id, id), eq(rapportsIaTable.cooperativeId, cooperativeId)))
+      .limit(1);
+    if (!rapport) { res.status(404).json({ erreur: "Rapport introuvable" }); return; }
+    res.json(rapport);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getRapportIA");
+    res.status(500).json({ erreur: "Erreur chargement rapport" });
+  }
+}
+
+export async function supprimerRapportIA(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  if (!id) { res.status(400).json({ erreur: "ID rapport invalide" }); return; }
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+
+  try {
+    const deleted = await db
+      .delete(rapportsIaTable)
+      .where(and(eq(rapportsIaTable.id, id), eq(rapportsIaTable.cooperativeId, cooperativeId)))
+      .returning({ id: rapportsIaTable.id });
+    if (!deleted.length) { res.status(404).json({ erreur: "Rapport introuvable" }); return; }
+    res.json({ succes: true });
+  } catch (err) {
+    req.log.error({ err }, "Erreur supprimerRapportIA");
+    res.status(500).json({ erreur: "Erreur suppression rapport" });
   }
 }

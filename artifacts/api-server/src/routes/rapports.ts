@@ -17,6 +17,9 @@ import {
   genererRapportIA,
   telechargerRapportIAPdf,
   telechargerRapportIADocx,
+  listerRapportsIA,
+  getRapportIA,
+  supprimerRapportIA,
 } from "../controllers/rapportsController";
 
 const router: IRouter = Router();
@@ -39,5 +42,8 @@ router.get("/rapports/recu/parts/:id",      checkPermission("reporting", "genere
 router.post("/rapports/ia/generer",  checkPermission("reporting", "generer_rapport_ia"), genererRapportIA);
 router.post("/rapports/ia/pdf",      checkPermission("reporting", "generer_rapport_ia"), telechargerRapportIAPdf);
 router.post("/rapports/ia/docx",     checkPermission("reporting", "generer_rapport_ia"), telechargerRapportIADocx);
+router.get("/rapports/ia/historique",        checkPermission("reporting", "generer_rapport_ia"), listerRapportsIA);
+router.get("/rapports/ia/historique/:id",    checkPermission("reporting", "generer_rapport_ia"), getRapportIA);
+router.delete("/rapports/ia/historique/:id", checkPermission("reporting", "generer_rapport_ia"), supprimerRapportIA);
 
 export default router;

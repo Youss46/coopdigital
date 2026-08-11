@@ -45,3 +45,4 @@
 - [Vercel+Railway frontend BASE URL](vercel-railway-base-url.md) — MissionsEnquetePage et tout nouveau fichier fetch doivent utiliser `import.meta.env.VITE_API_URL ?? ""` comme BASE; hardcoder `""` casse les appels API en production Vercel+Railway si VITE_API_URL est défini.
 - [Commissions délégués — architecture](commissions-delegues-arch.md) — Option A (délégué du membre via membres.delegue_id); 2 tables; hook dans enregistrerCollecte; résolution taux par priorité.
 - [Rôle Peseur — pattern ajout terrain role](terrain-peseur-role.md) — peseur = 4e rôle terrain (phone auth); 6 fichiers à toucher; backend delegueOnly guard déjà protège avance/paiement.
+- [Licence guard dev testing](licence-guard-dev-testing.md) — tenantGuard 402 sans licence active; le check négatif est caché en mémoire → redémarrer l'API après seed.

@@ -505,6 +505,13 @@
       "when": 1783906800000,
       "tag": "0071_config_pesee_expiration_session",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1783993200000,
+      "tag": "0072_rapports_ia",
+      "breakpoints": true
     }
   ]
 }
