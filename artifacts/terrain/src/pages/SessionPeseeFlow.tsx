@@ -15,6 +15,8 @@ import {
   convertirSessionEnLivraison,
   telechargerRecuLivraison,
   SessionEnCoursError,
+  getPrix,
+  getFournisseurRecap,
 } from "../lib/api";
 import type { Fournisseur, SessionDetail, ConversionLivraisonResult } from "../lib/types";
 
@@ -88,6 +90,12 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const [convertirLoading, setConvertirLoading] = useState(false);
   const [modePaiement, setModePaiement] = useState<"especes" | "orange_money" | "mtn_momo" | "wave">("especes");
   const [livraisonResult, setLivraisonResult] = useState<ConversionLivraisonResult | null>(null);
+
+  // Estimation avant conversion
+  const [estimeLoading, setEstimeLoading] = useState(false);
+  const [estimePrixUnitaire, setEstimePrixUnitaire] = useState<number | null>(null);
+  const [estimeAvance, setEstimeAvance] = useState<number>(0);
+  const [estimeIntrants, setEstimeIntrants] = useState<number>(0);
 
   // Map membreId → sessionId pour les sessions actives (badge + reprise directe)
   // Rafraîchie toutes les 30 s tant que l'écran de sélection du membre est visible.
@@ -304,6 +312,31 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
       setErreur((err as Error).message);
       setAnnulerLoading(false);
       setConfirmAnnuler(false);
+    }
+  }
+
+  // ── Ouvrir le modal de conversion (et pré-charger l'estimation) ───────────
+  async function ouvrirConvertirModal() {
+    setConfirmConvertir(true);
+    setEstimePrixUnitaire(null);
+    setEstimeAvance(fournisseur?.avanceEnCours ?? 0);
+    setEstimeIntrants(fournisseur?.intrantsDus ?? 0);
+    setEstimeLoading(true);
+    try {
+      const membreId = sessionTerminee?.membreId ?? fournisseur?.id;
+      const [prixData, recapData] = await Promise.all([
+        getPrix(),
+        membreId ? getFournisseurRecap(membreId).catch(() => null) : Promise.resolve(null),
+      ]);
+      setEstimePrixUnitaire(prixData.prixBordChampFcfa);
+      if (recapData) {
+        setEstimeAvance(recapData.avanceEnCours);
+        setEstimeIntrants(recapData.intrantsDus);
+      }
+    } catch {
+      // Silencieux — l'estimation restera null, on masque juste le bloc
+    } finally {
+      setEstimeLoading(false);
     }
   }
 
@@ -697,7 +730,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               <button
                 className="t-btn t-btn--primary"
                 style={{ width: "100%", marginBottom: 10, background: "linear-gradient(135deg, #16a34a, #15803d)" }}
-                onClick={() => setConfirmConvertir(true)}
+                onClick={ouvrirConvertirModal}
               >
                 📦 Convertir en livraison
               </button>
@@ -748,6 +781,50 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               {sessionTerminee?.membreNom} {sessionTerminee?.membrePrenoms}<br />
               {fmtPoids(parseFloat(String(sessionTerminee?.poidsTotalKg ?? 0)))} · {sessionTerminee?.nbSacsTotal} sacs
             </div>
+
+            {/* Estimation financière */}
+            {estimeLoading ? (
+              <div style={{ textAlign: "center", color: "#64748b", fontSize: ".8rem", marginBottom: 16 }}>
+                Calcul de l'estimation…
+              </div>
+            ) : estimePrixUnitaire !== null ? (() => {
+              const poidsKg = parseFloat(String(sessionTerminee?.poidsTotalKg ?? 0));
+              const brut = Math.round(poidsKg * estimePrixUnitaire);
+              const avance = estimeAvance;
+              const intrants = estimeIntrants;
+              const net = Math.max(0, brut - avance - intrants);
+              return (
+                <div className="t-recap" style={{ marginBottom: 16, borderLeft: "4px solid #22c55e" }}>
+                  <div style={{ fontSize: ".68rem", color: "#4ade80", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>
+                    Estimation (prix actuel : {estimePrixUnitaire.toLocaleString("fr-FR")} FCFA/kg)
+                  </div>
+                  <div className="t-recap-row">
+                    <span className="t-recap-row__label">Montant brut</span>
+                    <span className="t-recap-row__value">{brut.toLocaleString("fr-FR")} FCFA</span>
+                  </div>
+                  {avance > 0 && (
+                    <div className="t-recap-row">
+                      <span className="t-recap-row__label">Avance à déduire</span>
+                      <span className="t-recap-row__value" style={{ color: "#f87171" }}>−{avance.toLocaleString("fr-FR")} FCFA</span>
+                    </div>
+                  )}
+                  {intrants > 0 && (
+                    <div className="t-recap-row">
+                      <span className="t-recap-row__label">Intrants à déduire</span>
+                      <span className="t-recap-row__value" style={{ color: "#f87171" }}>−{intrants.toLocaleString("fr-FR")} FCFA</span>
+                    </div>
+                  )}
+                  <div className="t-divider" />
+                  <div className="t-recap-row t-recap-row--total">
+                    <span className="t-recap-row__label" style={{ fontWeight: 800 }}>≈ Montant net estimé</span>
+                    <span className="t-recap-row__value" style={{ color: "#22c55e", fontWeight: 800, fontSize: "1.1rem" }}>
+                      {net.toLocaleString("fr-FR")} FCFA
+                    </span>
+                  </div>
+                </div>
+              );
+            })() : null}
+
             <div className="t-field" style={{ marginBottom: 16 }}>
               <label className="t-label">Mode de paiement</label>
               <select
