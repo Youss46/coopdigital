@@ -3,6 +3,7 @@ import {
   usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable,
   distributionsIntrantsTable, historiquePrixTable, campagnesTable,
   caissesDeleguesTable, mouvementsCaisseDelegueTable, sessionsPeseeTable,
+  entrepotsTable, mouvementsStockTable,
 } from "@workspace/db";
 import { and, eq, sql, desc, or } from "drizzle-orm";
 import { creerCommissionSiTaux } from "./commissionService.js";
@@ -389,6 +390,24 @@ export async function enregistrerCollecte(
 
   // Entrée stock entrepôt délégué — poids BRUT (fire-and-forget — non bloquant)
   void entrerStockSiDelegue(agentId, cooperativeId, data.poidsBrutKg, livraison.id);
+
+  // Entrée stock entrepôt coopératif — poids BRUT
+  const [entrepotCoop] = await db
+    .select({ id: entrepotsTable.id })
+    .from(entrepotsTable)
+    .where(eq(entrepotsTable.cooperativeId, cooperativeId))
+    .orderBy(entrepotsTable.id)
+    .limit(1);
+  if (entrepotCoop) {
+    await db.insert(mouvementsStockTable).values({
+      entrepotId: entrepotCoop.id,
+      lotId: null,
+      type: "entree",
+      poidsKg: String(data.poidsBrutKg),
+      motif: `Collecte terrain LIV-${livraison.id}`,
+      agentId,
+    });
+  }
 
   // Commission délégué — Option A : délégué du membre (membres.delegue_id)
   const [membreDelegue] = await db
