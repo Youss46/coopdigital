@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express";
 import { db, paiementsTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable } from "@workspace/db";
-import { eq, desc, and, or, sql, gte, lt, lte, inArray, type SQL } from "drizzle-orm";
+import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
 import { proposerEcriture } from "../services/comptabiliteService.js";
 import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvement, getSessionActive } from "../services/caisseService.js";
@@ -239,6 +240,8 @@ async function debiterCaisseCentralePaiement(
 // ─── Sélection enrichie partagée ────────────────────────────────────────────
 
 const agentAlias = usersTable;
+// Alias SQL pour joindre la table users sur livraisons.agent_id (séparation délégué / base centrale)
+const agentUserAlias = alias(usersTable, "agent_user");
 
 const SELECT_FIELDS = {
   id: paiementsTable.id,
@@ -307,6 +310,16 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     // Un délégué ne voit que les règlements des membres qui lui sont rattachés
     if (req.user?.role === "delegue" && req.user?.id) {
       conditions.push(eq(membresTable.delegueId, req.user.id));
+    } else {
+      // Base centrale : masquer les règlements en espèces enregistrés par un délégué
+      // (ces règlements sont gérés dans la page Caisse du délégué concerné)
+      conditions.push(
+        or(
+          sql`${paiementsTable.modePaiement} != 'especes'`,
+          isNull(livraisonsTable.agentId),
+          sql`${agentUserAlias.role} != 'delegue'`,
+        )!,
+      );
     }
 
     const now = new Date();
@@ -325,6 +338,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
       .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+      .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
       .where(and(...conditions))
       .orderBy(desc(paiementsTable.createdAt))
       .limit(limit);
@@ -359,6 +373,15 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
     // Un délégué ne voit que les stats des membres qui lui sont rattachés
     if (req.user?.role === "delegue" && req.user?.id) {
       statsConditions.push(eq(membresTable.delegueId, req.user.id));
+    } else {
+      // Base centrale : exclure les règlements espèces des délégués des stats
+      statsConditions.push(
+        or(
+          sql`${paiementsTable.modePaiement} != 'especes'`,
+          isNull(livraisonsTable.agentId),
+          sql`${agentUserAlias.role} != 'delegue'`,
+        )!,
+      );
     }
 
     const rows = await db
@@ -372,6 +395,7 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
       .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+      .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
       .where(and(...statsConditions));
 
     let enAttente = { count: 0, montant_total: 0 };
