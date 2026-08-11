@@ -992,7 +992,7 @@ export default function TracabilitePage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({ quantiteCibleKg: cible, pourFournisseurs }),
       });
-      const data = await res.json() as { erreur?: string; livraisonIds: number[]; poidsTotalKg: number; nbLivraisons: number; surplusKg: number };
+      const data = await res.json() as { erreur?: string; livraisonIds: number[]; poidsTotalKg: number; nbLivraisons: number; surplusKg: number; nombreSacsTotal: number };
       if (!res.ok) {
         toast({ title: "Erreur", description: data.erreur ?? "Impossible de calculer la sélection", variant: "destructive" });
         return;
@@ -1002,6 +1002,8 @@ export default function TracabilitePage() {
         return;
       }
       setSelection(data.livraisonIds);
+      // Auto-remplir le nombre de sacs calculé depuis les livraisons
+      if (data.nombreSacsTotal > 0) setNombreSacsInput(String(data.nombreSacsTotal));
       const surplusTxt = data.surplusKg > 0 ? ` (surplus : ${formaterPoids(data.surplusKg)})` : "";
       toast({
         title: `${data.nbLivraisons} livraison${data.nbLivraisons > 1 ? "s" : ""} sélectionnée${data.nbLivraisons > 1 ? "s" : ""}`,

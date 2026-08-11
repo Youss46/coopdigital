@@ -9,6 +9,7 @@ import {
   ventesExportateursTable,
   exportateursTable,
   parcellesTable,
+  entrepotsTable,
 } from "@workspace/db";
 import { eq, inArray, sql, desc, and, or, isNull, isNotNull } from "drizzle-orm";
 import { CreateLotBody, UpdateLotStatutBody } from "@workspace/api-zod";
@@ -97,7 +98,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
   try {
     // Livraisons disponibles (non encore dans un lot) pour cette coopérative, triées FIFO
     const disponibles = await db
-      .select({ id: livraisonsTable.id, poidsKg: livraisonsTable.poidsKg })
+      .select({ id: livraisonsTable.id, poidsKg: livraisonsTable.poidsKg, nombreSacs: livraisonsTable.nombreSacs })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
@@ -121,10 +122,12 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
     // Sélection gloutonne jusqu'à atteindre la quantité cible
     const selectedIds: number[] = [];
     let cumul = 0;
+    let totalSacs = 0;
     for (const l of disponibles) {
       if (cumul >= quantiteCibleKg) break;
       selectedIds.push(l.id);
       cumul += parseFloat(l.poidsKg);
+      totalSacs += l.nombreSacs ?? 0;
     }
 
     res.json({
@@ -132,6 +135,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
       poidsTotalKg: Math.round(cumul * 100) / 100,
       nbLivraisons: selectedIds.length,
       surplusKg: Math.max(0, Math.round((cumul - quantiteCibleKg) * 100) / 100),
+      nombreSacsTotal: totalSacs,
     });
   } catch (err) {
     req.log.error({ err }, "Erreur previewAutoLot");
@@ -197,9 +201,32 @@ export async function createLot(req: Request, res: Response): Promise<void> {
 
     const poidsTotalKg = String(poidsRow?.total ?? 0);
 
+    // Auto-détecter l'entrepôt coopératif si non fourni
+    let entrepotFinal = entrepot ?? null;
+    if (!entrepotFinal) {
+      const [premierEntrepot] = await db
+        .select({ nom: entrepotsTable.nom })
+        .from(entrepotsTable)
+        .where(and(eq(entrepotsTable.cooperativeId, cooperativeId), eq(entrepotsTable.pourFournisseursExt, false)))
+        .orderBy(entrepotsTable.id)
+        .limit(1);
+      entrepotFinal = premierEntrepot?.nom ?? null;
+    }
+
+    // Auto-calculer le nombre de sacs si non fourni (somme des livraisons)
+    let nombreSacsFinal = nombreSacs ?? null;
+    if (nombreSacsFinal === null || nombreSacsFinal === undefined) {
+      const [sacsRow] = await db
+        .select({ total: sql<number>`coalesce(sum(nombre_sacs), 0)::int` })
+        .from(livraisonsTable)
+        .where(inArray(livraisonsTable.id, livraisonIds));
+      const totalSacs = sacsRow?.total ?? 0;
+      if (totalSacs > 0) nombreSacsFinal = totalSacs;
+    }
+
     const [lot] = await db
       .insert(lotsTable)
-      .values({ cooperativeId, poidsTotalKg, entrepot: entrepot ?? null, nombreSacs: nombreSacs ?? null })
+      .values({ cooperativeId, poidsTotalKg, entrepot: entrepotFinal, nombreSacs: nombreSacsFinal ?? null })
       .returning();
 
     if (!lot) {
