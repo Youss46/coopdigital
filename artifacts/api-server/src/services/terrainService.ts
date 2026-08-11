@@ -297,6 +297,8 @@ export async function enregistrerCollecte(
     poidsBrutKg: number;
     retenueKg: number;
     modePaiement: string;
+    /** ID du peseur ayant physiquement enregistré la collecte (traçabilité) */
+    peseurId?: number;
   }
 ) {
   const prix = await getPrixActuel(cooperativeId);
@@ -371,6 +373,7 @@ export async function enregistrerCollecte(
     montantNetFcfa: montantNet,
     dateLivraison: today,
     agentId,
+    peseurId: data.peseurId ?? null,
     statutPaiement,
     montantRestant: paiementImmediat ? "0" : String(montantNet),
   }).returning();
@@ -557,7 +560,11 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
     .from(livraisonsTable)
     .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
     .where(and(
-      or(eq(livraisonsTable.agentId, agentId), eq(sessionsPeseeTable.peseurId, agentId)),
+      or(
+        eq(livraisonsTable.agentId, agentId),
+        eq(livraisonsTable.peseurId, agentId),
+        eq(sessionsPeseeTable.peseurId, agentId),
+      ),
       eq(livraisonsTable.dateLivraison, todayStr),
     ));
 
@@ -596,7 +603,11 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
     .from(livraisonsTable)
     .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
     .where(and(
-      or(eq(livraisonsTable.agentId, agentId), eq(sessionsPeseeTable.peseurId, agentId)),
+      or(
+        eq(livraisonsTable.agentId, agentId),
+        eq(livraisonsTable.peseurId, agentId),
+        eq(sessionsPeseeTable.peseurId, agentId),
+      ),
       eq(livraisonsTable.dateLivraison, todayStr),
     ))
     .orderBy(desc(livraisonsTable.createdAt))
@@ -676,7 +687,9 @@ export async function syncOperations(
     type: "collecte" | "paiement" | "avance" | "gps_collecte";
     data: Record<string, unknown>;
     timestamp: number;
-  }>
+  }>,
+  /** ID du peseur rattaché à un délégué (traçabilité) */
+  peseurId?: number,
 ) {
   const sorted = [...operations].sort((a, b) => a.timestamp - b.timestamp);
   const succes: string[] = [];
@@ -685,7 +698,7 @@ export async function syncOperations(
   for (const op of sorted) {
     try {
       if (op.type === "collecte") {
-        await enregistrerCollecte(agentId, cooperativeId, op.data as Parameters<typeof enregistrerCollecte>[2]);
+        await enregistrerCollecte(agentId, cooperativeId, { ...(op.data as Parameters<typeof enregistrerCollecte>[2]), peseurId });
       } else if (op.type === "paiement") {
         await enregistrerPaiement(agentId, cooperativeId, op.data as Parameters<typeof enregistrerPaiement>[2]);
       } else if (op.type === "avance") {
@@ -734,6 +747,7 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
         // Livraisons enregistrées directement par l'agent OU converties depuis une session pesée par cet agent
         or(
           eq(livraisonsTable.agentId, agentId),
+          eq(livraisonsTable.peseurId, agentId),
           eq(sessionsPeseeTable.peseurId, agentId),
         ),
         eq(membresTable.cooperativeId, cooperativeId),

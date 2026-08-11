@@ -426,6 +426,9 @@ export async function handleConvertirSessionEnLivraison(req: Request, res: Respo
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const actorId = req.agent?.id ?? req.user?.id;
+  // Peseur rattaché : la livraison est imputée au délégué, le peseur est tracé séparément
+  const effectiveAgentId = req.agent?.delegueId ?? actorId;
+  const peseurId = req.agent?.delegueId ? req.agent.id : undefined;
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
   const { modePaiement, entrepotId } = req.body as {
     modePaiement?: "especes" | "orange_money" | "mtn_momo" | "wave" | "cheque";
@@ -435,7 +438,8 @@ export async function handleConvertirSessionEnLivraison(req: Request, res: Respo
     const result = await creerLivraisonDepuisSession(cooperativeId, sessionId, {
       modePaiement,
       entrepotId,
-      agentId: actorId,
+      agentId: effectiveAgentId,
+      peseurId,
     });
     res.status(201).json(result);
   } catch (err) {

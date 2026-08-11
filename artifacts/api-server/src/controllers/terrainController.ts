@@ -82,8 +82,13 @@ export async function getFournisseurRecapHandler(req: Request, res: Response): P
 }
 
 export async function postCollecteHandler(req: Request, res: Response): Promise<void> {
-  const { id, cooperativeId } = getAgent(req);
+  const agent = req.agent!;
+  const { cooperativeId } = agent;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
+  // Peseur rattaché à un délégué : les livraisons sont imputées au délégué (agentId = delegueId)
+  // et le peseur est conservé pour la traçabilité (peseurId)
+  const effectiveAgentId = agent.delegueId ?? agent.id;
+  const peseurId = agent.delegueId ? agent.id : undefined;
   const { membreId, nombreSacs, poidsBrutKg, retenueKg, modePaiement } = req.body as {
     membreId?: number;
     nombreSacs?: number;
@@ -96,12 +101,13 @@ export async function postCollecteHandler(req: Request, res: Response): Promise<
     return;
   }
   try {
-    const result = await terrainService.enregistrerCollecte(id, cooperativeId, {
+    const result = await terrainService.enregistrerCollecte(effectiveAgentId, cooperativeId, {
       membreId,
       nombreSacs: nombreSacs ?? 1,
       poidsBrutKg,
       retenueKg: retenueKg ?? 0,
       modePaiement,
+      peseurId,
     });
     res.status(201).json(result);
   } catch (err) {
@@ -165,14 +171,18 @@ export async function getBilanJourHandler(req: Request, res: Response): Promise<
 }
 
 export async function postSyncHandler(req: Request, res: Response): Promise<void> {
-  const { id, cooperativeId } = getAgent(req);
+  const agent = req.agent!;
+  const { cooperativeId } = agent;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
+  // Peseur rattaché : les opérations sont imputées au délégué
+  const effectiveAgentId = agent.delegueId ?? agent.id;
+  const peseurId = agent.delegueId ? agent.id : undefined;
   const { operations } = req.body as { operations?: unknown[] };
   if (!Array.isArray(operations)) {
     res.status(400).json({ erreur: "operations doit être un tableau" });
     return;
   }
-  const role = req.agent!.role;
+  const role = agent.role;
   const allowedTypes = role === "delegue"
     ? ["collecte", "paiement", "avance"]
     : role === "peseur"
@@ -184,9 +194,10 @@ export async function postSyncHandler(req: Request, res: Response): Promise<void
 
   try {
     const result = await terrainService.syncOperations(
-      id,
+      effectiveAgentId,
       cooperativeId,
-      filtered as Parameters<typeof terrainService.syncOperations>[2]
+      filtered as Parameters<typeof terrainService.syncOperations>[2],
+      peseurId,
     );
     res.json(result);
   } catch (err) {

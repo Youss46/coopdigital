@@ -325,6 +325,8 @@ export async function creerLivraisonDepuisSession(
     modePaiement?: "especes" | "orange_money" | "mtn_momo" | "wave" | "cheque";
     entrepotId?: number;
     agentId?: number;
+    /** ID du peseur ayant physiquement réalisé la session (traçabilité) */
+    peseurId?: number;
   },
 ) {
   // 1. Get current price + active campaign (before transaction — read-only, safe)
@@ -402,6 +404,7 @@ export async function creerLivraisonDepuisSession(
         produit: session.produit ?? "cacao",
         dateLivraison: dateStr,
         agentId: data.agentId ?? null,
+        peseurId: data.peseurId ?? null,
       })
       .returning();
 
