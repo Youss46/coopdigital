@@ -53,7 +53,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
 
   // ── Finance membre ───────────────────────────────────────────────────────────
   { href: "/avances",                label: "Avances",                   roles: ["pca","directeur","comptable","caissier","delegue","auditeur"],                          category: "Finance membre" },
-  { href: "/intrants",               label: "Intrants",                  roles: ["pca","directeur","comptable","delegue","auditeur","magasinier"],             category: "Finance membre" },
+  { href: "/intrants",               label: "Intrants",                  roles: ["pca","directeur","comptable","auditeur","magasinier"],                   category: "Finance membre" },
   { href: "/reglements",             label: "Règlements",                roles: ["pca","directeur","comptable","caissier","delegue","auditeur"],                          category: "Finance membre" },
   { href: "/primes",                 label: "Primes & Redistribution",   roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finance membre" },
 
