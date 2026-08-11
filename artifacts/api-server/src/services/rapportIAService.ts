@@ -216,6 +216,9 @@ export function buildPrompt(kpis: RapportKPIs, sections: string[]): { system: st
   const sectionLabels = sections.map((s) => SECTIONS_MAP[s] ?? s).join(", ");
   const fcfa = (n: number) => new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " FCFA";
   const kg = (n: number) => new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " kg";
+  const dateGeneration = new Date().toLocaleDateString("fr-FR", {
+    day: "numeric", month: "long", year: "numeric",
+  });
 
   const dataBlock = {
     cooperative: kpis.cooperative,
@@ -274,7 +277,8 @@ ${JSON.stringify(dataBlock, null, 2)}
 - La section "Résumé exécutif" doit tenir en 150 mots maximum et mettre en évidence 3 points essentiels
 - La section "Recommandations stratégiques" doit proposer 4 à 6 actions concrètes, priorisées, avec justification
 - Ton : professionnel, direct, orienté décision
-- Commencez directement par le contenu (pas de préambule ni "Voici le rapport...")`;
+- Commencez directement par le contenu (pas de préambule ni "Voici le rapport...")
+- Dans le pied de rapport, remplacez tout placeholder \`[Date]\` par la date réelle : **${dateGeneration}**`;
 
   return { system, user };
 }
