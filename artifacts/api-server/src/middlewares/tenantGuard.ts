@@ -7,9 +7,11 @@ export async function tenantGuard(req: Request, res: Response, next: NextFunctio
     return;
   }
 
-  // Le PCA a accès en lecture seule quelle que soit l'état de la licence
-  // (il doit pouvoir voir le dashboard pour décider de renouveler)
-  if (req.user.role === "pca") {
+  // Le PCA et les délégués de localité sont exemptés :
+  // - PCA : doit pouvoir voir le dashboard pour décider de renouveler
+  // - Délégué : opérateur terrain (caisse, collecte) — ne doit pas être bloqué
+  //   par un problème de licence de la coopérative centrale
+  if (req.user.role === "pca" || req.user.role === "delegue") {
     next();
     return;
   }
