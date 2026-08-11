@@ -2397,8 +2397,8 @@ export async function generateLotEudrPdf(lotId: number, cooperativeId: number): 
     ? await db
         .select({
           membreId:   livraisonsTable.membreId,
-          poidsKg:    livraisonsTable.poidsKg,
-          poidsNetKg: livraisonsTable.poidsNetKg,
+          poidsKg:       livraisonsTable.poidsKg,
+          produitBrutKg: livraisonsTable.produitBrutKg,
         })
         .from(livraisonsTable)
         .where(inArray(livraisonsTable.id, livraisonIds))
@@ -2431,7 +2431,7 @@ export async function generateLotEudrPdf(lotId: number, cooperativeId: number): 
   const poidsParMembre: Record<number, number> = {};
   for (const liv of livraisons) {
     if (!liv.membreId) continue;
-    const kg = parseFloat(String(liv.poidsNetKg ?? liv.poidsKg ?? "0"));
+    const kg = parseFloat(String(liv.produitBrutKg ?? liv.poidsKg ?? "0"));
     poidsParMembre[liv.membreId] = (poidsParMembre[liv.membreId] ?? 0) + kg;
   }
 

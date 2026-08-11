@@ -279,7 +279,7 @@ function DetailModal({
     const payload = {
       lot_id: String(data.lot.id),
       qr_code: data.lot.qrCodeLot,
-      poids_net_kg: parseFloat(data.lot.poidsTotalKg),
+      poids_brut_kg: parseFloat(data.lot.poidsTotalKg),
       producteurs: (data.parcelles ?? []).map((p) => ({
         nom: `${p.membreNom ?? ""} ${p.membrePrenoms ?? ""}`.trim(),
         parcelle_gps: p.coordonneesPoint ?? null,
