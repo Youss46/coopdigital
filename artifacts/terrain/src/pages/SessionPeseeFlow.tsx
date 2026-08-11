@@ -682,9 +682,14 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               </div>
             )}
 
-            {/* Bouton reçu PDF (après conversion) */}
+            {/* Bouton reçu PDF (après conversion dans cette session) */}
             {livraisonResult && isOnline && (
               <RecuButton livraisonId={livraisonResult.livraisonId} />
+            )}
+
+            {/* Bouton reçu PDF (session déjà convertie lors d'une visite précédente) */}
+            {!livraisonResult && sessionTerminee?.livraisonId && isOnline && (
+              <RecuButton livraisonId={sessionTerminee.livraisonId} />
             )}
 
             {/* Bouton conversion (si pas encore convertie) */}
