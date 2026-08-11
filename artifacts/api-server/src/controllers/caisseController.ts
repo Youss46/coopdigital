@@ -1,15 +1,71 @@
 import { Request, Response } from "express";
 import * as svc from "../services/caisseService.js";
+import { db, usersTable, caissesDeleguesTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 // ─── Caisses ──────────────────────────────────────────────────────────────────
 
 export async function getCaisses(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId;
-  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+  const role    = req.user?.role;
+  const userId  = req.user?.id;
+  let cooperativeId = req.user?.cooperativeId ?? null;
+
+  // Pour un délégué dont le cooperativeId est absent du JWT,
+  // on le résout depuis la DB (évite un 401 alors que l'utilisateur est valide)
+  if (role === "delegue" && !cooperativeId && userId) {
+    const [u] = await db
+      .select({ cooperativeId: usersTable.cooperativeId })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+    cooperativeId = u?.cooperativeId ?? null;
+  }
+
+  if (!cooperativeId) {
+    res.status(401).json({ erreur: "Coopérative non associée au compte" });
+    return;
+  }
+
   // Un délégué ne voit que la caisse dont il est responsable
-  const responsableId = req.user?.role === "delegue" ? req.user?.id : undefined;
-  try { res.json(await svc.listCaisses(cooperativeId, responsableId)); }
-  catch (err) { req.log.error({ err }, "getCaisses"); res.status(500).json({ error: "Erreur serveur" }); }
+  const responsableId = role === "delegue" ? userId : undefined;
+  try {
+    const caisses = await svc.listCaisses(cooperativeId, responsableId);
+
+    // Fallback : si aucune caisse dans le système principal (caisses table),
+    // on cherche dans caisses_delegues — le système terrain du délégué.
+    // Cela couvre le cas où la coopérative voit la caisse via l'onglet
+    // "Caisses déléguées" (caisses_delegues) alors que le délégué n'a pas
+    // de caisse attribuée dans la table principale.
+    if (role === "delegue" && userId && caisses.length === 0) {
+      const [cd] = await db
+        .select()
+        .from(caissesDeleguesTable)
+        .where(eq(caissesDeleguesTable.userId, userId))
+        .limit(1);
+      if (cd) {
+        res.json([{
+          id:                      cd.id,
+          nom:                     "Ma caisse",
+          type_caisse:             "deleguee",
+          responsable_id:          userId,
+          responsable_nom:         null,
+          solde_actuel_fcfa:       (cd.solde ?? "0").toString(),
+          fond_caisse_minimum_fcfa: "0",
+          actif:                   true,
+          session_id:              null,
+          session_statut:          null,
+          heure_ouverture:         null,
+          solde_ouverture_fcfa:    null,
+        }]);
+        return;
+      }
+    }
+
+    res.json(caisses);
+  } catch (err) {
+    req.log.error({ err }, "getCaisses");
+    res.status(500).json({ error: "Erreur serveur" });
+  }
 }
 
 export async function postCaisse(req: Request, res: Response): Promise<void> {
