@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable } from "@workspace/db";
+import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable } from "@workspace/db";
 import { eq, sql, desc, gte, lte, and, isNull } from "drizzle-orm";
 
 export async function getDashboard(req: Request, res: Response): Promise<void> {
@@ -410,6 +410,88 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboardDelegue");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── GET /dashboard/peseurs-collectes  (délégué uniquement) ────────────────
+export async function getDeleguesPeseursCollectes(req: Request, res: Response): Promise<void> {
+  const delegueId    = req.user?.id;
+  const cooperativeId = req.user?.cooperativeId;
+
+  if (!delegueId || !cooperativeId) {
+    res.status(401).json({ erreur: "Non authentifié" });
+    return;
+  }
+  if (req.user?.role !== "delegue") {
+    res.status(403).json({ erreur: "Réservé aux délégués" });
+    return;
+  }
+
+  try {
+    // 1. Trouver les peseurs rattachés à ce délégué
+    const peseurs = await db
+      .select({ id: usersTable.id, nom: usersTable.nom, prenoms: usersTable.prenoms, actif: usersTable.actif })
+      .from(usersTable)
+      .where(eq(usersTable.delegueId, delegueId));
+
+    if (peseurs.length === 0) {
+      res.json({ peseurs: [], collectes: [], stats: { nbPeseurs: 0, nbCollectes: 0, tonnageKg: 0, montantFcfa: 0 } });
+      return;
+    }
+
+    const peseurIds = peseurs.map((p) => p.id);
+
+    // 2. Dernières collectes enregistrées par ces peseurs (50 max)
+    const rows = await db
+      .select({
+        id:             livraisonsTable.id,
+        dateLivraison:  livraisonsTable.dateLivraison,
+        poidsKg:        livraisonsTable.poidsKg,
+        montantNetFcfa: livraisonsTable.montantNetFcfa,
+        statutPaiement: livraisonsTable.statutPaiement,
+        agentId:        livraisonsTable.agentId,
+        membreNom:      membresTable.nom,
+        membrePrenoms:  membresTable.prenoms,
+        peseurNom:      usersTable.nom,
+        peseurPrenoms:  usersTable.prenoms,
+      })
+      .from(livraisonsTable)
+      .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+      .leftJoin(usersTable, eq(usersTable.id, livraisonsTable.agentId))
+      .where(
+        and(
+          sql`${livraisonsTable.agentId} = ANY(ARRAY[${sql.join(peseurIds.map((id) => sql`${id}`), sql`, `)}]::int[])`,
+          eq(membresTable.cooperativeId, cooperativeId),
+        ),
+      )
+      .orderBy(desc(livraisonsTable.dateLivraison), desc(livraisonsTable.id))
+      .limit(50);
+
+    const collectes = rows.map((r) => ({
+      id:             r.id,
+      dateLivraison:  r.dateLivraison,
+      poidsKg:        parseFloat(r.poidsKg ?? "0"),
+      montantNetFcfa: r.montantNetFcfa,
+      statutPaiement: r.statutPaiement ?? "PAYÉ",
+      membreNom:      r.membreNom ?? "—",
+      membrePrenoms:  r.membrePrenoms ?? "",
+      peseurId:       r.agentId,
+      peseurNom:      r.peseurNom ?? "—",
+      peseurPrenoms:  r.peseurPrenoms ?? "",
+    }));
+
+    // 3. Stats agrégées
+    const stats = {
+      nbPeseurs:   peseurs.length,
+      nbCollectes: collectes.length,
+      tonnageKg:   collectes.reduce((s, c) => s + c.poidsKg, 0),
+      montantFcfa: collectes.reduce((s, c) => s + c.montantNetFcfa, 0),
+    };
+
+    res.json({ peseurs, collectes, stats });
+  } catch (err) {
+    req.log.error({ err }, "Erreur getDeleguesPeseursCollectes");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

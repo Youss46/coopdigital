@@ -14,6 +14,8 @@ import {
   XCircle,
   ChevronRight,
   CalendarDays,
+  Scale,
+  UserPlus,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
@@ -40,6 +42,25 @@ function formaterDate(d: string) {
 }
 function formaterHeure(iso: string) {
   return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
+interface PeseurCollecte {
+  id: number;
+  dateLivraison: string;
+  poidsKg: number;
+  montantNetFcfa: number;
+  statutPaiement: string;
+  membreNom: string;
+  membrePrenoms: string;
+  peseurId: number | null;
+  peseurNom: string;
+  peseurPrenoms: string;
+}
+interface PeseurInfo { id: number; nom: string; prenoms: string; actif: boolean; }
+interface PeseursCollectesData {
+  peseurs: PeseurInfo[];
+  collectes: PeseurCollecte[];
+  stats: { nbPeseurs: number; nbCollectes: number; tonnageKg: number; montantFcfa: number };
 }
 
 interface DashboardData {
@@ -226,6 +247,12 @@ export default function DashboardDelegue() {
   const { data: caisses = [], isLoading: caisseLoading } = useQuery<CaisseRow[]>({
     queryKey: ["caisse-delegue"],
     queryFn: () => apiFetch("/api/caisse"),
+    staleTime: 60_000,
+  });
+
+  const { data: peseursData, isLoading: peseursLoading } = useQuery<PeseursCollectesData>({
+    queryKey: ["delegue-peseurs-collectes"],
+    queryFn: () => apiFetch("/api/dashboard/peseurs-collectes"),
     staleTime: 60_000,
   });
 
@@ -442,6 +469,110 @@ export default function DashboardDelegue() {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Collectes de mes peseurs */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Scale size={18} className="text-blue-600" />
+            <h2 className="font-semibold text-gray-800">Collectes de mes peseurs</h2>
+            {(peseursData?.stats.nbPeseurs ?? 0) > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
+                {peseursData!.stats.nbPeseurs} peseur{peseursData!.stats.nbPeseurs > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => navigate("/mes-peseurs")}
+            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Gérer →
+          </button>
+        </div>
+
+        {peseursLoading ? (
+          <div className="divide-y divide-gray-50">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="px-5 py-3 h-14 animate-pulse bg-gray-50" />
+            ))}
+          </div>
+        ) : !peseursData || peseursData.peseurs.length === 0 ? (
+          /* Aucun peseur créé */
+          <div className="px-5 py-8 text-center">
+            <Scale size={32} className="text-gray-300 mx-auto mb-3" />
+            <p className="text-sm font-medium text-gray-600 mb-1">Aucun peseur rattaché</p>
+            <p className="text-xs text-gray-400 mb-4">
+              Créez un peseur pour qu'il enregistre les collectes à votre place
+            </p>
+            <button
+              onClick={() => navigate("/mes-peseurs")}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
+            >
+              <UserPlus size={14} />
+              Créer mon premier peseur
+            </button>
+          </div>
+        ) : peseursData.collectes.length === 0 ? (
+          /* Peseurs existants mais aucune collecte */
+          <div className="px-5 py-6 text-center text-gray-400 text-sm">
+            <p className="font-medium text-gray-600 mb-1">
+              {peseursData.stats.nbPeseurs} peseur{peseursData.stats.nbPeseurs > 1 ? "s" : ""} actif{peseursData.stats.nbPeseurs > 1 ? "s" : ""}
+            </p>
+            Aucune collecte enregistrée pour le moment.
+          </div>
+        ) : (
+          <>
+            {/* Mini KPIs peseurs */}
+            <div className="px-5 py-3 grid grid-cols-3 gap-3 bg-blue-50 border-b border-blue-100">
+              <div className="text-center">
+                <p className="text-xs text-blue-600 font-medium">Collectes</p>
+                <p className="text-lg font-bold text-blue-900">{peseursData.stats.nbCollectes}</p>
+              </div>
+              <div className="text-center border-x border-blue-100">
+                <p className="text-xs text-blue-600 font-medium">Tonnage</p>
+                <p className="text-lg font-bold text-blue-900">
+                  {peseursData.stats.tonnageKg >= 1000
+                    ? (peseursData.stats.tonnageKg / 1000).toFixed(2) + " t"
+                    : peseursData.stats.tonnageKg.toFixed(1) + " kg"}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-blue-600 font-medium">Montant net</p>
+                <p className="text-lg font-bold text-blue-900">
+                  {new Intl.NumberFormat("fr-FR").format(peseursData.stats.montantFcfa)}
+                </p>
+              </div>
+            </div>
+
+            {/* Liste des collectes */}
+            <div className="divide-y divide-gray-50">
+              {peseursData.collectes.map((c) => (
+                <div key={c.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Badge peseur */}
+                    <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold max-w-[90px] truncate" title={`${c.peseurPrenoms} ${c.peseurNom}`}>
+                      <Scale size={10} />
+                      {c.peseurPrenoms.split(" ")[0]}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {c.membreNom} {c.membrePrenoms}
+                      </p>
+                      <p className="text-xs text-gray-400">{formaterDate(c.dateLivraison)}</p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-semibold text-gray-800">
+                      {new Intl.NumberFormat("fr-FR").format(c.montantNetFcfa)} F
+                    </p>
+                    <p className="text-xs text-gray-400">{c.poidsKg.toFixed(1)} kg</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
