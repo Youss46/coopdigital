@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { FileText, Sparkles, Download, RotateCcw, ChevronDown } from "lucide-react";
+import { FileText, Sparkles, Download, RotateCcw, ChevronDown, FileDown } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 function getAuthToken(): string | null {
@@ -118,31 +118,36 @@ export default function RapportGestionPage() {
     }
   }, [selectedSections, campagneId]);
 
-  // ── Télécharger PDF ────────────────────────────────────────────────────────
+  // ── Téléchargement générique ───────────────────────────────────────────────
+  const [downloadingWord, setDownloadingWord] = useState(false);
+
+  const buildTitre = useCallback(() => {
+    const campagne = campagnes.find(c => String(c.id) === campagneId);
+    return campagne
+      ? `Rapport de gestion — Campagne ${campagne.anneeDebut}/${campagne.anneeFin}`
+      : "Rapport de gestion";
+  }, [campagnes, campagneId]);
+
+  const buildSlug = useCallback(() => {
+    const campagne = campagnes.find(c => String(c.id) === campagneId);
+    return campagne ? `${campagne.anneeDebut}_${campagne.anneeFin}` : "complet";
+  }, [campagnes, campagneId]);
+
   const handleDownloadPdf = useCallback(async () => {
     if (!contenu) return;
     setDownloading(true);
     try {
-      const campagne = campagnes.find(c => String(c.id) === campagneId);
-      const titre = campagne
-        ? `Rapport de gestion — Campagne ${campagne.anneeDebut}/${campagne.anneeFin}`
-        : "Rapport de gestion";
-
       const response = await fetch(`${BASE}/api/rapports/ia/pdf`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${getAuthToken() ?? ""}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ contenu, titre }),
+        headers: { Authorization: `Bearer ${getAuthToken() ?? ""}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ contenu, titre: buildTitre() }),
       });
-
       if (!response.ok) throw new Error(`Erreur ${response.status}`);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `rapport_gestion_${campagne ? `${campagne.anneeDebut}_${campagne.anneeFin}` : "complet"}.pdf`;
+      a.download = `rapport_gestion_${buildSlug()}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -150,7 +155,31 @@ export default function RapportGestionPage() {
     } finally {
       setDownloading(false);
     }
-  }, [contenu, campagneId, campagnes]);
+  }, [contenu, buildTitre, buildSlug]);
+
+  const handleDownloadWord = useCallback(async () => {
+    if (!contenu) return;
+    setDownloadingWord(true);
+    try {
+      const response = await fetch(`${BASE}/api/rapports/ia/docx`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${getAuthToken() ?? ""}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ contenu, titre: buildTitre() }),
+      });
+      if (!response.ok) throw new Error(`Erreur ${response.status}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rapport_gestion_${buildSlug()}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur téléchargement Word");
+    } finally {
+      setDownloadingWord(false);
+    }
+  }, [contenu, buildTitre, buildSlug]);
 
   const handleReset = () => {
     setContenu("");
@@ -182,12 +211,20 @@ export default function RapportGestionPage() {
               <RotateCcw className="w-3.5 h-3.5" /> Nouveau rapport
             </button>
             <button
+              onClick={handleDownloadWord}
+              disabled={downloadingWord}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 disabled:opacity-50"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              {downloadingWord ? "Génération…" : "Word"}
+            </button>
+            <button
               onClick={handleDownloadPdf}
               disabled={downloading}
               className="flex items-center gap-1.5 px-3 py-2 text-sm bg-[#1a4731] text-white rounded-lg hover:bg-green-900 disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
-              {downloading ? "Génération…" : "Télécharger PDF"}
+              {downloading ? "Génération…" : "PDF"}
             </button>
           </div>
         )}
@@ -326,6 +363,14 @@ export default function RapportGestionPage() {
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
                 >
                   <RotateCcw className="w-3 h-3" /> Nouveau
+                </button>
+                <button
+                  onClick={handleDownloadWord}
+                  disabled={downloadingWord}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 disabled:opacity-50"
+                >
+                  <FileDown className="w-3 h-3" />
+                  {downloadingWord ? "…" : "Word"}
                 </button>
                 <button
                   onClick={handleDownloadPdf}

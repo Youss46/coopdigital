@@ -3,6 +3,11 @@ import { db, campagnesTable, usersTable, livraisonsTable, membresTable } from "@
 import { and, eq } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
 import PDFDocument from "pdfkit";
+import {
+  Document, Packer, Paragraph, TextRun,
+  Table, TableRow, TableCell,
+  HeadingLevel, WidthType, BorderStyle, ShadingType, AlignmentType,
+} from "docx";
 import { getKPIs, buildPrompt } from "../services/rapportIAService";
 import { drawHeader, drawFooter } from "../services/pdfHeaderService";
 import {
@@ -644,5 +649,198 @@ export async function telechargerRapportIAPdf(req: Request, res: Response): Prom
   } catch (err) {
     req.log.error({ err }, "Erreur telechargerRapportIAPdf");
     res.status(500).json({ erreur: "Erreur génération PDF" });
+  }
+}
+
+// ─── Rapport IA → Word (.docx) ───────────────────────────────────────────────
+
+export async function telechargerRapportIADocx(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const { contenu, titre } = req.body as { contenu?: string; titre?: string };
+  if (!contenu) { res.status(400).json({ erreur: "Contenu manquant" }); return; }
+
+  try {
+    const VERT  = "1A4731";
+    const GRIS  = "6B7280";
+    const NOIR  = "1F2937";
+    const SPACE = { line: 360, lineRule: "auto" as const }; // interligne 1.5
+
+    /** Supprime les emojis non supportés. */
+    function stripEmoji(s: string): string {
+      return s
+        .replace(/[\u{1F000}-\u{1FFFF}]/gu, "")
+        .replace(/[\u{2600}-\u{27BF}]/gu, "")
+        .replace(/🟢/gu, "[OK]").replace(/🟡/gu, "[~]")
+        .replace(/🔴/gu, "[!]").replace(/✅/gu, "[OK]")
+        .replace(/❌/gu, "[X]").replace(/⚠️/gu, "[!]").replace(/⚠/gu, "[!]");
+    }
+
+    /** Parse le **gras** inline → TextRun[]. */
+    function parseInline(text: string, sz = 24, color = NOIR): TextRun[] {
+      const clean = stripEmoji(text)
+        .replace(/\*([^*]+)\*/g, "$1")
+        .replace(/_([^_]+)_/g, "$1");
+      const parts = clean.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+      return parts.map(p => {
+        const bold = p.startsWith("**") && p.endsWith("**");
+        return new TextRun({ text: bold ? p.slice(2, -2) : p, bold, size: sz, color, font: "Calibri" });
+      });
+    }
+
+    /** Construit un vrai tableau Word depuis les lignes Markdown buffurisées. */
+    function buildTable(rows: string[]): Table | null {
+      const data = rows.filter(r => !/^\|[\s\-:|]+\|$/.test(r.trim()));
+      if (!data.length) return null;
+      const parsed = data.map(r =>
+        r.split("|").slice(1, -1).map(c =>
+          stripEmoji(c.trim().replace(/\*\*/g, "").replace(/\*/g, ""))
+        )
+      );
+      const colCount = Math.max(...parsed.map(r => r.length));
+      const pct      = Math.floor(5000 / colCount);
+
+      return new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: {
+          top:              { style: BorderStyle.SINGLE, size: 4, color: "A3C4B0" },
+          bottom:           { style: BorderStyle.SINGLE, size: 4, color: "A3C4B0" },
+          left:             { style: BorderStyle.SINGLE, size: 4, color: "A3C4B0" },
+          right:            { style: BorderStyle.SINGLE, size: 4, color: "A3C4B0" },
+          insideHorizontal: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+          insideVertical:   { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+        },
+        rows: parsed.map((cells, rIdx) => {
+          const isHeader = rIdx === 0;
+          return new TableRow({
+            tableHeader: isHeader,
+            children: Array.from({ length: colCount }, (_, c) =>
+              new TableCell({
+                width: { size: pct, type: WidthType.PERCENTAGE },
+                shading: isHeader
+                  ? { fill: "E8F4ED", type: ShadingType.SOLID }
+                  : rIdx % 2 !== 0
+                    ? { fill: "F9FAFB", type: ShadingType.SOLID }
+                    : undefined,
+                margins: { top: 80, bottom: 80, left: 100, right: 100 },
+                children: [new Paragraph({
+                  children: [new TextRun({
+                    text: cells[c] ?? "",
+                    bold: isHeader,
+                    color: isHeader ? VERT : NOIR,
+                    size: 20,
+                    font: "Calibri",
+                  })],
+                  spacing: { line: 276, lineRule: "auto" },
+                })],
+              })
+            ),
+          });
+        }),
+      });
+    }
+
+    // ── Parsing Markdown → éléments docx ─────────────────────────────────────
+    const lines    = contenu.split("\n");
+    const children: (Paragraph | Table)[] = [];
+    let   tableBuf: string[] = [];
+
+    function flushTable(): void {
+      if (!tableBuf.length) return;
+      const t = buildTable(tableBuf);
+      if (t) {
+        children.push(t);
+        children.push(new Paragraph({ children: [], spacing: { after: 140 } }));
+      }
+      tableBuf = [];
+    }
+
+    // Titre du document
+    children.push(new Paragraph({
+      children: [new TextRun({ text: titre ?? "Rapport de gestion", bold: true, size: 40, color: VERT, font: "Calibri" })],
+      spacing: { after: 400 },
+      alignment: AlignmentType.CENTER,
+    }));
+
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+
+      if (line.startsWith("|")) { tableBuf.push(line); continue; }
+      flushTable();
+
+      if (line.startsWith("## ")) {
+        children.push(new Paragraph({
+          heading: HeadingLevel.HEADING_1,
+          children: [new TextRun({ text: line.slice(3).toUpperCase(), bold: true, size: 30, color: VERT, font: "Calibri" })],
+          spacing: { before: 440, after: 120 },
+          pageBreakBefore: true,
+        }));
+      } else if (line.startsWith("### ")) {
+        children.push(new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          children: [new TextRun({ text: line.slice(4), bold: true, size: 26, color: VERT, font: "Calibri" })],
+          spacing: { before: 280, after: 100 },
+        }));
+      } else if (line.startsWith("#### ")) {
+        children.push(new Paragraph({
+          heading: HeadingLevel.HEADING_3,
+          children: [new TextRun({ text: line.slice(5), bold: true, size: 24, color: GRIS, font: "Calibri" })],
+          spacing: { before: 180, after: 80 },
+        }));
+      } else if (line.startsWith("- ") || line.startsWith("* ")) {
+        children.push(new Paragraph({
+          bullet: { level: 0 },
+          children: parseInline(line.slice(2)),
+          spacing: { ...SPACE, after: 60 },
+        }));
+      } else if (/^\d+\.\s/.test(line)) {
+        children.push(new Paragraph({
+          numbering: { reference: "ol", level: 0 },
+          children: parseInline(line.replace(/^\d+\.\s/, "")),
+          spacing: { ...SPACE, after: 60 },
+        }));
+      } else if (line.startsWith("---")) {
+        children.push(new Paragraph({
+          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "E5E7EB" } },
+          children: [],
+          spacing: { before: 100, after: 100 },
+        }));
+      } else if (line.trim() === "") {
+        children.push(new Paragraph({ children: [], spacing: { after: 100 } }));
+      } else {
+        children.push(new Paragraph({
+          children: parseInline(line),
+          spacing: { ...SPACE, after: 80 },
+        }));
+      }
+    }
+    flushTable();
+
+    const doc = new Document({
+      numbering: {
+        config: [{
+          reference: "ol",
+          levels: [{
+            level: 0,
+            format: "decimal",
+            text: "%1.",
+            alignment: AlignmentType.START,
+            style: { paragraph: { indent: { left: 720, hanging: 360 } } },
+          }],
+        }],
+      },
+      sections: [{ properties: {}, children }],
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+    const safeName = (titre ?? "rapport_gestion").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}.docx"`);
+    res.setHeader("Content-Length", String(buffer.length));
+    res.end(buffer);
+  } catch (err) {
+    req.log.error({ err }, "Erreur telechargerRapportIADocx");
+    res.status(500).json({ erreur: "Erreur génération Word" });
   }
 }

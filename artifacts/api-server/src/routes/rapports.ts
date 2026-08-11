@@ -16,6 +16,7 @@ import {
   getEtatPartsSociales,
   genererRapportIA,
   telechargerRapportIAPdf,
+  telechargerRapportIADocx,
 } from "../controllers/rapportsController";
 
 const router: IRouter = Router();
@@ -37,5 +38,6 @@ router.get("/rapports/recu/parts/:id",      checkPermission("reporting", "genere
 
 router.post("/rapports/ia/generer",  checkPermission("reporting", "generer_rapport_ia"), genererRapportIA);
 router.post("/rapports/ia/pdf",      checkPermission("reporting", "generer_rapport_ia"), telechargerRapportIAPdf);
+router.post("/rapports/ia/docx",     checkPermission("reporting", "generer_rapport_ia"), telechargerRapportIADocx);
 
 export default router;
