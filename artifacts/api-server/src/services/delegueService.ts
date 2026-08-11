@@ -4,11 +4,8 @@ import {
   membresTable,
   livraisonsTable,
   paiementsTable,
-  caissesDeleguesTable,
-  mouvementsCaisseDelegueTable,
   caissesTable,
   mouvementsCaisseTable,
-  alimentationsCaisseDelegueTable,
   campagnesTable,
 } from "@workspace/db";
 import { and, eq, sql, desc } from "drizzle-orm";
@@ -21,21 +18,6 @@ function toNum(v: unknown): number {
 
 // ─── Caisse du délégué ──────────────────────────────────────────────────────
 
-export async function getOrCreateCaisse(agentId: number, cooperativeId: number) {
-  const [existing] = await db
-    .select()
-    .from(caissesDeleguesTable)
-    .where(eq(caissesDeleguesTable.userId, agentId))
-    .limit(1);
-  if (existing) return existing;
-
-  const [created] = await db
-    .insert(caissesDeleguesTable)
-    .values({ userId: agentId, cooperativeId, solde: "0" })
-    .returning();
-  return created!;
-}
-
 export async function debiterCaisseDelegue(
   agentId: number,
   cooperativeId: number,
@@ -43,7 +25,17 @@ export async function debiterCaisseDelegue(
   paiementId: number,
   livraisonId: number | null,
 ): Promise<{ nouveauSolde: number }> {
-  const caisse = await getOrCreateCaisse(agentId, cooperativeId);
+  const [caisse] = await db
+    .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, agentId),
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!caisse) throw new Error("Aucune caisse configurée pour ce délégué");
   const soldeActuel = toNum(caisse.solde);
 
   if (soldeActuel < montantFcfa) {
@@ -54,18 +46,20 @@ export async function debiterCaisseDelegue(
 
   const nouveauSolde = soldeActuel - montantFcfa;
 
-  await db.update(caissesDeleguesTable)
-    .set({ solde: String(nouveauSolde), updatedAt: new Date() })
-    .where(eq(caissesDeleguesTable.id, caisse.id));
+  await db.update(caissesTable)
+    .set({ soldeActuelFcfa: String(nouveauSolde) })
+    .where(eq(caissesTable.id, caisse.id));
 
-  await db.insert(mouvementsCaisseDelegueTable).values({
-    caisseDelegueId: caisse.id,
+  await db.insert(mouvementsCaisseTable).values({
+    caisseId: caisse.id,
+    cooperativeId,
     type: "sortie",
-    montantFcfa: String(-montantFcfa),
+    motif: "paiement_producteur",
+    montantFcfa: String(montantFcfa),
+    libelle: `Paiement producteur PAI-${paiementId}`,
+    referenceOperation: livraisonId ? `LIV-${livraisonId}` : null,
     soldeApresFcfa: String(nouveauSolde),
-    livraisonId: livraisonId ?? null,
-    note: `Paiement producteur PAI-${paiementId}`,
-    createdById: agentId,
+    enregistrePar: agentId,
   });
 
   logger.info({ agentId, paiementId, montantFcfa, nouveauSolde }, "Caisse délégué débitée (paiement producteur)");
@@ -73,7 +67,15 @@ export async function debiterCaisseDelegue(
 }
 
 export async function getCaisseDelegue(agentId: number, cooperativeId: number) {
-  const caisse = await getOrCreateCaisse(agentId, cooperativeId);
+  const [caisse] = await db
+    .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, agentId),
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
 
   const [differes] = await db
     .select({ nb: sql<number>`COUNT(*)` })
@@ -92,9 +94,9 @@ export async function getCaisseDelegue(agentId: number, cooperativeId: number) {
     ));
 
   return {
-    id: caisse.id,
-    solde: toNum(caisse.solde),
-    plafond: caisse.plafond ? toNum(caisse.plafond) : null,
+    id: caisse?.id ?? 0,
+    solde: caisse ? toNum(caisse.solde) : 0,
+    plafond: null as number | null,
     paiementsDifferesCount: Number(differes?.nb ?? 0),
     montantDuFcfa: toNum(montantDu?.total),
   };
@@ -108,20 +110,37 @@ export async function approvisionnerCaisse(
   adminId: number,
 ) {
   if (montantFcfa <= 0) throw new Error("Le montant doit être positif");
-  const caisse = await getOrCreateCaisse(agentId, cooperativeId);
+
+  // Source de vérité unique : caissesTable (créée depuis la page Caisse admin)
+  const [caisse] = await db
+    .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, agentId),
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!caisse) {
+    throw new Error("Aucune caisse n'a été créée pour ce délégué. Veuillez d'abord créer une caisse depuis la page Caisse.");
+  }
+
   const nouveauSolde = toNum(caisse.solde) + montantFcfa;
 
-  await db.update(caissesDeleguesTable)
-    .set({ solde: String(nouveauSolde), updatedAt: new Date() })
-    .where(eq(caissesDeleguesTable.id, caisse.id));
+  await db.update(caissesTable)
+    .set({ soldeActuelFcfa: String(nouveauSolde) })
+    .where(eq(caissesTable.id, caisse.id));
 
-  await db.insert(mouvementsCaisseDelegueTable).values({
-    caisseDelegueId: caisse.id,
-    type: "approvisionnement",
+  await db.insert(mouvementsCaisseTable).values({
+    caisseId: caisse.id,
+    cooperativeId,
+    type: "entree",
+    motif: "approvisionnement",
     montantFcfa: String(montantFcfa),
+    libelle: note ?? "Approvisionnement par admin",
     soldeApresFcfa: String(nouveauSolde),
-    note: note ?? `Approvisionnement par admin`,
-    createdById: adminId,
+    enregistrePar: adminId,
   });
 
   return { solde: nouveauSolde };
@@ -179,7 +198,18 @@ export async function regulariserPaiement(
   if (!livraison) throw new Error("Paiement différé introuvable");
 
   const montant = toNum(livraison.montantRestant);
-  const caisse = await getOrCreateCaisse(agentId, cooperativeId);
+  // Source de vérité unique : caissesTable
+  const [caisse] = await db
+    .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, agentId),
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!caisse) throw new Error("Aucune caisse configurée pour ce délégué");
 
   if (toNum(caisse.solde) < montant) {
     throw new Error(`Fonds insuffisants — solde : ${toNum(caisse.solde).toLocaleString("fr-FR")} FCFA, requis : ${montant.toLocaleString("fr-FR")} FCFA`);
@@ -198,18 +228,19 @@ export async function regulariserPaiement(
       eq(paiementsTable.statut, "en_attente"),
     ));
 
-  await db.update(caissesDeleguesTable)
-    .set({ solde: String(nouveauSolde), updatedAt: new Date() })
-    .where(eq(caissesDeleguesTable.id, caisse.id));
+  await db.update(caissesTable)
+    .set({ soldeActuelFcfa: String(nouveauSolde) })
+    .where(eq(caissesTable.id, caisse.id));
 
-  await db.insert(mouvementsCaisseDelegueTable).values({
-    caisseDelegueId: caisse.id,
-    type: "regularisation",
-    montantFcfa: String(-montant),
+  await db.insert(mouvementsCaisseTable).values({
+    caisseId: caisse.id,
+    cooperativeId,
+    type: "sortie",
+    motif: "regularisation",
+    montantFcfa: String(montant),
+    libelle: `Régularisation paiement LIV-${livraisonId}`,
     soldeApresFcfa: String(nouveauSolde),
-    livraisonId,
-    note: `Régularisation paiement LIV-${livraisonId}`,
-    createdById: agentId,
+    enregistrePar: agentId,
   });
 
   return { solde: nouveauSolde, montantPayeFcfa: montant };
@@ -246,21 +277,9 @@ export async function listDelegues(cooperativeId: number) {
       ))
       .limit(1);
 
-    // Repli sur caissesDeleguesTable (système terrain) si pas de caisse principale
-    let soldeCaisse = 0;
-    let caisseId: number | null = null;
-    if (caissePrincipale) {
-      soldeCaisse = toNum(caissePrincipale.solde);
-      caisseId = caissePrincipale.id;
-    } else {
-      const [caisseTerrain] = await db
-        .select({ id: caissesDeleguesTable.id, solde: caissesDeleguesTable.solde })
-        .from(caissesDeleguesTable)
-        .where(eq(caissesDeleguesTable.userId, a.id))
-        .limit(1);
-      soldeCaisse = toNum(caisseTerrain?.solde ?? "0");
-      caisseId = caisseTerrain?.id ?? null;
-    }
+    // Source de vérité unique : caissesTable (créée depuis la page Caisse admin)
+    const soldeCaisse = caissePrincipale ? toNum(caissePrincipale.solde) : 0;
+    const caisseId = caissePrincipale?.id ?? null;
 
     const [differes] = await db
       .select({ nb: sql<number>`COUNT(*)`, total: sql<string>`COALESCE(SUM(${livraisonsTable.montantRestant}), 0)` })
@@ -342,25 +361,10 @@ export async function getDetailCaisse(agentId: number, cooperativeId: number) {
       createdAt: m.createdAt,
     }));
   } else {
-    // Repli terrain
-    const caisseFallback = await getOrCreateCaisse(agentId, cooperativeId);
-    caisseId = caisseFallback.id;
-    soldeCaisse = toNum(caisseFallback.solde);
-    const rows = await db
-      .select()
-      .from(mouvementsCaisseDelegueTable)
-      .where(eq(mouvementsCaisseDelegueTable.caisseDelegueId, caisseFallback.id))
-      .orderBy(desc(mouvementsCaisseDelegueTable.createdAt))
-      .limit(50);
-    mappedMouvements = rows.map((m) => ({
-      id: m.id,
-      type: m.type,
-      montantFcfa: toNum(m.montantFcfa),
-      soldeApresFcfa: toNum(m.soldeApresFcfa),
-      note: m.note,
-      livraisonId: m.livraisonId,
-      createdAt: m.createdAt,
-    }));
+    // Aucune caisse officielle créée pour ce délégué
+    caisseId = 0;
+    soldeCaisse = 0;
+    mappedMouvements = [];
   }
 
   const differes = await getPaiementsDifferes(agentId, cooperativeId);
@@ -437,9 +441,22 @@ export async function alimenterDepuisCaissePrincipale(
   if (!agent) throw new Error("Délégué introuvable");
   const nomDelegue = `${agent.nom} ${agent.prenoms ?? ""}`.trim();
 
-  // 3. Caisse du délégué
-  const caisse = await getOrCreateCaisse(agentId, coopId);
-  const ancienSolde = toNum(caisse.solde);
+  // 3. Caisse du délégué (source de vérité unique : caissesTable)
+  const [caisseDelegue] = await db
+    .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, agentId),
+      eq(caissesTable.cooperativeId, coopId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!caisseDelegue) {
+    throw new Error("Aucune caisse n'a été créée pour ce délégué. Veuillez d'abord créer une caisse depuis la page Caisse.");
+  }
+
+  const ancienSolde = toNum(caisseDelegue.solde);
   const nouveauSolde = ancienSolde + montantFcfa;
   const nouveauSoldeSource = soldeSource - montantFcfa;
 
@@ -456,45 +473,35 @@ export async function alimenterDepuisCaissePrincipale(
   `);
   const sessionId = sessionResult.rows[0]?.id;
 
-  if (sessionId) {
-    await db.insert(mouvementsCaisseTable).values({
-      caisseId: caisseSourceId,
-      sessionId,
-      cooperativeId: coopId,
-      type: "sortie",
-      motif: "alimentation_delegue",
-      montantFcfa: String(montantFcfa),
-      libelle: `Alimentation caisse délégué ${nomDelegue}`,
-      soldeApresFcfa: String(nouveauSoldeSource),
-      enregistrePar: adminId,
-    });
-  }
-
-  // 5. Créditer la caisse déléguée
-  await db.update(caissesDeleguesTable)
-    .set({ solde: String(nouveauSolde), updatedAt: new Date() })
-    .where(eq(caissesDeleguesTable.id, caisse.id));
-
-  await db.insert(mouvementsCaisseDelegueTable).values({
-    caisseDelegueId: caisse.id,
-    type: "approvisionnement",
-    montantFcfa: String(montantFcfa),
-    soldeApresFcfa: String(nouveauSolde),
-    note: motif || `Alimentation depuis caisse principale`,
-    createdById: adminId,
-  });
-
-  // 6. Enregistrer l'alimentation
-  await db.insert(alimentationsCaisseDelegueTable).values({
+  await db.insert(mouvementsCaisseTable).values({
+    caisseId: caisseSourceId,
+    sessionId: sessionId ?? null,
     cooperativeId: coopId,
-    caisseDelegueId: caisse.id,
-    caisseSourceId,
+    type: "sortie",
+    motif: "alimentation_delegue",
     montantFcfa: String(montantFcfa),
-    motif,
-    statut: "confirme",
-    envoyePar: adminId,
-    dateEnvoi: new Date(),
+    libelle: `Alimentation caisse délégué ${nomDelegue}`,
+    soldeApresFcfa: String(nouveauSoldeSource),
+    enregistrePar: adminId,
   });
+
+  // 5. Créditer la caisse du délégué (caissesTable)
+  await db.update(caissesTable)
+    .set({ soldeActuelFcfa: String(nouveauSolde) })
+    .where(eq(caissesTable.id, caisseDelegue.id));
+
+  await db.insert(mouvementsCaisseTable).values({
+    caisseId: caisseDelegue.id,
+    cooperativeId: coopId,
+    type: "entree",
+    motif: "alimentation_delegue",
+    montantFcfa: String(montantFcfa),
+    libelle: motif || `Alimentation depuis caisse principale`,
+    soldeApresFcfa: String(nouveauSolde),
+    enregistrePar: adminId,
+  });
+
+  // 6. Log d'alimentation (traçabilité sans FK vers caisses_delegues)
 
   // 7. Notification délégué (alimentation caisse)
   void creerNotification(coopId, [agentId], {
@@ -526,18 +533,29 @@ export async function cloturerJournee(
   montantRecu: number;
   montantPaye: number;
 }> {
-  const caisse = await getOrCreateCaisse(agentId, coopId);
+  const [caisse] = await db
+    .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, agentId),
+      eq(caissesTable.cooperativeId, coopId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!caisse) throw new Error("Aucune caisse configurée pour ce délégué");
+
   const [agent] = await db
     .select({ nom: usersTable.nom, prenoms: usersTable.prenoms, telephone: usersTable.telephone, section: usersTable.section })
     .from(usersTable).where(eq(usersTable.id, agentId)).limit(1);
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Calculer totaux du jour depuis mouvements caisse déléguée
+  // Calculer totaux du jour depuis mouvements_caisse (source unique)
   const statsResult = await db.execute<{ type: string; total: string }>(sql`
     SELECT type, SUM(ABS(montant_fcfa)) as total
-    FROM mouvements_caisse_delegue
-    WHERE caisse_delegue_id = ${caisse.id}
+    FROM mouvements_caisse
+    WHERE caisse_id = ${caisse.id}
       AND DATE(created_at AT TIME ZONE 'UTC') = ${today}
     GROUP BY type
   `);
@@ -545,7 +563,7 @@ export async function cloturerJournee(
   let montantRecu = 0;
   let montantPaye = 0;
   for (const r of statsResult.rows) {
-    if (r.type === "approvisionnement") montantRecu += toNum(r.total);
+    if (r.type === "entree") montantRecu += toNum(r.total);
     else montantPaye += toNum(r.total);
   }
 

@@ -2,7 +2,7 @@ import { db } from "@workspace/db";
 import {
   usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable,
   distributionsIntrantsTable, historiquePrixTable, campagnesTable,
-  caissesDeleguesTable, mouvementsCaisseDelegueTable, sessionsPeseeTable,
+  caissesTable, mouvementsCaisseTable, sessionsPeseeTable,
   entrepotsTable, mouvementsStockTable,
 } from "@workspace/db";
 import { and, eq, sql, desc, or, isNull } from "drizzle-orm";
@@ -330,29 +330,24 @@ export async function enregistrerCollecte(
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Vérifier la caisse du délégué
-  // Si l'agent est un peseur, il n'a pas de caisse propre → utiliser la caisse de son délégué rattaché
-  let [caisse] = await db
-    .select()
-    .from(caissesDeleguesTable)
-    .where(eq(caissesDeleguesTable.userId, agentId))
+  // Vérifier la caisse du délégué (source de vérité unique : caissesTable).
+  // Si l'agent est un peseur rattaché à un délégué, utiliser la caisse du délégué.
+  const [agentRow] = await db
+    .select({ delegueId: usersTable.delegueId })
+    .from(usersTable)
+    .where(eq(usersTable.id, agentId))
     .limit(1);
+  const effectiveDelegueId = agentRow?.delegueId ?? agentId;
 
-  if (!caisse) {
-    // L'agent est peut-être un peseur → chercher son délégué via users.delegue_id
-    const [agentRow] = await db
-      .select({ delegueId: usersTable.delegueId })
-      .from(usersTable)
-      .where(eq(usersTable.id, agentId))
-      .limit(1);
-    if (agentRow?.delegueId) {
-      [caisse] = await db
-        .select()
-        .from(caissesDeleguesTable)
-        .where(eq(caissesDeleguesTable.userId, agentRow.delegueId))
-        .limit(1);
-    }
-  }
+  const [caisse] = await db
+    .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, effectiveDelegueId),
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
 
   const soldeCaisse = caisse ? Number(caisse.solde) : 0;
   const paiementImmediat = soldeCaisse >= montantNet;
@@ -403,20 +398,21 @@ export async function enregistrerCollecte(
     statut: paiementImmediat ? "confirme" : "en_attente",
   });
 
-  // Débiter la caisse si paiement immédiat
+  // Débiter la caisse si paiement immédiat (caissesTable — source de vérité unique)
   if (paiementImmediat && caisse) {
     const nouveauSolde = soldeCaisse - montantNet;
-    await db.update(caissesDeleguesTable)
-      .set({ solde: String(nouveauSolde), updatedAt: new Date() })
-      .where(eq(caissesDeleguesTable.id, caisse.id));
-    await db.insert(mouvementsCaisseDelegueTable).values({
-      caisseDelegueId: caisse.id,
-      type: "paiement_collecte",
-      montantFcfa: String(-montantNet),
+    await db.update(caissesTable)
+      .set({ soldeActuelFcfa: String(nouveauSolde) })
+      .where(eq(caissesTable.id, caisse.id));
+    await db.insert(mouvementsCaisseTable).values({
+      caisseId: caisse.id,
+      cooperativeId,
+      type: "sortie",
+      motif: "paiement_collecte",
+      montantFcfa: String(montantNet),
+      libelle: `Paiement collecte LIV-${livraison.id}`,
       soldeApresFcfa: String(nouveauSolde),
-      livraisonId: livraison.id,
-      note: `Paiement collecte LIV-${livraison.id}`,
-      createdById: agentId,
+      enregistrePar: agentId,
     });
   }
 

@@ -30,37 +30,9 @@ export async function getCaisses(req: Request, res: Response): Promise<void> {
   const responsableId = role === "delegue" ? userId : undefined;
   try {
     const caisses = await svc.listCaisses(cooperativeId, responsableId);
-
-    // Fallback : si aucune caisse dans le système principal (caisses table),
-    // on cherche dans caisses_delegues — le système terrain du délégué.
-    // Cela couvre le cas où la coopérative voit la caisse via l'onglet
-    // "Caisses déléguées" (caisses_delegues) alors que le délégué n'a pas
-    // de caisse attribuée dans la table principale.
-    if (role === "delegue" && userId && caisses.length === 0) {
-      const [cd] = await db
-        .select()
-        .from(caissesDeleguesTable)
-        .where(eq(caissesDeleguesTable.userId, userId))
-        .limit(1);
-      if (cd) {
-        res.json([{
-          id:                      cd.id,
-          nom:                     "Ma caisse",
-          type_caisse:             "deleguee",
-          responsable_id:          userId,
-          responsable_nom:         null,
-          solde_actuel_fcfa:       (cd.solde ?? "0").toString(),
-          fond_caisse_minimum_fcfa: "0",
-          actif:                   true,
-          session_id:              null,
-          session_statut:          null,
-          heure_ouverture:         null,
-          solde_ouverture_fcfa:    null,
-        }]);
-        return;
-      }
-    }
-
+    // Source de vérité unique : caissesTable (créée depuis la page Caisse admin).
+    // Si aucune caisse n'existe pour ce délégué, on retourne [] — pas de fallback
+    // sur caisses_delegues (voir règle : une caisse = une référence en base).
     res.json(caisses);
   } catch (err) {
     req.log.error({ err }, "getCaisses");
