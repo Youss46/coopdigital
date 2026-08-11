@@ -904,6 +904,7 @@ export default function TracabilitePage() {
   const [lotDetail, setLotDetail] = useState<number | null>(null);
   const [showFusion, setShowFusion] = useState(false);
   const [quantiteCibleInput, setQuantiteCibleInput] = useState<string>("");
+  const [toleranceInput, setToleranceInput] = useState<string>("5");
   const [autoSelectLoading, setAutoSelectLoading] = useState(false);
 
   const { data: lots = [], isLoading } = useGetLots({
@@ -1212,8 +1213,8 @@ export default function TracabilitePage() {
             <p className="text-xs text-gray-500 mb-4">
               Indiquez la quantité souhaitée. Les livraisons disponibles seront sélectionnées automatiquement, des plus anciennes aux plus récentes.
             </p>
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
+            <div className="flex items-end gap-3 flex-wrap">
+              <div className="flex-1 min-w-[140px]">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Quantité cible (kg)
                 </label>
@@ -1225,6 +1226,21 @@ export default function TracabilitePage() {
                   onChange={(e) => setQuantiteCibleInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAutoSelect()}
                   placeholder="ex : 45000"
+                  className="w-full border border-green-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 bg-white"
+                />
+              </div>
+              <div className="w-28">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Tolérance (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.5"
+                  value={toleranceInput}
+                  onChange={(e) => setToleranceInput(e.target.value)}
+                  placeholder="ex : 5"
                   className="w-full border border-green-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 bg-white"
                 />
               </div>
@@ -1240,20 +1256,25 @@ export default function TracabilitePage() {
             {/* Progression poids sélectionné / cible */}
             {(() => {
               const cible = quantiteCibleInput ? parseFloat(quantiteCibleInput) : null;
+              const tolerancePct = toleranceInput ? Math.max(0, parseFloat(toleranceInput)) : 0;
+              const cibleMax = cible !== null ? cible * (1 + tolerancePct / 100) : null;
               const depasse = cible !== null && poidsSelectionne > cible;
+              const horsTolérance = cible !== null && cibleMax !== null && poidsSelectionne > cibleMax;
+              const dansTolerance = depasse && !horsTolérance;
               const pct = cible !== null && cible > 0 ? Math.min((poidsSelectionne / cible) * 100, 100) : null;
+              const ecart = cible !== null ? poidsSelectionne - cible : 0;
               return (
                 <div className="mt-4">
                   <div className="flex items-baseline justify-between mb-1">
                     <span className="text-xs font-medium text-gray-600">Poids sélectionné</span>
-                    <span className={`text-sm font-semibold tabular-nums ${depasse ? "text-red-600" : "text-[#1a4731]"}`}>
+                    <span className={`text-sm font-semibold tabular-nums ${horsTolérance ? "text-red-600" : dansTolerance ? "text-amber-600" : "text-[#1a4731]"}`}>
                       {poidsSelectionne.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kg
                       {cible !== null && (
                         <span className="text-gray-400 font-normal">
                           {" "}/ {cible.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kg
                           {" "}
-                          <span className={depasse ? "text-red-500" : "text-green-700"}>
-                            ({depasse ? "+" : ""}{(poidsSelectionne - (cible ?? 0)).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kg)
+                          <span className={horsTolérance ? "text-red-500" : dansTolerance ? "text-amber-500" : "text-green-700"}>
+                            ({depasse ? "+" : ""}{ecart.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kg)
                           </span>
                         </span>
                       )}
@@ -1262,15 +1283,17 @@ export default function TracabilitePage() {
                   {pct !== null && (
                     <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                       <div
-                        className={`h-2 rounded-full transition-all duration-300 ${depasse ? "bg-red-500" : "bg-green-600"}`}
+                        className={`h-2 rounded-full transition-all duration-300 ${horsTolérance ? "bg-red-500" : dansTolerance ? "bg-amber-400" : "bg-green-600"}`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
                   )}
                   {pct !== null && (
-                    <p className={`text-xs mt-1 ${depasse ? "text-red-500" : "text-green-700"}`}>
-                      {depasse
-                        ? `Dépassement de ${(poidsSelectionne - (cible ?? 0)).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kg`
+                    <p className={`text-xs mt-1 ${horsTolérance ? "text-red-500" : dansTolerance ? "text-amber-600" : "text-green-700"}`}>
+                      {horsTolérance
+                        ? `Dépassement hors tolérance : +${ecart.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kg (limite ±${tolerancePct}%)`
+                        : dansTolerance
+                        ? `Dépassement dans la tolérance : +${ecart.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kg (±${tolerancePct}% accepté)`
                         : `${pct.toFixed(1)} % de la cible atteint`}
                     </p>
                   )}
