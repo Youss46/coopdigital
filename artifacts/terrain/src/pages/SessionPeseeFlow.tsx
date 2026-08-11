@@ -45,12 +45,16 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const [confirmAnnuler, setConfirmAnnuler] = useState(false);
   const [confirmTerminer, setConfirmTerminer] = useState(false);
 
-  // IDs des membres ayant déjà une session en cours (pour le badge dans la liste)
-  const [activeSessionIds, setActiveSessionIds] = useState<Set<number>>(new Set());
+  // Map membreId → sessionId pour les sessions actives (badge + reprise directe)
+  const [activeSessions, setActiveSessions] = useState<Map<number, number>>(new Map());
   useEffect(() => {
     if (!isOnline) return;
     getSessionsEnCours().then((sessions) => {
-      setActiveSessionIds(new Set(sessions.map((s) => s.membreId).filter((id): id is number => id !== null)));
+      const map = new Map<number, number>();
+      for (const s of sessions) {
+        if (s.membreId !== null && s.id !== undefined) map.set(s.membreId, s.id);
+      }
+      setActiveSessions(map);
     }).catch(() => { /* silencieux */ });
   }, [isOnline]);
 
@@ -110,7 +114,22 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     })();
   }, [fournisseur, isOnline]);
 
-  // ── Sélection du membre ────────────────────────────────────────────────────
+  // ── Reprise directe depuis le badge "Session en cours" ────────────────────
+  async function handleSelectActiveSession(f: Fournisseur, sessionId: number) {
+    setFournisseur(f);
+    setErreur("");
+    if (!isOnline) { setErreur("La pesée groupée requiert une connexion internet"); return; }
+    try {
+      const detail = await getSessionDetail(sessionId);
+      setSession(detail);
+      setStep("session");
+    } catch {
+      // Session clôturée ou expirée entre-temps — reprendre le chemin normal
+      await handleSelectMembre(f);
+    }
+  }
+
+  // ── Sélection du membre (chemin standard) ─────────────────────────────────
   async function handleSelectMembre(f: Fournisseur) {
     setFournisseur(f);
     setErreur("");
@@ -120,25 +139,35 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
       return;
     }
 
-    // Vérifier si session en cours existante
     try {
+      // Chemin rapide : sessionId déjà connu dans le cache local
+      const knownId = activeSessions.get(f.id);
+      if (knownId !== undefined) {
+        try {
+          const detail = await getSessionDetail(knownId);
+          setSession(detail);
+          setStep("session");
+          return;
+        } catch {
+          // Session expirée/annulée — continuer vers le chemin complet
+        }
+      }
+
+      // Chemin complet : vérification API
       const sessions = await getSessionsEnCours(f.id);
       if (sessions.length > 0) {
-        const { getSessionDetail: fetchDetail } = await import("../lib/api");
-        const detail = await fetchDetail(sessions[0]!.id);
+        const detail = await getSessionDetail(sessions[0]!.id);
         setSession(detail);
       } else {
         // Créer une nouvelle session
         try {
           const s = await createSessionPesee({ membreId: f.id, produit: "cacao", operation: "reception" });
-          const { getSessionDetail: fetchDetail } = await import("../lib/api");
-          const detail = await fetchDetail(s.id);
+          const detail = await getSessionDetail(s.id);
           setSession(detail);
         } catch (createErr) {
-          // Race condition: another peseur created a session between our check and our create
+          // Race condition : un autre peseur a créé une session entre le check et le create
           if (createErr instanceof SessionEnCoursError) {
-            const { getSessionDetail: fetchDetail } = await import("../lib/api");
-            const detail = await fetchDetail(createErr.sessionId);
+            const detail = await getSessionDetail(createErr.sessionId);
             setSession(detail);
           } else {
             throw createErr;
@@ -293,7 +322,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             <FournisseurSearch
               title="Choisir le planteur"
               onSelect={handleSelectMembre}
-              activeSessionIds={activeSessionIds}
+              activeSessions={activeSessions}
+              onSelectActiveSession={handleSelectActiveSession}
             />
           </>
         )}

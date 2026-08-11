@@ -7,10 +7,18 @@ import type { Fournisseur } from "../lib/types";
 interface Props {
   onSelect: (f: Fournisseur) => void;
   title?: string;
-  activeSessionIds?: Set<number>;
+  /** membreId → sessionId pour les membres qui ont déjà une session en cours */
+  activeSessions?: Map<number, number>;
+  /** Appelé à la place de onSelect quand le membre a une session active connue */
+  onSelectActiveSession?: (f: Fournisseur, sessionId: number) => void;
 }
 
-export default function FournisseurSearch({ onSelect, title = "Choisir un membre", activeSessionIds }: Props) {
+export default function FournisseurSearch({
+  onSelect,
+  title = "Choisir un membre",
+  activeSessions,
+  onSelectActiveSession,
+}: Props) {
   const { isOnline } = useOffline();
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<Fournisseur[]>([]);
@@ -86,40 +94,48 @@ export default function FournisseurSearch({ onSelect, title = "Choisir un membre
       )}
 
       <div className="t-fournisseur-list">
-        {filtered.map((f) => (
-          <button
-            key={f.id}
-            className="t-fournisseur-item"
-            onClick={() => onSelect(f)}
-          >
-            <div className="t-fournisseur-item__avatar">{initials(f)}</div>
-            <div className="t-fournisseur-item__body">
-              <div className="t-fournisseur-item__name">{f.nom} {f.prenoms}</div>
-              <div className="t-fournisseur-item__sub">
-                {f.code} · {f.telephone}
-                {f.section && ` · ${f.section}`}
+        {filtered.map((f) => {
+          const sessionId = activeSessions?.get(f.id);
+          const hasSession = sessionId !== undefined;
+          return (
+            <button
+              key={f.id}
+              className="t-fournisseur-item"
+              onClick={() =>
+                hasSession && onSelectActiveSession
+                  ? onSelectActiveSession(f, sessionId)
+                  : onSelect(f)
+              }
+            >
+              <div className="t-fournisseur-item__avatar">{initials(f)}</div>
+              <div className="t-fournisseur-item__body">
+                <div className="t-fournisseur-item__name">{f.nom} {f.prenoms}</div>
+                <div className="t-fournisseur-item__sub">
+                  {f.code} · {f.telephone}
+                  {f.section && ` · ${f.section}`}
+                </div>
+                <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {hasSession && (
+                    <span className="t-badge t-badge--warning" style={{ fontWeight: 700 }}>
+                      🟡 Session en cours — Reprendre
+                    </span>
+                  )}
+                  {f.avanceEnCours > 0 && (
+                    <span className="t-badge t-badge--danger">
+                      Avance {f.avanceEnCours.toLocaleString("fr-FR")} FCFA
+                    </span>
+                  )}
+                  {f.intrantsDus > 0 && (
+                    <span className="t-badge t-badge--warning">
+                      Intrants {f.intrantsDus.toLocaleString("fr-FR")} FCFA
+                    </span>
+                  )}
+                </div>
               </div>
-              <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {activeSessionIds?.has(f.id) && (
-                  <span className="t-badge t-badge--warning" style={{ fontWeight: 700 }}>
-                    🟡 Session en cours
-                  </span>
-                )}
-                {f.avanceEnCours > 0 && (
-                  <span className="t-badge t-badge--danger">
-                    Avance {f.avanceEnCours.toLocaleString("fr-FR")} FCFA
-                  </span>
-                )}
-                {f.intrantsDus > 0 && (
-                  <span className="t-badge t-badge--warning">
-                    Intrants {f.intrantsDus.toLocaleString("fr-FR")} FCFA
-                  </span>
-                )}
-              </div>
-            </div>
-            <span style={{ color: "#9ca3af", fontSize: "1.2rem" }}>›</span>
-          </button>
-        ))}
+              <span style={{ color: "#9ca3af", fontSize: "1.2rem" }}>›</span>
+            </button>
+          );
+        })}
       </div>
     </>
   );
