@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { FileText, Sparkles, Download, RotateCcw, ChevronDown } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -351,7 +352,38 @@ export default function RapportGestionPage() {
               prose-strong:text-gray-900
               prose-li:text-gray-700
               prose-ul:space-y-1">
-              <ReactMarkdown>{contenu}</ReactMarkdown>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  table: ({ children }) => (
+                    <div className="overflow-x-auto my-4">
+                      <table className="w-full text-sm border-collapse rounded-lg overflow-hidden">
+                        {children}
+                      </table>
+                    </div>
+                  ),
+                  thead: ({ children }) => (
+                    <thead className="bg-[#f0f7f3]">{children}</thead>
+                  ),
+                  th: ({ children }) => (
+                    <th className="text-left text-[#1a4731] font-semibold px-4 py-2.5 border border-[#c6dfd2] whitespace-nowrap">
+                      {children}
+                    </th>
+                  ),
+                  td: ({ children }) => (
+                    <td className="px-4 py-2 border border-gray-100 text-gray-700 align-top">
+                      {children}
+                    </td>
+                  ),
+                  tr: ({ children }) => (
+                    <tr className="even:bg-gray-50 hover:bg-[#f8fcfa] transition-colors">
+                      {children}
+                    </tr>
+                  ),
+                }}
+              >
+                {contenu}
+              </ReactMarkdown>
             </div>
             {generating && (
               <span className="inline-block w-0.5 h-4 bg-[#1a4731] animate-pulse ml-0.5 align-middle" />
