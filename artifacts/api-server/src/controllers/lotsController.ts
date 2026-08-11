@@ -19,6 +19,7 @@ const livraisonSelect = {
   id: livraisonsTable.id,
   membreId: livraisonsTable.membreId,
   poidsKg: livraisonsTable.poidsKg,
+  produitBrutKg: livraisonsTable.produitBrutKg,
   prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
   montantBrutFcfa: livraisonsTable.montantBrutFcfa,
   avanceDeduiteFcfa: livraisonsTable.avanceDeduiteFcfa,

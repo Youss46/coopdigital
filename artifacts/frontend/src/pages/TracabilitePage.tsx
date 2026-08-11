@@ -292,7 +292,7 @@ function DetailModal({
         superficie_declaree_ha: p.superficieDeclareeHa ? parseFloat(String(p.superficieDeclareeHa)) : null,
         poids_kg: data.livraisons
           .filter((l) => l.membreId === p.membreId)
-          .reduce((s, l) => s + parseFloat(String(l.poidsKg)), 0),
+          .reduce((s, l) => s + parseFloat(String(l.produitBrutKg ?? l.poidsKg)), 0),
         eudr_statut: p.eudrStatut ?? "non_verifie",
         eudr_risque: p.eudrRisqueDeforestation ?? "inconnu",
       })),
@@ -345,7 +345,7 @@ function DetailModal({
       if (!acc[k]) {
         acc[k] = { nom: l.membreNom ?? "", prenoms: l.membrePrenoms ?? "", poids: 0, montant: 0, nb: 0 };
       }
-      acc[k]!.poids += parseFloat(l.poidsKg);
+      acc[k]!.poids += parseFloat(String(l.produitBrutKg ?? l.poidsKg));
       acc[k]!.montant += l.montantNetFcfa;
       acc[k]!.nb += 1;
       return acc;
@@ -727,7 +727,7 @@ function DetailModal({
                             <td className="px-3 py-2 font-medium text-gray-800">
                               {l.membreNom} {l.membrePrenoms}
                             </td>
-                            <td className="px-3 py-2 text-gray-700">{formaterPoids(l.poidsKg)}</td>
+                            <td className="px-3 py-2 text-gray-700">{formaterPoids(l.produitBrutKg ?? l.poidsKg)}</td>
                             <td className="px-3 py-2 text-gray-600 hidden sm:table-cell">
                               {formaterMontant(l.montantNetFcfa)}
                             </td>
