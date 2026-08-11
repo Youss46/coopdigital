@@ -994,13 +994,21 @@ export default function TracabilitePage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({ quantiteCibleKg: cible, pourFournisseurs }),
       });
-      const data = await res.json() as { erreur?: string; livraisonIds: number[]; poidsTotalKg: number; nbLivraisons: number; deficitKg: number; nombreSacsTotal: number };
+      const data = await res.json() as { erreur?: string; livraisonIds: number[]; poidsTotalKg: number; nbLivraisons: number; nbDisponibles: number; deficitKg: number; nombreSacsTotal: number };
       if (!res.ok) {
         toast({ title: "Erreur", description: data.erreur ?? "Impossible de calculer la sélection", variant: "destructive" });
         return;
       }
       if (data.nbLivraisons === 0) {
-        toast({ title: "Aucune livraison disponible", description: "Il n'y a pas de livraisons non lotées pour atteindre cette quantité.", variant: "destructive" });
+        if (data.nbDisponibles === 0) {
+          toast({ title: "Aucune livraison disponible", description: "Il n'y a pas de livraisons non lotées pour cette coopérative.", variant: "destructive" });
+        } else {
+          toast({
+            title: "Quantité cible trop faible",
+            description: `Les ${data.nbDisponibles} livraison${data.nbDisponibles > 1 ? "s" : ""} disponible${data.nbDisponibles > 1 ? "s" : ""} dépassent individuellement votre cible. Augmentez la quantité cible ou sélectionnez manuellement.`,
+            variant: "destructive",
+          });
+        }
         return;
       }
       setSelection(data.livraisonIds);

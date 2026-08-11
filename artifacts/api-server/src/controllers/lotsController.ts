@@ -155,6 +155,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
       livraisonIds: selectedIds,
       poidsTotalKg: Math.round(cumul * 100) / 100,
       nbLivraisons: selectedIds.length,
+      nbDisponibles: disponibles.length,   // total avant filtrage
       deficitKg,
       nombreSacsTotal: totalSacs,
     });
