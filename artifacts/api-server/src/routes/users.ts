@@ -8,11 +8,17 @@ import {
   resetUserPassword,
   deleteUser,
   toggleUserActif,
+  getMesPeseurs,
+  createPeseurParDelegue,
+  togglePeseurActifParDelegue,
 } from "../controllers/usersController";
 
 const router = Router();
 
 router.get("/users", authMiddleware, listUsers);
+router.get("/users/mes-peseurs",                    authMiddleware, getMesPeseurs);
+router.post("/users/peseurs",                       authMiddleware, createPeseurParDelegue);
+router.put("/users/peseurs/:id/activer",            authMiddleware, togglePeseurActifParDelegue);
 router.post("/users", authMiddleware, auditMiddleware("users", "CREATE", { entiteType: "utilisateur" }), createUser);
 router.put("/users/:id", authMiddleware, auditMiddleware("users", "UPDATE", { entiteIdParam: "id", entiteType: "utilisateur" }), updateUser);
 router.put("/users/:id/password", authMiddleware, auditMiddleware("users", "CONFIG_CHANGE", { entiteIdParam: "id", entiteType: "utilisateur" }), resetUserPassword);

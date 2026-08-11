@@ -11,6 +11,7 @@ import {
 import { canCreateUser, canDeleteUser, canResetUserPassword } from "../middlewares/roleGuard";
 
 const ROLES_ALLOWED_TO_MANAGE = ["pca", "directeur"];
+const ROLES_ALLOWED_CREATE_PESEUR = ["pca", "directeur", "delegue"];
 
 function getCoopId(req: Request): number | null {
   return req.user?.cooperativeId ?? null;
@@ -338,5 +339,144 @@ export async function toggleUserActif(req: Request, res: Response): Promise<void
   } catch (err) {
     req.log.error({ err }, "Erreur lors de l'activation/désactivation du compte");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── Peseurs rattachés au délégué ─────────────────────────────────────────────
+
+// GET /users/mes-peseurs  (délégué uniquement)
+export async function getMesPeseurs(req: Request, res: Response): Promise<void> {
+  if (req.user?.role !== "delegue") {
+    res.status(403).json({ erreur: "Réservé aux délégués" });
+    return;
+  }
+  const delegueId = req.user.id;
+  try {
+    const peseurs = await db
+      .select({
+        id:          usersTable.id,
+        nom:         usersTable.nom,
+        prenoms:     usersTable.prenoms,
+        telephone:   usersTable.telephone,
+        section:     usersTable.section,
+        actif:       usersTable.actif,
+        createdAt:   usersTable.createdAt,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.delegueId, delegueId))
+      .orderBy(asc(usersTable.createdAt));
+    res.json(peseurs);
+  } catch (err) {
+    req.log.error({ err }, "getMesPeseurs");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// POST /users/peseurs  (délégué uniquement)
+export async function createPeseurParDelegue(req: Request, res: Response): Promise<void> {
+  if (req.user?.role !== "delegue") {
+    res.status(403).json({ erreur: "Réservé aux délégués" });
+    return;
+  }
+  const delegueId    = req.user.id;
+  const cooperativeId = req.user.cooperativeId;
+
+  // Récupérer la section du délégué depuis la DB (pas dans le JWT)
+  const [delegueRow] = await db
+    .select({ section: usersTable.section })
+    .from(usersTable)
+    .where(eq(usersTable.id, delegueId))
+    .limit(1);
+  const section = delegueRow?.section ?? null;
+
+  if (!cooperativeId) {
+    res.status(401).json({ erreur: "Coopérative non associée" });
+    return;
+  }
+
+  const body = req.body as { nom?: string; prenoms?: string; telephone?: string; motDePasse?: string };
+  const { nom, prenoms, telephone, motDePasse } = body;
+
+  if (!nom?.trim() || !prenoms?.trim() || !telephone?.trim() || !motDePasse) {
+    res.status(400).json({ erreur: "Champs obligatoires : nom, prenoms, telephone, motDePasse" });
+    return;
+  }
+  if (motDePasse.length < 6) {
+    res.status(400).json({ erreur: "Le mot de passe doit comporter au moins 6 caractères" });
+    return;
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(motDePasse, 10);
+    // Email auto-généré — non utilisé pour l'auth terrain
+    const tel = telephone.trim().replace(/\s+/g, "");
+    const fakeEmail = `peseur-${tel}-${delegueId}@terrain.local`;
+
+    const [created] = await db
+      .insert(usersTable)
+      .values({
+        nom:                 nom.trim(),
+        prenoms:             prenoms.trim(),
+        email:               fakeEmail,
+        telephone:           tel,
+        passwordHash,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        role:                "peseur" as any,
+        cooperativeId,
+        actif:               true,
+        motDePasseTemporaire: false,
+        section,
+        delegueId,
+      })
+      .returning({
+        id:        usersTable.id,
+        nom:       usersTable.nom,
+        prenoms:   usersTable.prenoms,
+        telephone: usersTable.telephone,
+        section:   usersTable.section,
+        actif:     usersTable.actif,
+        createdAt: usersTable.createdAt,
+      });
+
+    res.status(201).json(created);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("unique") || msg.includes("duplicate")) {
+      res.status(409).json({ erreur: "Un peseur avec ce numéro de téléphone existe déjà" });
+      return;
+    }
+    req.log.error({ err }, "createPeseurParDelegue");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// PUT /users/peseurs/:id/activer  (délégué uniquement — ses peseurs seulement)
+export async function togglePeseurActifParDelegue(req: Request, res: Response): Promise<void> {
+  if (req.user?.role !== "delegue") {
+    res.status(403).json({ erreur: "Réservé aux délégués" });
+    return;
+  }
+  const delegueId = req.user.id;
+  const peseurId  = parseInt(String(req.params["id"] ?? "0"));
+  const { actif } = req.body as { actif?: boolean };
+  if (typeof actif !== "boolean") {
+    res.status(400).json({ erreur: "Champ 'actif' (boolean) requis" });
+    return;
+  }
+  try {
+    const [row] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(and(eq(usersTable.id, peseurId), eq(usersTable.delegueId, delegueId)))
+      .limit(1);
+    if (!row) {
+      res.status(404).json({ erreur: "Peseur introuvable ou non rattaché à votre compte" });
+      return;
+    }
+    await db.update(usersTable).set({ actif }).where(eq(usersTable.id, peseurId));
+    res.json({ ok: true, actif });
+  } catch (err) {
+    req.log.error({ err }, "togglePeseurActifParDelegue");
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }

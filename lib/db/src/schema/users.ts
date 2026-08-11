@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, timestamp, integer, varchar } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, timestamp, integer, varchar, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { cooperativesTable } from "./cooperatives";
@@ -33,6 +33,7 @@ export const usersTable = pgTable("users", {
   actif: boolean("actif").notNull().default(true),
   motDePasseTemporaire: boolean("mot_de_passe_temporaire").notNull().default(false),
   photoUrl: text("photo_url"),
+  delegueId: integer("delegue_id").references((): AnyPgColumn => usersTable.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
