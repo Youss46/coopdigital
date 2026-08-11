@@ -973,7 +973,7 @@ export default function TracabilitePage() {
 
   const poidsSelectionne = livraisonsAfficher
     .filter((l) => selection.includes(l.id))
-    .reduce((s, l) => s + parseFloat(l.poidsKg), 0);
+    .reduce((s, l) => s + parseFloat(l.poidsKg), 0) + (fractionPendante?.poidsKg ?? 0);
 
   const handleCreerLot = () => {
     if (selection.length === 0 || !utilisateur?.cooperativeId) return;
@@ -1444,25 +1444,38 @@ export default function TracabilitePage() {
                         ? `${lv.fournisseurNom ?? ""} ${lv.fournisseurPrenoms ?? ""}`.trim() || "—"
                         : `${l.membreNom ?? ""} ${l.membrePrenoms ?? ""}`.trim() || "—";
                       const sel = selection.includes(l.id);
+                      const isFraction = fractionPendante?.livraisonId === l.id;
                       return (
                         <tr
                           key={l.id}
                           onClick={() => toggleSelection(l.id)}
                           className={`border-b border-gray-50 cursor-pointer transition-colors ${
-                            sel ? "bg-green-50" : "hover:bg-gray-50"
+                            sel ? "bg-green-50" : isFraction ? "bg-amber-50" : "hover:bg-gray-50"
                           }`}
                         >
                           <td className="px-4 py-3">
                             <div
                               className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-                                sel ? "border-[#1a4731] bg-[#1a4731]" : "border-gray-300"
+                                sel
+                                  ? "border-[#1a4731] bg-[#1a4731]"
+                                  : isFraction
+                                  ? "border-amber-500 bg-amber-500"
+                                  : "border-gray-300"
                               }`}
                             >
                               {sel && <Check size={10} className="text-white" />}
+                              {isFraction && !sel && <span className="text-white text-[8px] leading-none font-bold">½</span>}
                             </div>
                           </td>
                           <td className="px-4 py-3 font-medium text-gray-900">{nomAffiche}</td>
-                          <td className="px-4 py-3 text-gray-700">{formaterPoids(l.poidsKg)}</td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {isFraction ? (
+                              <span>
+                                <span className="text-amber-700 font-medium">{formaterPoids(fractionPendante.poidsKg)}</span>
+                                <span className="text-gray-400 text-xs ml-1">/ {formaterPoids(l.poidsKg)}</span>
+                              </span>
+                            ) : formaterPoids(l.poidsKg)}
+                          </td>
                           <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">
                             {l.montantNetFcfa != null
                               ? formaterMontant(l.montantNetFcfa)
