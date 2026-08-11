@@ -495,8 +495,9 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       valeur: sql<string>`COALESCE(SUM(${livraisonsTable.montantBrutFcfa}), 0)`,
     })
     .from(livraisonsTable)
+    .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
     .where(and(
-      eq(livraisonsTable.agentId, agentId),
+      or(eq(livraisonsTable.agentId, agentId), eq(sessionsPeseeTable.peseurId, agentId)),
       eq(livraisonsTable.dateLivraison, todayStr),
     ));
 
@@ -532,8 +533,9 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       createdAt: livraisonsTable.createdAt,
     })
     .from(livraisonsTable)
+    .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
     .where(and(
-      eq(livraisonsTable.agentId, agentId),
+      or(eq(livraisonsTable.agentId, agentId), eq(sessionsPeseeTable.peseurId, agentId)),
       eq(livraisonsTable.dateLivraison, todayStr),
     ))
     .orderBy(desc(livraisonsTable.createdAt))
