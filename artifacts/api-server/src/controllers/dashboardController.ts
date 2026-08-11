@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express";
 import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable } from "@workspace/db";
-import { eq, sql, desc, gte, lte, and, isNull } from "drizzle-orm";
+import { eq, sql, desc, gte, lte, and, isNull, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 export async function getDashboard(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -451,14 +452,26 @@ export async function getDeleguesPeseursCollectes(req: Request, res: Response): 
     const agentIdFilter = rawAgentId && peseurIds.includes(rawAgentId) ? rawAgentId : null;
 
     // 2. Collectes filtrées enregistrées par ces peseurs (100 max)
+    // Depuis le changement agentId → delegueId, les livraisons des peseurs sont tracées
+    // via livraisons.peseur_id. On inclut aussi livraisons.agent_id pour la rétrocompatibilité
+    // (livraisons créées avant ce changement).
+    const peseurIdsArr = sql.join(peseurIds.map((id) => sql`${id}`), sql`, `);
+    const peseurFilter = agentIdFilter
+      ? or(eq(livraisonsTable.peseurId, agentIdFilter), eq(livraisonsTable.agentId, agentIdFilter))!
+      : or(
+          sql`${livraisonsTable.peseurId} = ANY(ARRAY[${peseurIdsArr}]::int[])`,
+          sql`${livraisonsTable.agentId}  = ANY(ARRAY[${peseurIdsArr}]::int[])`,
+        )!;
+
     const conditions = [
-      agentIdFilter
-        ? eq(livraisonsTable.agentId, agentIdFilter)
-        : sql`${livraisonsTable.agentId} = ANY(ARRAY[${sql.join(peseurIds.map((id) => sql`${id}`), sql`, `)}]::int[])`,
+      peseurFilter,
       eq(membresTable.cooperativeId, cooperativeId),
       ...(rawDateDebut ? [gte(livraisonsTable.dateLivraison, rawDateDebut)] : []),
       ...(rawDateFin   ? [lte(livraisonsTable.dateLivraison, rawDateFin)]   : []),
     ];
+
+    // Alias pour joindre l'utilisateur peseur (via peseur_id en priorité, sinon agent_id)
+    const peseurUserAlias = alias(usersTable, "peseur_user");
 
     const rows = await db
       .select({
@@ -467,15 +480,16 @@ export async function getDeleguesPeseursCollectes(req: Request, res: Response): 
         poidsKg:        livraisonsTable.poidsKg,
         montantNetFcfa: livraisonsTable.montantNetFcfa,
         statutPaiement: livraisonsTable.statutPaiement,
+        peseurId:       livraisonsTable.peseurId,
         agentId:        livraisonsTable.agentId,
         membreNom:      membresTable.nom,
         membrePrenoms:  membresTable.prenoms,
-        peseurNom:      usersTable.nom,
-        peseurPrenoms:  usersTable.prenoms,
+        peseurNom:      peseurUserAlias.nom,
+        peseurPrenoms:  peseurUserAlias.prenoms,
       })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
-      .leftJoin(usersTable, eq(usersTable.id, livraisonsTable.agentId))
+      .leftJoin(peseurUserAlias, eq(peseurUserAlias.id, sql`COALESCE(${livraisonsTable.peseurId}, ${livraisonsTable.agentId})`))
       .where(and(...conditions))
       .orderBy(desc(livraisonsTable.dateLivraison), desc(livraisonsTable.id))
       .limit(100);
@@ -488,7 +502,7 @@ export async function getDeleguesPeseursCollectes(req: Request, res: Response): 
       statutPaiement: r.statutPaiement ?? "PAYÉ",
       membreNom:      r.membreNom ?? "—",
       membrePrenoms:  r.membrePrenoms ?? "",
-      peseurId:       r.agentId,
+      peseurId:       r.peseurId ?? r.agentId,
       peseurNom:      r.peseurNom ?? "—",
       peseurPrenoms:  r.peseurPrenoms ?? "",
     }));

@@ -24,7 +24,10 @@ import { CarteKpi } from "@/components/CarteKpi";
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const apiFetch = (url: string) =>
-  fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } }).then((r) => r.json());
+  fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } }).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  });
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -500,9 +503,9 @@ export default function DashboardDelegue() {
           <div className="flex items-center gap-2">
             <Scale size={18} className="text-blue-600" />
             <h2 className="font-semibold text-gray-800">Collectes de mes peseurs</h2>
-            {(peseursData?.stats.nbPeseurs ?? 0) > 0 && (
+            {(peseursData?.stats?.nbPeseurs ?? 0) > 0 && (
               <span className="ml-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
-                {peseursData!.stats.nbPeseurs} peseur{peseursData!.stats.nbPeseurs > 1 ? "s" : ""}
+                {peseursData!.stats!.nbPeseurs} peseur{peseursData!.stats!.nbPeseurs > 1 ? "s" : ""}
               </span>
             )}
           </div>
@@ -575,7 +578,7 @@ export default function DashboardDelegue() {
               <div key={i} className="px-5 py-3 h-14 animate-pulse bg-gray-50" />
             ))}
           </div>
-        ) : !peseursData || peseursData.peseurs.length === 0 ? (
+        ) : !peseursData || !peseursData.stats || peseursData.peseurs.length === 0 ? (
           /* Aucun peseur créé */
           <div className="px-5 py-8 text-center">
             <Scale size={32} className="text-gray-300 mx-auto mb-3" />
@@ -595,7 +598,7 @@ export default function DashboardDelegue() {
           /* Peseurs existants mais aucune collecte */
           <div className="px-5 py-6 text-center text-gray-400 text-sm">
             <p className="font-medium text-gray-600 mb-1">
-              {peseursData.stats.nbPeseurs} peseur{peseursData.stats.nbPeseurs > 1 ? "s" : ""} actif{peseursData.stats.nbPeseurs > 1 ? "s" : ""}
+              {peseursData.stats?.nbPeseurs ?? 0} peseur{(peseursData.stats?.nbPeseurs ?? 0) > 1 ? "s" : ""} actif{(peseursData.stats?.nbPeseurs ?? 0) > 1 ? "s" : ""}
             </p>
             Aucune collecte enregistrée pour le moment.
           </div>

@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 import SplashScreen from "@/components/SplashScreen";
 import Login from "@/pages/Login";
@@ -346,22 +347,24 @@ function App() {
         {!splashTermine && <SplashScreen onTermine={handleSplashTermine} />}
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
-            <OnlineToast />
-            <AppRoutes />
-            <Toaster
-              position="top-right"
-              richColors
-              closeButton
-              toastOptions={{
-                classNames: {
-                  success: "!border-l-4 !border-l-emerald-500",
-                  error: "!border-l-4 !border-l-red-500",
-                  warning: "!border-l-4 !border-l-amber-500",
-                  info: "!border-l-4 !border-l-blue-500",
-                },
-              }}
-            />
-            <PdfViewerModal />
+            <ErrorBoundary>
+              <OnlineToast />
+              <AppRoutes />
+              <Toaster
+                position="top-right"
+                richColors
+                closeButton
+                toastOptions={{
+                  classNames: {
+                    success: "!border-l-4 !border-l-emerald-500",
+                    error: "!border-l-4 !border-l-red-500",
+                    warning: "!border-l-4 !border-l-amber-500",
+                    info: "!border-l-4 !border-l-blue-500",
+                  },
+                }}
+              />
+              <PdfViewerModal />
+            </ErrorBoundary>
           </AuthProvider>
         </WouterRouter>
       </OfflineProvider>
