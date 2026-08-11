@@ -1,6 +1,21 @@
 import type { Request, Response } from "express";
 import * as commissionService from "../services/commissionService.js";
 
+// ─── Récapitulatif global par délégué ─────────────────────────────────────
+
+export async function getRecapCommissionsHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  const campagneId = req.query.campagneId ? Number(req.query.campagneId) : undefined;
+  try {
+    const recap = await commissionService.getRecapCommissionsParDelegue(cooperativeId, campagneId);
+    res.json(recap);
+  } catch (err) {
+    req.log.error({ err }, "getRecapCommissions");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 // ─── Taux (admin) ─────────────────────────────────────────────────────────
 
 export async function listTauxHandler(req: Request, res: Response): Promise<void> {

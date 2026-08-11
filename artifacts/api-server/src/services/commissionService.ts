@@ -359,20 +359,35 @@ export async function deleteTaux(id: number, cooperativeId: number) {
 
 // ─── Récapitulatif global pour la liste des délégués ─────────────────────
 
-export async function getRecapCommissionsParDelegue(cooperativeId: number) {
+export async function getRecapCommissionsParDelegue(cooperativeId: number, campagneId?: number) {
   const rows = await db
     .select({
       delegueId:   commissionsDeleguesTable.delegueId,
+      nom:         usersTable.nom,
+      prenoms:     usersTable.prenoms,
+      section:     usersTable.section,
       enAttente:   sql<string>`COALESCE(SUM(CASE WHEN ${commissionsDeleguesTable.statut} = 'en_attente' THEN ${commissionsDeleguesTable.montantFcfa} ELSE 0 END), 0)`,
       totalPaye:   sql<string>`COALESCE(SUM(CASE WHEN ${commissionsDeleguesTable.statut} = 'payé'     THEN ${commissionsDeleguesTable.montantFcfa} ELSE 0 END), 0)`,
+      total:       sql<string>`COALESCE(SUM(${commissionsDeleguesTable.montantFcfa}), 0)`,
+      nb:          sql<number>`COUNT(*)`,
     })
     .from(commissionsDeleguesTable)
     .innerJoin(usersTable, eq(usersTable.id, commissionsDeleguesTable.delegueId))
-    .where(eq(usersTable.cooperativeId, cooperativeId))
-    .groupBy(commissionsDeleguesTable.delegueId);
+    .where(and(
+      eq(usersTable.cooperativeId, cooperativeId),
+      campagneId ? eq(commissionsDeleguesTable.campagneId, campagneId) : undefined,
+    ))
+    .groupBy(commissionsDeleguesTable.delegueId, usersTable.nom, usersTable.prenoms, usersTable.section)
+    .orderBy(usersTable.nom);
 
-  return rows.reduce<Record<number, { enAttente: number; totalPaye: number }>>((acc, r) => {
-    acc[r.delegueId] = { enAttente: toNum(r.enAttente), totalPaye: toNum(r.totalPaye) };
-    return acc;
-  }, {});
+  return rows.map(r => ({
+    delegueId: r.delegueId,
+    nom:         r.nom,
+    prenoms:     r.prenoms,
+    section:     r.section,
+    enAttenteFcfa: toNum(r.enAttente),
+    totalPayeFcfa: toNum(r.totalPaye),
+    totalFcfa:   toNum(r.total),
+    nb:          Number(r.nb),
+  }));
 }

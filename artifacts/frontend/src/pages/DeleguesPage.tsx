@@ -40,6 +40,17 @@ interface CommissionsData {
   totaux: { enAttente: number; paye: number; total: number };
 }
 
+interface RecapCommission {
+  delegueId: number;
+  nom: string;
+  prenoms: string | null;
+  section: string | null;
+  enAttenteFcfa: number;
+  totalPayeFcfa: number;
+  totalFcfa: number;
+  nb: number;
+}
+
 const API = import.meta.env.VITE_API_URL ?? "";
 
 const MODES_PAIEMENT = [
@@ -95,7 +106,7 @@ export default function DeleguesPage() {
   const [tab, setTab] = useState<"liste" | "differes" | "commissions">("liste");
 
   // ── État onglet Commissions ──────────────────────────────────────────────
-  const [commTab, setCommTab] = useState<"taux" | "pardelegue">("taux");
+  const [commTab, setCommTab] = useState<"taux" | "recap" | "pardelegue">("taux");
   const [commDelegueId, setCommDelegueId] = useState<number | null>(null);
   const [showTauxForm, setShowTauxForm] = useState(false);
   const [editTaux, setEditTaux] = useState<Partial<TauxCommission> | null>(null);
@@ -169,6 +180,15 @@ export default function DeleguesPage() {
     queryKey: ["campagnes"],
     queryFn: () => apiFetch("/campagnes"),
     enabled: tab === "commissions",
+  });
+
+  const { data: recap = [] } = useQuery<RecapCommission[]>({
+    queryKey: ["commissions-recap", commCampagneId],
+    queryFn: () => {
+      const qs = commCampagneId ? `?campagneId=${commCampagneId}` : "";
+      return apiFetch(`/delegues/commissions/recap${qs}`);
+    },
+    enabled: tab === "commissions" && commTab === "recap",
   });
 
   const { data: commissions } = useQuery<CommissionsData>({
@@ -435,7 +455,7 @@ export default function DeleguesPage() {
           <div>
             {/* Sous-onglets */}
             <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "#f3f4f6", borderRadius: 10, padding: 4, width: "fit-content" }}>
-              {([{ key: "taux", label: "Taux configurés" }, { key: "pardelegue", label: "Par délégué" }] as const).map(({ key, label }) => (
+              {([{ key: "taux", label: "Taux configurés" }, { key: "recap", label: "Récapitulatif" }, { key: "pardelegue", label: "Par délégué" }] as const).map(({ key, label }) => (
                 <button key={key} onClick={() => setCommTab(key)} style={{ padding: "6px 16px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: ".85rem", cursor: "pointer", background: commTab === key ? "#fff" : "transparent", color: commTab === key ? "#111" : "#6b7280", boxShadow: commTab === key ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>
                   {label}
                 </button>
@@ -500,6 +520,86 @@ export default function DeleguesPage() {
                                 <button onClick={() => { setEditTaux(t); setShowTauxForm(true); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontSize: ".78rem", cursor: "pointer", fontWeight: 600 }}>Modifier</button>
                                 <button onClick={() => { if (confirm("Supprimer ce taux ?")) deleteTaux.mutate(t.id); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #fca5a5", color: "#dc2626", background: "#fff", fontSize: ".78rem", cursor: "pointer", fontWeight: 600 }}>Supprimer</button>
                               </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sous-onglet Récapitulatif */}
+            {commTab === "recap" && (
+              <div>
+                {/* Filtre campagne */}
+                <div style={{ display: "flex", gap: 16, marginBottom: 20, alignItems: "flex-end", flexWrap: "wrap" }}>
+                  <div>
+                    <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Filtrer par campagne</label>
+                    <select
+                      value={commCampagneId ?? ""}
+                      onChange={(e) => setCommCampagneId(e.target.value ? Number(e.target.value) : null)}
+                      style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem", minWidth: 220 }}
+                    >
+                      <option value="">— Toutes les campagnes —</option>
+                      {campagnes.map((c) => (
+                        <option key={c.id} value={c.id}>{c.libelle}{c.statut === "en_cours" ? " ✓" : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {recap.length > 0 && (
+                    <div style={{ fontSize: ".85rem", color: "#6b7280", paddingBottom: 8 }}>
+                      Total en attente :{" "}
+                      <strong style={{ color: "#f59e0b" }}>
+                        {recap.reduce((s, r) => s + r.enAttenteFcfa, 0).toLocaleString("fr-FR")} FCFA
+                      </strong>
+                      {" · "}Total payé :{" "}
+                      <strong style={{ color: "#16a34a" }}>
+                        {recap.reduce((s, r) => s + r.totalPayeFcfa, 0).toLocaleString("fr-FR")} FCFA
+                      </strong>
+                    </div>
+                  )}
+                </div>
+
+                {recap.length === 0 ? (
+                  <div style={{ padding: "48px 24px", textAlign: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12 }}>
+                    <div style={{ fontSize: "2rem", marginBottom: 8 }}>📊</div>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Aucune commission enregistrée</div>
+                    <div style={{ fontSize: ".85rem", color: "#6b7280" }}>Les commissions apparaissent ici après chaque collecte, selon les taux configurés.</div>
+                  </div>
+                ) : (
+                  <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ background: "#f0fdf4", borderBottom: "1px solid #bbf7d0" }}>
+                          {["Délégué", "Section", "Collectes", "En attente", "Déjà payé", "Total cumulé", ""].map((h) => (
+                            <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: ".78rem", fontWeight: 700, color: "#16a34a", textTransform: "uppercase", letterSpacing: ".05em" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recap.map((r) => (
+                          <tr key={r.delegueId} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                            <td style={{ padding: "10px 14px", fontWeight: 700, fontSize: ".92rem" }}>{r.nom} {r.prenoms ?? ""}</td>
+                            <td style={{ padding: "10px 14px", fontSize: ".85rem", color: "#6b7280" }}>{r.section ?? <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                            <td style={{ padding: "10px 14px", fontSize: ".85rem" }}>{r.nb}</td>
+                            <td style={{ padding: "10px 14px", fontWeight: 700, color: r.enAttenteFcfa > 0 ? "#f59e0b" : "#9ca3af" }}>
+                              {r.enAttenteFcfa.toLocaleString("fr-FR")} FCFA
+                            </td>
+                            <td style={{ padding: "10px 14px", fontWeight: 700, color: "#16a34a" }}>
+                              {r.totalPayeFcfa.toLocaleString("fr-FR")} FCFA
+                            </td>
+                            <td style={{ padding: "10px 14px", fontWeight: 700, color: "#2563eb" }}>
+                              {r.totalFcfa.toLocaleString("fr-FR")} FCFA
+                            </td>
+                            <td style={{ padding: "10px 14px" }}>
+                              <button
+                                onClick={() => { setCommDelegueId(r.delegueId); setCommTab("pardelegue"); }}
+                                style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontSize: ".78rem", cursor: "pointer", fontWeight: 600 }}
+                              >
+                                Détail →
+                              </button>
                             </td>
                           </tr>
                         ))}

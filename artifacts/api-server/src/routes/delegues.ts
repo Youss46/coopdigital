@@ -19,6 +19,7 @@ import {
   deleteTauxHandler,
   getCommissionsDelegueHandler,
   payerCommissionsHandler,
+  getRecapCommissionsHandler,
 } from "../controllers/commissionController.js";
 import { getAdminReleveCommissions } from "../controllers/rapportsController.js";
 
@@ -38,6 +39,7 @@ router.get("/delegues/paiements-differes", authMiddleware, getPaiementsDifferesA
 router.get("/delegues",                    authMiddleware, listDeleguesHandler);
 
 // ─── Taux de commission (admin) ───────────────────────────────────────────────
+router.get("/delegues/commissions/recap",         authMiddleware, getRecapCommissionsHandler);
 router.get("/delegues/commissions/taux",         authMiddleware, listTauxHandler);
 router.post("/delegues/commissions/taux",        authMiddleware, upsertTauxHandler);
 router.delete("/delegues/commissions/taux/:tauxId", authMiddleware, deleteTauxHandler);
