@@ -7,6 +7,7 @@ import { useOffline } from "../contexts/OfflineContext";
 import {
   createSessionPesee,
   getSessionsEnCours,
+  getSessionDetail,
   addLignePesee,
   deleteLignePesee,
   terminerSessionPesee,
@@ -22,7 +23,7 @@ function fmtPoids(kg: number): string {
   return kg.toFixed(3) + " kg";
 }
 
-export default function SessionPeseeFlow() {
+export default function SessionPeseeFlow({ params }: { params?: { sessionId?: string } }) {
   const [, setLocation] = useLocation();
   const { isOnline } = useOffline();
 
@@ -30,6 +31,7 @@ export default function SessionPeseeFlow() {
   const [fournisseur, setFournisseur] = useState<Fournisseur | null>(null);
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [sessionTerminee, setSessionTerminee] = useState<SessionDetail | null>(null);
+  const [resumeLoading, setResumeLoading] = useState(false);
 
   // Formulaire nouvelle pesée
   const [nbSacs, setNbSacs] = useState("");
@@ -51,6 +53,43 @@ export default function SessionPeseeFlow() {
       setActiveSessionIds(new Set(sessions.map((s) => s.membreId).filter((id): id is number => id !== null)));
     }).catch(() => { /* silencieux */ });
   }, [isOnline]);
+
+  // Reprise directe depuis l'accueil via /pesee-session/:sessionId
+  useEffect(() => {
+    const rawId = params?.sessionId;
+    if (!rawId || !isOnline) return;
+    const sessionId = parseInt(rawId, 10);
+    if (isNaN(sessionId)) return;
+    setResumeLoading(true);
+    (async () => {
+      try {
+        const detail = await getSessionDetail(sessionId);
+        setSession(detail);
+        // Construire un fournisseur synthétique depuis les données de la session
+        if (detail.membreId != null) {
+          setFournisseur({
+            id: detail.membreId,
+            code: detail.numeroSession,
+            nom: detail.membreNom ?? "",
+            prenoms: detail.membrePrenoms ?? "",
+            telephone: "",
+            section: null,
+            village: null,
+            typeMembre: "membre",
+            avanceEnCours: 0,
+            intrantsDus: 0,
+            derniereLivraison: null,
+          });
+        }
+        setStep("session");
+      } catch {
+        // Silencieux — retombe sur le step "membre"
+      } finally {
+        setResumeLoading(false);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params?.sessionId, isOnline]);
 
   // Reprise de session en cours pour ce membre
   useEffect(() => {
@@ -195,6 +234,23 @@ export default function SessionPeseeFlow() {
 
   const poidsNet = (parseFloat(poidsBrut) || 0) - (parseFloat(tare) || 0);
   const poidsTotalNum = parseFloat(String(session?.poidsTotalKg ?? 0));
+
+  if (resumeLoading) {
+    return (
+      <div className="t-app">
+        <header className="t-header">
+          <button className="t-header__back" onClick={() => setLocation("/")}>‹</button>
+          <div><div className="t-header__title">Pesée groupée</div></div>
+        </header>
+        <main className="t-main" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
+          <div style={{ textAlign: "center", color: "#94a3b8" }}>
+            <div style={{ fontSize: "2rem", marginBottom: 12 }}>⏳</div>
+            <div style={{ fontSize: ".9rem" }}>Chargement de la session…</div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="t-app">

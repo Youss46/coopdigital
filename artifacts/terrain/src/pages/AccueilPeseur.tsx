@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "../contexts/AuthContext";
 import { useOffline } from "../contexts/OfflineContext";
-import { getBilan } from "../lib/api";
+import { getBilan, getSessionsEnCours } from "../lib/api";
 import BottomNavPeseur from "../components/BottomNavPeseur";
-import type { BilanJour } from "../lib/types";
+import type { BilanJour, SessionPesee } from "../lib/types";
 
 function fmtPoids(kg: number): string {
   if (kg >= 1000) return (kg / 1000).toFixed(2) + " T";
@@ -21,6 +21,7 @@ export default function AccueilPeseur() {
   const [location] = useLocation();
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
   const [bilan, setBilan] = useState<BilanJour | null>(null);
+  const [sessionsEnCours, setSessionsEnCours] = useState<SessionPesee[]>([]);
 
   // Rafraîchit le bilan à chaque fois que la route revient sur "/" (retour depuis collecte, historique…)
   // et à chaque changement de connectivité
@@ -36,6 +37,12 @@ export default function AccueilPeseur() {
       getBilan().then(setBilan).catch(() => {});
     }
   }, [syncStatus, isOnline]);
+
+  // Récupère les sessions de pesée en cours pour les afficher en raccourci
+  useEffect(() => {
+    if (!isOnline) { setSessionsEnCours([]); return; }
+    getSessionsEnCours().then(setSessionsEnCours).catch(() => setSessionsEnCours([]));
+  }, [location, isOnline]);
 
   return (
     <div className="t-app">
@@ -97,6 +104,44 @@ export default function AccueilPeseur() {
                 Aucune collecte enregistrée pour l'instant
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Sessions en cours — raccourcis de reprise ─────────────────── */}
+        {sessionsEnCours.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            {sessionsEnCours.map((s) => (
+              <Link key={s.id} href={`/pesee-session/${s.id}`}>
+                <div className="t-card" style={{
+                  marginBottom: 8,
+                  background: "linear-gradient(135deg, #1a2d4a 0%, #1e3a5f 100%)",
+                  borderLeft: "4px solid #3b82f6",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}>
+                  <span style={{ fontSize: "1.6rem" }}>▶</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: "#93c5fd" }}>
+                      Session en cours
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "#e2e8f0", marginTop: 2 }}>
+                      {s.membreNom} {s.membrePrenoms}
+                    </div>
+                    <div style={{ fontSize: ".72rem", color: "#64748b", marginTop: 2, fontFamily: "monospace" }}>
+                      {s.numeroSession} · {s.nbLignes ?? 0} pesée{(s.nbLignes ?? 0) !== 1 ? "s" : ""}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: ".85rem", fontWeight: 700, color: "#22c55e" }}>
+                      Reprendre
+                    </div>
+                    <span style={{ fontSize: "1.1rem", color: "#3b82f6" }}>›</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
         )}
 

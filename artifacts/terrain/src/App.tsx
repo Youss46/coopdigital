@@ -64,6 +64,7 @@ function PeseurRoutes() {
     <Switch>
       <Route path="/" component={AccueilPeseur} />
       <Route path="/collecte" component={CollecteFlow} />
+      <Route path="/pesee-session/:sessionId" component={SessionPeseeFlow} />
       <Route path="/pesee-session" component={SessionPeseeFlow} />
       <Route path="/historique" component={HistoriquePeseur} />
       <Route><Redirect to="/" /></Route>
