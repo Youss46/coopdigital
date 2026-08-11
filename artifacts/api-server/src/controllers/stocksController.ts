@@ -437,15 +437,16 @@ export async function getLotissementStats(req: Request, res: Response): Promise<
   try {
     const rows = await db.execute(sql`
       SELECT
-        coalesce(sum(coalesce(l.poids_net_kg, l.poids_kg)::numeric), 0)::float  AS "poidsTotal",
+        coalesce(sum(coalesce(l.produit_brut_kg, l.poids_kg)::numeric), 0)::float  AS "poidsTotal",
         coalesce(sum(CASE WHEN ll.livraison_id IS NOT NULL
-          THEN coalesce(l.poids_net_kg, l.poids_kg)::numeric ELSE 0 END), 0)::float AS "poidsLoti",
+          THEN coalesce(l.produit_brut_kg, l.poids_kg)::numeric ELSE 0 END), 0)::float AS "poidsLoti",
         coalesce(sum(CASE WHEN ll.livraison_id IS NULL
-          THEN coalesce(l.poids_net_kg, l.poids_kg)::numeric ELSE 0 END), 0)::float AS "poidsNonLoti"
+          THEN coalesce(l.produit_brut_kg, l.poids_kg)::numeric ELSE 0 END), 0)::float AS "poidsNonLoti"
       FROM livraisons l
-      JOIN membres m ON m.id = l.membre_id
+      LEFT JOIN membres m ON m.id = l.membre_id
+      LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id
       LEFT JOIN lot_livraisons ll ON ll.livraison_id = l.id
-      WHERE m.cooperative_id = ${cooperativeId}
+      WHERE (m.cooperative_id = ${cooperativeId} OR f.cooperative_id = ${cooperativeId})
     `);
 
     const row = rows.rows[0] as { poidsTotal: number; poidsLoti: number; poidsNonLoti: number } | undefined;
