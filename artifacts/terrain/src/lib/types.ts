@@ -227,6 +227,8 @@ export interface PeseurCollecte {
   membreNom: string;
   membrePrenoms: string;
   membreCode: string;
+  /** Vrai si la livraison est issue d'une session de pesée groupée */
+  fromSession?: boolean;
 }
 
 export interface StatsAgent {

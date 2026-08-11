@@ -2,9 +2,9 @@ import { db } from "@workspace/db";
 import {
   usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable,
   distributionsIntrantsTable, historiquePrixTable, campagnesTable,
-  caissesDeleguesTable, mouvementsCaisseDelegueTable,
+  caissesDeleguesTable, mouvementsCaisseDelegueTable, sessionsPeseeTable,
 } from "@workspace/db";
-import { and, eq, sql, desc } from "drizzle-orm";
+import { and, eq, sql, desc, or } from "drizzle-orm";
 import { creerCommissionSiTaux } from "./commissionService.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -661,12 +661,18 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
       membreCode: membresTable.carteNumero,
+      sessionId: sessionsPeseeTable.id,
     })
     .from(livraisonsTable)
     .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+    .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
     .where(
       and(
-        eq(livraisonsTable.agentId, agentId),
+        // Livraisons enregistrées directement par l'agent OU converties depuis une session pesée par cet agent
+        or(
+          eq(livraisonsTable.agentId, agentId),
+          eq(sessionsPeseeTable.peseurId, agentId),
+        ),
         eq(membresTable.cooperativeId, cooperativeId),
       ),
     )
@@ -682,6 +688,7 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
     membreNom: r.membreNom ?? "—",
     membrePrenoms: r.membrePrenoms ?? "",
     membreCode: r.membreCode ?? "",
+    fromSession: r.sessionId !== null,
   }));
 }
 

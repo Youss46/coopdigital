@@ -173,6 +173,17 @@ export default function HistoriquePeseur() {
                         💵 {formatMontant(c.montantNetFcfa)}
                       </span>
                     </div>
+                    {c.fromSession && (
+                      <div style={{ marginTop: 4 }}>
+                        <span style={{
+                          fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                          color: "#818cf8", background: "rgba(129,140,248,.15)",
+                          border: "1px solid rgba(129,140,248,.3)",
+                        }}>
+                          ⚖️ Session groupée
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
                     <span style={{ fontSize: ".7rem", color: "var(--t-muted)" }}>
