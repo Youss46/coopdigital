@@ -473,6 +473,24 @@ export async function telechargerRapportIAPdf(req: Request, res: Response): Prom
       });
     }
 
+    /** Supprime les emojis et caractères hors-latin non supportés par Helvetica. */
+    function stripUnsupported(text: string): string {
+      return text
+        // Emojis unicode (cercles colorés, symboles, etc.)
+        .replace(/[\u{1F000}-\u{1FFFF}]/gu, "")
+        .replace(/[\u{2600}-\u{26FF}]/gu, "")
+        .replace(/[\u{2700}-\u{27BF}]/gu, "")
+        // Remplacer indicateurs courants par équivalents ASCII
+        .replace(/🟢/gu, "[OK]")
+        .replace(/🟡/gu, "[~]")
+        .replace(/🔴/gu, "[!]")
+        .replace(/✅/gu, "[OK]")
+        .replace(/❌/gu, "[X]")
+        .replace(/⚠️/gu, "[!]")
+        .replace(/⚠/gu, "[!]")
+        .trim();
+    }
+
     /** Rend un tableau Markdown en vraie grille PDF. */
     function renderTable(rows: string[]): void {
       // Supprimer les lignes séparatrices (|---|---|)
@@ -480,7 +498,9 @@ export async function telechargerRapportIAPdf(req: Request, res: Response): Prom
       if (!dataRows.length) return;
 
       const parsed = dataRows.map(r =>
-        r.split("|").slice(1, -1).map(c => c.trim().replace(/\*\*/g, "").replace(/\*/g, ""))
+        r.split("|").slice(1, -1).map(c =>
+          stripUnsupported(c.trim().replace(/\*\*/g, "").replace(/\*/g, ""))
+        )
       );
       const colCount = Math.max(...parsed.map(r => r.length));
       if (!colCount) return;
@@ -541,7 +561,13 @@ export async function telechargerRapportIAPdf(req: Request, res: Response): Prom
     let tableBuf: string[] = [];
 
     function flushTable(): void {
-      if (tableBuf.length) { renderTable(tableBuf); tableBuf = []; }
+      if (tableBuf.length) {
+        renderTable(tableBuf);
+        tableBuf = [];
+        // Réinitialiser X au bord gauche — PDFKit retient la position de la
+        // dernière cellule rendue, ce qui décale tout le texte suivant.
+        doc.x = MARGIN;
+      }
     }
 
     for (const raw of lines) {
