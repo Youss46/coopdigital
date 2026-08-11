@@ -13,6 +13,7 @@ export const USER_ROLES = [
   "delegue",
   "auditeur",
   "agent_terrain",
+  "peseur",
 ] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];

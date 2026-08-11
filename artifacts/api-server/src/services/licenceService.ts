@@ -5,7 +5,7 @@ import {
   licencesTable, plansAbonnementTable, historiqueLicencesTable,
   m15UsersTable, cooperativesTable, membresTable, usersTable,
 } from "@workspace/db";
-import { and, eq, desc, or, lte, isNotNull, ne } from "drizzle-orm";
+import { and, eq, desc, or, lte, isNotNull, ne, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { envoyerPushGroupe, envoyerPushNotification } from "./pushService.js";
@@ -173,22 +173,27 @@ export async function activerLicence(cleLicence: string, cooperativeId: number, 
     .from(licencesTable)
     .where(and(
       eq(licencesTable.cleLicence, cleLicence),
-      eq(licencesTable.statut, "inactive"),
+      inArray(licencesTable.statut, ["inactive", "trial"]),
     ))
     .limit(1);
 
   if (!licence) throw new Error("Clé de licence introuvable ou déjà utilisée");
 
+  // Vérifier qu'il n'existe pas une autre licence active/trial pour cette coop
+  // (exclure la licence qu'on est en train d'activer pour ne pas bloquer le trial)
   const [existante] = await db
     .select({ id: licencesTable.id })
     .from(licencesTable)
     .where(and(
       eq(licencesTable.cooperativeId, cooperativeId),
       or(eq(licencesTable.statut, "active"), eq(licencesTable.statut, "trial")),
+      ne(licencesTable.id, licence.id),
     ))
     .limit(1);
 
   if (existante) throw new Error("Cette coopérative a déjà une licence active");
+
+  const ancienStatut = licence.statut;
 
   const today = new Date();
   const dateExpiration = new Date(today);
@@ -211,7 +216,7 @@ export async function activerLicence(cleLicence: string, cooperativeId: number, 
     licenceId: licence.id,
     cooperativeId,
     action: "activation",
-    ancienStatut: "inactive",
+    ancienStatut,
     nouveauStatut: "active",
     details: { dureeAns: licence.dureeAns, dateExpiration: expirationStr },
     effectuePar: m15UserId ?? null,
