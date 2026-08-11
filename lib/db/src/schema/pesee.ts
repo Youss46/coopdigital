@@ -73,8 +73,9 @@ export const configPeseeTable = pgTable("config_pesee", {
   ecartMaxAutorisePct:        numeric("ecart_max_autorise_pct", { precision: 5, scale: 2 }).default("2"),
   seuilDoublePeseeKg:         numeric("seuil_double_pesee_kg", { precision: 10, scale: 2 }).default("500"),
   toleranceBalanceG:          numeric("tolerance_balance_g", { precision: 8, scale: 1 }).default("500"),
-  frequenceVerificationJours: integer("frequence_verification_jours").default(90),
-  updatedAt:                  timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  frequenceVerificationJours:      integer("frequence_verification_jours").default(90),
+  delaiExpirationSessionHeures:    integer("delai_expiration_session_heures").default(8),
+  updatedAt:                       timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ConfigPesee = typeof configPeseeTable.$inferSelect;

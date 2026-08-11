@@ -498,6 +498,13 @@
       "when": 1783820400000,
       "tag": "0070_sessions_pesee_unique_en_cours",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1783906800000,
+      "tag": "0071_config_pesee_expiration_session",
+      "breakpoints": true
     }
   ]
 }

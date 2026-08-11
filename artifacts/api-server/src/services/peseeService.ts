@@ -36,7 +36,13 @@ export async function getConfig(cooperativeId: number) {
 
 export async function upsertConfig(
   cooperativeId: number,
-  data: { ecart_max_autorise_pct?: number; seuil_double_pesee_kg?: number; tolerance_balance_g?: number; frequence_verification_jours?: number },
+  data: {
+    ecart_max_autorise_pct?: number;
+    seuil_double_pesee_kg?: number;
+    tolerance_balance_g?: number;
+    frequence_verification_jours?: number;
+    delai_expiration_session_heures?: number;
+  },
 ) {
   const existing = await getConfig(cooperativeId);
   if (existing.id) {
@@ -47,6 +53,7 @@ export async function upsertConfig(
         ...(data.seuil_double_pesee_kg != null && { seuilDoublePeseeKg: String(data.seuil_double_pesee_kg) }),
         ...(data.tolerance_balance_g != null && { toleranceBalanceG: String(data.tolerance_balance_g) }),
         ...(data.frequence_verification_jours != null && { frequenceVerificationJours: data.frequence_verification_jours }),
+        ...(data.delai_expiration_session_heures != null && { delaiExpirationSessionHeures: data.delai_expiration_session_heures }),
         updatedAt: new Date(),
       })
       .where(eq(configPeseeTable.cooperativeId, cooperativeId))
@@ -61,6 +68,7 @@ export async function upsertConfig(
         seuilDoublePeseeKg: data.seuil_double_pesee_kg != null ? String(data.seuil_double_pesee_kg) : "500",
         toleranceBalanceG: data.tolerance_balance_g != null ? String(data.tolerance_balance_g) : "500",
         frequenceVerificationJours: data.frequence_verification_jours ?? 90,
+        delaiExpirationSessionHeures: data.delai_expiration_session_heures ?? 8,
       })
       .returning();
     return row;

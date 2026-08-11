@@ -6458,7 +6458,8 @@ export const UpdateConfigPeseeBody = zod.object({
   "ecart_max_autorise_pct": zod.number().optional(),
   "seuil_double_pesee_kg": zod.number().optional(),
   "tolerance_balance_g": zod.number().optional(),
-  "frequence_verification_jours": zod.number().optional()
+  "frequence_verification_jours": zod.number().optional(),
+  "delai_expiration_session_heures": zod.number().optional()
 })
 
 export const UpdateConfigPeseeResponse = zod.object({
@@ -6468,6 +6469,7 @@ export const UpdateConfigPeseeResponse = zod.object({
   "seuil_double_pesee_kg": zod.number().optional(),
   "tolerance_balance_g": zod.number().optional(),
   "frequence_verification_jours": zod.number().optional(),
+  "delai_expiration_session_heures": zod.number().optional(),
   "updated_at": zod.string().nullish()
 })
 

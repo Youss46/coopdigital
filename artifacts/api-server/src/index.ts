@@ -84,6 +84,15 @@ cron.schedule("5 8 * * *", () => {
   }).catch((err: unknown) => logger.error({ err }, "Erreur cron fiscaliteService"));
 });
 
+// CRON pesée : expiration automatique des sessions abandonnées (toutes les heures, à H:30)
+cron.schedule("30 * * * *", () => {
+  import("./services/peseeSessionService.js").then(({ expirerToutesSessionsStales }) => {
+    expirerToutesSessionsStales().catch((err: unknown) => {
+      logger.error({ err }, "Cron expiration sessions pesée abandonnées");
+    });
+  }).catch((err: unknown) => logger.error({ err }, "Import peseeSessionService"));
+});
+
 // CRON support : alertes tickets haute priorité non pris en charge après 30 min (toutes les 5 min)
 cron.schedule("*/5 * * * *", () => {
   import("./services/supportService.js").then(({ envoyerAlertesHautePriorite }) => {

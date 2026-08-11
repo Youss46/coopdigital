@@ -7,10 +7,12 @@ import {
   paiementsTable,
   entrepotsTable,
   mouvementsStockTable,
+  configPeseeTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { getPrixActuel } from "./terrainService.js";
 import { generateEcrituresLivraison } from "./comptabiliteService.js";
+import { logger } from "../lib/logger.js";
 
 // ─── Génération numéro de session ─────────────────────────────────────────────
 async function generateNumeroSession(cooperativeId: number): Promise<string> {
@@ -453,6 +455,59 @@ export async function creerLivraisonDepuisSession(
   })();
 
   return result;
+}
+
+// ─── Expiration automatique des sessions abandonnées ─────────────────────────
+
+/**
+ * Marque comme `annulee` toutes les sessions `en_cours` de cette coopérative
+ * dont l'âge dépasse le seuil configuré (défaut : 8h).
+ * Retourne le nombre de sessions expirées.
+ */
+export async function expirerSessionsStales(cooperativeId: number): Promise<number> {
+  const [config] = await db
+    .select({ delai: configPeseeTable.delaiExpirationSessionHeures })
+    .from(configPeseeTable)
+    .where(eq(configPeseeTable.cooperativeId, cooperativeId))
+    .limit(1);
+
+  const heures = config?.delai ?? 8;
+
+  const expired = await db
+    .update(sessionsPeseeTable)
+    .set({ statut: "annulee", dateFin: new Date() })
+    .where(
+      and(
+        eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+        sql`${sessionsPeseeTable.statut}::text = 'en_cours'`,
+        sql`${sessionsPeseeTable.createdAt} < NOW() - interval '1 hour' * ${heures}`,
+      ),
+    )
+    .returning({ id: sessionsPeseeTable.id });
+
+  return expired.length;
+}
+
+/**
+ * Variante cron — parcourt toutes les coopératives qui ont des sessions en_cours
+ * et expire celles qui sont périmées selon leur propre config.
+ */
+export async function expirerToutesSessionsStales(): Promise<void> {
+  const coops = await db
+    .selectDistinct({ cooperativeId: sessionsPeseeTable.cooperativeId })
+    .from(sessionsPeseeTable)
+    .where(sql`${sessionsPeseeTable.statut}::text = 'en_cours'`);
+
+  for (const { cooperativeId } of coops) {
+    try {
+      const n = await expirerSessionsStales(cooperativeId);
+      if (n > 0) {
+        logger.info({ cooperativeId, n }, "[pesee] Sessions abandonnées expirées");
+      }
+    } catch (err) {
+      logger.error({ err, cooperativeId }, "[pesee] Erreur expiration sessions stales");
+    }
+  }
 }
 
 // ─── Annuler une session ──────────────────────────────────────────────────────

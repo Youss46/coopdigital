@@ -8,6 +8,7 @@ import {
   terminerSession,
   annulerSession,
   creerLivraisonDepuisSession,
+  expirerSessionsStales,
   SessionEnCoursError,
 } from "../services/peseeSessionService";
 import {
@@ -436,5 +437,17 @@ export async function handleConvertirSessionEnLivraison(req: Request, res: Respo
     req.log.error(err, "handleConvertirSessionEnLivraison");
     const msg = err instanceof Error ? err.message : "Erreur conversion session en livraison";
     res.status(400).json({ erreur: msg });
+  }
+}
+
+export async function handleExpirerSessionsStales(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  try {
+    const n = await expirerSessionsStales(cooperativeId);
+    res.json({ ok: true, expirées: n });
+  } catch (err) {
+    req.log.error(err, "handleExpirerSessionsStales");
+    res.status(500).json({ erreur: "Erreur lors de l'expiration des sessions" });
   }
 }

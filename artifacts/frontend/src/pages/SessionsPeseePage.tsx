@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Scale, Search, Loader2, ChevronRight,
   Package, CheckCircle2, AlertCircle, Clock, X,
-  TrendingUp,
+  TrendingUp, AlertTriangle, Ban,
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -12,6 +12,26 @@ const apiFetch = <T,>(url: string) =>
   fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } }).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json() as Promise<T>;
+  });
+
+const apiPost = (url: string, body?: unknown) =>
+  fetch(`${BASE}${url}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  }).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  });
+
+const apiPut = (url: string, body?: unknown) =>
+  fetch(`${BASE}${url}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  }).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
   });
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,6 +72,12 @@ interface SessionDetail extends SessionPesee {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const STALE_THRESHOLD_MS = 8 * 60 * 60 * 1000; // 8h par défaut (côté client)
+
+function isStale(dateDebut: string): boolean {
+  return Date.now() - new Date(dateDebut).getTime() > STALE_THRESHOLD_MS;
+}
+
 const STATUT_CONFIG: Record<SessionPesee["statut"], { label: string; color: string; bg: string; Icon: React.ElementType }> = {
   en_cours:  { label: "En cours",  color: "#0369a1", bg: "#e0f2fe", Icon: Clock         },
   terminee:  { label: "Terminée",  color: "#15803d", bg: "#dcfce7", Icon: CheckCircle2  },
@@ -90,10 +116,21 @@ function fmtDate(iso: string) {
 // ─── Modal détail ─────────────────────────────────────────────────────────────
 
 function SessionDetailModal({ sessionId, onClose }: { sessionId: number; onClose: () => void }) {
+  const qc = useQueryClient();
   const { data: detail, isLoading } = useQuery<SessionDetail>({
     queryKey: ["session-pesee-detail", sessionId],
     queryFn: () => apiFetch<SessionDetail>(`/api/pesee/sessions/${sessionId}`),
   });
+
+  const annulerMut = useMutation({
+    mutationFn: () => apiPut(`/api/pesee/sessions/${sessionId}/annuler`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["sessions-pesee"] });
+      void qc.invalidateQueries({ queryKey: ["session-pesee-detail", sessionId] });
+    },
+  });
+
+  const sessionStale = detail?.statut === "en_cours" && isStale(detail.dateDebut);
 
   return (
     <div
@@ -116,6 +153,16 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: number; onClose
             <X size={20} />
           </button>
         </div>
+
+        {/* Alerte session abandonnée */}
+        {sessionStale && (
+          <div style={{ margin: "12px 24px 0", padding: "10px 14px", borderRadius: 8, background: "#fef3c7", border: "1px solid #fcd34d", display: "flex", alignItems: "center", gap: 8 }}>
+            <AlertTriangle size={15} color="#92400e" />
+            <span style={{ fontSize: ".8rem", color: "#92400e", fontWeight: 600 }}>
+              Session en cours depuis plus de 8h — elle semble abandonnée.
+            </span>
+          </div>
+        )}
 
         {isLoading && (
           <div style={{ padding: 40, textAlign: "center" }}>
@@ -201,7 +248,7 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: number; onClose
               </div>
             )}
 
-            {/* Convertir en livraison (tâche #26) */}
+            {/* Convertir en livraison */}
             {detail.statut === "terminee" && !detail.livraisonId && (
               <div style={{ marginTop: 20, padding: 14, borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
                 <div style={{ fontSize: ".8rem", color: "#64748b", marginBottom: 8 }}>
@@ -223,6 +270,43 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: number; onClose
                 </button>
               </div>
             )}
+
+            {/* Annuler une session en cours */}
+            {detail.statut === "en_cours" && (
+              <div style={{ marginTop: 20, padding: 14, borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca" }}>
+                <div style={{ fontSize: ".8rem", color: "#7f1d1d", marginBottom: 8 }}>
+                  {sessionStale
+                    ? "Cette session semble abandonnée (>8h sans clôture). Vous pouvez l'annuler pour débloquer le membre."
+                    : "Annuler cette session la marquera comme abandonnée. Le membre pourra démarrer une nouvelle session."}
+                </div>
+                {annulerMut.isSuccess ? (
+                  <p style={{ margin: 0, fontSize: ".82rem", fontWeight: 600, color: "#15803d" }}>✓ Session annulée</p>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (confirm("Confirmer l'annulation de cette session ?")) {
+                        annulerMut.mutate();
+                      }
+                    }}
+                    disabled={annulerMut.isPending}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      padding: "7px 14px", borderRadius: 7, border: "none",
+                      background: annulerMut.isPending ? "#e2e8f0" : "#dc2626",
+                      color: annulerMut.isPending ? "#94a3b8" : "#fff",
+                      cursor: annulerMut.isPending ? "not-allowed" : "pointer",
+                      fontSize: ".82rem", fontWeight: 600,
+                    }}
+                  >
+                    <Ban size={14} />
+                    {annulerMut.isPending ? "Annulation…" : "Annuler cette session"}
+                  </button>
+                )}
+                {annulerMut.isError && (
+                  <p style={{ margin: "6px 0 0", fontSize: ".78rem", color: "#dc2626" }}>Erreur lors de l'annulation.</p>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -238,6 +322,7 @@ export default function SessionsPeseePage() {
   const [search, setSearch] = useState("");
   const [statut, setStatut] = useState<StatutFilter>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const qc = useQueryClient();
 
   const apiUrl = statut === "all"
     ? `/api/pesee/sessions?limit=200`
@@ -247,6 +332,11 @@ export default function SessionsPeseePage() {
     queryKey: ["sessions-pesee", statut],
     queryFn: () => apiFetch<SessionPesee[]>(apiUrl),
     refetchInterval: 30_000,
+  });
+
+  const expirerMut = useMutation({
+    mutationFn: () => apiPost("/api/pesee/sessions/expirer"),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["sessions-pesee"] }),
   });
 
   // Filtrage local par recherche
@@ -261,6 +351,7 @@ export default function SessionsPeseePage() {
   const nbEnCours  = sessions.filter((s) => s.statut === "en_cours").length;
   const nbTerminee = sessions.filter((s) => s.statut === "terminee").length;
   const totalKg    = sessions.filter((s) => s.statut === "terminee").reduce((acc, s) => acc + parseFloat(s.poidsTotalKg ?? "0"), 0);
+  const nbStale    = sessions.filter((s) => s.statut === "en_cours" && isStale(s.dateDebut)).length;
 
   return (
     <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto" }}>
@@ -275,6 +366,31 @@ export default function SessionsPeseePage() {
             Suivi des sessions de pesée groupée enregistrées par les peseurs
           </p>
         </div>
+
+        {/* Bouton expiration manuelle */}
+        {nbStale > 0 && (
+          <button
+            onClick={() => {
+              if (confirm(`Expirer les ${nbStale} session(s) abandonnée(s) depuis plus de 8h ?`)) {
+                expirerMut.mutate();
+              }
+            }}
+            disabled={expirerMut.isPending}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "8px 14px", borderRadius: 8, border: "none",
+              background: expirerMut.isPending ? "#e2e8f0" : "#b45309",
+              color: expirerMut.isPending ? "#94a3b8" : "#fff",
+              cursor: expirerMut.isPending ? "not-allowed" : "pointer",
+              fontSize: ".82rem", fontWeight: 600,
+            }}
+          >
+            <AlertTriangle size={14} />
+            {expirerMut.isPending
+              ? "Expiration…"
+              : `Expirer ${nbStale} session${nbStale > 1 ? "s" : ""} abandonnée${nbStale > 1 ? "s" : ""}`}
+          </button>
+        )}
       </div>
 
       {/* KPI cards */}
@@ -351,69 +467,85 @@ export default function SessionsPeseePage() {
             ))}
           </div>
 
-          {filtered.map((s, idx) => (
-            <div
-              key={s.id}
-              onClick={() => setSelectedId(s.id)}
-              style={{
-                display: "grid", gridTemplateColumns: "160px 1fr 110px 90px 80px 100px 40px",
-                padding: "12px 16px", cursor: "pointer", alignItems: "center",
-                borderTop: idx === 0 ? "none" : "1px solid #f1f5f9",
-                transition: "background .12s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
-            >
-              {/* N° session */}
-              <div style={{ fontFamily: "monospace", fontSize: ".78rem", color: "#374151", fontWeight: 600 }}>
-                {s.numeroSession}
-              </div>
-
-              {/* Membre */}
-              <div>
-                <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
-                  {s.membreNom ? `${s.membreNom} ${s.membrePrenoms ?? ""}` : <span style={{ color: "#94a3b8" }}>—</span>}
+          {filtered.map((s, idx) => {
+            const stale = s.statut === "en_cours" && isStale(s.dateDebut);
+            return (
+              <div
+                key={s.id}
+                onClick={() => setSelectedId(s.id)}
+                style={{
+                  display: "grid", gridTemplateColumns: "160px 1fr 110px 90px 80px 100px 40px",
+                  padding: "12px 16px", cursor: "pointer", alignItems: "center",
+                  borderTop: idx === 0 ? "none" : "1px solid #f1f5f9",
+                  transition: "background .12s",
+                  background: stale ? "#fffbeb" : undefined,
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = stale ? "#fef3c7" : "#f8fafc")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = stale ? "#fffbeb" : "#fff")}
+              >
+                {/* N° session */}
+                <div style={{ fontFamily: "monospace", fontSize: ".78rem", color: "#374151", fontWeight: 600 }}>
+                  {s.numeroSession}
                 </div>
-                <div style={{ fontSize: ".72rem", color: "#94a3b8", marginTop: 1 }}>{s.produit}</div>
-              </div>
 
-              {/* Date début */}
-              <div style={{ fontSize: ".78rem", color: "#64748b" }}>
-                {new Date(s.dateDebut).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
-                <div style={{ fontSize: ".68rem", color: "#94a3b8" }}>
-                  {new Date(s.dateDebut).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                </div>
-              </div>
-
-              {/* Passages */}
-              <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
-                {s.nbLignes} <span style={{ color: "#94a3b8", fontWeight: 400, fontSize: ".72rem" }}>pass.</span>
-              </div>
-
-              {/* Sacs */}
-              <div style={{ fontWeight: 600, fontSize: ".88rem" }}>{s.nbSacsTotal}</div>
-
-              {/* Poids */}
-              <div>
-                <StatutBadge statut={s.statut} />
-                {s.statut !== "en_cours" && (
-                  <div style={{ fontSize: ".78rem", fontWeight: 700, color: "#15803d", marginTop: 3 }}>
-                    {fmtKg(s.poidsTotalKg)}
+                {/* Membre */}
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
+                    {s.membreNom ? `${s.membreNom} ${s.membrePrenoms ?? ""}` : <span style={{ color: "#94a3b8" }}>—</span>}
                   </div>
-                )}
-              </div>
+                  <div style={{ fontSize: ".72rem", color: "#94a3b8", marginTop: 1 }}>{s.produit}</div>
+                </div>
 
-              {/* Chevron */}
-              <div style={{ textAlign: "right" }}>
-                <ChevronRight size={16} color="#cbd5e1" />
+                {/* Date début */}
+                <div style={{ fontSize: ".78rem", color: "#64748b" }}>
+                  {new Date(s.dateDebut).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                  <div style={{ fontSize: ".68rem", color: "#94a3b8" }}>
+                    {new Date(s.dateDebut).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                </div>
+
+                {/* Passages */}
+                <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
+                  {s.nbLignes} <span style={{ color: "#94a3b8", fontWeight: 400, fontSize: ".72rem" }}>pass.</span>
+                </div>
+
+                {/* Sacs */}
+                <div style={{ fontWeight: 600, fontSize: ".88rem" }}>{s.nbSacsTotal}</div>
+
+                {/* Statut / Poids + badge stale */}
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <StatutBadge statut={s.statut} />
+                    {stale && (
+                      <span title="Session abandonnée depuis >8h">
+                        <AlertTriangle size={13} color="#92400e" />
+                      </span>
+                    )}
+                  </div>
+                  {s.statut !== "en_cours" && (
+                    <div style={{ fontSize: ".78rem", fontWeight: 700, color: "#15803d", marginTop: 3 }}>
+                      {fmtKg(s.poidsTotalKg)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Chevron */}
+                <div style={{ textAlign: "right" }}>
+                  <ChevronRight size={16} color="#cbd5e1" />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* Footer count */}
           <div style={{ padding: "10px 16px", borderTop: "1px solid #f1f5f9", fontSize: ".75rem", color: "#94a3b8", textAlign: "right" }}>
             {filtered.length} session{filtered.length > 1 ? "s" : ""}
             {search && ` sur ${sessions.length}`}
+            {nbStale > 0 && (
+              <span style={{ marginLeft: 8, color: "#92400e", fontWeight: 600 }}>
+                · {nbStale} abandonnée{nbStale > 1 ? "s" : ""}
+              </span>
+            )}
           </div>
         </div>
       )}

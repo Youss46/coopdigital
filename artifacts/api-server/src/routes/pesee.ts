@@ -23,6 +23,7 @@ import {
   handleTerminerSession,
   handleAnnulerSession,
   handleConvertirSessionEnLivraison,
+  handleExpirerSessionsStales,
 } from "../controllers/peseeController";
 
 const router = Router();
@@ -47,6 +48,8 @@ router.get("/pesee/config",                  authMiddleware, handleGetConfig);
 router.put("/pesee/config",                  authMiddleware, handleUpdateConfig);
 
 // ── Sessions de pesée ─────────────────────────────────────────────────────────
+// Route fixe avant les routes paramétrées /:id
+router.post("/pesee/sessions/expirer",                authMiddleware, handleExpirerSessionsStales);
 router.post("/pesee/sessions",                        authMiddleware, handleCreateSession);
 router.get("/pesee/sessions",                         authMiddleware, handleGetSessions);
 router.get("/pesee/sessions/:id",                     authMiddleware, handleGetSession);
