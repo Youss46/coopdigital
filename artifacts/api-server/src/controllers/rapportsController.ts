@@ -748,8 +748,8 @@ export async function telechargerRapportIADocx(req: Request, res: Response): Pro
                 shading: isHeader
                   ? { fill: "E8F4ED", type: ShadingType.SOLID }
                   : rIdx % 2 !== 0
-                    ? { fill: "F9FAFB", type: ShadingType.SOLID }
-                    : undefined,
+                    ? { fill: "F2F4F7", type: ShadingType.SOLID }
+                    : { fill: "FFFFFF", type: ShadingType.SOLID },
                 margins: { top: 80, bottom: 80, left: 100, right: 100 },
                 children: [new Paragraph({
                   children: [new TextRun({
