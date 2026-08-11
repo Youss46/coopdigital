@@ -437,70 +437,170 @@ export async function telechargerRapportIAPdf(req: Request, res: Response): Prom
     const chunks: Buffer[] = [];
     doc.on("data", (c: Buffer) => chunks.push(c));
 
-    const pageW = doc.page.width - MARGIN * 2;
-    const VERT = "#1a4731";
-    const GRIS = "#555555";
+    const pageW  = doc.page.width - MARGIN * 2;
+    const VERT   = "#1a4731";
+    const GRIS   = "#6b7280";
+    const BODY   = 12;
+    const LGAP   = 6; // lineGap → interligne 1,5
 
-    // ── En-tête coopérative (logo + nom + ville) ──────────────────────────────
+    // ── En-tête coopérative ───────────────────────────────────────────────────
     await drawHeader(doc, cooperativeId, {
       titre_document: titre ?? "Rapport de gestion",
     });
 
-    // ── Parseur markdown simplifié ────────────────────────────────────────────
-    const lines = contenu.split("\n");
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Rend une ligne avec support du **gras** inline. */
+    function renderInline(
+      text: string,
+      opts: { width: number; indent?: number; lineGap?: number; align?: string }
+    ): void {
+      const stripped = text.replace(/\*([^*]+)\*/g, "$1").replace(/_([^_]+)_/g, "$1");
+      const parts = stripped.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const o = opts as any;
+      if (parts.length === 1) {
+        doc.font("Helvetica").text(stripped.replace(/\*\*/g, ""), o);
+        return;
+      }
+      parts.forEach((part, i) => {
+        const bold = part.startsWith("**") && part.endsWith("**");
+        const txt  = bold ? part.slice(2, -2) : part;
+        if (!txt) return;
+        const isLast = i === parts.length - 1;
+        doc.font(bold ? "Helvetica-Bold" : "Helvetica")
+          .text(txt, { ...o, continued: !isLast });
+      });
+    }
+
+    /** Rend un tableau Markdown en vraie grille PDF. */
+    function renderTable(rows: string[]): void {
+      // Supprimer les lignes séparatrices (|---|---|)
+      const dataRows = rows.filter(r => !/^\|[\s\-:|]+\|$/.test(r.trim()));
+      if (!dataRows.length) return;
+
+      const parsed = dataRows.map(r =>
+        r.split("|").slice(1, -1).map(c => c.trim().replace(/\*\*/g, "").replace(/\*/g, ""))
+      );
+      const colCount = Math.max(...parsed.map(r => r.length));
+      if (!colCount) return;
+
+      const PAD  = 7;
+      const FS   = 10;
+      const colW = pageW / colCount;
+
+      parsed.forEach((cells, rIdx) => {
+        const isHeader = rIdx === 0;
+
+        // Calcul de la hauteur de ligne
+        let rowH = FS + PAD * 2 + 2;
+        cells.forEach(cell => {
+          const approxCharsPerLine = Math.floor((colW - PAD * 2) / (FS * 0.55));
+          const nLines = Math.max(1, Math.ceil(cell.length / Math.max(1, approxCharsPerLine)));
+          const h = nLines * (FS + 2) + PAD * 2;
+          if (h > rowH) rowH = h;
+        });
+
+        // Saut de page si nécessaire
+        if (doc.y + rowH > doc.page.height - 80) {
+          doc.addPage();
+        }
+        const rowY = doc.y;
+
+        // Fond de cellule
+        for (let c = 0; c < colCount; c++) {
+          const bg = isHeader ? "#e8f4ed" : rIdx % 2 !== 0 ? "#f9fafb" : "#ffffff";
+          doc.rect(MARGIN + c * colW, rowY, colW, rowH).fill(bg);
+        }
+        // Bordures
+        for (let c = 0; c < colCount; c++) {
+          doc.rect(MARGIN + c * colW, rowY, colW, rowH)
+            .lineWidth(0.4)
+            .stroke(isHeader ? "#a3c4b0" : "#e2e8f0");
+        }
+        // Texte
+        for (let c = 0; c < colCount; c++) {
+          const cell = cells[c] ?? "";
+          doc
+            .fillColor(isHeader ? VERT : "#1f2937")
+            .font(isHeader ? "Helvetica-Bold" : "Helvetica")
+            .fontSize(FS)
+            .text(cell, MARGIN + c * colW + PAD, rowY + PAD, {
+              width: colW - PAD * 2,
+              lineGap: 2,
+            } as never);
+        }
+        doc.y = rowY + rowH;
+      });
+
+      doc.moveDown(0.7);
+    }
+
+    // ── Parseur Markdown ──────────────────────────────────────────────────────
+    const lines    = contenu.split("\n");
+    let tableBuf: string[] = [];
+
+    function flushTable(): void {
+      if (tableBuf.length) { renderTable(tableBuf); tableBuf = []; }
+    }
+
     for (const raw of lines) {
       const line = raw.trimEnd();
+
+      // Accumulation des lignes de tableau
+      if (line.startsWith("|")) {
+        tableBuf.push(line);
+        continue;
+      }
+      flushTable();
+
       if (line.startsWith("## ")) {
         doc.addPage();
-        doc.fillColor(VERT).font("Helvetica-Bold").fontSize(14)
-          .text(line.slice(3), { width: pageW });
-        doc.moveTo(56, doc.y + 4).lineTo(56 + pageW, doc.y + 4).strokeColor("#c6dfd2").lineWidth(1).stroke();
-        doc.moveDown(0.6);
+        doc.fillColor(VERT).font("Helvetica-Bold").fontSize(15)
+          .text(line.slice(3).toUpperCase(), { width: pageW } as never);
+        doc.moveTo(MARGIN, doc.y + 4)
+          .lineTo(MARGIN + pageW, doc.y + 4)
+          .strokeColor("#c6dfd2").lineWidth(1.5).stroke();
+        doc.moveDown(0.8);
+
       } else if (line.startsWith("### ")) {
-        doc.fillColor(VERT).font("Helvetica-Bold").fontSize(11)
-          .text(line.slice(4), { width: pageW });
-        doc.moveDown(0.3);
+        doc.fillColor(VERT).font("Helvetica-Bold").fontSize(13)
+          .text(line.slice(4), { width: pageW } as never);
+        doc.moveDown(0.45);
+
       } else if (line.startsWith("#### ")) {
-        doc.fillColor(GRIS).font("Helvetica-Bold").fontSize(10)
-          .text(line.slice(5), { width: pageW });
-        doc.moveDown(0.2);
+        doc.fillColor(GRIS).font("Helvetica-Bold").fontSize(12)
+          .text(line.slice(5), { width: pageW } as never);
+        doc.moveDown(0.3);
+
       } else if (line.startsWith("- ") || line.startsWith("* ")) {
-        doc.fillColor("#222222").font("Helvetica").fontSize(12)
-          .text(`• ${line.slice(2)}`, { width: pageW - 14, indent: 14, lineGap: 6 });
+        doc.fillColor("#1f2937").fontSize(BODY);
+        renderInline(`• ${line.slice(2)}`, { width: pageW - 16, indent: 16, lineGap: LGAP });
         doc.moveDown(0.2);
+
       } else if (/^\d+\.\s/.test(line)) {
-        doc.fillColor("#222222").font("Helvetica").fontSize(12)
-          .text(line, { width: pageW - 14, indent: 14, lineGap: 6 });
+        doc.fillColor("#1f2937").fontSize(BODY);
+        renderInline(line, { width: pageW - 16, indent: 16, lineGap: LGAP });
         doc.moveDown(0.2);
-      } else if (line.startsWith("|")) {
-        // Table row — render as plain text
-        const cells = line.split("|").filter(c => c.trim() && !c.match(/^[-:\s]+$/));
-        if (cells.length) {
-          const isHeader = lines[lines.indexOf(raw) + 1]?.startsWith("|---") || lines[lines.indexOf(raw) + 1]?.startsWith("| ---");
-          doc.fillColor(isHeader ? VERT : "#222222")
-            .font(isHeader ? "Helvetica-Bold" : "Helvetica")
-            .fontSize(11)
-            .text(cells.map(c => c.trim()).join("   ·   "), { width: pageW, lineGap: 4 });
-          doc.moveDown(0.25);
-        }
+
       } else if (line.startsWith("---")) {
-        doc.moveTo(56, doc.y).lineTo(56 + pageW, doc.y).strokeColor("#e5e7eb").lineWidth(0.5).stroke();
+        doc.moveTo(MARGIN, doc.y)
+          .lineTo(MARGIN + pageW, doc.y)
+          .strokeColor("#e5e7eb").lineWidth(0.5).stroke();
         doc.moveDown(0.5);
+
       } else if (line.trim() === "") {
         doc.moveDown(0.5);
+
       } else {
-        // Inline bold/italic — strip markers, render plain
-        const clean = line
-          .replace(/\*\*(.+?)\*\*/g, "$1")
-          .replace(/\*(.+?)\*/g, "$1")
-          .replace(/__(.+?)__/g, "$1");
-        doc.fillColor("#222222").font("Helvetica").fontSize(12)
-          .text(clean, { width: pageW, lineGap: 6 });
+        doc.fillColor("#1f2937").fontSize(BODY);
+        renderInline(line, { width: pageW, lineGap: LGAP });
         doc.moveDown(0.35);
       }
     }
+    flushTable();
 
-    // ── Pieds de page (logo coop + numérotation) ──────────────────────────────
+    // ── Pieds de page ─────────────────────────────────────────────────────────
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
