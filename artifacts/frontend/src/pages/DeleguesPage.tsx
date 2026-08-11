@@ -168,7 +168,7 @@ export default function DeleguesPage() {
   const { data: campagnes = [] } = useQuery<Campagne[]>({
     queryKey: ["campagnes"],
     queryFn: () => apiFetch("/campagnes"),
-    enabled: tab === "commissions" && commTab === "pardelegue",
+    enabled: tab === "commissions",
   });
 
   const { data: commissions } = useQuery<CommissionsData>({
@@ -450,7 +450,14 @@ export default function DeleguesPage() {
                     <div style={{ fontWeight: 700, fontSize: "1rem" }}>Taux de commission (FCFA/kg)</div>
                     <div style={{ fontSize: ".82rem", color: "#6b7280" }}>Les taux s'appliquent au poids net collecté par le délégué responsable du membre.</div>
                   </div>
-                  <button onClick={() => { setEditTaux({}); setShowTauxForm(true); }} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: ".85rem", cursor: "pointer" }}>
+                  <button
+                    onClick={() => {
+                      const active = campagnes.find(c => c.statut === "en_cours");
+                      setEditTaux({ campagneId: active?.id ?? null, dateDebut: new Date().toISOString().slice(0, 10) });
+                      setShowTauxForm(true);
+                    }}
+                    style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: ".85rem", cursor: "pointer" }}
+                  >
                     + Nouveau taux
                   </button>
                 </div>
@@ -644,7 +651,27 @@ export default function DeleguesPage() {
                 />
               </div>
               <div>
-                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Délégué (laisser vide = tous)</label>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>
+                  Campagne
+                  {campagnes.find(c => c.id === editTaux.campagneId)?.statut === "en_cours" && (
+                    <span style={{ marginLeft: 8, fontSize: ".75rem", background: "#dcfce7", color: "#16a34a", padding: "2px 7px", borderRadius: 10, fontWeight: 700 }}>En cours</span>
+                  )}
+                </label>
+                <select
+                  value={editTaux.campagneId ?? ""}
+                  onChange={(e) => setEditTaux({ ...editTaux, campagneId: e.target.value ? Number(e.target.value) : null })}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }}
+                >
+                  <option value="">— Toutes les campagnes —</option>
+                  {campagnes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.libelle}{c.statut === "en_cours" ? " ✓ En cours" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Délégué <span style={{ color: "#9ca3af", fontWeight: 400 }}>(laisser vide = tous)</span></label>
                 <select
                   value={editTaux.delegueId ?? ""}
                   onChange={(e) => setEditTaux({ ...editTaux, delegueId: e.target.value ? Number(e.target.value) : null })}
