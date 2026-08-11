@@ -274,7 +274,7 @@ export async function verifierLotPublicHandler(req: Request, res: Response): Pro
         membreNom:     membresTable.nom,
         membrePrenoms: membresTable.prenoms,
         village:       membresTable.village,
-        poidsKg:       sql<string>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::text`,
+        poidsKg:       sql<string>`coalesce(sum(coalesce(${livraisonsTable.produitBrutKg}::numeric, ${livraisonsTable.poidsKg}::numeric)), 0)::text`,
       })
       .from(lotLivraisonsTable)
       .innerJoin(livraisonsTable, eq(livraisonsTable.id, lotLivraisonsTable.livraisonId))
