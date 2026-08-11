@@ -757,10 +757,10 @@ export async function telechargerRapportIADocx(req: Request, res: Response): Pro
               new TableCell({
                 width: { size: pct, type: WidthType.PERCENTAGE },
                 shading: isHeader
-                  ? { fill: "E8F4ED", type: ShadingType.SOLID }
+                  ? { fill: "E8F4ED", type: ShadingType.CLEAR, color: "auto" }
                   : rIdx % 2 !== 0
-                    ? { fill: "F2F4F7", type: ShadingType.SOLID }
-                    : { fill: "FFFFFF", type: ShadingType.SOLID },
+                    ? { fill: "F2F4F7", type: ShadingType.CLEAR, color: "auto" }
+                    : { fill: "FFFFFF", type: ShadingType.CLEAR, color: "auto" },
                 margins: { top: 80, bottom: 80, left: 100, right: 100 },
                 children: [new Paragraph({
                   children: [new TextRun({
