@@ -531,6 +531,7 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       membreId: livraisonsTable.membreId,
       poidsKg: livraisonsTable.poidsKg,
       createdAt: livraisonsTable.createdAt,
+      fromSession: sessionsPeseeTable.id,
     })
     .from(livraisonsTable)
     .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
@@ -575,8 +576,8 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
   const dernieresOps = [
     ...recentesLivraisons.map((l) => ({
       heure: new Date(l.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
-      type: "collecte",
-      label: `Collecte ${(l.membreId ? nomMap.get(l.membreId) : null) ?? ""} — ${toNum(l.poidsKg)} kg`,
+      type: l.fromSession !== null ? "session_collecte" : "collecte",
+      label: `${l.fromSession !== null ? "Session groupée" : "Collecte"} ${(l.membreId ? nomMap.get(l.membreId) : null) ?? ""} — ${toNum(l.poidsKg)} kg`,
       montant: 0,
     })),
     ...recentesPaiements.map((p) => ({

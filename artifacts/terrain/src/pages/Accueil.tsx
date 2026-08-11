@@ -174,7 +174,7 @@ export default function Accueil() {
               {bilan.dernieresOps.map((op, i) => (
                 <div key={i} className="t-card" style={{ marginBottom: 10, display: "flex", gap: 12, alignItems: "center" }}>
                   <span style={{ fontSize: "1.4rem" }}>
-                    {op.type === "collecte" ? "⚖️" : op.type === "paiement" ? "💵" : "💰"}
+                    {op.type === "session_collecte" ? "📦" : op.type === "collecte" ? "⚖️" : op.type === "paiement" ? "💵" : "💰"}
                   </span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: ".9rem" }}>{op.label}</div>
