@@ -344,6 +344,47 @@ export async function toggleUserActif(req: Request, res: Response): Promise<void
 
 // ─── Peseurs rattachés au délégué ─────────────────────────────────────────────
 
+// PUT /users/peseurs/:id/password  (délégué uniquement — ses peseurs seulement)
+export async function resetPeseurPasswordParDelegue(req: Request, res: Response): Promise<void> {
+  if (req.user?.role !== "delegue") {
+    res.status(403).json({ erreur: "Réservé aux délégués" });
+    return;
+  }
+  const delegueId = req.user.id;
+  const peseurId  = parseInt(String(req.params["id"] ?? "0"), 10);
+  if (!peseurId) { res.status(400).json({ erreur: "ID invalide" }); return; }
+
+  const body = req.body as { nouveauMotDePasse?: string };
+  const { nouveauMotDePasse } = body;
+  if (!nouveauMotDePasse || nouveauMotDePasse.length < 6) {
+    res.status(400).json({ erreur: "Le mot de passe doit comporter au moins 6 caractères" });
+    return;
+  }
+
+  try {
+    const [row] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(and(eq(usersTable.id, peseurId), eq(usersTable.delegueId, delegueId)))
+      .limit(1);
+    if (!row) {
+      res.status(404).json({ erreur: "Peseur introuvable ou non rattaché à votre compte" });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(nouveauMotDePasse, 10);
+    await db
+      .update(usersTable)
+      .set({ passwordHash, motDePasseTemporaire: true })
+      .where(eq(usersTable.id, peseurId));
+
+    res.json({ message: "Mot de passe réinitialisé avec succès" });
+  } catch (err) {
+    req.log.error({ err }, "resetPeseurPasswordParDelegue");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 // GET /users/mes-peseurs  (délégué uniquement)
 export async function getMesPeseurs(req: Request, res: Response): Promise<void> {
   if (req.user?.role !== "delegue") {

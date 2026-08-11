@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Scale, Plus, Loader2, X, Eye, EyeOff, ToggleLeft, ToggleRight } from "lucide-react";
+import { Scale, Plus, Loader2, X, Eye, EyeOff, ToggleLeft, ToggleRight, KeyRound } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -150,11 +150,133 @@ function CreerPeseurModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Modal réinitialisation mot de passe ──────────────────────────────────────
+function ResetMdpModal({ peseur, onClose }: { peseur: Peseur; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [nouveauMdp, setNouveauMdp] = useState("");
+  const [showMdp, setShowMdp] = useState(false);
+  const [erreur, setErreur] = useState("");
+  const [succes, setSucces] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiFetch(`/api/users/peseurs/${peseur.id}/password`, {
+        method: "PUT",
+        body: JSON.stringify({ nouveauMotDePasse: nouveauMdp }),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["mes-peseurs"] });
+      setSucces(true);
+    },
+    onError: (e: Error) => setErreur(e.message),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErreur("");
+    if (!nouveauMdp) {
+      setErreur("Veuillez saisir un nouveau mot de passe");
+      return;
+    }
+    if (nouveauMdp.length < 6) {
+      setErreur("Le mot de passe doit comporter au moins 6 caractères");
+      return;
+    }
+    mutation.mutate();
+  }
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 420, boxShadow: "0 24px 48px rgba(0,0,0,.15)" }}>
+        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: "1rem" }}>Réinitialiser le mot de passe</div>
+            <div style={{ fontSize: ".8rem", color: "#64748b", marginTop: 2 }}>{peseur.prenoms} {peseur.nom}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8" }}><X size={18} /></button>
+        </div>
+
+        <div style={{ padding: 24 }}>
+          {succes ? (
+            <div style={{ textAlign: "center", padding: "16px 0" }}>
+              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
+                <KeyRound size={22} color="#15803d" />
+              </div>
+              <div style={{ fontWeight: 700, color: "#15803d", marginBottom: 6 }}>Mot de passe réinitialisé</div>
+              <div style={{ fontSize: ".84rem", color: "#64748b", marginBottom: 16 }}>
+                Le peseur devra utiliser ce nouveau mot de passe à sa prochaine connexion.
+              </div>
+              <button
+                onClick={onClose}
+                style={{ padding: "9px 24px", borderRadius: 8, background: "#0369a1", color: "#fff", border: "none", fontWeight: 700, fontSize: ".88rem", cursor: "pointer" }}
+              >
+                Fermer
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "10px 14px", fontSize: ".82rem", color: "#92400e" }}>
+                ⚠️ Le peseur sera invité à changer ce mot de passe à sa prochaine connexion.
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: ".78rem", fontWeight: 600, color: "#374151", marginBottom: 4 }}>Nouveau mot de passe *</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    value={nouveauMdp}
+                    onChange={(e) => setNouveauMdp(e.target.value)}
+                    type={showMdp ? "text" : "password"}
+                    autoFocus
+                    style={{ width: "100%", padding: "8px 36px 8px 10px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: ".88rem", boxSizing: "border-box", outline: "none" }}
+                    placeholder="Minimum 6 caractères"
+                  />
+                  <button type="button" onClick={() => setShowMdp(!showMdp)}
+                    style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#94a3b8" }}>
+                    {showMdp ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {erreur && (
+                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 12px", fontSize: ".82rem", color: "#dc2626" }}>
+                  {erreur}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{ flex: 1, padding: "9px", borderRadius: 8, background: "#f1f5f9", color: "#374151", border: "none", fontWeight: 600, fontSize: ".88rem", cursor: "pointer" }}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={mutation.isPending}
+                  style={{ flex: 1, padding: "9px", borderRadius: 8, background: "#0369a1", color: "#fff", border: "none", fontWeight: 700, fontSize: ".88rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                >
+                  {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />}
+                  {mutation.isPending ? "Envoi…" : "Réinitialiser"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page principale ──────────────────────────────────────────────────────────
 export default function MesPeseursPage() {
   const qc = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [resetPeseur, setResetPeseur] = useState<Peseur | null>(null);
 
   const { data: peseurs = [], isLoading } = useQuery<Peseur[]>({
     queryKey: ["mes-peseurs"],
@@ -244,6 +366,15 @@ export default function MesPeseursPage() {
                 {p.actif ? "Actif" : "Inactif"}
               </span>
 
+              {/* Réinitialiser mot de passe */}
+              <button
+                onClick={() => setResetPeseur(p)}
+                title="Réinitialiser le mot de passe"
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b", padding: 4, display: "flex", alignItems: "center" }}
+              >
+                <KeyRound size={18} />
+              </button>
+
               {/* Toggle actif */}
               <button
                 onClick={() => void handleToggle(p)}
@@ -261,6 +392,7 @@ export default function MesPeseursPage() {
       )}
 
       {showModal && <CreerPeseurModal onClose={() => setShowModal(false)} />}
+      {resetPeseur && <ResetMdpModal peseur={resetPeseur} onClose={() => setResetPeseur(null)} />}
     </div>
   );
 }
