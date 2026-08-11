@@ -12,11 +12,32 @@ import {
   deleteLignePesee,
   terminerSessionPesee,
   annulerSessionPesee,
+  convertirSessionEnLivraison,
+  telechargerRecuLivraison,
   SessionEnCoursError,
 } from "../lib/api";
-import type { Fournisseur, SessionDetail } from "../lib/types";
+import type { Fournisseur, SessionDetail, ConversionLivraisonResult } from "../lib/types";
 
 type Step = "membre" | "session" | "succes";
+
+function RecuButton({ livraisonId }: { livraisonId: number }) {
+  const [loading, setLoading] = useState(false);
+  return (
+    <button
+      className="t-btn t-btn--ghost"
+      style={{ width: "100%", marginBottom: 10 }}
+      disabled={loading}
+      onClick={async () => {
+        setLoading(true);
+        try { await telechargerRecuLivraison(livraisonId); }
+        catch { /* silencieux */ }
+        finally { setLoading(false); }
+      }}
+    >
+      {loading ? "Génération…" : "🧾 Télécharger le reçu PDF"}
+    </button>
+  );
+}
 
 function fmtPoids(kg: number): string {
   if (kg >= 1000) return (kg / 1000).toFixed(3) + " T";
@@ -44,6 +65,10 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const [erreur, setErreur] = useState("");
   const [confirmAnnuler, setConfirmAnnuler] = useState(false);
   const [confirmTerminer, setConfirmTerminer] = useState(false);
+  const [confirmConvertir, setConfirmConvertir] = useState(false);
+  const [convertirLoading, setConvertirLoading] = useState(false);
+  const [modePaiement, setModePaiement] = useState<"especes" | "orange_money" | "mtn_momo" | "wave">("especes");
+  const [livraisonResult, setLivraisonResult] = useState<ConversionLivraisonResult | null>(null);
 
   // Map membreId → sessionId pour les sessions actives (badge + reprise directe)
   // Rafraîchie toutes les 30 s tant que l'écran de sélection du membre est visible.
@@ -257,11 +282,28 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     }
   }
 
+  // ── Convertir la session terminée en livraison ─────────────────────────────
+  async function handleConvertir() {
+    if (!sessionTerminee) return;
+    setConvertirLoading(true);
+    setErreur("");
+    try {
+      const result = await convertirSessionEnLivraison(sessionTerminee.id, { modePaiement });
+      setLivraisonResult(result);
+    } catch (err) {
+      setErreur((err as Error).message);
+    } finally {
+      setConvertirLoading(false);
+      setConfirmConvertir(false);
+    }
+  }
+
   function reset() {
     setStep("membre");
     setFournisseur(null);
     setSession(null);
     setSessionTerminee(null);
+    setLivraisonResult(null);
     setErreur("");
     setNbSacs("");
     setPoidsBrut("");
@@ -519,14 +561,15 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
         {/* ─── STEP : Succès ────────────────────────────────────────────── */}
         {step === "succes" && sessionTerminee && (
           <div style={{ padding: "24px 16px", textAlign: "center" }}>
-            <div style={{ fontSize: "3rem", marginBottom: 12 }}>✅</div>
+            <div style={{ fontSize: "3rem", marginBottom: 12 }}>{livraisonResult ? "🎉" : "✅"}</div>
             <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "#22c55e", marginBottom: 4 }}>
-              Pesée terminée
+              {livraisonResult ? "Livraison créée" : "Pesée terminée"}
             </div>
             <div style={{ fontSize: ".82rem", color: "#94a3b8", fontFamily: "monospace", marginBottom: 20 }}>
               {sessionTerminee.numeroSession}
             </div>
 
+            {/* Récap session */}
             <div className="t-recap" style={{ textAlign: "left", marginBottom: 20 }}>
               <div className="t-recap-row">
                 <span className="t-recap-row__label">Producteur</span>
@@ -553,8 +596,51 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               </div>
             </div>
 
+            {/* ── Détail de la livraison (après conversion) ─────────────── */}
+            {livraisonResult && (
+              <div className="t-recap" style={{ textAlign: "left", marginBottom: 20, borderLeft: "4px solid #22c55e" }}>
+                <div style={{ fontSize: ".7rem", color: "#4ade80", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>
+                  Décompte livraison
+                </div>
+                <div className="t-recap-row">
+                  <span className="t-recap-row__label">
+                    Prix ({livraisonResult.prixUnitaireFcfa.toLocaleString("fr-FR")} FCFA/kg)
+                  </span>
+                  <span className="t-recap-row__value">{livraisonResult.montantBrutFcfa.toLocaleString("fr-FR")} FCFA</span>
+                </div>
+                {livraisonResult.avanceDeduiteFcfa > 0 && (
+                  <div className="t-recap-row t-recap-row--deduction">
+                    <span className="t-recap-row__label">Avance déduite</span>
+                    <span className="t-recap-row__value" style={{ color: "#f87171" }}>
+                      −{livraisonResult.avanceDeduiteFcfa.toLocaleString("fr-FR")} FCFA
+                    </span>
+                  </div>
+                )}
+                {livraisonResult.intrantsDeduitsFcfa > 0 && (
+                  <div className="t-recap-row t-recap-row--deduction">
+                    <span className="t-recap-row__label">Intrants déduits</span>
+                    <span className="t-recap-row__value" style={{ color: "#f87171" }}>
+                      −{livraisonResult.intrantsDeduitsFcfa.toLocaleString("fr-FR")} FCFA
+                    </span>
+                  </div>
+                )}
+                <div className="t-divider" />
+                <div className="t-recap-row t-recap-row--total">
+                  <span className="t-recap-row__label" style={{ fontWeight: 800 }}>Montant net</span>
+                  <span className="t-recap-row__value" style={{ color: "#22c55e", fontWeight: 800, fontSize: "1.15rem" }}>
+                    {livraisonResult.montantNetFcfa.toLocaleString("fr-FR")} FCFA
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Erreur conversion */}
+            {erreur && !livraisonResult && (
+              <div style={{ color: "#ef4444", fontSize: ".82rem", marginBottom: 12, textAlign: "left" }}>⚠️ {erreur}</div>
+            )}
+
             {/* Détail lignes */}
-            {(sessionTerminee.lignes?.length ?? 0) > 0 && (
+            {!livraisonResult && (sessionTerminee.lignes?.length ?? 0) > 0 && (
               <div style={{ textAlign: "left", marginBottom: 20 }}>
                 <div style={{ fontSize: ".7rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
                   Détail des passages
@@ -571,7 +657,23 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               </div>
             )}
 
-            <button className="t-btn t-btn--primary" style={{ width: "100%", marginBottom: 10 }} onClick={reset}>
+            {/* Bouton reçu PDF (après conversion) */}
+            {livraisonResult && isOnline && (
+              <RecuButton livraisonId={livraisonResult.livraisonId} />
+            )}
+
+            {/* Bouton conversion (si pas encore convertie) */}
+            {!livraisonResult && isOnline && (
+              <button
+                className="t-btn t-btn--primary"
+                style={{ width: "100%", marginBottom: 10, background: "linear-gradient(135deg, #16a34a, #15803d)" }}
+                onClick={() => setConfirmConvertir(true)}
+              >
+                📦 Convertir en livraison
+              </button>
+            )}
+
+            <button className="t-btn t-btn--primary" style={{ width: "100%", marginBottom: 10, background: livraisonResult ? undefined : "#334155" }} onClick={reset}>
               ⊕ Nouvelle session
             </button>
             <button className="t-btn t-btn--ghost" style={{ width: "100%" }} onClick={() => setLocation("/")}>
@@ -599,6 +701,41 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               {terminerLoading ? "Clôture…" : "✔ Confirmer la clôture"}
             </button>
             <button className="t-btn t-btn--ghost" style={{ width: "100%" }} onClick={() => setConfirmTerminer(false)}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmation convertir en livraison */}
+      {confirmConvertir && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: "#1e2d3a", width: "100%", borderRadius: "18px 18px 0 0", padding: 24 }}>
+            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#22c55e", marginBottom: 8, textAlign: "center" }}>
+              📦 Convertir en livraison
+            </div>
+            <div style={{ fontSize: ".85rem", color: "#94a3b8", textAlign: "center", marginBottom: 16 }}>
+              {sessionTerminee?.membreNom} {sessionTerminee?.membrePrenoms}<br />
+              {fmtPoids(parseFloat(String(sessionTerminee?.poidsTotalKg ?? 0)))} · {sessionTerminee?.nbSacsTotal} sacs
+            </div>
+            <div className="t-field" style={{ marginBottom: 16 }}>
+              <label className="t-label">Mode de paiement</label>
+              <select
+                className="t-input"
+                value={modePaiement}
+                onChange={(e) => setModePaiement(e.target.value as typeof modePaiement)}
+              >
+                <option value="especes">Espèces</option>
+                <option value="orange_money">Orange Money</option>
+                <option value="mtn_momo">MTN MoMo</option>
+                <option value="wave">Wave</option>
+              </select>
+            </div>
+            <button className="t-btn t-btn--primary" style={{ width: "100%", marginBottom: 10 }}
+              disabled={convertirLoading} onClick={handleConvertir}>
+              {convertirLoading ? "Création en cours…" : "✔ Confirmer la livraison"}
+            </button>
+            <button className="t-btn t-btn--ghost" style={{ width: "100%" }} onClick={() => setConfirmConvertir(false)}>
               Annuler
             </button>
           </div>

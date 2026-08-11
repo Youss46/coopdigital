@@ -67,6 +67,17 @@ export interface CollecteResult {
   commissionFcfa?: number | null;
 }
 
+export interface ConversionLivraisonResult {
+  livraisonId: number;
+  poidsKg: number;
+  prixUnitaireFcfa: number;
+  montantBrutFcfa: number;
+  avanceDeduiteFcfa: number;
+  intrantsDeduitsFcfa: number;
+  montantNetFcfa: number;
+  modePaiement: string;
+}
+
 export interface CommissionResume {
   enAttenteFcfa: number;
   payeFcfa: number;

@@ -340,6 +340,37 @@ export async function annulerSessionPesee(sessionId: number): Promise<void> {
   await apiPeseeFetch(`/pesee/sessions/${sessionId}/annuler`, { method: "PUT" });
 }
 
+export async function convertirSessionEnLivraison(
+  sessionId: number,
+  data: { modePaiement?: string } = {},
+): Promise<import("./types").ConversionLivraisonResult> {
+  const result = await apiPeseeFetch<{
+    livraison: {
+      id: number;
+      poidsKg: string;
+      prixUnitaireFcfa: number;
+      montantBrutFcfa: number;
+      avanceDeduiteFcfa: number;
+      intrantsDeduitsFcfa: number;
+      montantNetFcfa: number;
+    };
+    paiement: { modePaiement: string };
+  }>(`/pesee/sessions/${sessionId}/livraison`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+  return {
+    livraisonId: result.livraison.id,
+    poidsKg: parseFloat(result.livraison.poidsKg),
+    prixUnitaireFcfa: result.livraison.prixUnitaireFcfa,
+    montantBrutFcfa: result.livraison.montantBrutFcfa,
+    avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
+    intrantsDeduitsFcfa: result.livraison.intrantsDeduitsFcfa,
+    montantNetFcfa: result.livraison.montantNetFcfa,
+    modePaiement: result.paiement.modePaiement,
+  };
+}
+
 export async function getEnquetes(): Promise<import("./types").MissionEnquete[]> {
   return apiGet<import("./types").MissionEnquete[]>("/enquetes");
 }
