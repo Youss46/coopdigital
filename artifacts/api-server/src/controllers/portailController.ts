@@ -266,17 +266,22 @@ export async function verifierLotPublicHandler(req: Request, res: Response): Pro
 
     if (!lot) { res.status(404).json({ erreur: "Lot introuvable" }); return; }
 
+    const { asc } = await import("drizzle-orm");
+
     const producteurs = await db
       .select({
-        membreNom:    membresTable.nom,
+        membreId:      membresTable.id,
+        membreNom:     membresTable.nom,
         membrePrenoms: membresTable.prenoms,
-        village:      membresTable.village,
-        poidsKg:      livraisonsTable.poidsKg,
+        village:       membresTable.village,
+        poidsKg:       sql<string>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::text`,
       })
       .from(lotLivraisonsTable)
       .innerJoin(livraisonsTable, eq(livraisonsTable.id, lotLivraisonsTable.livraisonId))
       .innerJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
-      .where(eq(lotLivraisonsTable.lotId, lot.id));
+      .where(eq(lotLivraisonsTable.lotId, lot.id))
+      .groupBy(membresTable.id, membresTable.nom, membresTable.prenoms, membresTable.village)
+      .orderBy(asc(membresTable.nom));
 
     const statutLabels: Record<string, string> = {
       en_stock:  "En stock",
