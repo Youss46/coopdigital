@@ -293,15 +293,16 @@ export async function handleUpdateConfig(req: Request, res: Response) {
 // ─── Sessions de pesée ────────────────────────────────────────────────────────
 
 export async function handleCreateSession(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId;
+  const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const actorId = req.agent?.id ?? req.user?.id;
   const { membreId, produit, operation, balanceId, notes } = req.body as {
     membreId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string;
   };
   try {
     const session = await createSession(cooperativeId, {
       membreId, produit, operation, balanceId, notes,
-      peseurId: req.user?.id,
+      peseurId: actorId,
     });
     res.status(201).json(session);
   } catch (err) {
@@ -320,7 +321,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
 }
 
 export async function handleGetSessions(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId;
+  const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const { statut, membreId, limit } = req.query as { statut?: string; membreId?: string; limit?: string };
   try {
@@ -337,7 +338,7 @@ export async function handleGetSessions(req: Request, res: Response): Promise<vo
 }
 
 export async function handleGetSession(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId;
+  const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
   try {
@@ -351,7 +352,7 @@ export async function handleGetSession(req: Request, res: Response): Promise<voi
 }
 
 export async function handleAddLigne(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId;
+  const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
   const { nbSacs, poidsBrutKg, tareKg, notes } = req.body as {
@@ -375,7 +376,7 @@ export async function handleAddLigne(req: Request, res: Response): Promise<void>
 }
 
 export async function handleDeleteLigne(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId;
+  const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
   const ligneId = parseInt(String(req.params["ligneId"] ?? "0"));
@@ -391,7 +392,7 @@ export async function handleDeleteLigne(req: Request, res: Response): Promise<vo
 }
 
 export async function handleTerminerSession(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId;
+  const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
   try {
@@ -405,7 +406,7 @@ export async function handleTerminerSession(req: Request, res: Response): Promis
 }
 
 export async function handleAnnulerSession(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId;
+  const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
   try {
@@ -419,13 +420,9 @@ export async function handleAnnulerSession(req: Request, res: Response): Promise
 }
 
 export async function handleConvertirSessionEnLivraison(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId;
+  const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
-  const role = req.user?.role;
-  if (role !== "peseur" && role !== "delegue") {
-    res.status(403).json({ erreur: "Réservé aux délégués et peseurs" });
-    return;
-  }
+  const actorId = req.agent?.id ?? req.user?.id;
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
   const { modePaiement, entrepotId } = req.body as {
     modePaiement?: "especes" | "orange_money" | "mtn_momo" | "wave" | "cheque";
@@ -435,7 +432,7 @@ export async function handleConvertirSessionEnLivraison(req: Request, res: Respo
     const result = await creerLivraisonDepuisSession(cooperativeId, sessionId, {
       modePaiement,
       entrepotId,
-      agentId: req.user?.id,
+      agentId: actorId,
     });
     res.status(201).json(result);
   } catch (err) {
@@ -446,7 +443,7 @@ export async function handleConvertirSessionEnLivraison(req: Request, res: Respo
 }
 
 export async function handleExpirerSessionsStales(req: Request, res: Response): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId;
+  const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   try {
     const n = await expirerSessionsStales(cooperativeId);
