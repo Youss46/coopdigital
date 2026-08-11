@@ -428,6 +428,11 @@ export async function getDeleguesPeseursCollectes(req: Request, res: Response): 
     return;
   }
 
+  // Filtres optionnels
+  const rawAgentId  = typeof req.query.agentId   === "string" ? parseInt(req.query.agentId, 10) : null;
+  const rawDateDebut = typeof req.query.dateDebut === "string" && req.query.dateDebut ? req.query.dateDebut : null;
+  const rawDateFin   = typeof req.query.dateFin   === "string" && req.query.dateFin   ? req.query.dateFin   : null;
+
   try {
     // 1. Trouver les peseurs rattachés à ce délégué
     const peseurs = await db
@@ -442,7 +447,19 @@ export async function getDeleguesPeseursCollectes(req: Request, res: Response): 
 
     const peseurIds = peseurs.map((p) => p.id);
 
-    // 2. Dernières collectes enregistrées par ces peseurs (50 max)
+    // Sécurité : vérifier que l'agentId demandé appartient bien à ce délégué
+    const agentIdFilter = rawAgentId && peseurIds.includes(rawAgentId) ? rawAgentId : null;
+
+    // 2. Collectes filtrées enregistrées par ces peseurs (100 max)
+    const conditions = [
+      agentIdFilter
+        ? eq(livraisonsTable.agentId, agentIdFilter)
+        : sql`${livraisonsTable.agentId} = ANY(ARRAY[${sql.join(peseurIds.map((id) => sql`${id}`), sql`, `)}]::int[])`,
+      eq(membresTable.cooperativeId, cooperativeId),
+      ...(rawDateDebut ? [gte(livraisonsTable.dateLivraison, rawDateDebut)] : []),
+      ...(rawDateFin   ? [lte(livraisonsTable.dateLivraison, rawDateFin)]   : []),
+    ];
+
     const rows = await db
       .select({
         id:             livraisonsTable.id,
@@ -459,14 +476,9 @@ export async function getDeleguesPeseursCollectes(req: Request, res: Response): 
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
       .leftJoin(usersTable, eq(usersTable.id, livraisonsTable.agentId))
-      .where(
-        and(
-          sql`${livraisonsTable.agentId} = ANY(ARRAY[${sql.join(peseurIds.map((id) => sql`${id}`), sql`, `)}]::int[])`,
-          eq(membresTable.cooperativeId, cooperativeId),
-        ),
-      )
+      .where(and(...conditions))
       .orderBy(desc(livraisonsTable.dateLivraison), desc(livraisonsTable.id))
-      .limit(50);
+      .limit(100);
 
     const collectes = rows.map((r) => ({
       id:             r.id,

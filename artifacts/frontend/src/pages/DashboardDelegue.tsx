@@ -250,9 +250,30 @@ export default function DashboardDelegue() {
     staleTime: 60_000,
   });
 
+  // ── Filtres section peseurs ─────────────────────────────────────────────────
+  const [peseurFilter, setPeseurFilter] = useState<number | "all">("all");
+  const [peseursPreset, setPeseursPreset] = useState<Preset>("mois");
+  const [peseursPersoDebut, setPeseursPersoDebut] = useState("");
+  const [peseursPersoFin, setPeseursPersoFin]     = useState("");
+  const [showPeseursPerso, setShowPeseursPerso]   = useState(false);
+
+  const { dateDebut: peseursDateDebut, dateFin: peseursDateFin } = useMemo(
+    () => getPeriodeParams(peseursPreset, peseursPersoDebut, peseursPersoFin),
+    [peseursPreset, peseursPersoDebut, peseursPersoFin],
+  );
+
+  const buildPeseursUrl = () => {
+    const p = new URLSearchParams();
+    if (peseurFilter !== "all") p.set("agentId", String(peseurFilter));
+    if (peseursDateDebut) p.set("dateDebut", peseursDateDebut);
+    if (peseursDateFin)   p.set("dateFin",   peseursDateFin);
+    const qs = p.toString();
+    return `/api/dashboard/peseurs-collectes${qs ? `?${qs}` : ""}`;
+  };
+
   const { data: peseursData, isLoading: peseursLoading } = useQuery<PeseursCollectesData>({
-    queryKey: ["delegue-peseurs-collectes"],
-    queryFn: () => apiFetch("/api/dashboard/peseurs-collectes"),
+    queryKey: ["delegue-peseurs-collectes", peseurFilter, peseursDateDebut, peseursDateFin],
+    queryFn: () => apiFetch(buildPeseursUrl()),
     staleTime: 60_000,
   });
 
@@ -474,6 +495,7 @@ export default function DashboardDelegue() {
 
       {/* Collectes de mes peseurs */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* En-tête */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Scale size={18} className="text-blue-600" />
@@ -491,6 +513,61 @@ export default function DashboardDelegue() {
             Gérer →
           </button>
         </div>
+
+        {/* Barre de filtres (visible dès qu'il y a au moins un peseur) */}
+        {(peseursData?.peseurs?.length ?? 0) > 0 && (
+          <div className="px-5 py-2.5 border-b border-gray-100 bg-gray-50 flex flex-wrap items-center gap-2">
+            {/* Sélecteur peseur */}
+            <select
+              value={peseurFilter === "all" ? "all" : String(peseurFilter)}
+              onChange={(e) => setPeseurFilter(e.target.value === "all" ? "all" : parseInt(e.target.value, 10))}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 font-medium outline-none cursor-pointer"
+            >
+              <option value="all">Tous les peseurs</option>
+              {peseursData!.peseurs.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.prenoms} {p.nom}{!p.actif ? " (inactif)" : ""}
+                </option>
+              ))}
+            </select>
+
+            {/* Séparateur */}
+            <span className="text-gray-300 text-xs">|</span>
+
+            {/* Presets période */}
+            {(["mois", "mois_prec", "campagne", "perso"] as Preset[]).map((pk) => (
+              <button
+                key={pk}
+                onClick={() => { setPeseursPreset(pk); setShowPeseursPerso(pk === "perso"); }}
+                className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                  peseursPreset === pk
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {pk === "perso" && <CalendarDays size={10} />}
+                {{ mois: "Ce mois", mois_prec: "Mois préc.", campagne: "Campagne", perso: "Perso." }[pk]}
+              </button>
+            ))}
+
+            {/* Champs date perso */}
+            {showPeseursPerso && (
+              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5">
+                <input
+                  type="date" value={peseursPersoDebut}
+                  onChange={(e) => setPeseursPersoDebut(e.target.value)}
+                  className="text-xs border-0 outline-none text-gray-700"
+                />
+                <span className="text-gray-400 text-xs">→</span>
+                <input
+                  type="date" value={peseursPersoFin}
+                  onChange={(e) => setPeseursPersoFin(e.target.value)}
+                  className="text-xs border-0 outline-none text-gray-700"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {peseursLoading ? (
           <div className="divide-y divide-gray-50">
