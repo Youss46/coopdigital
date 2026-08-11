@@ -119,22 +119,43 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
       )
       .orderBy(livraisonsTable.dateLivraison); // FIFO — les plus anciennes en premier
 
-    // Sélection gloutonne jusqu'à atteindre la quantité cible
+    // Phase 1 — FIFO strict : n'inclure une livraison que si elle ne fait PAS dépasser la cible
     const selectedIds: number[] = [];
+    const candidatesRestantes: Array<{ id: number; poidsKg: string; nombreSacs: number | null }> = [];
     let cumul = 0;
     let totalSacs = 0;
+
     for (const l of disponibles) {
-      if (cumul >= quantiteCibleKg) break;
-      selectedIds.push(l.id);
-      cumul += parseFloat(l.poidsKg);
-      totalSacs += l.nombreSacs ?? 0;
+      const poids = parseFloat(l.poidsKg);
+      if (cumul + poids <= quantiteCibleKg) {
+        selectedIds.push(l.id);
+        cumul += poids;
+        totalSacs += l.nombreSacs ?? 0;
+      } else {
+        candidatesRestantes.push(l);
+      }
     }
+
+    // Phase 2 — remplissage de l'écart : ajouter des livraisons sautées si leur poids ≤ reste
+    let reste = Math.round((quantiteCibleKg - cumul) * 1000) / 1000;
+    for (const l of candidatesRestantes) {
+      if (reste <= 0) break;
+      const poids = parseFloat(l.poidsKg);
+      if (poids <= reste + 0.001) { // tolérance flottant 1g
+        selectedIds.push(l.id);
+        cumul += poids;
+        totalSacs += l.nombreSacs ?? 0;
+        reste = Math.round((quantiteCibleKg - cumul) * 1000) / 1000;
+      }
+    }
+
+    const deficitKg = Math.max(0, Math.round((quantiteCibleKg - cumul) * 100) / 100);
 
     res.json({
       livraisonIds: selectedIds,
       poidsTotalKg: Math.round(cumul * 100) / 100,
       nbLivraisons: selectedIds.length,
-      surplusKg: Math.max(0, Math.round((cumul - quantiteCibleKg) * 100) / 100),
+      deficitKg,
       nombreSacsTotal: totalSacs,
     });
   } catch (err) {
@@ -156,7 +177,7 @@ export async function createLot(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { livraisonIds, entrepot, nombreSacs } = parse.data;
+  const { livraisonIds, entrepot, nombreSacs, quantiteCibleKg } = parse.data;
 
   try {
     // Vérifier que toutes les livraisons appartiennent à cette coopérative
@@ -200,6 +221,14 @@ export async function createLot(req: Request, res: Response): Promise<void> {
       .where(inArray(livraisonsTable.id, livraisonIds));
 
     const poidsTotalKg = String(poidsRow?.total ?? 0);
+
+    // Garde quantité cible — refuser si le total dépasse la cible demandée
+    if (quantiteCibleKg && (poidsRow?.total ?? 0) > quantiteCibleKg + 0.001) {
+      res.status(400).json({
+        erreur: `Le poids total des livraisons sélectionnées (${poidsRow?.total?.toFixed(1)} kg) dépasse la quantité cible (${quantiteCibleKg} kg)`,
+      });
+      return;
+    }
 
     // Auto-détecter l'entrepôt coopératif si non fourni
     let entrepotFinal = entrepot ?? null;

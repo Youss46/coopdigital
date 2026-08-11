@@ -565,7 +565,8 @@ export const CreateLotBody = zod.object({
   "cooperativeId": zod.number(),
   "livraisonIds": zod.array(zod.number()),
   "entrepot": zod.string().optional(),
-  "nombreSacs": zod.number().optional()
+  "nombreSacs": zod.number().optional(),
+  "quantiteCibleKg": zod.number().optional()
 })
 
 

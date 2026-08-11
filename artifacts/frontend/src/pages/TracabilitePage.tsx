@@ -972,6 +972,7 @@ export default function TracabilitePage() {
         livraisonIds: selection,
         entrepot: entrepotNom ?? undefined,
         nombreSacs: nombreSacsInput ? parseInt(nombreSacsInput, 10) : undefined,
+        quantiteCibleKg: quantiteCibleInput ? parseFloat(quantiteCibleInput) : undefined,
       },
     });
   };
@@ -992,7 +993,7 @@ export default function TracabilitePage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({ quantiteCibleKg: cible, pourFournisseurs }),
       });
-      const data = await res.json() as { erreur?: string; livraisonIds: number[]; poidsTotalKg: number; nbLivraisons: number; surplusKg: number; nombreSacsTotal: number };
+      const data = await res.json() as { erreur?: string; livraisonIds: number[]; poidsTotalKg: number; nbLivraisons: number; deficitKg: number; nombreSacsTotal: number };
       if (!res.ok) {
         toast({ title: "Erreur", description: data.erreur ?? "Impossible de calculer la sélection", variant: "destructive" });
         return;
@@ -1004,10 +1005,10 @@ export default function TracabilitePage() {
       setSelection(data.livraisonIds);
       // Auto-remplir le nombre de sacs calculé depuis les livraisons
       if (data.nombreSacsTotal > 0) setNombreSacsInput(String(data.nombreSacsTotal));
-      const surplusTxt = data.surplusKg > 0 ? ` (surplus : ${formaterPoids(data.surplusKg)})` : "";
+      const deficitTxt = data.deficitKg > 0 ? ` — écart : ${formaterPoids(data.deficitKg)} sous la cible` : "";
       toast({
         title: `${data.nbLivraisons} livraison${data.nbLivraisons > 1 ? "s" : ""} sélectionnée${data.nbLivraisons > 1 ? "s" : ""}`,
-        description: `Poids total : ${formaterPoids(data.poidsTotalKg)}${surplusTxt}`,
+        description: `Poids retenu : ${formaterPoids(data.poidsTotalKg)}${deficitTxt}`,
       });
     } catch {
       toast({ title: "Erreur réseau", description: "Impossible de joindre le serveur.", variant: "destructive" });

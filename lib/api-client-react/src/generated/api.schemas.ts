@@ -1082,6 +1082,7 @@ export interface LotInput {
   livraisonIds: number[];
   entrepot?: string;
   nombreSacs?: number;
+  quantiteCibleKg?: number;
 }
 
 export type LotStatutInputStatut = typeof LotStatutInputStatut[keyof typeof LotStatutInputStatut];
