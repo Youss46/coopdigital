@@ -114,7 +114,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
         role,
         cooperativeId,
         actif: true,
-        motDePasseTemporaire: ["delegue", "directeur", "comptable", "caissier", "responsable_tracabilite", "auditeur", "magasinier", "agent_terrain"].includes(role),
+        motDePasseTemporaire: ["delegue", "directeur", "comptable", "caissier", "responsable_tracabilite", "auditeur", "magasinier", "agent_terrain", "peseur"].includes(role),
         section: section ?? null,
         zoneType: zoneType ?? null,
         zoneNom: zoneNom ?? null,
@@ -479,7 +479,7 @@ export async function createPeseurParDelegue(req: Request, res: Response): Promi
         role:                "peseur" as any,
         cooperativeId,
         actif:               true,
-        motDePasseTemporaire: false,
+        motDePasseTemporaire: true,
         section,
         delegueId,
       })
