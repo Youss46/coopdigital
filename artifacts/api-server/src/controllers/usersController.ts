@@ -12,6 +12,7 @@ import { canCreateUser, canDeleteUser, canResetUserPassword } from "../middlewar
 
 const ROLES_ALLOWED_TO_MANAGE = ["pca", "directeur"];
 const ROLES_ALLOWED_CREATE_PESEUR = ["pca", "directeur", "delegue"];
+const ROLES_ADMIN_PESEUR = ["pca", "directeur", "comptable"];
 
 function getCoopId(req: Request): number | null {
   return req.user?.cooperativeId ?? null;
@@ -505,33 +506,194 @@ export async function createPeseurParDelegue(req: Request, res: Response): Promi
   }
 }
 
-// PUT /users/peseurs/:id/activer  (délégué uniquement — ses peseurs seulement)
+// PUT /users/peseurs/:id/activer  (délégué OU admin)
 export async function togglePeseurActifParDelegue(req: Request, res: Response): Promise<void> {
-  if (req.user?.role !== "delegue") {
-    res.status(403).json({ erreur: "Réservé aux délégués" });
+  const role = req.user?.role ?? "";
+  const isAdmin = ROLES_ADMIN_PESEUR.includes(role);
+  const isDelegue = role === "delegue";
+  if (!isAdmin && !isDelegue) {
+    res.status(403).json({ erreur: "Accès non autorisé" });
     return;
   }
-  const delegueId = req.user.id;
-  const peseurId  = parseInt(String(req.params["id"] ?? "0"));
+  const cooperativeId = req.user?.cooperativeId;
+  const peseurId = parseInt(String(req.params["id"] ?? "0"));
   const { actif } = req.body as { actif?: boolean };
   if (typeof actif !== "boolean") {
     res.status(400).json({ erreur: "Champ 'actif' (boolean) requis" });
     return;
   }
   try {
-    const [row] = await db
-      .select({ id: usersTable.id })
-      .from(usersTable)
-      .where(and(eq(usersTable.id, peseurId), eq(usersTable.delegueId, delegueId)))
-      .limit(1);
+    const whereConditions = isDelegue && !isAdmin
+      ? and(eq(usersTable.id, peseurId), eq(usersTable.delegueId, req.user!.id))
+      : and(eq(usersTable.id, peseurId), eq(usersTable.cooperativeId, cooperativeId!));
+    const [row] = await db.select({ id: usersTable.id }).from(usersTable).where(whereConditions).limit(1);
     if (!row) {
-      res.status(404).json({ erreur: "Peseur introuvable ou non rattaché à votre compte" });
+      res.status(404).json({ erreur: "Peseur introuvable" });
       return;
     }
     await db.update(usersTable).set({ actif }).where(eq(usersTable.id, peseurId));
     res.json({ ok: true, actif });
   } catch (err) {
-    req.log.error({ err }, "togglePeseurActifParDelegue");
+    req.log.error({ err }, "togglePeseurActif");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── Admin peseur management ───────────────────────────────────────────────────
+
+// GET /users/peseurs/admin
+export async function listAllPeseurs(req: Request, res: Response): Promise<void> {
+  if (!ROLES_ADMIN_PESEUR.includes(req.user?.role ?? "")) {
+    res.status(403).json({ erreur: "Accès réservé aux administrateurs" });
+    return;
+  }
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const peseurs = await db
+      .select({
+        id:          usersTable.id,
+        nom:         usersTable.nom,
+        prenoms:     usersTable.prenoms,
+        telephone:   usersTable.telephone,
+        actif:       usersTable.actif,
+        delegueId:   usersTable.delegueId,
+        createdAt:   usersTable.createdAt,
+      })
+      .from(usersTable)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .where(and(eq(usersTable.cooperativeId, cooperativeId), eq(usersTable.role as any, "peseur" as any)))
+      .orderBy(asc(usersTable.nom));
+
+    // Charger les noms des délégués en une seule requête
+    const delegueIds = [...new Set(peseurs.map(p => p.delegueId).filter(Boolean))] as number[];
+    const delegues = delegueIds.length > 0
+      ? await db.select({ id: usersTable.id, nom: usersTable.nom, prenoms: usersTable.prenoms, section: usersTable.section })
+          .from(usersTable)
+          .where(eq(usersTable.cooperativeId, cooperativeId))
+      : [];
+    const delegueMap = new Map(delegues.map(d => [d.id, d]));
+
+    const result = peseurs.map(p => ({
+      ...p,
+      delegue: p.delegueId ? (delegueMap.get(p.delegueId) ?? null) : null,
+      rattachement: p.delegueId ? "delegue" : "cooperative",
+    }));
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "listAllPeseurs");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// POST /users/peseurs/admin
+export async function createPeseurAdmin(req: Request, res: Response): Promise<void> {
+  if (!ROLES_ADMIN_PESEUR.includes(req.user?.role ?? "")) {
+    res.status(403).json({ erreur: "Accès réservé aux administrateurs" });
+    return;
+  }
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+
+  const body = req.body as {
+    nom?: string; prenoms?: string; telephone?: string; motDePasse?: string;
+    delegueId?: number | null; // null = base centrale, number = délégué
+  };
+  const { nom, prenoms, telephone, motDePasse, delegueId = null } = body;
+
+  if (!nom?.trim() || !prenoms?.trim() || !telephone?.trim() || !motDePasse) {
+    res.status(400).json({ erreur: "Champs obligatoires : nom, prenoms, telephone, motDePasse" });
+    return;
+  }
+  if (motDePasse.length < 6) {
+    res.status(400).json({ erreur: "Le mot de passe doit comporter au moins 6 caractères" });
+    return;
+  }
+
+  try {
+    // Récupérer la section du délégué si rattaché à un délégué
+    let section: string | null = null;
+    if (delegueId) {
+      const [delegueRow] = await db
+        .select({ section: usersTable.section })
+        .from(usersTable)
+        .where(and(eq(usersTable.id, delegueId), eq(usersTable.cooperativeId, cooperativeId)))
+        .limit(1);
+      if (!delegueRow) {
+        res.status(404).json({ erreur: "Délégué introuvable" });
+        return;
+      }
+      section = delegueRow.section ?? null;
+    }
+
+    const passwordHash = await bcrypt.hash(motDePasse, 10);
+    const tel = telephone.trim().replace(/\s+/g, "");
+    const suffix = delegueId ?? "centrale";
+    const fakeEmail = `peseur-${tel}-${suffix}@terrain.local`;
+
+    const [created] = await db
+      .insert(usersTable)
+      .values({
+        nom: nom.trim(),
+        prenoms: prenoms.trim(),
+        email: fakeEmail,
+        telephone: tel,
+        passwordHash,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        role: "peseur" as any,
+        cooperativeId,
+        actif: true,
+        motDePasseTemporaire: true,
+        section,
+        delegueId: delegueId ?? null,
+      })
+      .returning({
+        id: usersTable.id, nom: usersTable.nom, prenoms: usersTable.prenoms,
+        telephone: usersTable.telephone, actif: usersTable.actif, delegueId: usersTable.delegueId,
+        createdAt: usersTable.createdAt,
+      });
+
+    res.status(201).json({ ...created, rattachement: delegueId ? "delegue" : "cooperative" });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("unique") || msg.includes("duplicate")) {
+      res.status(409).json({ erreur: "Un peseur avec ce numéro de téléphone existe déjà" });
+      return;
+    }
+    req.log.error({ err }, "createPeseurAdmin");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// PUT /users/peseurs/:id/password  (délégué OU admin)
+export async function resetPeseurPassword(req: Request, res: Response): Promise<void> {
+  const role = req.user?.role ?? "";
+  const isAdmin = ROLES_ADMIN_PESEUR.includes(role);
+  const isDelegue = role === "delegue";
+  if (!isAdmin && !isDelegue) {
+    res.status(403).json({ erreur: "Accès non autorisé" });
+    return;
+  }
+  const cooperativeId = req.user?.cooperativeId;
+  const peseurId = parseInt(String(req.params["id"] ?? "0"), 10);
+  if (!peseurId) { res.status(400).json({ erreur: "ID invalide" }); return; }
+
+  const { nouveauMotDePasse } = req.body as { nouveauMotDePasse?: string };
+  if (!nouveauMotDePasse || nouveauMotDePasse.length < 6) {
+    res.status(400).json({ erreur: "Le mot de passe doit comporter au moins 6 caractères" });
+    return;
+  }
+  try {
+    const whereConditions = isDelegue && !isAdmin
+      ? and(eq(usersTable.id, peseurId), eq(usersTable.delegueId, req.user!.id))
+      : and(eq(usersTable.id, peseurId), eq(usersTable.cooperativeId, cooperativeId!));
+    const [row] = await db.select({ id: usersTable.id }).from(usersTable).where(whereConditions).limit(1);
+    if (!row) { res.status(404).json({ erreur: "Peseur introuvable" }); return; }
+    const passwordHash = await bcrypt.hash(nouveauMotDePasse, 10);
+    await db.update(usersTable).set({ passwordHash, motDePasseTemporaire: true }).where(eq(usersTable.id, peseurId));
+    res.json({ message: "Mot de passe réinitialisé avec succès" });
+  } catch (err) {
+    req.log.error({ err }, "resetPeseurPassword");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

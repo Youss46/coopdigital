@@ -50,9 +50,9 @@ router.post("/terrain/sync", terrainAuthMiddleware, postSyncHandler);
 // Commissions du délégué connecté
 router.get("/terrain/mes-commissions", terrainAuthMiddleware, delegueOnly, getMesCommissionsHandler);
 
-// Routes protégées délégué uniquement
-router.get("/terrain/fournisseurs", terrainAuthMiddleware, delegueOnly, getFournisseursHandler);
-router.get("/terrain/fournisseur/:id/recap", terrainAuthMiddleware, delegueOnly, getFournisseurRecapHandler);
+// Fournisseurs : délégué ET peseur (le service filtre par périmètre du peseur)
+router.get("/terrain/fournisseurs", terrainAuthMiddleware, peseurOrDelegueOnly, getFournisseursHandler);
+router.get("/terrain/fournisseur/:id/recap", terrainAuthMiddleware, peseurOrDelegueOnly, getFournisseurRecapHandler);
 router.post("/terrain/collecte", terrainAuthMiddleware, collecteAllowed, postCollecteHandler);
 router.post("/terrain/paiement", terrainAuthMiddleware, delegueOnly, postPaiementHandler);
 router.post("/terrain/avance", terrainAuthMiddleware, delegueOnly, postAvanceHandler);

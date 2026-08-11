@@ -129,7 +129,7 @@ export async function createSession(
 // ─── Lister sessions (avec lignes count) ──────────────────────────────────────
 export async function getSessions(
   cooperativeId: number,
-  opts: { statut?: string; membreId?: number; limit?: number } = {},
+  opts: { statut?: string; membreId?: number; limit?: number; peseurId?: number } = {},
 ) {
   const conditions = [eq(sessionsPeseeTable.cooperativeId, cooperativeId)];
   if (opts.statut) {
@@ -139,6 +139,10 @@ export async function getSessions(
   }
   if (opts.membreId) {
     conditions.push(eq(sessionsPeseeTable.membreId, opts.membreId));
+  }
+  // Peseur : ne voit que ses propres sessions
+  if (opts.peseurId !== undefined) {
+    conditions.push(eq(sessionsPeseeTable.peseurId, opts.peseurId));
   }
 
   const sessions = await db

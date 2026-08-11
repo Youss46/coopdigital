@@ -8,6 +8,8 @@ export interface TerrainJwtPayload {
   section: string | null;
   zoneType: string | null;
   zoneNom: string | null;
+  /** Pour les peseurs : ID du délégué auquel ils sont rattachés (null = base centrale) */
+  delegueId?: number | null;
 }
 
 declare global {

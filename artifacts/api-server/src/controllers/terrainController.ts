@@ -50,12 +50,15 @@ export async function getPrixHandler(req: Request, res: Response): Promise<void>
 }
 
 export async function getFournisseursHandler(req: Request, res: Response): Promise<void> {
-  const { cooperativeId } = getAgent(req);
+  const agent = getAgent(req);
+  const { cooperativeId } = agent;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
   const search = req.query["search"] as string | undefined;
   const section = req.query["section"] as string | undefined;
+  // Peseur : filtrer selon le périmètre de rattachement (delegueId du peseur dans le JWT)
+  const peseurScopeDelegueId = agent.role === "peseur" ? (agent.delegueId ?? null) : undefined;
   try {
-    const fournisseurs = await terrainService.getFournisseurs(cooperativeId, section, search);
+    const fournisseurs = await terrainService.getFournisseurs(cooperativeId, section, search, peseurScopeDelegueId);
     res.json(fournisseurs);
   } catch (err) {
     req.log.error({ err }, "Erreur fournisseurs terrain");

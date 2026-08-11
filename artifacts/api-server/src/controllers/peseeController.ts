@@ -324,11 +324,14 @@ export async function handleGetSessions(req: Request, res: Response): Promise<vo
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const { statut, membreId, limit } = req.query as { statut?: string; membreId?: string; limit?: string };
+  // Peseur : ne voit que ses propres sessions (filtre par peseurId)
+  const peseurId = req.agent?.role === "peseur" ? req.agent.id : undefined;
   try {
     const sessions = await getSessions(cooperativeId, {
       statut,
       membreId: membreId ? parseInt(membreId) : undefined,
       limit: limit ? parseInt(limit) : undefined,
+      peseurId,
     });
     res.json(sessions);
   } catch (err) {

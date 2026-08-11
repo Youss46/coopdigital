@@ -5,7 +5,7 @@ import {
   caissesDeleguesTable, mouvementsCaisseDelegueTable, sessionsPeseeTable,
   entrepotsTable, mouvementsStockTable,
 } from "@workspace/db";
-import { and, eq, sql, desc, or } from "drizzle-orm";
+import { and, eq, sql, desc, or, isNull } from "drizzle-orm";
 import { creerCommissionSiTaux } from "./commissionService.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -47,6 +47,8 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
     section: user.section ?? null,
     zoneType: user.zoneType ?? null,
     zoneNom: user.zoneNom ?? null,
+    // Pour les peseurs : inclure leur delegueId pour le filtrage des membres/sessions
+    ...(user.role === "peseur" ? { delegueId: user.delegueId ?? null } : {}),
   };
   const token = jwt.sign(payload, secret, { expiresIn: "24h" });
 
@@ -64,6 +66,7 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
       zoneType: user.zoneType ?? null,
       zoneNom: user.zoneNom ?? null,
       motDePasseTemporaire: user.motDePasseTemporaire,
+      ...(user.role === "peseur" ? { delegueId: user.delegueId ?? null } : {}),
     },
   };
 }
@@ -148,11 +151,31 @@ export async function getPrixActuel(cooperativeId: number) {
 
 // ─── Fournisseurs ─────────────────────────────────────────────────────────
 
-export async function getFournisseurs(cooperativeId: number, section?: string, search?: string) {
+export async function getFournisseurs(
+  cooperativeId: number,
+  section?: string,
+  search?: string,
+  /** Périmètre peseur :
+   *  - number → membres rattachés à ce délégué
+   *  - null   → membres sans délégué (base centrale)
+   *  - undefined → pas de filtre (délégué, agent_terrain)
+   */
+  peseurScopeDelegueId?: number | null,
+) {
+  const whereConditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
+  if (peseurScopeDelegueId !== undefined) {
+    if (peseurScopeDelegueId === null) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      whereConditions.push(isNull(membresTable.delegueId) as any);
+    } else {
+      whereConditions.push(eq(membresTable.delegueId, peseurScopeDelegueId));
+    }
+  }
+
   const membres = await db
     .select()
     .from(membresTable)
-    .where(eq(membresTable.cooperativeId, cooperativeId))
+    .where(and(...whereConditions))
     .orderBy(membresTable.nom)
     .limit(300);
 

@@ -10,6 +10,8 @@ export interface AgentUser {
   zoneType: string | null;
   zoneNom: string | null;
   motDePasseTemporaire?: boolean;
+  /** Peseur uniquement : ID du délégué de rattachement (null = base centrale) */
+  delegueId?: number | null;
 }
 
 export interface Fournisseur {
