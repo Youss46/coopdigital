@@ -138,15 +138,45 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
 
     // Phase 2 — remplissage de l'écart : ajouter des livraisons sautées si leur poids ≤ reste
     let reste = Math.round((quantiteCibleKg - cumul) * 1000) / 1000;
+    const nonSelectionnees: Array<{ id: number; poidsKg: string; nombreSacs: number | null }> = [];
     for (const l of candidatesRestantes) {
-      if (reste <= 0) break;
+      if (reste <= 0) {
+        nonSelectionnees.push(l);
+        continue;
+      }
       const poids = parseFloat(l.poidsKg);
       if (poids <= reste + 0.001) { // tolérance flottant 1g
         selectedIds.push(l.id);
         cumul += poids;
         totalSacs += l.nombreSacs ?? 0;
         reste = Math.round((quantiteCibleKg - cumul) * 1000) / 1000;
+      } else {
+        nonSelectionnees.push(l);
       }
+    }
+
+    // Phase 3 — fractionnement : si déficit > 0 et des livraisons non sélectionnées existent,
+    // proposer de fractionner la plus légère d'entre elles pour combler exactement le reste.
+    let fractionLivraisonId: number | undefined;
+    let fractionPoidsKg: number | undefined;
+    let fractionReliquatKg: number | undefined;
+
+    reste = Math.round((quantiteCibleKg - cumul) * 1000) / 1000;
+    if (reste > 0.001 && nonSelectionnees.length > 0) {
+      // Choisir la livraison avec le poids le plus proche du reste (minimise le reliquat)
+      let meilleure = nonSelectionnees[0]!;
+      let ecartMin = Math.abs(parseFloat(meilleure.poidsKg) - reste);
+      for (const l of nonSelectionnees.slice(1)) {
+        const ecart = Math.abs(parseFloat(l.poidsKg) - reste);
+        if (ecart < ecartMin) {
+          meilleure = l;
+          ecartMin = ecart;
+        }
+      }
+      fractionLivraisonId = meilleure.id;
+      fractionPoidsKg = Math.round(reste * 100) / 100;
+      fractionReliquatKg = Math.round((parseFloat(meilleure.poidsKg) - fractionPoidsKg) * 100) / 100;
+      cumul += fractionPoidsKg;
     }
 
     const deficitKg = Math.max(0, Math.round((quantiteCibleKg - cumul) * 100) / 100);
@@ -158,6 +188,9 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
       nbDisponibles: disponibles.length,   // total avant filtrage
       deficitKg,
       nombreSacsTotal: totalSacs,
+      fractionLivraisonId,
+      fractionPoidsKg,
+      fractionReliquatKg,
     });
   } catch (err) {
     req.log.error({ err }, "Erreur previewAutoLot");
@@ -178,9 +211,110 @@ export async function createLot(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { livraisonIds, entrepot, nombreSacs, quantiteCibleKg } = parse.data;
+  const { livraisonIds: livraisonIdsRaw, entrepot, nombreSacs, quantiteCibleKg, fractionLivraisonId, fractionPoidsKg } = parse.data;
+
+  // IDs finaux à inclure dans le lot (pourra être augmenté d'un ID de fraction créée)
+  let livraisonIds = [...livraisonIdsRaw];
 
   try {
+    // ── Fractionnement ─────────────────────────────────────────────────────────
+    // Si une livraison doit être scindée pour atteindre exactement la cible :
+    // 1. Récupérer la livraison originale
+    // 2. Créer une nouvelle livraison (portion pour le lot) avec poidsKg = fractionPoidsKg
+    // 3. Réduire la livraison originale (reliquat) à poidsKg = originalPoids - fractionPoidsKg
+    // 4. Ajouter l'ID de la nouvelle livraison à livraisonIds
+    if (fractionLivraisonId != null && fractionPoidsKg != null && fractionPoidsKg > 0) {
+      const [original] = await db
+        .select()
+        .from(livraisonsTable)
+        .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+        .where(
+          and(
+            eq(livraisonsTable.id, fractionLivraisonId),
+            or(
+              eq(membresTable.cooperativeId, cooperativeId),
+              eq(fournisseursTable.cooperativeId, cooperativeId),
+            ),
+          ),
+        );
+
+      if (!original) {
+        res.status(403).json({ erreur: "La livraison à fractionner n'appartient pas à votre coopérative" });
+        return;
+      }
+
+      const liv = original.livraisons;
+      const originalPoidsKg = parseFloat(liv.poidsKg);
+      const reliquatKg = Math.round((originalPoidsKg - fractionPoidsKg) * 100) / 100;
+
+      if (reliquatKg <= 0) {
+        res.status(400).json({ erreur: "fractionPoidsKg doit être inférieur au poids de la livraison originale" });
+        return;
+      }
+
+      // Vérifier que la livraison originale n'est pas déjà dans un lot
+      const [dejaFraction] = await db
+        .select({ livraisonId: lotLivraisonsTable.livraisonId })
+        .from(lotLivraisonsTable)
+        .where(eq(lotLivraisonsTable.livraisonId, fractionLivraisonId));
+
+      if (dejaFraction) {
+        res.status(400).json({ erreur: `La livraison ${fractionLivraisonId} est déjà dans un lot` });
+        return;
+      }
+
+      // Calculer la répartition proportionnelle des sacs
+      const originalSacs = liv.nombreSacs ?? 0;
+      const sacsFraction = originalSacs > 0
+        ? Math.floor(originalSacs * fractionPoidsKg / originalPoidsKg)
+        : null;
+      const sacsReliquat = originalSacs > 0 && sacsFraction != null
+        ? originalSacs - sacsFraction
+        : null;
+
+      await db.transaction(async (tx) => {
+        // Créer la livraison fractionnée (portion pour ce lot)
+        const [nouvelleLiv] = await tx
+          .insert(livraisonsTable)
+          .values({
+            membreId: liv.membreId,
+            fournisseurId: liv.fournisseurId,
+            campagneId: liv.campagneId,
+            produit: liv.produit ?? "cacao",
+            poidsKg: String(fractionPoidsKg),
+            nombreSacs: sacsFraction,
+            prixUnitaireFcfa: liv.prixUnitaireFcfa,
+            montantBrutFcfa: Math.round(liv.montantBrutFcfa * fractionPoidsKg / originalPoidsKg),
+            avanceDeduiteFcfa: 0,
+            intrantsDeduitsFcfa: 0,
+            montantNetFcfa: Math.round(liv.montantNetFcfa * fractionPoidsKg / originalPoidsKg),
+            dateLivraison: liv.dateLivraison,
+            agentId: liv.agentId,
+            sectionLivraison: liv.sectionLivraison,
+            typeFournisseur: liv.typeFournisseur,
+            statutPaiement: liv.statutPaiement ?? "PAYÉ",
+          })
+          .returning({ id: livraisonsTable.id });
+
+        if (!nouvelleLiv) throw new Error("Échec création livraison fractionnée");
+
+        // Réduire la livraison originale au reliquat
+        await tx
+          .update(livraisonsTable)
+          .set({
+            poidsKg: String(reliquatKg),
+            nombreSacs: sacsReliquat,
+            montantBrutFcfa: Math.round(liv.montantBrutFcfa * reliquatKg / originalPoidsKg),
+            montantNetFcfa: Math.round(liv.montantNetFcfa * reliquatKg / originalPoidsKg),
+          })
+          .where(eq(livraisonsTable.id, fractionLivraisonId));
+
+        livraisonIds = [...livraisonIds, nouvelleLiv.id];
+      });
+    }
+
+    // ── Vérifications standard ─────────────────────────────────────────────────
     // Vérifier que toutes les livraisons appartiennent à cette coopérative
     // (membres OU fournisseurs externes) — on utilise Drizzle type-safe au lieu
     // de sql`ANY()` qui ne sérialise pas les tableaux JS correctement avec pg.

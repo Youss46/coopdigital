@@ -906,6 +906,12 @@ export default function TracabilitePage() {
   const [quantiteCibleInput, setQuantiteCibleInput] = useState<string>("");
   const [toleranceInput, setToleranceInput] = useState<string>("5");
   const [autoSelectLoading, setAutoSelectLoading] = useState(false);
+  // Fractionnement en attente : livraison à scinder lors de la création du lot
+  const [fractionPendante, setFractionPendante] = useState<{
+    livraisonId: number;
+    poidsKg: number;
+    reliquatKg: number;
+  } | null>(null);
 
   const { data: lots = [], isLoading } = useGetLots({
     statut: (filtreStatut as LotStatut) || undefined,
@@ -923,6 +929,7 @@ export default function TracabilitePage() {
         setSelection([]);
         setEntrepotId("");
         setNombreSacsInput("");
+        setFractionPendante(null);
       },
       onError: (err) => {
         const msg =
@@ -950,10 +957,13 @@ export default function TracabilitePage() {
       : (l as { membreId?: number | null }).membreId != null
   );
 
-  const toggleSelection = (id: number) =>
+  const toggleSelection = (id: number) => {
+    setFractionPendante(null); // annuler le fractionnement si on change manuellement la sélection
     setSelection((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  };
 
   const toutSelectionner = () => {
+    setFractionPendante(null);
     if (selection.length === livraisonsAfficher.length) {
       setSelection([]);
     } else {
@@ -974,6 +984,8 @@ export default function TracabilitePage() {
         entrepot: entrepotNom ?? undefined,
         nombreSacs: nombreSacsInput ? parseInt(nombreSacsInput, 10) : undefined,
         quantiteCibleKg: quantiteCibleInput ? parseFloat(quantiteCibleInput) : undefined,
+        fractionLivraisonId: fractionPendante?.livraisonId,
+        fractionPoidsKg: fractionPendante?.poidsKg,
       },
     });
   };
@@ -994,12 +1006,23 @@ export default function TracabilitePage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({ quantiteCibleKg: cible, pourFournisseurs }),
       });
-      const data = await res.json() as { erreur?: string; livraisonIds: number[]; poidsTotalKg: number; nbLivraisons: number; nbDisponibles: number; deficitKg: number; nombreSacsTotal: number };
+      const data = await res.json() as {
+        erreur?: string;
+        livraisonIds: number[];
+        poidsTotalKg: number;
+        nbLivraisons: number;
+        nbDisponibles: number;
+        deficitKg: number;
+        nombreSacsTotal: number;
+        fractionLivraisonId?: number;
+        fractionPoidsKg?: number;
+        fractionReliquatKg?: number;
+      };
       if (!res.ok) {
         toast({ title: "Erreur", description: data.erreur ?? "Impossible de calculer la sélection", variant: "destructive" });
         return;
       }
-      if (data.nbLivraisons === 0) {
+      if (data.nbLivraisons === 0 && !data.fractionLivraisonId) {
         if (data.nbDisponibles === 0) {
           toast({ title: "Aucune livraison disponible", description: "Il n'y a pas de livraisons non lotées pour cette coopérative.", variant: "destructive" });
         } else {
@@ -1012,12 +1035,25 @@ export default function TracabilitePage() {
         return;
       }
       setSelection(data.livraisonIds);
+      // Enregistrer le fractionnement si proposé par le backend
+      if (data.fractionLivraisonId != null && data.fractionPoidsKg != null && data.fractionReliquatKg != null) {
+        setFractionPendante({
+          livraisonId: data.fractionLivraisonId,
+          poidsKg: data.fractionPoidsKg,
+          reliquatKg: data.fractionReliquatKg,
+        });
+      } else {
+        setFractionPendante(null);
+      }
       // Auto-remplir le nombre de sacs calculé depuis les livraisons
       if (data.nombreSacsTotal > 0) setNombreSacsInput(String(data.nombreSacsTotal));
       const deficitTxt = data.deficitKg > 0 ? ` — écart : ${formaterPoids(data.deficitKg)} sous la cible` : "";
+      const fractionTxt = data.fractionLivraisonId
+        ? ` · livraison #${data.fractionLivraisonId} fractionnée (${formaterPoids(data.fractionPoidsKg ?? 0)} retenus, ${formaterPoids(data.fractionReliquatKg ?? 0)} reliquat)`
+        : "";
       toast({
-        title: `${data.nbLivraisons} livraison${data.nbLivraisons > 1 ? "s" : ""} sélectionnée${data.nbLivraisons > 1 ? "s" : ""}`,
-        description: `Poids retenu : ${formaterPoids(data.poidsTotalKg)}${deficitTxt}`,
+        title: `${data.nbLivraisons + (data.fractionLivraisonId ? 1 : 0)} livraison${data.nbLivraisons + (data.fractionLivraisonId ? 1 : 0) > 1 ? "s" : ""} sélectionnée${data.nbLivraisons + (data.fractionLivraisonId ? 1 : 0) > 1 ? "s" : ""}`,
+        description: `Poids retenu : ${formaterPoids(data.poidsTotalKg)}${deficitTxt}${fractionTxt}`,
       });
     } catch {
       toast({ title: "Erreur réseau", description: "Impossible de joindre le serveur.", variant: "destructive" });
