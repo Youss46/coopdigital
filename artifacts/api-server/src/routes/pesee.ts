@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth";
-import { terrainAuthMiddleware, peseurOrDelegueOnly } from "../middlewares/terrainAuth.js";
+import { terrainAuthMiddleware, peseurOrDelegueOnly, flexAuthMiddleware } from "../middlewares/terrainAuth.js";
 import {
   handleGetBalancesAlertes,
   handleGetBalances,
@@ -53,8 +53,8 @@ router.put("/pesee/config",                  authMiddleware, handleUpdateConfig)
 // Route fixe avant les routes paramétrées /:id
 router.post("/pesee/sessions/expirer",                terrainAuthMiddleware, peseurOrDelegueOnly, handleExpirerSessionsStales);
 router.post("/pesee/sessions",                        terrainAuthMiddleware, peseurOrDelegueOnly, handleCreateSession);
-router.get("/pesee/sessions",                         terrainAuthMiddleware, peseurOrDelegueOnly, handleGetSessions);
-router.get("/pesee/sessions/:id",                     terrainAuthMiddleware, peseurOrDelegueOnly, handleGetSession);
+router.get("/pesee/sessions",                         flexAuthMiddleware, handleGetSessions);
+router.get("/pesee/sessions/:id",                     flexAuthMiddleware, handleGetSession);
 router.post("/pesee/sessions/:id/lignes",             terrainAuthMiddleware, peseurOrDelegueOnly, handleAddLigne);
 router.delete("/pesee/sessions/:id/lignes/:ligneId",  terrainAuthMiddleware, peseurOrDelegueOnly, handleDeleteLigne);
 router.put("/pesee/sessions/:id/terminer",            terrainAuthMiddleware, peseurOrDelegueOnly, handleTerminerSession);

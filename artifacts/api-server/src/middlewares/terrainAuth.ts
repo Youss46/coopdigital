@@ -72,3 +72,35 @@ export function collecteAllowed(req: Request, res: Response, next: NextFunction)
   }
   next();
 }
+
+/**
+ * Middleware flexible : accepte un token terrain (→ req.agent) OU un token coopératif (→ req.user).
+ * Utilisé pour les routes de lecture des sessions de pesée qui doivent être accessibles
+ * aussi bien depuis l'app terrain que depuis le front-office coopératif.
+ */
+export function flexAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res.status(401).json({ erreur: "Token d'authentification manquant" });
+    return;
+  }
+  const token = authHeader.slice(7);
+  const secret = process.env["JWT_SECRET"] ?? process.env["SESSION_SECRET"];
+  if (!secret) {
+    res.status(500).json({ erreur: "Erreur de configuration du serveur" });
+    return;
+  }
+  try {
+    const payload = jwt.verify(token, secret) as TerrainJwtPayload & { role: string };
+    if (payload.role === "delegue" || payload.role === "agent_terrain" || payload.role === "peseur") {
+      req.agent = payload as TerrainJwtPayload;
+    } else {
+      // Token coopératif — importe JwtPayload à la volée pour typer req.user
+      (req as Request & { user?: { id: number; role: string; cooperativeId: number | null } }).user =
+        payload as { id: number; role: string; cooperativeId: number | null };
+    }
+    next();
+  } catch {
+    res.status(401).json({ erreur: "Token invalide ou expiré" });
+  }
+}
