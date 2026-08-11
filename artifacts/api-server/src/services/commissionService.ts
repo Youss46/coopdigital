@@ -16,6 +16,8 @@ import {
   commissionsDeleguesTable,
   caissesTable,
   mouvementsCaisseTable,
+  comptesMobilesMarchandsTable,
+  mouvementsMobileMarchandTable,
   usersTable,
   campagnesTable,
 } from "@workspace/db";
@@ -170,8 +172,10 @@ export async function payerCommissions(
     })
     .where(inArray(commissionsDeleguesTable.id, commissions.map((c) => c.id)));
 
-  // Débiter la caisse principale si paiement en espèces
-  // (mobile money / virement / chèque sortent via d'autres comptes)
+  const today = new Date().toISOString().slice(0, 10);
+  const libelleMvt = `Paiement commissions délégué (${commissions.length} livraison${commissions.length > 1 ? "s" : ""})`;
+
+  // ── Espèces → débiter la caisse centrale ─────────────────────────────────
   if (modePaiement === "especes") {
     const [caisse] = await db
       .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
@@ -187,23 +191,67 @@ export async function payerCommissions(
 
     if (caisse) {
       const nouveauSolde = toNum(caisse.solde) - montantTotal;
-      await db
-        .update(caissesTable)
+      await db.update(caissesTable)
         .set({ soldeActuelFcfa: String(nouveauSolde) })
         .where(eq(caissesTable.id, caisse.id));
-
       await db.insert(mouvementsCaisseTable).values({
         caisseId:       caisse.id,
         cooperativeId,
         type:           "sortie",
         motif:          "commission_delegue",
         montantFcfa:    String(montantTotal),
-        libelle:        `Paiement commissions délégué (${commissions.length} livraison${commissions.length > 1 ? "s" : ""})`,
+        libelle:        libelleMvt,
         soldeApresFcfa: String(nouveauSolde),
       });
     } else {
       throw new Error("Aucune caisse centrale active trouvée. Créez ou activez une caisse principale avant de payer des commissions en espèces.");
     }
+  }
+
+  // ── Mobile money → débiter le compte marchand correspondant ──────────────
+  const OPERATEURS_MOBILE = ["wave", "orange_money", "mtn_momo"] as const;
+  type OperateurMobile = typeof OPERATEURS_MOBILE[number];
+
+  if (OPERATEURS_MOBILE.includes(modePaiement as OperateurMobile)) {
+    const operateur = modePaiement as OperateurMobile;
+
+    const [compte] = await db
+      .select({ id: comptesMobilesMarchandsTable.id, solde: comptesMobilesMarchandsTable.soldeActuelFcfa, nom: comptesMobilesMarchandsTable.nom })
+      .from(comptesMobilesMarchandsTable)
+      .where(
+        and(
+          eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
+          eq(comptesMobilesMarchandsTable.operateur, operateur),
+          eq(comptesMobilesMarchandsTable.actif, true),
+        )
+      )
+      .limit(1);
+
+    if (!compte) {
+      throw new Error(`Aucun compte marchand ${operateur.replace("_", " ")} actif trouvé. Créez-en un dans le module Mobile Marchand avant de payer via ce canal.`);
+    }
+
+    const soldeActuel = toNum(compte.solde);
+    if (soldeActuel < montantTotal) {
+      throw new Error(`Solde insuffisant sur le compte ${compte.nom} — disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA, requis : ${montantTotal.toLocaleString("fr-FR")} FCFA.`);
+    }
+
+    const nouveauSolde = soldeActuel - montantTotal;
+    await db.update(comptesMobilesMarchandsTable)
+      .set({ soldeActuelFcfa: String(nouveauSolde) })
+      .where(eq(comptesMobilesMarchandsTable.id, compte.id));
+
+    await db.insert(mouvementsMobileMarchandTable).values({
+      compteId:       compte.id,
+      cooperativeId,
+      type:           "debit",
+      motif:          "commission_delegue",
+      montantFcfa:    String(montantTotal),
+      libelle:        libelleMvt,
+      reference:      referencePaiement ?? null,
+      dateOperation:  today,
+      soldeApresFcfa: String(nouveauSolde),
+    });
   }
 
   return { montantTotal, nb: commissions.length };
