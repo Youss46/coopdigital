@@ -459,6 +459,7 @@ export async function creerLivraisonDepuisSession(
         lotId: null,
         type: "entree",
         poidsKg: String(poidsKg),
+        nombreSacs: session.nbSacsTotal ?? null,
         motif: `Livraison depuis session pesée #${sessionId}`,
         agentId: data.agentId ?? null,
       });

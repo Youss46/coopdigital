@@ -404,6 +404,7 @@ export async function enregistrerCollecte(
       lotId: null,
       type: "entree",
       poidsKg: String(data.poidsBrutKg),
+      nombreSacs: data.nombreSacs ?? null,
       motif: `Collecte terrain LIV-${livraison.id}`,
       agentId,
     });
