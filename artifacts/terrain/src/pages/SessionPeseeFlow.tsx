@@ -11,6 +11,7 @@ import {
   deleteLignePesee,
   terminerSessionPesee,
   annulerSessionPesee,
+  SessionEnCoursError,
 } from "../lib/api";
 import type { Fournisseur, SessionDetail } from "../lib/types";
 
@@ -80,10 +81,21 @@ export default function SessionPeseeFlow() {
         setSession(detail);
       } else {
         // Créer une nouvelle session
-        const s = await createSessionPesee({ membreId: f.id, produit: "cacao", operation: "reception" });
-        const { getSessionDetail: fetchDetail } = await import("../lib/api");
-        const detail = await fetchDetail(s.id);
-        setSession(detail);
+        try {
+          const s = await createSessionPesee({ membreId: f.id, produit: "cacao", operation: "reception" });
+          const { getSessionDetail: fetchDetail } = await import("../lib/api");
+          const detail = await fetchDetail(s.id);
+          setSession(detail);
+        } catch (createErr) {
+          // Race condition: another peseur created a session between our check and our create
+          if (createErr instanceof SessionEnCoursError) {
+            const { getSessionDetail: fetchDetail } = await import("../lib/api");
+            const detail = await fetchDetail(createErr.sessionId);
+            setSession(detail);
+          } else {
+            throw createErr;
+          }
+        }
       }
       setStep("session");
     } catch (err) {

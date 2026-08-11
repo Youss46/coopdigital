@@ -265,10 +265,44 @@ async function apiPeseeFetch<T>(path: string, options: RequestInit = {}): Promis
   return res.json() as Promise<T>;
 }
 
+/** Thrown when the API returns 409 — an `en_cours` session already exists for this member. */
+export class SessionEnCoursError extends Error {
+  constructor(public readonly sessionId: number, public readonly numeroSession: string) {
+    super(`Une session en cours existe déjà pour ce membre (${numeroSession})`);
+    this.name = "SessionEnCoursError";
+  }
+}
+
 export async function createSessionPesee(data: {
   membreId?: number; produit?: string; operation?: string; notes?: string;
 }): Promise<import("./types").SessionPesee> {
-  return apiPeseeFetch("/pesee/sessions", { method: "POST", body: JSON.stringify(data) });
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+  const res = await fetch(`${PESEE_BASE}/pesee/sessions`, {
+    method: "POST",
+    body: JSON.stringify(data),
+    headers,
+  });
+  if (res.status === 409) {
+    const body = await res.json().catch(() => ({})) as {
+      sessionId?: number;
+      numeroSession?: string;
+    };
+    throw new SessionEnCoursError(body.sessionId!, body.numeroSession ?? "");
+  }
+  if (!res.ok) {
+    if (res.status === 401) {
+      clearAuth();
+      window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
+      throw new Error("Session expirée");
+    }
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
+  }
+  return res.json();
 }
 
 export async function getSessionsEnCours(membreId?: number): Promise<import("./types").SessionPesee[]> {

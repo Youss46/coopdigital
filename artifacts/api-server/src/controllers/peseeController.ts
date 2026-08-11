@@ -8,6 +8,7 @@ import {
   terminerSession,
   annulerSession,
   creerLivraisonDepuisSession,
+  SessionEnCoursError,
 } from "../services/peseeSessionService";
 import {
   CreateBalanceBody,
@@ -303,6 +304,15 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
     });
     res.status(201).json(session);
   } catch (err) {
+    if (err instanceof SessionEnCoursError) {
+      res.status(409).json({
+        erreur: err.message,
+        code: "SESSION_EN_COURS",
+        sessionId: err.sessionId,
+        numeroSession: err.numeroSession,
+      });
+      return;
+    }
     req.log.error(err, "handleCreateSession");
     res.status(500).json({ erreur: "Erreur création session" });
   }

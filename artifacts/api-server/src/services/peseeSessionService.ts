@@ -29,6 +29,19 @@ async function generateNumeroSession(cooperativeId: number): Promise<string> {
 }
 
 // ─── Créer une session ────────────────────────────────────────────────────────
+
+/** Thrown when an `en_cours` session already exists for the same (coop, membre). */
+export class SessionEnCoursError extends Error {
+  readonly code = "SESSION_EN_COURS";
+  constructor(
+    public readonly sessionId: number,
+    public readonly numeroSession: string,
+  ) {
+    super(`Une session en cours existe déjà pour ce membre (${numeroSession})`);
+    this.name = "SessionEnCoursError";
+  }
+}
+
 export async function createSession(
   cooperativeId: number,
   data: {
@@ -40,21 +53,72 @@ export async function createSession(
     notes?: string;
   },
 ) {
+  // Guard: refuse to create a second concurrent session for the same member
+  if (data.membreId) {
+    const [existing] = await db
+      .select({
+        id: sessionsPeseeTable.id,
+        numeroSession: sessionsPeseeTable.numeroSession,
+      })
+      .from(sessionsPeseeTable)
+      .where(
+        and(
+          eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+          eq(sessionsPeseeTable.membreId, data.membreId),
+          sql`${sessionsPeseeTable.statut}::text = 'en_cours'`,
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      throw new SessionEnCoursError(existing.id, existing.numeroSession);
+    }
+  }
+
   const numeroSession = await generateNumeroSession(cooperativeId);
-  const [session] = await db
-    .insert(sessionsPeseeTable)
-    .values({
-      cooperativeId,
-      numeroSession,
-      membreId: data.membreId,
-      produit: data.produit ?? "cacao",
-      operation: data.operation ?? "reception",
-      peseurId: data.peseurId,
-      balanceId: data.balanceId,
-      notes: data.notes,
-    })
-    .returning();
-  return session!;
+  try {
+    const [session] = await db
+      .insert(sessionsPeseeTable)
+      .values({
+        cooperativeId,
+        numeroSession,
+        membreId: data.membreId,
+        produit: data.produit ?? "cacao",
+        operation: data.operation ?? "reception",
+        peseurId: data.peseurId,
+        balanceId: data.balanceId,
+        notes: data.notes,
+      })
+      .returning();
+    return session!;
+  } catch (err) {
+    // PostgreSQL unique-constraint violation (23505) means a concurrent request
+    // won the race and already inserted an en_cours session for the same member.
+    // Re-read that session and surface it as SessionEnCoursError so the caller
+    // can return a 409 with the existing session id.
+    if (
+      data.membreId &&
+      typeof err === "object" &&
+      err !== null &&
+      (err as Record<string, unknown>)["code"] === "23505"
+    ) {
+      const [existing] = await db
+        .select({ id: sessionsPeseeTable.id, numeroSession: sessionsPeseeTable.numeroSession })
+        .from(sessionsPeseeTable)
+        .where(
+          and(
+            eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+            eq(sessionsPeseeTable.membreId, data.membreId),
+            sql`${sessionsPeseeTable.statut}::text = 'en_cours'`,
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        throw new SessionEnCoursError(existing.id, existing.numeroSession);
+      }
+    }
+    throw err;
+  }
 }
 
 // ─── Lister sessions (avec lignes count) ──────────────────────────────────────
