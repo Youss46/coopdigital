@@ -98,7 +98,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
   try {
     // Livraisons disponibles (non encore dans un lot) pour cette coopérative, triées FIFO
     const disponibles = await db
-      .select({ id: livraisonsTable.id, poidsKg: livraisonsTable.poidsKg, nombreSacs: livraisonsTable.nombreSacs })
+      .select({ id: livraisonsTable.id, poidsKg: livraisonsTable.poidsKg, produitBrutKg: livraisonsTable.produitBrutKg, nombreSacs: livraisonsTable.nombreSacs })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
@@ -120,13 +120,15 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
       .orderBy(livraisonsTable.dateLivraison); // FIFO — les plus anciennes en premier
 
     // Phase 1 — FIFO strict : n'inclure une livraison que si elle ne fait PAS dépasser la cible
+    // On travaille sur le poids brut (produit_brut_kg) = poids entré en stock.
+    // Si produit_brut_kg est null (livraison sans pesée brute), on retombe sur poids_kg.
     const selectedIds: number[] = [];
-    const candidatesRestantes: Array<{ id: number; poidsKg: string; nombreSacs: number | null }> = [];
+    const candidatesRestantes: Array<{ id: number; poidsKg: string; produitBrutKg: string | null; nombreSacs: number | null }> = [];
     let cumul = 0;
     let totalSacs = 0;
 
     for (const l of disponibles) {
-      const poids = parseFloat(l.poidsKg);
+      const poids = parseFloat(String(l.produitBrutKg ?? l.poidsKg));
       if (cumul + poids <= quantiteCibleKg) {
         selectedIds.push(l.id);
         cumul += poids;
@@ -138,13 +140,13 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
 
     // Phase 2 — remplissage de l'écart : ajouter des livraisons sautées si leur poids ≤ reste
     let reste = Math.round((quantiteCibleKg - cumul) * 1000) / 1000;
-    const nonSelectionnees: Array<{ id: number; poidsKg: string; nombreSacs: number | null }> = [];
+    const nonSelectionnees: Array<{ id: number; poidsKg: string; produitBrutKg: string | null; nombreSacs: number | null }> = [];
     for (const l of candidatesRestantes) {
       if (reste <= 0) {
         nonSelectionnees.push(l);
         continue;
       }
-      const poids = parseFloat(l.poidsKg);
+      const poids = parseFloat(String(l.produitBrutKg ?? l.poidsKg));
       if (poids <= reste + 0.001) { // tolérance flottant 1g
         selectedIds.push(l.id);
         cumul += poids;
@@ -156,18 +158,18 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
     }
 
     // Phase 3 — fractionnement : si déficit > 0 et des livraisons non sélectionnées existent,
-    // proposer de fractionner la plus légère d'entre elles pour combler exactement le reste.
+    // proposer de fractionner la plus légère d'entre elles pour combler exactement le reste (poids brut).
     let fractionLivraisonId: number | undefined;
-    let fractionPoidsKg: number | undefined;
-    let fractionReliquatKg: number | undefined;
+    let fractionPoidsKg: number | undefined;   // portion brut retenue
+    let fractionReliquatKg: number | undefined; // reliquat brut
 
     reste = Math.round((quantiteCibleKg - cumul) * 1000) / 1000;
     if (reste > 0.001 && nonSelectionnees.length > 0) {
-      // Choisir la livraison avec le poids le plus proche du reste (minimise le reliquat)
+      // Choisir la livraison avec le poids brut le plus proche du reste (minimise le reliquat)
       let meilleure = nonSelectionnees[0]!;
-      let ecartMin = Math.abs(parseFloat(meilleure.poidsKg) - reste);
+      let ecartMin = Math.abs(parseFloat(String(meilleure.produitBrutKg ?? meilleure.poidsKg)) - reste);
       for (const l of nonSelectionnees.slice(1)) {
-        const ecart = Math.abs(parseFloat(l.poidsKg) - reste);
+        const ecart = Math.abs(parseFloat(String(l.produitBrutKg ?? l.poidsKg)) - reste);
         if (ecart < ecartMin) {
           meilleure = l;
           ecartMin = ecart;
@@ -175,7 +177,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
       }
       fractionLivraisonId = meilleure.id;
       fractionPoidsKg = Math.round(reste * 100) / 100;
-      fractionReliquatKg = Math.round((parseFloat(meilleure.poidsKg) - fractionPoidsKg) * 100) / 100;
+      fractionReliquatKg = Math.round((parseFloat(String(meilleure.produitBrutKg ?? meilleure.poidsKg)) - fractionPoidsKg) * 100) / 100;
       cumul += fractionPoidsKg;
     }
 
@@ -245,11 +247,13 @@ export async function createLot(req: Request, res: Response): Promise<void> {
       }
 
       const liv = original.livraisons;
-      const originalPoidsKg = parseFloat(liv.poidsKg);
-      const reliquatKg = Math.round((originalPoidsKg - fractionPoidsKg) * 100) / 100;
+      // Le fractionnement se base sur le poids BRUT (= poids entré en stock)
+      const originalPoidsBrut = parseFloat(String(liv.produitBrutKg ?? liv.poidsKg));
+      const originalPoidsNet  = parseFloat(liv.poidsKg);
+      const reliquatBrut = Math.round((originalPoidsBrut - fractionPoidsKg) * 100) / 100;
 
-      if (reliquatKg <= 0) {
-        res.status(400).json({ erreur: "fractionPoidsKg doit être inférieur au poids de la livraison originale" });
+      if (reliquatBrut <= 0) {
+        res.status(400).json({ erreur: "fractionPoidsKg doit être inférieur au poids brut de la livraison originale" });
         return;
       }
 
@@ -264,14 +268,18 @@ export async function createLot(req: Request, res: Response): Promise<void> {
         return;
       }
 
-      // Calculer la répartition proportionnelle des sacs
+      // Répartition proportionnelle des sacs (sur base brut)
       const originalSacs = liv.nombreSacs ?? 0;
       const sacsFraction = originalSacs > 0
-        ? Math.floor(originalSacs * fractionPoidsKg / originalPoidsKg)
+        ? Math.floor(originalSacs * fractionPoidsKg / originalPoidsBrut)
         : null;
       const sacsReliquat = originalSacs > 0 && sacsFraction != null
         ? originalSacs - sacsFraction
         : null;
+
+      // Poids nets proportionnels au brut
+      const poidsNetFraction  = Math.round(originalPoidsNet * fractionPoidsKg / originalPoidsBrut * 100) / 100;
+      const poidsNetReliquat  = Math.round(originalPoidsNet * reliquatBrut / originalPoidsBrut * 100) / 100;
 
       await db.transaction(async (tx) => {
         // Créer la livraison fractionnée (portion pour ce lot)
@@ -282,13 +290,14 @@ export async function createLot(req: Request, res: Response): Promise<void> {
             fournisseurId: liv.fournisseurId,
             campagneId: liv.campagneId,
             produit: liv.produit ?? "cacao",
-            poidsKg: String(fractionPoidsKg),
+            produitBrutKg: String(fractionPoidsKg),
+            poidsKg: String(poidsNetFraction),
             nombreSacs: sacsFraction,
             prixUnitaireFcfa: liv.prixUnitaireFcfa,
-            montantBrutFcfa: Math.round(liv.montantBrutFcfa * fractionPoidsKg / originalPoidsKg),
+            montantBrutFcfa: Math.round(liv.montantBrutFcfa * fractionPoidsKg / originalPoidsBrut),
             avanceDeduiteFcfa: 0,
             intrantsDeduitsFcfa: 0,
-            montantNetFcfa: Math.round(liv.montantNetFcfa * fractionPoidsKg / originalPoidsKg),
+            montantNetFcfa: Math.round(liv.montantNetFcfa * fractionPoidsKg / originalPoidsBrut),
             dateLivraison: liv.dateLivraison,
             agentId: liv.agentId,
             sectionLivraison: liv.sectionLivraison,
@@ -299,14 +308,15 @@ export async function createLot(req: Request, res: Response): Promise<void> {
 
         if (!nouvelleLiv) throw new Error("Échec création livraison fractionnée");
 
-        // Réduire la livraison originale au reliquat
+        // Réduire la livraison originale au reliquat (brut + net proportionnel)
         await tx
           .update(livraisonsTable)
           .set({
-            poidsKg: String(reliquatKg),
+            produitBrutKg: String(reliquatBrut),
+            poidsKg: String(poidsNetReliquat),
             nombreSacs: sacsReliquat,
-            montantBrutFcfa: Math.round(liv.montantBrutFcfa * reliquatKg / originalPoidsKg),
-            montantNetFcfa: Math.round(liv.montantNetFcfa * reliquatKg / originalPoidsKg),
+            montantBrutFcfa: Math.round(liv.montantBrutFcfa * reliquatBrut / originalPoidsBrut),
+            montantNetFcfa: Math.round(liv.montantNetFcfa * reliquatBrut / originalPoidsBrut),
           })
           .where(eq(livraisonsTable.id, fractionLivraisonId));
 
@@ -350,17 +360,19 @@ export async function createLot(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    // Somme sur le poids BRUT (produit_brut_kg) — c'est ce qui entre en stock.
+    // COALESCE : si produit_brut_kg est null (ancienne livraison sans pesée brute), on retombe sur poids_kg.
     const [poidsRow] = await db
-      .select({ total: sql<number>`coalesce(sum(poids_kg::numeric), 0)::float` })
+      .select({ total: sql<number>`coalesce(sum(coalesce(produit_brut_kg, poids_kg)::numeric), 0)::float` })
       .from(livraisonsTable)
       .where(inArray(livraisonsTable.id, livraisonIds));
 
     const poidsTotalKg = String(poidsRow?.total ?? 0);
 
-    // Garde quantité cible — refuser si le total dépasse la cible demandée
+    // Garde quantité cible — refuser si le total brut dépasse la cible demandée
     if (quantiteCibleKg && (poidsRow?.total ?? 0) > quantiteCibleKg + 0.001) {
       res.status(400).json({
-        erreur: `Le poids total des livraisons sélectionnées (${poidsRow?.total?.toFixed(1)} kg) dépasse la quantité cible (${quantiteCibleKg} kg)`,
+        erreur: `Le poids brut total des livraisons sélectionnées (${poidsRow?.total?.toFixed(1)} kg) dépasse la quantité cible (${quantiteCibleKg} kg)`,
       });
       return;
     }

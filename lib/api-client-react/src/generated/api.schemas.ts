@@ -792,6 +792,8 @@ export interface LivraisonDetail {
   id: number;
   membreId: number;
   poidsKg: string;
+  /** @nullable */
+  produitBrutKg?: string | null;
   prixUnitaireFcfa: number;
   montantBrutFcfa: number;
   avanceDeduiteFcfa: number;

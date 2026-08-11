@@ -350,6 +350,7 @@ export async function getLivraisonsNonLotees(req: Request, res: Response): Promi
         membreId: livraisonsTable.membreId,
         fournisseurId: livraisonsTable.fournisseurId,
         poidsKg: livraisonsTable.poidsKg,
+        produitBrutKg: livraisonsTable.produitBrutKg,
         prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
         montantBrutFcfa: livraisonsTable.montantBrutFcfa,
         avanceDeduiteFcfa: livraisonsTable.avanceDeduiteFcfa,

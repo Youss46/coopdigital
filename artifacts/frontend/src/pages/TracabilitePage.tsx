@@ -971,9 +971,13 @@ export default function TracabilitePage() {
     }
   };
 
+  // Poids entré en stock = brut si disponible, sinon net
+  const poidsStockKg = (l: { poidsKg: string; produitBrutKg?: string | null }) =>
+    parseFloat(String(l.produitBrutKg ?? l.poidsKg));
+
   const poidsSelectionne = livraisonsAfficher
     .filter((l) => selection.includes(l.id))
-    .reduce((s, l) => s + parseFloat(l.poidsKg), 0) + (fractionPendante?.poidsKg ?? 0);
+    .reduce((s, l) => s + poidsStockKg(l), 0) + (fractionPendante?.poidsKg ?? 0);
 
   const handleCreerLot = () => {
     if ((selection.length === 0 && !fractionPendante) || !utilisateur?.cooperativeId) return;
@@ -1472,7 +1476,12 @@ export default function TracabilitePage() {
                             {isFraction ? (
                               <span>
                                 <span className="text-amber-700 font-medium">{formaterPoids(fractionPendante.poidsKg)}</span>
-                                <span className="text-gray-400 text-xs ml-1">/ {formaterPoids(l.poidsKg)}</span>
+                                <span className="text-gray-400 text-xs ml-1">/ {formaterPoids(l.produitBrutKg ?? l.poidsKg)}</span>
+                              </span>
+                            ) : l.produitBrutKg ? (
+                              <span>
+                                {formaterPoids(l.produitBrutKg)}
+                                <span className="text-gray-400 text-xs ml-1">(net {formaterPoids(l.poidsKg)})</span>
                               </span>
                             ) : formaterPoids(l.poidsKg)}
                           </td>
