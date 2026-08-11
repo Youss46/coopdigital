@@ -14,6 +14,8 @@ import { db } from "@workspace/db";
 import {
   tauxCommissionsDeleguesTable,
   commissionsDeleguesTable,
+  caissesTable,
+  mouvementsCaisseTable,
   usersTable,
   campagnesTable,
 } from "@workspace/db";
@@ -167,6 +169,42 @@ export async function payerCommissions(
       referencePaiement: referencePaiement ?? null,
     })
     .where(inArray(commissionsDeleguesTable.id, commissions.map((c) => c.id)));
+
+  // Débiter la caisse principale si paiement en espèces
+  // (mobile money / virement / chèque sortent via d'autres comptes)
+  if (modePaiement === "especes") {
+    const [caisse] = await db
+      .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
+      .from(caissesTable)
+      .where(
+        and(
+          eq(caissesTable.cooperativeId, cooperativeId),
+          eq(caissesTable.typeCaisse, "centrale"),
+          eq(caissesTable.actif, true),
+        )
+      )
+      .limit(1);
+
+    if (caisse) {
+      const nouveauSolde = toNum(caisse.solde) - montantTotal;
+      await db
+        .update(caissesTable)
+        .set({ soldeActuelFcfa: String(nouveauSolde) })
+        .where(eq(caissesTable.id, caisse.id));
+
+      await db.insert(mouvementsCaisseTable).values({
+        caisseId:       caisse.id,
+        cooperativeId,
+        type:           "sortie",
+        motif:          "commission_delegue",
+        montantFcfa:    String(montantTotal),
+        libelle:        `Paiement commissions délégué (${commissions.length} livraison${commissions.length > 1 ? "s" : ""})`,
+        soldeApresFcfa: String(nouveauSolde),
+      });
+    } else {
+      logger.warn({ cooperativeId }, "payerCommissions espèces : aucune caisse centrale active — solde non mis à jour");
+    }
+  }
 
   return { montantTotal, nb: commissions.length };
 }
