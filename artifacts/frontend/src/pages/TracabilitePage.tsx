@@ -1236,6 +1236,47 @@ export default function TracabilitePage() {
                 {autoSelectLoading ? "Calcul…" : "Sélectionner auto."}
               </button>
             </div>
+
+            {/* Progression poids sélectionné / cible */}
+            {(() => {
+              const cible = quantiteCibleInput ? parseFloat(quantiteCibleInput) : null;
+              const depasse = cible !== null && poidsSelectionne > cible;
+              const pct = cible !== null && cible > 0 ? Math.min((poidsSelectionne / cible) * 100, 100) : null;
+              return (
+                <div className="mt-4">
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className="text-xs font-medium text-gray-600">Poids sélectionné</span>
+                    <span className={`text-sm font-semibold tabular-nums ${depasse ? "text-red-600" : "text-[#1a4731]"}`}>
+                      {poidsSelectionne.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kg
+                      {cible !== null && (
+                        <span className="text-gray-400 font-normal">
+                          {" "}/ {cible.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kg
+                          {" "}
+                          <span className={depasse ? "text-red-500" : "text-green-700"}>
+                            ({depasse ? "+" : ""}{(poidsSelectionne - (cible ?? 0)).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kg)
+                          </span>
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {pct !== null && (
+                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${depasse ? "bg-red-500" : "bg-green-600"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  )}
+                  {pct !== null && (
+                    <p className={`text-xs mt-1 ${depasse ? "text-red-500" : "text-green-700"}`}>
+                      {depasse
+                        ? `Dépassement de ${(poidsSelectionne - (cible ?? 0)).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kg`
+                        : `${pct.toFixed(1)} % de la cible atteint`}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-5">
