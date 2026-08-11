@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "../contexts/AuthContext";
 import { useOffline } from "../contexts/OfflineContext";
-import { getBilan, getSessionsEnCours } from "../lib/api";
+import { getBilan, getSessionsEnCours, getSessionsAConvertir } from "../lib/api";
 import BottomNavPeseur from "../components/BottomNavPeseur";
 import type { BilanJour, SessionPesee } from "../lib/types";
 
@@ -22,6 +22,7 @@ export default function AccueilPeseur() {
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
   const [bilan, setBilan] = useState<BilanJour | null>(null);
   const [sessionsEnCours, setSessionsEnCours] = useState<SessionPesee[]>([]);
+  const [sessionsAConvertir, setSessionsAConvertir] = useState<SessionPesee[]>([]);
 
   // Rafraîchit le bilan à chaque fois que la route revient sur "/" (retour depuis collecte, historique…)
   // et à chaque changement de connectivité
@@ -38,10 +39,11 @@ export default function AccueilPeseur() {
     }
   }, [syncStatus, isOnline]);
 
-  // Récupère les sessions de pesée en cours pour les afficher en raccourci
+  // Récupère les sessions de pesée en cours + terminées sans livraison pour les afficher en raccourci
   useEffect(() => {
-    if (!isOnline) { setSessionsEnCours([]); return; }
+    if (!isOnline) { setSessionsEnCours([]); setSessionsAConvertir([]); return; }
     getSessionsEnCours().then(setSessionsEnCours).catch(() => setSessionsEnCours([]));
+    getSessionsAConvertir().then(setSessionsAConvertir).catch(() => setSessionsAConvertir([]));
   }, [location, isOnline]);
 
   return (
@@ -138,6 +140,44 @@ export default function AccueilPeseur() {
                       Reprendre
                     </div>
                     <span style={{ fontSize: "1.1rem", color: "#3b82f6" }}>›</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* ── Sessions terminées sans livraison — à convertir ────────────── */}
+        {sessionsAConvertir.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            {sessionsAConvertir.map((s) => (
+              <Link key={s.id} href={`/pesee-session/${s.id}`}>
+                <div className="t-card" style={{
+                  marginBottom: 8,
+                  background: "linear-gradient(135deg, #1a2d14 0%, #1e3a1e 100%)",
+                  borderLeft: "4px solid #22c55e",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}>
+                  <span style={{ fontSize: "1.6rem" }}>📦</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: "#86efac" }}>
+                      Pesée clôturée · à convertir
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "#e2e8f0", marginTop: 2 }}>
+                      {s.membreNom} {s.membrePrenoms}
+                    </div>
+                    <div style={{ fontSize: ".72rem", color: "#64748b", marginTop: 2, fontFamily: "monospace" }}>
+                      {s.numeroSession} · {fmtPoids(parseFloat(s.poidsTotalKg))}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: ".85rem", fontWeight: 700, color: "#22c55e" }}>
+                      Convertir
+                    </div>
+                    <span style={{ fontSize: "1.1rem", color: "#22c55e" }}>›</span>
                   </div>
                 </div>
               </Link>

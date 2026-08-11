@@ -337,6 +337,7 @@ export interface SessionPesee {
   dateDebut: string;
   dateFin: string | null;
   notes: string | null;
+  livraisonId: number | null;
   createdAt: string;
 }
 

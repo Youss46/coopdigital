@@ -120,7 +120,6 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     (async () => {
       try {
         const detail = await getSessionDetail(sessionId);
-        setSession(detail);
         // Construire un fournisseur synthétique depuis les données de la session
         if (detail.membreId != null) {
           setFournisseur({
@@ -137,7 +136,14 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             derniereLivraison: null,
           });
         }
-        setStep("session");
+        if (detail.statut === "terminee") {
+          // Session clôturée — aller directement à l'écran de succès pour permettre la conversion
+          setSessionTerminee(detail);
+          setStep("succes");
+        } else {
+          setSession(detail);
+          setStep("session");
+        }
       } catch {
         // Silencieux — retombe sur le step "membre"
       } finally {
@@ -682,7 +688,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             )}
 
             {/* Bouton conversion (si pas encore convertie) */}
-            {!livraisonResult && isOnline && (
+            {!livraisonResult && !sessionTerminee?.livraisonId && isOnline && (
               <button
                 className="t-btn t-btn--primary"
                 style={{ width: "100%", marginBottom: 10, background: "linear-gradient(135deg, #16a34a, #15803d)" }}

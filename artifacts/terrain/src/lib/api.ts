@@ -310,6 +310,12 @@ export async function getSessionsEnCours(membreId?: number): Promise<import("./t
   return apiPeseeFetch(`/pesee/sessions${q}`);
 }
 
+/** Sessions clôturées sans livraison (terminee + livraisonId null) — le peseur peut encore les convertir. */
+export async function getSessionsAConvertir(): Promise<import("./types").SessionPesee[]> {
+  const sessions = await apiPeseeFetch<import("./types").SessionPesee[]>("/pesee/sessions?statut=terminee");
+  return sessions.filter((s) => s.livraisonId === null);
+}
+
 export async function getSessionDetail(sessionId: number): Promise<import("./types").SessionDetail> {
   return apiPeseeFetch(`/pesee/sessions/${sessionId}`);
 }
