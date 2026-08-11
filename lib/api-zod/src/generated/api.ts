@@ -1445,9 +1445,9 @@ export const createUserBodyMotDePasseMin = 8;
 export const CreateUserBody = zod.object({
   "nom": zod.string(),
   "prenoms": zod.string(),
-  "email": zod.string().email(),
+  "email": zod.string().email().optional(),
   "telephone": zod.string().optional(),
-  "role": zod.enum(['pca', 'directeur', 'comptable', 'caissier', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur', 'delegue']),
+  "role": zod.enum(['pca', 'directeur', 'comptable', 'caissier', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur', 'delegue', 'peseur']),
   "motDePasse": zod.string().min(createUserBodyMotDePasseMin)
 })
 
@@ -6458,8 +6458,7 @@ export const UpdateConfigPeseeBody = zod.object({
   "ecart_max_autorise_pct": zod.number().optional(),
   "seuil_double_pesee_kg": zod.number().optional(),
   "tolerance_balance_g": zod.number().optional(),
-  "frequence_verification_jours": zod.number().optional(),
-  "delai_expiration_session_heures": zod.number().optional()
+  "frequence_verification_jours": zod.number().optional()
 })
 
 export const UpdateConfigPeseeResponse = zod.object({
@@ -6469,7 +6468,6 @@ export const UpdateConfigPeseeResponse = zod.object({
   "seuil_double_pesee_kg": zod.number().optional(),
   "tolerance_balance_g": zod.number().optional(),
   "frequence_verification_jours": zod.number().optional(),
-  "delai_expiration_session_heures": zod.number().optional(),
   "updated_at": zod.string().nullish()
 })
 

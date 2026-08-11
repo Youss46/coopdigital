@@ -1558,12 +1558,13 @@ export const CreateUserInputRole = {
   agent_terrain: 'agent_terrain',
   auditeur: 'auditeur',
   delegue: 'delegue',
+  peseur: 'peseur',
 } as const;
 
 export interface CreateUserInput {
   nom: string;
   prenoms: string;
-  email: string;
+  email?: string;
   telephone?: string;
   role: CreateUserInputRole;
   /** @minLength 8 */

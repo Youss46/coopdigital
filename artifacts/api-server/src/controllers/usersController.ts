@@ -74,7 +74,8 @@ export async function createUser(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { nom, prenoms, email, telephone, role, motDePasse } = parse.data;
+  const { nom, prenoms, telephone, role, motDePasse } = parse.data;
+  let { email } = parse.data;
   const rawBody = req.body as Record<string, unknown>;
   const section      = (rawBody["section"]      ?? undefined) as string | undefined;
   const zoneType     = (rawBody["zoneType"]     ?? undefined) as string | undefined;
@@ -83,6 +84,19 @@ export async function createUser(req: Request, res: Response): Promise<void> {
 
   if (!canCreateUser(requesterRole, role)) {
     res.status(403).json({ erreur: "Vous ne pouvez pas créer un compte avec ce rôle" });
+    return;
+  }
+
+  // Les peseurs n'ont pas d'email réel — on génère un email interne à partir du téléphone
+  if (role === "peseur") {
+    if (!telephone?.trim()) {
+      res.status(400).json({ erreur: "Le numéro de téléphone est obligatoire pour un peseur" });
+      return;
+    }
+    const tel = telephone.trim().replace(/\s+/g, "");
+    email = `peseur-${tel}-coop${cooperativeId}@terrain.local`;
+  } else if (!email) {
+    res.status(400).json({ erreur: "L'email est obligatoire pour ce rôle" });
     return;
   }
 

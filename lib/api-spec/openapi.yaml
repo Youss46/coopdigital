@@ -8028,7 +8028,7 @@ components:
 
     CreateUserInput:
       type: object
-      required: [nom, prenoms, email, role, motDePasse]
+      required: [nom, prenoms, role, motDePasse]
       properties:
         nom:
           type: string
@@ -8041,7 +8041,7 @@ components:
           type: string
         role:
           type: string
-          enum: [pca, directeur, comptable, caissier, magasinier, responsable_tracabilite, agent_terrain, auditeur, delegue]
+          enum: [pca, directeur, comptable, caissier, magasinier, responsable_tracabilite, agent_terrain, auditeur, delegue, peseur]
         motDePasse:
           type: string
           minLength: 8

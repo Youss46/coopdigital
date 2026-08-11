@@ -207,7 +207,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
         data: {
           nom: form.nom,
           prenoms: form.prenoms,
-          email: form.email,
+          email: form.email || undefined,
           telephone: form.telephone || undefined,
           role: form.role as Exclude<UserRole, "delegue">,
           motDePasse,
