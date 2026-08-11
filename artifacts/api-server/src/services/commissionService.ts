@@ -202,7 +202,7 @@ export async function payerCommissions(
         soldeApresFcfa: String(nouveauSolde),
       });
     } else {
-      logger.warn({ cooperativeId }, "payerCommissions espèces : aucune caisse centrale active — solde non mis à jour");
+      throw new Error("Aucune caisse centrale active trouvée. Créez ou activez une caisse principale avant de payer des commissions en espèces.");
     }
   }
 
