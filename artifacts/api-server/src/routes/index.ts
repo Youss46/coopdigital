@@ -78,6 +78,8 @@ router.use(deleguesRouter);
 router.use(entrepotsDeleguesRouter);
 router.use(m15Router);
 router.use(saasRouter);
+// Sessions pesée : utilisées par peseurs (terrain JWT) — avant le tenantGuard de licence
+router.use(peseeRouter);
 
 // Guard global : auth + vérification licence pour toutes les routes coopérative
 router.use(authMiddleware);
@@ -115,7 +117,6 @@ router.use(notificationsRouter);
 router.use(configRouter);
 router.use(storageRouter);
 router.use(transportRouter);
-router.use(peseeRouter);
 router.use(equipementsRouter);
 router.use(previsionsRouter);
 router.use(parcellesRouter);

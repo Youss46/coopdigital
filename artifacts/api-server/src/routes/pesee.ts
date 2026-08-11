@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth";
+import { terrainAuthMiddleware, peseurOrDelegueOnly } from "../middlewares/terrainAuth.js";
 import {
   handleGetBalancesAlertes,
   handleGetBalances,
@@ -47,15 +48,17 @@ router.get("/pesee/config",                  authMiddleware, handleGetConfig);
 router.put("/pesee/config",                  authMiddleware, handleUpdateConfig);
 
 // ── Sessions de pesée ─────────────────────────────────────────────────────────
+// Ces routes sont utilisées par les peseurs (app terrain) — elles utilisent
+// terrainAuthMiddleware pour ne pas passer par le tenantGuard de licence.
 // Route fixe avant les routes paramétrées /:id
-router.post("/pesee/sessions/expirer",                authMiddleware, handleExpirerSessionsStales);
-router.post("/pesee/sessions",                        authMiddleware, handleCreateSession);
-router.get("/pesee/sessions",                         authMiddleware, handleGetSessions);
-router.get("/pesee/sessions/:id",                     authMiddleware, handleGetSession);
-router.post("/pesee/sessions/:id/lignes",             authMiddleware, handleAddLigne);
-router.delete("/pesee/sessions/:id/lignes/:ligneId",  authMiddleware, handleDeleteLigne);
-router.put("/pesee/sessions/:id/terminer",            authMiddleware, handleTerminerSession);
-router.put("/pesee/sessions/:id/annuler",             authMiddleware, handleAnnulerSession);
-router.put("/pesee/sessions/:id/livraison",           authMiddleware, handleConvertirSessionEnLivraison);
+router.post("/pesee/sessions/expirer",                terrainAuthMiddleware, peseurOrDelegueOnly, handleExpirerSessionsStales);
+router.post("/pesee/sessions",                        terrainAuthMiddleware, peseurOrDelegueOnly, handleCreateSession);
+router.get("/pesee/sessions",                         terrainAuthMiddleware, peseurOrDelegueOnly, handleGetSessions);
+router.get("/pesee/sessions/:id",                     terrainAuthMiddleware, peseurOrDelegueOnly, handleGetSession);
+router.post("/pesee/sessions/:id/lignes",             terrainAuthMiddleware, peseurOrDelegueOnly, handleAddLigne);
+router.delete("/pesee/sessions/:id/lignes/:ligneId",  terrainAuthMiddleware, peseurOrDelegueOnly, handleDeleteLigne);
+router.put("/pesee/sessions/:id/terminer",            terrainAuthMiddleware, peseurOrDelegueOnly, handleTerminerSession);
+router.put("/pesee/sessions/:id/annuler",             terrainAuthMiddleware, peseurOrDelegueOnly, handleAnnulerSession);
+router.put("/pesee/sessions/:id/livraison",           terrainAuthMiddleware, peseurOrDelegueOnly, handleConvertirSessionEnLivraison);
 
 export default router;
