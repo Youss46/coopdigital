@@ -976,7 +976,7 @@ export default function TracabilitePage() {
     .reduce((s, l) => s + parseFloat(l.poidsKg), 0) + (fractionPendante?.poidsKg ?? 0);
 
   const handleCreerLot = () => {
-    if (selection.length === 0 || !utilisateur?.cooperativeId) return;
+    if ((selection.length === 0 && !fractionPendante) || !utilisateur?.cooperativeId) return;
     mutCreate.mutate({
       data: {
         cooperativeId: utilisateur.cooperativeId,
@@ -1394,9 +1394,9 @@ export default function TracabilitePage() {
                 )}
               </h3>
               <div className="flex items-center gap-3">
-                {selection.length > 0 && (
+                {(selection.length > 0 || fractionPendante) && (
                   <span className="text-xs font-medium text-[#1a4731]">
-                    {selection.length} sélectionnée{selection.length > 1 ? "s" : ""} —{" "}
+                    {selection.length + (fractionPendante ? 1 : 0)} sélectionnée{selection.length + (fractionPendante ? 1 : 0) > 1 ? "s" : ""} —{" "}
                     {formaterPoids(poidsSelectionne)}
                   </span>
                 )}
@@ -1502,12 +1502,13 @@ export default function TracabilitePage() {
             </div>
           )}
 
-          {selection.length > 0 && (
+          {(selection.length > 0 || fractionPendante) && (
             <div className="bg-[#1a4731] rounded-xl p-4 flex items-center justify-between gap-4">
               <div className="text-white">
                 <p className="text-sm font-semibold">
-                  {selection.length} livraison{selection.length > 1 ? "s" : ""} sélectionnée
-                  {selection.length > 1 ? "s" : ""}
+                  {selection.length + (fractionPendante ? 1 : 0)} livraison{(selection.length + (fractionPendante ? 1 : 0)) > 1 ? "s" : ""} sélectionnée
+                  {(selection.length + (fractionPendante ? 1 : 0)) > 1 ? "s" : ""}
+                  {fractionPendante ? " (dont 1 fractionnée)" : ""}
                 </p>
                 <p className="text-green-200 text-xs">
                   Poids total : {formaterPoids(poidsSelectionne)}
