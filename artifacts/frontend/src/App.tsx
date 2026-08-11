@@ -16,6 +16,7 @@ import Avances from "@/pages/Avances";
 import PrimesPage from "@/pages/PrimesPage";
 import NouvelleLivraison from "@/pages/NouvelleLivraison";
 import LivraisonsPage from "@/pages/LivraisonsPage";
+import SessionsPeseePage from "@/pages/SessionsPeseePage";
 import TracabilitePage from "@/pages/TracabilitePage";
 import ParcellePage from "@/pages/ParcellePage";
 import StocksPage from "@/pages/StocksPage";
@@ -144,6 +145,9 @@ function AppRoutes() {
       </Route>
       <Route path="/livraisons">
         <ProtectedRoute component={LivraisonsPage} />
+      </Route>
+      <Route path="/sessions-pesee">
+        <ProtectedRoute component={SessionsPeseePage} />
       </Route>
       <Route path="/tracabilite">
         <ProtectedRoute component={TracabilitePage} />

@@ -51,6 +51,7 @@ import {
   Ship,
   WifiOff,
   AlertTriangle,
+  Scale,
 } from "lucide-react";
 import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -97,7 +98,8 @@ const NAV_ICON_LIST: React.ElementType[] = [
   Award,          // /scoring
   CalendarDays,   // /campagnes
   Package,        // /livraisons (delegue)
-  Package,        // /livraisons/nouvelle
+  Package,        // /livraisons
+  Scale,          // /sessions-pesee
   Truck,          // /transport
   Ship,           // /expeditions
   QrCode,         // /tracabilite

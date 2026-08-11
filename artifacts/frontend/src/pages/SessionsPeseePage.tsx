@@ -1,0 +1,427 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Scale, Search, Loader2, ChevronRight,
+  Package, CheckCircle2, AlertCircle, Clock, X,
+  TrendingUp,
+} from "lucide-react";
+
+const BASE = import.meta.env.VITE_API_URL ?? "";
+const tok = () => localStorage.getItem("coop_token") ?? "";
+const apiFetch = <T,>(url: string) =>
+  fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } }).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json() as Promise<T>;
+  });
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface SessionPesee {
+  id: number;
+  numeroSession: string;
+  membreId: number | null;
+  membreNom: string | null;
+  membrePrenoms: string | null;
+  produit: string;
+  operation: string;
+  statut: "en_cours" | "terminee" | "annulee";
+  poidsTotalKg: string;
+  nbSacsTotal: number;
+  nbLignes: number;
+  dateDebut: string;
+  dateFin: string | null;
+  notes: string | null;
+  livraisonId: number | null;
+  createdAt: string;
+}
+
+interface LignePesee {
+  id: number;
+  sessionId: number;
+  numeroPassage: number;
+  nbSacs: number;
+  poidsBrutKg: string;
+  tareKg: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+interface SessionDetail extends SessionPesee {
+  lignes: LignePesee[];
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const STATUT_CONFIG: Record<SessionPesee["statut"], { label: string; color: string; bg: string; Icon: React.ElementType }> = {
+  en_cours:  { label: "En cours",  color: "#0369a1", bg: "#e0f2fe", Icon: Clock         },
+  terminee:  { label: "Terminée",  color: "#15803d", bg: "#dcfce7", Icon: CheckCircle2  },
+  annulee:   { label: "Annulée",   color: "#991b1b", bg: "#fee2e2", Icon: AlertCircle   },
+};
+
+function StatutBadge({ statut }: { statut: SessionPesee["statut"] }) {
+  const cfg = STATUT_CONFIG[statut];
+  const Icon = cfg.Icon;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: "2px 10px", borderRadius: 99,
+      fontSize: "0.75rem", fontWeight: 600,
+      color: cfg.color, background: cfg.bg,
+    }}>
+      <Icon size={11} /> {cfg.label}
+    </span>
+  );
+}
+
+function fmtKg(val: string | number) {
+  const n = parseFloat(String(val));
+  if (isNaN(n)) return "— kg";
+  if (n >= 1000) return (n / 1000).toFixed(3) + " T";
+  return n.toFixed(3) + " kg";
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleString("fr-FR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+// ─── Modal détail ─────────────────────────────────────────────────────────────
+
+function SessionDetailModal({ sessionId, onClose }: { sessionId: number; onClose: () => void }) {
+  const { data: detail, isLoading } = useQuery<SessionDetail>({
+    queryKey: ["session-pesee-detail", sessionId],
+    queryFn: () => apiFetch<SessionDetail>(`/api/pesee/sessions/${sessionId}`),
+  });
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "88vh", overflow: "auto", boxShadow: "0 24px 48px rgba(0,0,0,.18)" }}>
+        {/* Header */}
+        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: ".72rem", color: "#94a3b8", fontFamily: "monospace", marginBottom: 2 }}>
+              {detail?.numeroSession ?? "…"}
+            </div>
+            <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>
+              {detail ? `${detail.membreNom ?? ""} ${detail.membrePrenoms ?? ""}`.trim() || "—" : "Chargement…"}
+            </div>
+            {detail && <div style={{ marginTop: 4 }}><StatutBadge statut={detail.statut} /></div>}
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", padding: 4 }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {isLoading && (
+          <div style={{ padding: 40, textAlign: "center" }}>
+            <Loader2 size={28} className="animate-spin" style={{ color: "#94a3b8", margin: "0 auto" }} />
+          </div>
+        )}
+
+        {detail && (
+          <div style={{ padding: 24 }}>
+            {/* Recap */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
+              {[
+                { label: "Poids total net", value: fmtKg(detail.poidsTotalKg), color: "#15803d" },
+                { label: "Sacs", value: String(detail.nbSacsTotal) },
+                { label: "Passages", value: String(detail.lignes.length) },
+              ].map((kpi) => (
+                <div key={kpi.label} style={{ background: "#f8fafc", borderRadius: 10, padding: "12px 14px" }}>
+                  <div style={{ fontSize: "1.15rem", fontWeight: 800, color: kpi.color ?? "#0f172a" }}>{kpi.value}</div>
+                  <div style={{ fontSize: ".72rem", color: "#64748b", marginTop: 2 }}>{kpi.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Méta */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 24, fontSize: ".82rem" }}>
+              <div><span style={{ color: "#94a3b8" }}>Produit · </span>{detail.produit}</div>
+              <div><span style={{ color: "#94a3b8" }}>Opération · </span>{detail.operation}</div>
+              <div><span style={{ color: "#94a3b8" }}>Début · </span>{fmtDate(detail.dateDebut)}</div>
+              {detail.dateFin && <div><span style={{ color: "#94a3b8" }}>Fin · </span>{fmtDate(detail.dateFin)}</div>}
+              {detail.livraisonId && (
+                <div><span style={{ color: "#94a3b8" }}>Livraison liée · </span>#{detail.livraisonId}</div>
+              )}
+            </div>
+
+            {/* Lignes */}
+            {detail.lignes.length > 0 ? (
+              <>
+                <div style={{ fontSize: ".7rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
+                  Détail des passages
+                </div>
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: ".84rem" }}>
+                    <thead>
+                      <tr style={{ background: "#f8fafc" }}>
+                        <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: ".72rem" }}>N°</th>
+                        <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: "#64748b", fontSize: ".72rem" }}>Sacs</th>
+                        <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: "#64748b", fontSize: ".72rem" }}>Brut (kg)</th>
+                        <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: "#64748b", fontSize: ".72rem" }}>Tare (kg)</th>
+                        <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: "#64748b", fontSize: ".72rem" }}>Net (kg)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.lignes.map((l, idx) => {
+                        const brut = parseFloat(l.poidsBrutKg);
+                        const tare = parseFloat(l.tareKg ?? "0");
+                        const net = brut - tare;
+                        return (
+                          <tr key={l.id} style={{ borderTop: idx === 0 ? "none" : "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "9px 12px" }}>
+                              <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: "#eff6ff", color: "#2563eb", fontSize: ".72rem", fontWeight: 700 }}>
+                                {l.numeroPassage}
+                              </span>
+                            </td>
+                            <td style={{ padding: "9px 12px", textAlign: "right" }}>{l.nbSacs}</td>
+                            <td style={{ padding: "9px 12px", textAlign: "right" }}>{brut.toFixed(3)}</td>
+                            <td style={{ padding: "9px 12px", textAlign: "right", color: "#94a3b8" }}>{tare > 0 ? tare.toFixed(3) : "—"}</td>
+                            <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 700, color: "#15803d" }}>{net.toFixed(3)}</td>
+                          </tr>
+                        );
+                      })}
+                      {/* Total row */}
+                      <tr style={{ borderTop: "2px solid #e2e8f0", background: "#f8fafc" }}>
+                        <td colSpan={4} style={{ padding: "10px 12px", fontWeight: 700, fontSize: ".82rem" }}>Total</td>
+                        <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 800, color: "#15803d" }}>{fmtKg(detail.poidsTotalKg)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <div style={{ textAlign: "center", color: "#94a3b8", padding: "20px 0", fontSize: ".85rem" }}>
+                Aucun passage enregistré
+              </div>
+            )}
+
+            {/* Convertir en livraison (tâche #26) */}
+            {detail.statut === "terminee" && !detail.livraisonId && (
+              <div style={{ marginTop: 20, padding: 14, borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                <div style={{ fontSize: ".8rem", color: "#64748b", marginBottom: 8 }}>
+                  Cette session est terminée et peut être convertie en livraison officielle.
+                </div>
+                <button
+                  disabled
+                  title="Disponible prochainement"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "7px 14px", borderRadius: 7, border: "none",
+                    background: "#e2e8f0", color: "#94a3b8", cursor: "not-allowed",
+                    fontSize: ".82rem", fontWeight: 600,
+                  }}
+                >
+                  <Package size={14} />
+                  Convertir en livraison
+                  <span style={{ fontSize: ".7rem", fontWeight: 400 }}>(prochainement)</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Page principale ──────────────────────────────────────────────────────────
+
+type StatutFilter = "all" | "en_cours" | "terminee" | "annulee";
+
+export default function SessionsPeseePage() {
+  const [search, setSearch] = useState("");
+  const [statut, setStatut] = useState<StatutFilter>("all");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  const apiUrl = statut === "all"
+    ? `/api/pesee/sessions?limit=200`
+    : `/api/pesee/sessions?statut=${statut}&limit=200`;
+
+  const { data: sessions = [], isLoading } = useQuery<SessionPesee[]>({
+    queryKey: ["sessions-pesee", statut],
+    queryFn: () => apiFetch<SessionPesee[]>(apiUrl),
+    refetchInterval: 30_000,
+  });
+
+  // Filtrage local par recherche
+  const filtered = sessions.filter((s) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    const membre = `${s.membreNom ?? ""} ${s.membrePrenoms ?? ""}`.toLowerCase();
+    return membre.includes(q) || s.numeroSession.toLowerCase().includes(q);
+  });
+
+  // KPIs
+  const nbEnCours  = sessions.filter((s) => s.statut === "en_cours").length;
+  const nbTerminee = sessions.filter((s) => s.statut === "terminee").length;
+  const totalKg    = sessions.filter((s) => s.statut === "terminee").reduce((acc, s) => acc + parseFloat(s.poidsTotalKg ?? "0"), 0);
+
+  return (
+    <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto" }}>
+      {/* En-tête */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+            <Scale size={22} color="#0369a1" />
+            <h1 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 800 }}>Sessions de pesée</h1>
+          </div>
+          <p style={{ margin: 0, color: "#64748b", fontSize: ".88rem" }}>
+            Suivi des sessions de pesée groupée enregistrées par les peseurs
+          </p>
+        </div>
+      </div>
+
+      {/* KPI cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "En cours", value: nbEnCours, color: "#0369a1", bg: "#e0f2fe", Icon: Clock },
+          { label: "Terminées", value: nbTerminee, color: "#15803d", bg: "#dcfce7", Icon: CheckCircle2 },
+          { label: "Tonnage terminé", value: fmtKg(totalKg), color: "#7c3aed", bg: "#ede9fe", Icon: TrendingUp },
+          { label: "Total sessions", value: sessions.length, color: "#92400e", bg: "#fef3c7", Icon: Scale },
+        ].map((kpi) => (
+          <div key={kpi.label} style={{ background: kpi.bg, borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <kpi.Icon size={15} color={kpi.color} />
+              <span style={{ fontSize: ".72rem", fontWeight: 600, color: kpi.color, textTransform: "uppercase", letterSpacing: ".04em" }}>{kpi.label}</span>
+            </div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 800, color: kpi.color }}>{kpi.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtres */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+        {/* Recherche */}
+        <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
+          <Search size={15} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
+          <input
+            style={{ width: "100%", paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8, borderRadius: 8, border: "1px solid #e2e8f0", fontSize: ".84rem", outline: "none", boxSizing: "border-box" }}
+            placeholder="Rechercher membre ou n° session…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* Filtre statut */}
+        <div style={{ display: "flex", gap: 6 }}>
+          {(["all", "en_cours", "terminee", "annulee"] as const).map((s) => {
+            const labels: Record<StatutFilter, string> = { all: "Tous", en_cours: "En cours", terminee: "Terminées", annulee: "Annulées" };
+            const active = statut === s;
+            return (
+              <button
+                key={s}
+                onClick={() => setStatut(s)}
+                style={{
+                  padding: "6px 12px", borderRadius: 7, border: active ? "none" : "1px solid #e2e8f0",
+                  background: active ? "#0369a1" : "#fff", color: active ? "#fff" : "#374151",
+                  fontSize: ".78rem", fontWeight: active ? 700 : 400, cursor: "pointer",
+                  transition: "all .15s",
+                }}
+              >
+                {labels[s]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Table */}
+      {isLoading ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
+          <Loader2 size={28} className="animate-spin" style={{ color: "#94a3b8" }} />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "60px 0", color: "#94a3b8" }}>
+          <Scale size={36} style={{ margin: "0 auto 12px", opacity: .4 }} />
+          <div style={{ fontWeight: 600, color: "#64748b" }}>Aucune session trouvée</div>
+          <div style={{ fontSize: ".82rem", marginTop: 4 }}>{search ? "Affinez votre recherche" : "Les sessions de pesée groupée apparaîtront ici"}</div>
+        </div>
+      ) : (
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+          {/* Header */}
+          <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 110px 90px 80px 100px 40px", padding: "10px 16px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+            {["N° Session", "Membre", "Date début", "Passages", "Sacs", "Poids net", ""].map((h) => (
+              <div key={h} style={{ fontSize: ".7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".05em" }}>{h}</div>
+            ))}
+          </div>
+
+          {filtered.map((s, idx) => (
+            <div
+              key={s.id}
+              onClick={() => setSelectedId(s.id)}
+              style={{
+                display: "grid", gridTemplateColumns: "160px 1fr 110px 90px 80px 100px 40px",
+                padding: "12px 16px", cursor: "pointer", alignItems: "center",
+                borderTop: idx === 0 ? "none" : "1px solid #f1f5f9",
+                transition: "background .12s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+            >
+              {/* N° session */}
+              <div style={{ fontFamily: "monospace", fontSize: ".78rem", color: "#374151", fontWeight: 600 }}>
+                {s.numeroSession}
+              </div>
+
+              {/* Membre */}
+              <div>
+                <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
+                  {s.membreNom ? `${s.membreNom} ${s.membrePrenoms ?? ""}` : <span style={{ color: "#94a3b8" }}>—</span>}
+                </div>
+                <div style={{ fontSize: ".72rem", color: "#94a3b8", marginTop: 1 }}>{s.produit}</div>
+              </div>
+
+              {/* Date début */}
+              <div style={{ fontSize: ".78rem", color: "#64748b" }}>
+                {new Date(s.dateDebut).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                <div style={{ fontSize: ".68rem", color: "#94a3b8" }}>
+                  {new Date(s.dateDebut).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+
+              {/* Passages */}
+              <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
+                {s.nbLignes} <span style={{ color: "#94a3b8", fontWeight: 400, fontSize: ".72rem" }}>pass.</span>
+              </div>
+
+              {/* Sacs */}
+              <div style={{ fontWeight: 600, fontSize: ".88rem" }}>{s.nbSacsTotal}</div>
+
+              {/* Poids */}
+              <div>
+                <StatutBadge statut={s.statut} />
+                {s.statut !== "en_cours" && (
+                  <div style={{ fontSize: ".78rem", fontWeight: 700, color: "#15803d", marginTop: 3 }}>
+                    {fmtKg(s.poidsTotalKg)}
+                  </div>
+                )}
+              </div>
+
+              {/* Chevron */}
+              <div style={{ textAlign: "right" }}>
+                <ChevronRight size={16} color="#cbd5e1" />
+              </div>
+            </div>
+          ))}
+
+          {/* Footer count */}
+          <div style={{ padding: "10px 16px", borderTop: "1px solid #f1f5f9", fontSize: ".75rem", color: "#94a3b8", textAlign: "right" }}>
+            {filtered.length} session{filtered.length > 1 ? "s" : ""}
+            {search && ` sur ${sessions.length}`}
+          </div>
+        </div>
+      )}
+
+      {/* Modal détail */}
+      {selectedId !== null && (
+        <SessionDetailModal sessionId={selectedId} onClose={() => setSelectedId(null)} />
+      )}
+    </div>
+  );
+}
