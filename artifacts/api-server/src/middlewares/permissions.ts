@@ -134,6 +134,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     generer_fiche_membre:         ["pca", "directeur", "delegue"],
     generer_recu:                 ["pca", "directeur", "comptable", "delegue", "magasinier"],
     exporter_donnees_bailleurs:   ["pca", "directeur", "auditeur"],
+    generer_rapport_ia:           ["pca", "directeur", "comptable", "auditeur"],
   },
 
   // MODULE M08 — SALAIRES
