@@ -18,7 +18,10 @@ const ROLES_VOIR_SESSIONS = ["pca", "directeur", "magasinier", "comptable", "cai
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const apiFetch = (url: string) =>
-  fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } }).then((r) => r.json());
+  fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } }).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  });
 const apiPut = (url: string, body: unknown) =>
   fetch(`${BASE}${url}`, {
     method: "PUT",
