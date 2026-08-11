@@ -3,8 +3,13 @@ import {
   sessionsPeseeTable,
   lignesPeseeTable,
   membresTable,
+  livraisonsTable,
+  paiementsTable,
+  entrepotsTable,
+  mouvementsStockTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
+import { getPrixActuel } from "./terrainService.js";
 
 // ─── Génération numéro de session ─────────────────────────────────────────────
 async function generateNumeroSession(cooperativeId: number): Promise<string> {
@@ -237,6 +242,129 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
     .returning();
 
   return { ...detail, statut: "terminee" as const, dateFin: updated?.dateFin };
+}
+
+// ─── Convertir une session terminée en livraison ─────────────────────────────
+export async function creerLivraisonDepuisSession(
+  cooperativeId: number,
+  sessionId: number,
+  data: {
+    modePaiement?: "especes" | "orange_money" | "mtn_momo" | "wave" | "cheque";
+    entrepotId?: number;
+    agentId?: number;
+  },
+) {
+  // 1. Get current price + active campaign (before transaction — read-only, safe)
+  const { prixBordChampFcfa, campagneId } = await getPrixActuel(cooperativeId);
+
+  const modePaiement = data.modePaiement ?? "especes";
+
+  // 2. Transaction: lock session row, validate, create livraison + paiement + stock atomically
+  const result = await db.transaction(async (tx) => {
+    // Lock the session row to prevent concurrent conversions
+    const [session] = await tx
+      .select({
+        id: sessionsPeseeTable.id,
+        cooperativeId: sessionsPeseeTable.cooperativeId,
+        statut: sessionsPeseeTable.statut,
+        membreId: sessionsPeseeTable.membreId,
+        poidsTotalKg: sessionsPeseeTable.poidsTotalKg,
+        nbSacsTotal: sessionsPeseeTable.nbSacsTotal,
+        produit: sessionsPeseeTable.produit,
+        livraisonId: sessionsPeseeTable.livraisonId,
+        dateFin: sessionsPeseeTable.dateFin,
+      })
+      .from(sessionsPeseeTable)
+      .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.cooperativeId, cooperativeId)))
+      .for("update")
+      .limit(1);
+
+    if (!session) throw new Error("Session introuvable");
+    if (session.statut !== "terminee") throw new Error("La session doit être terminée avant d'être convertie en livraison");
+    if (session.livraisonId) throw new Error("Une livraison a déjà été créée pour cette session");
+    if (!session.membreId) throw new Error("La session ne comporte pas de membre — impossible de créer une livraison");
+
+    const poidsKg = parseFloat(String(session.poidsTotalKg ?? 0));
+    if (poidsKg <= 0) throw new Error("Le poids total de la session est invalide (0 kg)");
+
+    const montantBrut = Math.round(poidsKg * prixBordChampFcfa);
+    const dateStr = session.dateFin
+      ? (typeof session.dateFin === "string" ? session.dateFin : (session.dateFin as Date).toISOString().split("T")[0]!)
+      : new Date().toISOString().split("T")[0]!;
+
+    const [livraison] = await tx
+      .insert(livraisonsTable)
+      .values({
+        membreId: session.membreId,
+        campagneId,
+        poidsKg: String(poidsKg),
+        prixUnitaireFcfa: prixBordChampFcfa,
+        montantBrutFcfa: montantBrut,
+        avanceDeduiteFcfa: 0,
+        intrantsDeduitsFcfa: 0,
+        montantNetFcfa: montantBrut,
+        retenueKg: "0",
+        nombreSacs: session.nbSacsTotal ?? null,
+        produit: session.produit ?? "cacao",
+        dateLivraison: dateStr,
+        agentId: data.agentId ?? null,
+      })
+      .returning();
+
+    const [paiement] = await tx
+      .insert(paiementsTable)
+      .values({
+        livraisonId: livraison!.id,
+        membreId: session.membreId,
+        montantFcfa: montantBrut,
+        modePaiement,
+        statut: "en_attente",
+      })
+      .returning();
+
+    // Stock movement — resolve entrepot scoped to this cooperative
+    let entrepotId: number | null = null;
+    if (data.entrepotId) {
+      // Validate that the supplied entrepot belongs to this cooperative
+      const [entrepot] = await tx
+        .select({ id: entrepotsTable.id })
+        .from(entrepotsTable)
+        .where(and(eq(entrepotsTable.id, data.entrepotId), eq(entrepotsTable.cooperativeId, cooperativeId)))
+        .limit(1);
+      if (!entrepot) throw new Error("Entrepôt introuvable ou n'appartient pas à votre coopérative");
+      entrepotId = entrepot.id;
+    } else {
+      // Fall back to first entrepot of cooperative
+      const [entrepot] = await tx
+        .select({ id: entrepotsTable.id })
+        .from(entrepotsTable)
+        .where(eq(entrepotsTable.cooperativeId, cooperativeId))
+        .orderBy(entrepotsTable.id)
+        .limit(1);
+      entrepotId = entrepot?.id ?? null;
+    }
+
+    if (entrepotId) {
+      await tx.insert(mouvementsStockTable).values({
+        entrepotId,
+        lotId: null,
+        type: "entree",
+        poidsKg: String(poidsKg),
+        motif: `Livraison depuis session pesée #${sessionId}`,
+        agentId: data.agentId ?? null,
+      });
+    }
+
+    // Link livraison back to session (session is locked — no concurrent writer)
+    await tx
+      .update(sessionsPeseeTable)
+      .set({ livraisonId: livraison!.id })
+      .where(eq(sessionsPeseeTable.id, sessionId));
+
+    return { livraison: livraison!, paiement: paiement! };
+  });
+
+  return result;
 }
 
 // ─── Annuler une session ──────────────────────────────────────────────────────

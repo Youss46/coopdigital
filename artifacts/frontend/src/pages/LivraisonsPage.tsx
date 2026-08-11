@@ -1,24 +1,47 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Package, Search, Plus, Loader2, ChevronRight, Calendar,
   Scale, Banknote, TrendingDown, ArrowDownCircle, FileDown,
-  Warehouse, ChevronDown, MapPin, User, Printer,
+  Warehouse, ChevronDown, MapPin, User, Printer, ClipboardList,
+  ArrowRight, CheckCircle2, AlertCircle,
 } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 
 const ROLES_CREER = ["pca", "directeur", "delegue", "magasinier"];
 const ROLES_VOIR_DELEGUES = ["pca", "directeur", "magasinier", "comptable", "auditeur"];
+const ROLES_VOIR_SESSIONS = ["pca", "directeur", "magasinier", "comptable", "caissier", "auditeur"];
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const apiFetch = (url: string) =>
   fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } }).then((r) => r.json());
+const apiPut = (url: string, body: unknown) =>
+  fetch(`${BASE}${url}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+interface SessionPesee {
+  id: number;
+  numeroSession: string;
+  membreId: number | null;
+  membreNom: string | null;
+  membrePrenoms: string | null;
+  produit: string;
+  statut: "en_cours" | "terminee" | "annulee";
+  poidsTotalKg: string;
+  nbSacsTotal: number;
+  dateFin: string | null;
+  dateDebut: string;
+  livraisonId: number | null;
+}
 
 interface EntrepotDelegue {
   id: number;
@@ -80,12 +103,199 @@ function fmtDate(d: string | null | undefined) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// ─── SessionsPeseeSection ─────────────────────────────────────────────────────
+
+const MODE_LABELS: Record<string, string> = {
+  especes: "Espèces",
+  orange_money: "Orange Money",
+  mtn_momo: "MTN MoMo",
+  wave: "Wave",
+  cheque: "Chèque",
+};
+
+const ROLES_CONVERTIR_SESSION = ["pca", "directeur", "magasinier"];
+
+function SessionsPeseeSection() {
+  const { utilisateur } = useAuth();
+  const peutConvertir = ROLES_CONVERTIR_SESSION.includes(utilisateur?.role ?? "");
+  const qc = useQueryClient();
+  const [ouvert, setOuvert] = useState(true);
+  const [converting, setConverting] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [modeChoisi, setModeChoisi] = useState<Record<number, string>>({});
+
+  const { data: sessions = [], isLoading } = useQuery<SessionPesee[]>({
+    queryKey: ["sessions-pesee-terminées"],
+    queryFn: () => apiFetch("/api/pesee/sessions?statut=terminee&limit=30"),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
+  async function convertir(session: SessionPesee) {
+    const modePaiement = (modeChoisi[session.id] ?? "especes") as
+      "especes" | "orange_money" | "mtn_momo" | "wave" | "cheque";
+    setConverting(session.id);
+    setError(null);
+    try {
+      const res = await apiPut(`/api/pesee/sessions/${session.id}/livraison`, { modePaiement });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { erreur?: string };
+        setError(body?.erreur ?? "Erreur lors de la conversion");
+      } else {
+        await qc.invalidateQueries({ queryKey: ["sessions-pesee-terminées"] });
+        await qc.invalidateQueries({ queryKey: ["livraisons-liste"] });
+      }
+    } catch {
+      setError("Erreur réseau. Veuillez réessayer.");
+    } finally {
+      setConverting(null);
+    }
+  }
+
+  const aConvertir = sessions.filter((s) => !s.livraisonId);
+  const converties = sessions.filter((s) => s.livraisonId);
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOuvert((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50 transition"
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+            <ClipboardList size={14} className="text-blue-600" />
+          </div>
+          <span className="text-sm font-semibold text-gray-800">Sessions de pesée terminées</span>
+          {aConvertir.length > 0 && (
+            <span className="text-xs bg-amber-100 text-amber-700 font-medium px-2 py-0.5 rounded-full">
+              {aConvertir.length} à convertir
+            </span>
+          )}
+        </div>
+        <ChevronDown size={15} className={`text-gray-400 transition-transform ${ouvert ? "rotate-180" : ""}`} />
+      </button>
+
+      {ouvert && (
+        <div className="border-t border-gray-100">
+          {isLoading ? (
+            <div className="px-4 py-6 flex justify-center">
+              <Loader2 size={20} className="animate-spin text-gray-300" />
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="px-4 py-6 text-center text-sm text-gray-400">
+              Aucune session terminée pour le moment.
+            </div>
+          ) : (
+            <>
+              {error && (
+                <div className="mx-4 mt-3 flex items-center gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">
+                  <AlertCircle size={12} /> {error}
+                </div>
+              )}
+              {/* Sessions à convertir */}
+              {aConvertir.length > 0 && (
+                <div className="divide-y divide-gray-50">
+                  {aConvertir.map((s) => {
+                    const poids = parseFloat(s.poidsTotalKg ?? "0");
+                    const mode = modeChoisi[s.id] ?? "especes";
+                    return (
+                      <div key={s.id} className="px-4 py-3 space-y-2">
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                            <ClipboardList size={13} className="text-amber-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {s.membrePrenoms} {s.membreNom ?? "—"}
+                            </p>
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                              <span className="text-xs text-gray-400 flex items-center gap-1">
+                                <Scale size={10} /> {poids.toFixed(2)} kg · {s.nbSacsTotal} sac{s.nbSacsTotal !== 1 ? "s" : ""}
+                              </span>
+                              {s.dateFin && (
+                                <span className="text-xs text-gray-400 flex items-center gap-1">
+                                  <Calendar size={10} /> {fmtDate(s.dateFin)}
+                                </span>
+                              )}
+                              <span className="text-xs text-blue-500 font-mono">{s.numeroSession}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {peutConvertir && (
+                          <div className="flex items-center gap-2 pl-11">
+                            <select
+                              value={mode}
+                              onChange={(e) => setModeChoisi((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                              className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400 bg-white"
+                            >
+                              {Object.entries(MODE_LABELS).map(([v, label]) => (
+                                <option key={v} value={v}>{label}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => convertir(s)}
+                              disabled={converting === s.id}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition"
+                              style={{ backgroundColor: "#1a4731" }}
+                            >
+                              {converting === s.id
+                                ? <Loader2 size={11} className="animate-spin" />
+                                : <><ArrowRight size={11} /> Créer livraison</>
+                              }
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* Sessions déjà converties */}
+              {converties.length > 0 && (
+                <div className={`divide-y divide-gray-50 ${aConvertir.length > 0 ? "border-t border-gray-100" : ""}`}>
+                  {converties.map((s) => {
+                    const poids = parseFloat(s.poidsTotalKg ?? "0");
+                    return (
+                      <div key={s.id} className="px-4 py-3 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle2 size={13} className="text-green-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-700 truncate">
+                            {s.membrePrenoms} {s.membreNom ?? "—"}
+                          </p>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                              <Scale size={10} /> {poids.toFixed(2)} kg
+                            </span>
+                            <span className="text-xs text-blue-500 font-mono">{s.numeroSession}</span>
+                          </div>
+                        </div>
+                        <Link href={`/livraisons`}>
+                          <a className="flex items-center gap-1 text-xs font-medium text-green-700 hover:text-green-900 bg-green-50 px-2.5 py-1.5 rounded-lg border border-green-200 transition flex-shrink-0">
+                            Livraison #{s.livraisonId} <ChevronRight size={10} />
+                          </a>
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function LivraisonsPage() {
   const { utilisateur } = useAuth();
   const peutCreer = ROLES_CREER.includes(utilisateur?.role ?? "");
   const voitDelegues = ROLES_VOIR_DELEGUES.includes(utilisateur?.role ?? "");
+  const voitSessions = ROLES_VOIR_SESSIONS.includes(utilisateur?.role ?? "");
   const [recherche, setRecherche] = useState("");
   const [deleguesOuvert, setDeleguesOuvert] = useState(true);
   const [filtreRole, setFiltreRole] = useState<"" | "peseur" | "delegue" | "agent_terrain">("");
@@ -240,6 +450,9 @@ export default function LivraisonsPage() {
           ))}
         </div>
       )}
+
+      {/* ─── Sessions de pesée ───────────────────────────────────────────── */}
+      {voitSessions && <SessionsPeseeSection />}
 
       {/* ─── Entrepôts délégués ─────────────────────────────────────────── */}
       {voitDelegues && entrepotsDelegues.length > 0 && (

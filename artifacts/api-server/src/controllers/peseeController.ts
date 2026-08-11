@@ -7,6 +7,7 @@ import {
   deleteLigne,
   terminerSession,
   annulerSession,
+  creerLivraisonDepuisSession,
 } from "../services/peseeSessionService";
 import {
   CreateBalanceBody,
@@ -402,6 +403,28 @@ export async function handleAnnulerSession(req: Request, res: Response): Promise
   } catch (err) {
     req.log.error(err, "handleAnnulerSession");
     const msg = err instanceof Error ? err.message : "Erreur annulation session";
+    res.status(400).json({ erreur: msg });
+  }
+}
+
+export async function handleConvertirSessionEnLivraison(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const sessionId = parseInt(String(req.params["id"] ?? "0"));
+  const { modePaiement, entrepotId } = req.body as {
+    modePaiement?: "especes" | "orange_money" | "mtn_momo" | "wave" | "cheque";
+    entrepotId?: number;
+  };
+  try {
+    const result = await creerLivraisonDepuisSession(cooperativeId, sessionId, {
+      modePaiement,
+      entrepotId,
+      agentId: req.user?.id,
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    req.log.error(err, "handleConvertirSessionEnLivraison");
+    const msg = err instanceof Error ? err.message : "Erreur conversion session en livraison";
     res.status(400).json({ erreur: msg });
   }
 }
