@@ -46,17 +46,25 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const [confirmTerminer, setConfirmTerminer] = useState(false);
 
   // Map membreId → sessionId pour les sessions actives (badge + reprise directe)
+  // Rafraîchie toutes les 30 s tant que l'écran de sélection du membre est visible.
   const [activeSessions, setActiveSessions] = useState<Map<number, number>>(new Map());
   useEffect(() => {
-    if (!isOnline) return;
-    getSessionsEnCours().then((sessions) => {
-      const map = new Map<number, number>();
-      for (const s of sessions) {
-        if (s.membreId !== null && s.id !== undefined) map.set(s.membreId, s.id);
-      }
-      setActiveSessions(map);
-    }).catch(() => { /* silencieux */ });
-  }, [isOnline]);
+    if (!isOnline || step !== "membre") return;
+
+    function refresh() {
+      getSessionsEnCours().then((sessions) => {
+        const map = new Map<number, number>();
+        for (const s of sessions) {
+          if (s.membreId !== null && s.id !== undefined) map.set(s.membreId, s.id);
+        }
+        setActiveSessions(map);
+      }).catch(() => { /* silencieux */ });
+    }
+
+    refresh();
+    const timer = setInterval(refresh, 30_000);
+    return () => clearInterval(timer);
+  }, [isOnline, step]);
 
   // Reprise directe depuis l'accueil via /pesee-session/:sessionId
   useEffect(() => {
