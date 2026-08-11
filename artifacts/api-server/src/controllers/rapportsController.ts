@@ -465,13 +465,13 @@ export async function telechargerRapportIAPdf(req: Request, res: Response): Prom
           .text(line.slice(5), { width: pageW });
         doc.moveDown(0.2);
       } else if (line.startsWith("- ") || line.startsWith("* ")) {
-        doc.fillColor("#222222").font("Helvetica").fontSize(10)
-          .text(`• ${line.slice(2)}`, { width: pageW - 12, indent: 12 });
-        doc.moveDown(0.15);
+        doc.fillColor("#222222").font("Helvetica").fontSize(12)
+          .text(`• ${line.slice(2)}`, { width: pageW - 14, indent: 14, lineGap: 6 });
+        doc.moveDown(0.2);
       } else if (/^\d+\.\s/.test(line)) {
-        doc.fillColor("#222222").font("Helvetica").fontSize(10)
-          .text(line, { width: pageW - 12, indent: 12 });
-        doc.moveDown(0.15);
+        doc.fillColor("#222222").font("Helvetica").fontSize(12)
+          .text(line, { width: pageW - 14, indent: 14, lineGap: 6 });
+        doc.moveDown(0.2);
       } else if (line.startsWith("|")) {
         // Table row — render as plain text
         const cells = line.split("|").filter(c => c.trim() && !c.match(/^[-:\s]+$/));
@@ -479,24 +479,24 @@ export async function telechargerRapportIAPdf(req: Request, res: Response): Prom
           const isHeader = lines[lines.indexOf(raw) + 1]?.startsWith("|---") || lines[lines.indexOf(raw) + 1]?.startsWith("| ---");
           doc.fillColor(isHeader ? VERT : "#222222")
             .font(isHeader ? "Helvetica-Bold" : "Helvetica")
-            .fontSize(9)
-            .text(cells.map(c => c.trim()).join("   ·   "), { width: pageW });
-          doc.moveDown(0.2);
+            .fontSize(11)
+            .text(cells.map(c => c.trim()).join("   ·   "), { width: pageW, lineGap: 4 });
+          doc.moveDown(0.25);
         }
       } else if (line.startsWith("---")) {
         doc.moveTo(56, doc.y).lineTo(56 + pageW, doc.y).strokeColor("#e5e7eb").lineWidth(0.5).stroke();
-        doc.moveDown(0.4);
+        doc.moveDown(0.5);
       } else if (line.trim() === "") {
-        doc.moveDown(0.4);
+        doc.moveDown(0.5);
       } else {
         // Inline bold/italic — strip markers, render plain
         const clean = line
           .replace(/\*\*(.+?)\*\*/g, "$1")
           .replace(/\*(.+?)\*/g, "$1")
           .replace(/__(.+?)__/g, "$1");
-        doc.fillColor("#222222").font("Helvetica").fontSize(10)
-          .text(clean, { width: pageW });
-        doc.moveDown(0.25);
+        doc.fillColor("#222222").font("Helvetica").fontSize(12)
+          .text(clean, { width: pageW, lineGap: 6 });
+        doc.moveDown(0.35);
       }
     }
 
