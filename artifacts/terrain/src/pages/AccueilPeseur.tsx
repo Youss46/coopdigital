@@ -100,28 +100,37 @@ export default function AccueilPeseur() {
           </div>
         )}
 
-        {/* ── Action principale : nouvelle collecte ────────────────────── */}
-        <Link href="/collecte">
-          <div className="t-card" style={{
-            marginBottom: 12,
-            background: "linear-gradient(135deg, #16a34a 0%, #15803d 100%)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-          }}>
-            <span style={{ fontSize: "2.5rem" }}>⚖️</span>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
-                Nouvelle collecte
+        {/* ── Actions pesée ─────────────────────────────────────────────── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <Link href="/collecte">
+            <div className="t-card" style={{
+              background: "linear-gradient(135deg, #16a34a 0%, #15803d 100%)",
+              cursor: "pointer", textAlign: "center", padding: "18px 12px",
+            }}>
+              <span style={{ fontSize: "2rem" }}>⚖️</span>
+              <div style={{ fontWeight: 800, fontSize: ".95rem", color: "#fff", marginTop: 6 }}>
+                Pesée simple
               </div>
-              <div style={{ fontSize: ".82rem", color: "rgba(255,255,255,.8)", marginTop: 2 }}>
-                Enregistrer la livraison d'un membre
+              <div style={{ fontSize: ".72rem", color: "rgba(255,255,255,.75)", marginTop: 2 }}>
+                1 membre · 1 pesée
               </div>
             </div>
-            <span style={{ marginLeft: "auto", fontSize: "1.4rem", color: "rgba(255,255,255,.7)" }}>›</span>
-          </div>
-        </Link>
+          </Link>
+          <Link href="/pesee-session">
+            <div className="t-card" style={{
+              background: "linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)",
+              cursor: "pointer", textAlign: "center", padding: "18px 12px",
+            }}>
+              <span style={{ fontSize: "2rem" }}>📦</span>
+              <div style={{ fontWeight: 800, fontSize: ".95rem", color: "#fff", marginTop: 6 }}>
+                Pesée groupée
+              </div>
+              <div style={{ fontSize: ".72rem", color: "rgba(255,255,255,.75)", marginTop: 2 }}>
+                Plusieurs passages cumulés
+              </div>
+            </div>
+          </Link>
+        </div>
 
         {/* ── Opérations en attente de sync ────────────────────────────── */}
         {pendingCount > 0 && (

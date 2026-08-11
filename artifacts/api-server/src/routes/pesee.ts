@@ -14,6 +14,13 @@ import {
   handleGetRapportAgent,
   handleGetConfig,
   handleUpdateConfig,
+  handleCreateSession,
+  handleGetSessions,
+  handleGetSession,
+  handleAddLigne,
+  handleDeleteLigne,
+  handleTerminerSession,
+  handleAnnulerSession,
 } from "../controllers/peseeController";
 
 const router = Router();
@@ -36,5 +43,14 @@ router.get("/pesee/rapport-agent/:agent_id", authMiddleware, handleGetRapportAge
 
 router.get("/pesee/config",                  authMiddleware, handleGetConfig);
 router.put("/pesee/config",                  authMiddleware, handleUpdateConfig);
+
+// ── Sessions de pesée ─────────────────────────────────────────────────────────
+router.post("/pesee/sessions",                        authMiddleware, handleCreateSession);
+router.get("/pesee/sessions",                         authMiddleware, handleGetSessions);
+router.get("/pesee/sessions/:id",                     authMiddleware, handleGetSession);
+router.post("/pesee/sessions/:id/lignes",             authMiddleware, handleAddLigne);
+router.delete("/pesee/sessions/:id/lignes/:ligneId",  authMiddleware, handleDeleteLigne);
+router.put("/pesee/sessions/:id/terminer",            authMiddleware, handleTerminerSession);
+router.put("/pesee/sessions/:id/annuler",             authMiddleware, handleAnnulerSession);
 
 export default router;

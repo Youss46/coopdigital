@@ -1,10 +1,48 @@
 import {
   pgTable, serial, integer, numeric, text, boolean,
-  date, timestamp, varchar,
+  date, timestamp, varchar, pgEnum,
 } from "drizzle-orm/pg-core";
 import { cooperativesTable } from "./cooperatives";
 import { usersTable } from "./users";
 import { membresTable } from "./membres";
+
+// ─── Sessions de pesée ────────────────────────────────────────────────────────
+
+export const sessionPeseeStatutEnum = pgEnum("session_pesee_statut", ["en_cours", "terminee", "annulee"]);
+
+export const sessionsPeseeTable = pgTable("sessions_pesee", {
+  id:             serial("id").primaryKey(),
+  cooperativeId:  integer("cooperative_id").notNull().references(() => cooperativesTable.id),
+  numeroSession:  varchar("numero_session", { length: 30 }).notNull(),
+  membreId:       integer("membre_id").references(() => membresTable.id),
+  produit:        varchar("produit", { length: 100 }).notNull().default("cacao"),
+  operation:      varchar("operation", { length: 50 }).notNull().default("reception"),
+  peseurId:       integer("peseur_id").references(() => usersTable.id),
+  balanceId:      integer("balance_id"),
+  statut:         sessionPeseeStatutEnum("statut").notNull().default("en_cours"),
+  poidsTotalKg:   numeric("poids_total_kg", { precision: 12, scale: 3 }).notNull().default("0"),
+  nbSacsTotal:    integer("nb_sacs_total").notNull().default(0),
+  notes:          text("notes"),
+  livraisonId:    integer("livraison_id"),
+  dateDebut:      timestamp("date_debut", { withTimezone: true }).defaultNow().notNull(),
+  dateFin:        timestamp("date_fin", { withTimezone: true }),
+  createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type SessionPesee = typeof sessionsPeseeTable.$inferSelect;
+
+export const lignesPeseeTable = pgTable("lignes_pesee", {
+  id:             serial("id").primaryKey(),
+  sessionId:      integer("session_id").notNull().references(() => sessionsPeseeTable.id),
+  numeroPassage:  integer("numero_passage").notNull(),
+  nbSacs:         integer("nb_sacs").notNull().default(0),
+  poidsBrutKg:    numeric("poids_brut_kg", { precision: 10, scale: 3 }).notNull(),
+  tareKg:         numeric("tare_kg", { precision: 10, scale: 3 }).default("0"),
+  notes:          text("notes"),
+  createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type LignePesee = typeof lignesPeseeTable.$inferSelect;
 
 // ─── Balances ─────────────────────────────────────────────────────────────────
 

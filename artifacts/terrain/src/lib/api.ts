@@ -246,6 +246,66 @@ export async function getPeseurCollectes(): Promise<import("./types").PeseurColl
   return apiGet<import("./types").PeseurCollecte[]>("/peseur/collectes");
 }
 
+// ─── Sessions de pesée ─────────────────────────────────────────────────────────
+const PESEE_BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`;
+
+async function apiPeseeFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers as Record<string, string> || {}),
+  };
+  const res = await fetch(`${PESEE_BASE}${path}`, { ...options, headers });
+  if (!res.ok) {
+    if (res.status === 401) { clearAuth(); window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`; throw new Error("Session expirée"); }
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function createSessionPesee(data: {
+  membreId?: number; produit?: string; operation?: string; notes?: string;
+}): Promise<import("./types").SessionPesee> {
+  return apiPeseeFetch("/pesee/sessions", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function getSessionsEnCours(membreId?: number): Promise<import("./types").SessionPesee[]> {
+  const q = membreId ? `?statut=en_cours&membreId=${membreId}` : "?statut=en_cours";
+  return apiPeseeFetch(`/pesee/sessions${q}`);
+}
+
+export async function getSessionDetail(sessionId: number): Promise<import("./types").SessionDetail> {
+  return apiPeseeFetch(`/pesee/sessions/${sessionId}`);
+}
+
+export async function addLignePesee(sessionId: number, data: {
+  nbSacs: number; poidsBrutKg: number; tareKg?: number; notes?: string;
+}): Promise<import("./types").SessionDetail> {
+  const result = await apiPeseeFetch<{ ligne: import("./types").LignePesee; session: import("./types").SessionDetail }>(
+    `/pesee/sessions/${sessionId}/lignes`,
+    { method: "POST", body: JSON.stringify(data) },
+  );
+  return result.session;
+}
+
+export async function deleteLignePesee(sessionId: number, ligneId: number): Promise<import("./types").SessionDetail> {
+  const result = await apiPeseeFetch<{ ok: boolean; session: import("./types").SessionDetail }>(
+    `/pesee/sessions/${sessionId}/lignes/${ligneId}`,
+    { method: "DELETE" },
+  );
+  return result.session;
+}
+
+export async function terminerSessionPesee(sessionId: number): Promise<import("./types").SessionDetail> {
+  return apiPeseeFetch(`/pesee/sessions/${sessionId}/terminer`, { method: "PUT" });
+}
+
+export async function annulerSessionPesee(sessionId: number): Promise<void> {
+  await apiPeseeFetch(`/pesee/sessions/${sessionId}/annuler`, { method: "PUT" });
+}
+
 export async function getEnquetes(): Promise<import("./types").MissionEnquete[]> {
   return apiGet<import("./types").MissionEnquete[]>("/enquetes");
 }

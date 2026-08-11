@@ -64,7 +64,6 @@ export interface CollecteResult {
   prixUnitaireFcfa: number;
   statutPaiement?: "PAYÉ" | "DIFFÉRÉ";
   soldeCaisseApres?: number;
-  /** Commission délégué calculée sur cette livraison (null si aucun taux configuré) */
   commissionFcfa?: number | null;
 }
 
@@ -82,7 +81,6 @@ export interface CommissionResume {
     statut: string;
     createdAt: string;
   }>;
-  /** Campagnes ayant au moins une commission — utilisées pour le sélecteur de filtre */
   campagnes: Array<{
     id: number;
     libelle: string;
@@ -295,4 +293,40 @@ export interface EnqueteDetail {
   instructions: string | null;
   criteres: string[];
   membres: EnqueteMembre[];
+}
+
+// ─── Sessions de pesée ────────────────────────────────────────────────────────
+
+export interface LignePesee {
+  id: number;
+  sessionId: number;
+  numeroPassage: number;
+  nbSacs: number;
+  poidsBrutKg: string;
+  tareKg: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface SessionPesee {
+  id: number;
+  cooperativeId: number;
+  numeroSession: string;
+  membreId: number | null;
+  membreNom: string | null;
+  membrePrenoms: string | null;
+  produit: string;
+  operation: string;
+  statut: "en_cours" | "terminee" | "annulee";
+  poidsTotalKg: string;
+  nbSacsTotal: number;
+  nbLignes?: number;
+  dateDebut: string;
+  dateFin: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface SessionDetail extends SessionPesee {
+  lignes: LignePesee[];
 }

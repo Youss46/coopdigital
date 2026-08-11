@@ -477,6 +477,13 @@
       "when": 1783732700000,
       "tag": "0067_commissions_moyen_paiement",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1783733000000,
+      "tag": "0068_sessions_pesee",
+      "breakpoints": true
     }
   ]
 }

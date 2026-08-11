@@ -8,6 +8,7 @@ import SystemBanner from "./components/SystemBanner";
 import Login from "./pages/Login";
 import Accueil from "./pages/Accueil";
 import CollecteFlow from "./pages/CollecteFlow";
+import SessionPeseeFlow from "./pages/SessionPeseeFlow";
 import PaiementFlow from "./pages/PaiementFlow";
 import AvanceFlow from "./pages/AvanceFlow";
 import Bilan from "./pages/Bilan";
@@ -63,6 +64,7 @@ function PeseurRoutes() {
     <Switch>
       <Route path="/" component={AccueilPeseur} />
       <Route path="/collecte" component={CollecteFlow} />
+      <Route path="/pesee-session" component={SessionPeseeFlow} />
       <Route path="/historique" component={HistoriquePeseur} />
       <Route><Redirect to="/" /></Route>
     </Switch>

@@ -1,5 +1,14 @@
 import { type Request, type Response } from "express";
 import {
+  createSession,
+  getSessions,
+  getSessionDetail,
+  addLigne,
+  deleteLigne,
+  terminerSession,
+  annulerSession,
+} from "../services/peseeSessionService";
+import {
   CreateBalanceBody,
   UpdateBalanceBody,
   CreateVerificationBalanceBody,
@@ -275,5 +284,124 @@ export async function handleUpdateConfig(req: Request, res: Response) {
   } catch (err) {
     req.log.error(err, "handleUpdateConfig");
     res.status(500).json({ erreur: "Erreur serveur" });
+  }
+}
+
+// ─── Sessions de pesée ────────────────────────────────────────────────────────
+
+export async function handleCreateSession(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const { membreId, produit, operation, balanceId, notes } = req.body as {
+    membreId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string;
+  };
+  try {
+    const session = await createSession(cooperativeId, {
+      membreId, produit, operation, balanceId, notes,
+      peseurId: req.user?.id,
+    });
+    res.status(201).json(session);
+  } catch (err) {
+    req.log.error(err, "handleCreateSession");
+    res.status(500).json({ erreur: "Erreur création session" });
+  }
+}
+
+export async function handleGetSessions(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const { statut, membreId, limit } = req.query as { statut?: string; membreId?: string; limit?: string };
+  try {
+    const sessions = await getSessions(cooperativeId, {
+      statut,
+      membreId: membreId ? parseInt(membreId) : undefined,
+      limit: limit ? parseInt(limit) : undefined,
+    });
+    res.json(sessions);
+  } catch (err) {
+    req.log.error(err, "handleGetSessions");
+    res.status(500).json({ erreur: "Erreur récupération sessions" });
+  }
+}
+
+export async function handleGetSession(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const sessionId = parseInt(String(req.params["id"] ?? "0"));
+  try {
+    const session = await getSessionDetail(cooperativeId, sessionId);
+    if (!session) { res.status(404).json({ erreur: "Session introuvable" }); return; }
+    res.json(session);
+  } catch (err) {
+    req.log.error(err, "handleGetSession");
+    res.status(500).json({ erreur: "Erreur récupération session" });
+  }
+}
+
+export async function handleAddLigne(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const sessionId = parseInt(String(req.params["id"] ?? "0"));
+  const { nbSacs, poidsBrutKg, tareKg, notes } = req.body as {
+    nbSacs?: number; poidsBrutKg?: number; tareKg?: number; notes?: string;
+  };
+  if (!poidsBrutKg || poidsBrutKg <= 0) { res.status(400).json({ erreur: "Poids invalide" }); return; }
+  try {
+    const ligne = await addLigne(cooperativeId, sessionId, {
+      nbSacs: nbSacs ?? 0,
+      poidsBrutKg,
+      tareKg,
+      notes,
+    });
+    const session = await getSessionDetail(cooperativeId, sessionId);
+    res.status(201).json({ ligne, session });
+  } catch (err) {
+    req.log.error(err, "handleAddLigne");
+    const msg = err instanceof Error ? err.message : "Erreur ajout ligne";
+    res.status(400).json({ erreur: msg });
+  }
+}
+
+export async function handleDeleteLigne(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const sessionId = parseInt(String(req.params["id"] ?? "0"));
+  const ligneId = parseInt(String(req.params["ligneId"] ?? "0"));
+  try {
+    await deleteLigne(cooperativeId, sessionId, ligneId);
+    const session = await getSessionDetail(cooperativeId, sessionId);
+    res.json({ ok: true, session });
+  } catch (err) {
+    req.log.error(err, "handleDeleteLigne");
+    const msg = err instanceof Error ? err.message : "Erreur suppression ligne";
+    res.status(400).json({ erreur: msg });
+  }
+}
+
+export async function handleTerminerSession(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const sessionId = parseInt(String(req.params["id"] ?? "0"));
+  try {
+    const session = await terminerSession(cooperativeId, sessionId);
+    res.json(session);
+  } catch (err) {
+    req.log.error(err, "handleTerminerSession");
+    const msg = err instanceof Error ? err.message : "Erreur clôture session";
+    res.status(400).json({ erreur: msg });
+  }
+}
+
+export async function handleAnnulerSession(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const sessionId = parseInt(String(req.params["id"] ?? "0"));
+  try {
+    await annulerSession(cooperativeId, sessionId);
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err, "handleAnnulerSession");
+    const msg = err instanceof Error ? err.message : "Erreur annulation session";
+    res.status(400).json({ erreur: msg });
   }
 }
