@@ -20,6 +20,25 @@ import type { Fournisseur, SessionDetail, ConversionLivraisonResult } from "../l
 
 type Step = "membre" | "session" | "succes";
 
+function RecuLivraisonButton({ livraisonId }: { livraisonId: number }) {
+  const [loading, setLoading] = useState(false);
+  return (
+    <button
+      className="t-btn t-btn--ghost"
+      style={{ width: "100%", marginBottom: 10 }}
+      disabled={loading}
+      onClick={async () => {
+        setLoading(true);
+        try { await telechargerRecuLivraison(livraisonId); }
+        catch { /* silencieux */ }
+        finally { setLoading(false); }
+      }}
+    >
+      {loading ? "Génération…" : "📄 Télécharger le reçu PDF"}
+    </button>
+  );
+}
+
 function RecuButton({ livraisonId }: { livraisonId: number }) {
   const [loading, setLoading] = useState(false);
   return (

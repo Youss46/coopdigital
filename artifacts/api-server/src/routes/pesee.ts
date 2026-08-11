@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth";
-import { checkPermission } from "../middlewares/permissions";
 import {
   handleGetBalancesAlertes,
   handleGetBalances,
@@ -57,6 +56,6 @@ router.post("/pesee/sessions/:id/lignes",             authMiddleware, handleAddL
 router.delete("/pesee/sessions/:id/lignes/:ligneId",  authMiddleware, handleDeleteLigne);
 router.put("/pesee/sessions/:id/terminer",            authMiddleware, handleTerminerSession);
 router.put("/pesee/sessions/:id/annuler",             authMiddleware, handleAnnulerSession);
-router.put("/pesee/sessions/:id/livraison",           authMiddleware, checkPermission("livraisons", "creer"), handleConvertirSessionEnLivraison);
+router.put("/pesee/sessions/:id/livraison",           authMiddleware, handleConvertirSessionEnLivraison);
 
 export default router;

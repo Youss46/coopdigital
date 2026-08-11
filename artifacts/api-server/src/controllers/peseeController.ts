@@ -421,6 +421,11 @@ export async function handleAnnulerSession(req: Request, res: Response): Promise
 export async function handleConvertirSessionEnLivraison(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const role = req.user?.role;
+  if (role !== "peseur" && role !== "delegue") {
+    res.status(403).json({ erreur: "Réservé aux délégués et peseurs" });
+    return;
+  }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
   const { modePaiement, entrepotId } = req.body as {
     modePaiement?: "especes" | "orange_money" | "mtn_momo" | "wave" | "cheque";
