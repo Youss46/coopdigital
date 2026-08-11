@@ -306,11 +306,28 @@ export async function enregistrerCollecte(
   const today = new Date().toISOString().slice(0, 10);
 
   // Vérifier la caisse du délégué
-  const [caisse] = await db
+  // Si l'agent est un peseur, il n'a pas de caisse propre → utiliser la caisse de son délégué rattaché
+  let [caisse] = await db
     .select()
     .from(caissesDeleguesTable)
     .where(eq(caissesDeleguesTable.userId, agentId))
     .limit(1);
+
+  if (!caisse) {
+    // L'agent est peut-être un peseur → chercher son délégué via users.delegue_id
+    const [agentRow] = await db
+      .select({ delegueId: usersTable.delegueId })
+      .from(usersTable)
+      .where(eq(usersTable.id, agentId))
+      .limit(1);
+    if (agentRow?.delegueId) {
+      [caisse] = await db
+        .select()
+        .from(caissesDeleguesTable)
+        .where(eq(caissesDeleguesTable.userId, agentRow.delegueId))
+        .limit(1);
+    }
+  }
 
   const soldeCaisse = caisse ? Number(caisse.solde) : 0;
   const paiementImmediat = soldeCaisse >= montantNet;
