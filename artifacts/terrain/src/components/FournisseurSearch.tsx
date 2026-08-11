@@ -7,9 +7,10 @@ import type { Fournisseur } from "../lib/types";
 interface Props {
   onSelect: (f: Fournisseur) => void;
   title?: string;
+  activeSessionIds?: Set<number>;
 }
 
-export default function FournisseurSearch({ onSelect, title = "Choisir un membre" }: Props) {
+export default function FournisseurSearch({ onSelect, title = "Choisir un membre", activeSessionIds }: Props) {
   const { isOnline } = useOffline();
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<Fournisseur[]>([]);
@@ -99,6 +100,11 @@ export default function FournisseurSearch({ onSelect, title = "Choisir un membre
                 {f.section && ` · ${f.section}`}
               </div>
               <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {activeSessionIds?.has(f.id) && (
+                  <span className="t-badge t-badge--warning" style={{ fontWeight: 700 }}>
+                    🟡 Session en cours
+                  </span>
+                )}
                 {f.avanceEnCours > 0 && (
                   <span className="t-badge t-badge--danger">
                     Avance {f.avanceEnCours.toLocaleString("fr-FR")} FCFA

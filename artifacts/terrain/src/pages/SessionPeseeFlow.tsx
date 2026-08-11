@@ -43,6 +43,15 @@ export default function SessionPeseeFlow() {
   const [confirmAnnuler, setConfirmAnnuler] = useState(false);
   const [confirmTerminer, setConfirmTerminer] = useState(false);
 
+  // IDs des membres ayant déjà une session en cours (pour le badge dans la liste)
+  const [activeSessionIds, setActiveSessionIds] = useState<Set<number>>(new Set());
+  useEffect(() => {
+    if (!isOnline) return;
+    getSessionsEnCours().then((sessions) => {
+      setActiveSessionIds(new Set(sessions.map((s) => s.membreId).filter((id): id is number => id !== null)));
+    }).catch(() => { /* silencieux */ });
+  }, [isOnline]);
+
   // Reprise de session en cours pour ce membre
   useEffect(() => {
     if (!fournisseur || !isOnline) return;
@@ -228,6 +237,7 @@ export default function SessionPeseeFlow() {
             <FournisseurSearch
               title="Choisir le planteur"
               onSelect={handleSelectMembre}
+              activeSessionIds={activeSessionIds}
             />
           </>
         )}
