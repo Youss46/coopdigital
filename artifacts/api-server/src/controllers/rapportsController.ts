@@ -399,7 +399,18 @@ export async function genererRapportIA(req: Request, res: Response): Promise<voi
   res.flushHeaders();
 
   try {
-    const kpis = await getKPIs(cooperativeId, campagneId);
+    // Si aucune campagne sélectionnée, auto-associer à la campagne en cours
+    let resolvedCampagneId = campagneId;
+    if (!resolvedCampagneId) {
+      const [active] = await db
+        .select({ id: campagnesTable.id })
+        .from(campagnesTable)
+        .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
+        .limit(1);
+      if (active) resolvedCampagneId = active.id;
+    }
+
+    const kpis = await getKPIs(cooperativeId, resolvedCampagneId);
     const { system, user } = buildPrompt(kpis, sections);
 
     const anthropic = new Anthropic({ apiKey: process.env["ANTHROPIC_API_KEY"] });
@@ -431,7 +442,7 @@ export async function genererRapportIA(req: Request, res: Response): Promise<voi
           .insert(rapportsIaTable)
           .values({
             cooperativeId,
-            campagneId: kpis.campagne && campagneId ? campagneId : null,
+            campagneId: kpis.campagne ? (resolvedCampagneId ?? null) : null,
             titre,
             sections,
             contenu: contenuComplet,
