@@ -23,6 +23,34 @@ export async function getEncoursMembre(cooperativeId: number, membreId: number):
   return Math.round(parseFloat(rows[0]?.solde ?? "0"));
 }
 
+type TxClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Retourne le total des intrants non remboursés (solde dû) pour un membre,
+ * à l'intérieur d'une transaction existante (lecture cohérente).
+ */
+export async function getEncoursMembreTx(
+  tx: TxClient,
+  cooperativeId: number,
+  membreId: number,
+): Promise<number> {
+  const rows = await tx
+    .select({
+      solde: sql<string>`COALESCE(SUM(montant_membre_fcfa - montant_rembourse_fcfa), 0)`,
+    })
+    .from(distributionsIntrantsTable)
+    .where(
+      and(
+        eq(distributionsIntrantsTable.membreId, membreId),
+        eq(distributionsIntrantsTable.cooperativeId, cooperativeId),
+        sql`statut_remboursement != 'rembourse'`,
+        sql`montant_membre_fcfa > montant_rembourse_fcfa`,
+      ),
+    );
+
+  return Math.round(parseFloat(rows[0]?.solde ?? "0"));
+}
+
 /**
  * Enregistre un remboursement automatique par déduction sur livraison.
  * Doit être appelé à l'intérieur d'une transaction.

@@ -7,11 +7,13 @@ import {
   paiementsTable,
   entrepotsTable,
   mouvementsStockTable,
+  avancesTable,
   configPeseeTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { getPrixActuel } from "./terrainService.js";
 import { generateEcrituresLivraison } from "./comptabiliteService.js";
+import { getEncoursMembreTx, enregistrerRemboursementParLivraison } from "./intrantsService.js";
 import { logger } from "../lib/logger.js";
 
 // ─── Génération numéro de session ─────────────────────────────────────────────
@@ -359,6 +361,27 @@ export async function creerLivraisonDepuisSession(
       ? (typeof session.dateFin === "string" ? session.dateFin : (session.dateFin as Date).toISOString().split("T")[0]!)
       : new Date().toISOString().split("T")[0]!;
 
+    // ── Avances & intrants deductions (same logic as createLivraison) ─────
+    // Both reads run inside the transaction with FOR UPDATE so concurrent
+    // deliveries for the same member cannot see the same stale balance.
+    const avanceRows = await tx
+      .select()
+      .from(avancesTable)
+      .where(and(eq(avancesTable.membreId, session.membreId), eq(avancesTable.statut, "en_cours")))
+      .orderBy(desc(avancesTable.dateOctroi))
+      .for("update")
+      .limit(1);
+    const avanceEnCours = avanceRows[0];
+
+    const encoursIntrants = await getEncoursMembreTx(tx, cooperativeId, session.membreId);
+
+    const avanceDeduite = avanceEnCours
+      ? Math.min(avanceEnCours.soldeRestantFcfa, montantBrut)
+      : 0;
+    const apresAvance = montantBrut - avanceDeduite;
+    const intrantsDeduits = Math.min(encoursIntrants, Math.max(0, apresAvance));
+    const montantNet = montantBrut - avanceDeduite - intrantsDeduits;
+
     const [livraison] = await tx
       .insert(livraisonsTable)
       .values({
@@ -367,9 +390,9 @@ export async function creerLivraisonDepuisSession(
         poidsKg: String(poidsKg),
         prixUnitaireFcfa: prixBordChampFcfa,
         montantBrutFcfa: montantBrut,
-        avanceDeduiteFcfa: 0,
-        intrantsDeduitsFcfa: 0,
-        montantNetFcfa: montantBrut,
+        avanceDeduiteFcfa: avanceDeduite,
+        intrantsDeduitsFcfa: intrantsDeduits,
+        montantNetFcfa: montantNet,
         retenueKg: "0",
         nombreSacs: session.nbSacsTotal ?? null,
         produit: session.produit ?? "cacao",
@@ -383,11 +406,30 @@ export async function creerLivraisonDepuisSession(
       .values({
         livraisonId: livraison!.id,
         membreId: session.membreId,
-        montantFcfa: montantBrut,
+        montantFcfa: montantNet,
         modePaiement,
         statut: "en_attente",
       })
       .returning();
+
+    // ── Mise à jour de l'avance ───────────────────────────────────────────
+    if (avanceEnCours && avanceDeduite > 0) {
+      const nouveauRembourse = avanceEnCours.montantRembourse_fcfa + avanceDeduite;
+      const nouveauSolde = avanceEnCours.soldeRestantFcfa - avanceDeduite;
+      await tx
+        .update(avancesTable)
+        .set({
+          montantRembourse_fcfa: nouveauRembourse,
+          soldeRestantFcfa: nouveauSolde,
+          statut: nouveauSolde === 0 ? "rembourse" : "en_cours",
+        })
+        .where(eq(avancesTable.id, avanceEnCours.id));
+    }
+
+    // ── Remboursement intrants ────────────────────────────────────────────
+    if (intrantsDeduits > 0) {
+      await enregistrerRemboursementParLivraison(tx, cooperativeId, session.membreId, intrantsDeduits, dateStr);
+    }
 
     // Stock movement — resolve entrepot scoped to this cooperative
     let entrepotId: number | null = null;
