@@ -70,6 +70,20 @@ function ligneTableau(doc: InstanceType<typeof PDFDocument>, colonnes: string[],
   doc.fillColor("black");
 }
 
+/** Retourne le libellé de la campagne ouverte de la coopérative, ou null si aucune.
+ *  Format : "Libellé (annéeDebut/anneeFin)" ou "Libellé (année)" si une seule année. */
+async function getCampagneEnCours(cooperativeId: number): Promise<string | null> {
+  const [c] = await db
+    .select({ libelle: campagnesTable.libelle, anneeDebut: campagnesTable.anneeDebut, anneeFin: campagnesTable.anneeFin })
+    .from(campagnesTable)
+    .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
+    .orderBy(desc(campagnesTable.dateOuverture))
+    .limit(1);
+  if (!c) return null;
+  const years = c.anneeDebut === c.anneeFin ? String(c.anneeDebut) : `${c.anneeDebut}/${c.anneeFin}`;
+  return `${c.libelle} (${years})`;
+}
+
 /** Helper : ajoute les pieds de page sur toutes les pages bufferisées puis libère le buffer.
  *  drawFooter neutralise temporairement margin.bottom pour éviter que PDFKit ne détecte
  *  un débordement et insère des pages vides lors du rendu du footer. */
@@ -751,6 +765,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     .where(eq(livraisonsTable.id, livraisonId));
   if (!row) throw new Error("Livraison introuvable");
 
+  const campagne = await getCampagneEnCours(cooperativeId);
   const { doc, endPromise } = makePdfDoc();
   const ref = row.codeAchat ?? `LIV-${String(row.id).padStart(5, "0")}`;
   await drawHeader(doc, cooperativeId, { titre_document: "Reçu de Livraison", reference: ref });
@@ -768,6 +783,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
   doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("DÉTAILS DE LA LIVRAISON", MARGIN, y);
   y += 14;
   const recuLivDetails: Array<[string, string]> = [
+    ["Campagne",           campagne ?? "—"],
     ["Date de livraison",  formaterDate(row.dateLivraison)],
     ["Produit",            row.produit ?? "Cacao"],
     ["Nombre de sacs",     row.nombreSacs ? String(row.nombreSacs) : "—"],
@@ -878,6 +894,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     .where(eq(paiementsTable.id, paiementId));
   if (!row) throw new Error("Paiement introuvable");
 
+  const campagne = await getCampagneEnCours(cooperativeId);
   const { doc, endPromise } = makePdfDoc();
   const ref = row.numeroRecu ?? `PAY-${String(row.id).padStart(5, "0")}`;
   await drawHeader(doc, cooperativeId, { titre_document: "Reçu de Paiement", reference: ref });
@@ -897,6 +914,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     orange_money: "Orange Money", mtn_momo: "MTN MoMo", especes: "Espèces",
   };
   const payDetails: Array<[string, string]> = [
+    ["Campagne",             campagne ?? "—"],
     ["Date",                 formaterDate(row.createdAt)],
     ["Mode de paiement",     payModeLabel[row.modeReglement ?? row.modePaiement] ?? row.modePaiement],
     ["Référence transaction",row.referenceTransaction ?? "—"],
@@ -1119,6 +1137,7 @@ export async function generateBordereauPesee(livraisonId: number, cooperativeId:
     .where(eq(livraisonsTable.id, livraisonId));
   if (!row) throw new Error("Livraison introuvable");
 
+  const campagne = await getCampagneEnCours(cooperativeId);
   const { doc, endPromise } = makePdfDoc();
   const ref = row.codeAchat ?? `PES-${String(row.id).padStart(5,"0")}`;
   await drawHeader(doc, cooperativeId, { titre_document: "Bordereau de Pesée", reference: ref });
@@ -1131,6 +1150,13 @@ export async function generateBordereauPesee(livraisonId: number, cooperativeId:
   doc.fontSize(8).fillColor(GRIS).font("Helvetica")
     .text(`Groupement : ${row.membreGroupement ?? "—"}   |   Produit : ${row.produit ?? "Cacao"}   |   Sacs : ${row.nombreSacs ?? "—"}`, MARGIN + 8, y + 30);
   y += 52;
+
+  if (campagne) {
+    doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 16).fill("#e0f2fe");
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica").text("Campagne :", MARGIN + 8, y + 4, { width: 100, lineBreak: false });
+    doc.fontSize(8).fillColor("#0c4a6e").font("Helvetica-Bold").text(campagne, MARGIN + 110, y + 4, { lineBreak: false });
+    y += 20;
+  }
 
   doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("RÉSULTATS DE PESÉE", MARGIN, y);
   y += 14;
@@ -1201,6 +1227,7 @@ export async function generateRecuAvance(avanceId: number, cooperativeId: number
     .where(eq(avancesTable.id, avanceId));
   if (!row) throw new Error("Avance introuvable");
 
+  const campagne = await getCampagneEnCours(cooperativeId);
   const { doc, endPromise } = makePdfDoc();
   const ref = `AVC-${String(row.id).padStart(5, "0")}`;
   await drawHeader(doc, cooperativeId, { titre_document: "Reçu d'Avance", reference: ref });
@@ -1217,6 +1244,7 @@ export async function generateRecuAvance(avanceId: number, cooperativeId: number
   doc.fontSize(10).fillColor(OR).font("Helvetica-Bold").text("DÉTAILS DE L'AVANCE", MARGIN, y);
   y += 14;
   const avcDetails: Array<[string, string]> = [
+    ["Campagne",       campagne ?? "—"],
     ["Date d'octroi",  formaterDate(row.dateOctroi)],
     ["Motif",          row.motif ?? "—"],
     ["Échéance",       row.dateEcheance ? formaterDate(row.dateEcheance) : "Non définie"],
@@ -1291,6 +1319,7 @@ export async function generateRecuIntrant(distributionId: number, cooperativeId:
     .where(eq(distributionsIntrantsTable.id, distributionId));
   if (!row) throw new Error("Distribution introuvable");
 
+  const campagne = await getCampagneEnCours(cooperativeId);
   const { doc, endPromise } = makePdfDoc();
   const ref = `INT-${String(row.id).padStart(5, "0")}`;
   await drawHeader(doc, cooperativeId, { titre_document: "Reçu d'Intrant", reference: ref });
@@ -1308,6 +1337,7 @@ export async function generateRecuIntrant(distributionId: number, cooperativeId:
   y += 14;
   const intModeLabel: Record<string, string> = { credit: "Crédit", gratuit: "Gratuit", subventionne: "Subventionné" };
   const intDetails: Array<[string, string]> = [
+    ["Campagne",         campagne ?? "—"],
     ["Date",             formaterDate(row.dateDistribution)],
     ["Intrant",          row.intrantNom ?? "—"],
     ["Quantité",         `${parseFloat(row.quantite).toFixed(2)} ${row.intrantUnite ?? ""}`],
@@ -1376,6 +1406,7 @@ export async function generateEtatPartsSociales(membreId: number, cooperativeId:
   const restantFcfa      = Math.max(0, montantMinFcfa - totalLibereFcfa);
   const pctLibere        = montantMinFcfa > 0 ? Math.min(100, Math.round((totalLibereFcfa / montantMinFcfa) * 100)) : 100;
 
+  const campagne = await getCampagneEnCours(cooperativeId);
   const { doc, endPromise } = makePdfDoc();
   const ref = `PS-${String(membre.id).padStart(4, "0")}`;
   await drawHeader(doc, cooperativeId, { titre_document: "État des Parts Sociales", reference: ref });
@@ -1392,6 +1423,7 @@ export async function generateEtatPartsSociales(membreId: number, cooperativeId:
   doc.fontSize(10).fillColor(OR).font("Helvetica-Bold").text("RÉCAPITULATIF DES PARTS", MARGIN, y);
   y += 14;
   const psRecap: Array<[string, string, string]> = [
+    ["Campagne en cours",           campagne ?? "—",                 "#e0f2fe"],
     ["Valeur nominale d'une part",  formaterFCFA(valeurNominale),    "#f9fafb"],
     ["Nombre de parts minimum",     String(nbrePartsMin),            "#f9fafb"],
     ["Souscription minimale",       formaterFCFA(montantMinFcfa),    "#fffbeb"],
