@@ -886,6 +886,83 @@ export async function cloturerExercice(req: Request, res: Response): Promise<voi
   }
 }
 
+// ─── Grand livre tiers (position comptable individuelle) ─────────────────────
+export async function getGrandLivreTiers(req: Request, res: Response): Promise<void> {
+  try {
+    const coop      = coopId(req);
+    const tiersId   = parseInt(String(req.params["id"] ?? "0"));
+    const tiersType = (req.query["type"] as string) || "membre";
+    const exercice  = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : undefined;
+
+    if (!tiersId) { res.status(400).json({ erreur: "id invalide" }); return; }
+
+    const conds = [
+      eq(ecrituresComptablesTable.cooperativeId, coop),
+      eq(ecrituresComptablesTable.tiersId, tiersId),
+      sql`tiers_type = ${tiersType}`,
+    ];
+    if (exercice) conds.push(eq(ecrituresComptablesTable.exercice, exercice));
+
+    const ecritures = await db
+      .select()
+      .from(ecrituresComptablesTable)
+      .where(and(...conds))
+      .orderBy(asc(ecrituresComptablesTable.dateEcriture), asc(ecrituresComptablesTable.id));
+
+    // Comptes "membre" OHADA (classe 4 fournisseur/avances)
+    const COMPTES_FOURNISSEUR = new Set(["401", "4091", "4092"]);
+
+    // Pour chaque écriture, on calcule l'impact du point de vue du membre :
+    //   crédit sur compte fournisseur = la coop doit de l'argent au membre (+)
+    //   débit  sur compte fournisseur = réduction de la dette (-)
+    //   débit  sur 4091 = le membre doit des intrants à la coop (-)
+    //   crédit sur 4091 = remboursement intrant (+)
+    let solde = 0;
+    const lignes = ecritures.map(e => {
+      const creditFourn = COMPTES_FOURNISSEUR.has(e.compteCredit);
+      const debitFourn  = COMPTES_FOURNISSEUR.has(e.compteDebit);
+      const sens = creditFourn ? "credit" : debitFourn ? "debit" : "neutre";
+      const impact = creditFourn ? e.montantFcfa : debitFourn ? -e.montantFcfa : 0;
+      solde += impact;
+      return {
+        id:            e.id,
+        dateEcriture:  e.dateEcriture,
+        numeroPiece:   e.numeroPiece,
+        libelle:       e.libelle,
+        compteDebit:   e.compteDebit,
+        compteCredit:  e.compteCredit,
+        montantFcfa:   e.montantFcfa,
+        source:        e.source,
+        sens,
+        impact,
+        solde,
+      };
+    });
+
+    // Totaux synthétiques
+    const totalDuMembre      = ecritures.filter(e => COMPTES_FOURNISSEUR.has(e.compteCredit)).reduce((s, e) => s + e.montantFcfa, 0);
+    const totalPaye          = ecritures.filter(e => COMPTES_FOURNISSEUR.has(e.compteDebit) && e.source === "paiement").reduce((s, e) => s + e.montantFcfa, 0);
+    const totalIntrantsDus   = ecritures.filter(e => e.compteDebit === "4091").reduce((s, e) => s + e.montantFcfa, 0);
+    const totalIntrantsRemb  = ecritures.filter(e => e.compteCredit === "4091").reduce((s, e) => s + e.montantFcfa, 0);
+
+    res.json({
+      tiersId, tiersType,
+      lignes,
+      totaux: {
+        totalDuMembre,
+        totalPaye,
+        totalIntrantsDus,
+        totalIntrantsRemb,
+        soldeNet: solde,
+      },
+    });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur getGrandLivreTiers");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 // ─── Statut des exercices ─────────────────────────────────────────────────────
 export async function getStatutsExercices(req: Request, res: Response): Promise<void> {
   try {

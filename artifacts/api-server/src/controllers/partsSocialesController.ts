@@ -164,6 +164,8 @@ export async function enregistrerLiberation(req: Request, res: Response) {
     compteCredit: "101",
     montantFcfa,
     date: dateVersement,
+    tiersId: membreId,
+    tiersType: "membre",
   });
 
   const updated = await db.query.membresTable.findFirst({

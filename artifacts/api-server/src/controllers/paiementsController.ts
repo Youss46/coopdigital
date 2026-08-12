@@ -672,6 +672,8 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         montantFcfa: row.paiement.montantFcfa,
         date: dateStr,
         numeroPiece: `PAI-${id}`,
+        tiersId: row.paiement.membreId ?? undefined,
+        tiersType: "membre",
       });
     }
 

@@ -519,6 +519,13 @@
       "when": 1784079600000,
       "tag": "0073_config_auto_commissions",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1784166000000,
+      "tag": "0074_tiers_ecritures",
+      "breakpoints": true
     }
   ]
 }

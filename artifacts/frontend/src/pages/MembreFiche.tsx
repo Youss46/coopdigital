@@ -27,6 +27,7 @@ import {
   Coins, Loader2, ChevronDown, ChevronUp, UserCheck, UserX, Gift,
   GraduationCap, Award, Download, Building2, User, Edit3, AlertTriangle,
   Satellite, CheckCircle2, XCircle, CreditCard, Star, ShieldCheck, BadgeCheck, ClipboardX,
+  BookOpen,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
@@ -333,7 +334,7 @@ function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const TABS = ["Avances", "Livraisons", "Impayées", "Parts sociales", "Score", "Dons reçus", "Formations", "Parcelles GPS", "Certifications"] as const;
+const TABS = ["Avances", "Livraisons", "Impayées", "Parts sociales", "Score", "Dons reçus", "Formations", "Parcelles GPS", "Certifications", "Position comptable"] as const;
 type Tab = (typeof TABS)[number];
 
 const NIVEAUX_SCORE: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
@@ -343,6 +344,111 @@ const NIVEAUX_SCORE: Record<string, { label: string; color: string; bg: string; 
   bronze:     { label: "Bronze",     color: "text-orange-700", bg: "bg-orange-100",  emoji: "🥉" },
   non_classe: { label: "Non classé", color: "text-slate-500",  bg: "bg-slate-100",   emoji: "📋" },
 };
+
+// ── Position comptable individuelle ──────────────────────────────────────────
+interface LigneTiers {
+  id: number; dateEcriture: string; numeroPiece: string | null;
+  libelle: string; compteDebit: string; compteCredit: string;
+  montantFcfa: number; source: string; sens: string; impact: number; solde: number;
+}
+interface GrandLivreTiers {
+  tiersId: number; tiersType: string; lignes: LigneTiers[];
+  totaux: { totalDuMembre: number; totalPaye: number; totalIntrantsDus: number; totalIntrantsRemb: number; soldeNet: number };
+}
+
+function PositionComptableMembre({ membreId }: { membreId: number }) {
+  const token = localStorage.getItem("coop_token") ?? "";
+  const BASE = import.meta.env.VITE_API_URL ?? "";
+
+  const { data, isLoading } = useQuery<GrandLivreTiers>({
+    queryKey: ["position-comptable-membre", membreId],
+    queryFn: () =>
+      fetch(`${BASE}/api/comptabilite/tiers/${membreId}/grand-livre?type=membre`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(r => r.json()) as Promise<GrandLivreTiers>,
+    enabled: !!membreId,
+  });
+
+  if (isLoading) return <div className="text-center py-12 text-gray-400 text-sm">Chargement…</div>;
+
+  if (!data || data.lignes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-2 text-gray-400">
+        <BookOpen size={28} className="opacity-40" />
+        <p className="text-sm">Aucune écriture comptable enregistrée pour ce membre.</p>
+        <p className="text-xs text-gray-400">Les écritures apparaissent automatiquement dès qu'une livraison, avance ou paiement est enregistré.</p>
+      </div>
+    );
+  }
+
+  const { totaux } = data;
+  const fmt = (n: number) => new Intl.NumberFormat("fr-FR").format(Math.round(n));
+  const soldePositif = totaux.soldeNet >= 0;
+
+  return (
+    <div className="p-4 space-y-4">
+      {/* Cartes synthèse */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-blue-50 rounded-xl p-3">
+          <p className="text-xs text-blue-600 font-medium">Dû au membre</p>
+          <p className="text-sm font-bold text-blue-800 mt-1">{fmt(totaux.totalDuMembre)} FCFA</p>
+        </div>
+        <div className="bg-green-50 rounded-xl p-3">
+          <p className="text-xs text-green-600 font-medium">Payé</p>
+          <p className="text-sm font-bold text-green-800 mt-1">{fmt(totaux.totalPaye)} FCFA</p>
+        </div>
+        <div className="bg-amber-50 rounded-xl p-3">
+          <p className="text-xs text-amber-600 font-medium">Intrants dus</p>
+          <p className="text-sm font-bold text-amber-800 mt-1">{fmt(totaux.totalIntrantsDus)} FCFA</p>
+          <p className="text-xs text-amber-500">Remb. {fmt(totaux.totalIntrantsRemb)}</p>
+        </div>
+        <div className={`rounded-xl p-3 ${soldePositif ? "bg-green-50" : "bg-red-50"}`}>
+          <p className={`text-xs font-medium ${soldePositif ? "text-green-600" : "text-red-600"}`}>Solde net</p>
+          <p className={`text-sm font-bold mt-1 ${soldePositif ? "text-green-800" : "text-red-700"}`}>
+            {soldePositif ? "+" : ""}{fmt(totaux.soldeNet)} FCFA
+          </p>
+          <p className="text-xs text-gray-400">{soldePositif ? "Coop doit au membre" : "Membre doit à la coop"}</p>
+        </div>
+      </div>
+
+      {/* Table des écritures */}
+      <div className="overflow-x-auto rounded-xl border border-gray-200">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase bg-gray-50">
+              <th className="text-left px-3 py-2 font-medium">Date</th>
+              <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">Pièce</th>
+              <th className="text-left px-3 py-2 font-medium">Libellé</th>
+              <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">Débit</th>
+              <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">Crédit</th>
+              <th className="text-right px-3 py-2 font-medium">Montant</th>
+              <th className="text-right px-3 py-2 font-medium hidden sm:table-cell">Solde</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.lignes.map(l => (
+              <tr key={l.id} className="border-b border-gray-50 hover:bg-gray-50">
+                <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                  {new Date(l.dateEcriture).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                </td>
+                <td className="px-3 py-2 text-xs font-mono text-gray-400 hidden sm:table-cell">{l.numeroPiece ?? "—"}</td>
+                <td className="px-3 py-2 text-gray-700 text-xs">{l.libelle}</td>
+                <td className="px-3 py-2 font-mono text-xs text-gray-500 hidden sm:table-cell">{l.compteDebit}</td>
+                <td className="px-3 py-2 font-mono text-xs text-gray-500 hidden sm:table-cell">{l.compteCredit}</td>
+                <td className={`px-3 py-2 text-right text-xs font-semibold whitespace-nowrap ${l.impact > 0 ? "text-green-700" : l.impact < 0 ? "text-red-600" : "text-gray-500"}`}>
+                  {l.impact > 0 ? "+" : ""}{fmt(l.montantFcfa)}
+                </td>
+                <td className={`px-3 py-2 text-right text-xs hidden sm:table-cell whitespace-nowrap ${l.solde >= 0 ? "text-blue-700" : "text-red-600"}`}>
+                  {fmt(l.solde)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 export default function MembreFiche() {
   const [, navigate] = useLocation();
@@ -1450,6 +1556,10 @@ export default function MembreFiche() {
           </div>
         )}
         {/* Certifications */}
+        {activeTab === "Position comptable" && (
+          <PositionComptableMembre membreId={id} />
+        )}
+
         {activeTab === "Certifications" && (
           <div className="p-5 space-y-4">
             {certifsMembre.length === 0 ? (

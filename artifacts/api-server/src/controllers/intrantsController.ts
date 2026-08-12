@@ -391,33 +391,33 @@ export async function createDistribution(req: Request, res: Response): Promise<v
     const dateStr = String(dateDistribution);
     const piece = `DIST-${result.id}`;
     const coop = coopId(req);
+    const membreIdNum = Number(membreId);
     if (modeVal === "credit" && montantMembre > 0) {
-      // Crédit membre : 4091 Avances fournisseurs / 311 Stocks
       void proposerEcriture(coop, {
         source: "intrant", sourceId: result.id,
         libelle: `Intrants à crédit – membre #${membreId}`,
         compteDebit: "4091", compteCredit: "311",
         montantFcfa: Math.round(montantMembre), date: dateStr, numeroPiece: piece,
+        tiersId: membreIdNum, tiersType: "membre",
       });
     } else if (modeVal === "gratuit" && montantTotal > 0) {
-      // Don intrants : 604 Achats stockés / 311 Stocks
       void proposerEcriture(coop, {
         source: "don", sourceId: result.id,
         libelle: `Intrants gratuits – membre #${membreId}`,
         compteDebit: "604", compteCredit: "311",
         montantFcfa: Math.round(montantTotal), date: dateStr, numeroPiece: piece,
+        tiersId: membreIdNum, tiersType: "membre",
       });
     } else if (modeVal === "subventionne") {
-      // Part membre à crédit
       if (montantMembre > 0) {
         void proposerEcriture(coop, {
           source: "intrant", sourceId: result.id,
           libelle: `Intrants subventionnés (part membre) – membre #${membreId}`,
           compteDebit: "4091", compteCredit: "311",
           montantFcfa: Math.round(montantMembre), date: dateStr, numeroPiece: piece,
+          tiersId: membreIdNum, tiersType: "membre",
         });
       }
-      // Part coopérative (charge)
       const partCoop = montantTotal - montantMembre;
       if (partCoop > 0) {
         void proposerEcriture(coop, {
@@ -425,6 +425,7 @@ export async function createDistribution(req: Request, res: Response): Promise<v
           libelle: `Intrants subventionnés (part coop) – membre #${membreId}`,
           compteDebit: "604", compteCredit: "311",
           montantFcfa: Math.round(partCoop), date: dateStr, numeroPiece: piece,
+          tiersId: membreIdNum, tiersType: "membre",
         });
       }
     }
@@ -592,6 +593,7 @@ export async function remboursementManuel(req: Request, res: Response): Promise<
         compteCredit: "4091",
         montantFcfa: parseFloat(String(result.montantFcfa ?? 0)),
         date: dateStr,
+        tiersId: result.membreId, tiersType: "membre",
       }).catch((err: unknown) => req.log.error({ err }, "Erreur écriture remboursement intrant"));
     }
   } catch (err: unknown) {

@@ -48,6 +48,8 @@ export const ecrituresComptablesTable = pgTable("ecritures_comptables", {
   exercice:         integer("exercice").notNull(),
   typeEcriture:     varchar("type_ecriture", { length: 20 }).notNull().default("normale"),
   ecritureSourceId: integer("ecriture_source_id"),
+  tiersId:          integer("tiers_id"),
+  tiersType:        varchar("tiers_type", { length: 20 }),
   motifCorrection:  text("motif_correction"),
   corrigePar:       integer("corrige_par"),
   corrigeLe:        timestamp("corrige_le", { withTimezone: true }),

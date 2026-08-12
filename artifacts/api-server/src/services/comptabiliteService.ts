@@ -32,6 +32,10 @@ interface ProposerEcriturePayload {
   montantFcfa: number;
   date: string;
   numeroPiece?: string;
+  /** Tiers individualisé : id du membre / fournisseur / exportateur / délégué */
+  tiersId?: number;
+  /** Type du tiers : "membre" | "fournisseur" | "exportateur" | "delegue" */
+  tiersType?: "membre" | "fournisseur" | "exportateur" | "delegue";
 }
 
 const AUTO_KEY_MAP: Record<SourceEcriture, keyof typeof configComptableTable.$inferSelect> = {
@@ -124,6 +128,8 @@ export async function proposerEcriture(
         montantFcfa: Math.round(payload.montantFcfa),
         source: DB_SOURCE_MAP[payload.source],
         sourceId: payload.sourceId ?? null,
+        tiersId: payload.tiersId ?? null,
+        tiersType: payload.tiersType ?? null,
         exercice,
       }).returning({ id: ecrituresComptablesTable.id });
       if (inserted && !payload.numeroPiece) {
@@ -200,13 +206,14 @@ async function resolveCompteDebit(
  */
 export async function generateEcrituresLivraison(cooperativeId: number, params: {
   livraisonId: number;
+  membreId?: number;
   membreNom: string;
   montantBrutFcfa: number;
   avanceDeduiteFcfa: number;
   montantNetFcfa: number;
   dateLivraison: string;
 }) {
-  const { livraisonId, membreNom, montantBrutFcfa, avanceDeduiteFcfa, dateLivraison } = params;
+  const { livraisonId, membreId, membreNom, montantBrutFcfa, avanceDeduiteFcfa, dateLivraison } = params;
   const piece = `LIV-${livraisonId}`;
   const promises: Promise<unknown>[] = [];
 
@@ -217,6 +224,7 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
       libelle: `Achat cacao – ${membreNom}`,
       compteDebit: c.compteDebit, compteCredit: c.compteCredit,
       montantFcfa: montantBrutFcfa, date: dateLivraison, numeroPiece: piece,
+      tiersId: membreId, tiersType: "membre",
     }));
   }
   if (avanceDeduiteFcfa > 0) {
@@ -226,6 +234,7 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
       libelle: `Déduction avance sur livraison – ${membreNom}`,
       compteDebit: c.compteDebit, compteCredit: c.compteCredit,
       montantFcfa: avanceDeduiteFcfa, date: dateLivraison, numeroPiece: piece,
+      tiersId: membreId, tiersType: "membre",
     }));
   }
 
@@ -237,6 +246,7 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
  */
 export async function generateEcrituresAvance(cooperativeId: number, params: {
   avanceId: number;
+  membreId?: number;
   membreNom: string;
   montantFcfa: number;
   dateOctroi: string;
@@ -248,6 +258,7 @@ export async function generateEcrituresAvance(cooperativeId: number, params: {
     compteDebit: c.compteDebit, compteCredit: c.compteCredit,
     montantFcfa: params.montantFcfa, date: params.dateOctroi,
     numeroPiece: `AVA-${params.avanceId}`,
+    tiersId: params.membreId, tiersType: "membre",
   });
 }
 
@@ -469,6 +480,7 @@ export async function generateEcrituresCommission(
     compteCredit,
     montantFcfa,
     date,
+    tiersId: delegueId, tiersType: "delegue",
   });
 }
 
@@ -484,6 +496,7 @@ export async function generateEcrituresPrimePaiement(
   cooperativeId: number,
   params: {
     primeMembreId: number;
+    membreId?: number;
     membreNom: string;
     montantFcfa: number;
     modePaiement: string;
@@ -508,5 +521,6 @@ export async function generateEcrituresPrimePaiement(
     montantFcfa,
     date,
     numeroPiece: `PRM-PAY-${primeMembreId}`,
+    tiersId: params.membreId, tiersType: "membre",
   });
 }
