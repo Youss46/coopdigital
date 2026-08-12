@@ -216,7 +216,7 @@ export async function generateRapportMensuel(cooperativeId: number, mois: number
   const lastDay = new Date(annee, mois, 0).getDate();
   const dateMax = `${annee}-${String(mois).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-  const [livraisons, ventes, avancesRetard, ecritures] = await Promise.all([
+  const [livraisons, ventes, avancesRetard, ecritures, intrantsMois, commissionsMois] = await Promise.all([
     db.select({
       id: livraisonsTable.id,
       membreId: livraisonsTable.membreId,
@@ -228,7 +228,7 @@ export async function generateRapportMensuel(cooperativeId: number, mois: number
       membrePrenoms: membresTable.prenoms,
     })
     .from(livraisonsTable)
-    .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+    .innerJoin(membresTable, and(eq(livraisonsTable.membreId, membresTable.id), eq(membresTable.cooperativeId, cooperativeId)))
     .where(and(gte(livraisonsTable.dateLivraison, dateMin), lte(livraisonsTable.dateLivraison, dateMax)))
     .orderBy(livraisonsTable.dateLivraison),
 
@@ -242,21 +242,54 @@ export async function generateRapportMensuel(cooperativeId: number, mois: number
       dateVente: ventesExportateursTable.dateVente,
     })
     .from(ventesExportateursTable)
-    .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
+    .innerJoin(exportateursTable, and(eq(exportateursTable.id, ventesExportateursTable.exportateurId), eq(exportateursTable.cooperativeId, cooperativeId)))
     .where(and(gte(ventesExportateursTable.dateVente, dateMin), lte(ventesExportateursTable.dateVente, dateMax))),
 
     db.select({ id: avancesTable.id, membreNom: membresTable.nom, membrePrenoms: membresTable.prenoms, montantOctroyeFcfa: avancesTable.montantOctroyeFcfa, soldeRestantFcfa: avancesTable.soldeRestantFcfa, dateEcheance: avancesTable.dateEcheance })
     .from(avancesTable)
-    .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+    .innerJoin(membresTable, and(eq(avancesTable.membreId, membresTable.id), eq(membresTable.cooperativeId, cooperativeId)))
     .where(eq(avancesTable.statut, "en_retard")),
 
     db.select().from(ecrituresComptablesTable)
-    .where(and(eq(ecrituresComptablesTable.exercice, annee), gte(ecrituresComptablesTable.dateEcriture, dateMin), lte(ecrituresComptablesTable.dateEcriture, dateMax))),
+    .where(and(eq(ecrituresComptablesTable.cooperativeId, cooperativeId), eq(ecrituresComptablesTable.exercice, annee), gte(ecrituresComptablesTable.dateEcriture, dateMin), lte(ecrituresComptablesTable.dateEcriture, dateMax))),
+
+    db.execute(sql`
+      SELECT
+        COALESCE((
+          SELECT SUM(montant_fcfa)
+          FROM distributions_intrants
+          WHERE cooperative_id = ${cooperativeId}
+            AND date_distribution BETWEEN ${dateMin} AND ${dateMax}
+        ), 0) AS intrants_distribues,
+        COALESCE((
+          SELECT SUM(ri.montant_fcfa)
+          FROM remboursements_intrants ri
+          INNER JOIN distributions_intrants di ON di.id = ri.distribution_id
+          WHERE di.cooperative_id = ${cooperativeId}
+            AND ri.date_remboursement BETWEEN ${dateMin} AND ${dateMax}
+        ), 0) AS intrants_recouvres
+    `),
+
+    db.execute(sql`
+      SELECT COALESCE(SUM(montant_fcfa), 0) AS commissions_payees
+      FROM commissions_delegues cd
+      INNER JOIN campagnes c ON c.id = cd.campagne_id
+      WHERE c.cooperative_id = ${cooperativeId}
+        AND cd.statut = 'payé'
+        AND cd.date_paiement::date BETWEEN ${dateMin} AND ${dateMax}
+    `),
   ]);
 
   const tonnage    = livraisons.reduce((s, l) => s + parseFloat(l.poidsKg), 0);
   const caProduits = ecritures.filter(e => e.compteCredit === "701").reduce((s, e) => s + e.montantFcfa, 0);
   const coutAchats = ecritures.filter(e => e.compteDebit === "601").reduce((s, e) => s + e.montantFcfa, 0);
+  const chargesPersonnelMois = ecritures.filter(e => ["621","641","661"].includes(e.compteDebit ?? "")).reduce((s, e) => s + e.montantFcfa, 0);
+  const itRow = intrantsMois.rows[0] as Record<string, string>;
+  const intrantsDistrib  = Number(itRow?.intrants_distribues ?? 0);
+  const intrantsRecouvres = Number(itRow?.intrants_recouvres ?? 0);
+  const intrantsNetMois  = intrantsDistrib - intrantsRecouvres;
+  const comRow = commissionsMois.rows[0] as Record<string, string>;
+  const commissionsMoisFcfa = Number(comRow?.commissions_payees ?? 0);
   const moisLabel  = new Date(annee, mois - 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 
   const { doc, endPromise } = makePdfDoc();
@@ -325,10 +358,13 @@ export async function generateRapportMensuel(cooperativeId: number, mois: number
   // Page suivante – Compte de résultat simplifié (toujours inclus)
   doc.addPage();
   await drawHeader(doc, cooperativeId, { titre_document: "Compte de résultat" });
-  const margeNette = caProduits - coutAchats;
-  const crData = [
+  const margeNette = caProduits - coutAchats - chargesPersonnelMois - intrantsNetMois - commissionsMoisFcfa;
+  const crData: Array<{ label: string; montant: number; type: "produit" | "charge" | "resultat" }> = [
     { label: "Produits — Ventes cacao (701)", montant: caProduits, type: "produit" },
     { label: "Charges — Achats cacao (601)", montant: coutAchats, type: "charge" },
+    ...(chargesPersonnelMois > 0 ? [{ label: "Charges personnel (621/641/661)", montant: chargesPersonnelMois, type: "charge" as const }] : []),
+    ...(intrantsNetMois !== 0 ? [{ label: intrantsNetMois >= 0 ? "Intrants nets distribués" : "Intrants — recouvrement net", montant: intrantsNetMois, type: (intrantsNetMois >= 0 ? "charge" : "produit") as "charge" | "produit" }] : []),
+    ...(commissionsMoisFcfa > 0 ? [{ label: "Commissions délégués payées", montant: commissionsMoisFcfa, type: "charge" as const }] : []),
     { label: "Résultat net du mois", montant: margeNette, type: "resultat" },
   ];
   y = doc.y;

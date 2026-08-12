@@ -202,7 +202,9 @@ export async function getComparatifCampagnes(req: Request, res: Response): Promi
         COALESCE(lv."membresActifs", 0)::int     AS "membresActifs",
         COALESCE(ec."caVentesFcfa", 0)::int      AS "caVentesFcfa",
         COALESCE(ec."coutAchatsFcfa", 0)::int    AS "coutAchatsFcfa",
-        COALESCE(ec."chargesFcfa", 0)::int       AS "chargesFcfa"
+        COALESCE(ec."chargesFcfa", 0)::int       AS "chargesFcfa",
+        GREATEST(0, COALESCE(di."intrantsDist", 0) - COALESCE(di."intrantsRecouvres", 0))::int AS "intrantsNetFcfa",
+        COALESCE(cd."commissionsPay", 0)::int    AS "commissionsPay"
       FROM campagnes c
       LEFT JOIN LATERAL (
         SELECT
@@ -224,6 +226,18 @@ export async function getComparatifCampagnes(req: Request, res: Response): Promi
         WHERE e.cooperative_id = c.cooperative_id
           AND e.exercice = c.annee_debut
       ) ec ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          COALESCE(SUM(montant_fcfa), 0)           AS "intrantsDist",
+          COALESCE(SUM(montant_rembourse_fcfa), 0) AS "intrantsRecouvres"
+        FROM distributions_intrants
+        WHERE campagne_id = c.id
+      ) di ON true
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(SUM(montant_fcfa), 0) AS "commissionsPay"
+        FROM commissions_delegues
+        WHERE campagne_id = c.id AND statut = 'payé'
+      ) cd ON true
       WHERE c.cooperative_id = ${cooperativeId}
       ORDER BY c.annee_debut DESC
       LIMIT 6
@@ -240,8 +254,10 @@ export async function getComparatifCampagnes(req: Request, res: Response): Promi
       caVentesFcfa: number;
       coutAchatsFcfa: number;
       chargesFcfa: number;
+      intrantsNetFcfa: number;
+      commissionsPay: number;
     }>).map((r) => {
-      const margeNetteFcfa = r.caVentesFcfa - r.coutAchatsFcfa - r.chargesFcfa;
+      const margeNetteFcfa = r.caVentesFcfa - r.coutAchatsFcfa - r.chargesFcfa - r.intrantsNetFcfa - r.commissionsPay;
       const tauxMarge = r.caVentesFcfa > 0 ? Math.round((margeNetteFcfa / r.caVentesFcfa) * 10000) / 100 : 0;
       return {
         campagneId: r.campagneId,
@@ -255,6 +271,8 @@ export async function getComparatifCampagnes(req: Request, res: Response): Promi
         caVentesFcfa: r.caVentesFcfa,
         coutAchatsFcfa: r.coutAchatsFcfa,
         chargesFcfa: r.chargesFcfa,
+        intrantsNetFcfa: r.intrantsNetFcfa,
+        commissionsPay: r.commissionsPay,
         margeNetteFcfa,
         tauxMarge,
       };
@@ -270,23 +288,56 @@ export async function getComparatifCampagnes(req: Request, res: Response): Promi
 
 export async function getMargeCampagnes(req: Request, res: Response): Promise<void> {
   try {
-    const rows = await db.execute(sql`
-      SELECT
-        exercice AS annee,
-        COALESCE(SUM(CASE WHEN compte_credit = '701' THEN montant_fcfa ELSE 0 END), 0)::int AS "caVentesFcfa",
-        COALESCE(SUM(CASE WHEN compte_debit = '601' THEN montant_fcfa ELSE 0 END), 0)::int AS "coutAchatsFcfa",
-        COALESCE(SUM(CASE WHEN compte_debit IN ('621','641','661') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
-      FROM ecritures_comptables
-      WHERE cooperative_id = ${coopId(req)}
-      GROUP BY exercice
-      ORDER BY exercice DESC
-    `);
+    const cid = coopId(req);
 
-    const result = (rows.rows as Array<{ annee: number; caVentesFcfa: number; coutAchatsFcfa: number; chargesFcfa: number }>)
+    const [ecrituresRows, intrantsRows, commissionsRows] = await Promise.all([
+      db.execute(sql`
+        SELECT
+          exercice AS annee,
+          COALESCE(SUM(CASE WHEN compte_credit = '701' THEN montant_fcfa ELSE 0 END), 0)::int AS "caVentesFcfa",
+          COALESCE(SUM(CASE WHEN compte_debit = '601' THEN montant_fcfa ELSE 0 END), 0)::int AS "coutAchatsFcfa",
+          COALESCE(SUM(CASE WHEN compte_debit IN ('621','641','661') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
+        FROM ecritures_comptables
+        WHERE cooperative_id = ${cid}
+        GROUP BY exercice
+        ORDER BY exercice DESC
+      `),
+      db.execute(sql`
+        SELECT
+          c.annee_debut AS annee,
+          GREATEST(0, COALESCE(SUM(di.montant_fcfa), 0) - COALESCE(SUM(di.montant_rembourse_fcfa), 0))::int AS "intrantsNetFcfa"
+        FROM distributions_intrants di
+        INNER JOIN campagnes c ON c.id = di.campagne_id
+        WHERE di.cooperative_id = ${cid}
+        GROUP BY c.annee_debut
+      `),
+      db.execute(sql`
+        SELECT
+          c.annee_debut AS annee,
+          COALESCE(SUM(cd.montant_fcfa), 0)::int AS "commissionsPay"
+        FROM commissions_delegues cd
+        INNER JOIN campagnes c ON c.id = cd.campagne_id
+        WHERE c.cooperative_id = ${cid} AND cd.statut = 'payé'
+        GROUP BY c.annee_debut
+      `),
+    ]);
+
+    const intrantsMap = new Map<number, number>(
+      (intrantsRows.rows as Array<{ annee: number; intrantsNetFcfa: number }>)
+        .map((r) => [r.annee, r.intrantsNetFcfa])
+    );
+    const commissionsMap = new Map<number, number>(
+      (commissionsRows.rows as Array<{ annee: number; commissionsPay: number }>)
+        .map((r) => [r.annee, r.commissionsPay])
+    );
+
+    const result = (ecrituresRows.rows as Array<{ annee: number; caVentesFcfa: number; coutAchatsFcfa: number; chargesFcfa: number }>)
       .map((r) => {
-        const margeNetteFcfa = r.caVentesFcfa - r.coutAchatsFcfa - r.chargesFcfa;
+        const intrantsNetFcfa = intrantsMap.get(r.annee) ?? 0;
+        const commissionsPay = commissionsMap.get(r.annee) ?? 0;
+        const margeNetteFcfa = r.caVentesFcfa - r.coutAchatsFcfa - r.chargesFcfa - intrantsNetFcfa - commissionsPay;
         const tauxMarge = r.caVentesFcfa > 0 ? Math.round((margeNetteFcfa / r.caVentesFcfa) * 10000) / 100 : 0;
-        return { annee: r.annee, caVentesFcfa: r.caVentesFcfa, coutAchatsFcfa: r.coutAchatsFcfa, chargesFcfa: r.chargesFcfa, margeNetteFcfa, tauxMarge };
+        return { annee: r.annee, caVentesFcfa: r.caVentesFcfa, coutAchatsFcfa: r.coutAchatsFcfa, chargesFcfa: r.chargesFcfa, intrantsNetFcfa, commissionsPay, margeNetteFcfa, tauxMarge };
       });
 
     res.json(result);
