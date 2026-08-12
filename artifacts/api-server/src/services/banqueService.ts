@@ -10,16 +10,16 @@ import { proposerEcriture } from "./comptabiliteService.js";
 function comptesForMouvement(type: string, motif: string): { debit: string; credit: string } {
   if (type === "credit") {
     const credits: Record<string, string> = {
-      virement_entrant:   "471",  // Créditeurs divers
+      virement_entrant:   "585",  // Virements internes de fonds (transit)
       depot_especes:      "571",  // Caisse
       remboursement_recu: "162",  // Emprunts établissements de crédit
-      autre_credit:       "471",
+      autre_credit:       "471",  // Créditeurs divers
     };
     return { debit: "521", credit: credits[motif] ?? "471" };
   }
   // debit
   const debits: Record<string, string> = {
-    virement_sortant:     "401",  // Fournisseurs
+    virement_sortant:     "585",  // Virements internes de fonds (transit)
     retrait_especes:      "571",  // Caisse
     frais_bancaires:      "638",  // Autres charges externes
     remboursement_emprunt:"162",  // Emprunts
