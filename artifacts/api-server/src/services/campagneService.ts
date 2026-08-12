@@ -281,7 +281,8 @@ export async function genererBilan(cooperativeId: number, campagneId: number, us
 
   const intrants = await db.execute(sql`
     SELECT
-      COALESCE(SUM(montant_fcfa), 0) AS intrants_distribues
+      COALESCE(SUM(montant_fcfa), 0)          AS intrants_distribues,
+      COALESCE(SUM(montant_rembourse_fcfa), 0) AS intrants_recouvres
     FROM distributions_intrants
     WHERE campagne_id = ${campagneId}
   `);
@@ -323,10 +324,12 @@ export async function genererBilan(cooperativeId: number, campagneId: number, us
   const caVentes = Number(v.ca_ventes ?? 0);
   const coutAchat = Number(p.cout_achat_total ?? 0);
   const chargesPersonnel = Number(sal.charges_personnel ?? 0);
-  const intrantsDistrib = Number(it.intrants_distribues ?? 0);
-  const commissionsPay = Number(com.commissions_payees ?? 0);
+  const intrantsDistrib  = Number(it.intrants_distribues ?? 0);
+  const intrantsRecouvres = Number(it.intrants_recouvres ?? 0);
+  const intrantsNetFcfa  = Math.max(0, intrantsDistrib - intrantsRecouvres);
+  const commissionsPay   = Number(com.commissions_payees ?? 0);
   const margeBrute = caVentes - coutAchat;
-  const chargesExploitation = intrantsDistrib + commissionsPay;
+  const chargesExploitation = intrantsNetFcfa + commissionsPay;
   const margeNette = margeBrute - chargesPersonnel - chargesExploitation;
   const margeKg = tonnageTotal > 0 ? margeNette / tonnageTotal : 0;
   const tonnageVendu = Number(v.tonnage_vendu ?? 0);
@@ -377,7 +380,7 @@ export async function genererBilan(cooperativeId: number, campagneId: number, us
     avancesRembouRseesFcfa: String(Number(av.avances_remboursees ?? 0)),
     avancesSoldeFcfa: String(Number(av.avances_solde ?? 0)),
     intrantsDistribuEsFcfa: String(intrantsDistrib),
-    intrantsRecouVresFcfa: "0",
+    intrantsRecouVresFcfa: String(intrantsRecouvres),
     partsSocialesCollecteesFcfa: String(Number(ps.total ?? 0)),
     cotisationsCollecteesFcfa: String(Number(cot.total ?? 0)),
     variationTonnagePct: variationTonnage != null ? String(variationTonnage) : null,
