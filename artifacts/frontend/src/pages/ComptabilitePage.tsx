@@ -1233,6 +1233,31 @@ const MODULES_LABELS: Record<string, string> = {
 };
 
 // ─── Onglet A — Plan comptable ─────────────────────────────────────────────────
+function SeedOhadaButton({ onSuccess }: { onSuccess: () => void }) {
+  const { toast } = useToast();
+  const mut = useMutation({
+    mutationFn: () => apiPost<{ message: string; inseres: number; dejaPresents: number }>(
+      "/api/comptabilite/plan/seed-ohada", {}
+    ),
+    onSuccess: (data) => {
+      onSuccess();
+      toast({ description: data.message });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", description: e.message }),
+  });
+  return (
+    <button
+      onClick={() => mut.mutate()}
+      disabled={mut.isPending}
+      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+      title="Charger les 1 346 comptes SYSCOHADA révisé"
+    >
+      {mut.isPending ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
+      Plan SYSCOHADA
+    </button>
+  );
+}
+
 function OngletPlanComptable() {
   const qc = useQC();
   const { toast } = useToast();
@@ -1340,13 +1365,16 @@ function OngletPlanComptable() {
           Voir inactifs
         </label>
         {peutAjouter && (
-          <button
-            onClick={() => setModalCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white ml-auto"
-            style={{ backgroundColor: VERT }}
-          >
-            <Plus size={14} /> Nouveau compte
-          </button>
+          <div className="flex items-center gap-2 ml-auto">
+            <SeedOhadaButton onSuccess={() => void qc.invalidateQueries({ queryKey: ["plan-comptable"] })} />
+            <button
+              onClick={() => setModalCreate(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
+              style={{ backgroundColor: VERT }}
+            >
+              <Plus size={14} /> Nouveau compte
+            </button>
+          </div>
         )}
       </div>
 

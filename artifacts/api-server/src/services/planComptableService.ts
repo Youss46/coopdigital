@@ -29,6 +29,57 @@ export interface ParamEcriture {
   libelleTemplate: string;
 }
 
+// ── Seed SYSCOHADA ────────────────────────────────────────────────────────────
+
+import sysCohada from "../data/syscohada_plan.json" assert { type: "json" };
+
+/**
+ * Charge le plan comptable SYSCOHADA complet (1346 comptes) pour une coopérative.
+ * Insère en batch par paquets de 100 — ON CONFLICT DO NOTHING pour ne pas écraser
+ * les comptes déjà personnalisés.
+ * Retourne { inseres, deja_presents }.
+ */
+export async function seederPlanSyscohadaPourCooperative(cooperativeId: number): Promise<{
+  inseres: number;
+  dejaPresents: number;
+}> {
+  type PlanRow = {
+    numeroCompte: string;
+    libelle: string;
+    type: "actif" | "passif" | "charge" | "produit";
+    classe: number | null;
+    compteParent: string | null;
+    ordreAffichage: number;
+  };
+  const plan = sysCohada as PlanRow[];
+
+  const BATCH = 100;
+  let inseres = 0;
+
+  for (let i = 0; i < plan.length; i += BATCH) {
+    const slice = plan.slice(i, i + BATCH);
+    const result = await db
+      .insert(planComptableTable)
+      .values(
+        slice.map((c) => ({
+          cooperativeId,
+          numeroCompte:   c.numeroCompte,
+          libelle:        c.libelle,
+          type:           c.type,
+          classe:         c.classe,
+          compteParent:   c.compteParent,
+          ordreAffichage: c.ordreAffichage,
+          actif:          true,
+        }))
+      )
+      .onConflictDoNothing()
+      .returning({ id: planComptableTable.id });
+    inseres += result.length;
+  }
+
+  return { inseres, dejaPresents: plan.length - inseres };
+}
+
 // ── Plan comptable ────────────────────────────────────────────────────────────
 
 export async function listerPlanComptable(opts: {
