@@ -412,7 +412,7 @@ export async function generateEcrituresCommission(
     source: "commission_delegue",
     sourceId: delegueId,
     libelle: `Commission délégué – ${delegueNom} (${nbCommissions} livraison${nbCommissions > 1 ? "s" : ""})`,
-    compteDebit: "6625",
+    compteDebit: "6322",
     compteCredit,
     montantFcfa,
     date,
