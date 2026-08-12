@@ -491,12 +491,13 @@ export async function creerLivraisonDepuisSession(
         .limit(1);
 
       await generateEcrituresLivraison(cooperativeId, {
-        livraisonId:      result.livraison.id,
-        membreNom:        membre ? `${membre.nom} ${membre.prenoms}` : "—",
-        montantBrutFcfa:  result.livraison.montantBrutFcfa,
+        livraisonId:       result.livraison.id,
+        membreId:          result.livraison.membreId ?? undefined,
+        membreNom:         membre ? `${membre.nom} ${membre.prenoms}` : "—",
+        montantBrutFcfa:   result.livraison.montantBrutFcfa,
         avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
-        montantNetFcfa:   result.livraison.montantNetFcfa,
-        dateLivraison:    result.livraison.dateLivraison,
+        montantNetFcfa:    result.livraison.montantNetFcfa,
+        dateLivraison:     result.livraison.dateLivraison,
       });
     } catch (err) {
       // Ne pas bloquer la réponse — l'écriture sera visible dans les anomalies comptables

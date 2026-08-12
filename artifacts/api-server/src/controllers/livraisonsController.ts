@@ -283,6 +283,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
 
     void generateEcrituresLivraison(cooperativeId, {
       livraisonId: result.livraison.id,
+      membreId: membreId ?? undefined,
       membreNom: nomProducteur,
       montantBrutFcfa: result.livraison.montantBrutFcfa,
       avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,

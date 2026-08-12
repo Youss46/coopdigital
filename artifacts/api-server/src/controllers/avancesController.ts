@@ -132,6 +132,7 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
 
     void generateEcrituresAvance(cooperativeId, {
       avanceId: avance!.id,
+      membreId,
       membreNom: `${membre.prenoms} ${membre.nom}`,
       montantFcfa: montantOctroyeFcfa,
       dateOctroi: avance!.dateOctroi,
