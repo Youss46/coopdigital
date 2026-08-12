@@ -3,7 +3,7 @@ import { checkEcriture, creerAnomalies } from "../services/anomalieService";
 import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable } from "@workspace/db";
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
-import { assignerNumeroPiece, assignerNumerosPieces, buildNumeroPiece } from "../lib/numeroPiece";
+import { assignerNumeroPiece, assignerNumerosPieces } from "../lib/numeroPiece";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -195,8 +195,7 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
     }).returning();
 
     if (ecriture && !numeroPiece) {
-      await assignerNumeroPiece(ecriture.id, "manuel", exercice);
-      ecriture.numeroPiece = buildNumeroPiece("manuel", exercice, ecriture.id);
+      ecriture.numeroPiece = await assignerNumeroPiece(ecriture.id, "manuel", exercice, coopId(req));
     }
 
     if (anomaliesAttention.length > 0) {
@@ -504,7 +503,7 @@ export async function validerEcritureEnAttente(req: Request, res: Response): Pro
       sourceId: ecriture.sourceId,
       exercice,
     }).returning({ id: ecrituresComptablesTable.id });
-    if (inserted) await assignerNumeroPiece(inserted.id, srcVal, exercice);
+    if (inserted) await assignerNumeroPiece(inserted.id, srcVal, exercice, coopId(req));
 
     const [updated] = await db
       .update(ecrituresEnAttenteTable)
@@ -594,7 +593,7 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
         exercice: new Date(e.dateProposee).getFullYear(),
       }))
     ).returning({ id: ecrituresComptablesTable.id, source: ecrituresComptablesTable.source, exercice: ecrituresComptablesTable.exercice });
-    await assignerNumerosPieces(insertedAll.map((r) => ({ id: r.id, source: r.source, exercice: r.exercice })));
+    await assignerNumerosPieces(insertedAll.map((r) => ({ id: r.id, source: r.source, exercice: r.exercice, cooperativeId: coopId(req) })));
 
     const ids = enAttente.map((e) => e.id);
     await db

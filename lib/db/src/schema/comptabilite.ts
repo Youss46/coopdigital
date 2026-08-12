@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, serial, integer, varchar, date, timestamp, boolean, text } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, serial, integer, varchar, date, timestamp, boolean, text, unique } from "drizzle-orm/pg-core";
 
 export const typeCompteEnum = pgEnum("type_compte", ["actif", "passif", "charge", "produit"]);
 export const sourceEcritureEnum = pgEnum("source_ecriture", ["livraison", "vente", "avance", "paiement", "manuel", "encaissement", "salaire", "stock", "don"]);
@@ -91,6 +91,13 @@ export const configComptableTable = pgTable("config_comptable", {
   modifiePar:          integer("modifie_par"),
   updatedAt:           timestamp("updated_at", { withTimezone: true }),
 });
+
+export const sequencesPiecesTable = pgTable("sequences_pieces_comptables", {
+  id:            serial("id").primaryKey(),
+  cooperativeId: integer("cooperative_id").notNull(),
+  exercice:      integer("exercice").notNull(),
+  compteur:      integer("compteur").notNull().default(0),
+}, t => [unique("sequences_pieces_comptables_coop_exercice_unique").on(t.cooperativeId, t.exercice)]);
 
 export const ecrituresEnAttenteTable = pgTable("ecritures_en_attente", {
   id:                   serial("id").primaryKey(),

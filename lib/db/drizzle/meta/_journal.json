@@ -526,6 +526,13 @@
       "when": 1784166000000,
       "tag": "0074_tiers_ecritures",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1784252400000,
+      "tag": "0075_sequences_pieces",
+      "breakpoints": true
     }
   ]
 }

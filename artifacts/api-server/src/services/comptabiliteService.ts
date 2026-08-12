@@ -133,7 +133,7 @@ export async function proposerEcriture(
         exercice,
       }).returning({ id: ecrituresComptablesTable.id });
       if (inserted && !payload.numeroPiece) {
-        await assignerNumeroPiece(inserted.id, DB_SOURCE_MAP[payload.source], exercice);
+        await assignerNumeroPiece(inserted.id, DB_SOURCE_MAP[payload.source], exercice, cooperativeId);
       }
       return { mode: "automatique", statut: "enregistree" };
     }
@@ -385,7 +385,7 @@ export async function insererEcrituresSalaireDirectes(cooperativeId: number, par
       sourceId: bulletinId,
       exercice,
     }).returning({ id: ecrituresComptablesTable.id });
-    if (inserted) await assignerNumeroPiece(inserted.id, "salaire", exercice);
+    if (inserted) await assignerNumeroPiece(inserted.id, "salaire", exercice, cooperativeId);
   }
 
   const taches = [
