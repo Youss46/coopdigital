@@ -18,7 +18,9 @@ export type SourceEcriture =
   | "emprunt" | "transport" | "investissement" | "maintenance" | "intrant"
   | "amortissement" | "caisse" | "banque" | "subvention" | "mobile_marchand"
   // Primes exportateurs / redistribution producteurs
-  | "prime_reception" | "prime_paiement";
+  | "prime_reception" | "prime_paiement"
+  // Commissions délégués localités
+  | "commission_delegue";
 
 interface ProposerEcriturePayload {
   source: SourceEcriture;
@@ -51,8 +53,9 @@ const AUTO_KEY_MAP: Record<SourceEcriture, keyof typeof configComptableTable.$in
   banque:           "autoBanque",
   subvention:       "autoSubventions",
   mobile_marchand:  "autoMobileMarchand",
-  prime_reception:  "autoPrimes",
-  prime_paiement:   "autoPrimes",
+  prime_reception:   "autoPrimes",
+  prime_paiement:    "autoPrimes",
+  commission_delegue:"autoCommissions",
 };
 
 // Mapping vers les valeurs d'enum PostgreSQL existantes
@@ -76,8 +79,9 @@ const DB_SOURCE_MAP: Record<SourceEcriture, "livraison" | "vente" | "avance" | "
   banque:          "paiement",
   subvention:      "encaissement",
   mobile_marchand: "paiement",
-  prime_reception: "encaissement",
-  prime_paiement:  "paiement",
+  prime_reception:   "encaissement",
+  prime_paiement:    "paiement",
+  commission_delegue:"paiement",
 };
 
 async function getConfigComptable(cooperativeId: number) {
@@ -377,6 +381,43 @@ const MODES_CAISSE = new Set(["caisse", "especes", "espèces"]);
 const MODES_MOBILE_MARCHAND = new Set([
   "orange_money", "mtn_momo", "wave", "mobile_money", "mobile_marchand",
 ]);
+
+/**
+ * Paiement d'une commission à un délégué localité.
+ * SYSCOHADA :
+ *   Débit  6625 Rémunérations et commissions versées aux intermédiaires
+ *   Crédit  571 Caisse             (espèces)
+ *           554 Porte-monnaie élec (mobile money)
+ *           521 Banque             (virement, chèque)
+ */
+export async function generateEcrituresCommission(
+  cooperativeId: number,
+  params: {
+    delegueId: number;
+    delegueNom: string;
+    montantFcfa: number;
+    modePaiement: string;
+    date: string;
+    nbCommissions: number;
+  },
+): Promise<void> {
+  const { delegueId, delegueNom, montantFcfa, modePaiement, date, nbCommissions } = params;
+  const mode = modePaiement.toLowerCase();
+
+  const compteCredit = MODES_MOBILE_MARCHAND.has(mode) ? "554"
+    : MODES_CAISSE.has(mode) ? "571"
+    : "521"; // virement, chèque
+
+  await proposerEcriture(cooperativeId, {
+    source: "commission_delegue",
+    sourceId: delegueId,
+    libelle: `Commission délégué – ${delegueNom} (${nbCommissions} livraison${nbCommissions > 1 ? "s" : ""})`,
+    compteDebit: "6625",
+    compteCredit,
+    montantFcfa,
+    date,
+  });
+}
 
 /**
  * Paiement d'une prime à un producteur (complément prix d'achat cacao).

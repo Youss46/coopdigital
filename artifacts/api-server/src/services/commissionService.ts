@@ -26,6 +26,7 @@ import {
 } from "@workspace/db";
 import { and, eq, isNull, or, desc, inArray, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { generateEcrituresCommission } from "./comptabiliteService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -163,6 +164,16 @@ export async function payerCommissions(
   if (commissions.length === 0) return { montantTotal: 0, nb: 0 };
 
   const montantTotal = commissions.reduce((s, c) => s + toNum(c.montantFcfa), 0);
+
+  // Nom du délégué — utilisé pour le chèque et l'écriture comptable
+  const [delegueRow] = await db
+    .select({ nom: usersTable.nom, prenoms: usersTable.prenoms })
+    .from(usersTable)
+    .where(eq(usersTable.id, delegueId))
+    .limit(1);
+  const delegueNom = delegueRow
+    ? `${delegueRow.prenoms ?? ""} ${delegueRow.nom}`.trim()
+    : `Délégué #${delegueId}`;
 
   // Marquer les commissions comme payées avec le moyen de paiement choisi
   await db
@@ -310,20 +321,10 @@ export async function payerCommissions(
 
     // Pour un chèque : créer aussi l'enregistrement dans cheques_emis
     if (modePaiement === "cheque") {
-      const [delegue] = await db
-        .select({ nom: usersTable.nom, prenoms: usersTable.prenoms })
-        .from(usersTable)
-        .where(eq(usersTable.id, delegueId))
-        .limit(1);
-
-      const beneficiaire = delegue
-        ? `${delegue.prenoms ?? ""} ${delegue.nom}`.trim()
-        : `Délégué #${delegueId}`;
-
       await db.insert(chequesEmisTable).values({
         cooperativeId,
         numeroCheque:     referencePaiement ?? null,
-        beneficiaire,
+        beneficiaire:     delegueNom,
         montantFcfa:      montantTotal,
         compteBancaireId: compte.id,
         dateEmission:     today,
@@ -332,6 +333,19 @@ export async function payerCommissions(
       });
     }
   }
+
+  // ── Écriture comptable OHADA (fire-and-forget) ───────────────────────────
+  // 6625 Commissions versées / 571 Caisse | 554 Mobile | 521 Banque
+  generateEcrituresCommission(cooperativeId, {
+    delegueId,
+    delegueNom,
+    montantFcfa: montantTotal,
+    modePaiement,
+    date: today,
+    nbCommissions: commissions.length,
+  }).catch((err) =>
+    logger.error({ err, delegueId, cooperativeId }, "Erreur écriture comptable commission délégué")
+  );
 
   return { montantTotal, nb: commissions.length };
 }

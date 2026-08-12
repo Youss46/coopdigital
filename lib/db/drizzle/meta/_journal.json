@@ -512,6 +512,13 @@
       "when": 1783993200000,
       "tag": "0072_rapports_ia",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1784079600000,
+      "tag": "0073_config_auto_commissions",
+      "breakpoints": true
     }
   ]
 }
