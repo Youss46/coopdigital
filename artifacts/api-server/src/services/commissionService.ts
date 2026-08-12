@@ -18,6 +18,9 @@ import {
   mouvementsCaisseTable,
   comptesMobilesMarchandsTable,
   mouvementsMobileMarchandTable,
+  comptesBancairesTable,
+  mouvementsBanqueTable,
+  chequesEmisTable,
   usersTable,
   campagnesTable,
 } from "@workspace/db";
@@ -252,6 +255,82 @@ export async function payerCommissions(
       dateOperation:  today,
       soldeApresFcfa: String(nouveauSolde),
     });
+  }
+
+  // ── Virement / Chèque → débiter le compte bancaire ───────────────────────
+  if (modePaiement === "virement" || modePaiement === "cheque") {
+    const [compte] = await db
+      .select({
+        id:    comptesBancairesTable.id,
+        solde: comptesBancairesTable.soldeActuelFcfa,
+        nom:   comptesBancairesTable.nom,
+      })
+      .from(comptesBancairesTable)
+      .where(
+        and(
+          eq(comptesBancairesTable.cooperativeId, cooperativeId),
+          eq(comptesBancairesTable.actif, true),
+        )
+      )
+      .limit(1);
+
+    if (!compte) {
+      throw new Error(
+        "Aucun compte bancaire actif trouvé. Créez ou activez un compte bancaire avant de payer des commissions par virement ou chèque."
+      );
+    }
+
+    const soldeActuel = toNum(compte.solde);
+    if (soldeActuel < montantTotal) {
+      throw new Error(
+        `Solde insuffisant sur le compte ${compte.nom} — disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA, requis : ${montantTotal.toLocaleString("fr-FR")} FCFA.`
+      );
+    }
+
+    const nouveauSolde = soldeActuel - montantTotal;
+    await db
+      .update(comptesBancairesTable)
+      .set({ soldeActuelFcfa: String(nouveauSolde) })
+      .where(eq(comptesBancairesTable.id, compte.id));
+
+    const [mvt] = await db
+      .insert(mouvementsBanqueTable)
+      .values({
+        compteId:       compte.id,
+        cooperativeId,
+        type:           "debit",
+        motif:          "commission_delegue",
+        montantFcfa:    String(montantTotal),
+        libelle:        libelleMvt,
+        reference:      referencePaiement ?? null,
+        dateOperation:  today,
+        soldeApresFcfa: String(nouveauSolde),
+      })
+      .returning({ id: mouvementsBanqueTable.id });
+
+    // Pour un chèque : créer aussi l'enregistrement dans cheques_emis
+    if (modePaiement === "cheque") {
+      const [delegue] = await db
+        .select({ nom: usersTable.nom, prenoms: usersTable.prenoms })
+        .from(usersTable)
+        .where(eq(usersTable.id, delegueId))
+        .limit(1);
+
+      const beneficiaire = delegue
+        ? `${delegue.prenoms ?? ""} ${delegue.nom}`.trim()
+        : `Délégué #${delegueId}`;
+
+      await db.insert(chequesEmisTable).values({
+        cooperativeId,
+        numeroCheque:     referencePaiement ?? null,
+        beneficiaire,
+        montantFcfa:      montantTotal,
+        compteBancaireId: compte.id,
+        dateEmission:     today,
+        statut:           "emis",
+        mouvementBanqueId: mvt?.id ?? null,
+      });
+    }
   }
 
   return { montantTotal, nb: commissions.length };
