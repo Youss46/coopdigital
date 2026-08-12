@@ -66,29 +66,49 @@ export async function getBalance(req: Request, res: Response): Promise<void> {
   try {
     const exercice = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : exerciceCourant();
 
+    // On part des écritures (source de vérité) et on enrichit avec le plan comptable.
+    // L'ancienne requête partait du plan_comptable → retournait 0 ligne si le plan
+    // était vide ou si les numéros de comptes ne correspondaient pas exactement.
     const rows = await db.execute(sql`
       SELECT
-        p.numero_compte AS "numeroCompte",
-        p.libelle,
+        a.numero_compte                        AS "numeroCompte",
+        COALESCE(p.libelle, a.numero_compte)   AS libelle,
         p.type,
-        COALESCE(SUM(CASE WHEN e.compte_debit = p.numero_compte THEN e.montant_fcfa ELSE 0 END), 0)::int AS "totalDebit",
-        COALESCE(SUM(CASE WHEN e.compte_credit = p.numero_compte THEN e.montant_fcfa ELSE 0 END), 0)::int AS "totalCredit",
-        (
-          COALESCE(SUM(CASE WHEN e.compte_debit = p.numero_compte THEN e.montant_fcfa ELSE 0 END), 0) -
-          COALESCE(SUM(CASE WHEN e.compte_credit = p.numero_compte THEN e.montant_fcfa ELSE 0 END), 0)
-        )::int AS "solde"
-      FROM plan_comptable p
-      LEFT JOIN ecritures_comptables e
-        ON (e.compte_debit = p.numero_compte OR e.compte_credit = p.numero_compte)
-        AND e.cooperative_id = ${coopId(req)}
-        AND e.exercice = ${exercice}
-      WHERE p.cooperative_id = ${coopId(req)}
-      GROUP BY p.id, p.numero_compte, p.libelle, p.type
-      HAVING (
-        COALESCE(SUM(CASE WHEN e.compte_debit = p.numero_compte THEN e.montant_fcfa ELSE 0 END), 0) > 0 OR
-        COALESCE(SUM(CASE WHEN e.compte_credit = p.numero_compte THEN e.montant_fcfa ELSE 0 END), 0) > 0
-      )
-      ORDER BY p.numero_compte ASC
+        a.total_debit::int                     AS "totalDebit",
+        a.total_credit::int                    AS "totalCredit",
+        (a.total_debit - a.total_credit)::int  AS "solde"
+      FROM (
+        SELECT
+          numero_compte,
+          SUM(total_debit)  AS total_debit,
+          SUM(total_credit) AS total_credit
+        FROM (
+          SELECT
+            compte_debit  AS numero_compte,
+            SUM(montant_fcfa) AS total_debit,
+            0             AS total_credit
+          FROM ecritures_comptables
+          WHERE cooperative_id = ${coopId(req)}
+            AND exercice = ${exercice}
+          GROUP BY compte_debit
+
+          UNION ALL
+
+          SELECT
+            compte_credit AS numero_compte,
+            0             AS total_debit,
+            SUM(montant_fcfa) AS total_credit
+          FROM ecritures_comptables
+          WHERE cooperative_id = ${coopId(req)}
+            AND exercice = ${exercice}
+          GROUP BY compte_credit
+        ) sub
+        GROUP BY numero_compte
+      ) a
+      LEFT JOIN plan_comptable p
+        ON p.numero_compte = a.numero_compte
+        AND p.cooperative_id = ${coopId(req)}
+      ORDER BY a.numero_compte ASC
     `);
 
     res.json(rows.rows);
