@@ -1639,9 +1639,11 @@ function OngletComptesModules() {
                         if (confirm(`Réinitialiser le module "${MODULES_LABELS[module] ?? module}" avec les valeurs OHADA par défaut ?`))
                           mutReset.mutate(module);
                       }}
-                      className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 hover:border-amber-400 hover:text-amber-600 mr-2"
+                      className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 hover:border-amber-400 hover:text-amber-600 mr-2 flex-shrink-0"
+                      title="Réinitialiser OHADA"
                     >
-                      <RotateCcw size={11} /> Réinitialiser OHADA
+                      <RotateCcw size={11} />
+                      <span className="hidden sm:inline">Réinitialiser OHADA</span>
                     </button>
                   )}
                   {open ? <ChevronUp size={15} className="text-gray-400" /> : <ChevronDown size={15} className="text-gray-400" />}
