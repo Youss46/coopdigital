@@ -103,6 +103,18 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     valider_ecriture:         ["pca", "directeur", "comptable"],
     rejeter_ecriture:         ["pca", "directeur", "comptable"],
     valider_tout:             ["pca", "directeur", "comptable"],
+    // Plan comptable personnalisé
+    voir_plan:                ["pca", "directeur", "comptable", "auditeur"],
+    ajouter_compte:           ["pca", "directeur", "comptable"],
+    modifier_compte:          ["pca", "directeur", "comptable"],
+    desactiver_compte:        ["pca", "directeur"],
+    // Paramètres comptes modules
+    voir_params:              ["pca", "directeur", "comptable", "auditeur"],
+    modifier_params:          ["pca", "directeur", "comptable"],
+    reset_ohada:              ["pca", "directeur"],
+    // Corrections d'écritures
+    corriger:                 ["pca", "directeur", "comptable"],
+    voir_historique_corrections: ["pca", "directeur", "comptable", "auditeur"],
   },
 
   reporting: {
