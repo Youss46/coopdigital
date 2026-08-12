@@ -1396,19 +1396,19 @@ function OngletPlanComptable() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase">
-                    <th className="text-left px-4 py-2 font-medium">N°</th>
-                    <th className="text-left px-4 py-2 font-medium">Libellé</th>
-                    <th className="text-left px-4 py-2 font-medium">Type</th>
-                    <th className="text-left px-4 py-2 font-medium">Solde normal</th>
-                    <th className="text-left px-4 py-2 font-medium">Statut</th>
-                    <th className="px-4 py-2" />
+                    <th className="text-left px-2 sm:px-4 py-2 font-medium">N°</th>
+                    <th className="text-left px-2 sm:px-4 py-2 font-medium">Libellé</th>
+                    <th className="text-left px-2 sm:px-4 py-2 font-medium">Type</th>
+                    <th className="hidden sm:table-cell text-left px-4 py-2 font-medium">Solde normal</th>
+                    <th className="hidden sm:table-cell text-left px-4 py-2 font-medium">Statut</th>
+                    <th className="hidden sm:table-cell px-4 py-2" />
                   </tr>
                 </thead>
                 <tbody>
                   {rows.sort((a,b) => a.numeroCompte.localeCompare(b.numeroCompte)).map((c) => (
                     <tr key={c.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!c.actif ? "opacity-50" : ""}`}>
-                      <td className="px-4 py-2.5 font-mono font-semibold text-gray-800">{c.numeroCompte}</td>
-                      <td className="px-4 py-2.5 text-gray-700">
+                      <td className="px-2 sm:px-4 py-2.5 font-mono font-semibold text-gray-800 whitespace-nowrap">{c.numeroCompte}</td>
+                      <td className="px-2 sm:px-4 py-2.5 text-gray-700">
                         {editCompte?.id === c.id ? (
                           <input
                             autoFocus
@@ -1422,19 +1422,19 @@ function OngletPlanComptable() {
                           />
                         ) : c.libelle}
                       </td>
-                      <td className="px-4 py-2.5">
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                      <td className="px-2 sm:px-4 py-2.5">
+                        <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold whitespace-nowrap"
                           style={{ background: TYPES_COMPTE[c.type]?.color + "22", color: TYPES_COMPTE[c.type]?.color }}>
                           {TYPES_COMPTE[c.type]?.label ?? c.type}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-gray-500 capitalize">{c.soldeNormal}</td>
-                      <td className="px-4 py-2.5">
+                      <td className="hidden sm:table-cell px-4 py-2.5 text-gray-500 capitalize">{c.soldeNormal}</td>
+                      <td className="hidden sm:table-cell px-4 py-2.5">
                         <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${c.actif ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
                           {c.actif ? "Actif" : "Inactif"}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td className="hidden sm:table-cell px-4 py-2.5">
                         <div className="flex items-center gap-2 justify-end">
                           {editCompte?.id === c.id ? (
                             <>
