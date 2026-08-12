@@ -287,6 +287,14 @@ export async function genererBilan(cooperativeId: number, campagneId: number, us
   `);
   const it = intrants.rows[0] as Record<string, string>;
 
+  const commissionsRes = await db.execute(sql`
+    SELECT COALESCE(SUM(montant_fcfa), 0) AS commissions_payees
+    FROM commissions_delegues
+    WHERE campagne_id = ${campagneId}
+      AND statut = 'paye'
+  `).catch(() => ({ rows: [{ commissions_payees: "0" }] }));
+  const com = commissionsRes.rows[0] as Record<string, string>;
+
   const salaires = await db.execute(sql`
     SELECT COALESCE(SUM(salaire_net_fcfa), 0) AS charges_personnel
     FROM bulletins_paie
@@ -316,8 +324,9 @@ export async function genererBilan(cooperativeId: number, campagneId: number, us
   const coutAchat = Number(p.cout_achat_total ?? 0);
   const chargesPersonnel = Number(sal.charges_personnel ?? 0);
   const intrantsDistrib = Number(it.intrants_distribues ?? 0);
+  const commissionsPay = Number(com.commissions_payees ?? 0);
   const margeBrute = caVentes - coutAchat;
-  const chargesExploitation = intrantsDistrib;
+  const chargesExploitation = intrantsDistrib + commissionsPay;
   const margeNette = margeBrute - chargesPersonnel - chargesExploitation;
   const margeKg = tonnageTotal > 0 ? margeNette / tonnageTotal : 0;
   const tonnageVendu = Number(v.tonnage_vendu ?? 0);
