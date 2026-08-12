@@ -582,7 +582,8 @@ export async function remboursementManuel(req: Request, res: Response): Promise<
     // Écriture comptable — fire-and-forget
     const cooperativeId = req.user?.cooperativeId;
     if (cooperativeId && result) {
-      const compteDebit = modeVal === "especes" ? "571" : "521";
+      // deduction_livraison = réduction de la dette cacao (401), pas un flux bancaire
+      const compteDebit = modeVal === "especes" ? "571" : modeVal === "deduction_livraison" ? "401" : "521";
       proposerEcriture(cooperativeId, {
         source: "intrant",
         sourceId: result.id,
