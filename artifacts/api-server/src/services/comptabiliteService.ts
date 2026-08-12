@@ -10,6 +10,7 @@ import { db, ecrituresComptablesTable, configComptableTable, ecrituresEnAttenteT
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { assignerNumeroPiece } from "../lib/numeroPiece";
+import { getParamsEcriture } from "./planComptableService.js";
 
 export type SourceEcriture =
   | "livraison" | "paiement" | "avance" | "vente"
@@ -149,6 +150,43 @@ export async function proposerEcriture(
   }
 }
 
+// ─── Résolution des comptes depuis parametres_comptes_modules ────────────────
+//
+// Priorité : 1) paramètre configuré par la coopérative → 2) fallback OHADA codé en dur.
+// getParamsEcriture() dispose d'un cache mémoire 10 min — pas de surcharge DB.
+//
+async function resolveComptes(
+  cooperativeId: number,
+  module: string,
+  operation: string,
+  fallbackDebit: string,
+  fallbackCredit: string,
+): Promise<{ compteDebit: string; compteCredit: string }> {
+  try {
+    const p = await getParamsEcriture(cooperativeId, module, operation);
+    if (p) return { compteDebit: p.compteDebit, compteCredit: p.compteCredit };
+  } catch {
+    /* ignore — utiliser le fallback */
+  }
+  return { compteDebit: fallbackDebit, compteCredit: fallbackCredit };
+}
+
+// Variante : ne résoudre que le compte débit (crédit déterminé par le mode de paiement).
+async function resolveCompteDebit(
+  cooperativeId: number,
+  module: string,
+  operation: string,
+  fallback: string,
+): Promise<string> {
+  try {
+    const p = await getParamsEcriture(cooperativeId, module, operation);
+    if (p) return p.compteDebit;
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
 // ─── Wrappers métier ─────────────────────────────────────────────────────────
 
 /**
@@ -173,18 +211,20 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
   const promises: Promise<unknown>[] = [];
 
   if (montantBrutFcfa > 0) {
+    const c = await resolveComptes(cooperativeId, "livraisons", "achat_cacao_producteur", "601", "401");
     promises.push(proposerEcriture(cooperativeId, {
       source: "livraison", sourceId: livraisonId,
       libelle: `Achat cacao – ${membreNom}`,
-      compteDebit: "601", compteCredit: "401",
+      compteDebit: c.compteDebit, compteCredit: c.compteCredit,
       montantFcfa: montantBrutFcfa, date: dateLivraison, numeroPiece: piece,
     }));
   }
   if (avanceDeduiteFcfa > 0) {
+    const c = await resolveComptes(cooperativeId, "avances", "remboursement_avance", "401", "4091");
     promises.push(proposerEcriture(cooperativeId, {
       source: "livraison", sourceId: livraisonId,
       libelle: `Déduction avance sur livraison – ${membreNom}`,
-      compteDebit: "401", compteCredit: "4091",
+      compteDebit: c.compteDebit, compteCredit: c.compteCredit,
       montantFcfa: avanceDeduiteFcfa, date: dateLivraison, numeroPiece: piece,
     }));
   }
@@ -193,7 +233,7 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
 }
 
 /**
- * Avance octroyée : 416 / 521
+ * Avance octroyée
  */
 export async function generateEcrituresAvance(cooperativeId: number, params: {
   avanceId: number;
@@ -201,17 +241,18 @@ export async function generateEcrituresAvance(cooperativeId: number, params: {
   montantFcfa: number;
   dateOctroi: string;
 }) {
+  const c = await resolveComptes(cooperativeId, "avances", "octroi_avance_producteur", "4091", "521");
   await proposerEcriture(cooperativeId, {
     source: "avance", sourceId: params.avanceId,
     libelle: `Avance octroyée – ${params.membreNom}`,
-    compteDebit: "4091", compteCredit: "521",
+    compteDebit: c.compteDebit, compteCredit: c.compteCredit,
     montantFcfa: params.montantFcfa, date: params.dateOctroi,
     numeroPiece: `AVA-${params.avanceId}`,
   });
 }
 
 /**
- * Vente exportateur : 4111 / 701
+ * Vente exportateur
  */
 export async function generateEcrituresVente(cooperativeId: number, params: {
   venteId: number;
@@ -219,17 +260,18 @@ export async function generateEcrituresVente(cooperativeId: number, params: {
   montantFcfa: number;
   dateVente: string;
 }) {
+  const c = await resolveComptes(cooperativeId, "ventes_export", "vente_cacao_exportateur", "4111", "701");
   await proposerEcriture(cooperativeId, {
     source: "vente", sourceId: params.venteId,
     libelle: `Vente cacao – ${params.exportateurNom}`,
-    compteDebit: "4111", compteCredit: "701",
+    compteDebit: c.compteDebit, compteCredit: c.compteCredit,
     montantFcfa: params.montantFcfa, date: params.dateVente,
     numeroPiece: `VTE-${params.venteId}`,
   });
 }
 
 /**
- * Encaissement exportateur : 521 / 4111
+ * Encaissement exportateur
  */
 export async function generateEcrituresEncaissement(cooperativeId: number, params: {
   venteId: number;
@@ -237,20 +279,19 @@ export async function generateEcrituresEncaissement(cooperativeId: number, param
   montantFcfa: number;
   date: string;
 }) {
+  const c = await resolveComptes(cooperativeId, "ventes_export", "encaissement_exportateur", "521", "4111");
   await proposerEcriture(cooperativeId, {
     source: "encaissement", sourceId: params.venteId,
     libelle: `Encaissement exportateur – ${params.exportateurNom}`,
-    compteDebit: "521", compteCredit: "4111",
+    compteDebit: c.compteDebit, compteCredit: c.compteCredit,
     montantFcfa: params.montantFcfa, date: params.date,
     numeroPiece: `ENC-${params.venteId}`,
   });
 }
 
 /**
- * Paiement bulletin de salaire :
- * 661 / 421 = charges de personnel / rémunérations dues (brut)
- * 421 / 521 = versement net au salarié
- * 432 / 421 = cotisations CNPS salarié (si > 0)
+ * Paiement bulletin de salaire.
+ * Le compteCredit du versement net est passé par l'appelant (mode de paiement).
  */
 export async function generateEcrituresSalaire(cooperativeId: number, params: {
   bulletinId: number;
@@ -264,26 +305,32 @@ export async function generateEcrituresSalaire(cooperativeId: number, params: {
   const { bulletinId, personnelNom, salaireNetFcfa, salaireBrutFcfa, cotisationsSalarieFcfa, datePaiement, compteCredit = "521" } = params;
   const piece = `SAL-${bulletinId}`;
 
+  const [cBrut, cNet] = await Promise.all([
+    resolveComptes(cooperativeId, "salaires", "salaire_brut", "661", "421"),
+    resolveComptes(cooperativeId, "salaires", "paiement_salaire", "421", compteCredit),
+  ]);
+
   const promises: Promise<unknown>[] = [
     proposerEcriture(cooperativeId, {
       source: "salaire", sourceId: bulletinId,
       libelle: `Charge de personnel – ${personnelNom}`,
-      compteDebit: "661", compteCredit: "421",
+      compteDebit: cBrut.compteDebit, compteCredit: cBrut.compteCredit,
       montantFcfa: salaireBrutFcfa, date: datePaiement, numeroPiece: piece,
     }),
     proposerEcriture(cooperativeId, {
       source: "salaire", sourceId: bulletinId,
       libelle: `Versement salaire net – ${personnelNom}`,
-      compteDebit: "421", compteCredit: compteCredit,
+      compteDebit: cNet.compteDebit, compteCredit: compteCredit,
       montantFcfa: salaireNetFcfa, date: datePaiement, numeroPiece: piece,
     }),
   ];
 
   if (cotisationsSalarieFcfa > 0) {
+    const cCotis = await resolveComptes(cooperativeId, "salaires", "cotisations_salarie", "431", "421");
     promises.push(proposerEcriture(cooperativeId, {
       source: "salaire", sourceId: bulletinId,
       libelle: `Cotisations CNPS salarié – ${personnelNom}`,
-      compteDebit: "431", compteCredit: "421",
+      compteDebit: cCotis.compteDebit, compteCredit: cCotis.compteCredit,
       montantFcfa: cotisationsSalarieFcfa, date: datePaiement, numeroPiece: piece,
     }));
   }
@@ -308,30 +355,34 @@ export async function insererEcrituresSalaireDirectes(cooperativeId: number, par
   const piece = `SAL-${bulletinId}`;
   const exercice = new Date(datePaiement).getFullYear();
 
-  async function inserer(libelle: string, compteDebit: string, compteCredit: string, montantFcfa: number) {
+  const [cBrut, cNet, cCotis] = await Promise.all([
+    resolveComptes(cooperativeId, "salaires", "salaire_brut", "661", "421"),
+    resolveComptes(cooperativeId, "salaires", "paiement_salaire", "421", compteCredit),
+    resolveComptes(cooperativeId, "salaires", "cotisations_salarie", "431", "421"),
+  ]);
+
+  async function inserer(libelle: string, d: string, cr: string, montantFcfa: number) {
     const [inserted] = await db.insert(ecrituresComptablesTable).values({
       cooperativeId,
       dateEcriture: datePaiement,
       numeroPiece: piece,
       libelle,
-      compteDebit,
-      compteCredit,
+      compteDebit: d,
+      compteCredit: cr,
       montantFcfa: Math.round(montantFcfa),
       source: "salaire",
       sourceId: bulletinId,
       exercice,
     }).returning({ id: ecrituresComptablesTable.id });
-    if (inserted) {
-      await assignerNumeroPiece(inserted.id, "salaire", exercice);
-    }
+    if (inserted) await assignerNumeroPiece(inserted.id, "salaire", exercice);
   }
 
   const taches = [
-    inserer(`Charge de personnel – ${personnelNom}`, "661", "421", salaireBrutFcfa),
-    inserer(`Versement salaire net – ${personnelNom}`, "421", compteCredit, salaireNetFcfa),
+    inserer(`Charge de personnel – ${personnelNom}`, cBrut.compteDebit, cBrut.compteCredit, salaireBrutFcfa),
+    inserer(`Versement salaire net – ${personnelNom}`, cNet.compteDebit, compteCredit, salaireNetFcfa),
   ];
   if (cotisationsSalarieFcfa > 0) {
-    taches.push(inserer(`Cotisations CNPS salarié – ${personnelNom}`, "431", "421", cotisationsSalarieFcfa));
+    taches.push(inserer(`Cotisations CNPS salarié – ${personnelNom}`, cCotis.compteDebit, cCotis.compteCredit, cotisationsSalarieFcfa));
   }
   await Promise.all(taches);
 }
@@ -357,12 +408,13 @@ export async function generateEcrituresPrimeReception(
     ? `Prime ${typePrimeLabel} – ${exportateurNom}`
     : `Prime ${typePrimeLabel}`;
 
+  const c = await resolveComptes(cooperativeId, "primes", "reception_prime", "521", "7588");
   await proposerEcriture(cooperativeId, {
     source: "prime_reception",
     sourceId: receptionId,
     libelle,
-    compteDebit: "521",
-    compteCredit: "7588",
+    compteDebit: c.compteDebit,
+    compteCredit: c.compteCredit,
     montantFcfa,
     date,
     numeroPiece: `PRM-REC-${receptionId}`,
@@ -407,12 +459,13 @@ export async function generateEcrituresCommission(
   const compteCredit = MODES_MOBILE_MARCHAND.has(mode) ? "554"
     : MODES_CAISSE.has(mode) ? "571"
     : "521"; // virement, chèque
+  const compteDebit = await resolveCompteDebit(cooperativeId, "commissions_delegues", "paiement_commission", "6322");
 
   await proposerEcriture(cooperativeId, {
     source: "commission_delegue",
     sourceId: delegueId,
     libelle: `Commission délégué – ${delegueNom} (${nbCommissions} livraison${nbCommissions > 1 ? "s" : ""})`,
-    compteDebit: "6322",
+    compteDebit,
     compteCredit,
     montantFcfa,
     date,
@@ -439,15 +492,18 @@ export async function generateEcrituresPrimePaiement(
 ) {
   const { primeMembreId, membreNom, montantFcfa, modePaiement, date } = params;
   const mode = modePaiement.toLowerCase();
+  // Crédit = compte de trésorerie selon le mode de paiement (non configurable par opération)
   const compteCredit = MODES_MOBILE_MARCHAND.has(mode) ? "554"
     : MODES_CAISSE.has(mode) ? "571"
     : "521";
+  // Débit = compte de charge configurable par la coopérative
+  const compteDebit = await resolveCompteDebit(cooperativeId, "primes", "paiement_prime", "6018");
 
   await proposerEcriture(cooperativeId, {
     source: "prime_paiement",
     sourceId: primeMembreId,
     libelle: `Prime producteur – ${membreNom}`,
-    compteDebit: "6018",
+    compteDebit,
     compteCredit,
     montantFcfa,
     date,

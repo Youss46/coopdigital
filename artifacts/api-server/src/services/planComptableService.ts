@@ -284,6 +284,13 @@ const OHADA_DEFAULTS: Record<string, { compteDebit: string; compteCredit: string
   "transport:frais_transport":            { compteDebit: "624",  compteCredit: "521",  libelle: "Transport {mission} - {date}" },
   "amortissements:dotation_mensuelle":    { compteDebit: "681",  compteCredit: "284",  libelle: "Amort. {equipement} {mois}" },
   "parts_sociales:liberation_parts":      { compteDebit: "521",  compteCredit: "101",  libelle: "Parts sociales {membre}" },
+  // Salaires — cotisations salarié
+  "salaires:cotisations_salarie":         { compteDebit: "431",  compteCredit: "421",  libelle: "Cotisations CNPS salarié {employe}" },
+  // Primes
+  "primes:reception_prime":              { compteDebit: "521",  compteCredit: "7588", libelle: "Prime {type} – {exportateur}" },
+  "primes:paiement_prime":              { compteDebit: "6018", compteCredit: "521",  libelle: "Prime producteur – {membre}" },
+  // Commissions délégués
+  "commissions_delegues:paiement_commission": { compteDebit: "6322", compteCredit: "521", libelle: "Commission délégué – {delegue}" },
 };
 
 export async function modifierParams(cooperativeId: number, id: number, payload: {
