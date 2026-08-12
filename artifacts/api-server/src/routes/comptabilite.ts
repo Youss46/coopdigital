@@ -25,6 +25,7 @@ import {
   updateCompteHandler,
   deleteCompteHandler,
   seedPlanOhadaHandler,
+  seedParamsOhadaHandler,
   listParamsHandler,
   listParamsModuleHandler,
   updateParamsHandler,
@@ -72,6 +73,7 @@ router.put("/comptabilite/plan/:id",                checkPermission("comptabilit
 router.delete("/comptabilite/plan/:id",             checkPermission("comptabilite", "desactiver_compte"), deleteCompteHandler);
 
 // ─── Paramètres comptes modules ───────────────────────────────────────────────
+router.post("/comptabilite/params/seed-ohada",      checkPermission("comptabilite", "ajouter_compte"), seedParamsOhadaHandler);
 router.get("/comptabilite/params",                  checkPermission("comptabilite", "voir_params"),   listParamsHandler);
 router.get("/comptabilite/params/:module",          checkPermission("comptabilite", "voir_params"),   listParamsModuleHandler);
 router.put("/comptabilite/params/:id",              checkPermission("comptabilite", "modifier_params"), updateParamsHandler);

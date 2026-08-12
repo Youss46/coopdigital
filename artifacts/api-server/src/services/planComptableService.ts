@@ -330,31 +330,95 @@ export async function modifierParams(cooperativeId: number, id: number, payload:
   return updated;
 }
 
-export async function resetModuleOhada(cooperativeId: number, module: string, modifiePar?: number) {
-  const defaults = Object.entries(OHADA_DEFAULTS)
-    .filter(([k]) => k.startsWith(`${module}:`))
-    .map(([k, v]) => ({ operation: k.split(":")[1]!, ...v }));
+/**
+ * Upsert d'un ensemble de lignes dans parametres_comptes_modules.
+ * – Si la ligne (cooperative_id, module, operation) existe → UPDATE
+ * – Sinon → INSERT
+ */
+async function upsertParams(
+  cooperativeId: number,
+  entries: { module: string; operation: string; compteDebit: string; compteCredit: string; libelle: string }[],
+  modifiePar?: number,
+): Promise<number> {
+  // Récupérer les lignes existantes pour ce cooperative
+  const existing = await db
+    .select({ module: parametresComptesModulesTable.module, operation: parametresComptesModulesTable.operation })
+    .from(parametresComptesModulesTable)
+    .where(eq(parametresComptesModulesTable.cooperativeId, cooperativeId));
 
-  if (defaults.length === 0) throw new Error(`Module "${module}" non reconnu ou sans défaut OHADA`);
+  const existingSet = new Set(existing.map(r => `${r.module}:${r.operation}`));
 
-  for (const d of defaults) {
-    await db
-      .update(parametresComptesModulesTable)
-      .set({
-        compteDebit: d.compteDebit,
-        compteCredit: d.compteCredit,
-        libelleEcritureAuto: d.libelle,
+  const toInsert = entries.filter(e => !existingSet.has(`${e.module}:${e.operation}`));
+  const toUpdate = entries.filter(e => existingSet.has(`${e.module}:${e.operation}`));
+
+  if (toInsert.length > 0) {
+    await db.insert(parametresComptesModulesTable).values(
+      toInsert.map(e => ({
+        cooperativeId,
+        module: e.module,
+        operation: e.operation,
+        compteDebit: e.compteDebit,
+        compteCredit: e.compteCredit,
+        libelleEcritureAuto: e.libelle,
+        actif: true,
         modifiePar: modifiePar ?? null,
         updatedAt: new Date(),
-      })
+      }))
+    );
+  }
+
+  for (const e of toUpdate) {
+    await db
+      .update(parametresComptesModulesTable)
+      .set({ compteDebit: e.compteDebit, compteCredit: e.compteCredit, libelleEcritureAuto: e.libelle, modifiePar: modifiePar ?? null, updatedAt: new Date() })
       .where(and(
         eq(parametresComptesModulesTable.cooperativeId, cooperativeId),
-        eq(parametresComptesModulesTable.module, module),
-        eq(parametresComptesModulesTable.operation, d.operation),
+        eq(parametresComptesModulesTable.module, e.module),
+        eq(parametresComptesModulesTable.operation, e.operation),
       ));
   }
+
+  return entries.length;
+}
+
+export async function resetModuleOhada(cooperativeId: number, module: string, modifiePar?: number) {
+  const entries = Object.entries(OHADA_DEFAULTS)
+    .filter(([k]) => k.startsWith(`${module}:`))
+    .map(([k, v]) => ({ module, operation: k.split(":")[1]!, ...v }));
+
+  if (entries.length === 0) throw new Error(`Module "${module}" non reconnu ou sans défaut OHADA`);
+
+  await upsertParams(cooperativeId, entries, modifiePar);
   invaliderCacheParams(cooperativeId);
-  return { module, operations: defaults.length };
+  return { module, operations: entries.length };
+}
+
+/**
+ * Initialise TOUS les modules OHADA pour une coopérative.
+ * Insère les lignes manquantes, met à jour les existantes.
+ */
+export async function seederParamsTousModules(cooperativeId: number, modifiePar?: number): Promise<{
+  inseres: number; mises_a_jour: number;
+}> {
+  const entries = Object.entries(OHADA_DEFAULTS).map(([k, v]) => {
+    const [mod, op] = k.split(":");
+    return { module: mod!, operation: op!, ...v };
+  });
+
+  // Compter les existants avant pour calculer la répartition
+  const existing = await db
+    .select({ module: parametresComptesModulesTable.module, operation: parametresComptesModulesTable.operation })
+    .from(parametresComptesModulesTable)
+    .where(eq(parametresComptesModulesTable.cooperativeId, cooperativeId));
+
+  const existingSet = new Set(existing.map(r => `${r.module}:${r.operation}`));
+  const inseres = entries.filter(e => !existingSet.has(`${e.module}:${e.operation}`)).length;
+  const mises_a_jour = entries.length - inseres;
+
+  await upsertParams(cooperativeId, entries, modifiePar);
+  invaliderCacheParams(cooperativeId);
+
+  return { inseres, mises_a_jour };
 }
 
 // ── Correction d'écriture ─────────────────────────────────────────────────────

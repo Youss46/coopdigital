@@ -59,6 +59,22 @@ export async function updateCompteHandler(req: Request, res: Response): Promise<
   }
 }
 
+export async function seedParamsOhadaHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const modifiePar = req.user?.id;
+    const result = await svc.seederParamsTousModules(cooperativeId, modifiePar);
+    res.json({
+      message: `Paramètres OHADA initialisés : ${result.inseres} ajouté(s), ${result.mises_a_jour} mis à jour.`,
+      ...result,
+    });
+  } catch (err) {
+    req.log.error({ err }, "seedParamsOhada");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 export async function seedPlanOhadaHandler(req: Request, res: Response): Promise<void> {
   try {
     const cooperativeId = req.user?.cooperativeId;

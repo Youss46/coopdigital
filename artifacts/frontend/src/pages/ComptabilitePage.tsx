@@ -1529,6 +1529,31 @@ function OngletPlanComptable() {
   );
 }
 
+function SeedParamsButton({ onSuccess }: { onSuccess: () => void }) {
+  const { toast } = useToast();
+  const mut = useMutation({
+    mutationFn: () => apiPost<{ message: string; inseres: number; mises_a_jour: number }>(
+      "/api/comptabilite/params/seed-ohada", {}
+    ),
+    onSuccess: (data) => {
+      onSuccess();
+      toast({ description: data.message });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", description: e.message }),
+  });
+  return (
+    <button
+      onClick={() => mut.mutate()}
+      disabled={mut.isPending}
+      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 flex-shrink-0"
+      title="Charger les 26 opérations OHADA par défaut"
+    >
+      {mut.isPending ? <RefreshCw size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+      Initialiser OHADA
+    </button>
+  );
+}
+
 // ─── Onglet B — Comptes des modules ──────────────────────────────────────────
 function OngletComptesModules() {
   const qc = useQC();
@@ -1575,11 +1600,20 @@ function OngletComptesModules() {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-gray-500">
-        Configurez les comptes OHADA utilisés automatiquement par chaque module lors de la génération d'écritures.
-      </p>
+      <div className="flex items-start gap-3">
+        <p className="text-sm text-gray-500 flex-1">
+          Configurez les comptes OHADA utilisés automatiquement par chaque module lors de la génération d'écritures.
+        </p>
+        <SeedParamsButton onSuccess={() => void qc.invalidateQueries({ queryKey: ["params-comptes-modules"] })} />
+      </div>
       {isLoading ? (
         <div className="text-center py-12 text-gray-400">Chargement…</div>
+      ) : params.length === 0 ? (
+        <div className="text-center py-16 text-gray-400 space-y-3">
+          <Sliders size={32} className="mx-auto text-gray-300" />
+          <p className="text-sm">Aucun paramètre configuré.</p>
+          <p className="text-xs">Cliquez sur <strong>Initialiser OHADA</strong> pour charger les 26 opérations standards.</p>
+        </div>
       ) : (
         Object.entries(parModule)
           .sort(([a], [b]) => a.localeCompare(b))
