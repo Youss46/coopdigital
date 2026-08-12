@@ -1651,36 +1651,36 @@ function OngletComptesModules() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase">
-                          <th className="text-left px-4 py-2 font-medium">Opération</th>
-                          <th className="text-left px-4 py-2 font-medium">Débit</th>
-                          <th className="text-left px-4 py-2 font-medium">Crédit</th>
-                          <th className="text-left px-4 py-2 font-medium">Libellé auto</th>
-                          <th className="px-4 py-2" />
+                          <th className="text-left px-2 sm:px-4 py-2 font-medium">Opération</th>
+                          <th className="text-left px-2 sm:px-4 py-2 font-medium">Débit</th>
+                          <th className="text-left px-2 sm:px-4 py-2 font-medium">Crédit</th>
+                          <th className="hidden sm:table-cell text-left px-4 py-2 font-medium">Libellé auto</th>
+                          <th className="px-2 sm:px-4 py-2" />
                         </tr>
                       </thead>
                       <tbody>
                         {rows.sort((a,b) => a.operation.localeCompare(b.operation)).map((p) => (
                           <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
-                            <td className="px-4 py-2.5 text-gray-700 font-mono text-xs">{p.operation}</td>
+                            <td className="px-2 sm:px-4 py-2.5 text-gray-700 font-mono text-xs">{p.operation}</td>
                             {editId === p.id ? (
                               <>
-                                <td className="px-4 py-1.5">
+                                <td className="px-2 sm:px-4 py-1.5">
                                   <input value={editForm.compteDebit}
                                     onChange={(e) => setEditForm((f) => ({ ...f, compteDebit: e.target.value }))}
-                                    className="w-20 border border-gray-200 rounded px-2 py-1 text-sm font-mono" />
+                                    className="w-16 sm:w-20 border border-gray-200 rounded px-2 py-1 text-sm font-mono" />
                                 </td>
-                                <td className="px-4 py-1.5">
+                                <td className="px-2 sm:px-4 py-1.5">
                                   <input value={editForm.compteCredit}
                                     onChange={(e) => setEditForm((f) => ({ ...f, compteCredit: e.target.value }))}
-                                    className="w-20 border border-gray-200 rounded px-2 py-1 text-sm font-mono" />
+                                    className="w-16 sm:w-20 border border-gray-200 rounded px-2 py-1 text-sm font-mono" />
                                 </td>
-                                <td className="px-4 py-1.5">
+                                <td className="hidden sm:table-cell px-4 py-1.5">
                                   <input value={editForm.libelleEcritureAuto}
                                     onChange={(e) => setEditForm((f) => ({ ...f, libelleEcritureAuto: e.target.value }))}
                                     className="w-full border border-gray-200 rounded px-2 py-1 text-sm" />
                                 </td>
-                                <td className="px-4 py-1.5">
-                                  <div className="flex gap-2">
+                                <td className="px-2 sm:px-4 py-1.5">
+                                  <div className="flex gap-1 sm:gap-2">
                                     <button onClick={() => mutUpdate.mutate({ id: p.id, data: editForm })}
                                       className="text-xs px-2 py-1 rounded bg-green-700 text-white font-medium">
                                       ✓
@@ -1691,10 +1691,10 @@ function OngletComptesModules() {
                               </>
                             ) : (
                               <>
-                                <td className="px-4 py-2.5 font-mono font-semibold text-blue-700">{p.compteDebit}</td>
-                                <td className="px-4 py-2.5 font-mono font-semibold text-purple-700">{p.compteCredit}</td>
-                                <td className="px-4 py-2.5 text-gray-500 text-xs">{p.libelleEcritureAuto ?? "—"}</td>
-                                <td className="px-4 py-2.5 text-right">
+                                <td className="px-2 sm:px-4 py-2.5 font-mono font-semibold text-blue-700">{p.compteDebit}</td>
+                                <td className="px-2 sm:px-4 py-2.5 font-mono font-semibold text-purple-700">{p.compteCredit}</td>
+                                <td className="hidden sm:table-cell px-4 py-2.5 text-gray-500 text-xs">{p.libelleEcritureAuto ?? "—"}</td>
+                                <td className="px-2 sm:px-4 py-2.5 text-right">
                                   {peutModifier && (
                                     <button
                                       onClick={() => { setEditId(p.id); setEditForm({ compteDebit: p.compteDebit, compteCredit: p.compteCredit, libelleEcritureAuto: p.libelleEcritureAuto ?? "" }); }}
