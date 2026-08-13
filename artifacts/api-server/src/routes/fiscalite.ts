@@ -13,5 +13,6 @@ router.get("/fiscalite/calendrier",              checkPermission("fiscalite", "v
 router.get("/fiscalite/alertes",                 checkPermission("fiscalite", "voir"),       ctrl.getAlertes);
 router.get("/fiscalite/rapport-annuel",          checkPermission("fiscalite", "voir"),       ctrl.getRapportAnnuel);
 router.get("/fiscalite/rapport-pdf",             checkPermission("fiscalite", "voir"),       ctrl.getRapportPdf);
+router.get("/fiscalite/bordereau-cnps-pdf/:mois/:annee", checkPermission("fiscalite", "voir"), ctrl.getBordereauCnpsPdf);
 
 export default router;

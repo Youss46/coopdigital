@@ -333,6 +333,88 @@ function TableauBordFiscal() {
   );
 }
 
+// ─── Modal bordereau CNPS ─────────────────────────────────────────────────────
+
+function ModalBordereauCnps({ onClose }: { onClose: () => void }) {
+  const { toast } = useToast();
+  const now = new Date();
+  const [mois,  setMois]  = useState(now.getMonth() + 1);
+  const [annee, setAnnee] = useState(now.getFullYear());
+  const [loading, setLoading] = useState(false);
+
+  const telecharger = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(
+        `${BASE}/api/fiscalite/bordereau-cnps-pdf/${mois}/${annee}`,
+        { headers: { Authorization: `Bearer ${tok()}` } },
+      );
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? "Erreur serveur");
+      }
+      const blob = await r.blob();
+      const url  = URL.createObjectURL(blob);
+      openPdfViewer(url, `bordereau-cnps-${annee}-${String(mois).padStart(2, "0")}.pdf`);
+      onClose();
+    } catch (e) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-gray-900">Bordereau CNPS</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Générez le bordereau de cotisations CNPS pour la période sélectionnée.
+              Seuls les bulletins validés ou payés sont inclus.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-3 flex-shrink-0">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="space-y-3 mb-5">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Mois</label>
+            <select value={mois} onChange={e => setMois(+e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+              {MOIS_NOMS.slice(1).map((n, i) => <option key={i + 1} value={i + 1}>{n}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Année</label>
+            <select value={annee} onChange={e => setAnnee(+e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+              {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map(y =>
+                <option key={y} value={y}>{y}</option>
+              )}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={onClose}
+            className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
+            Annuler
+          </button>
+          <button onClick={telecharger} disabled={loading}
+            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
+            {loading
+              ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+              : <Download size={14} />}
+            Télécharger
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Onglet 2 — Déclarations ──────────────────────────────────────────────────
 
 function Declarations() {
@@ -343,6 +425,7 @@ function Declarations() {
   const [filtreType, setFiltreType]     = useState("");
   const [modalPayer, setModalPayer]     = useState<Declaration | null>(null);
   const [modalGenerer, setModalGenerer] = useState(false);
+  const [modalBordereau, setModalBordereau] = useState(false);
 
   const charger = useCallback(async () => {
     setLoading(true);
@@ -384,6 +467,10 @@ function Declarations() {
         </select>
         <button onClick={charger} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
           <RefreshCw size={14} /> Actualiser
+        </button>
+        <button onClick={() => setModalBordereau(true)}
+          className="flex items-center gap-1.5 px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg text-sm hover:bg-green-100">
+          <Download size={14} /> Bordereau CNPS
         </button>
         <button onClick={() => setModalGenerer(true)}
           className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 ml-auto">
@@ -472,6 +559,9 @@ function Declarations() {
       )}
       {modalGenerer && (
         <ModalGenerer onClose={() => setModalGenerer(false)} onDone={() => { setModalGenerer(false); charger(); }} />
+      )}
+      {modalBordereau && (
+        <ModalBordereauCnps onClose={() => setModalBordereau(false)} />
       )}
     </div>
   );

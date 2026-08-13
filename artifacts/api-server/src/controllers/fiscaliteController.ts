@@ -95,3 +95,20 @@ export async function getRapportPdf(req: Request, res: Response): Promise<void> 
     res.send(buf);
   } catch (err) { req.log.error({ err }, "getRapportPdf fiscalite"); res.status(500).json({ error: "Erreur serveur" }); }
 }
+
+export async function getBordereauCnpsPdf(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const mois  = parseInt(req.params["mois"]  as string, 10);
+    const annee = parseInt(req.params["annee"] as string, 10);
+    if (isNaN(mois) || mois < 1 || mois > 12 || isNaN(annee) || annee < 2000) {
+      res.status(400).json({ error: "Mois ou année invalide" }); return;
+    }
+    const buf = await svc.genererBordereauCnpsPdf(cooperativeId, mois, annee);
+    const moisStr = String(mois).padStart(2, "0");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="bordereau-cnps-${annee}-${moisStr}.pdf"`);
+    res.send(buf);
+  } catch (err) { req.log.error({ err }, "getBordereauCnpsPdf"); res.status(500).json({ error: "Erreur serveur" }); }
+}

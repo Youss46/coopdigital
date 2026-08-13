@@ -207,7 +207,10 @@ export const configPaieTable = pgTable("config_paie", {
 
   // CNPS patronale retraite (charge employeur)
   cnpsPatronaleActif: boolean("cnps_patronale_actif").notNull().default(true),
-  cnpsPatronaleTaux: integer("cnps_patronale_taux").notNull().default(770),      // 7,70%
+  cnpsPatronaleTaux: integer("cnps_patronale_taux").notNull().default(770),      // 7,70% — Retraite
+
+  // CNPS PF – Prestations Familiales (charge employeur)
+  cnpsPfTaux: integer("cnps_pf_taux").notNull().default(575),                    // 5,75%
 
   // CNPS AT/MP – accident de travail (charge employeur)
   cnpsAtmpActif: boolean("cnps_atmp_actif").notNull().default(true),

@@ -5,6 +5,8 @@ import {
   ecrituresComptablesTable,
   bulletinsPaieTable,
   lignesBulletinTable,
+  personnelTable,
+  configPaieTable,
 } from "@workspace/db";
 import { eq, and, sql, gte, lte, or, inArray } from "drizzle-orm";
 import { assignerNumeroPiece } from "../lib/numeroPiece.js";
@@ -573,4 +575,217 @@ export async function genererRapportPdf(cooperativeId: number, annee: number): P
 
   doc.end();
   return new Promise<Buffer>((resolve) => doc.on("end", () => resolve(Buffer.concat(chunks))));
+}
+
+// ─── Bordereau CNPS mensuel ───────────────────────────────────────────────────
+
+export async function genererBordereauCnpsPdf(
+  cooperativeId: number,
+  mois: number,
+  annee: number,
+): Promise<Buffer> {
+  // 1. Config paie
+  const [cfg] = await db
+    .select()
+    .from(configPaieTable)
+    .where(eq(configPaieTable.cooperativeId, cooperativeId))
+    .limit(1);
+
+  const txSal      = cfg?.cnpsSalarialeTaux  ?? 630;
+  const txRetraite = cfg?.cnpsPatronaleTaux  ?? 770;
+  const txPf       = cfg?.cnpsPfTaux         ?? 575;
+  const txAt       = cfg?.cnpsAtmpTaux       ?? 200;
+  const plafAnnuel = cfg?.cnpsPlafondAnnuel  ?? 1_647_315;
+  const plafMensuel = Math.floor(plafAnnuel / 12);
+
+  const fmtTaux = (t: number) =>
+    `${(t / 100).toFixed(2).replace(".", ",")} %`;
+
+  // 2. Bulletins valides/payés de la période
+  const bulletins = await db
+    .select({
+      nom:        personnelTable.nom,
+      prenoms:    personnelTable.prenoms,
+      numeroCnps: personnelTable.numeroCnps,
+      salaireBrut: bulletinsPaieTable.salaireBrutFcfa,
+    })
+    .from(bulletinsPaieTable)
+    .innerJoin(personnelTable, eq(personnelTable.id, bulletinsPaieTable.personnelId))
+    .where(and(
+      eq(bulletinsPaieTable.cooperativeId, cooperativeId),
+      eq(bulletinsPaieTable.mois, mois),
+      eq(bulletinsPaieTable.annee, annee),
+      or(eq(bulletinsPaieTable.statut, "valide"), eq(bulletinsPaieTable.statut, "paye")),
+    ))
+    .orderBy(personnelTable.nom, personnelTable.prenoms);
+
+  // 3. Calcul CNPS par salarié
+  const lignes = bulletins.map(b => {
+    const brut      = b.salaireBrut ?? 0;
+    const brutPlafo = Math.min(brut, plafMensuel);
+    const partSal   = Math.round(brutPlafo * txSal      / 10000);
+    const retraite  = Math.round(brutPlafo * txRetraite / 10000);
+    const pf        = Math.round(brutPlafo * txPf       / 10000);
+    const at        = Math.round(brutPlafo * txAt       / 10000);
+    const totalPat  = retraite + pf + at;
+    const totalCnps = partSal + totalPat;
+    return {
+      nom: b.nom ?? "—", prenoms: b.prenoms ?? "",
+      numeroCnps: b.numeroCnps ?? "—",
+      brutPlafo, partSal, retraite, pf, at, totalPat, totalCnps,
+    };
+  });
+
+  const totBrut = lignes.reduce((s, l) => s + l.brutPlafo,  0);
+  const totSal  = lignes.reduce((s, l) => s + l.partSal,    0);
+  const totPat  = lignes.reduce((s, l) => s + l.totalPat,   0);
+  const totCnps = lignes.reduce((s, l) => s + l.totalCnps,  0);
+
+  // 4. Nom coopérative
+  const coopNom = await db
+    .execute<{ nom: string }>(sql`SELECT nom FROM cooperatives WHERE id = ${cooperativeId} LIMIT 1`)
+    .then(r => r.rows[0]?.nom ?? "CoopDigital");
+
+  // 5. PDF
+  const F    = (n: number) => new Intl.NumberFormat("fr-FR").format(n);
+  const VERT = "#1a4731";
+  const M    = 45;
+
+  const doc    = new PDFDocument({ margin: M, size: "A4", bufferPages: true });
+  const chunks: Buffer[] = [];
+  doc.on("data", (c: Buffer) => chunks.push(c));
+
+  const pageW = doc.page.width;
+  const cW    = pageW - M * 2;
+
+  await drawHeader(doc, cooperativeId, {
+    titre_document:   "BORDEREAU DES COTISATIONS CNPS",
+    reference:        `${nomMois(mois)} ${annee}`,
+    hauteur_reservee: 90,
+  });
+
+  // ── Bloc info (gauche) + résumé (droite) ────────────────────────────────────
+  let y     = doc.y + 8;
+  const infoW = cW * 0.52;
+  const boxW  = cW * 0.44;
+  const boxX  = M + infoW + cW * 0.04;
+  const boxH  = 68;
+
+  // Résumé vert
+  doc.save().rect(boxX, y, boxW, boxH).fillColor(VERT).fill().restore();
+  doc.font("Helvetica").fontSize(7).fillColor("#a7f3d0")
+    .text("Montant total à reverser à la CNPS", boxX + 6, y + 7,
+      { width: boxW - 12, align: "center", lineBreak: false });
+  doc.font("Helvetica-Bold").fontSize(13).fillColor("#ffffff")
+    .text(`${F(totCnps)} FCFA`, boxX + 4, y + 18,
+      { width: boxW - 8, align: "center", lineBreak: false });
+  doc.font("Helvetica").fontSize(7).fillColor("#d1fae5")
+    .text(`Part salariale : ${F(totSal)} FCFA`,  boxX + 8, y + 36, { width: boxW - 16, lineBreak: false });
+  doc.text(`Part patronale : ${F(totPat)} FCFA`,  boxX + 8, y + 47, { width: boxW - 16, lineBreak: false });
+  doc.fillColor("#bbf7d0")
+    .text(`Effectif déclaré : ${lignes.length} salarié(s)`, boxX + 8, y + 57,
+      { width: boxW - 16, lineBreak: false });
+
+  // Info texte gauche
+  doc.font("Helvetica").fontSize(8.5).fillColor("#6b7280")
+    .text("Entreprise :", M, y + 4);
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(VERT)
+    .text(coopNom, M, y + 15);
+  doc.font("Helvetica").fontSize(8.5).fillColor("#6b7280")
+    .text("Période de déclaration :", M, y + 30);
+  doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#222222")
+    .text(`${nomMois(mois)} ${annee}`, M, y + 41);
+  doc.font("Helvetica").fontSize(8.5).fillColor("#6b7280")
+    .text("Devise : Francs CFA (XOF)", M, y + 55);
+
+  y += boxH + 14;
+
+  // ── Tableau ──────────────────────────────────────────────────────────────────
+  const cols: Array<{ label: string; w: number; align: "left" | "right" }> = [
+    { label: "N°",                            w: 22,  align: "left"  },
+    { label: "Nom & Prénom",                   w: 95,  align: "left"  },
+    { label: "N° CNPS",                        w: 58,  align: "left"  },
+    { label: "Brut plafonné",                  w: 56,  align: "right" },
+    { label: `Part sal.\n${fmtTaux(txSal)}`,   w: 50,  align: "right" },
+    { label: `Retraite\n${fmtTaux(txRetraite)}`, w: 46, align: "right" },
+    { label: `PF\n${fmtTaux(txPf)}`,           w: 40,  align: "right" },
+    { label: `AT\n${fmtTaux(txAt)}`,           w: 40,  align: "right" },
+    { label: "Total pat.",                      w: 48,  align: "right" },
+    { label: "TOTAL CNPS",                     w: 50,  align: "right" },
+  ];
+
+  const hdrH = 26;
+  doc.save().rect(M, y, cW, hdrH).fillColor(VERT).fill().restore();
+  let cx = M + 2;
+  cols.forEach(col => {
+    doc.font("Helvetica-Bold").fontSize(6.5).fillColor("#ffffff")
+      .text(col.label, cx, y + 2, { width: col.w - 3, align: col.align, lineBreak: true, height: hdrH - 4 });
+    cx += col.w;
+  });
+  y += hdrH;
+
+  const rowH = 16;
+  lignes.forEach((l, idx) => {
+    const bg = idx % 2 === 0 ? "#ffffff" : "#f0fdf4";
+    doc.save().rect(M, y, cW, rowH).fillColor(bg).fill().restore();
+    cx = M + 2;
+    const vals = [
+      String(idx + 1),
+      `${l.prenoms} ${l.nom}`.trim(),
+      l.numeroCnps,
+      F(l.brutPlafo),
+      F(l.partSal),
+      F(l.retraite),
+      F(l.pf),
+      F(l.at),
+      F(l.totalPat),
+      F(l.totalCnps),
+    ];
+    vals.forEach((v, i) => {
+      doc.font(i === 9 ? "Helvetica-Bold" : "Helvetica")
+        .fontSize(7).fillColor("#1f2937")
+        .text(v, cx, y + 4, { width: cols[i]!.w - 3, align: cols[i]!.align, lineBreak: false });
+      cx += cols[i]!.w;
+    });
+    doc.moveTo(M, y + rowH).lineTo(M + cW, y + rowH)
+      .strokeColor("#e5e7eb").lineWidth(0.3).stroke();
+    y += rowH;
+  });
+
+  // Ligne total
+  doc.save().rect(M, y, cW, rowH + 2).fillColor("#dcfce7").fill().restore();
+  cx = M + 2;
+  const totVals = ["", "TOTAL GÉNÉRAL", "", F(totBrut), F(totSal), "", "", "", F(totPat), F(totCnps)];
+  totVals.forEach((v, i) => {
+    doc.font("Helvetica-Bold").fontSize(7).fillColor(VERT)
+      .text(v, cx, y + 5, { width: cols[i]!.w - 3, align: cols[i]!.align, lineBreak: false });
+    cx += cols[i]!.w;
+  });
+  y += rowH + 2;
+
+  // ── Signatures ───────────────────────────────────────────────────────────────
+  y += 28;
+  const sigW = (cW - 20) / 2;
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#374151")
+    .text("Établi par (Employeur) :", M, y);
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#374151")
+    .text("Reçu par la CNPS :", M + sigW + 20, y);
+  y += 12;
+  doc.font("Helvetica").fontSize(7.5).fillColor("#9ca3af")
+    .text("Signature — Cachet — Date", M, y);
+  doc.font("Helvetica").fontSize(7.5).fillColor("#9ca3af")
+    .text("Cachet — Date de réception", M + sigW + 20, y);
+  y += 42;
+  doc.moveTo(M,               y).lineTo(M + sigW,    y).strokeColor("#9ca3af").lineWidth(0.5).stroke();
+  doc.moveTo(M + sigW + 20, y).lineTo(M + cW,      y).strokeColor("#9ca3af").lineWidth(0.5).stroke();
+
+  // ── Footer ───────────────────────────────────────────────────────────────────
+  const range = doc.bufferedPageRange();
+  for (let i = 0; i < range.count; i++) {
+    doc.switchToPage(range.start + i);
+    await drawFooter(doc, cooperativeId, i + 1, range.count);
+  }
+  doc.flushPages();
+  doc.end();
+  return new Promise<Buffer>(resolve => doc.on("end", () => resolve(Buffer.concat(chunks))));
 }
