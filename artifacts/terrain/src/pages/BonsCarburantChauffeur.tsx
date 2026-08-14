@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Fuel, CheckCircle2, Clock, Droplets, QrCode, X, Share2, Copy } from "lucide-react";
+import { Fuel, CheckCircle2, Clock, Droplets, QrCode, X, Share2, Copy, RefreshCw, AlertCircle } from "lucide-react";
 import BottomNavChauffeur from "@/components/BottomNavChauffeur";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "react-qr-code";
@@ -71,6 +71,7 @@ export default function BonsCarburantChauffeur() {
   const [qrBon, setQrBon] = useState<BonCarburant | null>(null);
   const [qrToken, setQrToken] = useState<{ payload: string; sig: string } | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<UtiliserForm>({
     quantite_livree: "", prix_litre_fcfa: "",
@@ -85,6 +86,37 @@ export default function BonsCarburantChauffeur() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [tab]);
+
+  // Récupère (ou rafraîchit) un token QR signé depuis le serveur.
+  // Retourne false si le bon n'est plus éligible (annulé, déjà utilisé).
+  const fetchQrToken = useCallback(async (bon: BonCarburant): Promise<boolean> => {
+    setQrLoading(true);
+    setQrError(null);
+    try {
+      const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`;
+      const res = await fetch(
+        `${BASE}/station/carburant/bons/${encodeURIComponent(bon.numero)}/qr-token`,
+      );
+      if (res.ok) {
+        const tok = await res.json() as { payload: string; sig: string; spki?: string };
+        setQrToken({ payload: tok.payload, sig: tok.sig });
+        if (tok.spki) {
+          try { localStorage.setItem("station_qr_spki_v1", tok.spki); } catch { /* ignore */ }
+        }
+        return true;
+      } else {
+        const body = await res.json().catch(() => ({})) as { erreur?: string };
+        setQrError(body.erreur ?? "Impossible de générer le QR");
+        setQrToken(null);
+        return false;
+      }
+    } catch {
+      setQrError("Hors connexion — impossible de rafraîchir le QR");
+      return false;
+    } finally {
+      setQrLoading(false);
+    }
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -195,25 +227,7 @@ export default function BonsCarburantChauffeur() {
                         onClick={async () => {
                           setQrBon(bon);
                           setQrToken(null);
-                          setQrLoading(true);
-                          try {
-                            const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`;
-                            const res = await fetch(
-                              `${BASE}/station/carburant/bons/${encodeURIComponent(bon.numero)}/qr-token`,
-                            );
-                            if (res.ok) {
-                              const tok = await res.json() as { payload: string; sig: string; spki?: string };
-                              setQrToken({ payload: tok.payload, sig: tok.sig });
-                              // Mettre en cache la clé publique pour la station (si fournie)
-                              if (tok.spki) {
-                                try { localStorage.setItem("station_qr_spki_v1", tok.spki); } catch { /* ignore */ }
-                              }
-                            }
-                          } catch {
-                            // offline ou erreur — on affiche le QR URL simple en fallback
-                          } finally {
-                            setQrLoading(false);
-                          }
+                          await fetchQrToken(bon);
                         }}>
                         <QrCode className="h-4 w-4 mr-1" /> QR
                       </Button>
@@ -316,7 +330,12 @@ export default function BonsCarburantChauffeur() {
                     )}
                     <QRCode value={stationUrl} size={220} level="M" />
                   </div>
-                  {qrToken ? (
+                  {qrError ? (
+                    <div className="flex items-center gap-1.5 text-red-600 text-xs text-center">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                      <span>{qrError}</span>
+                    </div>
+                  ) : qrToken ? (
                     <p className="text-xs text-green-600 text-center flex items-center gap-1">
                       <span>🔒</span> QR signé — lisible hors connexion
                     </p>
@@ -325,6 +344,15 @@ export default function BonsCarburantChauffeur() {
                       {qrLoading ? "Génération du QR sécurisé…" : "QR simple (connexion requise à la station)"}
                     </p>
                   )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    disabled={qrLoading}
+                    onClick={async () => { await fetchQrToken(qrBon); }}>
+                    <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${qrLoading ? "animate-spin" : ""}`} />
+                    Rafraîchir le QR
+                  </Button>
                   <p className="text-xs text-gray-400 text-center font-mono">{qrBon.numero}</p>
                   <Button
                     variant="outline"
