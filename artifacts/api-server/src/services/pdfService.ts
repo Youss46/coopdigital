@@ -59,6 +59,13 @@ function formaterDate(d: string | Date): string {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function formaterDateHeure(d: string | Date): string {
+  const dt = new Date(d);
+  const date = dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const heure = dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return `${date} à ${heure}`;
+}
+
 function ligneTableau(doc: InstanceType<typeof PDFDocument>, colonnes: string[], widths: number[], x: number, y: number, fond?: string) {
   if (fond) doc.rect(x, y, widths.reduce((a, b) => a + b, 0), 16).fill(fond);
   let cx = x;
@@ -915,7 +922,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
   };
   const payDetails: Array<[string, string]> = [
     ["Campagne",             campagne ?? "—"],
-    ["Date",                 formaterDate(row.createdAt)],
+    ["Date",                 formaterDateHeure(row.createdAt)],
     ["Mode de paiement",     payModeLabel[row.modeReglement ?? row.modePaiement] ?? row.modePaiement],
     ["Référence transaction",row.referenceTransaction ?? "—"],
     ["Libellé",              row.libelle ?? "Paiement livraison cacao"],
@@ -2933,7 +2940,7 @@ export async function generateConstatReception(expeditionId: number, cooperative
     .text("RECEPTION PORT", col2X + 8, y + 7);
   const dateArrivee = exp.dateArriveePort
     ? new Date(exp.dateArriveePort).toLocaleDateString("fr-FR") : "—";
-  const dateGen = new Date().toLocaleDateString("fr-FR");
+  const dateGen = formaterDateHeure(new Date());
   const lignesRec: Array<[string, string]> = [
     ["Date arrivee port", dateArrivee],
     ["N° Recepisse",      exp.numeroRecepissePort ?? "—"],
@@ -3092,7 +3099,7 @@ export async function generateConstatRefoulement(refusId: number, cooperativeId:
   const colW = (W - 12) / 2;
 
   const dateRefus  = r.dateRefus ? new Date(r.dateRefus).toLocaleDateString("fr-FR") : "—";
-  const dateGen    = new Date().toLocaleDateString("fr-FR");
+  const dateGen    = formaterDateHeure(new Date());
 
   // Col gauche : infos expédition
   doc.rect(MARGIN, y, colW, 90).fill("#f9fafb").stroke("#e5e7eb");
@@ -3346,7 +3353,7 @@ export async function generateBilanOHADA(cooperativeId: number, exercice: number
     .text(
       `Le present bilan est etabli conformement au Systeme Comptable OHADA. ` +
       `Les montants sont exprimes en FCFA. ` +
-      `Document genere le ${formaterDate(new Date())} par CoopDigital.`,
+      `Document genere le ${formaterDateHeure(new Date())} par CoopDigital.`,
       MARGIN, y, { width: W },
     );
 
@@ -3498,7 +3505,7 @@ export async function generateCompteResultatOHADA(cooperativeId: number, exercic
     .text(
       `Le present compte de resultat est etabli conformement au Systeme Comptable OHADA. ` +
       `Les montants sont exprimes en FCFA. ` +
-      `Document genere le ${formaterDate(new Date())} par CoopDigital.`,
+      `Document genere le ${formaterDateHeure(new Date())} par CoopDigital.`,
       MARGIN, y, { width: W },
     );
 
@@ -3632,7 +3639,7 @@ export async function generateFluxTresoreiriePdf(cooperativeId: number, exercice
       `Le present tableau est etabli conformement au Systeme Comptable OHADA (methode indirecte simplifiee). ` +
       `Les flux sont calcules sur la base des ecritures comptables de l'exercice ${exercice}. ` +
       `Les montants entre parentheses representent des sorties nettes de tresorerie. ` +
-      `Document genere le ${formaterDate(new Date())} par CoopDigital.`,
+      `Document genere le ${formaterDateHeure(new Date())} par CoopDigital.`,
       MARGIN, doc.y, { width: W },
     );
 
@@ -3712,7 +3719,7 @@ export async function generateReleveCommissions(
     .text(delegueNomComplet, MARGIN + 8, y + 16);
   doc.fontSize(8).fillColor(GRIS).font("Helvetica")
     .text(
-      `Tél : ${delegue.telephone ?? "—"}   |   Généré le : ${formaterDate(new Date())}`,
+      `Tél : ${delegue.telephone ?? "—"}   |   Généré le : ${formaterDateHeure(new Date())}`,
       MARGIN + 8, y + 30,
     );
   y += 52;
