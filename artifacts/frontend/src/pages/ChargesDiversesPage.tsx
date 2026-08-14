@@ -65,16 +65,16 @@ interface Stats {
 
 // ── Référentiels ──────────────────────────────────────────────────────────────
 const CATEGORIES: Array<{ value: string; label: string; compte: string }> = [
-  { value: "loyer",           label: "Loyer et charges locatives",  compte: "6132" },
-  { value: "eau_electricite", label: "Eau et électricité",           compte: "6060" },
-  { value: "fournitures",     label: "Fournitures de bureau",        compte: "6061" },
-  { value: "communication",   label: "Téléphone et communication",   compte: "6063" },
-  { value: "deplacement",     label: "Déplacements et transport",    compte: "6241" },
-  { value: "reception",       label: "Réceptions et hébergement",    compte: "6262" },
-  { value: "entretien",       label: "Entretien et réparations",     compte: "6270" },
-  { value: "honoraires",      label: "Honoraires et consultants",    compte: "6320" },
-  { value: "publicite",       label: "Publicité et marketing",       compte: "6350" },
-  { value: "autre",           label: "Autres charges",               compte: "6580" },
+  { value: "loyer",           label: "Loyer et charges locatives",  compte: "622"  },
+  { value: "eau_electricite", label: "Eau et électricité",           compte: "605"  },
+  { value: "fournitures",     label: "Fournitures de bureau",        compte: "604"  },
+  { value: "communication",   label: "Téléphone et communication",   compte: "628"  },
+  { value: "deplacement",     label: "Déplacements et transport",    compte: "618"  },
+  { value: "reception",       label: "Réceptions et hébergement",    compte: "627"  },
+  { value: "entretien",       label: "Entretien et réparations",     compte: "624"  },
+  { value: "honoraires",      label: "Honoraires et consultants",    compte: "632"  },
+  { value: "publicite",       label: "Publicité et marketing",       compte: "627"  },
+  { value: "autre",           label: "Autres charges",               compte: "658"  },
 ];
 
 const MODES_PAIEMENT = [

@@ -53,7 +53,7 @@ export async function handleCreateChargeDiverses(req: Request, res: Response): P
       description:    body.description ?? null,
       montantFcfa:    String(body.montant_fcfa),
       categorie:      body.categorie,
-      compteDebit:    body.compte_debit  ?? COMPTE_DEBIT_DEFAUT[body.categorie] ?? "6580",
+      compteDebit:    body.compte_debit  ?? COMPTE_DEBIT_DEFAUT[body.categorie] ?? "658",
       compteCredit:   body.compte_credit ?? "571",
       modePaiement:   body.mode_paiement ?? "especes",
       tiers:          body.tiers ?? null,
@@ -198,14 +198,14 @@ function mapCharge(r: Awaited<ReturnType<typeof getChargeDiverses>>) {
 
 // Comptes OHADA par défaut par catégorie
 const COMPTE_DEBIT_DEFAUT: Record<string, string> = {
-  loyer:            "6132",
-  eau_electricite:  "6060",
-  fournitures:      "6061",
-  communication:    "6063",
-  deplacement:      "6241",
-  reception:        "6262",
-  entretien:        "6270",
-  honoraires:       "6320",
-  publicite:        "6350",
-  autre:            "6580",
+  loyer:            "622",
+  eau_electricite:  "605",
+  fournitures:      "604",
+  communication:    "628",
+  deplacement:      "618",
+  reception:        "627",
+  entretien:        "624",
+  honoraires:       "632",
+  publicite:        "627",
+  autre:            "658",
 };
