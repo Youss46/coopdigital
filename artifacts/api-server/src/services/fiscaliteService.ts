@@ -647,7 +647,7 @@ export async function genererBordereauCnpsPdf(
     .then(r => r.rows[0]?.nom ?? "CoopDigital");
 
   // 5. PDF
-  const F    = (n: number) => new Intl.NumberFormat("fr-FR").format(n);
+  const F    = (n: number) => new Intl.NumberFormat("fr-FR").format(n).replace(/\u202f|\u00a0/g, " ");
   const VERT = "#1a4731";
   const M    = 45;
 
