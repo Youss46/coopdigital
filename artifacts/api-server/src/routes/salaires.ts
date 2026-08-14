@@ -17,6 +17,7 @@ import {
   getBulletinById,
   validerBulletin,
   payerBulletin,
+  payerBulletinsGroupe,
   deleteBulletin,
   getBulletinPdf,
   listAvancesPersonnel,
@@ -98,6 +99,11 @@ router.get(
   "/salaires/bulletins/:id",
   checkPermission("salaires", "lire"),
   getBulletinById,
+);
+router.put(
+  "/salaires/bulletins/payer-groupe",
+  checkPermission("salaires", "payer_bulletins"),
+  payerBulletinsGroupe,
 );
 router.put(
   "/salaires/bulletins/:id/valider",

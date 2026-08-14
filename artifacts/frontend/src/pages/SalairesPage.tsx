@@ -434,6 +434,7 @@ function TabPaie() {
   const [mois, setMois] = useState(now.getMonth() + 1);
   const [annee, setAnnee] = useState(now.getFullYear());
   const [showPayer, setShowPayer] = useState<BulletinAvecPersonnel | null>(null);
+  const [showPayerGroupe, setShowPayerGroupe] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [exportingGroupe, setExportingGroupe] = useState(false);
   const [downloadingBulletins, setDownloadingBulletins] = useState<Set<number>>(new Set());
@@ -537,6 +538,36 @@ function TabPaie() {
     refetch();
   }
 
+  async function handlePayerGroupe(params: {
+    compteSourceType?: "caisse" | "banque" | "mobile";
+    compteSourceId?: number;
+    reference: string;
+  }) {
+    const valides = list.filter((b: BulletinAvecPersonnel) => b.bulletin.statut === "valide");
+    if (valides.length === 0) return;
+    const token = localStorage.getItem("coop_token") ?? "";
+    const res = await fetch(`${BASE}/api/salaires/bulletins/payer-groupe`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        bulletinIds: valides.map((b: BulletinAvecPersonnel) => b.bulletin.id),
+        compteSourceType: params.compteSourceType,
+        compteSourceId: params.compteSourceId,
+        referencePaiement: params.reference || undefined,
+      }),
+    });
+    const data = await res.json() as { payes?: number; erreurs?: { id: number; message: string }[]; totalPaye?: number; erreur?: string };
+    if (!res.ok) throw new Error(data.erreur ?? "Erreur lors du paiement groupé");
+    const nbErreurs = data.erreurs?.length ?? 0;
+    if (nbErreurs > 0) {
+      toast({ title: `${data.payes ?? 0} payé(s), ${nbErreurs} erreur(s)`, description: data.erreurs!.map(e => e.message).join(" / "), variant: "destructive" });
+    } else {
+      toast({ title: `${data.payes} bulletin(s) payé(s)`, description: `Total : ${new Intl.NumberFormat("fr-CI").format(data.totalPaye ?? 0)} FCFA` });
+    }
+    setShowPayerGroupe(false);
+    refetch();
+  }
+
   async function handleReconcilier() {
     if (!await confirm({
       title: "Réconcilier les écritures",
@@ -612,6 +643,15 @@ function TabPaie() {
               >
                 <CheckCircle className="h-4 w-4" />
                 Valider tous ({nbBrouillons})
+              </button>
+            )}
+            {canPayer && nbValides > 0 && (
+              <button
+                onClick={() => setShowPayerGroupe(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm"
+              >
+                <Banknote className="h-4 w-4" />
+                Payer les validés ({nbValides})
               </button>
             )}
             {canValider && nbPayes > 0 && (
@@ -782,6 +822,13 @@ function TabPaie() {
           bulletin={showPayer}
           onClose={() => setShowPayer(null)}
           onPayer={(id, params) => handlePayer(id, params)}
+        />
+      )}
+      {showPayerGroupe && (
+        <PayerGroupeModal
+          bulletins={list.filter((b: BulletinAvecPersonnel) => b.bulletin.statut === "valide")}
+          onClose={() => setShowPayerGroupe(false)}
+          onPayer={handlePayerGroupe}
         />
       )}
     </div>
@@ -1465,6 +1512,131 @@ function PayerModal({
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               Confirmer le paiement
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal paiement groupé ────────────────────────────────────────────────────
+
+function PayerGroupeModal({
+  bulletins,
+  onClose,
+  onPayer,
+}: {
+  bulletins: BulletinAvecPersonnel[];
+  onClose: () => void;
+  onPayer: (params: { compteSourceType?: "caisse" | "banque" | "mobile"; compteSourceId?: number; reference: string }) => Promise<void>;
+}) {
+  const [compteSourceType, setCompteSourceType] = useState<"caisse" | "banque" | "mobile">("caisse");
+  const [compteSourceId, setCompteSourceId]     = useState<number | undefined>(undefined);
+  const [reference, setReference]               = useState("");
+  const [loading, setLoading]                   = useState(false);
+
+  const totalNet = bulletins.reduce((s, b) => s + b.bulletin.salaireNetFcfa, 0);
+
+  const { data: comptes, isLoading: comptesLoading } = useQuery<ComptesTresorerie>({
+    queryKey: ["comptes-tresorerie"],
+    queryFn: () => apiFetchSalaires<ComptesTresorerie>("/api/salaires/comptes-tresorerie"),
+  });
+
+  const comptesDisponibles =
+    compteSourceType === "caisse"  ? (comptes?.caisses  ?? []).map(c => ({ id: c.id, label: `${c.nom} (${Number(c.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA)` }))
+    : compteSourceType === "banque" ? (comptes?.banques  ?? []).map(b => ({ id: b.id, label: `${b.nom} — ${b.banque} (${Number(b.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA)` }))
+    : (comptes?.mobiles ?? []).map(m => ({ id: m.id, label: `${m.nom} (${Number(m.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA)` }));
+
+  const firstId = comptesDisponibles[0]?.id;
+  const selectedId = compteSourceId ?? firstId;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedId) return;
+    setLoading(true);
+    try {
+      await onPayer({ compteSourceType, compteSourceId: selectedId, reference });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-900">Paiement groupé — {bulletins.length} bulletin(s)</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* Résumé */}
+          <div className="bg-emerald-50 rounded-xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">{bulletins.length} salarié(s) à payer</p>
+              <p className="text-xs text-gray-400 mt-0.5">Bulletins validés de la période</p>
+            </div>
+            <p className="text-2xl font-bold text-emerald-700">{formatFcfa(totalNet)}</p>
+          </div>
+
+          {/* Liste des bulletins */}
+          <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-100 divide-y divide-gray-50 text-sm">
+            {bulletins.map(b => (
+              <div key={b.bulletin.id} className="flex items-center justify-between px-3 py-2">
+                <span className="text-gray-700">{b.personnel.prenoms} {b.personnel.nom}</span>
+                <span className="font-medium text-gray-800">{formatFcfa(b.bulletin.salaireNetFcfa)}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Type de compte */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Moyen de paiement</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["caisse", "banque", "mobile"] as const).map(t => (
+                <button key={t} type="button"
+                  onClick={() => { setCompteSourceType(t); setCompteSourceId(undefined); }}
+                  className={`py-2 rounded-lg text-xs font-medium border transition-all ${compteSourceType === t ? "bg-emerald-600 text-white border-emerald-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+                  {t === "caisse" ? "💵 Espèces" : t === "banque" ? "🏦 Banque" : "📱 Mobile"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Compte source */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {compteSourceType === "caisse" ? "Caisse à débiter" : compteSourceType === "banque" ? "Compte bancaire à débiter" : "Compte mobile à débiter"}
+            </label>
+            {comptesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-gray-400 py-2"><Loader2 className="h-4 w-4 animate-spin" /> Chargement…</div>
+            ) : comptesDisponibles.length === 0 ? (
+              <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">Aucun compte disponible pour ce mode.</p>
+            ) : (
+              <select className={INPUT_CLS} value={selectedId ?? ""}
+                onChange={e => setCompteSourceId(Number(e.target.value) || undefined)} required>
+                {comptesDisponibles.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+            )}
+          </div>
+
+          {/* Référence */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Référence (optionnel)</label>
+            <input className={INPUT_CLS} value={reference} onChange={e => setReference(e.target.value)}
+              placeholder="N° transaction, référence virement…" />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
+              Annuler
+            </button>
+            <button type="submit" disabled={loading || !selectedId}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2">
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              Confirmer le paiement groupé
             </button>
           </div>
         </form>
