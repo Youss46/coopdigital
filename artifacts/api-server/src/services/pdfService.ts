@@ -790,6 +790,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
   doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("DÉTAILS DE LA LIVRAISON", MARGIN, y);
   y += 14;
   const recuLivDetails: Array<[string, string]> = [
+    ["N° Reçu",            ref],
     ["Campagne",           campagne ?? "—"],
     ["Date de livraison",  formaterDate(row.dateLivraison)],
     ["Produit",            row.produit ?? "Cacao"],
@@ -921,6 +922,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     orange_money: "Orange Money", mtn_momo: "MTN MoMo", especes: "Espèces",
   };
   const payDetails: Array<[string, string]> = [
+    ["N° Reçu",              ref],
     ["Campagne",             campagne ?? "—"],
     ["Date",                 formaterDateHeure(row.createdAt)],
     ["Mode de paiement",     payModeLabel[row.modeReglement ?? row.modePaiement] ?? row.modePaiement],
@@ -1289,6 +1291,11 @@ export async function generateBordereauPesee(livraisonId: number, cooperativeId:
     y += 20;
   }
 
+  doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 16).fill("#f0fdf4");
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica").text("N° Bordereau :", MARGIN + 8, y + 4, { width: 120, lineBreak: false });
+  doc.fontSize(8).fillColor(VERT).font("Helvetica-Bold").text(ref, MARGIN + 130, y + 4, { lineBreak: false });
+  y += 22;
+
   doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("RÉSULTATS DE PESÉE", MARGIN, y);
   y += 14;
 
@@ -1375,6 +1382,7 @@ export async function generateRecuAvance(avanceId: number, cooperativeId: number
   doc.fontSize(10).fillColor(OR).font("Helvetica-Bold").text("DÉTAILS DE L'AVANCE", MARGIN, y);
   y += 14;
   const avcDetails: Array<[string, string]> = [
+    ["N° Reçu",        ref],
     ["Campagne",       campagne ?? "—"],
     ["Date d'octroi",  formaterDate(row.dateOctroi)],
     ["Motif",          row.motif ?? "—"],
@@ -1468,6 +1476,7 @@ export async function generateRecuIntrant(distributionId: number, cooperativeId:
   y += 14;
   const intModeLabel: Record<string, string> = { credit: "Crédit", gratuit: "Gratuit", subventionne: "Subventionné" };
   const intDetails: Array<[string, string]> = [
+    ["N° Reçu",          ref],
     ["Campagne",         campagne ?? "—"],
     ["Date",             formaterDate(row.dateDistribution)],
     ["Intrant",          row.intrantNom ?? "—"],
