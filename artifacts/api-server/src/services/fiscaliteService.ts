@@ -1004,6 +1004,17 @@ export async function createObligation(cooperativeId: number, data: {
   return created;
 }
 
+export async function countDeclarationsEnAttente(cooperativeId: number, obligationId: number): Promise<number> {
+  const result = await db.execute<{ count: string }>(sql`
+    SELECT COUNT(*)::text AS count
+    FROM declarations_fiscales
+    WHERE cooperative_id = ${cooperativeId}
+      AND obligation_id  = ${obligationId}
+      AND statut IN ('a_payer', 'en_retard')
+  `);
+  return parseInt(result.rows[0]?.count ?? "0", 10);
+}
+
 export async function toggleObligation(cooperativeId: number, id: number) {
   const [existing] = await db.select().from(obligationsFiscalesTable)
     .where(and(eq(obligationsFiscalesTable.id, id), eq(obligationsFiscalesTable.cooperativeId, cooperativeId)))

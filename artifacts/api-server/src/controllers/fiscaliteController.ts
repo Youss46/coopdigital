@@ -174,6 +174,24 @@ export async function patchObligationToggle(req: Request, res: Response): Promis
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
     if (isNaN(id)) { res.status(400).json({ error: "id invalide" }); return; }
+
+    const { confirme } = (req.body ?? {}) as { confirme?: boolean };
+
+    // Si l'obligation est active et qu'on va la désactiver → vérifier les déclarations en attente
+    const obligations = await svc.listObligationsAll(cooperativeId);
+    const obl = obligations.find(o => o.id === id);
+    if (obl?.actif && !confirme) {
+      const count = await svc.countDeclarationsEnAttente(cooperativeId, id);
+      if (count > 0) {
+        res.status(409).json({
+          needsConfirmation: true,
+          declarationsEnAttente: count,
+          message: `Cette obligation a ${count} déclaration(s) non payée(s) (à payer ou en retard). Confirmer la désactivation ?`,
+        });
+        return;
+      }
+    }
+
     const updated = await svc.toggleObligation(cooperativeId, id);
     res.json(updated);
   } catch (err) {

@@ -1060,6 +1060,8 @@ function SectionObligations({ onObligationsChange }: { onObligationsChange?: () 
   const [toggling, setToggling]       = useState<number | null>(null);
   const [modalObl, setModalObl]       = useState<Obligation | null>(null);
   const [showModal, setShowModal]     = useState(false);
+  // Confirmation désactivation
+  const [confirmObl, setConfirmObl]   = useState<{ obl: Obligation; count: number } | null>(null);
 
   const charger = useCallback(async () => {
     setLoading(true);
@@ -1074,21 +1076,37 @@ function SectionObligations({ onObligationsChange }: { onObligationsChange?: () 
 
   useEffect(() => { charger(); }, [charger]);
 
-  const handleToggle = async (obl: Obligation) => {
+  const doToggle = async (obl: Obligation, confirme = false) => {
     setToggling(obl.id);
     try {
       const r = await fetch(`${BASE}/api/fiscalite/obligations/${obl.id}/toggle`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${tok()}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
+        body: JSON.stringify({ confirme }),
       });
       const json = await r.json();
-      if (!r.ok) throw new Error(json.error ?? "Erreur");
-      toast({ title: json.actif ? "Obligation activée" : "Obligation désactivée", description: obl.libelle });
+      // 409 = déclarations en attente → demander confirmation
+      if (r.status === 409 && (json as { needsConfirmation?: boolean }).needsConfirmation) {
+        const count = (json as { declarationsEnAttente: number }).declarationsEnAttente;
+        setConfirmObl({ obl, count });
+        return;
+      }
+      if (!r.ok) throw new Error((json as { error?: string }).error ?? "Erreur");
+      toast({ title: (json as { actif: boolean }).actif ? "Obligation activée" : "Obligation désactivée", description: obl.libelle });
       charger();
       onObligationsChange?.();
     } catch (e) {
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
     } finally { setToggling(null); }
+  };
+
+  const handleToggle = (obl: Obligation) => void doToggle(obl, false);
+
+  const handleConfirmDesactivation = async () => {
+    if (!confirmObl) return;
+    const obl = confirmObl.obl;
+    setConfirmObl(null);
+    await doToggle(obl, true);
   };
 
   const openAdd  = () => { setModalObl(null); setShowModal(true); };
@@ -1215,6 +1233,48 @@ function SectionObligations({ onObligationsChange }: { onObligationsChange?: () 
           onClose={closeModal}
           onDone={onDone}
         />
+      )}
+
+      {/* Modal de confirmation désactivation */}
+      {confirmObl && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={18} className="text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-gray-800">Désactiver l'obligation ?</h2>
+                <p className="text-sm text-gray-500 mt-1">{confirmObl.obl.libelle}</p>
+              </div>
+            </div>
+            <div className="p-5">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 mb-4">
+                <p className="font-medium mb-1">
+                  {confirmObl.count} déclaration{confirmObl.count > 1 ? "s" : ""} non payée{confirmObl.count > 1 ? "s" : ""} en attente
+                </p>
+                <p className="text-xs">
+                  Ces déclarations ({confirmObl.count > 1 ? "statuts « à payer » ou « en retard »" : "statut « à payer » ou « en retard »"}) resteront
+                  dans votre liste après la désactivation. Elles ne seront plus générées automatiquement lors des prochaines périodes.
+                </p>
+              </div>
+              <p className="text-sm text-gray-600">Souhaitez-vous quand même désactiver cette obligation ?</p>
+            </div>
+            <div className="flex gap-3 p-5 pt-0">
+              <button
+                onClick={() => setConfirmObl(null)}
+                className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+                Annuler
+              </button>
+              <button
+                onClick={() => void handleConfirmDesactivation()}
+                disabled={toggling === confirmObl.obl.id}
+                className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">
+                {toggling === confirmObl.obl.id ? "Désactivation…" : "Désactiver quand même"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
