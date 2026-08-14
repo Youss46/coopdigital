@@ -10,6 +10,15 @@ export async function getObligations(req: Request, res: Response): Promise<void>
   catch (err) { req.log.error({ err }, "getObligations"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
+export async function postInitObligationsCI(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const result = await svc.initObligationsCI(cooperativeId);
+    res.status(201).json(result);
+  } catch (err) { req.log.error({ err }, "postInitObligationsCI"); res.status(500).json({ error: "Erreur serveur" }); }
+}
+
 export async function postGenererMensuel(req: Request, res: Response): Promise<void> {
   try {
     const cooperativeId = req.user?.cooperativeId;

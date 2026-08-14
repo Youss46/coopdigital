@@ -54,6 +54,44 @@ export async function listObligations(cooperativeId: number) {
                eq(obligationsFiscalesTable.actif, true)));
 }
 
+// ─── Seed obligations standard Côte d'Ivoire ──────────────────────────────────
+
+const OBLIGATIONS_CI = [
+  { typeTaxe: "cnps",              libelle: "CNPS — Part salariale",              periodicite: "mensuel", jourEcheance: 15, tauxPct: "3.20", baseCalcul: "Salaire brut plafonné" },
+  { typeTaxe: "cnps",              libelle: "CNPS — Part patronale",              periodicite: "mensuel", jourEcheance: 15, tauxPct: "7.70", baseCalcul: "Salaire brut plafonné" },
+  { typeTaxe: "its",               libelle: "ITS — Impôt sur traitements et salaires", periodicite: "mensuel", jourEcheance: 15, tauxPct: null,   baseCalcul: "Barème progressif DGI" },
+  { typeTaxe: "taxe_apprentissage",libelle: "Taxe d'Apprentissage (TA)",          periodicite: "annuel",  jourEcheance: 30, tauxPct: "0.50", baseCalcul: "Masse salariale annuelle brute" },
+  { typeTaxe: "fpc",               libelle: "Formation Professionnelle Continue (FPC)", periodicite: "annuel", jourEcheance: 31, tauxPct: "0.60", baseCalcul: "Masse salariale annuelle brute" },
+  { typeTaxe: "impot_societes",    libelle: "Impôt sur les Sociétés (IS)",        periodicite: "annuel",  jourEcheance: 30, tauxPct: "25.00", baseCalcul: "Bénéfice net imposable" },
+] as const;
+
+export async function initObligationsCI(cooperativeId: number): Promise<{ creees: number; dejaPresentes: number }> {
+  const existantes = await db.select({ typeTaxe: obligationsFiscalesTable.typeTaxe, libelle: obligationsFiscalesTable.libelle })
+    .from(obligationsFiscalesTable)
+    .where(eq(obligationsFiscalesTable.cooperativeId, cooperativeId));
+
+  const cles = new Set(existantes.map(o => `${o.typeTaxe}|${o.libelle}`));
+  let creees = 0;
+
+  for (const obl of OBLIGATIONS_CI) {
+    const cle = `${obl.typeTaxe}|${obl.libelle}`;
+    if (cles.has(cle)) continue;
+    await db.insert(obligationsFiscalesTable).values({
+      cooperativeId,
+      typeTaxe:     obl.typeTaxe,
+      libelle:      obl.libelle,
+      periodicite:  obl.periodicite,
+      jourEcheance: obl.jourEcheance,
+      tauxPct:      obl.tauxPct ?? undefined,
+      baseCalcul:   obl.baseCalcul,
+      actif:        true,
+    });
+    creees++;
+  }
+
+  return { creees, dejaPresentes: OBLIGATIONS_CI.length - creees };
+}
+
 // ─── Calcul base depuis bulletins ─────────────────────────────────────────────
 
 async function getBasesCnpsIts(cooperativeId: number, mois: number, annee: number) {

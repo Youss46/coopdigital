@@ -210,6 +210,45 @@ function ModalGenerer({ onClose, onDone }: { onClose: () => void; onDone: () => 
   );
 }
 
+// ─── Bouton d'initialisation des obligations CI ───────────────────────────────
+
+function InitObligationsButton({ onDone }: { onDone: () => void }) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+
+  const init = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE}/api/fiscalite/obligations/init-ci`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "Erreur");
+      const { creees, dejaPresentes } = json as { creees: number; dejaPresentes: number };
+      if (creees > 0) {
+        toast({ title: "Obligations initialisées", description: `${creees} obligation(s) ivoirienne(s) créée(s) — CNPS, ITS, TA, FPC, IS.` });
+        onDone();
+      } else {
+        toast({ title: "Déjà configurées", description: `${dejaPresentes} obligation(s) déjà présentes.` });
+      }
+    } catch (e) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <button
+      onClick={init}
+      disabled={loading}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+    >
+      <Calculator size={14} />
+      {loading ? "Initialisation…" : "Initialiser les obligations standard (Côte d'Ivoire)"}
+    </button>
+  );
+}
+
 // ─── Onglet 1 — Tableau de bord fiscal ───────────────────────────────────────
 
 function TableauBordFiscal() {
@@ -302,7 +341,10 @@ function TableauBordFiscal() {
         </div>
 
         {Object.keys(parMois).length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">Aucune déclaration à venir. Générez les déclarations du mois.</p>
+          <div className="text-center py-8 space-y-3">
+            <p className="text-sm text-gray-400">Aucune déclaration à venir. Générez les déclarations du mois.</p>
+            <InitObligationsButton onDone={charger} />
+          </div>
         ) : (
           Object.entries(parMois).map(([moisLabel, items]) => (
             <div key={moisLabel} className="mb-5">
