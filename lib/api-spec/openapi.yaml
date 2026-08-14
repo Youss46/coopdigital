@@ -5210,6 +5210,148 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/RapportCampagneTransport" }
 
+  /transport/carburant/bons:
+    get:
+      operationId: getBonsCarburant
+      summary: Liste des bons de carburant
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: vehicule_id, in: query, required: false, schema: { type: integer } }
+        - { name: chauffeur_id, in: query, required: false, schema: { type: integer } }
+        - { name: statut, in: query, required: false, schema: { type: string } }
+        - { name: date_debut, in: query, required: false, schema: { type: string, format: date } }
+        - { name: date_fin, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bons]
+                properties:
+                  bons: { type: array, items: { $ref: "#/components/schemas/BonCarburant" } }
+    post:
+      operationId: createBonCarburant
+      summary: Créer un bon de carburant
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateBonCarburantBody" }
+      responses:
+        "201":
+          description: Créé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BonCarburant" }
+
+  /transport/carburant/bons/{id}:
+    get:
+      operationId: getBonCarburant
+      summary: Détail d'un bon de carburant
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BonCarburant" }
+
+  /transport/carburant/bons/{id}/soumettre:
+    put:
+      operationId: soumettresBonCarburant
+      summary: Soumettre un bon pour approbation
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BonCarburant" }
+
+  /transport/carburant/bons/{id}/approuver:
+    put:
+      operationId: approuverBonCarburant
+      summary: Approuver un bon de carburant
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BonCarburant" }
+
+  /transport/carburant/bons/{id}/utiliser:
+    put:
+      operationId: utiliserBonCarburant
+      summary: Enregistrer l'utilisation du bon (retour station)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UtiliserBonCarburantBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BonCarburant" }
+
+  /transport/carburant/bons/{id}/annuler:
+    put:
+      operationId: annulerBonCarburant
+      summary: Annuler un bon de carburant
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BonCarburant" }
+
+  /transport/carburant/bons/{id}/pdf:
+    get:
+      operationId: getBonCarburantPdf
+      summary: Générer le PDF du bon de carburant
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+
+  /transport/carburant/stats:
+    get:
+      operationId: getStatsCarburant
+      summary: Statistiques de consommation carburant
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: vehicule_id, in: query, required: false, schema: { type: integer } }
+        - { name: date_debut, in: query, required: false, schema: { type: string, format: date } }
+        - { name: date_fin, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatsCarburant" }
+
   /transport/rapport-vehicule/{id}:
     get:
       operationId: getRapportVehiculeTransport
@@ -10714,6 +10856,79 @@ components:
         reference_piece:  { type: string }
         quantite:         { type: number }
         unite:            { type: string }
+
+    BonCarburant:
+      type: object
+      required: [id, cooperative_id, numero, vehicule_id, type_carburant, quantite_autorisee, date_emission, statut, created_at]
+      properties:
+        id:                  { type: integer }
+        cooperative_id:      { type: integer }
+        numero:              { type: string }
+        vehicule_id:         { type: integer }
+        immatriculation:     { type: string, nullable: true }
+        marque:              { type: string, nullable: true }
+        modele:              { type: string, nullable: true }
+        chauffeur_id:        { type: integer, nullable: true }
+        chauffeur_nom:       { type: string, nullable: true }
+        type_carburant:      { type: string }
+        quantite_autorisee:  { type: number }
+        station_service:     { type: string, nullable: true }
+        motif:               { type: string, nullable: true }
+        date_emission:       { type: string, format: date }
+        statut:              { type: string }
+        approuve_par:        { type: integer, nullable: true }
+        approuve_par_nom:    { type: string, nullable: true }
+        date_approbation:    { type: string, format: date-time, nullable: true }
+        date_utilisation:    { type: string, format: date, nullable: true }
+        quantite_livree:     { type: number, nullable: true }
+        prix_litre_fcfa:     { type: number, nullable: true }
+        montant_fcfa:        { type: number, nullable: true }
+        observations:        { type: string, nullable: true }
+        created_at:          { type: string, format: date-time }
+        updated_at:          { type: string, format: date-time }
+
+    CreateBonCarburantBody:
+      type: object
+      required: [vehicule_id, type_carburant, quantite_autorisee, date_emission]
+      properties:
+        vehicule_id:         { type: integer }
+        chauffeur_id:        { type: integer }
+        type_carburant:      { type: string }
+        quantite_autorisee:  { type: number }
+        station_service:     { type: string }
+        motif:               { type: string }
+        date_emission:       { type: string, format: date }
+
+    UtiliserBonCarburantBody:
+      type: object
+      required: [quantite_livree, date_utilisation]
+      properties:
+        quantite_livree:  { type: number }
+        prix_litre_fcfa:  { type: number }
+        montant_fcfa:     { type: number }
+        date_utilisation: { type: string, format: date }
+        station_service:  { type: string }
+        observations:     { type: string }
+
+    StatsCarburant:
+      type: object
+      required: [nb_bons, qte_autorisee_l, qte_livree_l, montant_total_fcfa, par_vehicule]
+      properties:
+        nb_bons:            { type: integer }
+        qte_autorisee_l:    { type: number }
+        qte_livree_l:       { type: number }
+        montant_total_fcfa: { type: number }
+        par_vehicule:
+          type: array
+          items:
+            type: object
+            properties:
+              vehicule_id:     { type: integer }
+              immatriculation: { type: string, nullable: true }
+              marque:          { type: string, nullable: true }
+              nb_bons:         { type: integer }
+              qte_livree_l:    { type: number }
+              montant_fcfa:    { type: number }
 
     CreateEntretienVehiculeBody:
       type: object

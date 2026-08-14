@@ -5,8 +5,9 @@ import {
   missionsTransportTable,
   entretienVehiculeTable,
   depensesVehiculeTable,
+  bonsCarburantTable,
 } from "@workspace/db";
-import { eq, and, sql, desc, lte, gte, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, lte, gte } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 
@@ -498,6 +499,141 @@ export async function deleteDepense(cooperativeId: number, id: number) {
     .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
     .returning({ id: depensesVehiculeTable.id });
   return deleted != null;
+}
+
+// ─── BONS DE CARBURANT ────────────────────────────────────────────────────────
+
+async function genNumero(cooperativeId: number): Promise<string> {
+  const [last] = await db
+    .select({ numero: bonsCarburantTable.numero })
+    .from(bonsCarburantTable)
+    .where(eq(bonsCarburantTable.cooperativeId, cooperativeId))
+    .orderBy(desc(bonsCarburantTable.id))
+    .limit(1);
+  const match = last?.numero?.match(/(\d+)$/);
+  const next  = (parseInt(match?.[1] ?? "0") + 1).toString().padStart(5, "0");
+  return `BC-${next}`;
+}
+
+export interface BonCarburantFilters {
+  vehiculeId?: number;
+  chauffeurId?: number;
+  statut?: string;
+  dateDebut?: string;
+  dateFin?: string;
+}
+
+export async function getBonsCarburant(cooperativeId: number, filters: BonCarburantFilters = {}) {
+  const conds = [eq(bonsCarburantTable.cooperativeId, cooperativeId)];
+  if (filters.vehiculeId)  conds.push(eq(bonsCarburantTable.vehiculeId, filters.vehiculeId));
+  if (filters.chauffeurId) conds.push(eq(bonsCarburantTable.chauffeurId, filters.chauffeurId));
+  if (filters.statut)      conds.push(eq(bonsCarburantTable.statut, filters.statut));
+  if (filters.dateDebut)   conds.push(gte(bonsCarburantTable.dateEmission, filters.dateDebut));
+  if (filters.dateFin)     conds.push(lte(bonsCarburantTable.dateEmission, filters.dateFin));
+
+  return db
+    .select({
+      bon:              bonsCarburantTable,
+      immatriculation:  vehiculesTable.immatriculation,
+      marque:           vehiculesTable.marque,
+      chauffeurNom:     chauffeursTable.nom,
+      chauffeurPrenoms: chauffeursTable.prenoms,
+    })
+    .from(bonsCarburantTable)
+    .leftJoin(vehiculesTable,  eq(vehiculesTable.id,  bonsCarburantTable.vehiculeId))
+    .leftJoin(chauffeursTable, eq(chauffeursTable.id, bonsCarburantTable.chauffeurId))
+    .where(and(...conds))
+    .orderBy(desc(bonsCarburantTable.createdAt));
+}
+
+export async function getBonCarburant(cooperativeId: number, id: number) {
+  const rows = await db
+    .select({
+      bon:              bonsCarburantTable,
+      immatriculation:  vehiculesTable.immatriculation,
+      marque:           vehiculesTable.marque,
+      modele:           vehiculesTable.modele,
+      chauffeurNom:     chauffeursTable.nom,
+      chauffeurPrenoms: chauffeursTable.prenoms,
+    })
+    .from(bonsCarburantTable)
+    .leftJoin(vehiculesTable,  eq(vehiculesTable.id,  bonsCarburantTable.vehiculeId))
+    .leftJoin(chauffeursTable, eq(chauffeursTable.id, bonsCarburantTable.chauffeurId))
+    .where(and(eq(bonsCarburantTable.id, id), eq(bonsCarburantTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createBonCarburant(
+  cooperativeId: number,
+  createdBy: number,
+  data: { vehiculeId: number; chauffeurId?: number | null; typeCarburant: string; quantiteAutorisee: string; stationService?: string | null; motif?: string | null; dateEmission: string },
+) {
+  const numero = await genNumero(cooperativeId);
+  const [row] = await db
+    .insert(bonsCarburantTable)
+    .values({ cooperativeId, createdBy, numero, statut: "brouillon", ...data })
+    .returning();
+  return row!;
+}
+
+export async function transitionBon(cooperativeId: number, id: number, statut: string, extra?: Record<string, unknown>) {
+  const [row] = await db
+    .update(bonsCarburantTable)
+    .set({ statut, updatedAt: new Date(), ...extra })
+    .where(and(eq(bonsCarburantTable.id, id), eq(bonsCarburantTable.cooperativeId, cooperativeId)))
+    .returning();
+  return row ?? null;
+}
+
+export async function getStatsCarburant(cooperativeId: number, filters: { vehiculeId?: number; dateDebut?: string; dateFin?: string } = {}) {
+  const conds = [
+    eq(bonsCarburantTable.cooperativeId, cooperativeId),
+    eq(bonsCarburantTable.statut, "utilise"),
+  ];
+  if (filters.vehiculeId) conds.push(eq(bonsCarburantTable.vehiculeId, filters.vehiculeId));
+  if (filters.dateDebut)  conds.push(gte(bonsCarburantTable.dateEmission, filters.dateDebut));
+  if (filters.dateFin)    conds.push(lte(bonsCarburantTable.dateEmission, filters.dateFin));
+
+  const [totaux] = await db
+    .select({
+      nb_bons:            sql<string>`COUNT(*)`,
+      qte_autorisee_l:    sql<string>`COALESCE(SUM(quantite_autorisee),0)`,
+      qte_livree_l:       sql<string>`COALESCE(SUM(quantite_livree),0)`,
+      montant_total_fcfa: sql<string>`COALESCE(SUM(montant_fcfa),0)`,
+    })
+    .from(bonsCarburantTable)
+    .where(and(...conds));
+
+  const parVehicule = await db
+    .select({
+      vehicule_id:      bonsCarburantTable.vehiculeId,
+      immatriculation:  vehiculesTable.immatriculation,
+      marque:           vehiculesTable.marque,
+      nb_bons:          sql<string>`COUNT(*)`,
+      qte_livree_l:     sql<string>`COALESCE(SUM(quantite_livree),0)`,
+      montant_fcfa:     sql<string>`COALESCE(SUM(${bonsCarburantTable.montantFcfa}),0)`,
+    })
+    .from(bonsCarburantTable)
+    .leftJoin(vehiculesTable, eq(vehiculesTable.id, bonsCarburantTable.vehiculeId))
+    .where(and(...conds))
+    .groupBy(bonsCarburantTable.vehiculeId, vehiculesTable.immatriculation, vehiculesTable.marque)
+    .orderBy(desc(sql`SUM(quantite_livree)`));
+
+  return {
+    nb_bons:            parseInt(totaux?.nb_bons ?? "0"),
+    qte_autorisee_l:    parseFloat(totaux?.qte_autorisee_l ?? "0"),
+    qte_livree_l:       parseFloat(totaux?.qte_livree_l ?? "0"),
+    montant_total_fcfa: Math.round(parseFloat(totaux?.montant_total_fcfa ?? "0")),
+    par_vehicule:       parVehicule.map(r => ({
+      vehicule_id:     r.vehicule_id,
+      immatriculation: r.immatriculation,
+      marque:          r.marque,
+      nb_bons:         parseInt(r.nb_bons),
+      qte_livree_l:    parseFloat(r.qte_livree_l),
+      montant_fcfa:    Math.round(parseFloat(r.montant_fcfa)),
+    })),
+  };
 }
 
 // ─── ALERTES CHAUFFEURS ───────────────────────────────────────────────────────

@@ -52,6 +52,7 @@ import type {
   BalanceLigne,
   BilanCampagneResult,
   BilanEtat,
+  BonCarburant,
   BudgetCampagne,
   BudgetDetail,
   BudgetResponse,
@@ -91,6 +92,7 @@ import type {
   CreateAvancePersonnelInput,
   CreateBalance201,
   CreateBalanceBody,
+  CreateBonCarburantBody,
   CreateCertificationBody,
   CreateChauffeurBody,
   CreateDepenseVehiculeBody,
@@ -158,6 +160,8 @@ import type {
   GetBalances200,
   GetBalancesAlertes200,
   GetBilanParams,
+  GetBonsCarburant200,
+  GetBonsCarburantParams,
   GetBulletinsParams,
   GetCertificationsCriteres200,
   GetChauffeurs200,
@@ -196,6 +200,7 @@ import type {
   GetRapportTypeFournisseur200Item,
   GetScoringParNiveauParams,
   GetScoringTopParams,
+  GetStatsCarburantParams,
   GetTableauAmortissement200,
   GetTransportAlertes200,
   GetVehicules200,
@@ -305,6 +310,7 @@ import type {
   SmsGroupeResult,
   SmsHistorique,
   StatistiquesPesee,
+  StatsCarburant,
   StatsCertifications,
   Subvention,
   SubventionAvecBailleur,
@@ -342,6 +348,7 @@ import type {
   UploadUrlRequest,
   UploadUrlResponse,
   UtilisateurCompte,
+  UtiliserBonCarburantBody,
   UtiliserFondsInput,
   ValiderDoublePesee200,
   ValiderDoublePeseeBody,
@@ -19503,6 +19510,681 @@ export function useGetRapportCampagneTransport<TData = Awaited<ReturnType<typeof
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRapportCampagneTransportQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetBonsCarburantUrl = (params?: GetBonsCarburantParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/transport/carburant/bons?${stringifiedParams}` : `/api/transport/carburant/bons`
+}
+
+/**
+ * @summary Liste des bons de carburant
+ */
+export const getBonsCarburant = async (params?: GetBonsCarburantParams, options?: RequestInit): Promise<GetBonsCarburant200> => {
+
+  return customFetch<GetBonsCarburant200>(getGetBonsCarburantUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBonsCarburantQueryKey = (params?: GetBonsCarburantParams,) => {
+    return [
+    `/api/transport/carburant/bons`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetBonsCarburantQueryOptions = <TData = Awaited<ReturnType<typeof getBonsCarburant>>, TError = ErrorType<unknown>>(params?: GetBonsCarburantParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBonsCarburant>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBonsCarburantQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBonsCarburant>>> = ({ signal }) => getBonsCarburant(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBonsCarburant>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBonsCarburantQueryResult = NonNullable<Awaited<ReturnType<typeof getBonsCarburant>>>
+export type GetBonsCarburantQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Liste des bons de carburant
+ */
+
+export function useGetBonsCarburant<TData = Awaited<ReturnType<typeof getBonsCarburant>>, TError = ErrorType<unknown>>(
+ params?: GetBonsCarburantParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBonsCarburant>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBonsCarburantQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateBonCarburantUrl = () => {
+
+
+
+
+  return `/api/transport/carburant/bons`
+}
+
+/**
+ * @summary Créer un bon de carburant
+ */
+export const createBonCarburant = async (createBonCarburantBody: CreateBonCarburantBody, options?: RequestInit): Promise<BonCarburant> => {
+
+  return customFetch<BonCarburant>(getCreateBonCarburantUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createBonCarburantBody,)
+  }
+);}
+
+
+
+
+export const getCreateBonCarburantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBonCarburant>>, TError,{data: BodyType<CreateBonCarburantBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBonCarburant>>, TError,{data: BodyType<CreateBonCarburantBody>}, TContext> => {
+
+const mutationKey = ['createBonCarburant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBonCarburant>>, {data: BodyType<CreateBonCarburantBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createBonCarburant(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBonCarburantMutationResult = NonNullable<Awaited<ReturnType<typeof createBonCarburant>>>
+    export type CreateBonCarburantMutationBody = BodyType<CreateBonCarburantBody>
+    export type CreateBonCarburantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Créer un bon de carburant
+ */
+export const useCreateBonCarburant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBonCarburant>>, TError,{data: BodyType<CreateBonCarburantBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createBonCarburant>>,
+        TError,
+        {data: BodyType<CreateBonCarburantBody>},
+        TContext
+      > => {
+      return useMutation(getCreateBonCarburantMutationOptions(options));
+    }
+
+export const getGetBonCarburantUrl = (id: number,) => {
+
+
+
+
+  return `/api/transport/carburant/bons/${id}`
+}
+
+/**
+ * @summary Détail d'un bon de carburant
+ */
+export const getBonCarburant = async (id: number, options?: RequestInit): Promise<BonCarburant> => {
+
+  return customFetch<BonCarburant>(getGetBonCarburantUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBonCarburantQueryKey = (id: number,) => {
+    return [
+    `/api/transport/carburant/bons/${id}`
+    ] as const;
+    }
+
+
+export const getGetBonCarburantQueryOptions = <TData = Awaited<ReturnType<typeof getBonCarburant>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBonCarburant>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBonCarburantQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBonCarburant>>> = ({ signal }) => getBonCarburant(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBonCarburant>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBonCarburantQueryResult = NonNullable<Awaited<ReturnType<typeof getBonCarburant>>>
+export type GetBonCarburantQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Détail d'un bon de carburant
+ */
+
+export function useGetBonCarburant<TData = Awaited<ReturnType<typeof getBonCarburant>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBonCarburant>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBonCarburantQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSoumettresBonCarburantUrl = (id: number,) => {
+
+
+
+
+  return `/api/transport/carburant/bons/${id}/soumettre`
+}
+
+/**
+ * @summary Soumettre un bon pour approbation
+ */
+export const soumettresBonCarburant = async (id: number, options?: RequestInit): Promise<BonCarburant> => {
+
+  return customFetch<BonCarburant>(getSoumettresBonCarburantUrl(id),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+export const getSoumettresBonCarburantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof soumettresBonCarburant>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof soumettresBonCarburant>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['soumettresBonCarburant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof soumettresBonCarburant>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  soumettresBonCarburant(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SoumettresBonCarburantMutationResult = NonNullable<Awaited<ReturnType<typeof soumettresBonCarburant>>>
+
+    export type SoumettresBonCarburantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Soumettre un bon pour approbation
+ */
+export const useSoumettresBonCarburant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof soumettresBonCarburant>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof soumettresBonCarburant>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getSoumettresBonCarburantMutationOptions(options));
+    }
+
+export const getApprouverBonCarburantUrl = (id: number,) => {
+
+
+
+
+  return `/api/transport/carburant/bons/${id}/approuver`
+}
+
+/**
+ * @summary Approuver un bon de carburant
+ */
+export const approuverBonCarburant = async (id: number, options?: RequestInit): Promise<BonCarburant> => {
+
+  return customFetch<BonCarburant>(getApprouverBonCarburantUrl(id),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+export const getApprouverBonCarburantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approuverBonCarburant>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approuverBonCarburant>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['approuverBonCarburant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approuverBonCarburant>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  approuverBonCarburant(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApprouverBonCarburantMutationResult = NonNullable<Awaited<ReturnType<typeof approuverBonCarburant>>>
+
+    export type ApprouverBonCarburantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Approuver un bon de carburant
+ */
+export const useApprouverBonCarburant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approuverBonCarburant>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approuverBonCarburant>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getApprouverBonCarburantMutationOptions(options));
+    }
+
+export const getUtiliserBonCarburantUrl = (id: number,) => {
+
+
+
+
+  return `/api/transport/carburant/bons/${id}/utiliser`
+}
+
+/**
+ * @summary Enregistrer l'utilisation du bon (retour station)
+ */
+export const utiliserBonCarburant = async (id: number,
+    utiliserBonCarburantBody: UtiliserBonCarburantBody, options?: RequestInit): Promise<BonCarburant> => {
+
+  return customFetch<BonCarburant>(getUtiliserBonCarburantUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      utiliserBonCarburantBody,)
+  }
+);}
+
+
+
+
+export const getUtiliserBonCarburantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof utiliserBonCarburant>>, TError,{id: number;data: BodyType<UtiliserBonCarburantBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof utiliserBonCarburant>>, TError,{id: number;data: BodyType<UtiliserBonCarburantBody>}, TContext> => {
+
+const mutationKey = ['utiliserBonCarburant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof utiliserBonCarburant>>, {id: number;data: BodyType<UtiliserBonCarburantBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  utiliserBonCarburant(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UtiliserBonCarburantMutationResult = NonNullable<Awaited<ReturnType<typeof utiliserBonCarburant>>>
+    export type UtiliserBonCarburantMutationBody = BodyType<UtiliserBonCarburantBody>
+    export type UtiliserBonCarburantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer l'utilisation du bon (retour station)
+ */
+export const useUtiliserBonCarburant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof utiliserBonCarburant>>, TError,{id: number;data: BodyType<UtiliserBonCarburantBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof utiliserBonCarburant>>,
+        TError,
+        {id: number;data: BodyType<UtiliserBonCarburantBody>},
+        TContext
+      > => {
+      return useMutation(getUtiliserBonCarburantMutationOptions(options));
+    }
+
+export const getAnnulerBonCarburantUrl = (id: number,) => {
+
+
+
+
+  return `/api/transport/carburant/bons/${id}/annuler`
+}
+
+/**
+ * @summary Annuler un bon de carburant
+ */
+export const annulerBonCarburant = async (id: number, options?: RequestInit): Promise<BonCarburant> => {
+
+  return customFetch<BonCarburant>(getAnnulerBonCarburantUrl(id),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+export const getAnnulerBonCarburantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annulerBonCarburant>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof annulerBonCarburant>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['annulerBonCarburant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof annulerBonCarburant>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  annulerBonCarburant(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnnulerBonCarburantMutationResult = NonNullable<Awaited<ReturnType<typeof annulerBonCarburant>>>
+
+    export type AnnulerBonCarburantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Annuler un bon de carburant
+ */
+export const useAnnulerBonCarburant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annulerBonCarburant>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof annulerBonCarburant>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getAnnulerBonCarburantMutationOptions(options));
+    }
+
+export const getGetBonCarburantPdfUrl = (id: number,) => {
+
+
+
+
+  return `/api/transport/carburant/bons/${id}/pdf`
+}
+
+/**
+ * @summary Générer le PDF du bon de carburant
+ */
+export const getBonCarburantPdf = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetBonCarburantPdfUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBonCarburantPdfQueryKey = (id: number,) => {
+    return [
+    `/api/transport/carburant/bons/${id}/pdf`
+    ] as const;
+    }
+
+
+export const getGetBonCarburantPdfQueryOptions = <TData = Awaited<ReturnType<typeof getBonCarburantPdf>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBonCarburantPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBonCarburantPdfQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBonCarburantPdf>>> = ({ signal }) => getBonCarburantPdf(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBonCarburantPdf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBonCarburantPdfQueryResult = NonNullable<Awaited<ReturnType<typeof getBonCarburantPdf>>>
+export type GetBonCarburantPdfQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Générer le PDF du bon de carburant
+ */
+
+export function useGetBonCarburantPdf<TData = Awaited<ReturnType<typeof getBonCarburantPdf>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBonCarburantPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBonCarburantPdfQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetStatsCarburantUrl = (params?: GetStatsCarburantParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/transport/carburant/stats?${stringifiedParams}` : `/api/transport/carburant/stats`
+}
+
+/**
+ * @summary Statistiques de consommation carburant
+ */
+export const getStatsCarburant = async (params?: GetStatsCarburantParams, options?: RequestInit): Promise<StatsCarburant> => {
+
+  return customFetch<StatsCarburant>(getGetStatsCarburantUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStatsCarburantQueryKey = (params?: GetStatsCarburantParams,) => {
+    return [
+    `/api/transport/carburant/stats`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetStatsCarburantQueryOptions = <TData = Awaited<ReturnType<typeof getStatsCarburant>>, TError = ErrorType<unknown>>(params?: GetStatsCarburantParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStatsCarburant>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStatsCarburantQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStatsCarburant>>> = ({ signal }) => getStatsCarburant(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStatsCarburant>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStatsCarburantQueryResult = NonNullable<Awaited<ReturnType<typeof getStatsCarburant>>>
+export type GetStatsCarburantQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Statistiques de consommation carburant
+ */
+
+export function useGetStatsCarburant<TData = Awaited<ReturnType<typeof getStatsCarburant>>, TError = ErrorType<unknown>>(
+ params?: GetStatsCarburantParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStatsCarburant>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStatsCarburantQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

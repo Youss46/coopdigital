@@ -3831,6 +3831,70 @@ export interface UpdateDepenseVehiculeBody {
   unite?: string;
 }
 
+export interface BonCarburant {
+  id: number;
+  cooperative_id: number;
+  numero: string;
+  vehicule_id: number;
+  immatriculation?: string | null;
+  marque?: string | null;
+  modele?: string | null;
+  chauffeur_id?: number | null;
+  chauffeur_nom?: string | null;
+  type_carburant: string;
+  quantite_autorisee: number;
+  station_service?: string | null;
+  motif?: string | null;
+  date_emission: string;
+  statut: string;
+  approuve_par?: number | null;
+  approuve_par_nom?: string | null;
+  date_approbation?: string | null;
+  date_utilisation?: string | null;
+  quantite_livree?: number | null;
+  prix_litre_fcfa?: number | null;
+  montant_fcfa?: number | null;
+  observations?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CreateBonCarburantBody {
+  vehicule_id: number;
+  chauffeur_id?: number;
+  type_carburant: string;
+  quantite_autorisee: number;
+  station_service?: string;
+  motif?: string;
+  date_emission: string;
+}
+
+export interface UtiliserBonCarburantBody {
+  quantite_livree: number;
+  prix_litre_fcfa?: number;
+  montant_fcfa?: number;
+  date_utilisation: string;
+  station_service?: string;
+  observations?: string;
+}
+
+export type StatsCarburantParVehiculeItem = {
+  vehicule_id?: number;
+  immatriculation?: string | null;
+  marque?: string | null;
+  nb_bons?: number;
+  qte_livree_l?: number;
+  montant_fcfa?: number;
+};
+
+export interface StatsCarburant {
+  nb_bons: number;
+  qte_autorisee_l: number;
+  qte_livree_l: number;
+  montant_total_fcfa: number;
+  par_vehicule: StatsCarburantParVehiculeItem[];
+}
+
 export interface CreateEntretienVehiculeBody {
   type_entretien: string;
   date_entretien: string;
@@ -5026,6 +5090,24 @@ export type DeleteDepenseVehicule200 = {
 
 export type GetRapportCampagneTransportParams = {
 campagne_id?: number;
+};
+
+export type GetBonsCarburantParams = {
+vehicule_id?: number;
+chauffeur_id?: number;
+statut?: string;
+date_debut?: string;
+date_fin?: string;
+};
+
+export type GetBonsCarburant200 = {
+  bons: BonCarburant[];
+};
+
+export type GetStatsCarburantParams = {
+vehicule_id?: number;
+date_debut?: string;
+date_fin?: string;
 };
 
 export type GetBalancesAlertes200 = {

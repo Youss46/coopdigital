@@ -22,6 +22,15 @@ import {
   handleCreateDepenseVehicule,
   handleUpdateDepenseVehicule,
   handleDeleteDepenseVehicule,
+  handleGetBonsCarburant,
+  handleCreateBonCarburant,
+  handleGetBonCarburant,
+  handleSoumettresBonCarburant,
+  handleApprouverBonCarburant,
+  handleUtiliserBonCarburant,
+  handleAnnulerBonCarburant,
+  handleGetBonCarburantPdf,
+  handleGetStatsCarburant,
 } from "../controllers/transportController";
 
 const router = Router();
@@ -48,6 +57,16 @@ router.get("/transport/vehicules/:id/depenses",         authMiddleware, handleGe
 router.post("/transport/vehicules/:id/depenses",        authMiddleware, handleCreateDepenseVehicule);
 router.put("/transport/depenses/:id",                   authMiddleware, handleUpdateDepenseVehicule);
 router.delete("/transport/depenses/:id",                authMiddleware, handleDeleteDepenseVehicule);
+
+router.get("/transport/carburant/bons",                     authMiddleware, handleGetBonsCarburant);
+router.post("/transport/carburant/bons",                    authMiddleware, handleCreateBonCarburant);
+router.get("/transport/carburant/bons/:id",                 authMiddleware, handleGetBonCarburant);
+router.put("/transport/carburant/bons/:id/soumettre",       authMiddleware, handleSoumettresBonCarburant);
+router.put("/transport/carburant/bons/:id/approuver",       authMiddleware, handleApprouverBonCarburant);
+router.put("/transport/carburant/bons/:id/utiliser",        authMiddleware, handleUtiliserBonCarburant);
+router.put("/transport/carburant/bons/:id/annuler",         authMiddleware, handleAnnulerBonCarburant);
+router.get("/transport/carburant/bons/:id/pdf",             authMiddleware, handleGetBonCarburantPdf);
+router.get("/transport/carburant/stats",                    authMiddleware, handleGetStatsCarburant);
 
 router.get("/transport/rapport-campagne",       authMiddleware, handleRapportCampagne);
 router.get("/transport/rapport-vehicule/:id",   authMiddleware, handleRapportVehicule);

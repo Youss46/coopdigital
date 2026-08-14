@@ -6259,6 +6259,284 @@ export const GetRapportCampagneTransportResponse = zod.object({
 
 
 /**
+ * @summary Liste des bons de carburant
+ */
+export const GetBonsCarburantQueryParams = zod.object({
+  "vehicule_id": zod.coerce.number().optional(),
+  "chauffeur_id": zod.coerce.number().optional(),
+  "statut": zod.coerce.string().optional(),
+  "date_debut": zod.date().optional(),
+  "date_fin": zod.date().optional()
+})
+
+export const GetBonsCarburantResponse = zod.object({
+  "bons": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "numero": zod.string(),
+  "vehicule_id": zod.number(),
+  "immatriculation": zod.string().nullish(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "chauffeur_id": zod.number().nullish(),
+  "chauffeur_nom": zod.string().nullish(),
+  "type_carburant": zod.string(),
+  "quantite_autorisee": zod.number(),
+  "station_service": zod.string().nullish(),
+  "motif": zod.string().nullish(),
+  "date_emission": zod.coerce.date(),
+  "statut": zod.string(),
+  "approuve_par": zod.number().nullish(),
+  "approuve_par_nom": zod.string().nullish(),
+  "date_approbation": zod.coerce.date().nullish(),
+  "date_utilisation": zod.coerce.date().nullish(),
+  "quantite_livree": zod.number().nullish(),
+  "prix_litre_fcfa": zod.number().nullish(),
+  "montant_fcfa": zod.number().nullish(),
+  "observations": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date().optional()
+}))
+})
+
+
+/**
+ * @summary Créer un bon de carburant
+ */
+export const CreateBonCarburantBody = zod.object({
+  "vehicule_id": zod.number(),
+  "chauffeur_id": zod.number().optional(),
+  "type_carburant": zod.string(),
+  "quantite_autorisee": zod.number(),
+  "station_service": zod.string().optional(),
+  "motif": zod.string().optional(),
+  "date_emission": zod.coerce.date()
+})
+
+
+/**
+ * @summary Détail d'un bon de carburant
+ */
+export const GetBonCarburantParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBonCarburantResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "numero": zod.string(),
+  "vehicule_id": zod.number(),
+  "immatriculation": zod.string().nullish(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "chauffeur_id": zod.number().nullish(),
+  "chauffeur_nom": zod.string().nullish(),
+  "type_carburant": zod.string(),
+  "quantite_autorisee": zod.number(),
+  "station_service": zod.string().nullish(),
+  "motif": zod.string().nullish(),
+  "date_emission": zod.coerce.date(),
+  "statut": zod.string(),
+  "approuve_par": zod.number().nullish(),
+  "approuve_par_nom": zod.string().nullish(),
+  "date_approbation": zod.coerce.date().nullish(),
+  "date_utilisation": zod.coerce.date().nullish(),
+  "quantite_livree": zod.number().nullish(),
+  "prix_litre_fcfa": zod.number().nullish(),
+  "montant_fcfa": zod.number().nullish(),
+  "observations": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Soumettre un bon pour approbation
+ */
+export const SoumettresBonCarburantParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SoumettresBonCarburantResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "numero": zod.string(),
+  "vehicule_id": zod.number(),
+  "immatriculation": zod.string().nullish(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "chauffeur_id": zod.number().nullish(),
+  "chauffeur_nom": zod.string().nullish(),
+  "type_carburant": zod.string(),
+  "quantite_autorisee": zod.number(),
+  "station_service": zod.string().nullish(),
+  "motif": zod.string().nullish(),
+  "date_emission": zod.coerce.date(),
+  "statut": zod.string(),
+  "approuve_par": zod.number().nullish(),
+  "approuve_par_nom": zod.string().nullish(),
+  "date_approbation": zod.coerce.date().nullish(),
+  "date_utilisation": zod.coerce.date().nullish(),
+  "quantite_livree": zod.number().nullish(),
+  "prix_litre_fcfa": zod.number().nullish(),
+  "montant_fcfa": zod.number().nullish(),
+  "observations": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Approuver un bon de carburant
+ */
+export const ApprouverBonCarburantParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ApprouverBonCarburantResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "numero": zod.string(),
+  "vehicule_id": zod.number(),
+  "immatriculation": zod.string().nullish(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "chauffeur_id": zod.number().nullish(),
+  "chauffeur_nom": zod.string().nullish(),
+  "type_carburant": zod.string(),
+  "quantite_autorisee": zod.number(),
+  "station_service": zod.string().nullish(),
+  "motif": zod.string().nullish(),
+  "date_emission": zod.coerce.date(),
+  "statut": zod.string(),
+  "approuve_par": zod.number().nullish(),
+  "approuve_par_nom": zod.string().nullish(),
+  "date_approbation": zod.coerce.date().nullish(),
+  "date_utilisation": zod.coerce.date().nullish(),
+  "quantite_livree": zod.number().nullish(),
+  "prix_litre_fcfa": zod.number().nullish(),
+  "montant_fcfa": zod.number().nullish(),
+  "observations": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Enregistrer l'utilisation du bon (retour station)
+ */
+export const UtiliserBonCarburantParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UtiliserBonCarburantBody = zod.object({
+  "quantite_livree": zod.number(),
+  "prix_litre_fcfa": zod.number().optional(),
+  "montant_fcfa": zod.number().optional(),
+  "date_utilisation": zod.coerce.date(),
+  "station_service": zod.string().optional(),
+  "observations": zod.string().optional()
+})
+
+export const UtiliserBonCarburantResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "numero": zod.string(),
+  "vehicule_id": zod.number(),
+  "immatriculation": zod.string().nullish(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "chauffeur_id": zod.number().nullish(),
+  "chauffeur_nom": zod.string().nullish(),
+  "type_carburant": zod.string(),
+  "quantite_autorisee": zod.number(),
+  "station_service": zod.string().nullish(),
+  "motif": zod.string().nullish(),
+  "date_emission": zod.coerce.date(),
+  "statut": zod.string(),
+  "approuve_par": zod.number().nullish(),
+  "approuve_par_nom": zod.string().nullish(),
+  "date_approbation": zod.coerce.date().nullish(),
+  "date_utilisation": zod.coerce.date().nullish(),
+  "quantite_livree": zod.number().nullish(),
+  "prix_litre_fcfa": zod.number().nullish(),
+  "montant_fcfa": zod.number().nullish(),
+  "observations": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Annuler un bon de carburant
+ */
+export const AnnulerBonCarburantParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AnnulerBonCarburantResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "numero": zod.string(),
+  "vehicule_id": zod.number(),
+  "immatriculation": zod.string().nullish(),
+  "marque": zod.string().nullish(),
+  "modele": zod.string().nullish(),
+  "chauffeur_id": zod.number().nullish(),
+  "chauffeur_nom": zod.string().nullish(),
+  "type_carburant": zod.string(),
+  "quantite_autorisee": zod.number(),
+  "station_service": zod.string().nullish(),
+  "motif": zod.string().nullish(),
+  "date_emission": zod.coerce.date(),
+  "statut": zod.string(),
+  "approuve_par": zod.number().nullish(),
+  "approuve_par_nom": zod.string().nullish(),
+  "date_approbation": zod.coerce.date().nullish(),
+  "date_utilisation": zod.coerce.date().nullish(),
+  "quantite_livree": zod.number().nullish(),
+  "prix_litre_fcfa": zod.number().nullish(),
+  "montant_fcfa": zod.number().nullish(),
+  "observations": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Générer le PDF du bon de carburant
+ */
+export const GetBonCarburantPdfParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Statistiques de consommation carburant
+ */
+export const GetStatsCarburantQueryParams = zod.object({
+  "vehicule_id": zod.coerce.number().optional(),
+  "date_debut": zod.date().optional(),
+  "date_fin": zod.date().optional()
+})
+
+export const GetStatsCarburantResponse = zod.object({
+  "nb_bons": zod.number(),
+  "qte_autorisee_l": zod.number(),
+  "qte_livree_l": zod.number(),
+  "montant_total_fcfa": zod.number(),
+  "par_vehicule": zod.array(zod.object({
+  "vehicule_id": zod.number().optional(),
+  "immatriculation": zod.string().nullish(),
+  "marque": zod.string().nullish(),
+  "nb_bons": zod.number().optional(),
+  "qte_livree_l": zod.number().optional(),
+  "montant_fcfa": zod.number().optional()
+}))
+})
+
+
+/**
  * @summary Rapport transport d'un véhicule
  */
 export const GetRapportVehiculeTransportParams = zod.object({

@@ -33,7 +33,15 @@ import {
   createDepense,
   updateDepense,
   deleteDepense,
+  getBonsCarburant,
+  getBonCarburant,
+  createBonCarburant,
+  transitionBon,
+  getStatsCarburant,
 } from "../services/transportService";
+import { generateBonCarburant } from "../services/bonCarburantPdf";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 function toDateStr(d: Date | null | undefined): string | null | undefined {
   if (d == null) return d;
@@ -650,6 +658,269 @@ export async function handleDeleteDepenseVehicule(req: Request, res: Response): 
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Erreur deleteDepenseVehicule");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── BONS DE CARBURANT ────────────────────────────────────────────────────────
+
+function mapBon(row: Awaited<ReturnType<typeof getBonsCarburant>>[number], approveParNom?: string | null) {
+  const b = row.bon;
+  return {
+    id:                 b.id,
+    cooperative_id:     b.cooperativeId,
+    numero:             b.numero,
+    vehicule_id:        b.vehiculeId,
+    immatriculation:    row.immatriculation ?? null,
+    marque:             row.marque ?? null,
+    modele:             null,
+    chauffeur_id:       b.chauffeurId ?? null,
+    chauffeur_nom:      row.chauffeurNom ? `${row.chauffeurPrenoms ?? ""} ${row.chauffeurNom}`.trim() : null,
+    type_carburant:     b.typeCarburant,
+    quantite_autorisee: b.quantiteAutorisee != null ? parseFloat(b.quantiteAutorisee) : 0,
+    station_service:    b.stationService ?? null,
+    motif:              b.motif ?? null,
+    date_emission:      b.dateEmission,
+    statut:             b.statut,
+    approuve_par:       b.approvePar ?? null,
+    approuve_par_nom:   approveParNom ?? null,
+    date_approbation:   b.dateApprobation?.toISOString() ?? null,
+    date_utilisation:   b.dateUtilisation ?? null,
+    quantite_livree:    b.quantiteLivree != null ? parseFloat(b.quantiteLivree) : null,
+    prix_litre_fcfa:    b.prixLitreFcfa != null ? parseFloat(b.prixLitreFcfa) : null,
+    montant_fcfa:       b.montantFcfa != null ? parseFloat(b.montantFcfa) : null,
+    observations:       b.observations ?? null,
+    created_at:         b.createdAt.toISOString(),
+    updated_at:         b.updatedAt.toISOString(),
+  };
+}
+
+async function getApproveNom(userId: number | null | undefined): Promise<string | null> {
+  if (!userId) return null;
+  const [u] = await db.select({ nom: usersTable.nom, prenoms: usersTable.prenoms })
+    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  return u ? `${u.prenoms} ${u.nom}`.trim() : null;
+}
+
+export async function handleGetBonsCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const q = req.query as Record<string, string | undefined>;
+    const rows = await getBonsCarburant(cooperativeId, {
+      vehiculeId:  q["vehicule_id"]  ? parseInt(q["vehicule_id"])  : undefined,
+      chauffeurId: q["chauffeur_id"] ? parseInt(q["chauffeur_id"]) : undefined,
+      statut:      q["statut"],
+      dateDebut:   q["date_debut"],
+      dateFin:     q["date_fin"],
+    });
+    res.json({ bons: rows.map(r => mapBon(r)) });
+  } catch (err) {
+    req.log.error({ err }, "Erreur getBonsCarburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleGetBonCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const row = await getBonCarburant(cooperativeId, id);
+    if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
+    const approveParNom = await getApproveNom(row.bon.approvePar);
+    res.json(mapBon(row as Parameters<typeof mapBon>[0], approveParNom));
+  } catch (err) {
+    req.log.error({ err }, "Erreur getBonCarburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleCreateBonCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const userId = req.user!.id;
+    const body = req.body as { vehicule_id: number; chauffeur_id?: number; type_carburant: string; quantite_autorisee: number; station_service?: string; motif?: string; date_emission: string };
+    if (!body.vehicule_id || !body.type_carburant || !body.quantite_autorisee || !body.date_emission) {
+      res.status(400).json({ erreur: "Champs requis manquants" }); return;
+    }
+    const bon = await createBonCarburant(cooperativeId, userId, {
+      vehiculeId:        body.vehicule_id,
+      chauffeurId:       body.chauffeur_id ?? null,
+      typeCarburant:     body.type_carburant,
+      quantiteAutorisee: String(body.quantite_autorisee),
+      stationService:    body.station_service ?? null,
+      motif:             body.motif ?? null,
+      dateEmission:      body.date_emission,
+    });
+    res.status(201).json({ ...bon, immatriculation: null, marque: null, modele: null, chauffeur_nom: null, approuve_par_nom: null });
+  } catch (err) {
+    req.log.error({ err }, "Erreur createBonCarburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleSoumettresBonCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const row = await getBonCarburant(cooperativeId, id);
+    if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
+    if (row.bon.statut !== "brouillon") { res.status(400).json({ erreur: "Le bon n'est pas en brouillon" }); return; }
+    await transitionBon(cooperativeId, id, "soumis");
+    res.json(mapBon({ ...row, bon: { ...row.bon, statut: "soumis", updatedAt: new Date() } }));
+  } catch (err) {
+    req.log.error({ err }, "Erreur soumettresBonCarburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleApprouverBonCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const userId = req.user!.id;
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const row = await getBonCarburant(cooperativeId, id);
+    if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
+    if (row.bon.statut !== "soumis") { res.status(400).json({ erreur: "Le bon doit être soumis pour être approuvé" }); return; }
+    await transitionBon(cooperativeId, id, "approuve", { approvePar: userId, dateApprobation: new Date() });
+    const approveParNom = await getApproveNom(userId);
+    res.json(mapBon({ ...row, bon: { ...row.bon, statut: "approuve", approvePar: userId, dateApprobation: new Date(), updatedAt: new Date() } }, approveParNom));
+  } catch (err) {
+    req.log.error({ err }, "Erreur approuverBonCarburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleUtiliserBonCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const row = await getBonCarburant(cooperativeId, id);
+    if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
+    if (row.bon.statut !== "approuve") { res.status(400).json({ erreur: "Le bon doit être approuvé avant utilisation" }); return; }
+    const body = req.body as { quantite_livree: number; prix_litre_fcfa?: number; montant_fcfa?: number; date_utilisation: string; station_service?: string; observations?: string };
+    if (!body.quantite_livree || !body.date_utilisation) { res.status(400).json({ erreur: "quantite_livree et date_utilisation requis" }); return; }
+
+    // Calcul montant si non fourni
+    const montant = body.montant_fcfa != null ? body.montant_fcfa
+      : (body.prix_litre_fcfa != null ? Math.round(body.quantite_livree * body.prix_litre_fcfa) : null);
+
+    const extra: Record<string, unknown> = {
+      quantiteLivree:  String(body.quantite_livree),
+      dateUtilisation: body.date_utilisation,
+    };
+    if (body.prix_litre_fcfa != null) extra["prixLitreFcfa"] = String(body.prix_litre_fcfa);
+    if (montant != null) extra["montantFcfa"] = String(montant);
+    if (body.station_service)  extra["stationService"] = body.station_service;
+    if (body.observations)     extra["observations"]   = body.observations;
+
+    await transitionBon(cooperativeId, id, "utilise", extra);
+
+    // Créer dépense automatiquement si montant connu
+    if (montant && montant > 0) {
+      const { createDepense } = await import("../services/transportService");
+      await createDepense(cooperativeId, row.bon.vehiculeId, {
+        type:           "carburant",
+        dateDepense:    body.date_utilisation,
+        montantFcfa:    String(montant),
+        libelle:        `Carburant — Bon ${row.bon.numero}`,
+        fournisseur:    body.station_service ?? row.bon.stationService ?? null,
+        referencePiece: row.bon.numero,
+        quantite:       String(body.quantite_livree),
+        unite:          "L",
+        missionId:      null,
+      });
+    }
+
+    res.json(mapBon({
+      ...row,
+      bon: { ...row.bon, statut: "utilise", quantiteLivree: String(body.quantite_livree), dateUtilisation: body.date_utilisation, updatedAt: new Date() },
+    }));
+  } catch (err) {
+    req.log.error({ err }, "Erreur utiliserBonCarburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleAnnulerBonCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const row = await getBonCarburant(cooperativeId, id);
+    if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
+    if (["utilise", "annule"].includes(row.bon.statut)) { res.status(400).json({ erreur: "Ce bon ne peut plus être annulé" }); return; }
+    await transitionBon(cooperativeId, id, "annule");
+    res.json(mapBon({ ...row, bon: { ...row.bon, statut: "annule", updatedAt: new Date() } }));
+  } catch (err) {
+    req.log.error({ err }, "Erreur annulerBonCarburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleGetBonCarburantPdf(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const row = await getBonCarburant(cooperativeId, id);
+    if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
+    const b = row.bon;
+    const approveParNom = await getApproveNom(b.approvePar);
+    const pdfBuffer = await generateBonCarburant(cooperativeId, {
+      id:               b.id,
+      numero:           b.numero,
+      statut:           b.statut,
+      typeCarburant:    b.typeCarburant,
+      quantiteAutorisee: b.quantiteAutorisee,
+      quantiteLivree:   b.quantiteLivree,
+      prixLitreFcfa:    b.prixLitreFcfa,
+      montantFcfa:      b.montantFcfa,
+      dateEmission:     b.dateEmission,
+      dateUtilisation:  b.dateUtilisation,
+      stationService:   b.stationService,
+      motif:            b.motif,
+      observations:     b.observations,
+      immatriculation:  row.immatriculation ?? null,
+      marque:           row.marque ?? null,
+      modele:           row.modele ?? null,
+      chauffeurNom:     row.chauffeurNom ?? null,
+      chauffeurPrenoms: row.chauffeurPrenoms ?? null,
+      approveParNom,
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="bon-carburant-${b.numero}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getBonCarburantPdf");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleGetStatsCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const q = req.query as Record<string, string | undefined>;
+    const stats = await getStatsCarburant(cooperativeId, {
+      vehiculeId: q["vehicule_id"] ? parseInt(q["vehicule_id"]) : undefined,
+      dateDebut:  q["date_debut"],
+      dateFin:    q["date_fin"],
+    });
+    res.json(stats);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getStatsCarburant");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

@@ -2,6 +2,7 @@ import {
   pgTable, serial, integer, varchar, numeric, text, boolean, date, timestamp,
 } from "drizzle-orm/pg-core";
 import { cooperativesTable } from "./cooperatives";
+import { usersTable } from "./users";
 
 export const vehiculesTable = pgTable("vehicules", {
   id:                       serial("id").primaryKey(),
@@ -88,6 +89,30 @@ export const entretienVehiculeTable = pgTable("entretiens_vehicule", {
   createdAt:              timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const bonsCarburantTable = pgTable("bons_carburant", {
+  id:                 serial("id").primaryKey(),
+  cooperativeId:      integer("cooperative_id").notNull().references(() => cooperativesTable.id),
+  numero:             varchar("numero", { length: 50 }).notNull(),
+  vehiculeId:         integer("vehicule_id").notNull().references(() => vehiculesTable.id),
+  chauffeurId:        integer("chauffeur_id").references(() => chauffeursTable.id),
+  typeCarburant:      varchar("type_carburant", { length: 20 }).notNull().default("gasoil"),
+  quantiteAutorisee:  numeric("quantite_autorisee", { precision: 10, scale: 3 }).notNull(),
+  stationService:     varchar("station_service", { length: 255 }),
+  motif:              text("motif"),
+  dateEmission:       date("date_emission", { mode: "string" }).notNull(),
+  statut:             varchar("statut", { length: 20 }).notNull().default("brouillon"),
+  approvePar:         integer("approuve_par").references(() => usersTable.id),
+  dateApprobation:    timestamp("date_approbation", { withTimezone: true }),
+  dateUtilisation:    date("date_utilisation", { mode: "string" }),
+  quantiteLivree:     numeric("quantite_livree", { precision: 10, scale: 3 }),
+  prixLitreFcfa:      numeric("prix_litre_fcfa", { precision: 10, scale: 2 }),
+  montantFcfa:        numeric("montant_fcfa", { precision: 14, scale: 2 }),
+  observations:       text("observations"),
+  createdBy:          integer("created_by").references(() => usersTable.id),
+  createdAt:          timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:          timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const depensesVehiculeTable = pgTable("depenses_vehicule", {
   id:             serial("id").primaryKey(),
   cooperativeId:  integer("cooperative_id").notNull().references(() => cooperativesTable.id),
@@ -110,3 +135,4 @@ export type Chauffeur = typeof chauffeursTable.$inferSelect;
 export type MissionTransport = typeof missionsTransportTable.$inferSelect;
 export type EntretienVehicule = typeof entretienVehiculeTable.$inferSelect;
 export type DepenseVehicule = typeof depensesVehiculeTable.$inferSelect;
+export type BonCarburant = typeof bonsCarburantTable.$inferSelect;

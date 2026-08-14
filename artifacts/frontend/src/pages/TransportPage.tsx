@@ -20,14 +20,22 @@ import {
   useCreateDepenseVehicule,
   useUpdateDepenseVehicule,
   useDeleteDepenseVehicule,
+  useGetBonsCarburant,
+  useCreateBonCarburant,
+  useSoumettresBonCarburant,
+  useApprouverBonCarburant,
+  useUtiliserBonCarburant,
+  useAnnulerBonCarburant,
+  useGetStatsCarburant,
   getGetVehiculesQueryKey,
   getGetChauffeursQueryKey,
   getGetMissionsQueryKey,
   getGetTransportAlertesQueryKey,
   getGetRapportCampagneTransportQueryKey,
   getGetDepensesTransportQueryKey,
+  getGetBonsCarburantQueryKey,
 } from "@workspace/api-client-react";
-import type { DepenseVehicule } from "@workspace/api-client-react";
+import type { DepenseVehicule, BonCarburant } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -81,6 +89,11 @@ import {
   Fuel,
   Package,
   Filter,
+  FileText,
+  Send,
+  ThumbsUp,
+  Droplets,
+  Ban,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1381,6 +1394,474 @@ function TabMaintenance() {
   );
 }
 
+// ─── Onglet Bons de carburant ─────────────────────────────────────────────────
+
+const STATUT_BON: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  brouillon: { label: "Brouillon",  color: "bg-gray-100 text-gray-700",   icon: <FileText className="h-3 w-3" /> },
+  soumis:    { label: "Soumis",     color: "bg-blue-100 text-blue-800",    icon: <Send className="h-3 w-3" /> },
+  approuve:  { label: "Approuvé",   color: "bg-green-100 text-green-800",  icon: <ThumbsUp className="h-3 w-3" /> },
+  utilise:   { label: "Utilisé",    color: "bg-emerald-100 text-emerald-800", icon: <Droplets className="h-3 w-3" /> },
+  annule:    { label: "Annulé",     color: "bg-red-100 text-red-800",      icon: <Ban className="h-3 w-3" /> },
+};
+
+const CARBURANT_TYPES = [
+  { value: "gasoil",  label: "Gasoil" },
+  { value: "essence", label: "Essence" },
+  { value: "super",   label: "Super" },
+];
+
+interface BonForm {
+  vehicule_id: string;
+  chauffeur_id: string;
+  type_carburant: string;
+  quantite_autorisee: number | "";
+  station_service: string;
+  motif: string;
+  date_emission: string;
+}
+
+interface UtiliserForm {
+  quantite_livree: number | "";
+  prix_litre_fcfa: number | "";
+  date_utilisation: string;
+  station_service: string;
+  observations: string;
+}
+
+const EMPTY_BON_FORM: BonForm = {
+  vehicule_id: "",
+  chauffeur_id: "",
+  type_carburant: "gasoil",
+  quantite_autorisee: "",
+  station_service: "",
+  motif: "",
+  date_emission: new Date().toISOString().split("T")[0],
+};
+
+const EMPTY_UTILISER_FORM: UtiliserForm = {
+  quantite_livree: "",
+  prix_litre_fcfa: "",
+  date_utilisation: new Date().toISOString().split("T")[0],
+  station_service: "",
+  observations: "",
+};
+
+function statutBonBadge(statut: string) {
+  const s = STATUT_BON[statut] ?? { label: statut, color: "bg-gray-100 text-gray-700", icon: null };
+  return (
+    <Badge className={`${s.color} flex items-center gap-1`}>{s.icon}{s.label}</Badge>
+  );
+}
+
+function TabCarburant() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const vehiculesQ = useGetVehicules();
+  const vehicules  = vehiculesQ.data?.vehicules ?? [];
+  const chauffeursQ = useGetChauffeurs();
+  const chauffeurs  = chauffeursQ.data?.chauffeurs ?? [];
+
+  // Filtres liste
+  const [filterVehicule, setFilterVehicule] = useState("all");
+  const [filterStatut,   setFilterStatut]   = useState("all");
+  const [filterDebut,    setFilterDebut]    = useState("");
+  const [filterFin,      setFilterFin]      = useState("");
+  const [view, setView] = useState<"liste" | "stats">("liste");
+
+  const bonsParams = {
+    ...(filterVehicule !== "all" ? { vehicule_id: parseInt(filterVehicule) } : {}),
+    ...(filterStatut   !== "all" ? { statut: filterStatut } : {}),
+    ...(filterDebut ? { date_debut: filterDebut } : {}),
+    ...(filterFin   ? { date_fin:   filterFin }   : {}),
+  };
+  const bonsQ  = useGetBonsCarburant(bonsParams);
+  const bons   = bonsQ.data?.bons ?? [];
+  const statsQ = useGetStatsCarburant();
+  const stats  = statsQ.data;
+
+  // Dialogs
+  const [showCreate, setShowCreate]       = useState(false);
+  const [showUtiliser, setShowUtiliser]   = useState(false);
+  const [selectedBon, setSelectedBon]     = useState<BonCarburant | null>(null);
+  const [form,   setForm]   = useState<BonForm>(EMPTY_BON_FORM);
+  const [uForm,  setUForm]  = useState<UtiliserForm>(EMPTY_UTILISER_FORM);
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: getGetBonsCarburantQueryKey() });
+
+  const createMut = useCreateBonCarburant({ mutation: {
+    onSuccess: () => { toast({ title: "Bon créé" }); setShowCreate(false); invalidate(); },
+    onError:   () => toast({ title: "Erreur", variant: "destructive" }),
+  }});
+  const soumMut = useSoumettresBonCarburant({ mutation: {
+    onSuccess: () => { toast({ title: "Bon soumis pour approbation" }); invalidate(); },
+    onError:   () => toast({ title: "Erreur", variant: "destructive" }),
+  }});
+  const appMut = useApprouverBonCarburant({ mutation: {
+    onSuccess: () => { toast({ title: "Bon approuvé ✓" }); invalidate(); },
+    onError:   () => toast({ title: "Erreur", variant: "destructive" }),
+  }});
+  const utilMut = useUtiliserBonCarburant({ mutation: {
+    onSuccess: () => { toast({ title: "Utilisation enregistrée — dépense créée" }); setShowUtiliser(false); invalidate(); },
+    onError:   () => toast({ title: "Erreur", variant: "destructive" }),
+  }});
+  const annMut = useAnnulerBonCarburant({ mutation: {
+    onSuccess: () => { toast({ title: "Bon annulé" }); invalidate(); },
+    onError:   () => toast({ title: "Erreur", variant: "destructive" }),
+  }});
+
+  // Calcul montant auto
+  const montantEstime = uForm.quantite_livree !== "" && uForm.prix_litre_fcfa !== ""
+    ? Math.round(Number(uForm.quantite_livree) * Number(uForm.prix_litre_fcfa))
+    : null;
+
+  function handleCreate() {
+    if (!form.vehicule_id || !form.quantite_autorisee || !form.date_emission) return;
+    createMut.mutate({ data: {
+      vehicule_id:        parseInt(form.vehicule_id),
+      ...(form.chauffeur_id ? { chauffeur_id: parseInt(form.chauffeur_id) } : {}),
+      type_carburant:     form.type_carburant,
+      quantite_autorisee: Number(form.quantite_autorisee),
+      ...(form.station_service ? { station_service: form.station_service } : {}),
+      ...(form.motif           ? { motif: form.motif }                     : {}),
+      date_emission: form.date_emission,
+    }});
+  }
+
+  function handleUtiliser() {
+    if (!selectedBon || !uForm.quantite_livree || !uForm.date_utilisation) return;
+    utilMut.mutate({ id: selectedBon.id, data: {
+      quantite_livree:  Number(uForm.quantite_livree),
+      date_utilisation: uForm.date_utilisation,
+      ...(uForm.prix_litre_fcfa !== "" ? { prix_litre_fcfa: Number(uForm.prix_litre_fcfa) } : {}),
+      ...(montantEstime != null        ? { montant_fcfa: montantEstime }                     : {}),
+      ...(uForm.station_service        ? { station_service: uForm.station_service }          : {}),
+      ...(uForm.observations           ? { observations: uForm.observations }                : {}),
+    }});
+  }
+
+  function openPdf(bon: BonCarburant) {
+    window.open(`/api/transport/carburant/bons/${bon.id}/pdf`, "_blank");
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Barre de vues */}
+      <div className="flex gap-2 border-b pb-2">
+        <Button size="sm" variant={view === "liste"  ? "default" : "outline"} onClick={() => setView("liste")}>
+          <FileText className="h-4 w-4 mr-1" /> Bons
+        </Button>
+        <Button size="sm" variant={view === "stats"  ? "default" : "outline"} onClick={() => setView("stats")}>
+          <BarChart3 className="h-4 w-4 mr-1" /> Statistiques
+        </Button>
+      </div>
+
+      {view === "stats" ? (
+        /* ─── Vue statistiques ─────────────────────────────────────────── */
+        <div className="space-y-4">
+          {stats && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Card className="p-3">
+                  <div className="text-xs text-gray-500">Bons utilisés</div>
+                  <div className="text-2xl font-bold">{stats.nb_bons}</div>
+                </Card>
+                <Card className="p-3">
+                  <div className="text-xs text-gray-500">Qté autorisée</div>
+                  <div className="text-2xl font-bold">{stats.qte_autorisee_l.toFixed(0)} <span className="text-sm font-normal">L</span></div>
+                </Card>
+                <Card className="p-3">
+                  <div className="text-xs text-gray-500">Qté livrée</div>
+                  <div className="text-2xl font-bold text-green-700">{stats.qte_livree_l.toFixed(0)} <span className="text-sm font-normal">L</span></div>
+                </Card>
+                <Card className="p-3">
+                  <div className="text-xs text-gray-500">Coût total</div>
+                  <div className="text-xl font-bold">{formatFcfa(stats.montant_total_fcfa)}</div>
+                </Card>
+              </div>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Consommation par véhicule</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Immatriculation</TableHead>
+                        <TableHead>Marque</TableHead>
+                        <TableHead className="text-right">Bons</TableHead>
+                        <TableHead className="text-right">Litres livrés</TableHead>
+                        <TableHead className="text-right">Montant</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stats.par_vehicule.map((v, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-mono text-sm">{v.immatriculation ?? "—"}</TableCell>
+                          <TableCell className="text-sm">{v.marque ?? "—"}</TableCell>
+                          <TableCell className="text-right">{v.nb_bons}</TableCell>
+                          <TableCell className="text-right font-semibold">{(v.qte_livree_l ?? 0).toFixed(1)} L</TableCell>
+                          <TableCell className="text-right">{formatFcfa(v.montant_fcfa)}</TableCell>
+                        </TableRow>
+                      ))}
+                      {stats.par_vehicule.length === 0 && (
+                        <TableRow><TableCell colSpan={5} className="text-center text-gray-400 py-6">Aucune donnée</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
+      ) : (
+        /* ─── Vue liste ────────────────────────────────────────────────── */
+        <div className="space-y-4">
+          {/* Filtres + créer */}
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="flex-1 min-w-[140px]">
+              <Label className="text-xs">Véhicule</Label>
+              <Select value={filterVehicule} onValueChange={setFilterVehicule}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  {vehicules.map(v => <SelectItem key={v.id} value={String(v.id)}>{v.immatriculation}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-w-[130px]">
+              <Label className="text-xs">Statut</Label>
+              <Select value={filterStatut} onValueChange={setFilterStatut}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  {Object.entries(STATUT_BON).map(([v, s]) => <SelectItem key={v} value={v}>{s.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Du</Label>
+              <Input type="date" className="h-8 text-sm w-36" value={filterDebut} onChange={e => setFilterDebut(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Au</Label>
+              <Input type="date" className="h-8 text-sm w-36" value={filterFin} onChange={e => setFilterFin(e.target.value)} />
+            </div>
+            <Button size="sm" onClick={() => { setForm({ ...EMPTY_BON_FORM, vehicule_id: vehicules[0] ? String(vehicules[0].id) : "" }); setShowCreate(true); }}>
+              <Plus className="h-4 w-4 mr-1" /> Nouveau bon
+            </Button>
+          </div>
+
+          {/* Table bons */}
+          {bons.length === 0 ? (
+            <Card className="p-12 text-center">
+              <Fuel className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500 text-sm">Aucun bon de carburant</p>
+              <p className="text-gray-400 text-xs mt-1">Créez un bon, soumettez-le, puis approuvez-le avant utilisation</p>
+              <Button size="sm" className="mt-4" onClick={() => { setForm({ ...EMPTY_BON_FORM, vehicule_id: vehicules[0] ? String(vehicules[0].id) : "" }); setShowCreate(true); }}>
+                <Plus className="h-4 w-4 mr-1" /> Nouveau bon
+              </Button>
+            </Card>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>N° Bon</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Véhicule</TableHead>
+                    <TableHead>Chauffeur</TableHead>
+                    <TableHead>Carburant</TableHead>
+                    <TableHead className="text-right">Qté auto.</TableHead>
+                    <TableHead className="text-right">Qté livrée</TableHead>
+                    <TableHead>Station</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead className="w-36" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bons.map(bon => (
+                    <TableRow key={bon.id}>
+                      <TableCell className="font-mono text-xs font-semibold text-green-700">{bon.numero}</TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">{formatDate(bon.date_emission)}</TableCell>
+                      <TableCell className="text-sm font-mono">{bon.immatriculation ?? "—"}</TableCell>
+                      <TableCell className="text-sm">{bon.chauffeur_nom ?? "—"}</TableCell>
+                      <TableCell className="text-sm">{CARBURANT_TYPES.find(t => t.value === bon.type_carburant)?.label ?? bon.type_carburant}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold">{bon.quantite_autorisee} L</TableCell>
+                      <TableCell className="text-right text-sm">{bon.quantite_livree != null ? `${bon.quantite_livree} L` : "—"}</TableCell>
+                      <TableCell className="text-sm text-gray-500 max-w-[100px] truncate">{bon.station_service ?? "—"}</TableCell>
+                      <TableCell>{statutBonBadge(bon.statut)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1 justify-end">
+                          {bon.statut === "brouillon" && (
+                            <Button size="sm" variant="outline" className="h-7 text-xs"
+                              onClick={() => soumMut.mutate({ id: bon.id })}>
+                              <Send className="h-3 w-3 mr-1" /> Soumettre
+                            </Button>
+                          )}
+                          {bon.statut === "soumis" && (
+                            <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                              onClick={() => appMut.mutate({ id: bon.id })}>
+                              <ThumbsUp className="h-3 w-3 mr-1" /> Approuver
+                            </Button>
+                          )}
+                          {bon.statut === "approuve" && (
+                            <Button size="sm" className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
+                              onClick={() => { setSelectedBon(bon); setUForm({ ...EMPTY_UTILISER_FORM, station_service: bon.station_service ?? "" }); setShowUtiliser(true); }}>
+                              <Droplets className="h-3 w-3 mr-1" /> Utiliser
+                            </Button>
+                          )}
+                          {!["utilise","annule"].includes(bon.statut) && (
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500"
+                              onClick={() => { if (confirm("Annuler ce bon ?")) annMut.mutate({ id: bon.id }); }}>
+                              <Ban className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openPdf(bon)}>
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ── Dialog création ── */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Nouveau bon de carburant</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Véhicule *</Label>
+                <Select value={form.vehicule_id} onValueChange={v => setForm(f => ({ ...f, vehicule_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
+                  <SelectContent>
+                    {vehicules.map(v => <SelectItem key={v.id} value={String(v.id)}>{v.immatriculation} — {v.marque ?? ""}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Chauffeur</Label>
+                <Select value={form.chauffeur_id} onValueChange={v => setForm(f => ({ ...f, chauffeur_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Aucun" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Aucun</SelectItem>
+                    {chauffeurs.filter(c => c.statut === "actif").map(c => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.prenoms ?? ""} {c.nom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Type de carburant *</Label>
+                <Select value={form.type_carburant} onValueChange={v => setForm(f => ({ ...f, type_carburant: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CARBURANT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Quantité autorisée (L) *</Label>
+                <Input type="number" min={1} step="any" placeholder="50" value={form.quantite_autorisee}
+                  onChange={e => setForm(f => ({ ...f, quantite_autorisee: e.target.value === "" ? "" : parseFloat(e.target.value) }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Date d'émission *</Label>
+                <Input type="date" value={form.date_emission}
+                  onChange={e => setForm(f => ({ ...f, date_emission: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Station-service</Label>
+                <Input placeholder="Nom de la station" value={form.station_service}
+                  onChange={e => setForm(f => ({ ...f, station_service: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label>Motif</Label>
+              <Input placeholder="Ex : Mission de collecte à Agboville" value={form.motif}
+                onChange={e => setForm(f => ({ ...f, motif: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
+            <Button onClick={handleCreate} disabled={!form.vehicule_id || !form.quantite_autorisee || createMut.isPending}>
+              Créer le bon
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog utilisation ── */}
+      <Dialog open={showUtiliser} onOpenChange={setShowUtiliser}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enregistrer l'utilisation</DialogTitle>
+            {selectedBon && (
+              <p className="text-sm text-gray-500">
+                Bon {selectedBon.numero} — {selectedBon.immatriculation} — autorisé : <strong>{selectedBon.quantite_autorisee} L</strong>
+              </p>
+            )}
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Quantité réellement livrée (L) *</Label>
+                <Input type="number" min={0} step="any" placeholder="0" value={uForm.quantite_livree}
+                  onChange={e => setUForm(f => ({ ...f, quantite_livree: e.target.value === "" ? "" : parseFloat(e.target.value) }))} />
+              </div>
+              <div>
+                <Label>Date d'utilisation *</Label>
+                <Input type="date" value={uForm.date_utilisation}
+                  onChange={e => setUForm(f => ({ ...f, date_utilisation: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Prix au litre (FCFA)</Label>
+                <Input type="number" min={0} step="any" placeholder="Prix/L" value={uForm.prix_litre_fcfa}
+                  onChange={e => setUForm(f => ({ ...f, prix_litre_fcfa: e.target.value === "" ? "" : parseFloat(e.target.value) }))} />
+              </div>
+              <div>
+                <Label>Montant estimé</Label>
+                <div className="h-9 flex items-center px-3 rounded-md border bg-gray-50 text-sm font-semibold">
+                  {montantEstime != null ? formatFcfa(montantEstime) : "—"}
+                </div>
+              </div>
+            </div>
+            <div>
+              <Label>Station-service</Label>
+              <Input placeholder="Nom de la station" value={uForm.station_service}
+                onChange={e => setUForm(f => ({ ...f, station_service: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Observations</Label>
+              <Input placeholder="Remarques éventuelles" value={uForm.observations}
+                onChange={e => setUForm(f => ({ ...f, observations: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUtiliser(false)}>Annuler</Button>
+            <Button onClick={handleUtiliser} disabled={!uForm.quantite_livree || !uForm.date_utilisation || utilMut.isPending}>
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // ─── Onglet Dépenses véhicules ────────────────────────────────────────────────
 
 const TYPE_DEPENSE = [
@@ -1742,7 +2223,7 @@ export default function TransportPage() {
       </div>
 
       <Tabs defaultValue="flotte">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="flotte" className="flex items-center gap-1.5">
             <Truck className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline truncate">Flotte</span>
@@ -1759,6 +2240,10 @@ export default function TransportPage() {
             <Wrench className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline truncate">Maintenance</span>
           </TabsTrigger>
+          <TabsTrigger value="carburant" className="flex items-center gap-1.5">
+            <Fuel className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Carburant</span>
+          </TabsTrigger>
           <TabsTrigger value="depenses" className="flex items-center gap-1.5">
             <Receipt className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline truncate">Dépenses</span>
@@ -1773,6 +2258,7 @@ export default function TransportPage() {
         <TabsContent value="chauffeurs" className="mt-6"><TabChauffeurs /></TabsContent>
         <TabsContent value="missions" className="mt-6"><TabMissions /></TabsContent>
         <TabsContent value="maintenance" className="mt-6"><TabMaintenance /></TabsContent>
+        <TabsContent value="carburant" className="mt-6"><TabCarburant /></TabsContent>
         <TabsContent value="depenses" className="mt-6"><TabDepenses /></TabsContent>
         <TabsContent value="rapports" className="mt-6"><TabRapports /></TabsContent>
       </Tabs>
