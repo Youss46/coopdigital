@@ -72,6 +72,10 @@ export default function BonsCarburantChauffeur() {
   const [qrToken, setQrToken] = useState<{ payload: string; sig: string } | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
+  // qrExpMs: expiry timestamp (ms) parsed from the signed payload; null if unavailable.
+  const [qrExpMs, setQrExpMs] = useState<number | null>(null);
+  // qrExpired: true once Date.now() >= qrExpMs; driven by a timer, not inline Date.now().
+  const [qrExpired, setQrExpired] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<UtiliserForm>({
     quantite_livree: "", prix_litre_fcfa: "",
@@ -93,6 +97,8 @@ export default function BonsCarburantChauffeur() {
   const fetchQrToken = useCallback(async (bon: BonCarburant): Promise<boolean> => {
     setQrLoading(true);
     setQrError(null);
+    setQrExpMs(null);
+    setQrExpired(false);
     try {
       // apiGet ajoute automatiquement le token Bearer terrain et cible /api/terrain/*
       const tok = await apiGet<{ payload: string; sig: string; spki?: string }>(
@@ -111,6 +117,30 @@ export default function BonsCarburantChauffeur() {
       setQrLoading(false);
     }
   }, []);
+
+  // Parse exp from the QR payload whenever the token changes, and schedule a
+  // one-shot timer that flips qrExpired to true exactly when the token expires.
+  useEffect(() => {
+    if (!qrToken) {
+      setQrExpMs(null);
+      setQrExpired(false);
+      return;
+    }
+    let exp: number | null = null;
+    try {
+      const json = JSON.parse(
+        atob(qrToken.payload.replace(/-/g, "+").replace(/_/g, "/")),
+      ) as { exp?: number };
+      if (typeof json.exp === "number" && Number.isFinite(json.exp)) exp = json.exp;
+    } catch { /* ignore malformed payload */ }
+    setQrExpMs(exp);
+    setQrExpired(exp !== null && exp < Date.now());
+    if (exp === null) return;
+    const delay = exp - Date.now();
+    if (delay <= 0) return; // already expired at parse time
+    const timer = setTimeout(() => setQrExpired(true), delay);
+    return () => clearTimeout(timer);
+  }, [qrToken]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -316,7 +346,8 @@ export default function BonsCarburantChauffeur() {
                 : `${base}/station/${encodeURIComponent(qrBon.numero)}`;
               return (
                 <>
-                  <div className="p-3 bg-white rounded-xl border border-gray-100 relative">
+                  {/* QR image — dimmed when expired */}
+                  <div className={`p-3 bg-white rounded-xl border border-gray-100 relative transition-opacity ${qrExpired ? "opacity-40" : ""}`}>
                     {qrLoading && (
                       <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
                         <div className="h-6 w-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
@@ -324,24 +355,45 @@ export default function BonsCarburantChauffeur() {
                     )}
                     <QRCode value={stationUrl} size={220} level="M" />
                   </div>
+
+                  {/* Expiry / status line — driven by qrExpired state (timer-backed) */}
                   {qrError ? (
                     <div className="flex items-center gap-1.5 text-red-600 text-xs text-center">
                       <AlertCircle className="h-4 w-4 flex-shrink-0" />
                       <span>{qrError}</span>
                     </div>
                   ) : qrToken ? (
-                    <p className="text-xs text-green-600 text-center flex items-center gap-1">
-                      <span>🔒</span> QR signé — lisible hors connexion
-                    </p>
+                    qrExpMs !== null ? (
+                      qrExpired ? (
+                        <p className="text-xs text-red-600 text-center font-medium flex items-center justify-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                          Expiré — rafraîchissez
+                        </p>
+                      ) : (
+                        <p className="text-xs text-green-600 text-center flex items-center justify-center gap-1">
+                          <span>🔒</span> Valide jusqu'au{" "}
+                          {new Date(qrExpMs).toLocaleString("fr-FR", {
+                            day: "2-digit", month: "short", year: "numeric",
+                            hour: "2-digit", minute: "2-digit",
+                          })}
+                        </p>
+                      )
+                    ) : (
+                      <p className="text-xs text-green-600 text-center flex items-center justify-center gap-1">
+                        <span>🔒</span> QR signé — lisible hors connexion
+                      </p>
+                    )
                   ) : (
                     <p className="text-xs text-amber-600 text-center">
                       {qrLoading ? "Génération du QR sécurisé…" : "QR simple (connexion requise à la station)"}
                     </p>
                   )}
+
+                  {/* Rafraîchir — highlighted in red when expired */}
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-full"
+                    className={`w-full ${qrExpired ? "border-red-400 text-red-600 hover:bg-red-50" : ""}`}
                     disabled={qrLoading}
                     onClick={async () => { await fetchQrToken(qrBon); }}>
                     <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${qrLoading ? "animate-spin" : ""}`} />
