@@ -925,6 +925,29 @@ export async function handleAnnulerBonCarburant(req: Request, res: Response): Pr
     if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
     if (["utilise", "annule"].includes(row.bon.statut)) { res.status(400).json({ erreur: "Ce bon ne peut plus être annulé" }); return; }
     await transitionBon(cooperativeId, id, "annule");
+
+    // Push notification → chauffeur (fire-and-forget)
+    if (row.bon.chauffeurId) {
+      void (async () => {
+        try {
+          const [userRow] = await db
+            .select({ id: usersTable.id })
+            .from(usersTable)
+            .where(eq(usersTable.chauffeurId, row.bon.chauffeurId!))
+            .limit(1);
+          if (userRow) {
+            await envoyerPushGroupe([userRow.id], {
+              title: "Bon carburant annulé",
+              body:  `Votre bon ${row.bon.numero} a été annulé. Contactez votre responsable.`,
+              url:   "./bons-carburant",
+            });
+          }
+        } catch (e) {
+          req.log.error({ err: e }, "Push annulation bon carburant échoué");
+        }
+      })();
+    }
+
     res.json(mapBon({ ...row, bon: { ...row.bon, statut: "annule", updatedAt: new Date() } }));
   } catch (err) {
     req.log.error({ err }, "Erreur annulerBonCarburant");
