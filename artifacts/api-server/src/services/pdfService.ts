@@ -1007,7 +1007,7 @@ async function drawBulletinOnDoc(
   { bulletin, agent, avantages, retenues }: BulletinData,
 ): Promise<void> {
   // ── Constantes de mise en page ─────────────────────────────────────────────
-  const REF      = `BP-${bulletin.annee}-${String(bulletin.mois).padStart(2,"0")}-${String(bulletin.personnelId).padStart(3,"0")}`;
+  const REF      = `BP-${bulletin.annee}-${String(bulletin.mois).padStart(2,"0")}-${String(bulletin.id).padStart(5,"0")}`;
   const W        = PAGE_W - MARGIN * 2;         // 495 pt
   const DARK     = "#0f2d1f";                    // vert très sombre pour titres
   const ACCENT   = "#e8f5ef";                    // vert très pale pour alternance
