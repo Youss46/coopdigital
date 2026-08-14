@@ -614,6 +614,26 @@ export async function handleCreateDepenseVehicule(req: Request, res: Response): 
       quantite:       body.quantite != null ? String(body.quantite) : null,
       unite:          body.unite ?? null,
     });
+
+    // Écriture comptable OHADA selon le type de dépense
+    const compteDebitDepense: Record<string, string> = {
+      carburant:      "6042", // Carburant et lubrifiant
+      reparation:     "624",  // Entretien, réparations et maintenance
+      piece_rechange: "624",  // Entretien, réparations et maintenance
+      autre:          "628",  // Frais divers
+    };
+    const compteDebit = compteDebitDepense[body.type] ?? "628";
+    if (body.montant_fcfa > 0) {
+      void proposerEcriture(cooperativeId, {
+        source: "transport", sourceId: depense.id,
+        libelle: body.libelle,
+        compteDebit, compteCredit: "521",
+        montantFcfa: Math.round(body.montant_fcfa),
+        date: toDateStr(new Date(body.date_depense))!,
+        numeroPiece: `DEP-${depense.id}`,
+      });
+    }
+
     res.status(201).json(mapDepense({ depense, immatriculation: null }));
   } catch (err) {
     req.log.error({ err }, "Erreur createDepenseVehicule");
@@ -825,10 +845,10 @@ export async function handleUtiliserBonCarburant(req: Request, res: Response): P
 
     await transitionBon(cooperativeId, id, "utilise", extra);
 
-    // Créer dépense automatiquement si montant connu
+    // Créer dépense automatiquement si montant connu + écriture comptable
     if (montant && montant > 0) {
       const { createDepense } = await import("../services/transportService");
-      await createDepense(cooperativeId, row.bon.vehiculeId, {
+      const depense = await createDepense(cooperativeId, row.bon.vehiculeId, {
         type:           "carburant",
         dateDepense:    body.date_utilisation,
         montantFcfa:    String(montant),
@@ -838,6 +858,15 @@ export async function handleUtiliserBonCarburant(req: Request, res: Response): P
         quantite:       String(body.quantite_livree),
         unite:          "L",
         missionId:      null,
+      });
+      // Écriture OHADA : 6042 Carburant / 521 Caisse
+      void proposerEcriture(cooperativeId, {
+        source: "transport", sourceId: depense.id,
+        libelle: `Carburant — Bon ${row.bon.numero} (${body.quantite_livree} L)`,
+        compteDebit: "6042", compteCredit: "521",
+        montantFcfa: Math.round(montant),
+        date: body.date_utilisation,
+        numeroPiece: row.bon.numero,
       });
     }
 
