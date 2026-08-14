@@ -197,11 +197,13 @@ export async function genererDeclarationsMensuelles(cooperativeId: number, mois:
     let montantCalcule = 0;
 
     if (obl.typeTaxe === "cnps" && obl.libelle.toLowerCase().includes("salariale")) {
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.032;
       baseImposable  = bases.totalBrut;
-      montantCalcule = Math.round(bases.totalBrut * 0.032);
+      montantCalcule = Math.round(bases.totalBrut * taux);
     } else if (obl.typeTaxe === "cnps" && obl.libelle.toLowerCase().includes("patronale")) {
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.077;
       baseImposable  = bases.totalBrut;
-      montantCalcule = Math.round(bases.totalBrut * 0.077);
+      montantCalcule = Math.round(bases.totalBrut * taux);
     } else if (obl.typeTaxe === "its") {
       baseImposable  = bases.totalBrut;
       montantCalcule = bases.totalIts;
@@ -277,11 +279,13 @@ export async function genererDeclarationsAnnuelles(cooperativeId: number, annee:
     let montantCalcule = 0;
 
     if (obl.typeTaxe === "taxe_apprentissage") {
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.005;
       baseImposable  = bases.totalBrut;
-      montantCalcule = bases.totalTa > 0 ? bases.totalTa : Math.round(bases.totalBrut * 0.005);
+      montantCalcule = Math.round(bases.totalBrut * taux);
     } else if (obl.typeTaxe === "fpc") {
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.012;
       baseImposable  = bases.totalBrut;
-      montantCalcule = bases.totalFpc > 0 ? bases.totalFpc : Math.round(bases.totalBrut * 0.012);
+      montantCalcule = Math.round(bases.totalBrut * taux);
     } else if (obl.typeTaxe === "impot_societes") {
       baseImposable  = 0;
       montantCalcule = 0; // calculé manuellement par le comptable
@@ -363,11 +367,13 @@ export async function recalculerDeclaration(cooperativeId: number, id: number): 
     const bases = await getBasesCnpsIts(cooperativeId, mois, annee);
 
     if (obl.typeTaxe === "cnps" && obl.libelle.toLowerCase().includes("salariale")) {
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.032;
       baseImposable  = bases.totalBrut;
-      montantCalcule = Math.round(bases.totalBrut * 0.032);
+      montantCalcule = Math.round(bases.totalBrut * taux);
     } else if (obl.typeTaxe === "cnps" && obl.libelle.toLowerCase().includes("patronale")) {
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.077;
       baseImposable  = bases.totalBrut;
-      montantCalcule = Math.round(bases.totalBrut * 0.077);
+      montantCalcule = Math.round(bases.totalBrut * taux);
     } else if (obl.typeTaxe === "its") {
       baseImposable  = bases.totalBrut;
       montantCalcule = bases.totalIts;
@@ -380,11 +386,13 @@ export async function recalculerDeclaration(cooperativeId: number, id: number): 
     const bases = await getBasesAnnuelles(cooperativeId, annee);
 
     if (obl.typeTaxe === "taxe_apprentissage") {
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.005;
       baseImposable  = bases.totalBrut;
-      montantCalcule = bases.totalTa > 0 ? bases.totalTa : Math.round(bases.totalBrut * 0.005);
+      montantCalcule = Math.round(bases.totalBrut * taux);
     } else if (obl.typeTaxe === "fpc") {
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.012;
       baseImposable  = bases.totalBrut;
-      montantCalcule = bases.totalFpc > 0 ? bases.totalFpc : Math.round(bases.totalBrut * 0.012);
+      montantCalcule = Math.round(bases.totalBrut * taux);
     }
     // IS : montant à renseigner manuellement, on ne touche pas
   }
