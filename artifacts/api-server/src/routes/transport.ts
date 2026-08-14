@@ -1,5 +1,20 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { authMiddleware } from "../middlewares/auth";
+
+// Rôles autorisés à approuver / annuler les bons de carburant
+const ROLES_APPROBATEUR = ["pca", "directeur", "comptable", "admin"];
+
+function requireRole(roles: string[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const role = req.user?.role;
+    if (!role || !roles.includes(role)) {
+      res.status(403).json({ erreur: "Permissions insuffisantes — rôle requis : " + roles.join(", ") });
+      return;
+    }
+    next();
+  };
+}
+
 import {
   handleGetVehicules,
   handleCreateVehicule,
@@ -62,9 +77,9 @@ router.get("/transport/carburant/bons",                     authMiddleware, hand
 router.post("/transport/carburant/bons",                    authMiddleware, handleCreateBonCarburant);
 router.get("/transport/carburant/bons/:id",                 authMiddleware, handleGetBonCarburant);
 router.put("/transport/carburant/bons/:id/soumettre",       authMiddleware, handleSoumettresBonCarburant);
-router.put("/transport/carburant/bons/:id/approuver",       authMiddleware, handleApprouverBonCarburant);
+router.put("/transport/carburant/bons/:id/approuver",       authMiddleware, requireRole(ROLES_APPROBATEUR), handleApprouverBonCarburant);
 router.put("/transport/carburant/bons/:id/utiliser",        authMiddleware, handleUtiliserBonCarburant);
-router.put("/transport/carburant/bons/:id/annuler",         authMiddleware, handleAnnulerBonCarburant);
+router.put("/transport/carburant/bons/:id/annuler",         authMiddleware, requireRole(ROLES_APPROBATEUR), handleAnnulerBonCarburant);
 router.get("/transport/carburant/bons/:id/pdf",             authMiddleware, handleGetBonCarburantPdf);
 router.get("/transport/carburant/stats",                    authMiddleware, handleGetStatsCarburant);
 

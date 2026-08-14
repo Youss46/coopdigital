@@ -1453,9 +1453,13 @@ function statutBonBadge(statut: string) {
   );
 }
 
+const ROLES_APPROBATEUR = ["pca", "directeur", "comptable", "admin"];
+
 function TabCarburant() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const peutApprouver = ROLES_APPROBATEUR.includes(user?.role ?? "");
 
   const vehiculesQ = useGetVehicules();
   const vehicules  = vehiculesQ.data?.vehicules ?? [];
@@ -1699,11 +1703,14 @@ function TabCarburant() {
                               <Send className="h-3 w-3 mr-1" /> Soumettre
                             </Button>
                           )}
-                          {bon.statut === "soumis" && (
+                          {bon.statut === "soumis" && peutApprouver && (
                             <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700"
                               onClick={() => appMut.mutate({ id: bon.id })}>
                               <ThumbsUp className="h-3 w-3 mr-1" /> Approuver
                             </Button>
+                          )}
+                          {bon.statut === "soumis" && !peutApprouver && (
+                            <Badge className="bg-blue-50 text-blue-700 text-xs">En attente d'approbation</Badge>
                           )}
                           {bon.statut === "approuve" && (
                             <Button size="sm" className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
@@ -1711,7 +1718,7 @@ function TabCarburant() {
                               <Droplets className="h-3 w-3 mr-1" /> Utiliser
                             </Button>
                           )}
-                          {!["utilise","annule"].includes(bon.statut) && (
+                          {!["utilise","annule"].includes(bon.statut) && peutApprouver && (
                             <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500"
                               onClick={() => { if (confirm("Annuler ce bon ?")) annMut.mutate({ id: bon.id }); }}>
                               <Ban className="h-3.5 w-3.5" />
