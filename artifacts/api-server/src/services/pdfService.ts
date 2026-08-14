@@ -1006,81 +1006,205 @@ async function drawBulletinOnDoc(
   cooperativeId: number,
   { bulletin, agent, avantages, retenues }: BulletinData,
 ): Promise<void> {
-  const ref = `BP-${bulletin.annee}-${String(bulletin.mois).padStart(2,"0")}-${String(bulletin.personnelId).padStart(3,"0")}`;
-  await drawHeader(doc, cooperativeId, { titre_document: "Bulletin de Paie", reference: ref });
+  // ── Constantes de mise en page ─────────────────────────────────────────────
+  const REF      = `BP-${bulletin.annee}-${String(bulletin.mois).padStart(2,"0")}-${String(bulletin.personnelId).padStart(3,"0")}`;
+  const W        = PAGE_W - MARGIN * 2;         // 495 pt
+  const DARK     = "#0f2d1f";                    // vert très sombre pour titres
+  const ACCENT   = "#e8f5ef";                    // vert très pale pour alternance
+  const BORDER   = "#c7ddd1";
+  const RED      = "#dc2626";
+  const STAT_CLR: Record<string, string> = { paye: "#16a34a", valide: "#2563eb", brouillon: "#f59e0b" };
 
-  let y = doc.y;
-  doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 60).fill("#f0fdf4").stroke("#bbf7d0");
-  doc.fontSize(8).fillColor(GRIS).font("Helvetica").text("SALARIÉ", MARGIN + 8, y + 5);
-  doc.fontSize(11).fillColor(VERT).font("Helvetica-Bold")
-    .text(`${agent?.prenoms ?? ""} ${agent?.nom ?? "—"}`, MARGIN + 8, y + 16);
-  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-    .text(`Poste : ${agent?.poste ?? "—"}   |   Contrat : ${agent?.typeContrat ?? "—"}   |   CNPS : ${agent?.numeroCnps ?? "—"}`, MARGIN + 8, y + 30);
-  doc.text(`CNI : ${agent?.numeroCni ?? "—"}   |   Période : ${bulletin.periode}`, MARGIN + 8, y + 42);
-  y += 68;
+  // helpers positionnels
+  const RIGHT = MARGIN + W;
+  const hline  = (y: number, color = BORDER) => doc.moveTo(MARGIN, y).lineTo(RIGHT, y).strokeColor(color).lineWidth(0.5).stroke().lineWidth(1);
+  const sectionTitle = (label: string, y: number, color: string = VERT) => {
+    doc.rect(MARGIN, y, 3, 11).fill(color);
+    doc.fontSize(8).fillColor(color).font("Helvetica-Bold")
+       .text(label, MARGIN + 8, y + 1, { lineBreak: false });
+    return y + 16;
+  };
 
+  await drawHeader(doc, cooperativeId, { titre_document: "Bulletin de Paie", reference: REF });
+
+  // ── 1. Bloc salarié — deux colonnes ────────────────────────────────────────
+  let y = doc.y + 4;
+  const BOX_H = 72;
+  const MID   = MARGIN + W / 2;
+
+  // Fond & bordure du bloc
+  doc.rect(MARGIN, y, W, BOX_H).fill(ACCENT);
+  doc.rect(MARGIN, y, W, BOX_H).stroke(BORDER);
+  // Séparateur vertical central
+  doc.moveTo(MID, y + 8).lineTo(MID, y + BOX_H - 8).strokeColor(BORDER).lineWidth(0.5).stroke().lineWidth(1);
+
+  // Colonne gauche — identité salarié
+  doc.fontSize(6.5).fillColor(GRIS).font("Helvetica")
+     .text("SALARIÉ", MARGIN + 10, y + 7);
+  doc.fontSize(12).fillColor(DARK).font("Helvetica-Bold")
+     .text(`${agent?.prenoms ?? ""} ${agent?.nom ?? "—"}`.trim(), MARGIN + 10, y + 17, { width: W / 2 - 20, lineBreak: false });
+  doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+     .text(`Poste : ${agent?.poste ?? "—"}`, MARGIN + 10, y + 32)
+     .text(`Contrat : ${(agent?.typeContrat ?? "—").toUpperCase()}   •   CNPS : ${agent?.numeroCnps ?? "—"}`, MARGIN + 10, y + 43)
+     .text(`CNI : ${agent?.numeroCni ?? "—"}`, MARGIN + 10, y + 54);
+
+  // Colonne droite — période / référence / statut
+  const statut = bulletin.statut;
+  const statutLabel = statut === "paye" ? "PAYÉ" : statut === "valide" ? "VALIDÉ" : "BROUILLON";
+  const statutClr   = STAT_CLR[statut] ?? GRIS;
+
+  doc.fontSize(6.5).fillColor(GRIS).font("Helvetica")
+     .text("INFORMATIONS", MID + 10, y + 7);
+  doc.fontSize(8.5).fillColor(DARK).font("Helvetica-Bold")
+     .text(`Période : ${bulletin.periode}`, MID + 10, y + 19);
+  doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+     .text(`Référence : ${REF}`, MID + 10, y + 31)
+     .text(`Ancienneté : ${agent?.anciennete ?? "—"}`, MID + 10, y + 42);
+
+  // Badge statut
+  const BADGE_W = 64, BADGE_H = 14;
+  const bx = RIGHT - BADGE_W - 8, by = y + 50;
+  doc.rect(bx, by, BADGE_W, BADGE_H).fill(statutClr);
+  doc.fontSize(7).fillColor("white").font("Helvetica-Bold")
+     .text(statutLabel, bx, by + 3.5, { width: BADGE_W, align: "center", lineBreak: false });
+  doc.fillColor("black");
+
+  y += BOX_H + 12;
+
+  // ── 2. Table des avantages ─────────────────────────────────────────────────
   if (avantages.length > 0) {
-    doc.fontSize(9).fillColor(VERT).font("Helvetica-Bold").text("AVANTAGES", MARGIN, y);
-    y += 12;
+    y = sectionTitle("ÉLÉMENTS DE RÉMUNÉRATION", y, VERT);
+
+    // En-tête de table
+    doc.rect(MARGIN, y, W, 15).fill(VERT);
+    doc.fontSize(7.5).fillColor("white").font("Helvetica-Bold");
+    doc.text("Libellé", MARGIN + 8, y + 4, { width: W - 100, lineBreak: false });
+    doc.text("Montant (FCFA)", RIGHT - 108, y + 4, { width: 100, align: "right", lineBreak: false });
+    y += 15;
+
     for (const [i, l] of avantages.entries()) {
-      if (i % 2 === 0) doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 15).fill("#f0fdf4");
-      doc.fontSize(8).fillColor("black").font("Helvetica").text(l.libelle, MARGIN + 6, y + 3, { width: 320, lineBreak: false });
-      doc.font("Helvetica-Bold").text(`+ ${formaterFCFA(l.montantFcfa)}`, MARGIN + 330, y + 3, { width: 150, align: "right", lineBreak: false });
-      y += 15;
-    }
-    y += 4;
-  }
-
-  if (retenues.length > 0) {
-    doc.fontSize(9).fillColor("#dc2626").font("Helvetica-Bold").text("RETENUES", MARGIN, y);
-    y += 12;
-    for (const [i, l] of retenues.entries()) {
-      if (i % 2 === 0) doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 15).fill("#fff7ed");
-      doc.fontSize(8).fillColor("black").font("Helvetica").text(l.libelle, MARGIN + 6, y + 3, { width: 320, lineBreak: false });
-      doc.fontSize(8).font("Helvetica-Bold").fillColor("#dc2626")
-        .text(`- ${formaterFCFA(l.montantFcfa)}`, MARGIN + 330, y + 3, { width: 150, align: "right", lineBreak: false });
+      const rowH = 14;
+      if (i % 2 === 0) doc.rect(MARGIN, y, W, rowH).fill(ACCENT);
+      doc.fontSize(7.5).fillColor("#1a1a1a").font("Helvetica")
+         .text(l.libelle, MARGIN + 8, y + 3, { width: W - 110, lineBreak: false });
+      doc.font("Helvetica-Bold").fillColor("#16a34a")
+         .text(`+ ${formaterFCFA(l.montantFcfa)}`, RIGHT - 108, y + 3, { width: 100, align: "right", lineBreak: false });
       doc.fillColor("black");
-      y += 15;
+      y += rowH;
     }
-    y += 4;
+    hline(y);
+    y += 10;
   }
 
-  const bpRecap: Array<[string, number, string]> = [
-    ["Salaire de base",  bulletin.salaireBaseFcfa,      "#f9fafb"],
-    ["Total avantages",  bulletin.totalAvantagesFcfa,   "#f0fdf4"],
-    ["Salaire brut",     bulletin.salaireBrutFcfa,      "#e0f2fe"],
-    ["Total retenues",   bulletin.totalRetenuesFcfa,    "#fff7ed"],
+  // ── 3. Table des retenues ──────────────────────────────────────────────────
+  if (retenues.length > 0) {
+    y = sectionTitle("RETENUES", y, RED);
+
+    doc.rect(MARGIN, y, W, 15).fill(RED);
+    doc.fontSize(7.5).fillColor("white").font("Helvetica-Bold");
+    doc.text("Libellé", MARGIN + 8, y + 4, { width: W - 100, lineBreak: false });
+    doc.text("Montant (FCFA)", RIGHT - 108, y + 4, { width: 100, align: "right", lineBreak: false });
+    y += 15;
+
+    for (const [i, l] of retenues.entries()) {
+      const rowH = 14;
+      if (i % 2 === 0) doc.rect(MARGIN, y, W, rowH).fill("#fff8f8");
+      doc.fontSize(7.5).fillColor("#1a1a1a").font("Helvetica")
+         .text(l.libelle, MARGIN + 8, y + 3, { width: W - 110, lineBreak: false });
+      doc.font("Helvetica-Bold").fillColor(RED)
+         .text(`- ${formaterFCFA(l.montantFcfa)}`, RIGHT - 108, y + 3, { width: 100, align: "right", lineBreak: false });
+      doc.fillColor("black");
+      y += rowH;
+    }
+    hline(y);
+    y += 10;
+  }
+
+  // ── 4. Récapitulatif ───────────────────────────────────────────────────────
+  y = sectionTitle("RÉCAPITULATIF", y, VERT);
+
+  const recap: Array<{ label: string; montant: number; bold?: boolean; color?: string }> = [
+    { label: "Salaire de base",  montant: bulletin.salaireBaseFcfa },
+    { label: "Total avantages",  montant: bulletin.totalAvantagesFcfa,  color: "#16a34a" },
+    { label: "Salaire brut",     montant: bulletin.salaireBrutFcfa,     bold: true },
+    { label: "Total retenues",   montant: bulletin.totalRetenuesFcfa,   color: RED },
   ];
-  y += 4;
-  for (const [label, montant, bg] of bpRecap) {
-    doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 18).fill(bg);
-    doc.fontSize(9).fillColor("black").font("Helvetica").text(label, MARGIN + 8, y + 5, { width: 320, lineBreak: false });
-    doc.font("Helvetica-Bold").text(formaterFCFA(montant), MARGIN + 330, y + 5, { width: 155, align: "right", lineBreak: false });
-    y += 18;
-  }
-  doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 26).fill(VERT);
-  doc.fontSize(12).fillColor("white").font("Helvetica-Bold")
-    .text("SALAIRE NET À PAYER", MARGIN + 8, y + 8, { width: 300, lineBreak: false });
-  doc.text(formaterFCFA(bulletin.salaireNetFcfa), MARGIN + 320, y + 8, { width: 165, align: "right", lineBreak: false });
-  y += 34;
 
-  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-    .text(`Coût total employeur : ${formaterFCFA(bulletin.coutTotalEmployeurFcfa)}   |   CNPS patronale : ${formaterFCFA(bulletin.chargesCnpsPatronaleFcfa)}   |   TA : ${formaterFCFA(bulletin.chargesTaxeApprentissageFcfa)}`, MARGIN, y);
-  y += 14;
+  // En-tête deux colonnes
+  doc.rect(MARGIN, y, W, 15).fill("#e2e8f0");
+  doc.fontSize(7.5).fillColor("#334155").font("Helvetica-Bold")
+     .text("Libellé", MARGIN + 8, y + 4, { width: W - 100, lineBreak: false });
+  doc.text("Montant", RIGHT - 108, y + 4, { width: 100, align: "right", lineBreak: false });
+  y += 15;
+
+  for (const [i, row] of recap.entries()) {
+    const rowH = 16;
+    if (i % 2 === 0) doc.rect(MARGIN, y, W, rowH).fill(ACCENT);
+    doc.fontSize(8).fillColor("#1a1a1a")
+       .font(row.bold ? "Helvetica-Bold" : "Helvetica")
+       .text(row.label, MARGIN + 8, y + 4, { width: W - 110, lineBreak: false });
+    doc.font("Helvetica-Bold").fillColor(row.color ?? "#1a1a1a")
+       .text(formaterFCFA(row.montant), RIGHT - 108, y + 4, { width: 100, align: "right", lineBreak: false });
+    doc.fillColor("black");
+    y += rowH;
+  }
+  y += 6;
+
+  // ── 5. Net à payer — bandeau principal ────────────────────────────────────
+  const NET_H = 32;
+  doc.rect(MARGIN, y, W, NET_H).fill(VERT);
+  // Sous-bande décorative gauche
+  doc.rect(MARGIN, y, 5, NET_H).fill(OR);
+  doc.fontSize(11).fillColor("white").font("Helvetica-Bold")
+     .text("NET À PAYER", MARGIN + 14, y + 10, { width: W - 130, lineBreak: false });
+  doc.fontSize(13).fillColor("white").font("Helvetica-Bold")
+     .text(formaterFCFA(bulletin.salaireNetFcfa), RIGHT - 130, y + 9, { width: 122, align: "right", lineBreak: false });
+  y += NET_H + 10;
+
+  // ── 6. Charges employeur ──────────────────────────────────────────────────
+  const CHARG_W = W / 3 - 4;
+  const charges: Array<[string, number]> = [
+    ["CNPS patronale",   bulletin.chargesCnpsPatronaleFcfa],
+    ["Taxe apprentissage", bulletin.chargesTaxeApprentissageFcfa],
+    ["Coût total employeur", bulletin.coutTotalEmployeurFcfa],
+  ];
+  doc.rect(MARGIN, y, W, 38).fill("#f8fafc").stroke(BORDER);
+  doc.fontSize(6.5).fillColor(GRIS).font("Helvetica-Bold")
+     .text("CHARGES EMPLOYEUR", MARGIN + 8, y + 5);
+  charges.forEach(([label, montant], i) => {
+    const cx = MARGIN + 8 + i * (CHARG_W + 4);
+    doc.fontSize(6.5).fillColor(GRIS).font("Helvetica")
+       .text(label, cx, y + 16, { width: CHARG_W, lineBreak: false });
+    doc.fontSize(8).fillColor(DARK).font("Helvetica-Bold")
+       .text(formaterFCFA(montant), cx, y + 25, { width: CHARG_W, lineBreak: false });
+  });
+  y += 46;
+
+  // Référence paiement si disponible
   if (bulletin.referencePaiement) {
-    doc.fontSize(8).fillColor(GRIS).text(`Référence paiement : ${bulletin.referencePaiement}`, MARGIN, y);
+    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+       .text(`Réf. paiement : ${bulletin.referencePaiement}`, MARGIN, y);
     y += 12;
   }
-  const bStatutColor: Record<string, string> = { paye: "#16a34a", valide: "#2563eb", brouillon: "#f59e0b" };
-  doc.fontSize(9).font("Helvetica-Bold").fillColor(bStatutColor[bulletin.statut] ?? GRIS)
-    .text(`Statut : ${bulletin.statut.toUpperCase()}`, MARGIN, y);
 
-  y = 700;
-  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-    .text("Directeur / Gérant", MARGIN, y, { width: 150, align: "center" });
-  doc.text("Salarié (signature)", PAGE_W - MARGIN - 170, y, { width: 160, align: "center" });
-  doc.rect(MARGIN, y + 12, 150, 38).stroke("#d1d5db");
-  doc.rect(PAGE_W - MARGIN - 170, y + 12, 160, 38).stroke("#d1d5db");
+  // ── 7. Signatures ─────────────────────────────────────────────────────────
+  const SIG_Y = Math.max(y + 16, 682);
+  const SIG_W = 155, SIG_H = 44;
+  const sig2x = RIGHT - SIG_W;
+
+  // Boîte gauche — employeur
+  doc.rect(MARGIN, SIG_Y, SIG_W, SIG_H).fill("#f8fafc").stroke(BORDER);
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica-Bold")
+     .text("L'EMPLOYEUR", MARGIN, SIG_Y + 5, { width: SIG_W, align: "center", lineBreak: false });
+  doc.fontSize(6.5).fillColor(GRIS).font("Helvetica")
+     .text("Directeur Général / Gérant", MARGIN, SIG_Y + 33, { width: SIG_W, align: "center", lineBreak: false });
+
+  // Boîte droite — salarié
+  doc.rect(sig2x, SIG_Y, SIG_W, SIG_H).fill("#f8fafc").stroke(BORDER);
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica-Bold")
+     .text("LE SALARIÉ", sig2x, SIG_Y + 5, { width: SIG_W, align: "center", lineBreak: false });
+  doc.fontSize(6.5).fillColor(GRIS).font("Helvetica")
+     .text("Signature précédée de « Lu et approuvé »", sig2x, SIG_Y + 33, { width: SIG_W, align: "center", lineBreak: false });
 }
 
 export async function generateBulletinPaie(bulletinId: number, cooperativeId: number): Promise<Buffer> {
