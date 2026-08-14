@@ -69,6 +69,8 @@ export default function BonsCarburantChauffeur() {
   const [tab, setTab] = useState(FILTER_TABS[0]!.value);
   const [selected, setSelected] = useState<BonCarburant | null>(null);
   const [qrBon, setQrBon] = useState<BonCarburant | null>(null);
+  const [qrToken, setQrToken] = useState<{ payload: string; sig: string } | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<UtiliserForm>({
     quantite_livree: "", prix_litre_fcfa: "",
@@ -189,7 +191,30 @@ export default function BonsCarburantChauffeur() {
                         <Droplets className="h-4 w-4 mr-1" /> Utilisation
                       </Button>
                       <Button variant="outline" size="sm" className="border-green-300 text-green-700"
-                        onClick={() => setQrBon(bon)}>
+                        disabled={qrLoading}
+                        onClick={async () => {
+                          setQrBon(bon);
+                          setQrToken(null);
+                          setQrLoading(true);
+                          try {
+                            const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`;
+                            const res = await fetch(
+                              `${BASE}/station/carburant/bons/${encodeURIComponent(bon.numero)}/qr-token`,
+                            );
+                            if (res.ok) {
+                              const tok = await res.json() as { payload: string; sig: string; spki?: string };
+                              setQrToken({ payload: tok.payload, sig: tok.sig });
+                              // Mettre en cache la clé publique pour la station (si fournie)
+                              if (tok.spki) {
+                                try { localStorage.setItem("station_qr_spki_v1", tok.spki); } catch { /* ignore */ }
+                              }
+                            }
+                          } catch {
+                            // offline ou erreur — on affiche le QR URL simple en fallback
+                          } finally {
+                            setQrLoading(false);
+                          }
+                        }}>
                         <QrCode className="h-4 w-4 mr-1" /> QR
                       </Button>
                     </div>
@@ -275,49 +300,69 @@ export default function BonsCarburantChauffeur() {
             <p className="text-xs text-gray-500 text-center">
               Présentez ce QR à la station-service
             </p>
-            <div className="p-3 bg-white rounded-xl border border-gray-100">
-              <QRCode
-                value={`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/station/${encodeURIComponent(qrBon.numero)}`}
-                size={220}
-                level="M"
-              />
-            </div>
-            <p className="text-xs text-gray-400 text-center font-mono">{qrBon.numero}</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => navigate(`/station/${encodeURIComponent(qrBon.numero)}`)}>
-              Ouvrir l'espace station →
-            </Button>
-            <Button
-              size="sm"
-              className="w-full bg-green-700 hover:bg-green-800"
-              onClick={async () => {
-                const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/station/${encodeURIComponent(qrBon.numero)}`;
-                if (navigator.share) {
-                  try {
-                    await navigator.share({
-                      title: `Bon carburant ${qrBon.numero}`,
-                      text: `Bon carburant ${qrBon.numero} — ${qrBon.quantite_autorisee} L`,
-                      url,
-                    });
-                  } catch {
-                    // user cancelled or share failed silently
-                  }
-                } else {
-                  try {
-                    await navigator.clipboard.writeText(url);
-                    toast({ title: "Lien copié dans le presse-papiers ✓" });
-                  } catch {
-                    toast({ title: "Impossible de copier le lien", variant: "destructive" });
-                  }
-                }
-              }}>
-              {navigator.share
-                ? <><Share2 className="h-4 w-4 mr-1" /> Partager</>
-                : <><Copy className="h-4 w-4 mr-1" /> Copier le lien</>}
-            </Button>
+            {/* QR avec payload signé si disponible, sinon URL simple */}
+            {(() => {
+              const base = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}`;
+              const stationUrl = qrToken
+                ? `${base}/station/${encodeURIComponent(qrBon.numero)}?p=${qrToken.payload}&s=${qrToken.sig}`
+                : `${base}/station/${encodeURIComponent(qrBon.numero)}`;
+              return (
+                <>
+                  <div className="p-3 bg-white rounded-xl border border-gray-100 relative">
+                    {qrLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
+                        <div className="h-6 w-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                    <QRCode value={stationUrl} size={220} level="M" />
+                  </div>
+                  {qrToken ? (
+                    <p className="text-xs text-green-600 text-center flex items-center gap-1">
+                      <span>🔒</span> QR signé — lisible hors connexion
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-600 text-center">
+                      {qrLoading ? "Génération du QR sécurisé…" : "QR simple (connexion requise à la station)"}
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-400 text-center font-mono">{qrBon.numero}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => navigate(`/station/${encodeURIComponent(qrBon.numero)}`)}>
+                    Ouvrir l'espace station →
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="w-full bg-green-700 hover:bg-green-800"
+                    onClick={async () => {
+                      if (navigator.share) {
+                        try {
+                          await navigator.share({
+                            title: `Bon carburant ${qrBon.numero}`,
+                            text: `Bon carburant ${qrBon.numero} — ${qrBon.quantite_autorisee} L`,
+                            url: stationUrl,
+                          });
+                        } catch {
+                          // user cancelled or share failed silently
+                        }
+                      } else {
+                        try {
+                          await navigator.clipboard.writeText(stationUrl);
+                          toast({ title: "Lien copié dans le presse-papiers ✓" });
+                        } catch {
+                          toast({ title: "Impossible de copier le lien", variant: "destructive" });
+                        }
+                      }
+                    }}>
+                    {"share" in navigator
+                      ? <><Share2 className="h-4 w-4 mr-1" /> Partager</>
+                      : <><Copy className="h-4 w-4 mr-1" /> Copier le lien</>}
+                  </Button>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

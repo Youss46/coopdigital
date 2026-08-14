@@ -10,6 +10,7 @@ export default defineConfig({
       JWT_SECRET: "test-secret-for-tenant-isolation-tests",
       DATABASE_URL: "postgresql://test:test@localhost:5432/test",
       NODE_ENV: "test",
+      SESSION_SECRET: "test-station-qr-secret-for-unit-tests",
     },
   },
   resolve: {

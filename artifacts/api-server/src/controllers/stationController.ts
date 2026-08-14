@@ -5,10 +5,73 @@
  */
 import type { Request, Response } from "express";
 import {
+  signQrPayload,
+  verifyQrPayload,
+  PUBLIC_KEY_SPKI_B64,
+  QR_TTL_MS,
+} from "../lib/stationQrCrypto";
+import {
   getBonCarburantByNumero,
   transitionBon,
   createDepense,
 } from "../services/transportService";
+
+// ── GET /station/carburant/public-key ─────────────────────────────────────────
+// Retourne la clé publique Ed25519 en SPKI base64 pour vérification offline.
+export async function handleGetPublicKey(
+  _req: Request,
+  res: Response,
+): Promise<void> {
+  res.json({ alg: "Ed25519", spki: PUBLIC_KEY_SPKI_B64 });
+}
+
+// ── GET /station/carburant/bons/:numero/qr-token ─────────────────────────────
+// Génère un payload signé Ed25519 pour encoder dans le QR code.
+// Appelé par le chauffeur (en ligne) au moment d'afficher son QR.
+export async function handleQrTokenBonStation(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const numero = String(req.params["numero"]).toUpperCase();
+    const row = await getBonCarburantByNumero(numero);
+
+    if (!row) {
+      res.status(404).json({ erreur: "Bon introuvable" });
+      return;
+    }
+    if (row.bon.statut !== "approuve") {
+      res
+        .status(400)
+        .json({ erreur: "Seuls les bons approuvés peuvent générer un QR" });
+      return;
+    }
+
+    const b = row.bon;
+    const qrData = {
+      v: 1,
+      num: b.numero,
+      qte: parseFloat(b.quantiteAutorisee),
+      type: b.typeCarburant,
+      immat: row.immatriculation ?? null,
+      chauffeur: row.chauffeurNom
+        ? `${row.chauffeurPrenoms ?? ""} ${row.chauffeurNom}`.trim()
+        : null,
+      marque: row.marque ?? null,
+      date_em: b.dateEmission,
+      motif: b.motif ?? null,
+      exp: Date.now() + QR_TTL_MS,
+    };
+
+    const payload = Buffer.from(JSON.stringify(qrData)).toString("base64url");
+    const sig = signQrPayload(payload);
+
+    res.json({ payload, sig, spki: PUBLIC_KEY_SPKI_B64 });
+  } catch (err) {
+    req.log.error({ err }, "Erreur qrTokenBonStation");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
 
 // ── GET /station/carburant/bons/:numero ───────────────────────────────────────
 // Vérifie un bon et retourne les infos nécessaires à la station.
@@ -27,18 +90,18 @@ export async function handleVerifierBonStation(
 
     const b = row.bon;
     res.json({
-      id:                  b.id,
-      numero:              b.numero,
-      statut:              b.statut,
-      type_carburant:      b.typeCarburant,
-      quantite_autorisee:  parseFloat(b.quantiteAutorisee),
-      station_service:     b.stationService ?? null,
-      motif:               b.motif ?? null,
-      date_emission:       b.dateEmission,
-      immatriculation:     row.immatriculation ?? null,
-      marque:              row.marque ?? null,
-      modele:              row.modele ?? null,
-      chauffeur_nom:       row.chauffeurNom
+      id: b.id,
+      numero: b.numero,
+      statut: b.statut,
+      type_carburant: b.typeCarburant,
+      quantite_autorisee: parseFloat(b.quantiteAutorisee),
+      station_service: b.stationService ?? null,
+      motif: b.motif ?? null,
+      date_emission: b.dateEmission,
+      immatriculation: row.immatriculation ?? null,
+      marque: row.marque ?? null,
+      modele: row.modele ?? null,
+      chauffeur_nom: row.chauffeurNom
         ? `${row.chauffeurPrenoms ?? ""} ${row.chauffeurNom}`.trim()
         : null,
     });
@@ -80,7 +143,43 @@ export async function handleLivrerBonStation(
       station_service?: string;
       observations?: string;
       ticket_url?: string;
+      qr_payload?: string;
+      qr_sig?: string;
     };
+
+    // Vérification de la signature QR si fournie
+    if (body.qr_payload !== undefined || body.qr_sig !== undefined) {
+      if (!body.qr_payload || !body.qr_sig) {
+        res.status(400).json({
+          erreur: "qr_payload et qr_sig doivent être fournis ensemble",
+        });
+        return;
+      }
+      if (!verifyQrPayload(body.qr_payload, body.qr_sig)) {
+        res.status(400).json({ erreur: "Signature QR invalide ou falsifiée" });
+        return;
+      }
+      try {
+        const decoded = JSON.parse(
+          Buffer.from(body.qr_payload, "base64url").toString("utf8"),
+        ) as { exp?: number; num?: string };
+        if (decoded.exp && decoded.exp < Date.now()) {
+          res
+            .status(400)
+            .json({ erreur: "QR code expiré — demandez un nouveau bon" });
+          return;
+        }
+        if (decoded.num && decoded.num !== numero) {
+          res.status(400).json({
+            erreur: "Le QR code ne correspond pas au bon demandé",
+          });
+          return;
+        }
+      } catch {
+        res.status(400).json({ erreur: "Payload QR illisible" });
+        return;
+      }
+    }
 
     if (!body.quantite_livree || !body.date_utilisation) {
       res
@@ -97,15 +196,15 @@ export async function handleLivrerBonStation(
           : null;
 
     const extra: Record<string, unknown> = {
-      quantiteLivree:  String(body.quantite_livree),
+      quantiteLivree: String(body.quantite_livree),
       dateUtilisation: body.date_utilisation,
     };
     if (body.prix_litre_fcfa != null)
       extra["prixLitreFcfa"] = String(body.prix_litre_fcfa);
     if (montant != null) extra["montantFcfa"] = String(montant);
     if (body.station_service) extra["stationService"] = body.station_service;
-    if (body.observations)    extra["observations"]   = body.observations;
-    if (body.ticket_url)      extra["ticketUrl"]      = body.ticket_url;
+    if (body.observations) extra["observations"] = body.observations;
+    if (body.ticket_url) extra["ticketUrl"] = body.ticket_url;
 
     await transitionBon(row.bon.cooperativeId, row.bon.id, "utilise", extra);
 
@@ -116,33 +215,32 @@ export async function handleLivrerBonStation(
           row.bon.cooperativeId,
           row.bon.vehiculeId,
           {
-            type:           "carburant",
-            dateDepense:    body.date_utilisation,
-            montantFcfa:    String(montant),
-            libelle:        `Carburant — Bon ${row.bon.numero}`,
+            type: "carburant",
+            dateDepense: body.date_utilisation,
+            montantFcfa: String(montant),
+            libelle: `Carburant — Bon ${row.bon.numero}`,
             fournisseur:
               body.station_service ?? row.bon.stationService ?? null,
             referencePiece: row.bon.numero,
-            quantite:       String(body.quantite_livree),
-            unite:          "L",
-            missionId:      null,
+            quantite: String(body.quantite_livree),
+            unite: "L",
+            missionId: null,
           },
         );
         const { proposerEcriture } = await import(
           "../services/comptabiliteService"
         );
         void proposerEcriture(row.bon.cooperativeId, {
-          source:       "transport",
-          sourceId:     depense.id,
-          libelle:      `Carburant — Bon ${row.bon.numero} (${body.quantite_livree} L)`,
-          compteDebit:  "6042",
+          source: "transport",
+          sourceId: depense.id,
+          libelle: `Carburant — Bon ${row.bon.numero} (${body.quantite_livree} L)`,
+          compteDebit: "6042",
           compteCredit: "521",
-          montantFcfa:  Math.round(montant),
-          date:         body.date_utilisation,
-          numeroPiece:  row.bon.numero,
+          montantFcfa: Math.round(montant),
+          date: body.date_utilisation,
+          numeroPiece: row.bon.numero,
         });
       } catch (err) {
-        // Ne pas bloquer la réponse si l'écriture comptable échoue
         req.log.warn({ err }, "Écriture comptable station carburant échouée");
       }
     }
