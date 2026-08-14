@@ -251,7 +251,7 @@ function TabPersonnel() {
           { label: "CDD", value: list.filter((p: Personnel) => p.typeContrat === "cdd" && p.statut === "actif").length, color: "text-amber-700" },
           {
             label: "Masse de base",
-            value: formatFcfaShort(list.filter((p: Personnel) => p.statut === "actif").reduce((s: number, p: Personnel) => s + p.salaireBaseFcfa, 0)),
+            value: formatFcfa(list.filter((p: Personnel) => p.statut === "actif").reduce((s: number, p: Personnel) => s + p.salaireBaseFcfa, 0)),
             color: "text-purple-700",
           },
         ].map((k) => (
