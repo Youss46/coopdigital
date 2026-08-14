@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
-import { Calculator, AlertTriangle, CheckCircle2, Clock, Download, Plus, RefreshCw, X, Calendar, Trash2, RotateCcw } from "lucide-react";
+import { Calculator, AlertTriangle, CheckCircle2, Clock, Download, Plus, RefreshCw, X, Calendar, Trash2, RotateCcw, Pencil, ToggleLeft, ToggleRight, Settings } from "lucide-react";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useToast } from "@/hooks/use-toast";
 
@@ -12,8 +12,18 @@ const FCFA = (n: number | string) =>
 const MOIS_NOMS = ["","Janvier","Février","Mars","Avril","Mai","Juin",
                    "Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
+interface Obligation {
+  id: number;
+  cooperative_id: number;
+  type_taxe: string;
+  libelle: string;
+  base_calcul: string | null;
+  taux_pct: string | null;
+  periodicite: string;
+  jour_echeance: number | null;
+  actif: boolean;
+  created_at: string;
+}
 interface Declaration {
   id: number; periode: string; base_imposable_fcfa: string | null;
   montant_calcule_fcfa: string; montant_paye_fcfa: string;
@@ -249,8 +259,15 @@ function InitObligationsButton({ onDone }: { onDone: () => void }) {
   );
 }
 
-// ─── Onglet 1 — Tableau de bord fiscal ───────────────────────────────────────
-
+const TYPE_TAXE_OPTIONS = [
+  { value: "cnps",               label: "CNPS" },
+  { value: "its",                label: "ITS" },
+  { value: "tva",                label: "TVA" },
+  { value: "impot_societes",     label: "Impôt sur les sociétés (IS)" },
+  { value: "taxe_apprentissage", label: "Taxe d'apprentissage (TA)" },
+  { value: "fpc",                label: "FPC" },
+  { value: "autre",              label: "Autre" },
+];
 function TableauBordFiscal() {
   const [calendrier, setCalendrier] = useState<CalendrierItem[] | null>(null);
   const [alertes, setAlertes]       = useState<CalendrierItem[] | null>(null);
@@ -379,6 +396,9 @@ function TableauBordFiscal() {
           ))
         )}
       </div>
+
+      {/* Gestion des obligations */}
+      <SectionObligations onObligationsChange={charger} />
     </div>
   );
 }
@@ -883,3 +903,321 @@ export default function FiscalitePage() {
     </div>
   );
 }
+
+function ModalObligationForm({
+  obligation,
+  onClose,
+  onDone,
+}: {
+  obligation: Obligation | null;   // null = ajout
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const { toast } = useToast();
+  const isEdit = obligation !== null;
+
+  const [libelle,     setLibelle]     = useState(obligation?.libelle ?? "");
+  const [typeTaxe,    setTypeTaxe]    = useState(obligation?.type_taxe ?? "cnps");
+  const [periodicite, setPeriodicite] = useState(obligation?.periodicite ?? "mensuel");
+  const [jourEcheance,setJourEcheance]= useState(String(obligation?.jour_echeance ?? "15"));
+  const [tauxPct,     setTauxPct]     = useState(obligation?.taux_pct ?? "");
+  const [baseCalcul,  setBaseCalcul]  = useState(obligation?.base_calcul ?? "");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if (!libelle.trim()) { toast({ title: "Libellé requis", variant: "destructive" }); return; }
+    setLoading(true);
+    try {
+      const body = {
+        libelle: libelle.trim(),
+        typeTaxe,
+        periodicite,
+        jourEcheance: jourEcheance ? parseInt(jourEcheance) : undefined,
+        tauxPct: tauxPct.trim() || null,
+        baseCalcul: baseCalcul.trim() || null,
+      };
+      const url = isEdit
+        ? `${BASE}/api/fiscalite/obligations/${obligation!.id}`
+        : `${BASE}/api/fiscalite/obligations`;
+      const r = await fetch(url, {
+        method: isEdit ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
+        body: JSON.stringify(body),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "Erreur");
+      toast({ title: isEdit ? "Obligation modifiée" : "Obligation créée", description: libelle });
+      onDone();
+    } catch (e) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="text-lg font-semibold text-gray-800">
+            {isEdit ? "Modifier l'obligation" : "Ajouter une obligation fiscale"}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          {/* Libellé */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Libellé *</label>
+            <input
+              type="text"
+              value={libelle}
+              onChange={e => setLibelle(e.target.value)}
+              placeholder="Ex: CNPS — Part salariale"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+
+          {/* Type taxe + Périodicité */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Type de taxe *</label>
+              <select value={typeTaxe} onChange={e => setTypeTaxe(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                {TYPE_TAXE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Périodicité *</label>
+              <select value={periodicite} onChange={e => setPeriodicite(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="mensuel">Mensuelle</option>
+                <option value="trimestriel">Trimestrielle</option>
+                <option value="annuel">Annuelle</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Taux + Jour échéance */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Taux (%)</label>
+              <input
+                type="number"
+                value={tauxPct}
+                onChange={e => setTauxPct(e.target.value)}
+                step="0.01"
+                min="0"
+                max="100"
+                placeholder="Ex: 3.20"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-0.5">Laisser vide si calculé manuellement</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Jour d'échéance</label>
+              <input
+                type="number"
+                value={jourEcheance}
+                onChange={e => setJourEcheance(e.target.value)}
+                min="1"
+                max="31"
+                placeholder="Ex: 15"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-0.5">Jour du mois suivant (mensuel)</p>
+            </div>
+          </div>
+
+          {/* Base de calcul */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Base de calcul</label>
+            <input
+              type="text"
+              value={baseCalcul}
+              onChange={e => setBaseCalcul(e.target.value)}
+              placeholder="Ex: Salaire brut plafonné"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 p-5 pt-0">
+          <button onClick={onClose}
+            className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            Annuler
+          </button>
+          <button onClick={submit} disabled={loading}
+            className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50">
+            {loading ? "Enregistrement…" : isEdit ? "Enregistrer" : "Créer l'obligation"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SectionObligations({ onObligationsChange }: { onObligationsChange?: () => void }) {
+  const { toast } = useToast();
+  const [obligations, setObligations] = useState<Obligation[] | null>(null);
+  const [loading, setLoading]         = useState(false);
+  const [toggling, setToggling]       = useState<number | null>(null);
+  const [modalObl, setModalObl]       = useState<Obligation | null>(null);
+  const [showModal, setShowModal]     = useState(false);
+
+  const charger = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE}/api/fiscalite/obligations/all`, { headers: { Authorization: `Bearer ${tok()}` } });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `Erreur ${r.status}`);
+      setObligations(await r.json());
+    } catch (e) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    } finally { setLoading(false); }
+  }, [toast]);
+
+  useEffect(() => { charger(); }, [charger]);
+
+  const handleToggle = async (obl: Obligation) => {
+    setToggling(obl.id);
+    try {
+      const r = await fetch(`${BASE}/api/fiscalite/obligations/${obl.id}/toggle`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "Erreur");
+      toast({ title: json.actif ? "Obligation activée" : "Obligation désactivée", description: obl.libelle });
+      charger();
+      onObligationsChange?.();
+    } catch (e) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    } finally { setToggling(null); }
+  };
+
+  const openAdd  = () => { setModalObl(null); setShowModal(true); };
+  const openEdit = (o: Obligation) => { setModalObl(o); setShowModal(true); };
+  const closeModal = () => setShowModal(false);
+  const onDone = () => { closeModal(); charger(); onObligationsChange?.(); };
+
+  const actives   = obligations?.filter(o => o.actif)  ?? [];
+  const inactives = obligations?.filter(o => !o.actif) ?? [];
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+          <Settings size={16} className="text-green-600" /> Obligations fiscales configurées
+        </h3>
+        <div className="flex items-center gap-2">
+          <InitObligationsButton onDone={() => { charger(); onObligationsChange?.(); }} />
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
+            <Plus size={14} /> Ajouter
+          </button>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center h-24">
+          <div className="animate-spin rounded-full h-6 w-6 border-2 border-green-600 border-t-transparent" />
+        </div>
+      )}
+
+      {!loading && obligations && obligations.length === 0 && (
+        <div className="text-center py-8 text-gray-400">
+          <p className="text-sm">Aucune obligation configurée.</p>
+          <p className="text-xs mt-1">Utilisez "Initialiser les obligations standard" ou "Ajouter" pour commencer.</p>
+        </div>
+      )}
+
+      {!loading && obligations && obligations.length > 0 && (
+        <div className="space-y-4">
+          {/* Actives */}
+          {actives.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Actives ({actives.length})</p>
+              <div className="divide-y divide-gray-50">
+                {actives.map(obl => (
+                  <div key={obl.id} className="flex items-center justify-between py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{obl.libelle}</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                        <span className="text-xs text-gray-500">{typeTaxeLabel(obl.type_taxe)}</span>
+                        <span className="text-xs text-gray-400 capitalize">{obl.periodicite}</span>
+                        {obl.taux_pct && <span className="text-xs text-blue-600 font-medium">{obl.taux_pct}%</span>}
+                        {obl.jour_echeance && <span className="text-xs text-gray-400">J-{obl.jour_echeance}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                      <button
+                        onClick={() => openEdit(obl)}
+                        className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="Modifier">
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        onClick={() => handleToggle(obl)}
+                        disabled={toggling === obl.id}
+                        className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium transition-colors disabled:opacity-50"
+                        title="Désactiver">
+                        {toggling === obl.id
+                          ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-500 border-t-transparent" />
+                          : <ToggleRight size={20} className="text-green-500" />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Inactives */}
+          {inactives.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-gray-300 uppercase tracking-wide mb-2">Inactives ({inactives.length})</p>
+              <div className="divide-y divide-gray-50">
+                {inactives.map(obl => (
+                  <div key={obl.id} className="flex items-center justify-between py-3 opacity-50">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-500 truncate">{obl.libelle}</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                        <span className="text-xs text-gray-400">{typeTaxeLabel(obl.type_taxe)}</span>
+                        <span className="text-xs text-gray-400 capitalize">{obl.periodicite}</span>
+                        {obl.taux_pct && <span className="text-xs text-gray-400">{obl.taux_pct}%</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                      <button
+                        onClick={() => openEdit(obl)}
+                        className="p-1.5 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors opacity-100"
+                        title="Modifier">
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        onClick={() => handleToggle(obl)}
+                        disabled={toggling === obl.id}
+                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-green-600 font-medium transition-colors disabled:opacity-50 opacity-100"
+                        title="Réactiver">
+                        {toggling === obl.id
+                          ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent" />
+                          : <ToggleLeft size={20} className="text-gray-400" />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showModal && (
+        <ModalObligationForm
+          obligation={modalObl}
+          onClose={closeModal}
+          onDone={onDone}
+        />
+      )}
+    </div>
+  );
+}
+
+const typeTaxeLabel = (t: string) => TYPE_TAXE_OPTIONS.find(o => o.value === t)?.label ?? t;

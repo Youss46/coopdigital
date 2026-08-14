@@ -15,7 +15,6 @@ import PDFDocument from "pdfkit";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 
 
-
 // ─── Comptes OHADA par type de taxe ───────────────────────────────────────────
 const COMPTE_DEBIT: Record<string, string> = {
   cnps:               "431",
@@ -54,8 +53,20 @@ export async function listObligations(cooperativeId: number) {
                eq(obligationsFiscalesTable.actif, true)));
 }
 
-// ─── Seed obligations standard Côte d'Ivoire ──────────────────────────────────
-
+export async function listObligationsAll(cooperativeId: number) {
+  const result = await db.execute<{
+    id: number; cooperative_id: number; type_taxe: string; libelle: string;
+    base_calcul: string | null; taux_pct: string | null; periodicite: string;
+    jour_echeance: number | null; actif: boolean; created_at: string;
+  }>(sql`
+    SELECT id, cooperative_id, type_taxe, libelle, base_calcul, taux_pct::text,
+           periodicite, jour_echeance, actif, created_at::text
+    FROM obligations_fiscales
+    WHERE cooperative_id = ${cooperativeId}
+    ORDER BY periodicite, type_taxe, id
+  `);
+  return result.rows;
+}
 const OBLIGATIONS_CI = [
   { typeTaxe: "cnps",              libelle: "CNPS — Part salariale",              periodicite: "mensuel", jourEcheance: 15, tauxPct: "3.20", baseCalcul: "Salaire brut plafonné" },
   { typeTaxe: "cnps",              libelle: "CNPS — Part patronale",              periodicite: "mensuel", jourEcheance: 15, tauxPct: "7.70", baseCalcul: "Salaire brut plafonné" },
@@ -946,4 +957,61 @@ export async function genererBordereauCnpsPdf(
   doc.flushPages();
   doc.end();
   return new Promise<Buffer>(resolve => doc.on("end", () => resolve(Buffer.concat(chunks))));
+}
+
+export async function updateObligation(cooperativeId: number, id: number, data: {
+  libelle?: string;
+  typeTaxe?: string;
+  periodicite?: string;
+  jourEcheance?: number | null;
+  tauxPct?: string | null;
+  baseCalcul?: string | null;
+}) {
+  const [existing] = await db.select().from(obligationsFiscalesTable)
+    .where(and(eq(obligationsFiscalesTable.id, id), eq(obligationsFiscalesTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!existing) throw new Error("Obligation introuvable");
+
+  const [updated] = await db.update(obligationsFiscalesTable).set({
+    ...(data.libelle     !== undefined && { libelle:      data.libelle }),
+    ...(data.typeTaxe    !== undefined && { typeTaxe:     data.typeTaxe }),
+    ...(data.periodicite !== undefined && { periodicite:  data.periodicite }),
+    ...(data.jourEcheance !== undefined && { jourEcheance: data.jourEcheance }),
+    ...(data.tauxPct     !== undefined && { tauxPct:      data.tauxPct }),
+    ...(data.baseCalcul  !== undefined && { baseCalcul:   data.baseCalcul }),
+  }).where(eq(obligationsFiscalesTable.id, id)).returning();
+  return updated;
+}
+
+export async function createObligation(cooperativeId: number, data: {
+  libelle: string;
+  typeTaxe: string;
+  periodicite: string;
+  jourEcheance?: number;
+  tauxPct?: string;
+  baseCalcul?: string;
+}) {
+  const [created] = await db.insert(obligationsFiscalesTable).values({
+    cooperativeId,
+    typeTaxe:     data.typeTaxe,
+    libelle:      data.libelle,
+    periodicite:  data.periodicite,
+    jourEcheance: data.jourEcheance ?? null,
+    tauxPct:      data.tauxPct ?? null,
+    baseCalcul:   data.baseCalcul ?? null,
+    actif:        true,
+  }).returning();
+  return created;
+}
+
+export async function toggleObligation(cooperativeId: number, id: number) {
+  const [existing] = await db.select().from(obligationsFiscalesTable)
+    .where(and(eq(obligationsFiscalesTable.id, id), eq(obligationsFiscalesTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!existing) throw new Error("Obligation introuvable");
+
+  const [updated] = await db.update(obligationsFiscalesTable)
+    .set({ actif: !existing.actif })
+    .where(eq(obligationsFiscalesTable.id, id)).returning();
+  return updated;
 }

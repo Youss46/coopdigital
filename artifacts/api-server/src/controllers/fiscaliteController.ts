@@ -10,6 +10,14 @@ export async function getObligations(req: Request, res: Response): Promise<void>
   catch (err) { req.log.error({ err }, "getObligations"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
+export async function getAllObligations(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    res.json(await svc.listObligationsAll(cooperativeId));
+  }
+  catch (err) { req.log.error({ err }, "getAllObligations"); res.status(500).json({ error: "Erreur serveur" }); }
+}
 export async function postInitObligationsCI(req: Request, res: Response): Promise<void> {
   try {
     const cooperativeId = req.user?.cooperativeId;
@@ -158,4 +166,82 @@ export async function getBordereauCnpsPdf(req: Request, res: Response): Promise<
     res.setHeader("Content-Disposition", `attachment; filename="bordereau-cnps-${annee}-${moisStr}.pdf"`);
     res.send(buf);
   } catch (err) { req.log.error({ err }, "getBordereauCnpsPdf"); res.status(500).json({ error: "Erreur serveur" }); }
+}
+
+export async function patchObligationToggle(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const id = parseInt(String(req.params["id"]), 10);
+    if (isNaN(id)) { res.status(400).json({ error: "id invalide" }); return; }
+    const updated = await svc.toggleObligation(cooperativeId, id);
+    res.json(updated);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    req.log.error({ err }, "patchObligationToggle");
+    res.status(400).json({ error: msg });
+  }
+}
+
+const VALID_TYPE_TAXE   = ["cnps","its","tva","impot_societes","taxe_apprentissage","fpc","autre"];
+const VALID_PERIODICITE = ["mensuel","trimestriel","annuel"];
+
+function validateObligationFields(body: Record<string, unknown>): string | null {
+  const { libelle, typeTaxe, periodicite, jourEcheance, tauxPct } = body;
+  if (typeof libelle === "string" && libelle.trim().length === 0)
+    return "Le libellé ne peut pas être vide";
+  if (typeTaxe !== undefined && !VALID_TYPE_TAXE.includes(typeTaxe as string))
+    return `Type de taxe invalide. Valeurs autorisées : ${VALID_TYPE_TAXE.join(", ")}`;
+  if (periodicite !== undefined && !VALID_PERIODICITE.includes(periodicite as string))
+    return `Périodicité invalide. Valeurs autorisées : ${VALID_PERIODICITE.join(", ")}`;
+  if (jourEcheance !== undefined && jourEcheance !== null) {
+    const j = Number(jourEcheance);
+    if (!Number.isInteger(j) || j < 1 || j > 31)
+      return "Le jour d'échéance doit être un entier entre 1 et 31";
+  }
+  if (tauxPct !== undefined && tauxPct !== null && tauxPct !== "") {
+    const t = parseFloat(String(tauxPct));
+    if (isNaN(t) || t < 0 || t > 100)
+      return "Le taux doit être compris entre 0 et 100";
+  }
+  return null;
+}
+
+export async function putObligation(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const id = parseInt(String(req.params["id"]), 10);
+    if (isNaN(id)) { res.status(400).json({ error: "id invalide" }); return; }
+    const validErr = validateObligationFields(req.body as Record<string, unknown>);
+    if (validErr) { res.status(400).json({ error: validErr }); return; }
+    const { libelle, typeTaxe, periodicite, jourEcheance, tauxPct, baseCalcul } = req.body as {
+      libelle?: string; typeTaxe?: string; periodicite?: string;
+      jourEcheance?: number | null; tauxPct?: string | null; baseCalcul?: string | null;
+    };
+    const updated = await svc.updateObligation(cooperativeId, id, { libelle, typeTaxe, periodicite, jourEcheance, tauxPct, baseCalcul });
+    res.json(updated);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    req.log.error({ err }, "putObligation");
+    res.status(400).json({ error: msg });
+  }
+}
+
+export async function postObligation(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const { libelle, typeTaxe, periodicite, jourEcheance, tauxPct, baseCalcul } = req.body as {
+      libelle: string; typeTaxe: string; periodicite: string;
+      jourEcheance?: number; tauxPct?: string; baseCalcul?: string;
+    };
+    if (!libelle?.trim() || !typeTaxe?.trim() || !periodicite?.trim()) {
+      res.status(400).json({ error: "libelle, typeTaxe et periodicite sont requis" }); return;
+    }
+    const validErr = validateObligationFields(req.body as Record<string, unknown>);
+    if (validErr) { res.status(400).json({ error: validErr }); return; }
+    const created = await svc.createObligation(cooperativeId, { libelle, typeTaxe, periodicite, jourEcheance, tauxPct, baseCalcul });
+    res.status(201).json(created);
+  } catch (err) { req.log.error({ err }, "postObligation"); res.status(500).json({ error: "Erreur serveur" }); }
 }
