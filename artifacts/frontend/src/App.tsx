@@ -78,6 +78,7 @@ import CertificationsPage from "@/pages/CertificationsPage";
 import MissionsEnquetePage from "@/pages/MissionsEnquetePage";
 import MissionEnqueteDetailPage from "@/pages/MissionEnqueteDetailPage";
 import CertificationsDashboardPage from "@/pages/CertificationsDashboardPage";
+import ChargesDiversesPage from "@/pages/ChargesDiversesPage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/sonner";
@@ -331,6 +332,9 @@ function AppRoutes() {
       </Route>
       <Route path="/enquetes">
         <ProtectedRoute component={MissionsEnquetePage} />
+      </Route>
+      <Route path="/charges-diverses">
+        <ProtectedRoute component={ChargesDiversesPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

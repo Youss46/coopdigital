@@ -47,6 +47,7 @@ import {
   Calculator,
   GitMerge,
   FolderKanban,
+  TrendingDown,
   Users2,
   Ship,
   WifiOff,
@@ -127,6 +128,7 @@ const NAV_ICON_LIST: React.ElementType[] = [
   Calculator,     // /fiscalite
   GitMerge,       // /reconciliation
   FolderKanban,   // /investissements
+  TrendingDown,   // /charges-diverses
   BookOpen,       // /comptabilite
   Banknote,       // /salaires
   GraduationCap,  // /formations

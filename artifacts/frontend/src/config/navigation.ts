@@ -77,6 +77,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/fiscalite",              label: "Fiscalité",                 roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
   { href: "/reconciliation",         label: "Réconciliation",            roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
   { href: "/investissements",        label: "Investissements",           roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
+  { href: "/charges-diverses",       label: "Charges diverses",          roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
   { href: "/comptabilite",           label: "Comptabilité",              roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances", showBadge: true },
   { href: "/salaires",               label: "Salaires",                  roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
 

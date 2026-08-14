@@ -575,6 +575,13 @@
       "when": 1786873800000,
       "tag": "0081_bon_carburant_ticket_url",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1786960200000,
+      "tag": "0082_charges_diverses",
+      "breakpoints": true
     }
   ]
 }
