@@ -9,6 +9,7 @@ import {
   CreateEntretienVehiculeBody,
 } from "@workspace/api-zod";
 import { proposerEcriture } from "../services/comptabiliteService";
+import { envoyerPushGroupe } from "../services/pushService";
 import {
   getVehicules,
   getVehicule,
@@ -811,6 +812,29 @@ export async function handleApprouverBonCarburant(req: Request, res: Response): 
     if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
     if (row.bon.statut !== "soumis") { res.status(400).json({ erreur: "Le bon doit être soumis pour être approuvé" }); return; }
     await transitionBon(cooperativeId, id, "approuve", { approvePar: userId, dateApprobation: new Date() });
+
+    // Push notification → chauffeur terrain (fire-and-forget)
+    if (row.bon.chauffeurId != null) {
+      void (async () => {
+        try {
+          const [chauffeurUser] = await db
+            .select({ id: usersTable.id })
+            .from(usersTable)
+            .where(eq(usersTable.chauffeurId, row.bon.chauffeurId!))
+            .limit(1);
+          if (chauffeurUser) {
+            await envoyerPushGroupe([chauffeurUser.id], {
+              title: "Bon carburant approuvé ✓",
+              body:  `Votre bon ${row.bon.numero} est approuvé — ouvrez l'app pour générer votre QR`,
+              url:   "./bons-carburant",
+            });
+          }
+        } catch (pushErr) {
+          req.log.warn({ err: pushErr }, "Push notification bon approuvé échouée (non bloquant)");
+        }
+      })();
+    }
+
     const approveParNom = await getApproveNom(userId);
     res.json(mapBon({ ...row, bon: { ...row.bon, statut: "approuve", approvePar: userId, dateApprobation: new Date(), updatedAt: new Date() } }, approveParNom));
   } catch (err) {

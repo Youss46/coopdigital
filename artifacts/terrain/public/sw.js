@@ -137,8 +137,11 @@ self.addEventListener("notificationclick", (e) => {
   const url = e.notification.data?.url ?? "./";
   e.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      // Cherche une fenêtre terrain déjà ouverte et navigue vers l'URL cible
       for (const client of list) {
-        if ("focus" in client) { client.focus(); return; }
+        if (client.url.includes("/terrain") && "navigate" in client) {
+          return client.navigate(url).then(() => client.focus());
+        }
       }
       return self.clients.openWindow(url);
     })
