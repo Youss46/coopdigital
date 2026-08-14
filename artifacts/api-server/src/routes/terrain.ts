@@ -94,11 +94,14 @@ import {
   getChauffeurBons,
   utiliserBonChauffeur,
 } from "../controllers/chauffeurTerrainController.js";
+import { handleQrTokenBonStation } from "../controllers/stationController.js";
 
-router.get("/terrain/chauffeur/accueil",           terrainAuthMiddleware, getChauffeurAccueil);
-router.get("/terrain/chauffeur/missions",           terrainAuthMiddleware, getChauffeurMissions);
-router.get("/terrain/chauffeur/bons-carburant",     terrainAuthMiddleware, getChauffeurBons);
-router.put("/terrain/chauffeur/bons-carburant/:id/utiliser", terrainAuthMiddleware, utiliserBonChauffeur);
+router.get("/terrain/chauffeur/accueil",                              terrainAuthMiddleware, getChauffeurAccueil);
+router.get("/terrain/chauffeur/missions",                             terrainAuthMiddleware, getChauffeurMissions);
+router.get("/terrain/chauffeur/bons-carburant",                       terrainAuthMiddleware, getChauffeurBons);
+router.put("/terrain/chauffeur/bons-carburant/:id/utiliser",          terrainAuthMiddleware, utiliserBonChauffeur);
+// QR token : réservé au chauffeur propriétaire du bon (ownership vérifié dans le contrôleur)
+router.get("/terrain/chauffeur/bons-carburant/:numero/qr-token",      terrainAuthMiddleware, handleQrTokenBonStation);
 
 // Push notifications
 router.get("/terrain/push/vapid-key", getVapidPublicKey);

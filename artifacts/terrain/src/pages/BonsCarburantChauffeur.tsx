@@ -88,30 +88,24 @@ export default function BonsCarburantChauffeur() {
   }, [tab]);
 
   // Récupère (ou rafraîchit) un token QR signé depuis le serveur.
-  // Retourne false si le bon n'est plus éligible (annulé, déjà utilisé).
+  // Endpoint authentifié : seul le chauffeur propriétaire du bon peut le générer.
+  // Retourne false si le bon n'est plus éligible ou en cas d'erreur.
   const fetchQrToken = useCallback(async (bon: BonCarburant): Promise<boolean> => {
     setQrLoading(true);
     setQrError(null);
     try {
-      const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`;
-      const res = await fetch(
-        `${BASE}/station/carburant/bons/${encodeURIComponent(bon.numero)}/qr-token`,
+      // apiGet ajoute automatiquement le token Bearer terrain et cible /api/terrain/*
+      const tok = await apiGet<{ payload: string; sig: string; spki?: string }>(
+        `/chauffeur/bons-carburant/${encodeURIComponent(bon.numero)}/qr-token`,
       );
-      if (res.ok) {
-        const tok = await res.json() as { payload: string; sig: string; spki?: string };
-        setQrToken({ payload: tok.payload, sig: tok.sig });
-        if (tok.spki) {
-          try { localStorage.setItem("station_qr_spki_v1", tok.spki); } catch { /* ignore */ }
-        }
-        return true;
-      } else {
-        const body = await res.json().catch(() => ({})) as { erreur?: string };
-        setQrError(body.erreur ?? "Impossible de générer le QR");
-        setQrToken(null);
-        return false;
+      setQrToken({ payload: tok.payload, sig: tok.sig });
+      if (tok.spki) {
+        try { localStorage.setItem("station_qr_spki_v1", tok.spki); } catch { /* ignore */ }
       }
-    } catch {
-      setQrError("Hors connexion — impossible de rafraîchir le QR");
+      return true;
+    } catch (err) {
+      setQrError((err as Error).message ?? "Impossible de générer le QR");
+      setQrToken(null);
       return false;
     } finally {
       setQrLoading(false);

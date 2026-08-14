@@ -185,16 +185,31 @@ function extractQrParamsFromUrl(raw: string): { p: string; s: string } | null {
   return null;
 }
 
-/** Décode un payload base64url en QrData. Retourne null si invalide/expiré. */
-function decodeQrPayload(payload: string): QrData | null {
+/**
+ * Décode un payload base64url en QrData, SANS vérifier l'expiration.
+ * Retourne null uniquement si le format est invalide (mauvais JSON, version, num absent).
+ */
+function decodeQrPayloadRaw(payload: string): QrData | null {
   try {
     const json = JSON.parse(
       atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
     ) as QrData;
     if (json.v !== 1 || !json.num) return null;
-    if (json.exp < Date.now()) return null; // expiré
     return json;
   } catch { return null; }
+}
+
+/** Décode un payload base64url en QrData. Retourne null si invalide OU expiré. */
+function decodeQrPayload(payload: string): QrData | null {
+  const data = decodeQrPayloadRaw(payload);
+  if (!data) return null;
+  if (data.exp < Date.now()) return null; // expiré
+  return data;
+}
+
+/** Retourne le nombre de jours restants avant expiration (peut être négatif). */
+function daysUntilExpiry(expMs: number): number {
+  return Math.floor((expMs - Date.now()) / 86_400_000);
 }
 
 // ── Composant ─────────────────────────────────────────────────────────────────
@@ -211,8 +226,8 @@ export default function StationService() {
   const [notFound, setNotFound] = useState(false);
 
   // État QR — conservé en state pour être transmis à la confirmation
-  const [qrPayload, setQrPayload] = useState<string | null>(null);
-  const [qrSig, setQrSig]         = useState<string | null>(null);
+  const [qrPayload, setQrPayload]   = useState<string | null>(null);
+  const [qrSig, setQrSig]           = useState<string | null>(null);
   /**
    * null     = vérification en cours (payload présent, vérif pas encore terminée)
    * true     = Ed25519 OK
@@ -221,6 +236,10 @@ export default function StationService() {
    * "online" = bon chargé depuis l'API (pas de vérification Ed25519 requise)
    */
   const [qrVerified, setQrVerified] = useState<true | false | "no-key" | "online" | null>(null);
+  /** true = le QR est expiré (timestamp exp dépassé) — bloque la délivrance */
+  const [qrExpired, setQrExpired]   = useState(false);
+  /** Timestamp d'expiration extrait du payload QR (ms). */
+  const [qrExpiryMs, setQrExpiryMs] = useState<number | null>(null);
 
   // Compteur pour annuler les vérifications obsolètes (race condition API vs offline)
   const verifGenRef = useRef(0);
@@ -241,49 +260,28 @@ export default function StationService() {
 
   // ── applyQrOffline : vérification Ed25519 avant affichage ────────────────────
   // N'appelle setBon() qu'APRÈS que la vérification soit terminée.
-  const applyQrOffline = useCallback(async (payload: string, sig: string): Promise<"ok" | "failed" | "no-key"> => {
-    const data = decodeQrPayload(payload);
-    if (!data) return "failed";
+  const applyQrOffline = useCallback(async (payload: string, sig: string): Promise<"ok" | "failed" | "no-key" | "expired"> => {
+    // Décoder sans filtrer l'expiration pour pouvoir afficher un message clair
+    const rawData = decodeQrPayloadRaw(payload);
+    if (!rawData) return "failed";
+
+    const isExpired = rawData.exp < Date.now();
 
     const gen = ++verifGenRef.current;
     setQrPayload(payload);
     setQrSig(sig);
     setQrVerified(null); // en cours
+    setQrExpired(isExpired);
+    setQrExpiryMs(rawData.exp);
 
     const pubKey = await loadPublicKey();
-
     if (verifGenRef.current !== gen) return "failed"; // annulé par l'API
 
-    if (!pubKey) {
-      // Clé absente — afficher les données avec avertissement
-      setQrVerified("no-key");
-      setBon({
-        numero: data.num, statut: "approuve",
-        type_carburant: data.type, quantite_autorisee: data.qte,
-        station_service: null, motif: data.motif,
-        date_emission: data.date_em, immatriculation: data.immat,
-        marque: data.marque, chauffeur_nom: data.chauffeur,
-        offline: true,
-      });
-      return "no-key";
-    }
-
-    const ok = await verifyQrSig(payload, sig, pubKey);
-
+    const sigOk = pubKey ? await verifyQrSig(payload, sig, pubKey) : null;
     if (verifGenRef.current !== gen) return "failed"; // annulé par l'API
 
-    if (ok) {
-      setQrVerified(true);
-      setBon({
-        numero: data.num, statut: "approuve",
-        type_carburant: data.type, quantite_autorisee: data.qte,
-        station_service: null, motif: data.motif,
-        date_emission: data.date_em, immatriculation: data.immat,
-        marque: data.marque, chauffeur_nom: data.chauffeur,
-        offline: true,
-      });
-      return "ok";
-    } else {
+    // QR falsifié (signature invalide) — refus immédiat qu'il soit expiré ou non
+    if (sigOk === false) {
       setQrVerified(false);
       setQrPayload(null);
       setQrSig(null);
@@ -294,6 +292,25 @@ export default function StationService() {
       });
       return "failed";
     }
+
+    // Afficher les données du bon (expiré ou non)
+    setBon({
+      numero: rawData.num, statut: "approuve",
+      type_carburant: rawData.type, quantite_autorisee: rawData.qte,
+      station_service: null, motif: rawData.motif,
+      date_emission: rawData.date_em, immatriculation: rawData.immat,
+      marque: rawData.marque, chauffeur_nom: rawData.chauffeur,
+      offline: true,
+    });
+
+    if (!pubKey) {
+      setQrVerified("no-key");
+      return isExpired ? "expired" : "no-key";
+    }
+
+    // sigOk === true ici
+    setQrVerified(true);
+    return isExpired ? "expired" : "ok";
   }, [toast]);
 
   // ── Recherche du bon (en ligne) ───────────────────────────────────────────────
@@ -309,13 +326,63 @@ export default function StationService() {
       if (res.status === 404) { setNotFound(true); return; }
       if (!res.ok) throw new Error(`Erreur ${res.status}`);
       const data = (await res.json()) as BonInfo;
-      // Annuler toute vérification Ed25519 en cours (on a la réponse API)
+
+      // Annuler toute vérification Ed25519 offline en cours (on a la réponse API)
       verifGenRef.current++;
       setBon(data);
-      setQrPayload(offlinePayload ?? null);
-      setQrSig(offlineSig ?? null);
-      setQrVerified("online");
       if (data.station_service) setForm(f => ({ ...f, station_service: data.station_service! }));
+
+      if (offlinePayload && offlineSig) {
+        // QR params présents → valider signature ET expiration même en ligne.
+        // Le QR est la preuve d'autorisation requise pour livrer.
+        const rawData = decodeQrPayloadRaw(offlinePayload);
+        if (!rawData) {
+          // Payload illisible — bloquer la délivrance
+          setQrPayload(null);
+          setQrSig(null);
+          setQrVerified(false);
+          setQrExpired(false);
+          setQrExpiryMs(null);
+          toast({ title: "QR code invalide", description: "Le payload QR est illisible.", variant: "destructive" });
+          return;
+        }
+
+        const isExpired = rawData.exp < Date.now();
+        setQrExpiryMs(rawData.exp);
+        setQrExpired(isExpired);
+
+        // Vérifier la signature (peut nécessiter un fetch réseau la 1re fois)
+        const pubKey = await loadPublicKey();
+        if (pubKey) {
+          const sigOk = await verifyQrSig(offlinePayload, offlineSig, pubKey);
+          if (!sigOk) {
+            setQrPayload(null);
+            setQrSig(null);
+            setQrVerified(false);
+            setQrExpiryMs(null);
+            setQrExpired(false);
+            toast({
+              title: "QR code invalide",
+              description: "La signature est incorrecte. Ce bon pourrait être falsifié.",
+              variant: "destructive",
+            });
+            return;
+          }
+          setQrVerified(true);
+        } else {
+          // Pas de clé disponible — afficher avec avertissement
+          setQrVerified("no-key");
+        }
+        setQrPayload(offlinePayload);
+        setQrSig(offlineSig);
+      } else {
+        // Recherche manuelle (pas de QR) — afficher le bon mais pas le formulaire
+        setQrPayload(null);
+        setQrSig(null);
+        setQrVerified(null);
+        setQrExpired(false);
+        setQrExpiryMs(null);
+      }
     } catch {
       // Si on a un payload QR valide → mode offline
       if (offlinePayload && offlineSig) {
@@ -454,6 +521,7 @@ export default function StationService() {
           onClick={() => {
             setBon(null); setDone(false); setSearchValue(""); setTicketPhoto(null);
             setQrPayload(null); setQrSig(null); setQrVerified(null);
+            setQrExpired(false); setQrExpiryMs(null);
             setForm({ quantite_livree: "", prix_litre_fcfa: "", date_utilisation: new Date().toISOString().split("T")[0]!, station_service: "", observations: "" });
           }}
         >
@@ -532,14 +600,28 @@ export default function StationService() {
         {/* Infos du bon — affichées seulement après vérification */}
         {bon && !qrPending && (
           <>
-            {/* Bannière statut offline */}
-            {bon.offline && qrVerified === true && (
+            {/* Bannière QR expiré — prioritaire sur les autres bannières */}
+            {bon.offline && qrExpired && (
+              <div className="flex items-start gap-2 text-red-800 text-sm bg-red-50 border border-red-300 rounded-lg px-3 py-3">
+                <XCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold">QR code expiré</p>
+                  <p className="text-xs text-red-700 mt-0.5">
+                    Ce QR a expiré le {new Date(qrExpiryMs!).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}.
+                    Le chauffeur doit générer un nouveau QR depuis son application.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Bannière statut offline — seulement si non expiré */}
+            {bon.offline && !qrExpired && qrVerified === true && (
               <div className="flex items-center gap-2 text-green-800 text-sm bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                 <ShieldCheck className="h-4 w-4 shrink-0 text-green-600" />
                 QR authentique — signature vérifiée hors connexion. La confirmation nécessite internet.
               </div>
             )}
-            {bon.offline && qrVerified === "no-key" && (
+            {bon.offline && !qrExpired && qrVerified === "no-key" && (
               <div className="flex items-center gap-2 text-amber-800 text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 <WifiOff className="h-4 w-4 shrink-0" />
                 Clé de vérification introuvable (connexion hors ligne totale). Les données proviennent du QR mais n'ont pas pu être vérifiées. La confirmation nécessite internet.
@@ -550,9 +632,26 @@ export default function StationService() {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base font-mono">{bon.numero}</CardTitle>
-                  <div className="flex items-center gap-1.5">
-                    {bon.offline && qrVerified === true && <ShieldCheck className="h-4 w-4 text-green-600" />}
-                    {bon.offline && qrVerified === "no-key" && <ShieldAlert className="h-4 w-4 text-amber-500" />}
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    {bon.offline && qrExpired && (
+                      <Badge className="bg-red-100 text-red-700 border border-red-300">
+                        QR expiré
+                      </Badge>
+                    )}
+                    {bon.offline && !qrExpired && qrExpiryMs !== null && (
+                      <Badge className={
+                        daysUntilExpiry(qrExpiryMs) <= 3
+                          ? "bg-amber-100 text-amber-700 border border-amber-300"
+                          : "bg-green-100 text-green-700 border border-green-200"
+                      }>
+                        {daysUntilExpiry(qrExpiryMs) <= 0
+                          ? "Expire aujourd'hui"
+                          : `Expire dans ${daysUntilExpiry(qrExpiryMs)} j`}
+                      </Badge>
+                    )}
+                    {bon.offline && !qrExpired && qrVerified === true && <ShieldCheck className="h-4 w-4 text-green-600" />}
+                    {bon.offline && !qrExpired && qrVerified === "no-key" && <ShieldAlert className="h-4 w-4 text-amber-500" />}
+                    {bon.offline && qrExpired && <XCircle className="h-4 w-4 text-red-500" />}
                     <Badge className={
                       bon.statut === "approuve" ? "bg-green-100 text-green-800"
                       : bon.statut === "utilise" ? "bg-gray-100 text-gray-600"
@@ -606,8 +705,21 @@ export default function StationService() {
               </CardContent>
             </Card>
 
+            {/* Message si bon trouvé en ligne sans QR (recherche manuelle) */}
+            {bon.statut === "approuve" && !qrPayload && qrVerified === null && (
+              <div className="flex items-start gap-2 text-amber-800 text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-3">
+                <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold">QR code requis pour livrer</p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Demandez au chauffeur de présenter son QR code, puis scannez-le ou saisissez l'URL du QR.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Formulaire délivrance */}
-            {bon.statut === "approuve" && qrVerified !== false && (
+            {bon.statut === "approuve" && !!qrPayload && !!qrSig && qrVerified !== false && !qrExpired && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">

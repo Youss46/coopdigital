@@ -38,10 +38,9 @@ export const PUBLIC_KEY_SPKI_B64: string = (
   QR_PUBLIC_KEY.export({ type: "spki", format: "der" }) as Buffer
 ).toString("base64");
 
-/** Durée de validité des QR codes : configurable via QR_TTL_DAYS (défaut 7 jours). */
-const _ttlDays = process.env["QR_TTL_DAYS"]
-  ? Math.max(1, parseInt(process.env["QR_TTL_DAYS"], 10))
-  : 7;
+/** Durée de validité des QR codes : configurable via QR_TTL_DAYS (défaut 7 jours, max 90). */
+const _rawTtl = parseInt(process.env["QR_TTL_DAYS"] ?? "", 10);
+const _ttlDays = Number.isFinite(_rawTtl) && _rawTtl > 0 ? Math.min(_rawTtl, 90) : 7;
 export const QR_TTL_MS = _ttlDays * 24 * 60 * 60 * 1000;
 
 /** Signe un payload (string base64url) avec la clé privée Ed25519. */

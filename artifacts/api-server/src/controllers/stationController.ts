@@ -25,14 +25,21 @@ export async function handleGetPublicKey(
   res.json({ alg: "Ed25519", spki: PUBLIC_KEY_SPKI_B64 });
 }
 
-// ── GET /station/carburant/bons/:numero/qr-token ─────────────────────────────
+// ── GET /terrain/chauffeur/bons-carburant/:numero/qr-token ───────────────────
 // Génère un payload signé Ed25519 pour encoder dans le QR code.
-// Appelé par le chauffeur (en ligne) au moment d'afficher son QR.
+// Réservé au chauffeur propriétaire du bon (terrainAuthMiddleware requis).
 export async function handleQrTokenBonStation(
   req: Request,
   res: Response,
 ): Promise<void> {
   try {
+    // Vérifier que l'appelant est bien un chauffeur avec un compte rattaché
+    const agentChauffeurId = req.agent?.chauffeurId ?? null;
+    if (req.agent?.role !== "chauffeur" || !agentChauffeurId) {
+      res.status(403).json({ erreur: "Accès réservé au chauffeur du bon" });
+      return;
+    }
+
     const numero = String(req.params["numero"]).toUpperCase();
     const row = await getBonCarburantByNumero(numero);
 
@@ -40,6 +47,13 @@ export async function handleQrTokenBonStation(
       res.status(404).json({ erreur: "Bon introuvable" });
       return;
     }
+
+    // S'assurer que ce bon appartient bien au chauffeur connecté
+    if (row.bon.chauffeurId !== agentChauffeurId) {
+      res.status(403).json({ erreur: "Ce bon ne vous appartient pas" });
+      return;
+    }
+
     if (row.bon.statut !== "approuve") {
       res
         .status(400)
@@ -147,38 +161,44 @@ export async function handleLivrerBonStation(
       qr_sig?: string;
     };
 
-    // Vérification de la signature QR si fournie
-    if (body.qr_payload !== undefined || body.qr_sig !== undefined) {
-      if (!body.qr_payload || !body.qr_sig) {
-        res.status(400).json({
-          erreur: "qr_payload et qr_sig doivent être fournis ensemble",
-        });
+    // Le QR code signé est obligatoire — c'est la preuve d'autorisation du chauffeur
+    if (!body.qr_payload || !body.qr_sig) {
+      res.status(400).json({
+        erreur: "Un QR code signé est requis pour livrer un bon",
+      });
+      return;
+    }
+    if (!verifyQrPayload(body.qr_payload, body.qr_sig)) {
+      res.status(400).json({ erreur: "Signature QR invalide ou falsifiée" });
+      return;
+    }
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(body.qr_payload, "base64url").toString("utf8"),
+      ) as { exp?: unknown; num?: unknown };
+
+      // exp doit être un nombre fini et dans le futur — fail-closed si absent ou NaN
+      if (typeof decoded.exp !== "number" || !Number.isFinite(decoded.exp)) {
+        res.status(400).json({ erreur: "Payload QR invalide — champ exp manquant ou non numérique" });
         return;
       }
-      if (!verifyQrPayload(body.qr_payload, body.qr_sig)) {
-        res.status(400).json({ erreur: "Signature QR invalide ou falsifiée" });
+      if (decoded.exp <= Date.now()) {
+        res.status(400).json({ erreur: "QR code expiré — demandez un nouveau bon" });
         return;
       }
-      try {
-        const decoded = JSON.parse(
-          Buffer.from(body.qr_payload, "base64url").toString("utf8"),
-        ) as { exp?: number; num?: string };
-        if (decoded.exp && decoded.exp < Date.now()) {
-          res
-            .status(400)
-            .json({ erreur: "QR code expiré — demandez un nouveau bon" });
-          return;
-        }
-        if (decoded.num && decoded.num !== numero) {
-          res.status(400).json({
-            erreur: "Le QR code ne correspond pas au bon demandé",
-          });
-          return;
-        }
-      } catch {
-        res.status(400).json({ erreur: "Payload QR illisible" });
+
+      // num doit correspondre exactement au bon demandé — fail-closed si absent
+      if (typeof decoded.num !== "string" || !decoded.num) {
+        res.status(400).json({ erreur: "Payload QR invalide — champ num manquant" });
         return;
       }
+      if (decoded.num !== numero) {
+        res.status(400).json({ erreur: "Le QR code ne correspond pas au bon demandé" });
+        return;
+      }
+    } catch {
+      res.status(400).json({ erreur: "Payload QR illisible" });
+      return;
     }
 
     if (!body.quantite_livree || !body.date_utilisation) {
