@@ -675,13 +675,13 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
       a.href = URL.createObjectURL(blob);
       const cd = r.headers.get("Content-Disposition") ?? "";
       const match = cd.match(/filename="([^"]+)"/);
-      a.download = match?.[1] ?? `journal-${annee}.csv`;
+      a.download = match?.[1] ?? `journal-${annee}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(a.href);
     } catch {
-      alert("Impossible de télécharger le fichier CSV.");
+      alert("Impossible de télécharger le fichier Excel.");
     } finally {
       setExporting(false);
     }
@@ -747,7 +747,7 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
         >
           <Download size={14} />
-          {exporting ? "Export…" : hasFilters ? "Exporter la sélection" : "Exporter CSV"}
+          {exporting ? "Export…" : hasFilters ? "Exporter la sélection" : "Exporter Excel"}
         </button>
 
         <div className="flex items-center gap-2">

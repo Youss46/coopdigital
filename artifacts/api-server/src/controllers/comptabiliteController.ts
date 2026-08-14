@@ -4,6 +4,7 @@ import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, confi
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
 import { assignerNumeroPiece, assignerNumerosPieces } from "../lib/numeroPiece";
+import ExcelJS from "exceljs";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -232,46 +233,77 @@ export async function exportJournalCsv(req: Request, res: Response): Promise<voi
 
     const SOURCE_LABELS: Record<string, string> = {
       livraison: "Livraisons prod.",
-      paiement: "Paiements prod.",
-      avance: "Avances prod.",
-      vente: "Ventes export.",
+      paiement:  "Paiements prod.",
+      avance:    "Avances prod.",
+      vente:     "Ventes export.",
       encaissement: "Encaissements",
-      salaire: "Salaires",
-      stock: "Stocks",
-      manuel: "Manuel",
+      salaire:   "Salaires",
+      stock:     "Stocks",
+      manuel:    "Manuel",
     };
 
-    const csvEscape = (v: string | number | null | undefined): string => {
-      if (v === null || v === undefined) return "";
-      const s = String(v);
-      if (s.includes(";") || s.includes('"') || s.includes("\n")) {
-        return `"${s.replace(/"/g, '""')}"`;
+    // ── Génération Excel ─────────────────────────────────────────────────────────
+    const wb = new ExcelJS.Workbook();
+    wb.creator  = "CoopDigital";
+    wb.created  = new Date();
+
+    const ws = wb.addWorksheet("Journal comptable");
+
+    ws.columns = [
+      { header: "Date",          key: "date",    width: 14 },
+      { header: "N° Pièce",      key: "piece",   width: 22 },
+      { header: "Libellé",       key: "libelle", width: 50 },
+      { header: "Compte Débit",  key: "debit",   width: 16 },
+      { header: "Compte Crédit", key: "credit",  width: 16 },
+      { header: "Montant FCFA",  key: "montant", width: 18 },
+      { header: "Source",        key: "source",  width: 22 },
+    ];
+
+    // En-tête : fond vert foncé, texte blanc, gras
+    const headerRow = ws.getRow(1);
+    headerRow.height = 22;
+    headerRow.font      = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+    headerRow.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A4731" } };
+    headerRow.alignment = { vertical: "middle", horizontal: "center" };
+
+    // Données
+    for (let i = 0; i < ecritures.length; i++) {
+      const e = ecritures[i]!;
+      const row = ws.addRow({
+        date:    e.dateEcriture  ?? "",
+        piece:   e.numeroPiece  ?? "",
+        libelle: e.libelle       ?? "",
+        debit:   e.compteDebit  ?? "",
+        credit:  e.compteCredit ?? "",
+        montant: parseFloat(String(e.montantFcfa)) || 0,
+        source:  SOURCE_LABELS[e.source] ?? e.source ?? "",
+      });
+      row.font = { size: 9 };
+      // Lignes alternées : gris très clair sur les lignes paires
+      if (i % 2 === 1) {
+        row.eachCell({ includeEmpty: true }, cell => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+        });
       }
-      return s;
-    };
+    }
 
-    const header = ["Date", "N° Pièce", "Libellé", "Compte Débit", "Compte Crédit", "Montant FCFA", "Source"].join(";");
-    const rows = ecritures.map((e) =>
-      [
-        csvEscape(e.dateEcriture),
-        csvEscape(e.numeroPiece),
-        csvEscape(e.libelle),
-        csvEscape(e.compteDebit),
-        csvEscape(e.compteCredit),
-        csvEscape(e.montantFcfa),
-        csvEscape(SOURCE_LABELS[e.source] ?? e.source),
-      ].join(";")
-    );
+    // Colonne montant : format numérique + alignement droite
+    ws.getColumn("montant").numFmt    = '#,##0';
+    ws.getColumn("montant").alignment = { horizontal: "right" };
 
-    const csv = [header, ...rows].join("\n");
-    const filename = `journal-${exercice}${source ? `-${source}` : ""}.csv`;
+    // Figer la 1ère ligne, activer l'auto-filtre
+    ws.views      = [{ state: "frozen", ySplit: 1 }];
+    ws.autoFilter = { from: "A1", to: "G1" };
 
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    const filename = `journal-${exercice}${source ? `-${source}` : ""}.xlsx`;
+    const buf      = await wb.xlsx.writeBuffer();
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.send("\uFEFF" + csv); // BOM UTF-8 pour Excel
+    res.send(buf);
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
-    req.log.error({ err }, "Erreur exportJournalCsv");
+    req.log.error({ err }, "Erreur exportJournalExcel");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
