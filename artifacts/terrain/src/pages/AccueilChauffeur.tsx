@@ -112,10 +112,16 @@ export default function AccueilChauffeur() {
                     <p className="text-xs text-gray-600">{bon.immatriculation ?? "—"} · {bon.quantite_autorisee} L {bon.type_carburant}</p>
                     {bon.station_service && <p className="text-xs text-gray-400">{bon.station_service}</p>}
                   </div>
-                  <Button size="sm" className="h-8 text-xs bg-amber-600 hover:bg-amber-700"
-                    onClick={() => navigate("/carburant")}>
-                    Utiliser
-                  </Button>
+                  <div className="flex gap-1.5">
+                    <Button size="sm" className="h-8 text-xs bg-amber-600 hover:bg-amber-700"
+                      onClick={() => navigate("/carburant")}>
+                      Utiliser
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8 text-xs border-amber-400 text-amber-700"
+                      onClick={() => navigate(`/station/${encodeURIComponent(bon.numero)}`)}>
+                      Station →
+                    </Button>
+                  </div>
                 </div>
               ))}
             </CardContent>

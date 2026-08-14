@@ -1,13 +1,14 @@
 import { useLocation } from "wouter";
-import { Home, Truck, Fuel } from "lucide-react";
+import { Home, Truck, Fuel, MapPin } from "lucide-react";
 
 export default function BottomNavChauffeur() {
   const [location, navigate] = useLocation();
 
   const links = [
-    { path: "/",          icon: Home,  label: "Accueil"  },
-    { path: "/missions",  icon: Truck, label: "Missions" },
-    { path: "/carburant", icon: Fuel,  label: "Carburant" },
+    { path: "/",          icon: Home,   label: "Accueil"  },
+    { path: "/missions",  icon: Truck,  label: "Missions" },
+    { path: "/carburant", icon: Fuel,   label: "Carburant" },
+    { path: "/station",   icon: MapPin, label: "Station"  },
   ];
 
   return (

@@ -2,7 +2,8 @@
  * Espace partenaire station-service.
  * Page publique (sans login coopérative) accessible depuis le QR code du bon.
  */
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,9 +76,10 @@ function compressPhoto(file: File): Promise<string> {
 
 export default function StationService() {
   const { toast } = useToast();
+  const params = useParams<{ numero?: string }>();
 
   // Recherche
-  const [searchValue, setSearchValue] = useState("");
+  const [searchValue, setSearchValue] = useState(params.numero ? decodeURIComponent(params.numero).toUpperCase() : "");
   const [loading, setLoading]         = useState(false);
   const [bon, setBon]                 = useState<BonInfo | null>(null);
   const [notFound, setNotFound]       = useState(false);
@@ -117,6 +119,17 @@ export default function StationService() {
       setLoading(false);
     }
   }, [searchValue, toast]);
+
+  // ── Auto-recherche si numéro passé en URL ────────────────────────────────────
+  useEffect(() => {
+    if (params.numero) {
+      const q = decodeURIComponent(params.numero).toUpperCase();
+      setSearchValue(q);
+      rechercher(q);
+    }
+    // On ne veut s'exécuter qu'au montage (params.numero ne change pas)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── QR / photo capture ───────────────────────────────────────────────────────
   const handleScanQR = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {

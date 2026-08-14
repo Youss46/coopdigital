@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useLocation } from "wouter";
 import { apiGet, apiPut } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Fuel, CheckCircle2, Clock, Droplets } from "lucide-react";
+import { Fuel, CheckCircle2, Clock, Droplets, QrCode, X } from "lucide-react";
 import BottomNavChauffeur from "@/components/BottomNavChauffeur";
 import { useToast } from "@/hooks/use-toast";
+import QRCode from "react-qr-code";
 
 interface BonCarburant {
   id: number;
@@ -61,10 +63,12 @@ const FILTER_TABS = [
 
 export default function BonsCarburantChauffeur() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [bons, setBons] = useState<BonCarburant[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(FILTER_TABS[0]!.value);
   const [selected, setSelected] = useState<BonCarburant | null>(null);
+  const [qrBon, setQrBon] = useState<BonCarburant | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<UtiliserForm>({
     quantite_livree: "", prix_litre_fcfa: "",
@@ -174,15 +178,21 @@ export default function BonsCarburantChauffeur() {
                   </div>
 
                   {bon.statut === "approuve" && (
-                    <Button className="w-full mt-1 bg-green-700 hover:bg-green-800" size="sm"
-                      onClick={() => {
-                        setSelected(bon);
-                        setForm({ quantite_livree: "", prix_litre_fcfa: "",
-                          date_utilisation: new Date().toISOString().split("T")[0]!,
-                          station_service: bon.station_service ?? "", observations: "" });
-                      }}>
-                      <Droplets className="h-4 w-4 mr-1" /> Enregistrer l'utilisation
-                    </Button>
+                    <div className="flex gap-2 mt-1">
+                      <Button className="flex-1 bg-green-700 hover:bg-green-800" size="sm"
+                        onClick={() => {
+                          setSelected(bon);
+                          setForm({ quantite_livree: "", prix_litre_fcfa: "",
+                            date_utilisation: new Date().toISOString().split("T")[0]!,
+                            station_service: bon.station_service ?? "", observations: "" });
+                        }}>
+                        <Droplets className="h-4 w-4 mr-1" /> Utilisation
+                      </Button>
+                      <Button variant="outline" size="sm" className="border-green-300 text-green-700"
+                        onClick={() => setQrBon(bon)}>
+                        <QrCode className="h-4 w-4 mr-1" /> QR
+                      </Button>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -248,6 +258,41 @@ export default function BonsCarburantChauffeur() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog QR code plein écran */}
+      {qrBon && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-6"
+          onClick={() => setQrBon(null)}>
+          <button
+            className="absolute top-4 right-4 text-white"
+            onClick={() => setQrBon(null)}
+          >
+            <X className="h-7 w-7" />
+          </button>
+          <div className="bg-white rounded-2xl p-6 flex flex-col items-center gap-4 max-w-xs w-full shadow-2xl"
+            onClick={e => e.stopPropagation()}>
+            <p className="font-mono text-lg font-bold text-green-700">{qrBon.numero}</p>
+            <p className="text-xs text-gray-500 text-center">
+              Présentez ce QR à la station-service
+            </p>
+            <div className="p-3 bg-white rounded-xl border border-gray-100">
+              <QRCode
+                value={`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/station/${encodeURIComponent(qrBon.numero)}`}
+                size={220}
+                level="M"
+              />
+            </div>
+            <p className="text-xs text-gray-400 text-center font-mono">{qrBon.numero}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => navigate(`/station/${encodeURIComponent(qrBon.numero)}`)}>
+              Ouvrir l'espace station →
+            </Button>
+          </div>
+        </div>
+      )}
 
       <BottomNavChauffeur />
     </div>
