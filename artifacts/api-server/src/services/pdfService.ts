@@ -32,6 +32,8 @@ import {
   traitementsRefusTable,
   campagnesTable,
   commissionsDeleguesTable,
+  certificationsTable,
+  certificationsMembresTable,
 } from "@workspace/db";
 import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -89,6 +91,33 @@ async function getCampagneEnCours(cooperativeId: number): Promise<string | null>
   if (!c) return null;
   const years = c.anneeDebut === c.anneeFin ? String(c.anneeDebut) : `${c.anneeDebut}/${c.anneeFin}`;
   return `${c.libelle} (${years})`;
+}
+
+/** Retourne le libellé de certification du produit pour un membre.
+ *  Ex : "Cacao certifié Rainforest Alliance · Fairtrade" ou "Cacao ordinaire". */
+async function getMentionCertification(membreId: number | null | undefined, cooperativeId: number): Promise<string> {
+  const LABELS: Record<string, string> = {
+    rainforest_alliance: "Rainforest Alliance",
+    fairtrade: "Fairtrade",
+    bio: "Agriculture Biologique",
+    eudr: "EUDR",
+    utz: "UTZ",
+    autre: "Certifié",
+  };
+  if (!membreId) return "Cacao ordinaire";
+  const rows = await db
+    .select({ type: certificationsTable.type })
+    .from(certificationsMembresTable)
+    .innerJoin(certificationsTable, eq(certificationsTable.id, certificationsMembresTable.certificationId))
+    .where(and(
+      eq(certificationsMembresTable.membreId, membreId),
+      eq(certificationsMembresTable.cooperativeId, cooperativeId),
+      eq(certificationsMembresTable.statutConformite, "certifie"),
+      eq(certificationsTable.statut, "actif"),
+    ));
+  if (rows.length === 0) return "Cacao ordinaire";
+  const labels = rows.map(r => LABELS[r.type] ?? r.type);
+  return `Cacao certifié ${labels.join(" · ")}`;
 }
 
 /** Helper : ajoute les pieds de page sur toutes les pages bufferisées puis libère le buffer.
@@ -739,6 +768,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
   const peseurUserAlias = alias(usersTable, "peseur_user");
   const [row] = await db.select({
     id: livraisonsTable.id,
+    membreId: livraisonsTable.membreId,
     codeAchat: livraisonsTable.codeAchat,
     dateLivraison: livraisonsTable.dateLivraison,
     produit: livraisonsTable.produit,
@@ -772,7 +802,10 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     .where(eq(livraisonsTable.id, livraisonId));
   if (!row) throw new Error("Livraison introuvable");
 
-  const campagne = await getCampagneEnCours(cooperativeId);
+  const [campagne, mentionCertif] = await Promise.all([
+    getCampagneEnCours(cooperativeId),
+    getMentionCertification(row.membreId, cooperativeId),
+  ]);
   const { doc, endPromise } = makePdfDoc();
   const ref = row.codeAchat ?? `LIV-${String(row.id).padStart(5, "0")}`;
   await drawHeader(doc, cooperativeId, { titre_document: "Reçu de Livraison", reference: ref });
@@ -793,7 +826,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     ["N° Reçu",            ref],
     ["Campagne",           campagne ?? "—"],
     ["Date de livraison",  formaterDate(row.dateLivraison)],
-    ["Produit",            row.produit ?? "Cacao"],
+    ["Produit",            mentionCertif],
     ["Nombre de sacs",     row.nombreSacs ? String(row.nombreSacs) : "—"],
     ["Poids brut",         row.produitBrutKg
       ? `${parseFloat(row.produitBrutKg).toFixed(2)} kg`
@@ -1262,6 +1295,7 @@ export async function generateBordereauPesee(livraisonId: number, cooperativeId:
     litigePesee: livraisonsTable.litigePesee,
     prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
     montantBrutFcfa: livraisonsTable.montantBrutFcfa,
+    membreId: livraisonsTable.membreId,
     membreNom: membresTable.nom,
     membrePrenoms: membresTable.prenoms,
     membreGroupement: membresTable.groupement,
@@ -1270,7 +1304,10 @@ export async function generateBordereauPesee(livraisonId: number, cooperativeId:
     .where(eq(livraisonsTable.id, livraisonId));
   if (!row) throw new Error("Livraison introuvable");
 
-  const campagne = await getCampagneEnCours(cooperativeId);
+  const [campagne, mentionCertif] = await Promise.all([
+    getCampagneEnCours(cooperativeId),
+    getMentionCertification(row.membreId, cooperativeId),
+  ]);
   const { doc, endPromise } = makePdfDoc();
   const ref = row.codeAchat ?? `PES-${String(row.id).padStart(5,"0")}`;
   await drawHeader(doc, cooperativeId, { titre_document: "Bordereau de Pesée", reference: ref });
@@ -1281,7 +1318,7 @@ export async function generateBordereauPesee(livraisonId: number, cooperativeId:
   doc.fontSize(11).fillColor(VERT).font("Helvetica-Bold")
     .text(`${row.membrePrenoms ?? ""} ${row.membreNom ?? "—"}`, MARGIN + 8, y + 16);
   doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-    .text(`Groupement : ${row.membreGroupement ?? "—"}   |   Produit : ${row.produit ?? "Cacao"}   |   Sacs : ${row.nombreSacs ?? "—"}`, MARGIN + 8, y + 30);
+    .text(`Groupement : ${row.membreGroupement ?? "—"}   |   ${mentionCertif}   |   Sacs : ${row.nombreSacs ?? "—"}`, MARGIN + 8, y + 30);
   y += 52;
 
   if (campagne) {
