@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { db, ecrituresComptablesTable } from "@workspace/db";
+import { proposerEcriture } from "../services/comptabiliteService";
 import {
   listChargesDiverses,
   getChargeDiverses,
@@ -123,26 +123,17 @@ export async function handleValiderChargeDiverses(req: Request, res: Response): 
     const row = await validerChargeDiverses(cooperativeId, id, userId);
     if (!row) { res.status(404).json({ erreur: "Charge introuvable ou déjà validée" }); return; }
 
-    // Écriture comptable OHADA — insertion directe avec source "manuel"
-    void (async () => {
-      try {
-        const exercice = new Date(row.dateCharge).getFullYear();
-        await db.insert(ecrituresComptablesTable).values({
-          cooperativeId:  row.cooperativeId,
-          dateEcriture:   row.dateCharge,
-          libelle:        row.libelle,
-          compteDebit:    row.compteDebit,
-          compteCredit:   row.compteCredit,
-          montantFcfa:    Math.round(parseFloat(row.montantFcfa)),
-          source:         "manuel",
-          sourceId:       null,
-          exercice,
-          numeroPiece:    row.referencePiece ?? null,
-        });
-      } catch (e) {
-        req.log.warn({ err: e }, "Écriture charges_diverses échouée");
-      }
-    })();
+    // Écriture comptable OHADA — respecte le toggle auto/manuel de la coopérative
+    void proposerEcriture(cooperativeId, {
+      source:       "charges_diverses",
+      sourceId:     row.id,
+      libelle:      row.libelle,
+      compteDebit:  row.compteDebit,
+      compteCredit: row.compteCredit,
+      montantFcfa:  Math.round(parseFloat(row.montantFcfa)),
+      date:         row.dateCharge,
+      numeroPiece:  row.referencePiece ?? undefined,
+    });
 
     res.json(mapCharge(row));
   } catch (err) {

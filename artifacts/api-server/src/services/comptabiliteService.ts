@@ -21,7 +21,9 @@ export type SourceEcriture =
   // Primes exportateurs / redistribution producteurs
   | "prime_reception" | "prime_paiement"
   // Commissions délégués localités
-  | "commission_delegue";
+  | "commission_delegue"
+  // Charges diverses d'exploitation
+  | "charges_diverses";
 
 interface ProposerEcriturePayload {
   source: SourceEcriture;
@@ -61,6 +63,7 @@ const AUTO_KEY_MAP: Record<SourceEcriture, keyof typeof configComptableTable.$in
   prime_reception:   "autoPrimes",
   prime_paiement:    "autoPrimes",
   commission_delegue:"autoCommissions",
+  charges_diverses:  "autoMaintenances",   // exploitation courante — même toggle que les charges opérationnelles
 };
 
 // Mapping vers les valeurs d'enum PostgreSQL existantes
@@ -87,6 +90,7 @@ const DB_SOURCE_MAP: Record<SourceEcriture, "livraison" | "vente" | "avance" | "
   prime_reception:   "encaissement",
   prime_paiement:    "paiement",
   commission_delegue:"paiement",
+  charges_diverses:  "paiement",
 };
 
 async function getConfigComptable(cooperativeId: number) {
