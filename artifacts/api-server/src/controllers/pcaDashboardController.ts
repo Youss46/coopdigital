@@ -450,6 +450,8 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
         creances_en_retard: creancesEnRetardRows[0]?.count ?? 0,
         avances_en_cours_fcfa: Number(avancesRow?.total ?? 0),
         emprunts_solde_fcfa: Number(empruntsRow?.total ?? 0),
+        bilan_date_generation: bilan?.dateGeneration ? new Date(bilan.dateGeneration).toISOString() : null,
+        bilan_source: bilan ? "bilan" : "estimation",
       },
       budget: {
         prevu_fcfa: prevuFcfa,
@@ -661,6 +663,7 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
             nb_membres_actifs: bilan.nbMembresActifs ?? 0,
             taux_remboursement_avances_pct: avOctroyees > 0 ? Math.round((avRemboursees / avOctroyees) * 100) : 0,
             source: "bilan",
+            date_generation: bilan.dateGeneration ? new Date(bilan.dateGeneration).toISOString() : null,
           };
         }
 

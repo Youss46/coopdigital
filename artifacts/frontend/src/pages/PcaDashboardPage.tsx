@@ -30,6 +30,8 @@ interface Synthese {
     tresorerie_disponible_fcfa: number;
     creances_exportateurs_fcfa: number; creances_en_retard: number;
     avances_en_cours_fcfa: number; emprunts_solde_fcfa: number;
+    bilan_date_generation?: string | null;
+    bilan_source?: "bilan" | "estimation";
   };
   budget: {
     prevu_fcfa: number; realise_fcfa: number;
@@ -49,6 +51,8 @@ interface ComparaisonRow {
   tonnage_t: number; ca_fcfa: number; marge_nette_fcfa: number;
   marge_kg_fcfa: number; nb_membres_actifs: number;
   taux_remboursement_avances_pct: number;
+  source?: "bilan" | "computed";
+  date_generation?: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -368,8 +372,19 @@ export default function PcaDashboardPage() {
           label="Marge nette"
           value={fmtFull(s.financier.marge_nette_fcfa)}
           unit="FCFA"
-          sub={`${s.financier.marge_kg_fcfa.toLocaleString("fr-FR")} FCFA/T`}
-          subColor="text-green-600"
+          sub={
+            s.financier.bilan_source === "estimation"
+              ? "⚠️ Estimation — bilan non généré"
+              : s.financier.bilan_date_generation
+              ? `Bilan du ${new Date(s.financier.bilan_date_generation).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}`
+              : `${s.financier.marge_kg_fcfa.toLocaleString("fr-FR")} FCFA/T`
+          }
+          subColor={s.financier.bilan_source === "estimation" ? "text-amber-600" : "text-green-600"}
+          badge={
+            s.financier.bilan_source === "estimation"
+              ? { text: "Estimation", color: "bg-amber-100 text-amber-700" }
+              : undefined
+          }
         />
         <KpiCard
           icon={<Wallet className="w-5 h-5 text-blue-600" />}
@@ -611,7 +626,20 @@ export default function PcaDashboardPage() {
                 },
                 {
                   label: "Marge nette (FCFA)",
-                  key: (r: ComparaisonRow) => fmt(r.marge_nette_fcfa),
+                  key: (r: ComparaisonRow) => (
+                    <span className="flex flex-col items-end gap-0.5">
+                      <span>{fmt(r.marge_nette_fcfa)}</span>
+                      {r.source === "bilan" && r.date_generation ? (
+                        <span className="text-[10px] text-gray-400 font-sans font-normal whitespace-nowrap">
+                          Bilan du {new Date(r.date_generation).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "2-digit" })}
+                        </span>
+                      ) : r.source === "computed" ? (
+                        <span className="text-[10px] text-amber-500 font-sans font-normal whitespace-nowrap">
+                          ⚠️ Estimation
+                        </span>
+                      ) : null}
+                    </span>
+                  ),
                 },
                 {
                   label: "Marge/T (FCFA)",
