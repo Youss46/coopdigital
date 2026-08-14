@@ -565,10 +565,7 @@ export const CreateLotBody = zod.object({
   "cooperativeId": zod.number(),
   "livraisonIds": zod.array(zod.number()),
   "entrepot": zod.string().optional(),
-  "nombreSacs": zod.number().optional(),
-  "quantiteCibleKg": zod.number().optional(),
-  "fractionLivraisonId": zod.number().optional(),
-  "fractionPoidsKg": zod.number().optional()
+  "nombreSacs": zod.number().optional()
 })
 
 
@@ -6100,6 +6097,143 @@ export const TerminerMissionResponse = zod.object({
   "observations": zod.string().nullish(),
   "created_at": zod.coerce.date(),
   "updated_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Dépenses d'un véhicule
+ */
+export const GetDepensesVehiculeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetDepensesVehiculeQueryParams = zod.object({
+  "type": zod.coerce.string().optional(),
+  "date_debut": zod.date().optional(),
+  "date_fin": zod.date().optional()
+})
+
+export const GetDepensesVehiculeResponse = zod.object({
+  "depenses": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "vehicule_id": zod.number(),
+  "immatriculation": zod.string().nullish(),
+  "mission_id": zod.number().nullish(),
+  "type": zod.string(),
+  "date_depense": zod.coerce.date(),
+  "montant_fcfa": zod.number(),
+  "libelle": zod.string(),
+  "fournisseur": zod.string().nullish(),
+  "reference_piece": zod.string().nullish(),
+  "quantite": zod.number().nullish(),
+  "unite": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date().optional()
+})),
+  "total_fcfa": zod.number()
+})
+
+
+/**
+ * @summary Enregistrer une dépense véhicule
+ */
+export const CreateDepenseVehiculeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateDepenseVehiculeBody = zod.object({
+  "type": zod.string(),
+  "date_depense": zod.coerce.date(),
+  "montant_fcfa": zod.number(),
+  "libelle": zod.string(),
+  "mission_id": zod.number().optional(),
+  "fournisseur": zod.string().optional(),
+  "reference_piece": zod.string().optional(),
+  "quantite": zod.number().optional(),
+  "unite": zod.string().optional()
+})
+
+
+/**
+ * @summary Toutes les dépenses véhicules de la coopérative
+ */
+export const GetDepensesTransportQueryParams = zod.object({
+  "vehicule_id": zod.coerce.number().optional(),
+  "type": zod.coerce.string().optional(),
+  "date_debut": zod.date().optional(),
+  "date_fin": zod.date().optional()
+})
+
+export const GetDepensesTransportResponse = zod.object({
+  "depenses": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "vehicule_id": zod.number(),
+  "immatriculation": zod.string().nullish(),
+  "mission_id": zod.number().nullish(),
+  "type": zod.string(),
+  "date_depense": zod.coerce.date(),
+  "montant_fcfa": zod.number(),
+  "libelle": zod.string(),
+  "fournisseur": zod.string().nullish(),
+  "reference_piece": zod.string().nullish(),
+  "quantite": zod.number().nullish(),
+  "unite": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date().optional()
+})),
+  "total_fcfa": zod.number()
+})
+
+
+/**
+ * @summary Modifier une dépense véhicule
+ */
+export const UpdateDepenseVehiculeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateDepenseVehiculeBody = zod.object({
+  "type": zod.string().optional(),
+  "date_depense": zod.coerce.date().optional(),
+  "montant_fcfa": zod.number().optional(),
+  "libelle": zod.string().optional(),
+  "mission_id": zod.number().optional(),
+  "fournisseur": zod.string().optional(),
+  "reference_piece": zod.string().optional(),
+  "quantite": zod.number().optional(),
+  "unite": zod.string().optional()
+})
+
+export const UpdateDepenseVehiculeResponse = zod.object({
+  "id": zod.number(),
+  "cooperative_id": zod.number(),
+  "vehicule_id": zod.number(),
+  "immatriculation": zod.string().nullish(),
+  "mission_id": zod.number().nullish(),
+  "type": zod.string(),
+  "date_depense": zod.coerce.date(),
+  "montant_fcfa": zod.number(),
+  "libelle": zod.string(),
+  "fournisseur": zod.string().nullish(),
+  "reference_piece": zod.string().nullish(),
+  "quantite": zod.number().nullish(),
+  "unite": zod.string().nullish(),
+  "created_at": zod.coerce.date(),
+  "updated_at": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Supprimer une dépense véhicule
+ */
+export const DeleteDepenseVehiculeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteDepenseVehiculeResponse = zod.object({
+  "ok": zod.boolean().optional()
 })
 
 

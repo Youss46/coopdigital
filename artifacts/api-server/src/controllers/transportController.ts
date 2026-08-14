@@ -29,6 +29,10 @@ import {
   terminerMission,
   getRapportCampagne,
   getRapportVehicule,
+  getDepenses,
+  createDepense,
+  updateDepense,
+  deleteDepense,
 } from "../services/transportService";
 
 function toDateStr(d: Date | null | undefined): string | null | undefined {
@@ -526,6 +530,126 @@ export async function handleTerminerMission(req: Request, res: Response): Promis
     res.json(mappedMission);
   } catch (err) {
     req.log.error({ err }, "Erreur terminerMission");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── DÉPENSES VÉHICULES ───────────────────────────────────────────────────────
+
+function mapDepense(d: { depense: { id: number; cooperativeId: number; vehiculeId: number; missionId: number | null; type: string; dateDepense: string; montantFcfa: string; libelle: string; fournisseur: string | null; referencePiece: string | null; quantite: string | null; unite: string | null; createdAt: Date; updatedAt: Date }; immatriculation: string | null | undefined }) {
+  return {
+    id:               d.depense.id,
+    cooperative_id:   d.depense.cooperativeId,
+    vehicule_id:      d.depense.vehiculeId,
+    immatriculation:  d.immatriculation ?? null,
+    mission_id:       d.depense.missionId ?? null,
+    type:             d.depense.type,
+    date_depense:     d.depense.dateDepense,
+    montant_fcfa:     parseFloat(d.depense.montantFcfa),
+    libelle:          d.depense.libelle,
+    fournisseur:      d.depense.fournisseur ?? null,
+    reference_piece:  d.depense.referencePiece ?? null,
+    quantite:         d.depense.quantite != null ? parseFloat(d.depense.quantite) : null,
+    unite:            d.depense.unite ?? null,
+    created_at:       d.depense.createdAt.toISOString(),
+    updated_at:       d.depense.updatedAt.toISOString(),
+  };
+}
+
+export async function handleGetDepensesVehicule(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const vehiculeId = parseInt(String(req.params["id"]));
+    if (isNaN(vehiculeId)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const { type, date_debut, date_fin } = req.query as Record<string, string | undefined>;
+    const { rows, total } = await getDepenses(cooperativeId, { vehiculeId, type, dateDebut: date_debut, dateFin: date_fin });
+    res.json({ depenses: rows.map(mapDepense), total_fcfa: Math.round(total) });
+  } catch (err) {
+    req.log.error({ err }, "Erreur getDepensesVehicule");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleGetDepensesTransport(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const { vehicule_id, type, date_debut, date_fin } = req.query as Record<string, string | undefined>;
+    const vehiculeId = vehicule_id ? parseInt(vehicule_id) : undefined;
+    const { rows, total } = await getDepenses(cooperativeId, { vehiculeId, type, dateDebut: date_debut, dateFin: date_fin });
+    res.json({ depenses: rows.map(mapDepense), total_fcfa: Math.round(total) });
+  } catch (err) {
+    req.log.error({ err }, "Erreur getDepensesTransport");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleCreateDepenseVehicule(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const vehiculeId = parseInt(String(req.params["id"]));
+    if (isNaN(vehiculeId)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const body = req.body as { type: string; date_depense: string; montant_fcfa: number; libelle: string; mission_id?: number; fournisseur?: string; reference_piece?: string; quantite?: number; unite?: string };
+    if (!body.type || !body.date_depense || body.montant_fcfa == null || !body.libelle) {
+      res.status(400).json({ erreur: "Champs requis manquants" }); return;
+    }
+    const depense = await createDepense(cooperativeId, vehiculeId, {
+      type:           body.type,
+      dateDepense:    toDateStr(new Date(body.date_depense))!,
+      montantFcfa:    String(body.montant_fcfa),
+      libelle:        body.libelle,
+      missionId:      body.mission_id ?? null,
+      fournisseur:    body.fournisseur ?? null,
+      referencePiece: body.reference_piece ?? null,
+      quantite:       body.quantite != null ? String(body.quantite) : null,
+      unite:          body.unite ?? null,
+    });
+    res.status(201).json(mapDepense({ depense, immatriculation: null }));
+  } catch (err) {
+    req.log.error({ err }, "Erreur createDepenseVehicule");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleUpdateDepenseVehicule(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const body = req.body as Record<string, unknown>;
+    const patch: Record<string, unknown> = {};
+    if (body["type"] != null)             patch["type"]           = body["type"];
+    if (body["date_depense"] != null)     patch["dateDepense"]    = String(body["date_depense"]);
+    if (body["montant_fcfa"] != null)     patch["montantFcfa"]    = String(body["montant_fcfa"]);
+    if (body["libelle"] != null)          patch["libelle"]        = body["libelle"];
+    if (body["mission_id"] !== undefined) patch["missionId"]      = body["mission_id"] ?? null;
+    if (body["fournisseur"] !== undefined) patch["fournisseur"]   = body["fournisseur"] ?? null;
+    if (body["reference_piece"] !== undefined) patch["referencePiece"] = body["reference_piece"] ?? null;
+    if (body["quantite"] !== undefined)   patch["quantite"]       = body["quantite"] != null ? String(body["quantite"]) : null;
+    if (body["unite"] !== undefined)      patch["unite"]          = body["unite"] ?? null;
+    const updated = await updateDepense(cooperativeId, id, patch as Parameters<typeof updateDepense>[2]);
+    if (!updated) { res.status(404).json({ erreur: "Dépense introuvable" }); return; }
+    res.json(mapDepense({ depense: updated, immatriculation: null }));
+  } catch (err) {
+    req.log.error({ err }, "Erreur updateDepenseVehicule");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleDeleteDepenseVehicule(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const ok = await deleteDepense(cooperativeId, id);
+    if (!ok) { res.status(404).json({ erreur: "Dépense introuvable" }); return; }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Erreur deleteDepenseVehicule");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

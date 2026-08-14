@@ -93,6 +93,7 @@ import type {
   CreateBalanceBody,
   CreateCertificationBody,
   CreateChauffeurBody,
+  CreateDepenseVehiculeBody,
   CreateDocumentBody,
   CreateEntretienVehiculeBody,
   CreateEquipementBody,
@@ -106,7 +107,9 @@ import type {
   CreateVerificationBalance201,
   CreateVerificationBody,
   DashboardKpi,
+  DeleteDepenseVehicule200,
   DeleteEquipement200,
+  DepenseVehicule,
   DesactiverMembresSansCampagne200,
   Devise,
   DiffuserPrixSmsInput,
@@ -161,6 +164,10 @@ import type {
   GetComparaisonCampagnesParams,
   GetCompteResultatParams,
   GetDashboardParams,
+  GetDepensesTransport200,
+  GetDepensesTransportParams,
+  GetDepensesVehicule200,
+  GetDepensesVehiculeParams,
   GetDocumentsOfficiels200,
   GetEmpruntsParams,
   GetEncoursIntrantsMembre200,
@@ -324,6 +331,7 @@ import type {
   UpdateConfigComptableInput,
   UpdateConfigPeseeBody,
   UpdateConfigScoringInput,
+  UpdateDepenseVehiculeBody,
   UpdateEquipementBody,
   UpdatePersonnelInput,
   UpdatePreferencesNotificationsBody,
@@ -19034,6 +19042,393 @@ export const useTerminerMission = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getTerminerMissionMutationOptions(options));
+    }
+
+export const getGetDepensesVehiculeUrl = (id: number,
+    params?: GetDepensesVehiculeParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/transport/vehicules/${id}/depenses?${stringifiedParams}` : `/api/transport/vehicules/${id}/depenses`
+}
+
+/**
+ * @summary Dépenses d'un véhicule
+ */
+export const getDepensesVehicule = async (id: number,
+    params?: GetDepensesVehiculeParams, options?: RequestInit): Promise<GetDepensesVehicule200> => {
+
+  return customFetch<GetDepensesVehicule200>(getGetDepensesVehiculeUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDepensesVehiculeQueryKey = (id: number,
+    params?: GetDepensesVehiculeParams,) => {
+    return [
+    `/api/transport/vehicules/${id}/depenses`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetDepensesVehiculeQueryOptions = <TData = Awaited<ReturnType<typeof getDepensesVehicule>>, TError = ErrorType<unknown>>(id: number,
+    params?: GetDepensesVehiculeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepensesVehicule>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDepensesVehiculeQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDepensesVehicule>>> = ({ signal }) => getDepensesVehicule(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDepensesVehicule>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDepensesVehiculeQueryResult = NonNullable<Awaited<ReturnType<typeof getDepensesVehicule>>>
+export type GetDepensesVehiculeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Dépenses d'un véhicule
+ */
+
+export function useGetDepensesVehicule<TData = Awaited<ReturnType<typeof getDepensesVehicule>>, TError = ErrorType<unknown>>(
+ id: number,
+    params?: GetDepensesVehiculeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepensesVehicule>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDepensesVehiculeQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateDepenseVehiculeUrl = (id: number,) => {
+
+
+
+
+  return `/api/transport/vehicules/${id}/depenses`
+}
+
+/**
+ * @summary Enregistrer une dépense véhicule
+ */
+export const createDepenseVehicule = async (id: number,
+    createDepenseVehiculeBody: CreateDepenseVehiculeBody, options?: RequestInit): Promise<DepenseVehicule> => {
+
+  return customFetch<DepenseVehicule>(getCreateDepenseVehiculeUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createDepenseVehiculeBody,)
+  }
+);}
+
+
+
+
+export const getCreateDepenseVehiculeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDepenseVehicule>>, TError,{id: number;data: BodyType<CreateDepenseVehiculeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDepenseVehicule>>, TError,{id: number;data: BodyType<CreateDepenseVehiculeBody>}, TContext> => {
+
+const mutationKey = ['createDepenseVehicule'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDepenseVehicule>>, {id: number;data: BodyType<CreateDepenseVehiculeBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createDepenseVehicule(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDepenseVehiculeMutationResult = NonNullable<Awaited<ReturnType<typeof createDepenseVehicule>>>
+    export type CreateDepenseVehiculeMutationBody = BodyType<CreateDepenseVehiculeBody>
+    export type CreateDepenseVehiculeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer une dépense véhicule
+ */
+export const useCreateDepenseVehicule = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDepenseVehicule>>, TError,{id: number;data: BodyType<CreateDepenseVehiculeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createDepenseVehicule>>,
+        TError,
+        {id: number;data: BodyType<CreateDepenseVehiculeBody>},
+        TContext
+      > => {
+      return useMutation(getCreateDepenseVehiculeMutationOptions(options));
+    }
+
+export const getGetDepensesTransportUrl = (params?: GetDepensesTransportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/transport/depenses?${stringifiedParams}` : `/api/transport/depenses`
+}
+
+/**
+ * @summary Toutes les dépenses véhicules de la coopérative
+ */
+export const getDepensesTransport = async (params?: GetDepensesTransportParams, options?: RequestInit): Promise<GetDepensesTransport200> => {
+
+  return customFetch<GetDepensesTransport200>(getGetDepensesTransportUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDepensesTransportQueryKey = (params?: GetDepensesTransportParams,) => {
+    return [
+    `/api/transport/depenses`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetDepensesTransportQueryOptions = <TData = Awaited<ReturnType<typeof getDepensesTransport>>, TError = ErrorType<unknown>>(params?: GetDepensesTransportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepensesTransport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDepensesTransportQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDepensesTransport>>> = ({ signal }) => getDepensesTransport(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDepensesTransport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDepensesTransportQueryResult = NonNullable<Awaited<ReturnType<typeof getDepensesTransport>>>
+export type GetDepensesTransportQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Toutes les dépenses véhicules de la coopérative
+ */
+
+export function useGetDepensesTransport<TData = Awaited<ReturnType<typeof getDepensesTransport>>, TError = ErrorType<unknown>>(
+ params?: GetDepensesTransportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepensesTransport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDepensesTransportQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateDepenseVehiculeUrl = (id: number,) => {
+
+
+
+
+  return `/api/transport/depenses/${id}`
+}
+
+/**
+ * @summary Modifier une dépense véhicule
+ */
+export const updateDepenseVehicule = async (id: number,
+    updateDepenseVehiculeBody: UpdateDepenseVehiculeBody, options?: RequestInit): Promise<DepenseVehicule> => {
+
+  return customFetch<DepenseVehicule>(getUpdateDepenseVehiculeUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateDepenseVehiculeBody,)
+  }
+);}
+
+
+
+
+export const getUpdateDepenseVehiculeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDepenseVehicule>>, TError,{id: number;data: BodyType<UpdateDepenseVehiculeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDepenseVehicule>>, TError,{id: number;data: BodyType<UpdateDepenseVehiculeBody>}, TContext> => {
+
+const mutationKey = ['updateDepenseVehicule'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDepenseVehicule>>, {id: number;data: BodyType<UpdateDepenseVehiculeBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateDepenseVehicule(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDepenseVehiculeMutationResult = NonNullable<Awaited<ReturnType<typeof updateDepenseVehicule>>>
+    export type UpdateDepenseVehiculeMutationBody = BodyType<UpdateDepenseVehiculeBody>
+    export type UpdateDepenseVehiculeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Modifier une dépense véhicule
+ */
+export const useUpdateDepenseVehicule = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDepenseVehicule>>, TError,{id: number;data: BodyType<UpdateDepenseVehiculeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDepenseVehicule>>,
+        TError,
+        {id: number;data: BodyType<UpdateDepenseVehiculeBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateDepenseVehiculeMutationOptions(options));
+    }
+
+export const getDeleteDepenseVehiculeUrl = (id: number,) => {
+
+
+
+
+  return `/api/transport/depenses/${id}`
+}
+
+/**
+ * @summary Supprimer une dépense véhicule
+ */
+export const deleteDepenseVehicule = async (id: number, options?: RequestInit): Promise<DeleteDepenseVehicule200> => {
+
+  return customFetch<DeleteDepenseVehicule200>(getDeleteDepenseVehiculeUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteDepenseVehiculeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDepenseVehicule>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDepenseVehicule>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteDepenseVehicule'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDepenseVehicule>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteDepenseVehicule(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDepenseVehiculeMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDepenseVehicule>>>
+
+    export type DeleteDepenseVehiculeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Supprimer une dépense véhicule
+ */
+export const useDeleteDepenseVehicule = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDepenseVehicule>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDepenseVehicule>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteDepenseVehiculeMutationOptions(options));
     }
 
 export const getGetRapportCampagneTransportUrl = (params?: GetRapportCampagneTransportParams,) => {

@@ -88,7 +88,25 @@ export const entretienVehiculeTable = pgTable("entretiens_vehicule", {
   createdAt:              timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const depensesVehiculeTable = pgTable("depenses_vehicule", {
+  id:             serial("id").primaryKey(),
+  cooperativeId:  integer("cooperative_id").notNull().references(() => cooperativesTable.id),
+  vehiculeId:     integer("vehicule_id").notNull().references(() => vehiculesTable.id),
+  missionId:      integer("mission_id").references(() => missionsTransportTable.id),
+  type:           varchar("type", { length: 30 }).notNull(), // carburant | reparation | piece_rechange | autre
+  dateDepense:    date("date_depense", { mode: "string" }).notNull(),
+  montantFcfa:    numeric("montant_fcfa", { precision: 14, scale: 2 }).notNull(),
+  libelle:        varchar("libelle", { length: 255 }).notNull(),
+  fournisseur:    varchar("fournisseur", { length: 255 }),
+  referencePiece: varchar("reference_piece", { length: 100 }),
+  quantite:       numeric("quantite", { precision: 10, scale: 3 }),
+  unite:          varchar("unite", { length: 30 }),
+  createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:      timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type Vehicule = typeof vehiculesTable.$inferSelect;
 export type Chauffeur = typeof chauffeursTable.$inferSelect;
 export type MissionTransport = typeof missionsTransportTable.$inferSelect;
 export type EntretienVehicule = typeof entretienVehiculeTable.$inferSelect;
+export type DepenseVehicule = typeof depensesVehiculeTable.$inferSelect;

@@ -4,8 +4,9 @@ import {
   chauffeursTable,
   missionsTransportTable,
   entretienVehiculeTable,
+  depensesVehiculeTable,
 } from "@workspace/db";
-import { eq, and, sql, desc, lte, gte } from "drizzle-orm";
+import { eq, and, sql, desc, lte, gte, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 
@@ -434,6 +435,69 @@ export async function getRapportVehicule(cooperativeId: number, vehiculeId: numb
     cout_entretiens_fcfa: Math.round(parseFloat(entretiensStats?.cout_entretiens ?? "0")),
     nb_missions:          parseInt(coutStats?.nb_missions ?? "0"),
   };
+}
+
+// ─── DÉPENSES VÉHICULES ───────────────────────────────────────────────────────
+
+export interface DepenseVehiculeFilters {
+  vehiculeId?: number;
+  type?: string;
+  dateDebut?: string;
+  dateFin?: string;
+}
+
+export async function getDepenses(cooperativeId: number, filters: DepenseVehiculeFilters = {}) {
+  const conditions = [eq(depensesVehiculeTable.cooperativeId, cooperativeId)];
+  if (filters.vehiculeId) conditions.push(eq(depensesVehiculeTable.vehiculeId, filters.vehiculeId));
+  if (filters.type)       conditions.push(eq(depensesVehiculeTable.type, filters.type));
+  if (filters.dateDebut)  conditions.push(gte(depensesVehiculeTable.dateDepense, filters.dateDebut));
+  if (filters.dateFin)    conditions.push(lte(depensesVehiculeTable.dateDepense, filters.dateFin));
+
+  const rows = await db
+    .select({
+      depense: depensesVehiculeTable,
+      immatriculation: vehiculesTable.immatriculation,
+    })
+    .from(depensesVehiculeTable)
+    .leftJoin(vehiculesTable, eq(vehiculesTable.id, depensesVehiculeTable.vehiculeId))
+    .where(and(...conditions))
+    .orderBy(desc(depensesVehiculeTable.dateDepense));
+
+  const total = rows.reduce((s, r) => s + parseFloat(r.depense.montantFcfa), 0);
+  return { rows, total };
+}
+
+export async function createDepense(
+  cooperativeId: number,
+  vehiculeId: number,
+  data: Omit<typeof depensesVehiculeTable.$inferInsert, "id" | "cooperativeId" | "vehiculeId" | "createdAt" | "updatedAt">,
+) {
+  const [row] = await db
+    .insert(depensesVehiculeTable)
+    .values({ cooperativeId, vehiculeId, ...data })
+    .returning();
+  return row;
+}
+
+export async function updateDepense(
+  cooperativeId: number,
+  id: number,
+  data: Partial<typeof depensesVehiculeTable.$inferInsert>,
+) {
+  const [row] = await db
+    .update(depensesVehiculeTable)
+    .set({ ...data, updatedAt: new Date() })
+    .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
+    .returning();
+  return row ?? null;
+}
+
+export async function deleteDepense(cooperativeId: number, id: number) {
+  const [deleted] = await db
+    .delete(depensesVehiculeTable)
+    .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
+    .returning({ id: depensesVehiculeTable.id });
+  return deleted != null;
 }
 
 // ─── ALERTES CHAUFFEURS ───────────────────────────────────────────────────────

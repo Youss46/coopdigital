@@ -792,8 +792,6 @@ export interface LivraisonDetail {
   id: number;
   membreId: number;
   poidsKg: string;
-  /** @nullable */
-  produitBrutKg?: string | null;
   prixUnitaireFcfa: number;
   montantBrutFcfa: number;
   avanceDeduiteFcfa: number;
@@ -1084,9 +1082,6 @@ export interface LotInput {
   livraisonIds: number[];
   entrepot?: string;
   nombreSacs?: number;
-  quantiteCibleKg?: number;
-  fractionLivraisonId?: number;
-  fractionPoidsKg?: number;
 }
 
 export type LotStatutInputStatut = typeof LotStatutInputStatut[keyof typeof LotStatutInputStatut];
@@ -3794,6 +3789,48 @@ export interface EntretienVehicule {
   created_at: string;
 }
 
+export interface DepenseVehicule {
+  id: number;
+  cooperative_id: number;
+  vehicule_id: number;
+  immatriculation?: string | null;
+  mission_id?: number | null;
+  type: string;
+  date_depense: string;
+  montant_fcfa: number;
+  libelle: string;
+  fournisseur?: string | null;
+  reference_piece?: string | null;
+  quantite?: number | null;
+  unite?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CreateDepenseVehiculeBody {
+  type: string;
+  date_depense: string;
+  montant_fcfa: number;
+  libelle: string;
+  mission_id?: number;
+  fournisseur?: string;
+  reference_piece?: string;
+  quantite?: number;
+  unite?: string;
+}
+
+export interface UpdateDepenseVehiculeBody {
+  type?: string;
+  date_depense?: string;
+  montant_fcfa?: number;
+  libelle?: string;
+  mission_id?: number;
+  fournisseur?: string;
+  reference_piece?: string;
+  quantite?: number;
+  unite?: string;
+}
+
 export interface CreateEntretienVehiculeBody {
   type_entretien: string;
   date_entretien: string;
@@ -4958,6 +4995,33 @@ statut?: string;
 
 export type GetMissions200 = {
   missions: MissionTransport[];
+};
+
+export type GetDepensesVehiculeParams = {
+type?: string;
+date_debut?: string;
+date_fin?: string;
+};
+
+export type GetDepensesVehicule200 = {
+  depenses: DepenseVehicule[];
+  total_fcfa: number;
+};
+
+export type GetDepensesTransportParams = {
+vehicule_id?: number;
+type?: string;
+date_debut?: string;
+date_fin?: string;
+};
+
+export type GetDepensesTransport200 = {
+  depenses: DepenseVehicule[];
+  total_fcfa: number;
+};
+
+export type DeleteDepenseVehicule200 = {
+  ok?: boolean;
 };
 
 export type GetRapportCampagneTransportParams = {

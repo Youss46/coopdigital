@@ -17,6 +17,11 @@ import {
   handleTerminerMission,
   handleRapportCampagne,
   handleRapportVehicule,
+  handleGetDepensesVehicule,
+  handleGetDepensesTransport,
+  handleCreateDepenseVehicule,
+  handleUpdateDepenseVehicule,
+  handleDeleteDepenseVehicule,
 } from "../controllers/transportController";
 
 const router = Router();
@@ -37,6 +42,12 @@ router.get("/transport/missions",               authMiddleware, handleGetMission
 router.post("/transport/missions",              authMiddleware, handleCreateMission);
 router.put("/transport/missions/:id/demarrer",  authMiddleware, handleDemarrerMission);
 router.put("/transport/missions/:id/terminer",  authMiddleware, handleTerminerMission);
+
+router.get("/transport/depenses",                       authMiddleware, handleGetDepensesTransport);
+router.get("/transport/vehicules/:id/depenses",         authMiddleware, handleGetDepensesVehicule);
+router.post("/transport/vehicules/:id/depenses",        authMiddleware, handleCreateDepenseVehicule);
+router.put("/transport/depenses/:id",                   authMiddleware, handleUpdateDepenseVehicule);
+router.delete("/transport/depenses/:id",                authMiddleware, handleDeleteDepenseVehicule);
 
 router.get("/transport/rapport-campagne",       authMiddleware, handleRapportCampagne);
 router.get("/transport/rapport-vehicule/:id",   authMiddleware, handleRapportVehicule);

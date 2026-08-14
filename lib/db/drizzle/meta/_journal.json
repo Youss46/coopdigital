@@ -547,6 +547,13 @@
       "when": 1786617783611,
       "tag": "0077_cnps_pf_taux",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1786700000000,
+      "tag": "0078_depenses_vehicule",
+      "breakpoints": true
     }
   ]
 }

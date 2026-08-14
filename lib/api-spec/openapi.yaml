@@ -5104,6 +5104,98 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/MissionTransport" }
 
+  /transport/vehicules/{id}/depenses:
+    get:
+      operationId: getDepensesVehicule
+      summary: Dépenses d'un véhicule
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: type, in: query, required: false, schema: { type: string } }
+        - { name: date_debut, in: query, required: false, schema: { type: string, format: date } }
+        - { name: date_fin, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [depenses, total_fcfa]
+                properties:
+                  depenses: { type: array, items: { $ref: "#/components/schemas/DepenseVehicule" } }
+                  total_fcfa: { type: number }
+    post:
+      operationId: createDepenseVehicule
+      summary: Enregistrer une dépense véhicule
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateDepenseVehiculeBody" }
+      responses:
+        "201":
+          description: Créée
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DepenseVehicule" }
+
+  /transport/depenses:
+    get:
+      operationId: getDepensesTransport
+      summary: Toutes les dépenses véhicules de la coopérative
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: vehicule_id, in: query, required: false, schema: { type: integer } }
+        - { name: type, in: query, required: false, schema: { type: string } }
+        - { name: date_debut, in: query, required: false, schema: { type: string, format: date } }
+        - { name: date_fin, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [depenses, total_fcfa]
+                properties:
+                  depenses: { type: array, items: { $ref: "#/components/schemas/DepenseVehicule" } }
+                  total_fcfa: { type: number }
+
+  /transport/depenses/{id}:
+    put:
+      operationId: updateDepenseVehicule
+      summary: Modifier une dépense véhicule
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateDepenseVehiculeBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DepenseVehicule" }
+    delete:
+      operationId: deleteDepenseVehicule
+      summary: Supprimer une dépense véhicule
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+
   /transport/rapport-campagne:
     get:
       operationId: getRapportCampagneTransport
@@ -10575,6 +10667,53 @@ components:
         prochain_entretien_km:    { type: integer, nullable: true }
         prochain_entretien_date:  { type: string, format: date, nullable: true }
         created_at:               { type: string, format: date-time }
+
+    DepenseVehicule:
+      type: object
+      required: [id, cooperative_id, vehicule_id, type, date_depense, montant_fcfa, libelle, created_at]
+      properties:
+        id:               { type: integer }
+        cooperative_id:   { type: integer }
+        vehicule_id:      { type: integer }
+        immatriculation:  { type: string, nullable: true }
+        mission_id:       { type: integer, nullable: true }
+        type:             { type: string }
+        date_depense:     { type: string, format: date }
+        montant_fcfa:     { type: number }
+        libelle:          { type: string }
+        fournisseur:      { type: string, nullable: true }
+        reference_piece:  { type: string, nullable: true }
+        quantite:         { type: number, nullable: true }
+        unite:            { type: string, nullable: true }
+        created_at:       { type: string, format: date-time }
+        updated_at:       { type: string, format: date-time }
+
+    CreateDepenseVehiculeBody:
+      type: object
+      required: [type, date_depense, montant_fcfa, libelle]
+      properties:
+        type:             { type: string }
+        date_depense:     { type: string, format: date }
+        montant_fcfa:     { type: number }
+        libelle:          { type: string }
+        mission_id:       { type: integer }
+        fournisseur:      { type: string }
+        reference_piece:  { type: string }
+        quantite:         { type: number }
+        unite:            { type: string }
+
+    UpdateDepenseVehiculeBody:
+      type: object
+      properties:
+        type:             { type: string }
+        date_depense:     { type: string, format: date }
+        montant_fcfa:     { type: number }
+        libelle:          { type: string }
+        mission_id:       { type: integer }
+        fournisseur:      { type: string }
+        reference_piece:  { type: string }
+        quantite:         { type: number }
+        unite:            { type: string }
 
     CreateEntretienVehiculeBody:
       type: object
