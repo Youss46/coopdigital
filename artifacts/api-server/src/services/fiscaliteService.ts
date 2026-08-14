@@ -294,6 +294,103 @@ export async function genererDeclarationsAnnuelles(cooperativeId: number, annee:
   return generees;
 }
 
+// ─── Supprimer déclaration ────────────────────────────────────────────────────
+
+export async function supprimerDeclaration(cooperativeId: number, id: number): Promise<void> {
+  const [decl] = await db.select({ id: declarationsFiscalesTable.id, statut: declarationsFiscalesTable.statut })
+    .from(declarationsFiscalesTable)
+    .where(and(
+      eq(declarationsFiscalesTable.id, id),
+      eq(declarationsFiscalesTable.cooperativeId, cooperativeId),
+    )).limit(1);
+
+  if (!decl) throw new Error("Déclaration introuvable");
+  if (decl.statut === "paye") throw new Error("Impossible de supprimer une déclaration déjà payée");
+
+  await db.delete(declarationsFiscalesTable)
+    .where(and(
+      eq(declarationsFiscalesTable.id, id),
+      eq(declarationsFiscalesTable.cooperativeId, cooperativeId),
+    ));
+}
+
+// ─── Recalculer déclaration ───────────────────────────────────────────────────
+
+const MOIS_PARSE: Record<string, number> = {
+  "Janvier": 1, "Février": 2, "Mars": 3, "Avril": 4,
+  "Mai": 5, "Juin": 6, "Juillet": 7, "Août": 8,
+  "Septembre": 9, "Octobre": 10, "Novembre": 11, "Décembre": 12,
+};
+
+export async function recalculerDeclaration(cooperativeId: number, id: number): Promise<void> {
+  const [decl] = await db.select()
+    .from(declarationsFiscalesTable)
+    .where(and(
+      eq(declarationsFiscalesTable.id, id),
+      eq(declarationsFiscalesTable.cooperativeId, cooperativeId),
+    )).limit(1);
+
+  if (!decl) throw new Error("Déclaration introuvable");
+  if (decl.statut === "paye") throw new Error("Impossible de recalculer une déclaration déjà payée");
+
+  const [obl] = await db.select()
+    .from(obligationsFiscalesTable)
+    .where(eq(obligationsFiscalesTable.id, decl.obligationId))
+    .limit(1);
+  if (!obl) throw new Error("Obligation introuvable");
+
+  let baseImposable = 0;
+  let montantCalcule = 0;
+
+  if (obl.periodicite === "mensuel") {
+    // Période format: "Août 2026"
+    const parts = decl.periode.split(" ");
+    const mois  = MOIS_PARSE[parts[0]!] ?? 0;
+    const annee = parseInt(parts[1] ?? "0", 10);
+    if (!mois || !annee) throw new Error(`Période non parseable : ${decl.periode}`);
+
+    const bases = await getBasesCnpsIts(cooperativeId, mois, annee);
+
+    if (obl.typeTaxe === "cnps" && obl.libelle.toLowerCase().includes("salariale")) {
+      baseImposable  = bases.totalBrut;
+      montantCalcule = Math.round(bases.totalBrut * 0.032);
+    } else if (obl.typeTaxe === "cnps" && obl.libelle.toLowerCase().includes("patronale")) {
+      baseImposable  = bases.totalBrut;
+      montantCalcule = Math.round(bases.totalBrut * 0.077);
+    } else if (obl.typeTaxe === "its") {
+      baseImposable  = bases.totalBrut;
+      montantCalcule = bases.totalIts;
+    }
+  } else {
+    // Période annuelle : "2026"
+    const annee = parseInt(decl.periode, 10);
+    if (!annee) throw new Error(`Période annuelle non parseable : ${decl.periode}`);
+
+    const bases = await getBasesAnnuelles(cooperativeId, annee);
+
+    if (obl.typeTaxe === "taxe_apprentissage") {
+      baseImposable  = bases.totalBrut;
+      montantCalcule = bases.totalTa > 0 ? bases.totalTa : Math.round(bases.totalBrut * 0.005);
+    } else if (obl.typeTaxe === "fpc") {
+      baseImposable  = bases.totalBrut;
+      montantCalcule = bases.totalFpc > 0 ? bases.totalFpc : Math.round(bases.totalBrut * 0.012);
+    }
+    // IS : montant à renseigner manuellement, on ne touche pas
+  }
+
+  await db.update(declarationsFiscalesTable)
+    .set({
+      baseImposableFcfa:  baseImposable.toString(),
+      montantCalculeFcfa: montantCalcule.toString(),
+      statut: montantCalcule === 0 ? "exonere" : "a_payer",
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(declarationsFiscalesTable.id, id),
+      eq(declarationsFiscalesTable.cooperativeId, cooperativeId),
+    ));
+}
+
 // ─── Liste déclarations ───────────────────────────────────────────────────────
 
 export async function listDeclarations(cooperativeId: number, opts?: {

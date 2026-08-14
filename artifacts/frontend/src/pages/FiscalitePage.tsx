@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
-import { Calculator, AlertTriangle, CheckCircle2, Clock, Download, Plus, RefreshCw, X, Calendar } from "lucide-react";
+import { Calculator, AlertTriangle, CheckCircle2, Clock, Download, Plus, RefreshCw, X, Calendar, Trash2, RotateCcw } from "lucide-react";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useToast } from "@/hooks/use-toast";
 
@@ -476,6 +476,7 @@ function Declarations() {
   const [modalPayer, setModalPayer]     = useState<Declaration | null>(null);
   const [modalGenerer, setModalGenerer] = useState(false);
   const [modalBordereau, setModalBordereau] = useState(false);
+  const [actionLoading, setActionLoading]   = useState<number | null>(null); // id de la ligne en cours
 
   const charger = useCallback(async () => {
     setLoading(true);
@@ -493,6 +494,38 @@ function Declarations() {
   }, [filtreStatut, filtreType, toast]);
 
   useEffect(() => { charger(); }, [charger]);
+
+  const handleSupprimer = async (d: Declaration) => {
+    if (!window.confirm(`Supprimer la déclaration "${d.libelle} — ${d.periode}" ?`)) return;
+    setActionLoading(d.id);
+    try {
+      const r = await fetch(`${BASE}/api/fiscalite/declarations/${d.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (!r.ok) throw new Error((await r.json()).error ?? "Erreur");
+      toast({ title: "Déclaration supprimée" });
+      charger();
+    } catch (e) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    } finally { setActionLoading(null); }
+  };
+
+  const handleRecalculer = async (d: Declaration) => {
+    setActionLoading(d.id);
+    try {
+      const r = await fetch(`${BASE}/api/fiscalite/declarations/${d.id}/recalculer`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "Erreur");
+      toast({ title: "Déclaration recalculée", description: "Les bases ont été mises à jour depuis les bulletins payés." });
+      charger();
+    } catch (e) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    } finally { setActionLoading(null); }
+  };
 
   return (
     <div>
@@ -583,17 +616,44 @@ function Declarations() {
                         ) : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-3">
-                        {d.statut !== "paye" && d.statut !== "exonere" && (
-                          <button onClick={() => setModalPayer(d)}
-                            className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium whitespace-nowrap">
-                            <CheckCircle2 size={12} /> Payer
-                          </button>
-                        )}
-                        {d.statut === "paye" && (
-                          <span className="flex items-center gap-1 text-xs text-green-600">
-                            <CheckCircle2 size={12} /> {d.date_paiement ? new Date(d.date_paiement + "T00:00:00").toLocaleDateString("fr-FR") : "Payé"}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2 justify-end">
+                          {/* Payer */}
+                          {d.statut !== "paye" && d.statut !== "exonere" && (
+                            <button onClick={() => setModalPayer(d)}
+                              className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium whitespace-nowrap">
+                              <CheckCircle2 size={12} /> Payer
+                            </button>
+                          )}
+                          {d.statut === "paye" && (
+                            <span className="flex items-center gap-1 text-xs text-green-600">
+                              <CheckCircle2 size={12} /> {d.date_paiement ? new Date(d.date_paiement + "T00:00:00").toLocaleDateString("fr-FR") : "Payé"}
+                            </span>
+                          )}
+                          {/* Recalculer — disponible si non payé */}
+                          {d.statut !== "paye" && (
+                            <button
+                              onClick={() => void handleRecalculer(d)}
+                              disabled={actionLoading === d.id}
+                              title="Recalculer depuis les bulletins payés"
+                              className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-40 transition-colors"
+                            >
+                              {actionLoading === d.id
+                                ? <div className="h-3 w-3 border border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                : <RotateCcw size={13} />}
+                            </button>
+                          )}
+                          {/* Supprimer — disponible si non payé */}
+                          {d.statut !== "paye" && (
+                            <button
+                              onClick={() => void handleSupprimer(d)}
+                              disabled={actionLoading === d.id}
+                              title="Supprimer cette déclaration"
+                              className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

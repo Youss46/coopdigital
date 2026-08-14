@@ -9,7 +9,9 @@ router.post("/fiscalite/obligations/init-ci",   checkPermission("fiscalite", "ge
 router.post("/fiscalite/generer/:mois/:annee",   checkPermission("fiscalite", "generer"),    ctrl.postGenererMensuel);
 router.post("/fiscalite/generer-annuel/:annee",  checkPermission("fiscalite", "generer"),    ctrl.postGenererAnnuel);
 router.get("/fiscalite/declarations",            checkPermission("fiscalite", "voir"),       ctrl.getDeclarations);
-router.put("/fiscalite/declarations/:id/payer",  checkPermission("fiscalite", "payer"),      ctrl.putPayer);
+router.put("/fiscalite/declarations/:id/payer",      checkPermission("fiscalite", "payer"),    ctrl.putPayer);
+router.put("/fiscalite/declarations/:id/recalculer", checkPermission("fiscalite", "generer"), ctrl.putRecalculer);
+router.delete("/fiscalite/declarations/:id",         checkPermission("fiscalite", "generer"), ctrl.deleteDeclaration);
 router.get("/fiscalite/calendrier",              checkPermission("fiscalite", "voir"),       ctrl.getCalendrier);
 router.get("/fiscalite/alertes",                 checkPermission("fiscalite", "voir"),       ctrl.getAlertes);
 router.get("/fiscalite/rapport-annuel",          checkPermission("fiscalite", "voir"),       ctrl.getRapportAnnuel);

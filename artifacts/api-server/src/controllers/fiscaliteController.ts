@@ -49,6 +49,44 @@ export async function getDeclarations(req: Request, res: Response): Promise<void
   } catch (err) { req.log.error({ err }, "getDeclarations"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
+export async function deleteDeclaration(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const id = parseInt(String(req.params["id"]), 10);
+    if (!id) { res.status(400).json({ error: "id invalide" }); return; }
+    await svc.supprimerDeclaration(cooperativeId, id);
+    res.status(204).end();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    if (msg.includes("introuvable") || msg.includes("impossible")) {
+      res.status(400).json({ error: msg });
+    } else {
+      req.log.error({ err }, "deleteDeclaration");
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  }
+}
+
+export async function putRecalculer(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const id = parseInt(String(req.params["id"]), 10);
+    if (!id) { res.status(400).json({ error: "id invalide" }); return; }
+    await svc.recalculerDeclaration(cooperativeId, id);
+    res.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    if (msg.includes("introuvable") || msg.includes("impossible") || msg.includes("parseable")) {
+      res.status(400).json({ error: msg });
+    } else {
+      req.log.error({ err }, "putRecalculer");
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  }
+}
+
 export async function putPayer(req: Request, res: Response): Promise<void> {
   try {
     const cooperativeId = req.user?.cooperativeId;
