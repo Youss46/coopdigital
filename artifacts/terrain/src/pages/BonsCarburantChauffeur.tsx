@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Fuel, CheckCircle2, Clock, Droplets, QrCode, X } from "lucide-react";
+import { Fuel, CheckCircle2, Clock, Droplets, QrCode, X, Share2, Copy } from "lucide-react";
 import BottomNavChauffeur from "@/components/BottomNavChauffeur";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "react-qr-code";
@@ -289,6 +289,34 @@ export default function BonsCarburantChauffeur() {
               className="w-full"
               onClick={() => navigate(`/station/${encodeURIComponent(qrBon.numero)}`)}>
               Ouvrir l'espace station →
+            </Button>
+            <Button
+              size="sm"
+              className="w-full bg-green-700 hover:bg-green-800"
+              onClick={async () => {
+                const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/station/${encodeURIComponent(qrBon.numero)}`;
+                if (navigator.share) {
+                  try {
+                    await navigator.share({
+                      title: `Bon carburant ${qrBon.numero}`,
+                      text: `Bon carburant ${qrBon.numero} — ${qrBon.quantite_autorisee} L`,
+                      url,
+                    });
+                  } catch {
+                    // user cancelled or share failed silently
+                  }
+                } else {
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    toast({ title: "Lien copié dans le presse-papiers ✓" });
+                  } catch {
+                    toast({ title: "Impossible de copier le lien", variant: "destructive" });
+                  }
+                }
+              }}>
+              {navigator.share
+                ? <><Share2 className="h-4 w-4 mr-1" /> Partager</>
+                : <><Copy className="h-4 w-4 mr-1" /> Copier le lien</>}
             </Button>
           </div>
         </div>
