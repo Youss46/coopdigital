@@ -31,6 +31,9 @@ export function apiGet<T>(path: string): Promise<T> { return apiFetch<T>(path); 
 export function apiPost<T>(path: string, data: unknown): Promise<T> {
   return apiFetch<T>(path, { method: "POST", body: JSON.stringify(data) });
 }
+export function apiPut<T>(path: string, data: unknown): Promise<T> {
+  return apiFetch<T>(path, { method: "PUT", body: JSON.stringify(data) });
+}
 
 export async function loginTerrain(telephone: string, motDePasse: string) {
   return apiFetch<{ token: string; agent: import("./types").AgentUser }>(

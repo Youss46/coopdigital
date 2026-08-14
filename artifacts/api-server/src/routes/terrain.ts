@@ -87,6 +87,19 @@ router.get("/terrain/recu/livraison/:id", terrainAuthMiddleware, peseurOrDelegue
 // Relevé commissions PDF (délégué)
 router.get("/terrain/commissions/releve", terrainAuthMiddleware, delegueOnly, getTerrainReleveCommissions);
 
+// Routes chauffeur
+import {
+  getChauffeurAccueil,
+  getChauffeurMissions,
+  getChauffeurBons,
+  utiliserBonChauffeur,
+} from "../controllers/chauffeurTerrainController.js";
+
+router.get("/terrain/chauffeur/accueil",           terrainAuthMiddleware, getChauffeurAccueil);
+router.get("/terrain/chauffeur/missions",           terrainAuthMiddleware, getChauffeurMissions);
+router.get("/terrain/chauffeur/bons-carburant",     terrainAuthMiddleware, getChauffeurBons);
+router.put("/terrain/chauffeur/bons-carburant/:id/utiliser", terrainAuthMiddleware, utiliserBonChauffeur);
+
 // Push notifications
 router.get("/terrain/push/vapid-key", getVapidPublicKey);
 router.post("/terrain/push/subscribe", terrainAuthMiddleware, subscribePush);

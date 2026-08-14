@@ -94,6 +94,8 @@ import {
   ThumbsUp,
   Droplets,
   Ban,
+  Smartphone,
+  KeyRound,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -450,9 +452,12 @@ const chauffeurVide: ChauffeurForm = {
   categorie_permis: "", date_expiration_permis: "", date_embauche: "", statut: "actif",
 };
 
+const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+
 function TabChauffeurs() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { token } = useAuth();
   const { data } = useGetChauffeurs();
   const createMut = useCreateChauffeur({ mutation: { onSuccess: () => { qc.invalidateQueries({ queryKey: getGetChauffeursQueryKey() }); toast({ title: "Chauffeur créé" }); setShowForm(false); } } });
   const updateMut = useUpdateChauffeur({ mutation: { onSuccess: () => { qc.invalidateQueries({ queryKey: getGetChauffeursQueryKey() }); toast({ title: "Chauffeur modifié" }); setShowForm(false); setEditId(null); } } });
@@ -461,6 +466,36 @@ function TabChauffeurs() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<ChauffeurForm>(chauffeurVide);
+
+  // Création compte terrain chauffeur
+  const [showAccesTerrain, setShowAccesTerrain] = useState(false);
+  const [selectedChauffeur, setSelectedChauffeur] = useState<{ id: number; nom: string; prenoms: string | null; telephone: string | null } | null>(null);
+  const [terrainForm, setTerrainForm] = useState({ telephone: "", motDePasse: "" });
+  const [terrainLoading, setTerrainLoading] = useState(false);
+
+  async function handleCreateAccesTerrain() {
+    if (!terrainForm.telephone || !terrainForm.motDePasse || !selectedChauffeur) return;
+    setTerrainLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/users/chauffeurs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          nom:         selectedChauffeur.nom,
+          prenoms:     selectedChauffeur.prenoms ?? "",
+          telephone:   terrainForm.telephone,
+          motDePasse:  terrainForm.motDePasse,
+          chauffeur_id: selectedChauffeur.id,
+        }),
+      });
+      const json = await res.json() as { erreur?: string };
+      if (!res.ok) { toast({ title: json.erreur ?? "Erreur", variant: "destructive" }); return; }
+      toast({ title: `Accès terrain créé pour ${selectedChauffeur.nom}`, description: "Le mot de passe est temporaire — le chauffeur devra le changer à la connexion." });
+      setShowAccesTerrain(false);
+      setTerrainForm({ telephone: "", motDePasse: "" });
+    } catch { toast({ title: "Erreur réseau", variant: "destructive" }); }
+    finally { setTerrainLoading(false); }
+  }
 
   const chauffeurs = data?.chauffeurs ?? [];
 
@@ -540,6 +575,11 @@ function TabChauffeurs() {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Edit2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="text-blue-500 hover:text-blue-700"
+                        title="Créer un accès terrain pour ce chauffeur"
+                        onClick={() => { setSelectedChauffeur({ id: c.id, nom: c.nom, prenoms: c.prenoms ?? null, telephone: c.telephone ?? null }); setTerrainForm({ telephone: c.telephone ?? "", motDePasse: "" }); setShowAccesTerrain(true); }}>
+                        <Smartphone className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700" onClick={() => { if (confirm(`Supprimer ${c.nom} ?`)) deleteMut.mutate({ id: c.id }); }}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   </TableCell>
@@ -549,6 +589,41 @@ function TabChauffeurs() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Dialog accès terrain */}
+      <Dialog open={showAccesTerrain} onOpenChange={o => { if (!o) setShowAccesTerrain(false); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Smartphone className="h-5 w-5 text-blue-600" /> Accès terrain</DialogTitle>
+            {selectedChauffeur && (
+              <p className="text-sm text-gray-500">
+                Créer un compte pour <strong>{selectedChauffeur.prenoms} {selectedChauffeur.nom}</strong> dans l'app Agent Terrain.
+              </p>
+            )}
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label>Numéro de téléphone *</Label>
+              <Input placeholder="Ex : 0701020304" value={terrainForm.telephone}
+                onChange={e => setTerrainForm(f => ({ ...f, telephone: e.target.value }))} />
+              <p className="text-xs text-gray-400 mt-1">Utilisé pour se connecter à l'application terrain</p>
+            </div>
+            <div>
+              <Label className="flex items-center gap-1"><KeyRound className="h-3 w-3" /> Mot de passe provisoire *</Label>
+              <Input type="password" placeholder="Min. 6 caractères" value={terrainForm.motDePasse}
+                onChange={e => setTerrainForm(f => ({ ...f, motDePasse: e.target.value }))} />
+              <p className="text-xs text-gray-400 mt-1">Le chauffeur devra le changer à la première connexion</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAccesTerrain(false)}>Annuler</Button>
+            <Button onClick={handleCreateAccesTerrain}
+              disabled={!terrainForm.telephone || terrainForm.motDePasse.length < 6 || terrainLoading}>
+              Créer l'accès
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showForm} onOpenChange={o => { if (!o) { setShowForm(false); setEditId(null); } }}>
         <DialogContent className="max-w-lg">
@@ -1458,8 +1533,8 @@ const ROLES_APPROBATEUR = ["pca", "directeur", "comptable", "admin"];
 function TabCarburant() {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
-  const peutApprouver = ROLES_APPROBATEUR.includes(user?.role ?? "");
+  const { utilisateur } = useAuth();
+  const peutApprouver = ROLES_APPROBATEUR.includes(utilisateur?.role ?? "");
 
   const vehiculesQ = useGetVehicules();
   const vehicules  = vehiculesQ.data?.vehicules ?? [];

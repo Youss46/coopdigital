@@ -506,6 +506,91 @@ export async function createPeseurParDelegue(req: Request, res: Response): Promi
   }
 }
 
+// ─── Chauffeurs terrain ───────────────────────────────────────────────────────
+
+// POST /users/chauffeurs  — crée un compte terrain pour un chauffeur de la flotte
+export async function createChauffeurUser(req: Request, res: Response): Promise<void> {
+  const cooperativeId = getCoopId(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+
+  const role = req.user?.role;
+  if (!ROLES_ALLOWED_TO_MANAGE.includes(role ?? "")) {
+    res.status(403).json({ erreur: "Réservé au directeur / PCA" }); return;
+  }
+
+  const body = req.body as { nom?: string; prenoms?: string; telephone?: string; motDePasse?: string; chauffeur_id?: number };
+  const { nom, prenoms, telephone, motDePasse } = body;
+  const chauffeurId = body.chauffeur_id ?? null;
+
+  if (!nom?.trim() || !prenoms?.trim() || !telephone?.trim() || !motDePasse) {
+    res.status(400).json({ erreur: "nom, prenoms, telephone et motDePasse sont requis" }); return;
+  }
+  if (motDePasse.length < 6) {
+    res.status(400).json({ erreur: "Le mot de passe doit comporter au moins 6 caractères" }); return;
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(motDePasse, 10);
+    const tel = telephone.trim().replace(/\s+/g, "");
+    const fakeEmail = `chauffeur-${tel}-${cooperativeId}@terrain.local`;
+
+    const [created] = await db
+      .insert(usersTable)
+      .values({
+        nom:                 nom.trim(),
+        prenoms:             prenoms.trim(),
+        email:               fakeEmail,
+        telephone:           tel,
+        passwordHash,
+        role:                "chauffeur" as never,
+        cooperativeId,
+        actif:               true,
+        motDePasseTemporaire: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...(chauffeurId != null ? { chauffeurId } as any : {}),
+      })
+      .returning({
+        id:          usersTable.id,
+        nom:         usersTable.nom,
+        prenoms:     usersTable.prenoms,
+        telephone:   usersTable.telephone,
+        actif:       usersTable.actif,
+        createdAt:   usersTable.createdAt,
+      });
+
+    res.status(201).json(created);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("unique") || msg.includes("duplicate")) {
+      res.status(409).json({ erreur: "Un compte avec ce numéro de téléphone existe déjà" }); return;
+    }
+    req.log.error({ err }, "createChauffeurUser");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// GET /users/chauffeurs — liste les comptes terrain chauffeurs de la coopérative
+export async function listChauffeurUsers(req: Request, res: Response): Promise<void> {
+  const cooperativeId = getCoopId(req);
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const rows = await db
+    .select({
+      id:          usersTable.id,
+      nom:         usersTable.nom,
+      prenoms:     usersTable.prenoms,
+      telephone:   usersTable.telephone,
+      actif:       usersTable.actif,
+      createdAt:   usersTable.createdAt,
+    })
+    .from(usersTable)
+    .where(and(
+      eq(usersTable.cooperativeId, cooperativeId),
+      eq(usersTable.role, "chauffeur" as never),
+    ))
+    .orderBy(asc(usersTable.nom));
+  res.json(rows);
+}
+
 // PUT /users/peseurs/:id/activer  (délégué OU admin)
 export async function togglePeseurActifParDelegue(req: Request, res: Response): Promise<void> {
   const role = req.user?.role ?? "";

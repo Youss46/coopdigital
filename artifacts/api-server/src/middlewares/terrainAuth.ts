@@ -3,13 +3,15 @@ import jwt from "jsonwebtoken";
 
 export interface TerrainJwtPayload {
   id: number;
-  role: "delegue" | "agent_terrain" | "peseur";
+  role: "delegue" | "agent_terrain" | "peseur" | "chauffeur";
   cooperativeId: number | null;
   section: string | null;
   zoneType: string | null;
   zoneNom: string | null;
   /** Pour les peseurs : ID du délégué auquel ils sont rattachés (null = base centrale) */
   delegueId?: number | null;
+  /** Pour les chauffeurs : ID dans la table chauffeurs (transport) */
+  chauffeurId?: number | null;
 }
 
 declare global {
@@ -37,7 +39,8 @@ export function terrainAuthMiddleware(req: Request, res: Response, next: NextFun
 
   try {
     const payload = jwt.verify(token, secret) as TerrainJwtPayload;
-    if (payload.role !== "delegue" && payload.role !== "agent_terrain" && payload.role !== "peseur") {
+    const rolesAutorisés = ["delegue", "agent_terrain", "peseur", "chauffeur"];
+    if (!rolesAutorisés.includes(payload.role)) {
       res.status(403).json({ erreur: "Accès réservé aux agents terrain" });
       return;
     }
@@ -94,7 +97,7 @@ export function flexAuthMiddleware(req: Request, res: Response, next: NextFuncti
   }
   try {
     const payload = jwt.verify(token, secret) as TerrainJwtPayload & { role: string };
-    if (payload.role === "delegue" || payload.role === "agent_terrain" || payload.role === "peseur") {
+    if (["delegue", "agent_terrain", "peseur", "chauffeur"].includes(payload.role)) {
       req.agent = payload as TerrainJwtPayload;
     } else {
       // Token coopératif — importe JwtPayload à la volée pour typer req.user

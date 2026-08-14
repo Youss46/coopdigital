@@ -12,6 +12,8 @@ export interface AgentUser {
   motDePasseTemporaire?: boolean;
   /** Peseur uniquement : ID du délégué de rattachement (null = base centrale) */
   delegueId?: number | null;
+  /** Chauffeur uniquement : ID dans la table chauffeurs (transport) */
+  chauffeurId?: number | null;
 }
 
 export interface Fournisseur {

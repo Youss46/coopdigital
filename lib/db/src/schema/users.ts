@@ -14,6 +14,7 @@ export const USER_ROLES = [
   "auditeur",
   "agent_terrain",
   "peseur",
+  "chauffeur",
 ] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
@@ -34,7 +35,8 @@ export const usersTable = pgTable("users", {
   actif: boolean("actif").notNull().default(true),
   motDePasseTemporaire: boolean("mot_de_passe_temporaire").notNull().default(false),
   photoUrl: text("photo_url"),
-  delegueId: integer("delegue_id").references((): AnyPgColumn => usersTable.id),
+  delegueId:   integer("delegue_id").references((): AnyPgColumn => usersTable.id),
+  chauffeurId: integer("chauffeur_id"),  // FK vers chauffeurs (transport) — défini sans .references() pour éviter la dépendance circulaire entre schémas
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -19,6 +19,9 @@ import Commissions from "./pages/Commissions";
 import AccueilAgent from "./pages/AccueilAgent";
 import AccueilPeseur from "./pages/AccueilPeseur";
 import HistoriquePeseur from "./pages/HistoriquePeseur";
+import AccueilChauffeur from "./pages/AccueilChauffeur";
+import MissionsChauffeur from "./pages/MissionsChauffeur";
+import BonsCarburantChauffeur from "./pages/BonsCarburantChauffeur";
 import MissionsAgent from "./pages/MissionsAgent";
 import MissionDetail from "./pages/MissionDetail";
 import CollecteGps from "./pages/CollecteGps";
@@ -59,6 +62,17 @@ function DelegueRoutes() {
   );
 }
 
+function ChauffeurRoutes() {
+  return (
+    <Switch>
+      <Route path="/" component={AccueilChauffeur} />
+      <Route path="/missions" component={MissionsChauffeur} />
+      <Route path="/carburant" component={BonsCarburantChauffeur} />
+      <Route><Redirect to="/" /></Route>
+    </Switch>
+  );
+}
+
 function PeseurRoutes() {
   return (
     <Switch>
@@ -94,6 +108,10 @@ function AppRoutes() {
 
   if (user?.role === "peseur") {
     return <PeseurRoutes />;
+  }
+
+  if (user?.role === "chauffeur") {
+    return <ChauffeurRoutes />;
   }
 
   return <DelegueRoutes />;

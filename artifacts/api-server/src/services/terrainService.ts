@@ -34,7 +34,7 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
     .where(and(eq(usersTable.telephone, tel), eq(usersTable.actif, true)))
     .limit(1);
 
-  const rolesAutorisés = ["delegue", "agent_terrain", "peseur"];
+  const rolesAutorisés = ["delegue", "agent_terrain", "peseur", "chauffeur"];
   if (!user || !rolesAutorisés.includes(user.role as string)) return null;
 
   const ok = await bcrypt.compare(motDePasse, user.passwordHash);
@@ -47,8 +47,8 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
     section: user.section ?? null,
     zoneType: user.zoneType ?? null,
     zoneNom: user.zoneNom ?? null,
-    // Pour les peseurs : inclure leur delegueId pour le filtrage des membres/sessions
-    ...(user.role === "peseur" ? { delegueId: user.delegueId ?? null } : {}),
+    ...(user.role === "peseur"   ? { delegueId:   user.delegueId   ?? null } : {}),
+    ...(user.role === "chauffeur" ? { chauffeurId: (user as typeof user & { chauffeurId?: number | null }).chauffeurId ?? null } : {}),
   };
   const token = jwt.sign(payload, secret, { expiresIn: "24h" });
 
@@ -66,7 +66,8 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
       zoneType: user.zoneType ?? null,
       zoneNom: user.zoneNom ?? null,
       motDePasseTemporaire: user.motDePasseTemporaire,
-      ...(user.role === "peseur" ? { delegueId: user.delegueId ?? null } : {}),
+      ...(user.role === "peseur"   ? { delegueId:   user.delegueId   ?? null } : {}),
+      ...(user.role === "chauffeur" ? { chauffeurId: (user as typeof user & { chauffeurId?: number | null }).chauffeurId ?? null } : {}),
     },
   };
 }

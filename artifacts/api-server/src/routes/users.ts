@@ -14,6 +14,8 @@ import {
   listAllPeseurs,
   createPeseurAdmin,
   resetPeseurPassword,
+  createChauffeurUser,
+  listChauffeurUsers,
 } from "../controllers/usersController";
 
 const router = Router();
@@ -28,6 +30,10 @@ router.post("/users/peseurs/admin",                 authMiddleware, createPeseur
 // Routes partagées délégué + admin (implémentation unifiée)
 router.put("/users/peseurs/:id/activer",            authMiddleware, togglePeseurActifParDelegue);
 router.put("/users/peseurs/:id/password",           authMiddleware, resetPeseurPassword);
+// Routes chauffeurs terrain
+router.get("/users/chauffeurs",  authMiddleware, listChauffeurUsers);
+router.post("/users/chauffeurs", authMiddleware, createChauffeurUser);
+
 router.post("/users", authMiddleware, auditMiddleware("users", "CREATE", { entiteType: "utilisateur" }), createUser);
 router.put("/users/:id", authMiddleware, auditMiddleware("users", "UPDATE", { entiteIdParam: "id", entiteType: "utilisateur" }), updateUser);
 router.put("/users/:id/password", authMiddleware, auditMiddleware("users", "CONFIG_CHANGE", { entiteIdParam: "id", entiteType: "utilisateur" }), resetUserPassword);
