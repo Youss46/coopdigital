@@ -136,20 +136,14 @@ export async function genererDeclarationsMensuelles(cooperativeId: number, mois:
   const obligations = await listObligations(cooperativeId);
   const mensuelles = obligations.filter(o => o.periodicite === "mensuel");
 
+  if (mensuelles.length === 0) {
+    return { creees: 0, misesAJour: 0, ignorees: 0, aucuneObligation: true };
+  }
+
   const bases = await getBasesCnpsIts(cooperativeId, mois, annee);
-  const generees: typeof declarationsFiscalesTable.$inferSelect[] = [];
+  let creees = 0, misesAJour = 0, ignorees = 0;
 
   for (const obl of mensuelles) {
-    // Éviter les doublons
-    const existing = await db.select({ id: declarationsFiscalesTable.id })
-      .from(declarationsFiscalesTable)
-      .where(and(
-        eq(declarationsFiscalesTable.cooperativeId, cooperativeId),
-        eq(declarationsFiscalesTable.obligationId, obl.id),
-        eq(declarationsFiscalesTable.periode, periode),
-      )).limit(1);
-    if (existing.length > 0) continue;
-
     let baseImposable = 0;
     let montantCalcule = 0;
 
@@ -166,7 +160,37 @@ export async function genererDeclarationsMensuelles(cooperativeId: number, mois:
 
     const echeance = dateEcheanceMensuelle(mois, annee, obl.jourEcheance ?? 15);
 
-    const [decl] = await db.insert(declarationsFiscalesTable).values({
+    // Vérifie si une déclaration existe déjà pour cette obligation/période
+    const existing = await db.select({
+      id: declarationsFiscalesTable.id,
+      statut: declarationsFiscalesTable.statut,
+    }).from(declarationsFiscalesTable)
+      .where(and(
+        eq(declarationsFiscalesTable.cooperativeId, cooperativeId),
+        eq(declarationsFiscalesTable.obligationId, obl.id),
+        eq(declarationsFiscalesTable.periode, periode),
+      )).limit(1);
+
+    if (existing.length > 0) {
+      const ex = existing[0]!;
+      // Si elle était "exonere" (base 0) et que maintenant on a une base, on met à jour
+      if (ex.statut === "exonere" && montantCalcule > 0) {
+        await db.update(declarationsFiscalesTable)
+          .set({
+            baseImposableFcfa:  baseImposable.toString(),
+            montantCalculeFcfa: montantCalcule.toString(),
+            statut:             "a_payer",
+          })
+          .where(eq(declarationsFiscalesTable.id, ex.id));
+        misesAJour++;
+      } else {
+        ignorees++;
+      }
+      continue;
+    }
+
+    // Nouvelle déclaration
+    await db.insert(declarationsFiscalesTable).values({
       cooperativeId:      cooperativeId,
       obligationId:       obl.id,
       periode,
@@ -174,12 +198,11 @@ export async function genererDeclarationsMensuelles(cooperativeId: number, mois:
       montantCalculeFcfa: montantCalcule.toString(),
       dateEcheance:       echeance,
       statut:             montantCalcule === 0 ? "exonere" : "a_payer",
-    }).returning();
-
-    if (decl) generees.push(decl);
+    });
+    creees++;
   }
 
-  return generees;
+  return { creees, misesAJour, ignorees, aucuneObligation: false };
 }
 
 // ─── Génération déclarations annuelles ────────────────────────────────────────

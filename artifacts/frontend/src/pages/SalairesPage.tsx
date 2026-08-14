@@ -652,7 +652,7 @@ function TabPaie() {
           { label: "Brouillons", value: nbBrouillons, color: "text-gray-600" },
           { label: "Validés", value: nbValides, color: "text-blue-700" },
           { label: "Payés", value: nbPayes, color: "text-green-700" },
-          { label: "Total net", value: formatFcfaShort(totalNet), color: "text-purple-700" },
+          { label: "Total net", value: formatFcfa(totalNet), color: "text-purple-700" },
         ].map((k) => (
           <div key={k.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
             <p className="text-xs text-gray-500 mb-1">{k.label}</p>

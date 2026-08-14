@@ -146,8 +146,16 @@ function ModalGenerer({ onClose, onDone }: { onClose: () => void; onDone: () => 
       const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${tok()}` } });
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? "Erreur");
-      const nb = Array.isArray(json) ? json.length : 0;
-      toast({ title: "Déclarations générées", description: `${nb} déclaration(s) créée(s)${nb === 0 ? " (déjà existantes)" : ""}.` });
+      if (json.aucuneObligation) {
+        toast({ title: "Aucune obligation configurée", description: "Configurez d'abord vos obligations fiscales dans l'onglet Tableau de bord.", variant: "destructive" });
+      } else {
+        const { creees = 0, misesAJour = 0, ignorees = 0 } = json as { creees: number; misesAJour: number; ignorees: number };
+        const parts: string[] = [];
+        if (creees > 0)     parts.push(`${creees} créée(s)`);
+        if (misesAJour > 0) parts.push(`${misesAJour} mise(s) à jour`);
+        if (ignorees > 0)   parts.push(`${ignorees} déjà à jour`);
+        toast({ title: "Déclarations générées", description: parts.length ? parts.join(", ") + "." : "Aucune modification." });
+      }
       onDone();
     } catch (e) {
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
