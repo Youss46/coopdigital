@@ -196,12 +196,18 @@ export async function genererDeclarationsMensuelles(cooperativeId: number, mois:
     let baseImposable = 0;
     let montantCalcule = 0;
 
-    if (obl.typeTaxe === "cnps" && obl.libelle.toLowerCase().includes("salariale")) {
+    const libelleLC = obl.libelle.toLowerCase();
+    if (obl.typeTaxe === "cnps" && (libelleLC.includes("salarial") && !libelleLC.includes("patronal"))) {
       const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.032;
       baseImposable  = bases.totalBrut;
       montantCalcule = Math.round(bases.totalBrut * taux);
-    } else if (obl.typeTaxe === "cnps" && obl.libelle.toLowerCase().includes("patronale")) {
+    } else if (obl.typeTaxe === "cnps" && libelleLC.includes("patronal")) {
       const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.077;
+      baseImposable  = bases.totalBrut;
+      montantCalcule = Math.round(bases.totalBrut * taux);
+    } else if (obl.typeTaxe === "cnps") {
+      // CNPS générique sans précision salarial/patronal : on applique le taux configuré sur le brut
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.032;
       baseImposable  = bases.totalBrut;
       montantCalcule = Math.round(bases.totalBrut * taux);
     } else if (obl.typeTaxe === "its") {
@@ -366,12 +372,18 @@ export async function recalculerDeclaration(cooperativeId: number, id: number): 
 
     const bases = await getBasesCnpsIts(cooperativeId, mois, annee);
 
-    if (obl.typeTaxe === "cnps" && obl.libelle.toLowerCase().includes("salariale")) {
+    const libelleLC = obl.libelle.toLowerCase();
+    if (obl.typeTaxe === "cnps" && (libelleLC.includes("salarial") && !libelleLC.includes("patronal"))) {
       const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.032;
       baseImposable  = bases.totalBrut;
       montantCalcule = Math.round(bases.totalBrut * taux);
-    } else if (obl.typeTaxe === "cnps" && obl.libelle.toLowerCase().includes("patronale")) {
+    } else if (obl.typeTaxe === "cnps" && libelleLC.includes("patronal")) {
       const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.077;
+      baseImposable  = bases.totalBrut;
+      montantCalcule = Math.round(bases.totalBrut * taux);
+    } else if (obl.typeTaxe === "cnps") {
+      // CNPS générique : on applique le taux configuré
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.032;
       baseImposable  = bases.totalBrut;
       montantCalcule = Math.round(bases.totalBrut * taux);
     } else if (obl.typeTaxe === "its") {
