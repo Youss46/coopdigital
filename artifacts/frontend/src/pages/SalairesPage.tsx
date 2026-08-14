@@ -5,6 +5,7 @@ import {
   Plus, RefreshCw, CheckCircle, Banknote,
   Loader2, ChevronDown, TrendingUp, Building2,
   UserCheck, AlertCircle, FileDown, Save, Info, Pencil, Trash2, RotateCcw,
+  Settings2, History, ChevronRight,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -1015,10 +1016,19 @@ function TabMasse() {
 //  ONGLET 4 — Avances personnel
 // ══════════════════════════════════════════════════════════════════════════════
 
+const PLAN_BADGE: Record<string, { label: string; cls: string }> = {
+  integral: { label: "Intégral",  cls: "bg-gray-100 text-gray-600" },
+  mensuel:  { label: "Mensuel",   cls: "bg-blue-100 text-blue-700" },
+  reporte:  { label: "Reporté",   cls: "bg-amber-100 text-amber-700" },
+};
+
 function TabAvances() {
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
+  const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [planTarget, setPlanTarget] = useState<{ avance: any; personnel: any } | null>(null);
   const canGerer = usePermission("salaires", "gerer_avances");
 
   const { data: avances, refetch, isLoading } = useGetAvancesPersonnel({ statut: "en_cours" });
@@ -1042,6 +1052,7 @@ function TabAvances() {
   );
   const now = Date.now();
   const deuxMoisMs = 2 * 30 * 24 * 3600 * 1000;
+  void queryClient;
 
   return (
     <div className="space-y-4">
@@ -1086,16 +1097,21 @@ function TabAvances() {
                   <th className="px-4 py-3 text-right">Montant</th>
                   <th className="px-4 py-3 text-right">Remboursé</th>
                   <th className="px-4 py-3 text-right">Restant</th>
+                  <th className="px-4 py-3 text-left">Plan</th>
                   <th className="px-4 py-3 text-left">Date octroi</th>
                   <th className="px-4 py-3 text-left">Motif</th>
                   {canGerer && <th className="px-4 py-3 text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {list.map(({ avance, personnel }: AvanceAvecPersonnel) => {
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {list.map((row: any) => {
+                  const { avance, personnel } = row as AvanceAvecPersonnel & { avance: { planType?: string; montantMensuelFcfa?: number; reportMois?: number; reportAnnee?: number } };
                   const restant = avance.montantFcfa - avance.montantRembourse;
                   const octroiDate = toDate(avance.createdAt);
                   const isOld = octroiDate ? (now - octroiDate.getTime() > deuxMoisMs) : false;
+                  const planKey = avance.planType ?? "integral";
+                  const badge = PLAN_BADGE[planKey] ?? PLAN_BADGE["integral"];
                   return (
                     <tr key={avance.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
@@ -1120,6 +1136,17 @@ function TabAvances() {
                       <td className="px-4 py-3 text-right font-bold text-red-600">
                         {formatFcfa(restant)}
                       </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.cls}`}>
+                          {badge.label}
+                        </span>
+                        {planKey === "mensuel" && avance.montantMensuelFcfa && (
+                          <p className="text-xs text-gray-400 mt-0.5">{formatFcfa(avance.montantMensuelFcfa)}/mois</p>
+                        )}
+                        {planKey === "reporte" && avance.reportMois && avance.reportAnnee && (
+                          <p className="text-xs text-gray-400 mt-0.5">Dès {avance.reportMois}/{avance.reportAnnee}</p>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-gray-600">
                         {toDate(avance.dateOctroi)?.toLocaleDateString("fr-CI") ?? avance.dateOctroi}
                         {isOld && (
@@ -1132,13 +1159,23 @@ function TabAvances() {
                         {avance.motif ?? "—"}
                       </td>
                       {canGerer && (
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => handleRembourser(avance.id)}
-                            className="text-xs text-green-600 hover:text-green-800 underline"
-                          >
-                            Rembourser
-                          </button>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => setPlanTarget({ avance, personnel })}
+                              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                              title="Configurer le plan de remboursement"
+                            >
+                              <Settings2 className="h-3 w-3" /> Plan
+                            </button>
+                            <span className="text-gray-200">|</span>
+                            <button
+                              onClick={() => handleRembourser(avance.id)}
+                              className="text-xs text-green-600 hover:text-green-800 underline"
+                            >
+                              Rembourser
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -1156,6 +1193,14 @@ function TabAvances() {
           onSaved={() => { setShowCreate(false); refetch(); }}
         />
       )}
+      {planTarget && (
+        <PlanAvanceModal
+          avance={planTarget.avance}
+          personnel={planTarget.personnel}
+          onClose={() => setPlanTarget(null)}
+          onSaved={() => { setPlanTarget(null); refetch(); }}
+        />
+      )}
     </div>
   );
 }
@@ -1163,6 +1208,224 @@ function TabAvances() {
 // ══════════════════════════════════════════════════════════════════════════════
 //  MODALES
 // ══════════════════════════════════════════════════════════════════════════════
+
+// ─── Modal plan de remboursement ─────────────────────────────────────────────
+function PlanAvanceModal({
+  avance,
+  personnel,
+  onClose,
+  onSaved,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  avance: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  personnel: any;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+
+  const [planType, setPlanType] = useState<"integral" | "mensuel" | "reporte">(
+    avance.planType ?? "integral",
+  );
+  const [montantMensuel, setMontantMensuel] = useState<string>(
+    avance.montantMensuelFcfa ? String(avance.montantMensuelFcfa) : "",
+  );
+  const [reportMois, setReportMois] = useState<string>(
+    avance.reportMois ? String(avance.reportMois) : "",
+  );
+  const [reportAnnee, setReportAnnee] = useState<string>(
+    avance.reportAnnee ? String(avance.reportAnnee) : "",
+  );
+
+  // Historique de remboursements
+  const { data: historique, isLoading: histLoading } = useQuery({
+    queryKey: ["remboursements-avance", avance.id],
+    queryFn: async () => {
+      const token = localStorage.getItem("token") ?? "";
+      const r = await fetch(`${BASE_URL}/api/salaires/avances/${avance.id}/remboursements`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) return [];
+      return r.json() as Promise<Array<{ remboursement: { montantFcfa: number; createdAt: string }; periode: string | null }>>;
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const token = localStorage.getItem("token") ?? "";
+      const body: Record<string, unknown> = { plan_type: planType };
+      if (planType === "mensuel") body["montant_mensuel_fcfa"] = Number(montantMensuel) || null;
+      if (planType === "reporte") {
+        body["report_mois"]  = Number(reportMois)  || null;
+        body["report_annee"] = Number(reportAnnee) || null;
+      }
+      const r = await fetch(`${BASE_URL}/api/salaires/avances/${avance.id}/plan`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error((await r.json()).erreur ?? "Erreur");
+    },
+    onSuccess: () => {
+      toast({ title: "Plan de remboursement mis à jour" });
+      onSaved();
+    },
+    onError: (e: unknown) => {
+      toast({ title: (e as Error).message, variant: "destructive" });
+    },
+  });
+
+  const restant = avance.montantFcfa - avance.montantRembourse;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Plan de remboursement</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {personnel.prenoms} {personnel.nom} — restant&nbsp;:&nbsp;
+              <span className="font-semibold text-red-600">{restant.toLocaleString("fr-CI")} FCFA</span>
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-5 overflow-y-auto flex-1">
+          {/* Plan type */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Mode de déduction</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(["integral", "mensuel", "reporte"] as const).map((p) => {
+                const labels: Record<string, string> = {
+                  integral: "Intégral",
+                  mensuel:  "Mensuel",
+                  reporte:  "Reporté",
+                };
+                const descs: Record<string, string> = {
+                  integral: "Tout déduit au prochain bulletin",
+                  mensuel:  "Montant fixe chaque mois",
+                  reporte:  "Aucune déduction jusqu'à la période choisie",
+                };
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setPlanType(p)}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      planType === p
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-100 hover:border-gray-300"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold text-gray-800">{labels[p]}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{descs[p]}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Plan-specific inputs */}
+          {planType === "mensuel" && (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">
+                Montant mensuel à déduire (FCFA)
+              </label>
+              <MoneyInput
+                className={INPUT_CLS}
+                value={montantMensuel}
+                onChange={(raw) => setMontantMensuel(raw)}
+                placeholder="Ex : 50 000"
+              />
+              {Number(montantMensuel) > 0 && (
+                <p className="text-xs text-gray-400">
+                  Durée estimée : {Math.ceil(restant / Number(montantMensuel))} bulletin(s)
+                </p>
+              )}
+            </div>
+          )}
+
+          {planType === "reporte" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Mois de début (1–12)</label>
+                <input
+                  type="number"
+                  min={1} max={12}
+                  className={INPUT_CLS}
+                  value={reportMois}
+                  onChange={(e) => setReportMois(e.target.value)}
+                  placeholder="Ex : 3"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Année</label>
+                <input
+                  type="number"
+                  min={2024} max={2040}
+                  className={INPUT_CLS}
+                  value={reportAnnee}
+                  onChange={(e) => setReportAnnee(e.target.value)}
+                  placeholder="Ex : 2026"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Historique */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-2">
+              <History className="h-3 w-3" /> Historique des déductions
+            </p>
+            {histLoading ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+              </div>
+            ) : !historique || historique.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">Aucune déduction enregistrée</p>
+            ) : (
+              <div className="divide-y divide-gray-50 border border-gray-100 rounded-lg overflow-hidden">
+                {historique.map((h, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 text-xs">
+                    <span className="text-gray-500">
+                      {h.periode ?? new Date(h.remboursement.createdAt).toLocaleDateString("fr-CI")}
+                    </span>
+                    <span className="font-semibold text-green-700">
+                      −&nbsp;{h.remboursement.montantFcfa.toLocaleString("fr-CI")} FCFA
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 p-5 border-t border-gray-100 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-60 flex items-center gap-2"
+          >
+            {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Enregistrer le plan
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function PersonnelModal({
   personnel,

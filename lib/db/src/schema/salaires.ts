@@ -55,6 +55,12 @@ export const avancePersonnelStatutEnum = pgEnum("avance_personnel_statut", [
   "rembourse",
 ]);
 
+export const avancePersonnelPlanEnum = pgEnum("avance_personnel_plan", [
+  "integral",
+  "mensuel",
+  "reporte",
+]);
+
 export const ligneBulletinTypeEnum = pgEnum("ligne_bulletin_type", [
   "avantage",
   "retenue",
@@ -182,12 +188,35 @@ export const avancesPersonnelTable = pgTable("avances_personnel", {
   motif: text("motif"),
   statut: avancePersonnelStatutEnum("statut").notNull().default("en_cours"),
   montantRembourse: integer("montant_rembourse").notNull().default(0),
+  // Plan de remboursement flexible
+  planType: avancePersonnelPlanEnum("plan_type").notNull().default("integral"),
+  montantMensuelFcfa: integer("montant_mensuel_fcfa"),
+  reportMois: integer("report_mois"),
+  reportAnnee: integer("report_annee"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
 });
 
 export type AvancePersonnel = typeof avancesPersonnelTable.$inferSelect;
+
+// ─── Table remboursements_avance ──────────────────────────────────────────────
+
+export const remboursementsAvanceTable = pgTable("remboursements_avance", {
+  id: serial("id").primaryKey(),
+  avanceId: integer("avance_id")
+    .notNull()
+    .references(() => avancesPersonnelTable.id, { onDelete: "cascade" }),
+  bulletinId: integer("bulletin_id")
+    .references(() => bulletinsPaieTable.id, { onDelete: "set null" }),
+  montantFcfa: integer("montant_fcfa").notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export type RemboursementAvance = typeof remboursementsAvanceTable.$inferSelect;
 
 // ─── Table config_paie ────────────────────────────────────────────────────────
 // Taux légaux configurables par coopérative (CNPS, ITS, taxe apprentissage, FPC)

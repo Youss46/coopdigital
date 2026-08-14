@@ -6,6 +6,7 @@ import {
   bulletinsPaieTable,
   lignesBulletinTable,
   avancesPersonnelTable,
+  remboursementsAvanceTable,
   configPaieTable,
   comptesMobilesMarchandsTable,
   mouvementsMobileMarchandTable,
@@ -953,6 +954,94 @@ export async function rembourserAvance(
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "rembourserAvance");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleUpdatePlanAvance(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const id = parseId(req.params["id"]);
+    const { plan_type, montant_mensuel_fcfa, report_mois, report_annee } =
+      req.body as {
+        plan_type?: string;
+        montant_mensuel_fcfa?: number | null;
+        report_mois?: number | null;
+        report_annee?: number | null;
+      };
+
+    const validPlans = ["integral", "mensuel", "reporte"];
+    if (plan_type && !validPlans.includes(plan_type)) {
+      res.status(400).json({ erreur: "plan_type invalide (integral | mensuel | reporte)" });
+      return;
+    }
+
+    const [av] = await db
+      .select()
+      .from(avancesPersonnelTable)
+      .where(and(
+        eq(avancesPersonnelTable.id, id),
+        eq(avancesPersonnelTable.cooperativeId, coopId(req)),
+      ))
+      .limit(1);
+
+    if (!av) { res.status(404).json({ erreur: "Avance introuvable" }); return; }
+    if (av.statut === "rembourse") {
+      res.status(400).json({ erreur: "Cette avance est déjà remboursée" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(avancesPersonnelTable)
+      .set({
+        ...(plan_type != null && { planType: plan_type as "integral" | "mensuel" | "reporte" }),
+        ...(montant_mensuel_fcfa !== undefined && { montantMensuelFcfa: montant_mensuel_fcfa }),
+        ...(report_mois !== undefined && { reportMois: report_mois }),
+        ...(report_annee !== undefined && { reportAnnee: report_annee }),
+      })
+      .where(eq(avancesPersonnelTable.id, id))
+      .returning();
+
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "handleUpdatePlanAvance");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function getRemboursementsAvance(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const id = parseId(req.params["id"]);
+    const [av] = await db
+      .select({ id: avancesPersonnelTable.id })
+      .from(avancesPersonnelTable)
+      .where(and(
+        eq(avancesPersonnelTable.id, id),
+        eq(avancesPersonnelTable.cooperativeId, coopId(req)),
+      ))
+      .limit(1);
+    if (!av) { res.status(404).json({ erreur: "Avance introuvable" }); return; }
+
+    const rows = await db
+      .select({
+        remboursement: remboursementsAvanceTable,
+        periode: bulletinsPaieTable.periode,
+      })
+      .from(remboursementsAvanceTable)
+      .leftJoin(bulletinsPaieTable, eq(remboursementsAvanceTable.bulletinId, bulletinsPaieTable.id))
+      .where(eq(remboursementsAvanceTable.avanceId, id))
+      .orderBy(desc(remboursementsAvanceTable.createdAt));
+
+    res.json(rows);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "getRemboursementsAvance");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

@@ -23,6 +23,8 @@ import {
   listAvancesPersonnel,
   createAvancePersonnel,
   rembourserAvance,
+  handleUpdatePlanAvance,
+  getRemboursementsAvance,
   getRapportMensuel,
   getHistoriqueMasse,
   getConfigPaie,
@@ -136,6 +138,16 @@ router.put(
   "/salaires/avances/:id/rembourser",
   checkPermission("salaires", "gerer_avances"),
   rembourserAvance,
+);
+router.patch(
+  "/salaires/avances/:id/plan",
+  checkPermission("salaires", "gerer_avances"),
+  handleUpdatePlanAvance,
+);
+router.get(
+  "/salaires/avances/:id/remboursements",
+  checkPermission("salaires", "lire"),
+  getRemboursementsAvance,
 );
 
 // ─── Config paie ─────────────────────────────────────────────────────────────

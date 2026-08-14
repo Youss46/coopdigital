@@ -28,6 +28,7 @@ import {
   bulletinsPaieTable,
   lignesBulletinTable,
   avancesPersonnelTable,
+  remboursementsAvanceTable,
   configPaieTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
@@ -196,7 +197,7 @@ export async function generateBulletin(
     }
   }
 
-  // 6. Avances en cours → retenue automatique
+  // 6. Avances en cours → retenue selon plan de remboursement
   const avancesEnCours = await dbInst
     .select()
     .from(avancesPersonnelTable)
@@ -207,10 +208,34 @@ export async function generateBulletin(
       ),
     );
 
-  const totalAvance = avancesEnCours.reduce(
-    (sum, a) => sum + (a.montantFcfa - a.montantRembourse),
-    0,
-  );
+  // Calcul du montant à déduire par avance selon le plan configuré
+  type RemItem = { avanceId: number; montantFcfa: number };
+  const remboursementsAPasser: RemItem[] = [];
+  let totalAvance = 0;
+
+  for (const av of avancesEnCours) {
+    const planType = av.planType ?? "integral";
+    const restant = av.montantFcfa - av.montantRembourse;
+    if (restant <= 0) continue;
+
+    // Report intégral : sauter si la période cible n'est pas encore atteinte
+    if (planType === "reporte" && av.reportMois != null && av.reportAnnee != null) {
+      const auDelaDeLaPeriode =
+        av.reportAnnee > annee ||
+        (av.reportAnnee === annee && av.reportMois > mois);
+      if (auDelaDeLaPeriode) continue;
+    }
+
+    // Montant de cette période : mensuel plafonné au restant, sinon tout le restant
+    const montantCePeriode =
+      planType === "mensuel" && av.montantMensuelFcfa != null
+        ? Math.min(av.montantMensuelFcfa, restant)
+        : restant;
+
+    totalAvance += montantCePeriode;
+    remboursementsAPasser.push({ avanceId: av.id, montantFcfa: montantCePeriode });
+  }
+
   if (totalAvance > 0) {
     lignesRetenues.push({
       libelle: "Avance sur salaire",
@@ -293,15 +318,23 @@ export async function generateBulletin(
     await dbInst.insert(lignesBulletinTable).values(lignesInsert);
   }
 
-  // 10. Marquer les avances comme remboursées (si déduites en intégralité)
-  for (const av of avancesEnCours) {
+  // 10. Enregistrer les remboursements + mettre à jour chaque avance
+  for (const rem of remboursementsAPasser) {
+    // Historique de remboursement
+    await dbInst.insert(remboursementsAvanceTable).values({
+      avanceId:   rem.avanceId,
+      bulletinId: bulletin.id,
+      montantFcfa: rem.montantFcfa,
+    });
+
+    // Mettre à jour le solde et le statut de l'avance
+    const av = avancesEnCours.find((a) => a.id === rem.avanceId)!;
+    const nouveauRembourse = av.montantRembourse + rem.montantFcfa;
+    const nouveauStatut = nouveauRembourse >= av.montantFcfa ? "rembourse" : "en_cours";
     await dbInst
       .update(avancesPersonnelTable)
-      .set({
-        statut: "rembourse",
-        montantRembourse: av.montantFcfa,
-      })
-      .where(eq(avancesPersonnelTable.id, av.id));
+      .set({ montantRembourse: nouveauRembourse, statut: nouveauStatut })
+      .where(eq(avancesPersonnelTable.id, rem.avanceId));
   }
 
   return bulletin.id;
