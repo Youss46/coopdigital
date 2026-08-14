@@ -546,6 +546,24 @@ export async function getBonsCarburant(cooperativeId: number, filters: BonCarbur
     .orderBy(desc(bonsCarburantTable.createdAt));
 }
 
+export async function getBonCarburantByNumero(numero: string) {
+  const rows = await db
+    .select({
+      bon:              bonsCarburantTable,
+      immatriculation:  vehiculesTable.immatriculation,
+      marque:           vehiculesTable.marque,
+      modele:           vehiculesTable.modele,
+      chauffeurNom:     chauffeursTable.nom,
+      chauffeurPrenoms: chauffeursTable.prenoms,
+    })
+    .from(bonsCarburantTable)
+    .leftJoin(vehiculesTable,  eq(vehiculesTable.id,  bonsCarburantTable.vehiculeId))
+    .leftJoin(chauffeursTable, eq(chauffeursTable.id, bonsCarburantTable.chauffeurId))
+    .where(eq(bonsCarburantTable.numero, numero))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function getBonCarburant(cooperativeId: number, id: number) {
   const rows = await db
     .select({

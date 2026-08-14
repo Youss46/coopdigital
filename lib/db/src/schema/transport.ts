@@ -108,6 +108,7 @@ export const bonsCarburantTable = pgTable("bons_carburant", {
   prixLitreFcfa:      numeric("prix_litre_fcfa", { precision: 10, scale: 2 }),
   montantFcfa:        numeric("montant_fcfa", { precision: 14, scale: 2 }),
   observations:       text("observations"),
+  ticketUrl:          text("ticket_url"),
   createdBy:          integer("created_by").references(() => usersTable.id),
   createdAt:          timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:          timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

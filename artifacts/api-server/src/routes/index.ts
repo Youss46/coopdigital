@@ -65,6 +65,7 @@ import entrepotsDeleguesRouter from "./entrepots_delegues";
 import archivesRouter from "./archives";
 import certificationsRouter from "./certifications";
 import primesRouter from "./primes";
+import stationRouter from "./station";
 
 const router: IRouter = Router();
 
@@ -72,6 +73,7 @@ const router: IRouter = Router();
 router.use(healthRouter);
 router.use(setupRouter);
 router.use(authRouter);
+router.use(stationRouter);
 router.use(portailRouter);
 router.use(terrainRouter);
 router.use(deleguesRouter);

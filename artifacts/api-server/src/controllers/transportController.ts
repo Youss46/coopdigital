@@ -710,6 +710,7 @@ function mapBon(row: Awaited<ReturnType<typeof getBonsCarburant>>[number], appro
     prix_litre_fcfa:    b.prixLitreFcfa != null ? parseFloat(b.prixLitreFcfa) : null,
     montant_fcfa:       b.montantFcfa != null ? parseFloat(b.montantFcfa) : null,
     observations:       b.observations ?? null,
+    ticket_url:         b.ticketUrl ?? null,
     created_at:         b.createdAt.toISOString(),
     updated_at:         b.updatedAt.toISOString(),
   };

@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import QRCode from "qrcode";
 import { drawHeader } from "./pdfHeaderService";
 
 const VERT  = "#16a34a";
@@ -54,6 +55,13 @@ const CARBURANT_LABELS: Record<string, string> = {
 };
 
 export async function generateBonCarburant(cooperativeId: number, bon: BonData): Promise<Buffer> {
+  // Générer le QR code avec le numéro du bon
+  const qrBuffer = await QRCode.toBuffer(bon.numero, {
+    errorCorrectionLevel: "M",
+    margin: 1,
+    width: 96,
+  });
+
   const doc = new PDFDocument({ size: "A4", margin: MARGIN, bufferPages: true });
   const chunks: Buffer[] = [];
   const endPromise = new Promise<Buffer>((resolve, reject) => {
@@ -79,10 +87,19 @@ export async function generateBonCarburant(cooperativeId: number, bon: BonData):
     .text(STATUT_LABELS[bon.statut] ?? bon.statut, MARGIN + 8, y + 6, { width: PAGE_W - 16, align: "center", lineBreak: false });
   y += 26;
 
-  // ── Numéro prominent ──────────────────────────────────────────────────────
+  // ── Numéro prominent + QR code ────────────────────────────────────────────
+  const QR_SIZE = 72;
+  const QR_X = MARGIN + PAGE_W - QR_SIZE;
+
   doc.fontSize(22).fillColor(VERT).font("Helvetica-Bold")
-    .text(bon.numero, MARGIN, y, { width: PAGE_W, align: "center" });
-  y += 32;
+    .text(bon.numero, MARGIN, y + 8, { width: PAGE_W - QR_SIZE - 12, align: "left" });
+
+  // QR code à droite du numéro
+  doc.image(qrBuffer, QR_X, y, { width: QR_SIZE, height: QR_SIZE });
+  doc.fontSize(6).fillColor(GRIS).font("Helvetica")
+    .text("Scanner à la station", QR_X, y + QR_SIZE + 2, { width: QR_SIZE, align: "center", lineBreak: false });
+
+  y += QR_SIZE + 14;
 
   // ── Bloc infos véhicule / chauffeur ───────────────────────────────────────
   const colW1 = 240;

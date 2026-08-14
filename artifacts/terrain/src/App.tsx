@@ -29,6 +29,7 @@ import HistoriqueAgent from "./pages/HistoriqueAgent";
 import EnquetesAgent from "./pages/EnquetesAgent";
 import MissionEnqueteDetail from "./pages/MissionEnqueteDetail";
 import CollecteEnquete from "./pages/CollecteEnquete";
+import StationService from "./pages/StationService";
 
 function AgentTerrainRoutes() {
   return (
@@ -124,7 +125,11 @@ export default function App() {
         <OfflineProvider>
           <SystemBanner />
           <OfflineBanner />
-          <AppRoutes />
+          {/* Route publique station-service — AVANT le guard auth */}
+          <Switch>
+            <Route path="/station/:numero?" component={StationService} />
+            <Route component={AppRoutes} />
+          </Switch>
         </OfflineProvider>
       </AuthProvider>
     </WouterRouter>
