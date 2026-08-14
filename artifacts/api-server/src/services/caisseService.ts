@@ -865,7 +865,7 @@ export async function debiterCaisseParResponsable(
 }
 
 // ─── Débit caisse pour paiement de salaire ────────────────────────────────────
-// N'exige pas de session ouverte (session_id nullable depuis la migration).
+// Exige une session ouverte : le mouvement est rattaché à la session du jour.
 // L'écriture comptable est gérée séparément par generateEcrituresSalaire.
 
 // ─── Vérification compte Mobile Marchand avant paiement de prime ─────────────
@@ -1022,6 +1022,13 @@ export async function debitCaisseForSalaire(
   if (!caisse) throw new Error("Caisse introuvable");
   if (caisse.cooperativeId !== cooperativeId) throw new Error("Accès refusé");
 
+  const sessionRow = await getSessionActive(caisseId);
+  if (!sessionRow) {
+    throw new Error(
+      `Aucune session de caisse ouverte. Ouvrez une session dans la page Caisse avant de payer un salaire en espèces.`,
+    );
+  }
+
   const montant = Math.round(montantFcfa);
   const soldeActuel = parseFloat(caisse.soldeActuelFcfa as string);
   if (soldeActuel < montant) {
@@ -1029,11 +1036,9 @@ export async function debitCaisseForSalaire(
   }
   const nouveauSolde = soldeActuel - montant;
 
-  const sessionRow = await getSessionActive(caisseId);
-
   await db.insert(mouvementsCaisseTable).values({
     caisseId,
-    sessionId: sessionRow?.id ?? null,
+    sessionId: sessionRow.id,
     cooperativeId,
     type: "sortie",
     motif: "paiement_salaire",
