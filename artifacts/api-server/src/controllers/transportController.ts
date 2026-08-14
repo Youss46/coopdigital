@@ -10,6 +10,7 @@ import {
 } from "@workspace/api-zod";
 import { proposerEcriture } from "../services/comptabiliteService";
 import { envoyerPushGroupe } from "../services/pushService";
+import { notifBonSoumisCarburant } from "../services/notificationService";
 import {
   getVehicules,
   getVehicule,
@@ -794,6 +795,15 @@ export async function handleSoumettresBonCarburant(req: Request, res: Response):
     if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
     if (row.bon.statut !== "brouillon") { res.status(400).json({ erreur: "Le bon n'est pas en brouillon" }); return; }
     await transitionBon(cooperativeId, id, "soumis");
+
+    // Notification push + in-app → comptable/directeur (fire-and-forget)
+    void notifBonSoumisCarburant(
+      cooperativeId,
+      row.bon.numero,
+      `${row.chauffeurPrenoms ?? ""} ${row.chauffeurNom ?? ""}`.trim() || "Chauffeur",
+      id,
+    );
+
     res.json(mapBon({ ...row, bon: { ...row.bon, statut: "soumis", updatedAt: new Date() } }));
   } catch (err) {
     req.log.error({ err }, "Erreur soumettresBonCarburant");

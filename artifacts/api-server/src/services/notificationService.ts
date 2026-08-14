@@ -50,7 +50,9 @@ export type NotifType =
   | "transfert_confirme"
   | "transfert_litige"
   // ── Intrants ──────────────────────────────────────────
-  | "peremption_intrant";
+  | "peremption_intrant"
+  // ── Transport ─────────────────────────────────────────
+  | "bon_soumis_carburant";
 
 export type NotifGravite = "info" | "attention" | "critique";
 
@@ -104,6 +106,8 @@ const PREF_COL: Record<NotifType, keyof typeof preferencesNotificationsTable.$in
   transfert_planifie:       "notifMessageRecu",
   transfert_confirme:       "notifMessageRecu",
   transfert_litige:         "notifAnomalieCritique",
+  // Transport
+  bon_soumis_carburant:     "notifAnomalieCritique",
 };
 
 // ─── Créer des notifications pour une liste de users ──────────────────────────
@@ -308,6 +312,38 @@ export async function notifExpeditionLitige(
     });
   } catch (err) {
     logger.error({ err }, "notifExpeditionLitige");
+  }
+}
+
+// ─── Transport — bon carburant soumis ─────────────────────────────────────────
+
+export async function notifBonSoumisCarburant(
+  cooperativeId: number,
+  numero:        string,
+  chauffeurNom:  string,
+  bonId:         number,
+): Promise<void> {
+  const roles = ["pca", "directeur", "comptable"];
+  const payload: NotifPayload = {
+    type:         "bon_soumis_carburant",
+    gravite:      "attention",
+    titre:        "Nouveau bon carburant à approuver",
+    message:      `Le chauffeur ${chauffeurNom} a soumis le bon ${numero} pour approbation`,
+    lien:         "/transport",
+    lienLibelle:  "Aller au transport",
+    sourceModule: "transport",
+    sourceId:     bonId,
+  };
+  try {
+    const userIds = await getUsersParRole(cooperativeId, roles);
+    await creerNotification(cooperativeId, userIds, payload);
+    await envoyerPushGroupe(userIds, {
+      title: payload.titre,
+      body:  payload.message,
+      url:   payload.lien,
+    });
+  } catch (err) {
+    logger.error({ err }, "notifBonSoumisCarburant");
   }
 }
 
