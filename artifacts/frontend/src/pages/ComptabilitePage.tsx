@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import ExcelJS from "exceljs";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useQuery, useMutation, useQueryClient as useQC } from "@tanstack/react-query";
 import {
@@ -2016,11 +2017,56 @@ export function WidgetTauxChange() {
   );
 }
 
-// ─── Export CSV helper ────────────────────────────────────────────────────────
-function exportCSV(filename: string, headers: string[], rows: string[][]): void {
-  const bom = "\uFEFF";
-  const lines = [headers.join(";"), ...rows.map((r) => r.map((c) => c.includes(";") ? `"${c}"` : c).join(";"))];
-  const blob = new Blob([bom + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+// ─── Export Excel helper ──────────────────────────────────────────────────────
+interface ExcelCol {
+  header: string; key: string; width: number;
+  numFmt?: string; align?: "left" | "right" | "center";
+}
+
+async function exportExcel(
+  filename: string,
+  sheetName: string,
+  columns: ExcelCol[],
+  rows: Record<string, string | number>[],
+): Promise<void> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "CoopDigital";
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet(sheetName);
+  ws.columns = columns.map(c => ({ header: c.header, key: c.key, width: c.width }));
+
+  // En-tête vert foncé
+  const hdr = ws.getRow(1);
+  hdr.height = 22;
+  hdr.font      = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+  hdr.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A4731" } };
+  hdr.alignment = { vertical: "middle", horizontal: "center" };
+
+  // Données avec lignes alternées
+  for (let i = 0; i < rows.length; i++) {
+    const row = ws.addRow(rows[i]!);
+    row.font = { size: 9 };
+    if (i % 2 === 1) {
+      row.eachCell({ includeEmpty: true }, cell => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+      });
+    }
+  }
+
+  // Formats et alignements par colonne
+  columns.forEach(c => {
+    if (c.numFmt) ws.getColumn(c.key).numFmt = c.numFmt;
+    if (c.align)  ws.getColumn(c.key).alignment = { horizontal: c.align };
+  });
+
+  // Figer la 1ère ligne + auto-filtre
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+  const lastCol = String.fromCharCode(64 + columns.length);
+  ws.autoFilter = { from: "A1", to: `${lastCol}1` };
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = filename; a.click();
@@ -2056,21 +2102,28 @@ function OngletGrandLivre() {
 
   const handleFilter = () => { setCompteFiltre(compte); setPage(1); };
 
-  const handleExport = () => {
-    exportCSV(
-      `grand_livre_${exercice}${compteFiltre ? "_" + compteFiltre : ""}.csv`,
-      ["Date", "Pièce", "Libellé", "Compte Débit", "Compte Crédit", "Montant FCFA", "Source"],
-      list.map((e) => [
-        new Date(e.dateEcriture).toLocaleDateString("fr-FR"),
-        e.numeroPiece ?? "",
-        e.libelle.replace(/;/g, ","),
-        e.compteDebit,
-        e.compteCredit,
-        String(e.montantFcfa),
-        SOURCE_LABELS[e.source] ?? e.source,
-      ])
-    );
-  };
+  const handleExport = () => void exportExcel(
+    `grand_livre_${exercice}${compteFiltre ? "_" + compteFiltre : ""}.xlsx`,
+    "Grand livre",
+    [
+      { header: "Date",          key: "date",    width: 14 },
+      { header: "Pièce",         key: "piece",   width: 22 },
+      { header: "Libellé",       key: "libelle", width: 50 },
+      { header: "Compte Débit",  key: "debit",   width: 16 },
+      { header: "Compte Crédit", key: "credit",  width: 16 },
+      { header: "Montant FCFA",  key: "montant", width: 18, numFmt: "#,##0", align: "right" },
+      { header: "Source",        key: "source",  width: 22 },
+    ],
+    list.map((e) => ({
+      date:    new Date(e.dateEcriture).toLocaleDateString("fr-FR"),
+      piece:   e.numeroPiece ?? "",
+      libelle: e.libelle,
+      debit:   e.compteDebit,
+      credit:  e.compteCredit,
+      montant: Number(e.montantFcfa),
+      source:  SOURCE_LABELS[e.source] ?? e.source,
+    }))
+  );
 
   return (
     <div>
@@ -2105,7 +2158,7 @@ function OngletGrandLivre() {
           <p className="text-sm text-gray-500">{total} écriture{total > 1 ? "s" : ""}</p>
           <button onClick={handleExport} disabled={list.length === 0}
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-40">
-            <Download size={14} /> Exporter CSV
+            <Download size={14} /> Exporter Excel
           </button>
         </div>
       </div>
@@ -2182,13 +2235,26 @@ function OngletBalance() {
   const totalDebit  = list.reduce((s, l) => s + l.totalDebit,  0);
   const totalCredit = list.reduce((s, l) => s + l.totalCredit, 0);
 
-  const handleExport = () => {
-    exportCSV(
-      `balance_${exercice}.csv`,
-      ["N° Compte", "Libellé", "Type", "Total Débit", "Total Crédit", "Solde"],
-      list.map((l) => [l.numeroCompte, l.libelle.replace(/;/g, ","), l.type, String(l.totalDebit), String(l.totalCredit), String(l.solde)])
-    );
-  };
+  const handleExport = () => void exportExcel(
+    `balance_${exercice}.xlsx`,
+    "Balance des comptes",
+    [
+      { header: "N° Compte",    key: "compte",  width: 14 },
+      { header: "Libellé",      key: "libelle", width: 45 },
+      { header: "Type",         key: "type",    width: 14, align: "center" },
+      { header: "Total Débit",  key: "debit",   width: 18, numFmt: "#,##0", align: "right" },
+      { header: "Total Crédit", key: "credit",  width: 18, numFmt: "#,##0", align: "right" },
+      { header: "Solde",        key: "solde",   width: 18, numFmt: "#,##0;[Red]-#,##0", align: "right" },
+    ],
+    list.map((l) => ({
+      compte:  l.numeroCompte,
+      libelle: l.libelle,
+      type:    l.type,
+      debit:   Number(l.totalDebit),
+      credit:  Number(l.totalCredit),
+      solde:   Number(l.solde),
+    }))
+  );
 
   return (
     <div>
@@ -2204,7 +2270,7 @@ function OngletBalance() {
           <p className="text-sm text-gray-500">{list.length} compte{list.length > 1 ? "s" : ""} mouvementés</p>
           <button onClick={handleExport} disabled={list.length === 0}
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-40">
-            <Download size={14} /> Exporter CSV
+            <Download size={14} /> Exporter Excel
           </button>
         </div>
       </div>
