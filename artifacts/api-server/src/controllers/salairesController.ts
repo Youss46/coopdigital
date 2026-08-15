@@ -880,8 +880,16 @@ export async function createAvancePersonnel(
     const { personnelId, montantFcfa, dateOctroi, motif } =
       req.body as Record<string, unknown>;
 
-    if (!personnelId || !montantFcfa || !dateOctroi) {
+    if (!personnelId || montantFcfa === undefined || montantFcfa === null || !dateOctroi) {
       res.status(400).json({ erreur: "Champs obligatoires manquants" });
+      return;
+    }
+
+    // Guard: advance amount must be strictly positive
+    if (Number(montantFcfa) <= 0) {
+      res.status(400).json({
+        erreur: "Le montant de l'avance doit être un montant positif",
+      });
       return;
     }
 
