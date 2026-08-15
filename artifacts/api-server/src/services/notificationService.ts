@@ -323,7 +323,7 @@ export async function notifBonSoumisCarburant(
   chauffeurNom:  string,
   bonId:         number,
 ): Promise<void> {
-  const roles = ["pca", "directeur", "comptable"];
+  const roles = ["pca", "directeur"];
   const payload: NotifPayload = {
     type:         "bon_soumis_carburant",
     gravite:      "attention",
