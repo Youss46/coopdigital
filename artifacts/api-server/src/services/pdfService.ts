@@ -826,6 +826,9 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     ["N° Reçu",            ref],
     ["Campagne",           campagne ?? "—"],
     ["Date de livraison",  formaterDate(row.dateLivraison)],
+    ["Heure de pesée",     row.createdAt
+      ? new Date(row.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Abidjan" })
+      : "—"],
     ["Produit",            mentionCertif],
     ["Nombre de sacs",     row.nombreSacs ? String(row.nombreSacs) : "—"],
     ["Poids brut",         row.produitBrutKg
