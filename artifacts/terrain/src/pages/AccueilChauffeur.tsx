@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiGet } from "@/lib/api";
-import { Truck, Fuel, MapPin, AlertTriangle, ChevronRight, ClipboardList, History, ArrowRight } from "lucide-react";
+import { Truck, Fuel, MapPin, AlertTriangle, ChevronRight, ClipboardList, History, ArrowRight, LogOut } from "lucide-react";
 import BottomNavChauffeur from "@/components/BottomNavChauffeur";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
@@ -175,6 +175,7 @@ function ChauffeurHeader({
   missionCount: number;
   loading?: boolean;
 }) {
+  const { logout } = useAuth();
   return (
     <div style={{
       background: "linear-gradient(145deg, #1a4731 0%, #16a34a 100%)",
@@ -202,7 +203,7 @@ function ChauffeurHeader({
             <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.75rem" }}>Chauffeur</p>
           </div>
         </div>
-        {/* Statut */}
+        {/* Statut + déconnexion */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, paddingTop: 4 }}>
           <span style={{
             display: "flex", alignItems: "center", gap: 5,
@@ -217,6 +218,23 @@ function ChauffeurHeader({
               {missionCount} mission{missionCount !== 1 ? "s" : ""} en cours
             </span>
           )}
+          <button
+            onClick={logout}
+            title="Se déconnecter"
+            style={{
+              marginTop: 4,
+              display: "flex", alignItems: "center", gap: 5,
+              background: "rgba(255,255,255,0.12)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: 999,
+              padding: "4px 10px",
+              fontSize: "0.72rem", color: "rgba(255,255,255,0.8)", fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            <LogOut size={12} />
+            Déconnexion
+          </button>
         </div>
       </div>
       {/* Vague */}
