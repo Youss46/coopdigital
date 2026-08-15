@@ -1619,8 +1619,19 @@ function TabCarburant() {
     }});
   }
 
-  function openPdf(bon: BonCarburant) {
-    window.open(`/api/transport/carburant/bons/${bon.id}/pdf`, "_blank");
+  async function openPdf(bon: BonCarburant) {
+    try {
+      const res = await fetch(`${BASE}/api/transport/carburant/bons/${bon.id}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch (e) {
+      console.error(e);
+      alert("Impossible de générer le PDF.");
+    }
   }
 
   return (
