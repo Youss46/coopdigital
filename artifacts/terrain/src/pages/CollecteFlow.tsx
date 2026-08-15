@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNav from "../components/BottomNav";
+import ScaleWeightDisplay from "../components/ScaleWeightDisplay";
 import { useOffline } from "../contexts/OfflineContext";
 import { enregistrerCollecte, getPrix, telechargerRecuLivraison } from "../lib/api";
 import { getCachedPrix, cachePrix } from "../lib/idb";
@@ -184,6 +185,11 @@ export default function CollecteFlow() {
                   placeholder="Ex: 5"
                 />
               </div>
+
+              {/* Lecture automatique depuis la balance RS232 (service local) */}
+              <ScaleWeightDisplay
+                onUse={(kg) => setPoidsBrut(kg.toFixed(1))}
+              />
 
               <div className="t-field">
                 <label className="t-label">Poids brut (kg)</label>
