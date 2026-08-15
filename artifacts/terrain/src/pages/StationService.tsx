@@ -11,31 +11,18 @@
  */
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Fuel, Search, CheckCircle2, XCircle, Loader2, Camera,
+  Fuel, Search, CheckCircle2, XCircle, Camera,
   Car, User, Droplets, CalendarDays, Receipt, WifiOff, ShieldCheck, ShieldAlert,
 } from "lucide-react";
 
 const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`;
 
 // ── Clé publique Ed25519 (embarquée au build) ────────────────────────────────
-// __STATION_QR_PUBLIC_KEY__ est remplacé par Vite à la compilation avec la valeur
-// dérivée de SESSION_SECRET. La clé est publique — safe à inclure dans le bundle.
 const EMBEDDED_SPKI_B64: string = __STATION_QR_PUBLIC_KEY__;
 const STATION_PK_LS_KEY = "station_qr_spki_v1";
 
-/**
- * Charge la clé publique Ed25519 pour vérification.
- * Priorité : bundle embarqué → localStorage → fetch API.
- * Avec la clé embarquée au build, la première option est toujours disponible,
- * y compris sur un appareil n'ayant jamais été en ligne.
- */
 async function loadPublicKey(): Promise<CryptoKey | null> {
   const candidates: string[] = [];
   if (EMBEDDED_SPKI_B64) candidates.push(EMBEDDED_SPKI_B64);
@@ -46,16 +33,11 @@ async function loadPublicKey(): Promise<CryptoKey | null> {
     try {
       const spkiBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
       return await crypto.subtle.importKey(
-        "spki",
-        spkiBytes,
-        { name: "Ed25519" },
-        false,
-        ["verify"],
+        "spki", spkiBytes, { name: "Ed25519" }, false, ["verify"],
       );
     } catch { /* essayer le suivant */ }
   }
 
-  // Dernier recours : fetch réseau (met aussi à jour le cache)
   try {
     const res = await fetch(`${BASE}/station/carburant/public-key`);
     if (!res.ok) return null;
@@ -63,25 +45,15 @@ async function loadPublicKey(): Promise<CryptoKey | null> {
     try { localStorage.setItem(STATION_PK_LS_KEY, spki); } catch { /* ignore */ }
     const spkiBytes = Uint8Array.from(atob(spki), c => c.charCodeAt(0));
     return await crypto.subtle.importKey(
-      "spki",
-      spkiBytes,
-      { name: "Ed25519" },
-      false,
-      ["verify"],
+      "spki", spkiBytes, { name: "Ed25519" }, false, ["verify"],
     );
   } catch { return null; }
 }
 
-/** Vérifie la signature Ed25519 d'un payload base64url. */
-async function verifyQrSig(
-  payload: string,
-  sig: string,
-  pubKey: CryptoKey,
-): Promise<boolean> {
+async function verifyQrSig(payload: string, sig: string, pubKey: CryptoKey): Promise<boolean> {
   try {
     const sigBytes = Uint8Array.from(
-      atob(sig.replace(/-/g, "+").replace(/_/g, "/")),
-      c => c.charCodeAt(0),
+      atob(sig.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0),
     );
     const payloadBytes = new TextEncoder().encode(payload);
     return await crypto.subtle.verify("Ed25519", pubKey, sigBytes, payloadBytes);
@@ -102,7 +74,6 @@ interface BonInfo {
   marque: string | null;
   modele?: string | null;
   chauffeur_nom: string | null;
-  /** true = données issues du QR, non encore confirmées par l'API */
   offline?: boolean;
 }
 
@@ -120,18 +91,12 @@ interface QrData {
 }
 
 const TYPE_CARB: Record<string, string> = {
-  gasoil: "Gasoil",
-  essence: "Essence",
-  super: "Super",
+  gasoil: "Gasoil", essence: "Essence", super: "Super",
 };
 
 function fmt(d: string | null | undefined) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
+  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
 function compressPhoto(file: File): Promise<string> {
@@ -141,15 +106,13 @@ function compressPhoto(file: File): Promise<string> {
       const img = new Image();
       img.onload = () => {
         const MAX = 800;
-        let w = img.width;
-        let h = img.height;
+        let w = img.width, h = img.height;
         if (w > MAX || h > MAX) {
           if (w > h) { h = Math.round((h * MAX) / w); w = MAX; }
           else { w = Math.round((w * MAX) / h); h = MAX; }
         }
         const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
+        canvas.width = w; canvas.height = h;
         canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
         resolve(canvas.toDataURL("image/jpeg", 0.75));
       };
@@ -161,7 +124,6 @@ function compressPhoto(file: File): Promise<string> {
   });
 }
 
-/** Extrait le numéro de bon d'une valeur QR brute (URL ou numéro direct). */
 function extractNumeroFromRaw(raw: string): string {
   try {
     const url = new URL(raw.trim());
@@ -174,7 +136,6 @@ function extractNumeroFromRaw(raw: string): string {
   return raw.trim().toUpperCase();
 }
 
-/** Extrait ?p= et ?s= depuis une URL QR brute. */
 function extractQrParamsFromUrl(raw: string): { p: string; s: string } | null {
   try {
     const url = new URL(raw.trim());
@@ -185,10 +146,6 @@ function extractQrParamsFromUrl(raw: string): { p: string; s: string } | null {
   return null;
 }
 
-/**
- * Décode un payload base64url en QrData, SANS vérifier l'expiration.
- * Retourne null uniquement si le format est invalide (mauvais JSON, version, num absent).
- */
 function decodeQrPayloadRaw(payload: string): QrData | null {
   try {
     const json = JSON.parse(
@@ -199,17 +156,30 @@ function decodeQrPayloadRaw(payload: string): QrData | null {
   } catch { return null; }
 }
 
-/** Décode un payload base64url en QrData. Retourne null si invalide OU expiré. */
 function decodeQrPayload(payload: string): QrData | null {
   const data = decodeQrPayloadRaw(payload);
   if (!data) return null;
-  if (data.exp < Date.now()) return null; // expiré
+  if (data.exp < Date.now()) return null;
   return data;
 }
 
-/** Retourne le nombre de jours restants avant expiration (peut être négatif). */
 function daysUntilExpiry(expMs: number): number {
   return Math.floor((expMs - Date.now()) / 86_400_000);
+}
+
+// ── Inline spinner (uses t-spin keyframe from terrain.css) ────────────────────
+function Spinner({ color = "var(--t-primary)", size = 18 }: { color?: string; size?: number }) {
+  return (
+    <span style={{
+      display: "inline-block",
+      width: size, height: size,
+      border: `2px solid ${color}33`,
+      borderTopColor: color,
+      borderRadius: "50%",
+      animation: "t-spin .7s linear infinite",
+      flexShrink: 0,
+    }} />
+  );
 }
 
 // ── Composant ─────────────────────────────────────────────────────────────────
@@ -217,7 +187,6 @@ export default function StationService() {
   const { toast } = useToast();
   const params = useParams<{ numero?: string }>();
 
-  // Recherche / bon affiché
   const [searchValue, setSearchValue] = useState(
     params.numero ? decodeURIComponent(params.numero).toUpperCase() : "",
   );
@@ -225,26 +194,14 @@ export default function StationService() {
   const [bon, setBon]           = useState<BonInfo | null>(null);
   const [notFound, setNotFound] = useState(false);
 
-  // État QR — conservé en state pour être transmis à la confirmation
   const [qrPayload, setQrPayload]   = useState<string | null>(null);
   const [qrSig, setQrSig]           = useState<string | null>(null);
-  /**
-   * null     = vérification en cours (payload présent, vérif pas encore terminée)
-   * true     = Ed25519 OK
-   * false    = vérification échouée (QR invalide/falsifié)
-   * "no-key" = clé absente, données affichées avec avertissement
-   * "online" = bon chargé depuis l'API (pas de vérification Ed25519 requise)
-   */
   const [qrVerified, setQrVerified] = useState<true | false | "no-key" | "online" | null>(null);
-  /** true = le QR est expiré (timestamp exp dépassé) — bloque la délivrance */
   const [qrExpired, setQrExpired]   = useState(false);
-  /** Timestamp d'expiration extrait du payload QR (ms). */
   const [qrExpiryMs, setQrExpiryMs] = useState<number | null>(null);
 
-  // Compteur pour annuler les vérifications obsolètes (race condition API vs offline)
   const verifGenRef = useRef(0);
 
-  // Formulaire de délivrance
   const [form, setForm] = useState({
     quantite_livree:  "",
     prix_litre_fcfa:  "",
@@ -258,42 +215,27 @@ export default function StationService() {
 
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  // ── applyQrOffline : vérification Ed25519 avant affichage ────────────────────
-  // N'appelle setBon() qu'APRÈS que la vérification soit terminée.
   const applyQrOffline = useCallback(async (payload: string, sig: string): Promise<"ok" | "failed" | "no-key" | "expired"> => {
-    // Décoder sans filtrer l'expiration pour pouvoir afficher un message clair
     const rawData = decodeQrPayloadRaw(payload);
     if (!rawData) return "failed";
 
     const isExpired = rawData.exp < Date.now();
-
     const gen = ++verifGenRef.current;
-    setQrPayload(payload);
-    setQrSig(sig);
-    setQrVerified(null); // en cours
-    setQrExpired(isExpired);
-    setQrExpiryMs(rawData.exp);
+    setQrPayload(payload); setQrSig(sig);
+    setQrVerified(null); setQrExpired(isExpired); setQrExpiryMs(rawData.exp);
 
     const pubKey = await loadPublicKey();
-    if (verifGenRef.current !== gen) return "failed"; // annulé par l'API
+    if (verifGenRef.current !== gen) return "failed";
 
     const sigOk = pubKey ? await verifyQrSig(payload, sig, pubKey) : null;
-    if (verifGenRef.current !== gen) return "failed"; // annulé par l'API
+    if (verifGenRef.current !== gen) return "failed";
 
-    // QR falsifié (signature invalide) — refus immédiat qu'il soit expiré ou non
     if (sigOk === false) {
-      setQrVerified(false);
-      setQrPayload(null);
-      setQrSig(null);
-      toast({
-        title: "QR code invalide",
-        description: "La signature est incorrecte. Ce bon pourrait être falsifié.",
-        variant: "destructive",
-      });
+      setQrVerified(false); setQrPayload(null); setQrSig(null);
+      toast({ title: "QR code invalide", description: "La signature est incorrecte. Ce bon pourrait être falsifié.", variant: "destructive" });
       return "failed";
     }
 
-    // Afficher les données du bon (expiré ou non)
     setBon({
       numero: rawData.num, statut: "approuve",
       type_carburant: rawData.type, quantite_autorisee: rawData.qte,
@@ -303,131 +245,81 @@ export default function StationService() {
       offline: true,
     });
 
-    if (!pubKey) {
-      setQrVerified("no-key");
-      return isExpired ? "expired" : "no-key";
-    }
-
-    // sigOk === true ici
+    if (!pubKey) { setQrVerified("no-key"); return isExpired ? "expired" : "no-key"; }
     setQrVerified(true);
     return isExpired ? "expired" : "ok";
   }, [toast]);
 
-  // ── Recherche du bon (en ligne) ───────────────────────────────────────────────
   const rechercher = useCallback(async (numero?: string, offlinePayload?: string, offlineSig?: string) => {
     const q = (numero ?? searchValue).trim().toUpperCase();
     if (!q) return;
-    setLoading(true);
-    setNotFound(false);
-    setBon(null);
-    setDone(false);
+    setLoading(true); setNotFound(false); setBon(null); setDone(false);
     try {
       const res = await fetch(`${BASE}/station/carburant/bons/${encodeURIComponent(q)}`);
       if (res.status === 404) { setNotFound(true); return; }
       if (!res.ok) throw new Error(`Erreur ${res.status}`);
       const data = (await res.json()) as BonInfo;
 
-      // Annuler toute vérification Ed25519 offline en cours (on a la réponse API)
       verifGenRef.current++;
       setBon(data);
       if (data.station_service) setForm(f => ({ ...f, station_service: data.station_service! }));
 
       if (offlinePayload && offlineSig) {
-        // QR params présents → valider signature ET expiration même en ligne.
-        // Le QR est la preuve d'autorisation requise pour livrer.
         const rawData = decodeQrPayloadRaw(offlinePayload);
         if (!rawData) {
-          // Payload illisible — bloquer la délivrance
-          setQrPayload(null);
-          setQrSig(null);
-          setQrVerified(false);
-          setQrExpired(false);
-          setQrExpiryMs(null);
+          setQrPayload(null); setQrSig(null); setQrVerified(false);
+          setQrExpired(false); setQrExpiryMs(null);
           toast({ title: "QR code invalide", description: "Le payload QR est illisible.", variant: "destructive" });
           return;
         }
-
         const isExpired = rawData.exp < Date.now();
-        setQrExpiryMs(rawData.exp);
-        setQrExpired(isExpired);
+        setQrExpiryMs(rawData.exp); setQrExpired(isExpired);
 
-        // Vérifier la signature (peut nécessiter un fetch réseau la 1re fois)
         const pubKey = await loadPublicKey();
         if (pubKey) {
           const sigOk = await verifyQrSig(offlinePayload, offlineSig, pubKey);
           if (!sigOk) {
-            setQrPayload(null);
-            setQrSig(null);
-            setQrVerified(false);
-            setQrExpiryMs(null);
-            setQrExpired(false);
-            toast({
-              title: "QR code invalide",
-              description: "La signature est incorrecte. Ce bon pourrait être falsifié.",
-              variant: "destructive",
-            });
+            setQrPayload(null); setQrSig(null); setQrVerified(false);
+            setQrExpiryMs(null); setQrExpired(false);
+            toast({ title: "QR code invalide", description: "La signature est incorrecte. Ce bon pourrait être falsifié.", variant: "destructive" });
             return;
           }
           setQrVerified(true);
         } else {
-          // Pas de clé disponible — afficher avec avertissement
           setQrVerified("no-key");
         }
-        setQrPayload(offlinePayload);
-        setQrSig(offlineSig);
+        setQrPayload(offlinePayload); setQrSig(offlineSig);
       } else {
-        // Recherche manuelle (pas de QR) — afficher le bon mais pas le formulaire
-        setQrPayload(null);
-        setQrSig(null);
-        setQrVerified(null);
-        setQrExpired(false);
-        setQrExpiryMs(null);
+        setQrPayload(null); setQrSig(null);
+        setQrVerified(null); setQrExpired(false); setQrExpiryMs(null);
       }
     } catch {
-      // Si on a un payload QR valide → mode offline
       if (offlinePayload && offlineSig) {
         await applyQrOffline(offlinePayload, offlineSig);
       } else {
-        toast({
-          title: "Erreur réseau",
-          description: "Impossible de contacter le serveur.",
-          variant: "destructive",
-        });
+        toast({ title: "Erreur réseau", description: "Impossible de contacter le serveur.", variant: "destructive" });
       }
     } finally {
       setLoading(false);
     }
   }, [searchValue, toast, applyQrOffline]);
 
-  // ── Auto-recherche au montage ─────────────────────────────────────────────────
   useEffect(() => {
-    // Rafraîchir le cache de clé publique en arrière-plan dès que possible
     void loadPublicKey();
-
     if (!params.numero) return;
 
     const q = decodeURIComponent(params.numero).toUpperCase();
     setSearchValue(q);
-
     const sp = new URLSearchParams(window.location.search);
-    const p = sp.get("p");
-    const s = sp.get("s");
-
-    if (p && s) {
-      // Tenter l'API en ligne et la vérification offline en parallèle.
-      // L'API prend priorité si elle répond (verifGenRef annule la vérif offline).
-      void rechercher(q, p, s);
-    } else {
-      rechercher(q);
-    }
+    const p = sp.get("p"); const s = sp.get("s");
+    if (p && s) { void rechercher(q, p, s); }
+    else { rechercher(q); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── QR / photo scan ───────────────────────────────────────────────────────────
   const handleScanQR = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if ("BarcodeDetector" in window) {
       try {
         const bd = new (window as unknown as {
@@ -444,12 +336,8 @@ export default function StationService() {
           const numero = extractNumeroFromRaw(raw);
           setSearchValue(numero);
           const qrParams = extractQrParamsFromUrl(raw);
-          if (qrParams) {
-            // Tenter API + vérification offline en parallèle
-            await rechercher(numero, qrParams.p, qrParams.s);
-          } else {
-            rechercher(numero);
-          }
+          if (qrParams) { await rechercher(numero, qrParams.p, qrParams.s); }
+          else { rechercher(numero); }
           return;
         }
       } catch { /* fallback */ }
@@ -457,7 +345,6 @@ export default function StationService() {
     toast({ title: "Scan non disponible", description: "Saisissez le numéro manuellement." });
   }, [rechercher, toast]);
 
-  // ── Photo ticket ─────────────────────────────────────────────────────────────
   const handlePhotoTicket = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -469,7 +356,6 @@ export default function StationService() {
     }
   }, [toast]);
 
-  // ── Soumettre la délivrance ───────────────────────────────────────────────────
   const handleLivrer = useCallback(async () => {
     if (!bon) return;
     if (!form.quantite_livree || !form.date_utilisation) {
@@ -486,11 +372,7 @@ export default function StationService() {
       if (form.station_service)  body["station_service"]  = form.station_service;
       if (form.observations)     body["observations"]     = form.observations;
       if (ticketPhoto)           body["ticket_url"]       = ticketPhoto;
-      // Payload signé depuis le state — fonctionne pour URL et scan photo
-      if (qrPayload && qrSig) {
-        body["qr_payload"] = qrPayload;
-        body["qr_sig"] = qrSig;
-      }
+      if (qrPayload && qrSig)   { body["qr_payload"] = qrPayload; body["qr_sig"] = qrSig; }
 
       const res = await fetch(
         `${BASE}/station/carburant/bons/${encodeURIComponent(bon.numero)}/livrer`,
@@ -507,17 +389,33 @@ export default function StationService() {
     }
   }, [bon, form, ticketPhoto, toast, qrPayload, qrSig]);
 
-  // ── Rendu ────────────────────────────────────────────────────────────────────
+  // ── Écran succès ──────────────────────────────────────────────────────────────
   if (done && bon) {
     return (
-      <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center p-6">
-        <CheckCircle2 className="h-20 w-20 text-green-500 mb-4" />
-        <h1 className="text-2xl font-bold text-green-800 mb-1">Carburant délivré</h1>
-        <p className="text-green-700 text-center mb-6">
-          Bon <strong>{bon.numero}</strong> — {form.quantite_livree} L de {TYPE_CARB[bon.type_carburant] ?? bon.type_carburant}
-        </p>
-        <Button
-          variant="outline"
+      <div style={{
+        minHeight: "100dvh", background: "var(--t-success-bg)",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", padding: "24px", gap: 16, textAlign: "center",
+      }}>
+        <div style={{
+          width: 80, height: 80, borderRadius: "50%",
+          background: "var(--t-success)", display: "flex",
+          alignItems: "center", justifyContent: "center",
+        }}>
+          <CheckCircle2 size={44} color="#fff" />
+        </div>
+        <div>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--t-success)", marginBottom: 6 }}>
+            Carburant délivré
+          </h1>
+          <p style={{ color: "var(--t-text)", fontSize: "0.95rem", lineHeight: 1.5 }}>
+            Bon <strong>{bon.numero}</strong><br />
+            {form.quantite_livree} L de {TYPE_CARB[bon.type_carburant] ?? bon.type_carburant}
+          </p>
+        </div>
+        <button
+          className="t-btn t-btn--ghost"
+          style={{ maxWidth: 260, height: 48, fontSize: "0.9rem" }}
           onClick={() => {
             setBon(null); setDone(false); setSearchValue(""); setTicketPhoto(null);
             setQrPayload(null); setQrSig(null); setQrVerified(null);
@@ -526,294 +424,378 @@ export default function StationService() {
           }}
         >
           Nouveau bon
-        </Button>
+        </button>
       </div>
     );
   }
 
-  // Vérification Ed25519 en cours (bon pas encore affiché)
   const qrPending = qrPayload !== null && qrVerified === null;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8">
-      <div className="bg-green-700 text-white px-4 py-5 shadow">
-        <div className="flex items-center gap-3 max-w-lg mx-auto">
-          <Fuel className="h-7 w-7" />
+    <div style={{ minHeight: "100dvh", background: "var(--t-bg)" }}>
+      {/* ── Header ── */}
+      <div style={{
+        background: "linear-gradient(145deg, #1a4731 0%, #16a34a 100%)",
+        padding: "40px 20px 32px", position: "relative",
+      }}>
+        <div style={{ maxWidth: 480, margin: "0 auto", display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: 14,
+            background: "rgba(255,255,255,0.18)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: "2px solid rgba(255,255,255,0.25)",
+          }}>
+            <Fuel size={24} color="#fff" />
+          </div>
           <div>
-            <h1 className="text-lg font-bold leading-tight">Espace Station-Service</h1>
-            <p className="text-green-200 text-sm">Délivrance de carburant</p>
+            <h1 style={{ color: "#fff", fontWeight: 800, fontSize: "1.25rem", lineHeight: 1.2 }}>
+              Espace Station-Service
+            </h1>
+            <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.78rem", marginTop: 2 }}>
+              Délivrance de carburant
+            </p>
           </div>
         </div>
+        <svg style={{ position: "absolute", bottom: 0, left: 0, right: 0, width: "100%", display: "block" }}
+          viewBox="0 0 375 20" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0 20 C100 0 275 40 375 20 L375 20 L0 20Z" fill="var(--t-bg)" />
+        </svg>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 pt-6 space-y-4">
-        {/* Recherche */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Search className="h-4 w-4" /> Rechercher un bon
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Numéro du bon (ex: BC-00001)"
-                value={searchValue}
-                onChange={e => setSearchValue(e.target.value.toUpperCase())}
-                onKeyDown={e => e.key === "Enter" && rechercher()}
-                className="uppercase"
-              />
-              <Button onClick={() => rechercher()} disabled={loading || !searchValue.trim()}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              </Button>
+      {/* ── Contenu ── */}
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: "16px", display: "flex", flexDirection: "column", gap: 12 }}>
+
+        {/* ── Recherche ── */}
+        <div className="t-card">
+          <p style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--t-text)", display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+            <Search size={16} color="var(--t-primary)" /> Rechercher un bon
+          </p>
+
+          {/* Ligne recherche */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <input
+              className="t-input"
+              style={{ flex: 1, height: 48, fontSize: "1rem", textTransform: "uppercase" }}
+              placeholder="Numéro du bon (ex: BC-00001)"
+              value={searchValue}
+              onChange={e => setSearchValue(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === "Enter" && rechercher()}
+            />
+            <button
+              onClick={() => rechercher()}
+              disabled={loading || !searchValue.trim()}
+              style={{
+                width: 48, height: 48, flexShrink: 0,
+                background: "var(--t-primary)", color: "#fff",
+                border: "none", borderRadius: "var(--t-radius)", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                opacity: loading || !searchValue.trim() ? 0.5 : 1,
+              }}
+            >
+              {loading
+                ? <Spinner color="#fff" size={18} />
+                : <Search size={18} />
+              }
+            </button>
+          </div>
+
+          {/* Scanner QR */}
+          <div style={{ textAlign: "center" }}>
+            <button
+              className="t-btn t-btn--ghost t-btn--sm"
+              style={{ width: "auto", padding: "0 20px", fontSize: "0.85rem" }}
+              onClick={() => photoInputRef.current?.click()}
+            >
+              <Camera size={15} /> Scanner le QR code
+            </button>
+            <input ref={photoInputRef} type="file" accept="image/*" capture="environment"
+              style={{ display: "none" }} onChange={handleScanQR} />
+          </div>
+
+          {/* Introuvable */}
+          {notFound && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8, marginTop: 12,
+              background: "var(--t-danger-bg)", color: "var(--t-danger)",
+              borderRadius: 8, padding: "10px 14px", fontSize: "0.85rem", fontWeight: 600,
+            }}>
+              <XCircle size={16} style={{ flexShrink: 0 }} />
+              Bon introuvable. Vérifiez le numéro.
             </div>
+          )}
+        </div>
 
-            <div className="text-center">
-              <Button variant="outline" size="sm" className="gap-2"
-                onClick={() => photoInputRef.current?.click()}>
-                <Camera className="h-4 w-4" /> Scanner le QR code
-              </Button>
-              <input ref={photoInputRef} type="file" accept="image/*" capture="environment"
-                className="hidden" onChange={handleScanQR} />
-            </div>
-
-            {notFound && (
-              <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg">
-                <XCircle className="h-4 w-4 shrink-0" />
-                Bon introuvable. Vérifiez le numéro.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Spinner pendant la vérification Ed25519 (bon pas encore affiché) */}
+        {/* ── Vérification QR en cours ── */}
         {qrPending && (
-          <div className="flex items-center gap-3 bg-gray-50 border rounded-xl px-4 py-5 text-gray-600 text-sm">
-            <Loader2 className="h-5 w-5 animate-spin shrink-0 text-green-600" />
+          <div className="t-card" style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <Spinner color="var(--t-primary)" size={22} />
             <div>
-              <p className="font-medium">Vérification de la signature QR…</p>
-              <p className="text-xs text-gray-400 mt-0.5">Validation de l'authenticité du bon hors connexion</p>
+              <p style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--t-text)" }}>
+                Vérification de la signature QR…
+              </p>
+              <p style={{ fontSize: "0.78rem", color: "var(--t-muted)", marginTop: 2 }}>
+                Validation de l'authenticité du bon hors connexion
+              </p>
             </div>
           </div>
         )}
 
-        {/* Infos du bon — affichées seulement après vérification */}
+        {/* ── Bon + bannières ── */}
         {bon && !qrPending && (
           <>
-            {/* Bannière QR expiré — prioritaire sur les autres bannières */}
+            {/* Bannière QR expiré */}
             {bon.offline && qrExpired && (
-              <div className="flex items-start gap-2 text-red-800 text-sm bg-red-50 border border-red-300 rounded-lg px-3 py-3">
-                <XCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
-                <div>
-                  <p className="font-semibold">QR code expiré</p>
-                  <p className="text-xs text-red-700 mt-0.5">
-                    Ce QR a expiré le {new Date(qrExpiryMs!).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}.
-                    Le chauffeur doit générer un nouveau QR depuis son application.
-                  </p>
-                </div>
-              </div>
+              <Banner variant="danger" icon={<XCircle size={16} style={{ flexShrink: 0 }} />}>
+                <strong>QR code expiré</strong>
+                <span style={{ fontSize: "0.78rem", display: "block", marginTop: 3 }}>
+                  Ce QR a expiré le {new Date(qrExpiryMs!).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}.
+                  Le chauffeur doit générer un nouveau QR depuis son application.
+                </span>
+              </Banner>
             )}
 
-            {/* Bannière statut offline — seulement si non expiré */}
+            {/* Bannière QR vérifié OK */}
             {bon.offline && !qrExpired && qrVerified === true && (
-              <div className="flex items-center gap-2 text-green-800 text-sm bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-green-600" />
+              <Banner variant="success" icon={<ShieldCheck size={16} style={{ flexShrink: 0 }} />}>
                 QR authentique — signature vérifiée hors connexion. La confirmation nécessite internet.
-              </div>
+              </Banner>
             )}
+
+            {/* Bannière clé absente */}
             {bon.offline && !qrExpired && qrVerified === "no-key" && (
-              <div className="flex items-center gap-2 text-amber-800 text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                <WifiOff className="h-4 w-4 shrink-0" />
+              <Banner variant="warning" icon={<WifiOff size={16} style={{ flexShrink: 0 }} />}>
                 Clé de vérification introuvable (connexion hors ligne totale). Les données proviennent du QR mais n'ont pas pu être vérifiées. La confirmation nécessite internet.
-              </div>
+              </Banner>
             )}
 
-            <Card className={bon.statut === "approuve" ? "border-green-400" : "border-orange-300"}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-mono">{bon.numero}</CardTitle>
-                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                    {bon.offline && qrExpired && (
-                      <Badge className="bg-red-100 text-red-700 border border-red-300">
-                        QR expiré
-                      </Badge>
-                    )}
-                    {bon.offline && !qrExpired && qrExpiryMs !== null && (
-                      <Badge className={
-                        daysUntilExpiry(qrExpiryMs) <= 3
-                          ? "bg-amber-100 text-amber-700 border border-amber-300"
-                          : "bg-green-100 text-green-700 border border-green-200"
-                      }>
-                        {daysUntilExpiry(qrExpiryMs) <= 0
-                          ? "Expire aujourd'hui"
-                          : `Expire dans ${daysUntilExpiry(qrExpiryMs)} j`}
-                      </Badge>
-                    )}
-                    {bon.offline && !qrExpired && qrVerified === true && <ShieldCheck className="h-4 w-4 text-green-600" />}
-                    {bon.offline && !qrExpired && qrVerified === "no-key" && <ShieldAlert className="h-4 w-4 text-amber-500" />}
-                    {bon.offline && qrExpired && <XCircle className="h-4 w-4 text-red-500" />}
-                    <Badge className={
-                      bon.statut === "approuve" ? "bg-green-100 text-green-800"
-                      : bon.statut === "utilise" ? "bg-gray-100 text-gray-600"
-                      : "bg-orange-100 text-orange-800"
-                    }>
-                      {bon.statut === "approuve" ? "✓ Approuvé" : bon.statut === "utilise" ? "Déjà utilisé" : bon.statut}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="flex items-start gap-2">
-                    <Car className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-gray-500 text-xs">Véhicule</p>
-                      <p className="font-semibold">{bon.immatriculation ?? "—"}</p>
-                      {bon.marque && <p className="text-gray-500 text-xs">{bon.marque}</p>}
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <User className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-gray-500 text-xs">Chauffeur</p>
-                      <p className="font-semibold">{bon.chauffeur_nom ?? "—"}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Droplets className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-gray-500 text-xs">Carburant autorisé</p>
-                      <p className="font-bold text-blue-700">
-                        {bon.quantite_autorisee} L — {TYPE_CARB[bon.type_carburant] ?? bon.type_carburant}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <CalendarDays className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-gray-500 text-xs">Date d'émission</p>
-                      <p className="font-semibold">{fmt(bon.date_emission)}</p>
-                    </div>
-                  </div>
-                </div>
-                {bon.motif && (
-                  <p className="text-sm text-gray-600 bg-gray-50 rounded p-2">
-                    <span className="text-gray-400 text-xs block">Motif</span>
-                    {bon.motif}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            {/* Carte bon */}
+            <div className={`t-card ${bon.statut === "approuve" ? "t-card--success" : bon.statut === "utilise" ? "" : "t-card--warning"}`}
+              style={{ padding: 0, overflow: "hidden" }}>
 
-            {/* Message si bon trouvé en ligne sans QR (recherche manuelle) */}
-            {bon.statut === "approuve" && !qrPayload && qrVerified === null && (
-              <div className="flex items-start gap-2 text-amber-800 text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-3">
-                <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="font-semibold">QR code requis pour livrer</p>
-                  <p className="text-xs text-amber-700 mt-0.5">
-                    Demandez au chauffeur de présenter son QR code, puis scannez-le ou saisissez l'URL du QR.
-                  </p>
+              {/* En-tête carte */}
+              <div style={{
+                display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+                padding: "14px 16px 12px", borderBottom: "1px solid var(--t-border)",
+              }}>
+                <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.05rem", color: "var(--t-primary)" }}>
+                  {bon.numero}
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  {/* Badge expiration QR */}
+                  {bon.offline && qrExpired && (
+                    <span className="t-badge t-badge--danger">QR expiré</span>
+                  )}
+                  {bon.offline && !qrExpired && qrExpiryMs !== null && (
+                    <span className={`t-badge ${daysUntilExpiry(qrExpiryMs) <= 3 ? "t-badge--warning" : "t-badge--success"}`}>
+                      {daysUntilExpiry(qrExpiryMs) <= 0 ? "Expire aujourd'hui" : `Expire dans ${daysUntilExpiry(qrExpiryMs)} j`}
+                    </span>
+                  )}
+                  {/* Icône signature */}
+                  {bon.offline && !qrExpired && qrVerified === true && <ShieldCheck size={16} color="var(--t-success)" />}
+                  {bon.offline && !qrExpired && qrVerified === "no-key" && <ShieldAlert size={16} color="var(--t-warning)" />}
+                  {bon.offline && qrExpired && <XCircle size={16} color="var(--t-danger)" />}
+                  {/* Statut bon */}
+                  <span className={`t-badge ${
+                    bon.statut === "approuve" ? "t-badge--success"
+                    : bon.statut === "utilise" ? ""
+                    : "t-badge--warning"
+                  }`} style={bon.statut === "utilise" ? { background: "#f3f4f6", color: "#6b7280" } : {}}>
+                    {bon.statut === "approuve" ? "✓ Approuvé"
+                     : bon.statut === "utilise" ? "Déjà utilisé"
+                     : bon.statut}
+                  </span>
                 </div>
               </div>
+
+              {/* Détails grille */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, padding: "14px 16px" }}>
+                <InfoCell icon={<Car size={15} color="var(--t-muted)" />} label="Véhicule"
+                  value={bon.immatriculation ?? "—"} sub={bon.marque ?? undefined} />
+                <InfoCell icon={<User size={15} color="var(--t-muted)" />} label="Chauffeur"
+                  value={bon.chauffeur_nom ?? "—"} />
+                <InfoCell icon={<Droplets size={15} color="var(--t-info)" />} label="Carburant autorisé"
+                  value={`${bon.quantite_autorisee} L — ${TYPE_CARB[bon.type_carburant] ?? bon.type_carburant}`}
+                  valueColor="var(--t-info)" />
+                <InfoCell icon={<CalendarDays size={15} color="var(--t-muted)" />} label="Date d'émission"
+                  value={fmt(bon.date_emission)} />
+              </div>
+
+              {/* Motif */}
+              {bon.motif && (
+                <div style={{ margin: "0 16px 14px", background: "var(--t-bg)", borderRadius: 8, padding: "8px 12px" }}>
+                  <span style={{ fontSize: "0.72rem", color: "var(--t-muted)", display: "block", marginBottom: 2 }}>Motif</span>
+                  <p style={{ fontSize: "0.88rem", color: "var(--t-text)" }}>{bon.motif}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Avertissement QR requis (recherche manuelle) */}
+            {bon.statut === "approuve" && !qrPayload && qrVerified === null && (
+              <Banner variant="warning" icon={<ShieldAlert size={16} style={{ flexShrink: 0 }} />}>
+                <strong>QR code requis pour livrer</strong>
+                <span style={{ fontSize: "0.78rem", display: "block", marginTop: 3 }}>
+                  Demandez au chauffeur de présenter son QR code, puis scannez-le ou saisissez l'URL du QR.
+                </span>
+              </Banner>
             )}
 
             {/* Formulaire délivrance */}
             {bon.statut === "approuve" && !!qrPayload && !!qrSig && qrVerified !== false && !qrExpired && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Fuel className="h-4 w-4 text-green-600" /> Enregistrer la délivrance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <Label htmlFor="qte">Quantité livrée (L) *</Label>
-                      <Input id="qte" type="number" step="0.1" min="0"
-                        max={bon.quantite_autorisee + 1}
-                        placeholder={`Max ${bon.quantite_autorisee} L`}
-                        value={form.quantite_livree}
-                        onChange={e => setForm(f => ({ ...f, quantite_livree: e.target.value }))} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="prix">Prix / litre (FCFA)</Label>
-                      <Input id="prix" type="number" min="0" placeholder="ex: 650"
-                        value={form.prix_litre_fcfa}
-                        onChange={e => setForm(f => ({ ...f, prix_litre_fcfa: e.target.value }))} />
-                    </div>
-                  </div>
+              <div className="t-card">
+                <p style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--t-text)", display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                  <Fuel size={16} color="var(--t-success)" /> Enregistrer la délivrance
+                </p>
 
-                  {form.quantite_livree && form.prix_litre_fcfa && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                      <p className="text-xs text-green-600">Montant total</p>
-                      <p className="text-xl font-bold text-green-800">
-                        {Math.round(parseFloat(form.quantite_livree) * parseFloat(form.prix_litre_fcfa)).toLocaleString("fr-FR")} FCFA
-                      </p>
+                {/* Quantité + Prix */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div className="t-field">
+                    <label className="t-label">Quantité livrée (L) *</label>
+                    <input className="t-input" style={{ height: 48, fontSize: "1rem" }}
+                      type="number" step="0.1" min="0" max={bon.quantite_autorisee + 1}
+                      placeholder={`Max ${bon.quantite_autorisee} L`}
+                      value={form.quantite_livree}
+                      onChange={e => setForm(f => ({ ...f, quantite_livree: e.target.value }))} />
+                  </div>
+                  <div className="t-field">
+                    <label className="t-label">Prix / litre (FCFA)</label>
+                    <input className="t-input" style={{ height: 48, fontSize: "1rem" }}
+                      type="number" min="0" placeholder="ex: 650"
+                      value={form.prix_litre_fcfa}
+                      onChange={e => setForm(f => ({ ...f, prix_litre_fcfa: e.target.value }))} />
+                  </div>
+                </div>
+
+                {/* Montant total calculé */}
+                {form.quantite_livree && form.prix_litre_fcfa && (
+                  <div style={{
+                    background: "var(--t-success-bg)", borderRadius: 10,
+                    padding: "10px 16px", textAlign: "center", marginBottom: 12,
+                  }}>
+                    <p style={{ fontSize: "0.72rem", color: "var(--t-success)", marginBottom: 2 }}>Montant total</p>
+                    <p style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--t-success)" }}>
+                      {Math.round(parseFloat(form.quantite_livree) * parseFloat(form.prix_litre_fcfa)).toLocaleString("fr-FR")} FCFA
+                    </p>
+                  </div>
+                )}
+
+                <div className="t-field" style={{ marginBottom: 12 }}>
+                  <label className="t-label">Date de délivrance *</label>
+                  <input className="t-input" style={{ height: 48 }}
+                    type="date" value={form.date_utilisation}
+                    onChange={e => setForm(f => ({ ...f, date_utilisation: e.target.value }))} />
+                </div>
+
+                <div className="t-field" style={{ marginBottom: 12 }}>
+                  <label className="t-label">Nom de votre station</label>
+                  <input className="t-input" style={{ height: 48, fontSize: "1rem" }}
+                    placeholder="Ex: Total Plateau, Shell Koumassi…"
+                    value={form.station_service}
+                    onChange={e => setForm(f => ({ ...f, station_service: e.target.value }))} />
+                </div>
+
+                <div className="t-field" style={{ marginBottom: 16 }}>
+                  <label className="t-label">Observations</label>
+                  <input className="t-input" style={{ height: 48, fontSize: "1rem" }}
+                    placeholder="Remarques éventuelles"
+                    value={form.observations}
+                    onChange={e => setForm(f => ({ ...f, observations: e.target.value }))} />
+                </div>
+
+                {/* Photo ticket */}
+                <div className="t-field" style={{ marginBottom: 16 }}>
+                  <label className="t-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Receipt size={14} /> Ticket de carburant (photo)
+                  </label>
+                  {ticketPhoto ? (
+                    <div style={{ position: "relative" }}>
+                      <img src={ticketPhoto} alt="Ticket"
+                        style={{ width: "100%", maxHeight: 200, objectFit: "contain", borderRadius: 8, border: "1px solid var(--t-border)" }} />
+                      <button
+                        onClick={() => setTicketPhoto(null)}
+                        style={{
+                          position: "absolute", top: 6, right: 6,
+                          background: "rgba(255,255,255,0.9)", border: "1px solid var(--t-border)",
+                          borderRadius: 6, width: 28, height: 28, cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "0.85rem", fontWeight: 700, color: "var(--t-text)",
+                        }}
+                      >✕</button>
                     </div>
+                  ) : (
+                    <label style={{
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                      border: "2px dashed var(--t-border)", borderRadius: "var(--t-radius)",
+                      padding: "20px 16px", cursor: "pointer",
+                      transition: "border-color .15s",
+                    }}>
+                      <Camera size={32} color="var(--t-muted)" />
+                      <span style={{ fontSize: "0.85rem", color: "var(--t-muted)" }}>Prendre ou choisir une photo</span>
+                      <input type="file" accept="image/*" capture="environment"
+                        style={{ display: "none" }} onChange={handlePhotoTicket} />
+                    </label>
                   )}
+                </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="date">Date de délivrance *</Label>
-                    <Input id="date" type="date" value={form.date_utilisation}
-                      onChange={e => setForm(f => ({ ...f, date_utilisation: e.target.value }))} />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="station">Nom de votre station</Label>
-                    <Input id="station" placeholder="Ex: Total Plateau, Shell Koumassi…"
-                      value={form.station_service}
-                      onChange={e => setForm(f => ({ ...f, station_service: e.target.value }))} />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="obs">Observations</Label>
-                    <Input id="obs" placeholder="Remarques éventuelles"
-                      value={form.observations}
-                      onChange={e => setForm(f => ({ ...f, observations: e.target.value }))} />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Receipt className="h-4 w-4" /> Ticket de carburant (photo)
-                    </Label>
-                    {ticketPhoto ? (
-                      <div className="relative">
-                        <img src={ticketPhoto} alt="Ticket" className="w-full max-h-48 object-contain rounded-lg border" />
-                        <Button variant="ghost" size="sm" className="absolute top-1 right-1 bg-white/80"
-                          onClick={() => setTicketPhoto(null)}>✕</Button>
-                      </div>
-                    ) : (
-                      <label className="flex flex-col items-center gap-2 border-2 border-dashed border-gray-300 rounded-lg p-4 cursor-pointer hover:border-green-400 transition-colors">
-                        <Camera className="h-8 w-8 text-gray-400" />
-                        <span className="text-sm text-gray-500">Prendre ou choisir une photo</span>
-                        <input type="file" accept="image/*" capture="environment"
-                          className="hidden" onChange={handlePhotoTicket} />
-                      </label>
-                    )}
-                  </div>
-
-                  <Button
-                    className="w-full bg-green-700 hover:bg-green-800"
-                    onClick={handleLivrer}
-                    disabled={submitting || !form.quantite_livree || !form.date_utilisation}
-                  >
-                    {submitting
-                      ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Enregistrement…</>
-                      : <><CheckCircle2 className="h-4 w-4 mr-2" /> Confirmer la délivrance</>
-                    }
-                  </Button>
-                </CardContent>
-              </Card>
+                <button
+                  className="t-btn t-btn--success"
+                  onClick={handleLivrer}
+                  disabled={submitting || !form.quantite_livree || !form.date_utilisation}
+                >
+                  {submitting
+                    ? <><Spinner color="#fff" size={18} /> Enregistrement…</>
+                    : <><CheckCircle2 size={18} /> Confirmer la délivrance</>
+                  }
+                </button>
+              </div>
             )}
 
+            {/* Bon déjà utilisé */}
             {bon.statut === "utilise" && (
-              <div className="text-center text-gray-500 text-sm py-4">
+              <div style={{ textAlign: "center", color: "var(--t-muted)", fontSize: "0.9rem", padding: "16px 0" }}>
                 Ce bon a déjà été utilisé.
               </div>
             )}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Sous-composants ────────────────────────────────────────────────────────────
+type BannerVariant = "success" | "warning" | "danger";
+const BANNER_STYLES: Record<BannerVariant, { bg: string; color: string; border: string }> = {
+  success: { bg: "var(--t-success-bg)", color: "#166534", border: "#bbf7d0" },
+  warning: { bg: "var(--t-warning-bg)", color: "#92400e", border: "#fde68a" },
+  danger:  { bg: "var(--t-danger-bg)",  color: "#991b1b", border: "#fecaca" },
+};
+
+function Banner({ variant, icon, children }: { variant: BannerVariant; icon: React.ReactNode; children: React.ReactNode }) {
+  const s = BANNER_STYLES[variant];
+  return (
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: 10,
+      background: s.bg, color: s.color,
+      border: `1px solid ${s.border}`,
+      borderRadius: "var(--t-radius)", padding: "12px 14px",
+      fontSize: "0.85rem", lineHeight: 1.4,
+    }}>
+      {icon}
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function InfoCell({ icon, label, value, sub, valueColor }: {
+  icon: React.ReactNode; label: string; value: string; sub?: string; valueColor?: string;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+      <span style={{ marginTop: 2, flexShrink: 0 }}>{icon}</span>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ fontSize: "0.7rem", color: "var(--t-muted)", marginBottom: 2 }}>{label}</p>
+        <p style={{ fontWeight: 700, fontSize: "0.88rem", color: valueColor ?? "var(--t-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</p>
+        {sub && <p style={{ fontSize: "0.72rem", color: "var(--t-muted)" }}>{sub}</p>}
       </div>
     </div>
   );
