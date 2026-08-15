@@ -2,12 +2,12 @@ import "leaflet/dist/leaflet.css";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Polyline, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Polyline, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import {
   Map, List, ShieldCheck, Download, Plus, RefreshCw, X, CheckCircle2,
   AlertTriangle, XCircle, Clock, HelpCircle, ChevronRight, Leaf, Navigation,
-  Globe, Users, Layers, Filter, FileDown, Printer,
+  Globe, Users, Layers, Filter, FileDown, Printer, Search, MapPin,
 } from "lucide-react";
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)["_getIconUrl"];
@@ -140,6 +140,29 @@ interface NouvelleParcelleForm {
   polygone: [number, number][] | null;
 }
 
+// ── Navigation carte ─────────────────────────────────────────────────────────
+
+type FlyTarget = { bounds: [[number, number], [number, number]] };
+
+function computeBounds(pts: [number, number][]): [[number, number], [number, number]] {
+  const lats = pts.map(p => p[0]);
+  const lngs = pts.map(p => p[1]);
+  return [[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]];
+}
+
+function pointToBounds(lat: number, lng: number, delta = 0.003): [[number, number], [number, number]] {
+  return [[lat - delta, lng - delta], [lat + delta, lng + delta]];
+}
+
+function FlyToController({ target }: { target: FlyTarget | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!target) return;
+    map.fitBounds(target.bounds, { padding: [40, 40], maxZoom: 17 });
+  }, [target, map]);
+  return null;
+}
+
 // ── Couleurs EUDR ─────────────────────────────────────────────────────────────
 
 const EUDR_CONFIG: Record<string, { color: string; fill: string; label: string; icon: typeof CheckCircle2 }> = {
@@ -219,6 +242,7 @@ function LeafletMap({
   showGpsTerrain,
   membresSansGps,
   showMembresSansGps,
+  flyTarget,
 }: {
   parcelles: ParcelleCarte[];
   zones: ZoneRisque[];
@@ -232,6 +256,7 @@ function LeafletMap({
   showGpsTerrain: boolean;
   membresSansGps: MembreSansGps[];
   showMembresSansGps: boolean;
+  flyTarget?: FlyTarget | null;
 }) {
   const COOP_CENTER: [number, number] = [7.0, -6.5];
 
@@ -375,6 +400,7 @@ function LeafletMap({
       })}
 
       <DrawingLayer active={drawingMode} vertices={drawVertices} onAddVertex={onAddVertex} />
+      <FlyToController target={flyTarget ?? null} />
     </MapContainer>
   );
 }
@@ -729,10 +755,12 @@ function OngletListe({
   onExportGeoJSON,
   onVerifierTout,
   isVerifying,
+  onShowOnMap,
 }: {
   onExportGeoJSON: () => void;
   onVerifierTout: () => Promise<void>;
   isVerifying: boolean;
+  onShowOnMap?: (polygone: [number,number][] | null, point: { lat: number; lng: number } | null) => void;
 }) {
   const [search, setSearch] = useState("");
   const [filterEudr, setFilterEudr] = useState("");
@@ -819,6 +847,7 @@ function OngletListe({
                   <th className="text-right px-4 py-3 font-semibold text-gray-700">Superficie</th>
                   <th className="text-center px-4 py-3 font-semibold text-gray-700">EUDR</th>
                   <th className="text-center px-4 py-3 font-semibold text-gray-700">Certification</th>
+                  {onShowOnMap && <th className="px-3 py-3" />}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -849,6 +878,22 @@ function OngletListe({
                         <span className="text-gray-400 text-xs">—</span>
                       )}
                     </td>
+                    {onShowOnMap && (
+                      <td className="px-3 py-2.5">
+                        <button
+                          onClick={() => onShowOnMap(p.polygone, p.coordonneesPoint)}
+                          title="Voir sur la carte"
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            p.polygone || p.coordonneesPoint
+                              ? "text-green-600 hover:bg-green-50"
+                              : "text-gray-300 cursor-default"
+                          }`}
+                          disabled={!p.polygone && !p.coordonneesPoint}
+                        >
+                          <MapPin size={14} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {!data?.parcelles?.length && (
@@ -1026,7 +1071,10 @@ interface CoopConfig {
   logo_url: string | null;
 }
 
-function OngletCarteGlobale() {
+function OngletCarteGlobale({ externalFlyTarget, onFlyTargetConsumed }: {
+  externalFlyTarget?: FlyTarget | null;
+  onFlyTargetConsumed?: () => void;
+} = {}) {
   const qc = useQueryClient();
   const [filterEudr, setFilterEudr] = useState("all");
   const [filterVillage, setFilterVillage] = useState("");
@@ -1040,6 +1088,29 @@ function OngletCarteGlobale() {
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingXlsx, setIsExportingXlsx] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
+  const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
+  const [searchMap, setSearchMap] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Réagit aux flyTarget externes (depuis la liste)
+  useEffect(() => {
+    if (externalFlyTarget) {
+      setFlyTarget(externalFlyTarget);
+      onFlyTargetConsumed?.();
+    }
+  }, [externalFlyTarget, onFlyTargetConsumed]);
+
+  // Ferme le dropdown de recherche si clic hors
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   const configQ = useQuery({
     queryKey: ["coop-config"],
@@ -1112,6 +1183,75 @@ function OngletCarteGlobale() {
     if (filterSection && p.section !== filterSection) return false;
     return true;
   });
+
+  // Résultats de recherche sur la carte (parcelles + GPS terrain)
+  type SearchResult =
+    | { kind: "parcelle"; id: number; label: string; sub: string; polygone: [number,number][] | null; point: { lat: number; lng: number } | null }
+    | { kind: "terrain";  key: string; label: string; sub: string; polygone: [number,number][] };
+
+  const searchResults: SearchResult[] = (() => {
+    if (!searchMap.trim()) return [];
+    const q = searchMap.toLowerCase();
+    const seen = new Set<string>();
+    const results: SearchResult[] = [];
+
+    for (const p of parcelles) {
+      const name = `${p.membreNom ?? ""} ${p.membrePrenoms ?? ""}`.toLowerCase();
+      const code = (p.codeParcelle ?? "").toLowerCase();
+      if (name.includes(q) || code.includes(q)) {
+        const uid = `p-${p.id}`;
+        if (!seen.has(uid)) {
+          seen.add(uid);
+          results.push({
+            kind: "parcelle",
+            id: p.id,
+            label: `${p.membreNom ?? ""} ${p.membrePrenoms ?? ""}`.trim(),
+            sub: p.codeParcelle ?? "",
+            polygone: p.polygone,
+            point: p.coordonneesPoint,
+          });
+        }
+      }
+      if (results.length >= 8) break;
+    }
+
+    if (results.length < 8) {
+      for (const tp of allGpsPolygones) {
+        const name = `${tp.membreNom ?? ""} ${tp.membrePrenoms ?? ""}`.toLowerCase();
+        const village = (tp.village ?? "").toLowerCase();
+        if (name.includes(q) || village.includes(q)) {
+          const uid = `t-${tp.missionId}-${tp.membreId}`;
+          if (!seen.has(uid)) {
+            seen.add(uid);
+            results.push({
+              kind: "terrain",
+              key: uid,
+              label: `${tp.membreNom ?? ""} ${tp.membrePrenoms ?? ""}`.trim(),
+              sub: `GPS Terrain · ${tp.village ?? ""}${tp.section ? ` – ${tp.section}` : ""}`,
+              polygone: tp.polygone,
+            });
+          }
+        }
+        if (results.length >= 8) break;
+      }
+    }
+
+    return results;
+  })();
+
+  function flyToResult(r: SearchResult) {
+    if (r.kind === "parcelle") {
+      if (r.polygone && r.polygone.length >= 3) {
+        setFlyTarget({ bounds: computeBounds(r.polygone) });
+      } else if (r.point) {
+        setFlyTarget({ bounds: pointToBounds(r.point.lat, r.point.lng) });
+      }
+    } else {
+      setFlyTarget({ bounds: computeBounds(r.polygone) });
+    }
+    setSearchMap("");
+    setSearchOpen(false);
+  }
 
   // Fix 1: filter protected zones by type
   const filteredZones = filterZoneType
@@ -1405,6 +1545,50 @@ function OngletCarteGlobale() {
         />
       </div>
 
+      {/* Barre de recherche carte */}
+      <div className="no-print relative" ref={searchRef}>
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+          <Search size={15} className="text-gray-400 shrink-0" />
+          <input
+            type="text"
+            placeholder="Rechercher un membre ou une parcelle sur la carte…"
+            value={searchMap}
+            onChange={e => { setSearchMap(e.target.value); setSearchOpen(true); }}
+            onFocus={() => setSearchOpen(true)}
+            className="flex-1 text-sm outline-none bg-transparent placeholder-gray-400"
+          />
+          {searchMap && (
+            <button onClick={() => { setSearchMap(""); setSearchOpen(false); }} className="text-gray-400 hover:text-gray-600">
+              <X size={13} />
+            </button>
+          )}
+        </div>
+        {searchOpen && searchResults.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-[9999] overflow-hidden">
+            {searchResults.map((r, i) => (
+              <button
+                key={r.kind === "parcelle" ? r.id : r.key}
+                onMouseDown={() => flyToResult(r)}
+                className={`w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-green-50 transition-colors ${i > 0 ? "border-t border-gray-100" : ""}`}
+              >
+                {r.kind === "parcelle"
+                  ? <MapPin size={14} className="text-green-600 shrink-0" />
+                  : <Navigation size={14} className="text-amber-500 shrink-0" />}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{r.label}</p>
+                  {r.sub && <p className="text-xs text-gray-500 truncate">{r.sub}</p>}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+        {searchOpen && searchMap.trim().length > 0 && searchResults.length === 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-[9999] px-4 py-3 text-sm text-gray-400">
+            Aucun résultat pour « {searchMap} »
+          </div>
+        )}
+      </div>
+
       {/* Barre filtres */}
       <div className="no-print bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-2">
         <Filter size={14} className="text-gray-400 shrink-0" />
@@ -1549,6 +1733,7 @@ function OngletCarteGlobale() {
           showGpsTerrain={showGpsTerrain}
           membresSansGps={membresSansGps}
           showMembresSansGps={showMembresSansGps}
+          flyTarget={flyTarget}
         />
         {selectedParcelle && (
           <SidePanel
@@ -1703,8 +1888,22 @@ type Tab = "carte" | "carte_globale" | "liste" | "conformite";
 export default function ParcellePage() {
   const [tab, setTab] = useState<Tab>("carte_globale");
   const [isVerifying, setIsVerifying] = useState(false);
+  const [mapTarget, setMapTarget] = useState<FlyTarget | null>(null);
   const qc = useQueryClient();
   const { toast } = useToast();
+
+  function handleShowOnMap(polygone: [number,number][] | null, point: { lat: number; lng: number } | null) {
+    let target: FlyTarget | null = null;
+    if (polygone && polygone.length >= 3) {
+      target = { bounds: computeBounds(polygone) };
+    } else if (point) {
+      target = { bounds: pointToBounds(point.lat, point.lng) };
+    }
+    if (target) {
+      setMapTarget(target);
+      setTab("carte_globale");
+    }
+  }
 
   const carteQ = useQuery({
     queryKey: ["parcelles-carte"],
@@ -1811,7 +2010,10 @@ export default function ParcellePage() {
 
       {/* Contenu onglet */}
       {tab === "carte_globale" && (
-        <OngletCarteGlobale />
+        <OngletCarteGlobale
+          externalFlyTarget={mapTarget}
+          onFlyTargetConsumed={() => setMapTarget(null)}
+        />
       )}
       {tab === "carte" && (
         <OngletCarte
@@ -1828,6 +2030,7 @@ export default function ParcellePage() {
           onExportGeoJSON={handleExportGeoJSON}
           onVerifierTout={handleVerifierTout}
           isVerifying={isVerifying}
+          onShowOnMap={handleShowOnMap}
         />
       )}
       {tab === "conformite" && (
