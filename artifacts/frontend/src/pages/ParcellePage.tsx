@@ -505,6 +505,33 @@ function NouvelleParcelleDrawer({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  // Géocodage inversé — pré-remplit Région depuis le centroïde du polygone
+  useEffect(() => {
+    if (!polygone || polygone.length < 3) return;
+    const lat = polygone.reduce((s, p) => s + p[0], 0) / polygone.length;
+    const lng = polygone.reduce((s, p) => s + p[1], 0) / polygone.length;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`,
+          { signal: controller.signal, headers: { "User-Agent": "CoopDigital/1.0" } },
+        );
+        if (!res.ok) return;
+        const data = await res.json() as { address?: Record<string, string> };
+        const region =
+          data.address?.["state"] ??
+          data.address?.["region"] ??
+          data.address?.["county"] ??
+          "";
+        if (region) setForm(f => ({ ...f, region: f.region || region }));
+      } catch {
+        // réseau indisponible ou signal annulé — silencieux
+      }
+    })();
+    return () => controller.abort();
+  }, [polygone]);
+
   function selectMember(m: { id: number; nom: string; prenoms: string; village: string | null; section: string | null }) {
     setForm(f => ({
       ...f,
