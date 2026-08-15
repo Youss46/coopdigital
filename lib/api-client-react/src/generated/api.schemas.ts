@@ -972,7 +972,12 @@ export const PaiementListItemStatut = {
 
 export interface PaiementListItem {
   id: number;
-  livraisonId: number;
+  /** @nullable */
+  livraisonId?: number | null;
+  /** @nullable */
+  bonCarburantId?: number | null;
+  /** @nullable */
+  bonCarburantNumero?: string | null;
   /** @nullable */
   membreId?: number | null;
   montantFcfa: number;

@@ -610,6 +610,13 @@
       "when": 1786757915156,
       "tag": "0086_stations_gps",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1786800000000,
+      "tag": "0087_paiements_bon_carburant",
+      "breakpoints": true
     }
   ]
 }

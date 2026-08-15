@@ -2943,7 +2943,9 @@ export const ListPaiementsQueryParams = zod.object({
 
 export const ListPaiementsResponseItem = zod.object({
   "id": zod.number(),
-  "livraisonId": zod.number(),
+  "livraisonId": zod.number().nullish(),
+  "bonCarburantId": zod.number().nullish(),
+  "bonCarburantNumero": zod.string().nullish(),
   "membreId": zod.number().nullish(),
   "montantFcfa": zod.number(),
   "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes', 'wave', 'cheque']),
@@ -2985,7 +2987,9 @@ export const ValiderPaiementBody = zod.object({
 
 export const ValiderPaiementResponse = zod.object({
   "id": zod.number(),
-  "livraisonId": zod.number(),
+  "livraisonId": zod.number().nullish(),
+  "bonCarburantId": zod.number().nullish(),
+  "bonCarburantNumero": zod.string().nullish(),
   "membreId": zod.number().nullish(),
   "montantFcfa": zod.number(),
   "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes', 'wave', 'cheque']),
@@ -3027,7 +3031,9 @@ export const RejeterPaiementBody = zod.object({
 
 export const RejeterPaiementResponse = zod.object({
   "id": zod.number(),
-  "livraisonId": zod.number(),
+  "livraisonId": zod.number().nullish(),
+  "bonCarburantId": zod.number().nullish(),
+  "bonCarburantNumero": zod.string().nullish(),
   "membreId": zod.number().nullish(),
   "montantFcfa": zod.number(),
   "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes', 'wave', 'cheque']),

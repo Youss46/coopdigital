@@ -7364,12 +7364,16 @@ components:
 
     PaiementListItem:
       type: object
-      required: [id, livraisonId, montantFcfa, modePaiement, statut, createdAt]
+      required: [id, montantFcfa, modePaiement, statut, createdAt]
       properties:
         id:
           type: integer
         livraisonId:
-          type: integer
+          type: ["integer", "null"]
+        bonCarburantId:
+          type: ["integer", "null"]
+        bonCarburantNumero:
+          type: ["string", "null"]
         membreId:
           type: ["integer", "null"]
         montantFcfa:

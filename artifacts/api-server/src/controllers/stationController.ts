@@ -15,6 +15,7 @@ import {
   transitionBon,
   createDepense,
 } from "../services/transportService";
+import { db, paiementsTable } from "@workspace/db";
 
 // ── GET /station/carburant/public-key ─────────────────────────────────────────
 // Retourne la clé publique Ed25519 en SPKI base64 pour vérification offline.
@@ -228,10 +229,10 @@ export async function handleLivrerBonStation(
 
     await transitionBon(row.bon.cooperativeId, row.bon.id, "utilise", extra);
 
-    // Dépense et écriture comptable OHADA si montant connu
+    // Dépense véhicule (suivi consommation) + paiement en attente (validé dans ReglementsPage)
     if (montant && montant > 0) {
       try {
-        const depense = await createDepense(
+        await createDepense(
           row.bon.cooperativeId,
           row.bon.vehiculeId,
           {
@@ -239,29 +240,22 @@ export async function handleLivrerBonStation(
             dateDepense: body.date_utilisation,
             montantFcfa: String(montant),
             libelle: `Carburant — Bon ${row.bon.numero}`,
-            fournisseur:
-              body.station_service ?? row.bon.stationService ?? null,
+            fournisseur: body.station_service ?? row.bon.stationService ?? null,
             referencePiece: row.bon.numero,
             quantite: String(body.quantite_livree),
             unite: "L",
             missionId: null,
           },
         );
-        const { proposerEcriture } = await import(
-          "../services/comptabiliteService"
-        );
-        void proposerEcriture(row.bon.cooperativeId, {
-          source: "transport",
-          sourceId: depense.id,
-          libelle: `Carburant — Bon ${row.bon.numero} (${body.quantite_livree} L)`,
-          compteDebit: "6042",
-          compteCredit: "521",
+        // Créer un règlement en attente — sera validé depuis ReglementsPage
+        await db.insert(paiementsTable).values({
+          bonCarburantId: row.bon.id,
           montantFcfa: Math.round(montant),
-          date: body.date_utilisation,
-          numeroPiece: row.bon.numero,
+          modePaiement: "especes",
+          statut: "en_attente",
         });
       } catch (err) {
-        req.log.warn({ err }, "Écriture comptable station carburant échouée");
+        req.log.warn({ err }, "Paiement carburant station création échouée");
       }
     }
 

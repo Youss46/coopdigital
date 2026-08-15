@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, paiementsTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable } from "@workspace/db";
+import { db, paiementsTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, bonsCarburantTable } from "@workspace/db";
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
@@ -246,6 +246,8 @@ const agentUserAlias = alias(usersTable, "agent_user");
 const SELECT_FIELDS = {
   id: paiementsTable.id,
   livraisonId: paiementsTable.livraisonId,
+  bonCarburantId: paiementsTable.bonCarburantId,
+  bonCarburantNumero: bonsCarburantTable.numero,
   membreId: paiementsTable.membreId,
   montantFcfa: paiementsTable.montantFcfa,
   modePaiement: paiementsTable.modePaiement,
@@ -280,6 +282,7 @@ async function fetchEnrichedPaiement(id: number) {
     .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
     .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
     .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+    .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
     .where(eq(paiementsTable.id, id))
     .limit(1);
   return row ?? null;
@@ -303,6 +306,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     const coopFilter = or(
       eq(membresTable.cooperativeId, cooperativeId),
       eq(fournisseursTable.cooperativeId, cooperativeId),
+      eq(bonsCarburantTable.cooperativeId, cooperativeId),
     )!;
     const conditions: SQL<unknown>[] = [coopFilter];
     if (statut) conditions.push(eq(paiementsTable.statut, statut as "en_attente" | "confirme" | "echec" | "rejete" | "en_cours" | "effectue"));
@@ -339,6 +343,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
+      .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
       .where(and(...conditions))
       .orderBy(desc(paiementsTable.createdAt))
       .limit(limit);
@@ -368,6 +373,7 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
     const statsCoopFilter = or(
       eq(membresTable.cooperativeId, cooperativeId),
       eq(fournisseursTable.cooperativeId, cooperativeId),
+      eq(bonsCarburantTable.cooperativeId, cooperativeId),
     )!;
     const statsConditions: SQL<unknown>[] = [statsCoopFilter];
     // Un délégué ne voit que les stats des membres qui lui sont rattachés
@@ -396,6 +402,7 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
       .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
+      .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
       .where(and(...statsConditions));
 
     let enAttente = { count: 0, montant_total: 0 };
@@ -467,11 +474,13 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         prenoms: membresTable.prenoms,
         membreDelegueId: membresTable.delegueId,
         fournisseurCoopId: fournisseursTable.cooperativeId,
+        bonCarburantCoopId: bonsCarburantTable.cooperativeId,
       })
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
       .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+      .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
       .where(eq(paiementsTable.id, id))
       .limit(1);
 
@@ -479,7 +488,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       res.status(404).json({ erreur: "Paiement introuvable" });
       return;
     }
-    if (row.membreCoopId !== cooperativeId && row.fournisseurCoopId !== cooperativeId) {
+    if (row.membreCoopId !== cooperativeId && row.fournisseurCoopId !== cooperativeId && row.bonCarburantCoopId !== cooperativeId) {
       res.status(403).json({ erreur: "Ce paiement n'appartient pas à votre coopérative" });
       return;
     }
@@ -612,11 +621,13 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         })
         .where(eq(paiementsTable.id, id));
 
-      // 3. Mettre à jour le statut paiement de la livraison
-      await tx
-        .update(livraisonsTable)
-        .set({ statutPaiement: "PAYÉ" })
-        .where(eq(livraisonsTable.id, row.paiement.livraisonId));
+      // 3. Mettre à jour le statut paiement de la livraison (si applicable)
+      if (row.paiement.livraisonId) {
+        await tx
+          .update(livraisonsTable)
+          .set({ statutPaiement: "PAYÉ" })
+          .where(eq(livraisonsTable.id, row.paiement.livraisonId));
+      }
     });
 
     // 4. Débiter la caisse principale du délégué si paiement espèces
@@ -654,26 +665,30 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       );
     }
 
-    // 7. Écriture comptable décaissement pour modes non-espèces
-    //    Espèces   → enregistrerMouvement crée 401/571 via source "caisse"
-    //    Mobile    → 401/552 (orange_money, mtn_momo, wave)
-    //    Chèque    → 401/521 (banque)
-    if (mode !== "especes" && cooperativeId) {
+    // 7. Écriture comptable décaissement
+    //    Producteur espèces → enregistrerMouvement crée 401/571 via source "caisse"
+    //    Producteur mobile  → 401/552  |  Producteur chèque → 401/521
+    //    Carburant espèces  → 6042/571 |  Carburant mobile  → 6042/552  |  Carburant chèque → 6042/521
+    const isBonCarburant = !!row.paiement.bonCarburantId;
+    if (mode !== "especes" || isBonCarburant) {
       const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
-      const compteCredit = isMobile ? "552" : "521";
+      const compteCredit = mode === "especes" ? "571" : isMobile ? "552" : "521";
+      const compteDebit  = isBonCarburant ? "6042" : "401";
       const dateStr = new Date().toISOString().slice(0, 10);
-      const producteurNom = `${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`;
+      const libelle = isBonCarburant
+        ? `Carburant – Bon PAI-${id}`
+        : `Paiement producteur – ${`${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`}`;
       void proposerEcriture(cooperativeId, {
         source: "paiement",
         sourceId: id,
-        libelle: `Paiement producteur – ${producteurNom}`,
-        compteDebit: "401",
+        libelle,
+        compteDebit,
         compteCredit,
         montantFcfa: row.paiement.montantFcfa,
         date: dateStr,
         numeroPiece: `PAI-${id}`,
-        tiersId: row.paiement.membreId ?? undefined,
-        tiersType: "membre",
+        tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
+        tiersType: isBonCarburant ? undefined : "membre",
       });
     }
 
@@ -722,11 +737,13 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
         telephone: membresTable.telephone,
         nom: membresTable.nom,
         fournisseurCoopId: fournisseursTable.cooperativeId,
+        bonCarburantCoopId: bonsCarburantTable.cooperativeId,
       })
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
       .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+      .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
       .where(eq(paiementsTable.id, id))
       .limit(1);
 
@@ -734,7 +751,7 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
       res.status(404).json({ erreur: "Paiement introuvable" });
       return;
     }
-    if (row.membreCoopId !== cooperativeId && row.fournisseurCoopId !== cooperativeId) {
+    if (row.membreCoopId !== cooperativeId && row.fournisseurCoopId !== cooperativeId && row.bonCarburantCoopId !== cooperativeId) {
       res.status(403).json({ erreur: "Ce paiement n'appartient pas à votre coopérative" });
       return;
     }
@@ -755,11 +772,13 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
         })
         .where(eq(paiementsTable.id, id));
 
-      // 2. Remettre la livraison en EN_ATTENTE
-      await tx
-        .update(livraisonsTable)
-        .set({ statutPaiement: "EN_ATTENTE" })
-        .where(eq(livraisonsTable.id, row.paiement.livraisonId));
+      // 2. Remettre la livraison en EN_ATTENTE (si applicable)
+      if (row.paiement.livraisonId) {
+        await tx
+          .update(livraisonsTable)
+          .set({ statutPaiement: "EN_ATTENTE" })
+          .where(eq(livraisonsTable.id, row.paiement.livraisonId));
+      }
     });
 
     // 3. Notifier le producteur (best-effort)

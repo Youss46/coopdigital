@@ -11,9 +11,9 @@ import {
   chauffeursTable,
   depensesVehiculeTable,
   stationsCarburantTable,
+  paiementsTable,
 } from "@workspace/db";
 import { and, eq, desc, inArray, isNotNull } from "drizzle-orm";
-import { proposerEcriture } from "../services/comptabiliteService.js";
 
 function cooperativeId(req: Request): number | null {
   return req.agent?.cooperativeId ?? null;
@@ -187,9 +187,9 @@ export async function utiliserBonChauffeur(req: Request, res: Response): Promise
       .where(eq(bonsCarburantTable.id, bonId))
       .returning();
 
-    // Dépense véhicule automatique
+    // Dépense véhicule automatique (suivi consommation)
     if (montant && montant > 0) {
-      const [dep] = await db.insert(depensesVehiculeTable).values({
+      await db.insert(depensesVehiculeTable).values({
         cooperativeId: coopId,
         vehiculeId:    bon.vehiculeId,
         type:          "carburant",
@@ -200,18 +200,14 @@ export async function utiliserBonChauffeur(req: Request, res: Response): Promise
         referencePiece: bon.numero,
         quantite:      String(body.quantite_livree),
         unite:         "L",
-      }).returning({ id: depensesVehiculeTable.id });
-
-      if (dep) {
-        void proposerEcriture(coopId, {
-          source: "transport", sourceId: dep.id,
-          libelle: `Carburant — Bon ${bon.numero} (${body.quantite_livree} L)`,
-          compteDebit: "6042", compteCredit: "521",
-          montantFcfa: montant,
-          date: body.date_utilisation,
-          numeroPiece: bon.numero,
-        });
-      }
+      });
+      // Créer un règlement en attente — sera validé depuis ReglementsPage
+      await db.insert(paiementsTable).values({
+        bonCarburantId: bon.id,
+        montantFcfa:    montant,
+        modePaiement:   "especes",
+        statut:         "en_attente",
+      });
     }
 
     res.json({ ...updated, message: "Utilisation enregistrée avec succès" });

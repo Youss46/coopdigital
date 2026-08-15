@@ -3,7 +3,7 @@ import {
   CheckCircle2, Clock, XCircle, Loader2, CreditCard, Search,
   CheckCheck, AlertCircle, Banknote, Smartphone, ChevronDown,
   Receipt, Package, User, Calendar, TrendingUp, X, Wallet,
-  AlertTriangle, Lock, FileDown,
+  AlertTriangle, Lock, FileDown, Fuel,
 } from "lucide-react";
 import {
   useListPaiements,
@@ -22,12 +22,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
 function nomProducteur(p: PaiementListItem) {
+  if (p.bonCarburantNumero) return `Carburant — ${p.bonCarburantNumero}`;
   const nom = p.membreNom ?? p.fournisseurNom ?? "";
   const prenoms = p.membrePrenoms ?? p.fournisseurPrenoms ?? "";
   return `${nom} ${prenoms}`.trim() || "—";
 }
 function telProducteur(p: PaiementListItem) {
   return p.telephone ?? p.fournisseurTelephone ?? null;
+}
+function isBonCarburant(p: PaiementListItem) {
+  return !!p.bonCarburantId;
 }
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -580,7 +584,8 @@ export default function ReglementsPage() {
     const r = recherche.toLowerCase();
     return (
       nomProducteur(p).toLowerCase().includes(r) ||
-      (telProducteur(p) ?? "").includes(r)
+      (telProducteur(p) ?? "").includes(r) ||
+      (p.bonCarburantNumero ?? "").toLowerCase().includes(r)
     );
   });
 
@@ -933,13 +938,15 @@ function PaiementRow({
   const showRejet = p.statut === "rejete";
   const isMobileMarchand = MODES_MOBILE_MARCHAND.has(p.modePaiement);
   const delegueBloque = isDelegue && isMobileMarchand;
+  const isCarburant = isBonCarburant(p);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
       <div className="flex items-start justify-between gap-3">
-        {/* Infos producteur */}
+        {/* Infos */}
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
+            {isCarburant && <Fuel size={14} className="text-amber-600 shrink-0" />}
             <p className="font-semibold text-gray-900 text-sm">
               {nomProducteur(p)}
             </p>
@@ -947,11 +954,13 @@ function PaiementRow({
             <ModeBadge mode={p.modePaiement} />
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
-            {telProducteur(p) && <span>{telProducteur(p)}</span>}
-            {p.dateLivraison && <span>Livr. {p.dateLivraison}</span>}
-            {poids && <span>{fmtPoids(poids)}</span>}
+            {!isCarburant && telProducteur(p) && <span>{telProducteur(p)}</span>}
+            {!isCarburant && p.dateLivraison && <span>Livr. {p.dateLivraison}</span>}
+            {!isCarburant && poids && <span>{fmtPoids(poids)}</span>}
+            {isCarburant && <span className="text-amber-600">Bon carburant — règlement station</span>}
           </div>
-          {/* Décomposition montants */}
+          {/* Décomposition montants (producteurs uniquement) */}
+          {!isCarburant && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs mt-1">
             {p.montantBrutFcfa != null && (
               <span className="text-gray-500">Brut : {fmt(p.montantBrutFcfa)}</span>
@@ -963,6 +972,7 @@ function PaiementRow({
               <span className="text-red-500">− intrants {fmt(p.intrantsDeduitsFcfa)}</span>
             )}
           </div>
+          )}
           {/* Motif rejet */}
           {showRejet && p.motifRejet && (
             <p className="text-xs text-red-500 italic mt-1">Motif : {p.motifRejet}</p>
