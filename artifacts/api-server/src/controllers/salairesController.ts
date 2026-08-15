@@ -943,6 +943,14 @@ export async function rembourserAvance(
 
     const nouveauMontant = montantRembourse ?? av.montantFcfa;
 
+    // Guard: repayment cannot exceed the original advance amount
+    if (nouveauMontant > av.montantFcfa) {
+      res.status(400).json({
+        erreur: "Le montant remboursé ne peut pas dépasser le montant de l'avance",
+      });
+      return;
+    }
+
     // Guard: delta must be strictly positive — reject no-op or retrograde calls
     const montantCetteOperation = nouveauMontant - av.montantRembourse;
     if (montantCetteOperation <= 0) {
