@@ -248,18 +248,25 @@ function StationCard({ station }: { station: Station }) {
       </div>
 
       {/* Bouton directions */}
-      <button
-        onClick={() => openMaps(station)}
-        style={{
-          flexShrink: 0, width: 40, height: 40,
-          background: "var(--t-primary-light)", color: "var(--t-primary)",
-          border: "none", borderRadius: 10, cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}
-        title="Ouvrir dans Google Maps"
-      >
-        <Navigation size={18} />
-      </button>
+      {(() => {
+        const hasGps = station.latitude != null && station.longitude != null;
+        return (
+          <button
+            onClick={() => openMaps(station)}
+            style={{
+              flexShrink: 0, width: 40, height: 40,
+              background: hasGps ? "var(--t-success-bg)" : "var(--t-card)",
+              color: hasGps ? "var(--t-success)" : "var(--t-muted)",
+              border: hasGps ? "none" : "1.5px solid var(--t-border)",
+              borderRadius: 10, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+            title={hasGps ? "Position exacte" : "Recherche approximative"}
+          >
+            {hasGps ? <MapPin size={18} /> : <Search size={18} />}
+          </button>
+        );
+      })()}
     </div>
   );
 }
