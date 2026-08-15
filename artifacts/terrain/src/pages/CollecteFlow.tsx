@@ -34,8 +34,6 @@ function RecuButton({ livraisonId }: { livraisonId: number }) {
     </div>
   );
 }
-type ModePaiement = "especes" | "orange_money" | "mtn_momo";
-
 export default function CollecteFlow() {
   const [, setLocation] = useLocation();
   const { isOnline } = useOffline();
@@ -47,7 +45,6 @@ export default function CollecteFlow() {
   const [nombreSacs, setNombreSacs] = useState("");
   const [poidsBrut, setPoidsBrut] = useState("");
   const [retenueKg, setRetenueKg] = useState("0");
-  const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
 
   // Step 3 result
   const [result, setResult] = useState<CollecteResult | null>(null);
@@ -95,7 +92,6 @@ export default function CollecteFlow() {
           nombreSacs: parseInt(nombreSacs) || 1,
           poidsBrutKg: poidsBrutNum,
           retenueKg: retenueNum,
-          modePaiement,
           localId,
         },
         isOnline
@@ -119,7 +115,6 @@ export default function CollecteFlow() {
     setPoidsBrut("");
     setNombreSacs("");
     setRetenueKg("0");
-    setModePaiement("especes");
     setResult(null);
     setErreur("");
   }
@@ -229,15 +224,6 @@ export default function CollecteFlow() {
                 />
               </div>
 
-              <div className="t-field">
-                <label className="t-label">Mode de paiement</label>
-                <select className="t-select" value={modePaiement} onChange={(e) => setModePaiement(e.target.value as ModePaiement)}>
-                  <option value="especes">💵 Espèces</option>
-                  <option value="orange_money">🟠 Orange Money</option>
-                  <option value="mtn_momo">🟡 MTN Mobile Money</option>
-                </select>
-              </div>
-
               {/* Aperçu calcul */}
               {poidsBrut && prix && (
                 <div className="t-recap">
@@ -330,10 +316,8 @@ export default function CollecteFlow() {
                 <span className="t-recap-row__value" style={{ fontSize: "1.3rem" }}>{montantNet.toLocaleString("fr-FR")} FCFA</span>
               </div>
               <div className="t-recap-row">
-                <span className="t-recap-row__label">Mode</span>
-                <span className="t-recap-row__value">
-                  {modePaiement === "especes" ? "💵 Espèces" : modePaiement === "orange_money" ? "🟠 Orange Money" : "🟡 MTN MoMo"}
-                </span>
+                <span className="t-recap-row__label">Règlement</span>
+                <span className="t-recap-row__value" style={{ color: "var(--t-warning, #f59e0b)", fontWeight: 700 }}>⏳ En attente</span>
               </div>
             </div>
 

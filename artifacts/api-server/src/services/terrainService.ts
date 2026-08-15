@@ -300,7 +300,6 @@ export async function enregistrerCollecte(
     nombreSacs: number;
     poidsBrutKg: number;
     retenueKg: number;
-    modePaiement: string;
     /** ID du peseur ayant physiquement enregistré la collecte (traçabilité) */
     peseurId?: number;
   }
@@ -339,28 +338,9 @@ export async function enregistrerCollecte(
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Vérifier la caisse du délégué (source de vérité unique : caissesTable).
-  // Si l'agent est un peseur rattaché à un délégué, utiliser la caisse du délégué.
-  const [agentRow] = await db
-    .select({ delegueId: usersTable.delegueId })
-    .from(usersTable)
-    .where(eq(usersTable.id, agentId))
-    .limit(1);
-  const effectiveDelegueId = agentRow?.delegueId ?? agentId;
-
-  const [caisse] = await db
-    .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
-    .from(caissesTable)
-    .where(and(
-      eq(caissesTable.responsableId, effectiveDelegueId),
-      eq(caissesTable.cooperativeId, cooperativeId),
-      eq(caissesTable.actif, true),
-    ))
-    .limit(1);
-
-  const soldeCaisse = caisse ? Number(caisse.solde) : 0;
-  const paiementImmediat = soldeCaisse >= montantNet;
-  const statutPaiement = paiementImmediat ? "PAYÉ" : "DIFFÉRÉ";
+  // Le règlement est toujours différé : le peseur enregistre la collecte,
+  // le paiement est confirmé ultérieurement via la page Règlements.
+  const statutPaiement = "DIFFÉRÉ" as const;
 
   const [livraison] = await db.insert(livraisonsTable).values({
     membreId: data.membreId ?? null,
@@ -380,7 +360,7 @@ export async function enregistrerCollecte(
     agentId,
     peseurId: data.peseurId ?? null,
     statutPaiement,
-    montantRestant: paiementImmediat ? "0" : String(montantNet),
+    montantRestant: String(montantNet),
   }).returning();
 
   if (!livraison) throw new Error("Erreur lors de l'enregistrement de la collecte");
@@ -398,33 +378,14 @@ export async function enregistrerCollecte(
       .where(eq(avancesTable.id, avance.id));
   }
 
-  // Créer le paiement (en_attente si différé)
+  // Créer le paiement en_attente — le mode sera choisi lors du règlement
   await db.insert(paiementsTable).values({
     livraisonId: livraison.id,
     membreId: data.membreId ?? null,
     campagneId: prix.campagneId ?? undefined,
     montantFcfa: montantNet,
-    modePaiement: data.modePaiement as "orange_money" | "mtn_momo" | "especes",
-    statut: paiementImmediat ? "confirme" : "en_attente",
+    statut: "en_attente",
   });
-
-  // Débiter la caisse si paiement immédiat (caissesTable — source de vérité unique)
-  if (paiementImmediat && caisse) {
-    const nouveauSolde = soldeCaisse - montantNet;
-    await db.update(caissesTable)
-      .set({ soldeActuelFcfa: String(nouveauSolde) })
-      .where(eq(caissesTable.id, caisse.id));
-    await db.insert(mouvementsCaisseTable).values({
-      caisseId: caisse.id,
-      cooperativeId,
-      type: "sortie",
-      motif: "paiement_collecte",
-      montantFcfa: String(montantNet),
-      libelle: `Paiement collecte LIV-${livraison.id}`,
-      soldeApresFcfa: String(nouveauSolde),
-      enregistrePar: agentId,
-    });
-  }
 
   // Résolution du nom et push portail (uniquement pour les membres)
   let membreNom = "";
@@ -498,10 +459,9 @@ export async function enregistrerCollecte(
     avanceDeduiteFcfa: avanceDeduite,
     intrantsDeduitsFcfa: intrantsDed,
     montantNetFcfa: montantNet,
-    modePaiement: data.modePaiement,
+    modePaiement: "en_attente",
     prixUnitaireFcfa: prixUnitaire,
     statutPaiement,
-    soldeCaisseApres: paiementImmediat ? (soldeCaisse - montantNet) : soldeCaisse,
     commissionFcfa,
   };
 }

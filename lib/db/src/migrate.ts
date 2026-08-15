@@ -24,6 +24,19 @@ async function applyHotfixes(client: pg.Client): Promise<void> {
     `ALTER TABLE expeditions ADD COLUMN IF NOT EXISTS ecriture_arrivee_id   integer`,
     `ALTER TABLE expeditions ADD COLUMN IF NOT EXISTS ecriture_transport_id integer`,
     `ALTER TABLE expeditions ADD COLUMN IF NOT EXISTS ecriture_ecart_id     integer`,
+
+    // ── Hotfixes Railway : colonnes absentes des migrations 0024-0088 ─────────
+    // livraisons : membre_id rendu nullable (migration 0055) + fournisseur_id
+    `ALTER TABLE livraisons ALTER COLUMN membre_id DROP NOT NULL`,
+    `ALTER TABLE livraisons ADD COLUMN IF NOT EXISTS fournisseur_id integer`,
+    // livraisons : peseur_id (migration dans 0068 / sessions_pesee)
+    `ALTER TABLE livraisons ADD COLUMN IF NOT EXISTS peseur_id integer`,
+    // paiements : bon_carburant_id (migration 0087)
+    `ALTER TABLE paiements ADD COLUMN IF NOT EXISTS bon_carburant_id integer`,
+    // paiements : livraison_id rendu nullable (migration 0087)
+    `ALTER TABLE paiements ALTER COLUMN livraison_id DROP NOT NULL`,
+    // paiements : membre_id rendu nullable (migration 0057)
+    `ALTER TABLE paiements ALTER COLUMN membre_id DROP NOT NULL`,
   ];
 
   for (const sql of hotfixes) {

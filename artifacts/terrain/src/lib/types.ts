@@ -54,7 +54,8 @@ export interface CollecteInput {
   nombreSacs: number;
   poidsBrutKg: number;
   retenueKg: number;
-  modePaiement: "orange_money" | "mtn_momo" | "especes";
+  /** Mode de paiement — optionnel au niveau terrain, le règlement se fait via la page Règlements */
+  modePaiement?: "orange_money" | "mtn_momo" | "especes";
   localId?: string;
 }
 
