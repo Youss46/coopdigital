@@ -695,6 +695,11 @@ body {
   margin: 40px auto;
 }
 
+@keyframes t-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
 @keyframes t-spin {
   to { transform: rotate(360deg); }
 }

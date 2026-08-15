@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNavPeseur from "../components/BottomNavPeseur";
+import ScaleWeightDisplay from "../components/ScaleWeightDisplay";
 import { useOffline } from "../contexts/OfflineContext";
 import {
   createSessionPesee,
@@ -551,6 +552,11 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                   />
                 </div>
               </div>
+
+              {/* Lecture automatique depuis la balance RS232 (service local) */}
+              <ScaleWeightDisplay
+                onUse={(kg) => setPoidsBrut(kg.toFixed(3))}
+              />
 
               <div className="t-field" style={{ marginBottom: 8 }}>
                 <label className="t-label">Poids brut (kg) *</label>
