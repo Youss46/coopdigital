@@ -89,7 +89,6 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const [confirmTerminer, setConfirmTerminer] = useState(false);
   const [confirmConvertir, setConfirmConvertir] = useState(false);
   const [convertirLoading, setConvertirLoading] = useState(false);
-  const [modePaiement, setModePaiement] = useState<"especes" | "orange_money" | "mtn_momo" | "wave">("especes");
   const [livraisonResult, setLivraisonResult] = useState<ConversionLivraisonResult | null>(null);
 
   // Estimation avant conversion
@@ -347,7 +346,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     setConvertirLoading(true);
     setErreur("");
     try {
-      const result = await convertirSessionEnLivraison(sessionTerminee.id, { modePaiement });
+      const result = await convertirSessionEnLivraison(sessionTerminee.id);
       setLivraisonResult(result);
     } catch (err) {
       setErreur((err as Error).message);
@@ -831,18 +830,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               );
             })() : null}
 
-            <div className="t-field" style={{ marginBottom: 16 }}>
-              <label className="t-label">Mode de paiement</label>
-              <select
-                className="t-input"
-                value={modePaiement}
-                onChange={(e) => setModePaiement(e.target.value as typeof modePaiement)}
-              >
-                <option value="especes">Espèces</option>
-                <option value="orange_money">Orange Money</option>
-                <option value="mtn_momo">MTN MoMo</option>
-                <option value="wave">Wave</option>
-              </select>
+            <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: ".85rem", color: "#78350f" }}>
+              ⏳ Le mode de paiement sera choisi lors du règlement.
             </div>
             <button className="t-btn t-btn--primary" style={{ width: "100%", marginBottom: 10 }}
               disabled={convertirLoading} onClick={handleConvertir}>

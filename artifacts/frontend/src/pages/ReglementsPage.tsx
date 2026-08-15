@@ -119,22 +119,24 @@ function ModalValidation({
   const [telephone, setTelephone] = useState(telProducteur(paiement) ?? "");
   const [touched, setTouched] = useState(false);
   const isCarburant = isBonCarburant(paiement);
-  // Délégués can only validate cash; cap the initial mode to espèces for them
-  const initialMode = isDelegue ? "especes" : paiement.modePaiement;
+  // Délégués can only validate cash; others must pick explicitly (no default)
+  const initialMode = isDelegue ? "especes" : "";
   const [selectedMode, setSelectedMode] = useState<string>(initialMode);
   // Modes available in the selector depend on role
   const modesDisponibles = isDelegue
     ? MODES_CARBURANT.filter((m) => m.value === "especes")
     : MODES_CARBURANT;
+  const modeManquant = !selectedMode;
   const isMobile = selectedMode === "orange_money" || selectedMode === "mtn_momo" || selectedMode === "wave";
   const isEspeces = selectedMode === "especes";
   const sessionBloquee = isEspeces && sessionCaisseOuverte === false;
   const refManquante = isMobile && !ref.trim();
 
   function handleConfirm() {
+    if (modeManquant) { setTouched(true); return; }
     if (sessionBloquee) return;
     if (refManquante) { setTouched(true); return; }
-    onConfirm(ref, telephone, isCarburant ? selectedMode : undefined);
+    onConfirm(ref, telephone, selectedMode || undefined);
   }
 
   return (
@@ -177,30 +179,33 @@ function ModalValidation({
             </div>
           </div>
 
-          {/* Mode de règlement — sélectionnable pour les bons carburant */}
-          {isCarburant ? (
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Mode de règlement station
-              </label>
-              <select
-                value={selectedMode}
-                onChange={(e) => { setSelectedMode(e.target.value); setRef(""); setTouched(false); }}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400 bg-white"
-              >
-                {modesDisponibles.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <ModeBadge mode={paiement.modePaiement} />
-              {paiement.dateLivraison && (
-                <span className="text-xs text-gray-400">Livr. {paiement.dateLivraison}</span>
-              )}
-            </div>
-          )}
+          {/* Mode de règlement — toujours sélectionnable */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Mode de paiement
+              {!isDelegue && <span className="text-red-500 font-semibold ml-1">*</span>}
+            </label>
+            <select
+              value={selectedMode}
+              onChange={(e) => { setSelectedMode(e.target.value); setRef(""); setTouched(false); }}
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 bg-white ${
+                touched && modeManquant
+                  ? "border-red-400 focus:ring-red-400 bg-red-50"
+                  : "border-gray-200 focus:ring-green-400"
+              }`}
+            >
+              {!isDelegue && <option value="">— Choisir le mode de paiement —</option>}
+              {modesDisponibles.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            {touched && modeManquant && (
+              <p className="text-xs text-red-500 mt-1">Veuillez choisir un mode de paiement.</p>
+            )}
+            {paiement.dateLivraison && (
+              <p className="text-xs text-gray-400 mt-1">Livr. {paiement.dateLivraison}</p>
+            )}
+          </div>
 
           {/* Bandeau bloquant — aucune session de caisse ouverte */}
           {sessionBloquee && (
@@ -269,9 +274,9 @@ function ModalValidation({
             </button>
             <button
               onClick={handleConfirm}
-              disabled={loading || sessionBloquee}
+              disabled={loading || sessionBloquee || modeManquant}
               className="flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1.5"
-              style={{ backgroundColor: sessionBloquee ? "#9ca3af" : "#1a4731" }}
+              style={{ backgroundColor: (sessionBloquee || modeManquant) ? "#9ca3af" : "#1a4731" }}
             >
               {loading ? (
                 <Loader2 size={15} className="animate-spin" />
