@@ -49,6 +49,12 @@ export async function handleQrTokenBonStation(
       return;
     }
 
+    // Vérifier que le bon appartient à la même coopérative que le chauffeur
+    if (row.bon.cooperativeId !== req.agent?.cooperativeId) {
+      res.status(403).json({ erreur: "Ce bon n'appartient pas à votre coopérative" });
+      return;
+    }
+
     // S'assurer que ce bon appartient bien au chauffeur connecté
     if (row.bon.chauffeurId !== agentChauffeurId) {
       res.status(403).json({ erreur: "Ce bon ne vous appartient pas" });

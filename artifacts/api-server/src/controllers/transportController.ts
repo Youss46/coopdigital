@@ -718,10 +718,12 @@ function mapBon(row: Awaited<ReturnType<typeof getBonsCarburant>>[number], appro
   };
 }
 
-async function getApproveNom(userId: number | null | undefined): Promise<string | null> {
+async function getApproveNom(userId: number | null | undefined, cooperativeId: number): Promise<string | null> {
   if (!userId) return null;
   const [u] = await db.select({ nom: usersTable.nom, prenoms: usersTable.prenoms })
-    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    .from(usersTable)
+    .where(and(eq(usersTable.id, userId), eq(usersTable.cooperativeId, cooperativeId)))
+    .limit(1);
   return u ? `${u.prenoms} ${u.nom}`.trim() : null;
 }
 
@@ -752,7 +754,7 @@ export async function handleGetBonCarburant(req: Request, res: Response): Promis
     if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
     const row = await getBonCarburant(cooperativeId, id);
     if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
-    const approveParNom = await getApproveNom(row.bon.approvePar);
+    const approveParNom = await getApproveNom(row.bon.approvePar, cooperativeId);
     res.json(mapBon(row as Parameters<typeof mapBon>[0], approveParNom));
   } catch (err) {
     req.log.error({ err }, "Erreur getBonCarburant");
@@ -869,7 +871,10 @@ export async function handleApprouverBonCarburant(req: Request, res: Response): 
           const [chauffeurUser] = await db
             .select({ id: usersTable.id })
             .from(usersTable)
-            .where(eq(usersTable.chauffeurId, row.bon.chauffeurId!))
+            .where(and(
+              eq(usersTable.chauffeurId,   row.bon.chauffeurId!),
+              eq(usersTable.cooperativeId, cooperativeId),
+            ))
             .limit(1);
           if (chauffeurUser) {
             await envoyerPushGroupe([chauffeurUser.id], {
@@ -884,7 +889,7 @@ export async function handleApprouverBonCarburant(req: Request, res: Response): 
       })();
     }
 
-    const approveParNom = await getApproveNom(userId);
+    const approveParNom = await getApproveNom(userId, cooperativeId);
     res.json(mapBon({ ...row, bon: { ...row.bon, statut: "approuve", approvePar: userId, dateApprobation: new Date(), updatedAt: new Date() } }, approveParNom));
   } catch (err) {
     req.log.error({ err }, "Erreur approuverBonCarburant");
@@ -1003,7 +1008,7 @@ export async function handleGetBonCarburantPdf(req: Request, res: Response): Pro
     const row = await getBonCarburant(cooperativeId, id);
     if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
     const b = row.bon;
-    const approveParNom = await getApproveNom(b.approvePar);
+    const approveParNom = await getApproveNom(b.approvePar, cooperativeId);
     const pdfBuffer = await generateBonCarburant(cooperativeId, {
       id:               b.id,
       numero:           b.numero,

@@ -200,7 +200,11 @@ export async function utiliserBonChauffeur(req: Request, res: Response): Promise
         ...(body.observations      ? { observations: body.observations }              : {}),
         updatedAt: new Date(),
       })
-      .where(eq(bonsCarburantTable.id, bonId))
+      .where(and(
+        eq(bonsCarburantTable.id,            bonId),
+        eq(bonsCarburantTable.cooperativeId, coopId),
+        eq(bonsCarburantTable.chauffeurId,   chId),
+      ))
       .returning();
 
     // Dépense véhicule automatique (suivi consommation)
