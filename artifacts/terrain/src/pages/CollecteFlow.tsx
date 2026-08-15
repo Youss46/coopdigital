@@ -70,12 +70,15 @@ export default function CollecteFlow() {
     load();
   }, [isOnline]);
 
+  const isExterne = fournisseur?.typeMembre === "externe";
+
   const poidsBrutNum = parseFloat(poidsBrut) || 0;
   const retenueNum = parseFloat(retenueKg) || 0;
   const poidsNet = Math.max(0, poidsBrutNum - retenueNum);
   const montantBrut = prix ? Math.round(poidsNet * prix.prixBordChampFcfa) : 0;
-  const avanceDed = fournisseur ? Math.min(fournisseur.avanceEnCours, montantBrut) : 0;
-  const intrantsDed = fournisseur ? Math.min(fournisseur.intrantsDus, montantBrut - avanceDed) : 0;
+  // Les fournisseurs externes n'ont pas d'avance ni d'intrants
+  const avanceDed = (!isExterne && fournisseur) ? Math.min(fournisseur.avanceEnCours, montantBrut) : 0;
+  const intrantsDed = (!isExterne && fournisseur) ? Math.min(fournisseur.intrantsDus, montantBrut - avanceDed) : 0;
   const montantNet = Math.max(0, montantBrut - avanceDed - intrantsDed);
 
   async function handleConfirmer() {
@@ -86,7 +89,9 @@ export default function CollecteFlow() {
     try {
       const res = await enregistrerCollecte(
         {
-          membreId: fournisseur.id,
+          ...(isExterne
+            ? { fournisseurId: fournisseur.id }
+            : { membreId: fournisseur.id }),
           nombreSacs: parseInt(nombreSacs) || 1,
           poidsBrutKg: poidsBrutNum,
           retenueKg: retenueNum,
@@ -153,7 +158,7 @@ export default function CollecteFlow() {
         {/* STEP 1 : Choisir membre */}
         {step === 1 && (
           <FournisseurSearch
-            title="Choisir le planteur"
+            title="Choisir le planteur ou fournisseur"
             onSelect={(f) => { setFournisseur(f); setStep(2); }}
           />
         )}
@@ -162,10 +167,15 @@ export default function CollecteFlow() {
         {step === 2 && fournisseur && (
           <>
             {/* Récap fournisseur */}
-            <div className="t-card" style={{ margin: "16px 16px 0", borderLeft: "4px solid var(--t-primary)" }}>
+            <div className="t-card" style={{ margin: "16px 16px 0", borderLeft: `4px solid ${isExterne ? "#f59e0b" : "var(--t-primary)"}` }}>
               <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>{fournisseur.nom} {fournisseur.prenoms}</div>
-              <div className="t-text-muted">{fournisseur.code} · {fournisseur.section ?? "—"}</div>
-              {fournisseur.avanceEnCours > 0 && (
+              <div className="t-text-muted">{fournisseur.code} · {isExterne ? "Fournisseur externe" : (fournisseur.section ?? "—")}</div>
+              {isExterne && (
+                <div style={{ marginTop: 6 }}>
+                  <span className="t-badge" style={{ background: "rgba(245,158,11,.15)", color: "#f59e0b" }}>🏷️ Pisteur / Non-membre</span>
+                </div>
+              )}
+              {!isExterne && fournisseur.avanceEnCours > 0 && (
                 <div style={{ marginTop: 6 }}>
                   <span className="t-badge t-badge--danger">Avance en cours : {fournisseur.avanceEnCours.toLocaleString("fr-FR")} FCFA</span>
                 </div>
@@ -279,7 +289,7 @@ export default function CollecteFlow() {
 
             <div className="t-recap">
               <div className="t-recap-row">
-                <span className="t-recap-row__label">Planteur</span>
+                <span className="t-recap-row__label">{isExterne ? "Fournisseur ext." : "Planteur"}</span>
                 <span className="t-recap-row__value">{fournisseur.nom} {fournisseur.prenoms}</span>
               </div>
               <div className="t-recap-row">
@@ -366,7 +376,7 @@ export default function CollecteFlow() {
               {!isOnline
                 ? "Sera synchronisé dès le retour du réseau."
                 : result?.statutPaiement === "DIFFÉRÉ"
-                  ? "Fonds insuffisants — le planteur sera payé dès que la caisse sera approvisionnée."
+                  ? `Fonds insuffisants — ${isExterne ? "le fournisseur" : "le planteur"} sera payé dès que la caisse sera approvisionnée.`
                   : "La collecte a été enregistrée et le paiement effectué."}
             </div>
 

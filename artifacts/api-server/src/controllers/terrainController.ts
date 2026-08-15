@@ -89,20 +89,22 @@ export async function postCollecteHandler(req: Request, res: Response): Promise<
   // et le peseur est conservé pour la traçabilité (peseurId)
   const effectiveAgentId = agent.delegueId ?? agent.id;
   const peseurId = agent.delegueId ? agent.id : undefined;
-  const { membreId, nombreSacs, poidsBrutKg, retenueKg, modePaiement } = req.body as {
+  const { membreId, fournisseurId, nombreSacs, poidsBrutKg, retenueKg, modePaiement } = req.body as {
     membreId?: number;
+    fournisseurId?: number;
     nombreSacs?: number;
     poidsBrutKg?: number;
     retenueKg?: number;
     modePaiement?: string;
   };
-  if (!membreId || !poidsBrutKg || !modePaiement) {
-    res.status(400).json({ erreur: "Données manquantes" });
+  if ((!membreId && !fournisseurId) || !poidsBrutKg || !modePaiement) {
+    res.status(400).json({ erreur: "Données manquantes (membreId ou fournisseurId requis)" });
     return;
   }
   try {
     const result = await terrainService.enregistrerCollecte(effectiveAgentId, cooperativeId, {
       membreId,
+      fournisseurId,
       nombreSacs: nombreSacs ?? 1,
       poidsBrutKg,
       retenueKg: retenueKg ?? 0,

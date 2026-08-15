@@ -47,7 +47,10 @@ export interface FournisseurRecap {
 }
 
 export interface CollecteInput {
-  membreId: number;
+  /** ID du membre (planteur inscrit à la coopérative) */
+  membreId?: number;
+  /** ID du fournisseur externe (pisteur / non-membre) */
+  fournisseurId?: number;
   nombreSacs: number;
   poidsBrutKg: number;
   retenueKg: number;

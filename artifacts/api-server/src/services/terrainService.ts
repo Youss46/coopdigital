@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import {
-  usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable,
+  usersTable, membresTable, fournisseursTable, avancesTable, livraisonsTable, paiementsTable,
   distributionsIntrantsTable, historiquePrixTable, campagnesTable,
   caissesTable, mouvementsCaisseTable, sessionsPeseeTable,
   entrepotsTable, mouvementsStockTable,
@@ -293,7 +293,10 @@ export async function enregistrerCollecte(
   agentId: number,
   cooperativeId: number,
   data: {
-    membreId: number;
+    /** Membre inscrit à la coopérative (exclusif avec fournisseurId) */
+    membreId?: number;
+    /** Fournisseur externe / pisteur (exclusif avec membreId) */
+    fournisseurId?: number;
     nombreSacs: number;
     poidsBrutKg: number;
     retenueKg: number;
@@ -308,24 +311,29 @@ export async function enregistrerCollecte(
   const poidsNet = Math.max(0, data.poidsBrutKg - data.retenueKg);
   const montantBrut = Math.round(poidsNet * prixUnitaire);
 
-  // Avance en cours
-  const [avance] = await db
-    .select()
-    .from(avancesTable)
-    .where(and(eq(avancesTable.membreId, data.membreId), eq(avancesTable.statut, "en_cours")))
-    .orderBy(desc(avancesTable.createdAt))
-    .limit(1);
+  // Avance et intrants — uniquement pour les membres (les fournisseurs externes n'en ont pas)
+  let avance: typeof avancesTable.$inferSelect | undefined;
+  let avanceDeduite = 0;
+  let intrantsDed = 0;
 
-  const avanceDeduite = avance ? Math.min(avance.soldeRestantFcfa, montantBrut) : 0;
+  if (data.membreId) {
+    const [av] = await db
+      .select()
+      .from(avancesTable)
+      .where(and(eq(avancesTable.membreId, data.membreId), eq(avancesTable.statut, "en_cours")))
+      .orderBy(desc(avancesTable.createdAt))
+      .limit(1);
+    avance = av;
+    avanceDeduite = avance ? Math.min(avance.soldeRestantFcfa, montantBrut) : 0;
 
-  // Intrants dus
-  const [intrantsDus] = await db
-    .select({
-      total: sql<string>`COALESCE(SUM(${distributionsIntrantsTable.montantMembreFcfa} - ${distributionsIntrantsTable.montantRembourse_fcfa}), 0)`,
-    })
-    .from(distributionsIntrantsTable)
-    .where(eq(distributionsIntrantsTable.membreId, data.membreId));
-  const intrantsDed = Math.max(0, Math.min(toNum(intrantsDus?.total), montantBrut - avanceDeduite));
+    const [intrantsDus] = await db
+      .select({
+        total: sql<string>`COALESCE(SUM(${distributionsIntrantsTable.montantMembreFcfa} - ${distributionsIntrantsTable.montantRembourse_fcfa}), 0)`,
+      })
+      .from(distributionsIntrantsTable)
+      .where(eq(distributionsIntrantsTable.membreId, data.membreId));
+    intrantsDed = Math.max(0, Math.min(toNum(intrantsDus?.total), montantBrut - avanceDeduite));
+  }
 
   const montantNet = montantBrut - avanceDeduite - intrantsDed;
 
@@ -355,7 +363,8 @@ export async function enregistrerCollecte(
   const statutPaiement = paiementImmediat ? "PAYÉ" : "DIFFÉRÉ";
 
   const [livraison] = await db.insert(livraisonsTable).values({
-    membreId: data.membreId,
+    membreId: data.membreId ?? null,
+    fournisseurId: data.fournisseurId ?? null,
     campagneId: prix.campagneId ?? undefined,
     nombreSacs: data.nombreSacs,
     produitBrutKg: String(data.poidsBrutKg),
@@ -392,7 +401,7 @@ export async function enregistrerCollecte(
   // Créer le paiement (en_attente si différé)
   await db.insert(paiementsTable).values({
     livraisonId: livraison.id,
-    membreId: data.membreId,
+    membreId: data.membreId ?? null,
     campagneId: prix.campagneId ?? undefined,
     montantFcfa: montantNet,
     modePaiement: data.modePaiement as "orange_money" | "mtn_momo" | "especes",
@@ -417,16 +426,27 @@ export async function enregistrerCollecte(
     });
   }
 
-  const [membre] = await db
-    .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
-    .from(membresTable)
-    .where(eq(membresTable.id, data.membreId));
+  // Résolution du nom et push portail (uniquement pour les membres)
+  let membreNom = "";
+  if (data.membreId) {
+    const [membre] = await db
+      .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
+      .from(membresTable)
+      .where(eq(membresTable.id, data.membreId));
+    membreNom = membre ? `${membre.nom} ${membre.prenoms}` : "";
 
-  void envoyerPushGroupePortail([data.membreId], {
-    title: "Livraison enregistrée",
-    body: `${poidsNet.toLocaleString("fr-FR")} kg — ${montantNet.toLocaleString("fr-FR")} FCFA net`,
-    url: "/portail/livraisons",
-  });
+    void envoyerPushGroupePortail([data.membreId], {
+      title: "Livraison enregistrée",
+      body: `${poidsNet.toLocaleString("fr-FR")} kg — ${montantNet.toLocaleString("fr-FR")} FCFA net`,
+      url: "/portail/livraisons",
+    });
+  } else if (data.fournisseurId) {
+    const [fourn] = await db
+      .select({ nom: fournisseursTable.nom, prenoms: fournisseursTable.prenoms })
+      .from(fournisseursTable)
+      .where(eq(fournisseursTable.id, data.fournisseurId));
+    membreNom = fourn ? `${fourn.nom} ${fourn.prenoms ?? ""}`.trim() : "";
+  }
 
   // Entrée stock entrepôt délégué — poids BRUT (fire-and-forget — non bloquant)
   void entrerStockSiDelegue(agentId, cooperativeId, data.poidsBrutKg, livraison.id);
@@ -450,28 +470,29 @@ export async function enregistrerCollecte(
     });
   }
 
-  // Commission délégué — Option A : délégué du membre (membres.delegue_id)
-  const [membreDelegue] = await db
-    .select({ delegueId: membresTable.delegueId })
-    .from(membresTable)
-    .where(eq(membresTable.id, data.membreId))
-    .limit(1);
-
+  // Commission délégué — uniquement pour les membres (Option A : délégué du membre)
   let commissionFcfa: number | null = null;
-  if (membreDelegue?.delegueId) {
-    commissionFcfa = await creerCommissionSiTaux(
-      livraison.id,
-      membreDelegue.delegueId,
-      prix.campagneId ?? null,
-      poidsNet,
-      cooperativeId
-    );
+  if (data.membreId) {
+    const [membreDelegue] = await db
+      .select({ delegueId: membresTable.delegueId })
+      .from(membresTable)
+      .where(eq(membresTable.id, data.membreId))
+      .limit(1);
+    if (membreDelegue?.delegueId) {
+      commissionFcfa = await creerCommissionSiTaux(
+        livraison.id,
+        membreDelegue.delegueId,
+        prix.campagneId ?? null,
+        poidsNet,
+        cooperativeId
+      );
+    }
   }
 
   return {
     livraisonId: livraison.id,
     ref: `LIV-${new Date().getFullYear()}-${String(livraison.id).padStart(4, "0")}`,
-    membreNom: membre ? `${membre.nom} ${membre.prenoms}` : "",
+    membreNom,
     poidsNetKg: poidsNet,
     montantBrutFcfa: montantBrut,
     avanceDeduiteFcfa: avanceDeduite,
