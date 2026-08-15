@@ -1530,13 +1530,16 @@ function statutBonBadge(statut: string) {
   );
 }
 
-const ROLES_APPROBATEUR = ["pca", "directeur", "comptable", "admin"];
+const ROLES_APPROBATEUR = ["pca", "directeur"];
+const ROLES_EMETTEUR    = ["pca", "directeur", "magasinier"];
 
 function TabCarburant() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const { utilisateur } = useAuth();
-  const peutApprouver = ROLES_APPROBATEUR.includes(utilisateur?.role ?? "");
+  const role = utilisateur?.role ?? "";
+  const peutApprouver = ROLES_APPROBATEUR.includes(role);
+  const peutCreer     = ROLES_EMETTEUR.includes(role);
 
   const vehiculesQ = useGetVehicules();
   const vehicules  = vehiculesQ.data?.vehicules ?? [];
@@ -1734,9 +1737,11 @@ function TabCarburant() {
               <Label className="text-xs">Au</Label>
               <Input type="date" className="h-8 text-sm w-36" value={filterFin} onChange={e => setFilterFin(e.target.value)} />
             </div>
-            <Button size="sm" onClick={() => { setForm({ ...EMPTY_BON_FORM, vehicule_id: vehicules[0] ? String(vehicules[0].id) : "" }); setShowCreate(true); }}>
-              <Plus className="h-4 w-4 mr-1" /> Nouveau bon
-            </Button>
+            {peutCreer && (
+              <Button size="sm" onClick={() => { setForm({ ...EMPTY_BON_FORM, vehicule_id: vehicules[0] ? String(vehicules[0].id) : "" }); setShowCreate(true); }}>
+                <Plus className="h-4 w-4 mr-1" /> Nouveau bon
+              </Button>
+            )}
           </div>
 
           {/* Table bons */}
@@ -1745,9 +1750,11 @@ function TabCarburant() {
               <Fuel className="h-12 w-12 mx-auto text-gray-300 mb-3" />
               <p className="text-gray-500 text-sm">Aucun bon de carburant</p>
               <p className="text-gray-400 text-xs mt-1">Créez un bon, soumettez-le, puis approuvez-le avant utilisation</p>
-              <Button size="sm" className="mt-4" onClick={() => { setForm({ ...EMPTY_BON_FORM, vehicule_id: vehicules[0] ? String(vehicules[0].id) : "" }); setShowCreate(true); }}>
-                <Plus className="h-4 w-4 mr-1" /> Nouveau bon
-              </Button>
+              {peutCreer && (
+                <Button size="sm" className="mt-4" onClick={() => { setForm({ ...EMPTY_BON_FORM, vehicule_id: vehicules[0] ? String(vehicules[0].id) : "" }); setShowCreate(true); }}>
+                  <Plus className="h-4 w-4 mr-1" /> Nouveau bon
+                </Button>
+              )}
             </Card>
           ) : (
             <Card>
@@ -1780,7 +1787,7 @@ function TabCarburant() {
                       <TableCell>{statutBonBadge(bon.statut)}</TableCell>
                       <TableCell>
                         <div className="flex gap-1 justify-end">
-                          {bon.statut === "brouillon" && (
+                          {bon.statut === "brouillon" && peutCreer && (
                             <Button size="sm" variant="outline" className="h-7 text-xs"
                               onClick={() => soumMut.mutate({ id: bon.id })}>
                               <Send className="h-3 w-3 mr-1" /> Soumettre
