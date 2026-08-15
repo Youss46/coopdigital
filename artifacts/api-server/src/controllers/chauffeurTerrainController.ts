@@ -265,6 +265,24 @@ export async function getChauffeurAccueil(req: Request, res: Response): Promise<
       .orderBy(desc(bonsCarburantTable.createdAt))
       .limit(5) : [];
 
+    // Statistiques de consommation (bons déjà utilisés)
+    const bonsUtilises = chId ? await db
+      .select({
+        quantiteAutorisee: bonsCarburantTable.quantiteAutorisee,
+        quantiteLivree:    bonsCarburantTable.quantiteLivree,
+      })
+      .from(bonsCarburantTable)
+      .where(and(
+        eq(bonsCarburantTable.cooperativeId, coopId),
+        eq(bonsCarburantTable.chauffeurId,   chId),
+        eq(bonsCarburantTable.statut, "utilise"),
+      )) : [];
+
+    const litresConsommes = bonsUtilises.reduce((s, b) => {
+      const q = b.quantiteLivree ?? b.quantiteAutorisee;
+      return s + (q != null ? parseFloat(String(q)) : 0);
+    }, 0);
+
     res.json({
       missions_en_cours:  missionsEnCours.map(m => ({
         id:             m.id,
@@ -284,6 +302,8 @@ export async function getChauffeurAccueil(req: Request, res: Response): Promise<
         station_service:  b.stationService ?? null,
         immatriculation:  b.immatriculation ?? null,
       })),
+      litres_consommes:    Math.round(litresConsommes * 10) / 10,
+      bons_utilises_count: bonsUtilises.length,
       chauffeur_rattache: chId != null,
     });
   } catch (err) {

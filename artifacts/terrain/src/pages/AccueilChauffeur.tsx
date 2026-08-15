@@ -29,6 +29,8 @@ interface BonResume {
 interface AccueilData {
   missions_en_cours: MissionResume[];
   bons_en_attente: BonResume[];
+  litres_consommes: number;
+  bons_utilises_count: number;
   chauffeur_rattache: boolean;
 }
 
@@ -86,7 +88,8 @@ export default function AccueilChauffeur() {
   const bons = data?.bons_en_attente ?? [];
   const missions = data?.missions_en_cours ?? [];
   const prochaineMission = missions[0] ?? null;
-  const totalLitres = bons.reduce((s, b) => s + b.quantite_autorisee, 0);
+  const litresConsommes = data?.litres_consommes ?? 0;
+  const bonsUtilisesCount = data?.bons_utilises_count ?? 0;
 
   /* ── Non rattaché ── */
   if (!data?.chauffeur_rattache && !loading) {
@@ -147,8 +150,8 @@ export default function AccueilChauffeur() {
       <p className="t-section-title">Mon activité</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, padding: "0 16px" }}>
         <StatTile icon={<Truck size={22} color="var(--t-primary)" />} value={loading ? "…" : String(missions.length)} label="Mission(s)" />
-        <StatTile icon={<Fuel size={22} color="var(--t-warning)" />} value={loading ? "…" : `${totalLitres} L`} label="Carburant" />
-        <StatTile icon={<ClipboardList size={22} color="var(--t-info)" />} value={loading ? "…" : String(bons.length)} label="Bon(s)" />
+        <StatTile icon={<Fuel size={22} color="var(--t-warning)" />} value={loading ? "…" : `${litresConsommes} L`} label="Carburant" />
+        <StatTile icon={<ClipboardList size={22} color="var(--t-info)" />} value={loading ? "…" : String(bonsUtilisesCount)} label="Bon(s)" />
       </div>
 
       {/* ── Actions rapides ── */}
