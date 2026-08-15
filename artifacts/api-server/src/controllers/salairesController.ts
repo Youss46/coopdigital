@@ -942,28 +942,59 @@ export async function rembourserAvance(
     }
 
     const nouveauMontant = montantRembourse ?? av.montantFcfa;
+
+    // Guard: delta must be strictly positive — reject no-op or retrograde calls
+    const montantCetteOperation = nouveauMontant - av.montantRembourse;
+    if (montantCetteOperation <= 0) {
+      res.status(400).json({
+        erreur:
+          "Le montant remboursé doit être supérieur au montant déjà remboursé",
+      });
+      return;
+    }
+
     const nouveauStatut =
       nouveauMontant >= av.montantFcfa ? "rembourse" : "en_cours";
 
-    // Amount repaid in this specific operation (delta)
-    const montantCetteOperation = nouveauMontant - av.montantRembourse;
+    // Wrap insert + update in a transaction with a row-level lock (FOR UPDATE)
+    // to prevent duplicate history rows from concurrent requests that would
+    // otherwise read the same stale montantRembourse under READ COMMITTED.
+    const [updated] = await db.transaction(async (tx) => {
+      // Lock the row — concurrent transactions block here until this one commits
+      // or rolls back, guaranteeing a consistent read of montantRembourse.
+      const [current] = await tx
+        .select({ montantRembourse: avancesPersonnelTable.montantRembourse })
+        .from(avancesPersonnelTable)
+        .where(eq(avancesPersonnelTable.id, id))
+        .for("update")
+        .limit(1);
 
-    // Insert a history record so this manual repayment is visible in the deduction history
-    await db.insert(remboursementsAvanceTable).values({
-      avanceId: id,
-      bulletinId: null,
-      montantFcfa: montantCetteOperation,
-      note: note ? String(note) : null,
+      if (!current || nouveauMontant <= (current.montantRembourse ?? 0)) {
+        throw Object.assign(new Error("CONCURRENT_UPDATE"), { status: 409 });
+      }
+
+      // Insert a history record so this manual repayment is visible in the deduction history
+      await tx.insert(remboursementsAvanceTable).values({
+        avanceId: id,
+        bulletinId: null,
+        montantFcfa: nouveauMontant - (current.montantRembourse ?? 0),
+        note: note ? String(note) : null,
+      });
+
+      return tx
+        .update(avancesPersonnelTable)
+        .set({ montantRembourse: nouveauMontant, statut: nouveauStatut })
+        .where(eq(avancesPersonnelTable.id, id))
+        .returning();
     });
 
-    const [updated] = await db
-      .update(avancesPersonnelTable)
-      .set({ montantRembourse: nouveauMontant, statut: nouveauStatut })
-      .where(eq(avancesPersonnelTable.id, id))
-      .returning();
     res.json(updated);
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    if (err instanceof Error && err.message === "CONCURRENT_UPDATE") {
+      res.status(409).json({ erreur: "Remboursement déjà enregistré par une autre requête simultanée" });
+      return;
+    }
     req.log.error({ err }, "rembourserAvance");
     res.status(500).json({ erreur: "Erreur interne" });
   }
