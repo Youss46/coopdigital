@@ -62,18 +62,19 @@ function getPeriodeDates(periode: PeriodeFilter): { date_debut?: string; date_fi
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  // Le backend attend YYYY-MM-DD et concatène lui-même "T23:59:59Z" pour date_fin
   if (periode === "today") {
     const today = fmt(now);
-    return { date_debut: `${today}T00:00:00`, date_fin: `${today}T23:59:59` };
+    return { date_debut: today, date_fin: today };
   }
   if (periode === "week") {
     const day = now.getDay() === 0 ? 6 : now.getDay() - 1;
-    const monday = new Date(now); monday.setDate(now.getDate() - day); monday.setHours(0, 0, 0, 0);
-    return { date_debut: monday.toISOString(), date_fin: now.toISOString() };
+    const monday = new Date(now); monday.setDate(now.getDate() - day);
+    return { date_debut: fmt(monday), date_fin: fmt(now) };
   }
   if (periode === "month") {
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
-    return { date_debut: first.toISOString(), date_fin: now.toISOString() };
+    return { date_debut: fmt(first), date_fin: fmt(now) };
   }
   return {};
 }
