@@ -43,7 +43,7 @@ import {
 } from "../services/transportService";
 import { generateBonCarburant } from "../services/bonCarburantPdf";
 import { db, usersTable, stationsCarburantTable, bonsCarburantTable } from "@workspace/db";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq, and, isNotNull, count } from "drizzle-orm";
 
 function toDateStr(d: Date | null | undefined): string | null | undefined {
   if (d == null) return d;
@@ -1131,10 +1131,64 @@ export async function handleDeleteStationCarburant(req: Request, res: Response):
   }
 }
 
+export async function handleGetHistoriquePreview(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+
+    // Paires (station, type_carburant) avec nombre de bons par paire
+    const bonsRows = await db
+      .select({
+        nom:           bonsCarburantTable.stationService,
+        typeCarburant: bonsCarburantTable.typeCarburant,
+        nbBons:        count(bonsCarburantTable.id),
+      })
+      .from(bonsCarburantTable)
+      .where(and(
+        eq(bonsCarburantTable.cooperativeId, cooperativeId),
+        isNotNull(bonsCarburantTable.stationService),
+      ))
+      .groupBy(bonsCarburantTable.stationService, bonsCarburantTable.typeCarburant);
+
+    // Noms déjà configurés (tous statuts confondus)
+    const existing = await db
+      .select({ nom: stationsCarburantTable.nom })
+      .from(stationsCarburantTable)
+      .where(eq(stationsCarburantTable.cooperativeId, cooperativeId));
+    const existingNames = new Set(existing.map(e => e.nom));
+
+    // Agréger par station en excluant les noms déjà configurés
+    const map = new Map<string, { types: Set<string>; total: number }>();
+    for (const r of bonsRows) {
+      if (!r.nom || existingNames.has(r.nom)) continue;
+      if (!map.has(r.nom)) map.set(r.nom, { types: new Set(), total: 0 });
+      const entry = map.get(r.nom)!;
+      entry.types.add(r.typeCarburant);
+      entry.total += Number(r.nbBons);
+    }
+
+    res.json({
+      stations: [...map.entries()]
+        .sort(([a], [b]) => a.localeCompare(b, "fr"))
+        .map(([nom, { types, total }]) => ({
+          nom,
+          types_carburant: [...types].sort(),
+          count: total,
+        })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "handleGetHistoriquePreview");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 export async function handleImporterStationsHistorique(req: Request, res: Response): Promise<void> {
   try {
     const cooperativeId = req.user?.cooperativeId;
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+
+    const body = req.body as { noms?: string[] };
+    const nomsSelectionnes = Array.isArray(body.noms) ? body.noms.filter(Boolean) : null;
 
     // Lire les paires (station, type_carburant) distinctes depuis les bons historiques
     const bonsRows = await db
@@ -1156,16 +1210,17 @@ export async function handleImporterStationsHistorique(req: Request, res: Respon
       fromBons.get(r.nom)!.add(r.typeCarburant);
     }
 
-    // Noms déjà configurés (toutes statuts confondus pour éviter les doublons)
+    // Noms déjà configurés (tous statuts confondus pour éviter les doublons)
     const existing = await db
       .select({ nom: stationsCarburantTable.nom })
       .from(stationsCarburantTable)
       .where(eq(stationsCarburantTable.cooperativeId, cooperativeId));
     const existingNames = new Set(existing.map(e => e.nom));
 
-    // Insérer les nouvelles stations uniquement
+    // Insérer uniquement les noms sélectionnés (ou tous si aucune sélection transmise)
     const toInsert = [...fromBons.entries()]
       .filter(([nom]) => !existingNames.has(nom))
+      .filter(([nom]) => nomsSelectionnes === null || nomsSelectionnes.includes(nom))
       .map(([nom, types]) => ({
         cooperativeId,
         nom,

@@ -2373,17 +2373,57 @@ function TabStationsCarburant() {
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
-  const importMut = useMutation({
+  // ── Modal de prévisualisation de l'import ──
+  const [showPreview, setShowPreview] = useState(false);
+  const [selectedNoms, setSelectedNoms] = useState<Set<string>>(new Set());
+
+  interface PreviewRow { nom: string; types_carburant: string[]; count: number; }
+  const previewQuery = useQuery<{ stations: PreviewRow[] }>({
+    queryKey: [...QK, "preview"],
+    queryFn: () => fetch(`${BASE}/api/transport/stations-carburant/historique-preview`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("terrain_token") ?? localStorage.getItem("auth_token") ?? ""}` },
+    }).then(r => r.json() as Promise<{ stations: PreviewRow[] }>),
+    enabled: showPreview,
+    staleTime: 0,
+  });
+  const previewRows = previewQuery.data?.stations ?? [];
+
+  function openPreview() {
+    setShowPreview(true);
+    // pré-sélectionner tout après le chargement (géré dans useEffect ci-dessous)
+  }
+  // Sélectionner tout automatiquement quand les données arrivent
+  const prevPreviewRows = previewRows;
+  if (showPreview && previewQuery.isSuccess && selectedNoms.size === 0 && prevPreviewRows.length > 0) {
+    setSelectedNoms(new Set(prevPreviewRows.map(r => r.nom)));
+  }
+
+  function toggleNom(nom: string) {
+    setSelectedNoms(prev => {
+      const next = new Set(prev);
+      if (next.has(nom)) next.delete(nom); else next.add(nom);
+      return next;
+    });
+  }
+  function selectAll()   { setSelectedNoms(new Set(previewRows.map(r => r.nom))); }
+  function deselectAll() { setSelectedNoms(new Set()); }
+
+  const confirmImportMut = useMutation({
     mutationFn: async () => {
       const res = await fetch(`${BASE}/api/transport/stations-carburant/importer-historique`, {
-        method: "POST", headers: authHeader(),
+        method: "POST",
+        headers: authHeader(),
+        body: JSON.stringify({ noms: [...selectedNoms] }),
       });
       if (!res.ok) { const d = await res.json(); throw new Error((d as { erreur?: string }).erreur ?? "Erreur"); }
       return res.json() as Promise<{ importees: number }>;
     },
     onSuccess: (d) => {
       void qc.invalidateQueries({ queryKey: QK });
-      toast({ title: d.importees > 0 ? `${d.importees} station${d.importees > 1 ? "s" : ""} importée${d.importees > 1 ? "s" : ""}` : "Aucune nouvelle station à importer" });
+      void qc.invalidateQueries({ queryKey: [...QK, "preview"] });
+      toast({ title: d.importees > 0 ? `${d.importees} station${d.importees > 1 ? "s" : ""} importée${d.importees > 1 ? "s" : ""}` : "Aucune station importée" });
+      setShowPreview(false);
+      setSelectedNoms(new Set());
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
@@ -2419,9 +2459,9 @@ function TabStationsCarburant() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => importMut.mutate()} disabled={importMut.isPending} className="gap-2">
+          <Button variant="outline" onClick={openPreview} className="gap-2">
             <History className="h-4 w-4" />
-            {importMut.isPending ? "Importation…" : "Importer depuis l'historique"}
+            Importer depuis l'historique
           </Button>
           <Button onClick={openCreate} className="gap-2">
             <Plus className="h-4 w-4" /> Ajouter une station
@@ -2584,6 +2624,79 @@ function TabStationsCarburant() {
             >
               {editing ? "Enregistrer" : "Ajouter"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal prévisualisation de l'import historique ── */}
+      <Dialog open={showPreview} onOpenChange={o => { if (!o) { setShowPreview(false); setSelectedNoms(new Set()); } }}>
+        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Importer depuis l'historique</DialogTitle>
+            <p className="text-sm text-gray-500">
+              Ces noms de stations ont été utilisés dans vos bons de carburant mais ne sont pas encore configurés.
+              Cochez ceux à importer.
+            </p>
+          </DialogHeader>
+
+          {previewQuery.isPending ? (
+            <div className="flex-1 flex items-center justify-center py-8 text-gray-400">Chargement…</div>
+          ) : previewRows.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center py-8 gap-2 text-gray-500">
+              <CheckCircle2 className="h-10 w-10 text-green-400" />
+              <p className="font-medium">Tout est déjà importé</p>
+              <p className="text-sm text-center">Toutes les stations trouvées dans vos bons sont déjà dans votre liste configurée.</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between text-sm text-gray-500 px-1">
+                <span>{selectedNoms.size} / {previewRows.length} sélectionnée{previewRows.length > 1 ? "s" : ""}</span>
+                <div className="flex gap-3">
+                  <button onClick={selectAll}   className="text-blue-600 hover:underline">Tout sélectionner</button>
+                  <button onClick={deselectAll} className="text-gray-500 hover:underline">Tout désélectionner</button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto border rounded-md divide-y">
+                {previewRows.map(row => (
+                  <label key={row.nom} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedNoms.has(row.nom)}
+                      onChange={() => toggleNom(row.nom)}
+                      className="h-4 w-4 rounded flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{row.nom}</p>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {row.types_carburant.map(t => (
+                          <Badge key={t} variant="secondary" className="text-xs">
+                            {TYPE_CARB_OPTS.find(o => o.value === t)?.label ?? t}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-400 flex-shrink-0">
+                      {row.count} bon{row.count > 1 ? "s" : ""}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={() => { setShowPreview(false); setSelectedNoms(new Set()); }}>Annuler</Button>
+            {previewRows.length > 0 && (
+              <Button
+                onClick={() => confirmImportMut.mutate()}
+                disabled={selectedNoms.size === 0 || confirmImportMut.isPending}
+              >
+                {confirmImportMut.isPending
+                  ? "Importation…"
+                  : `Importer ${selectedNoms.size} station${selectedNoms.size > 1 ? "s" : ""}`}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

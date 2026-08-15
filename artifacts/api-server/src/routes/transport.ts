@@ -51,6 +51,7 @@ import {
   handleUpdateStationCarburant,
   handleDeleteStationCarburant,
   handleImporterStationsHistorique,
+  handleGetHistoriquePreview,
 } from "../controllers/transportController";
 
 const router = Router();
@@ -91,10 +92,11 @@ router.get("/transport/carburant/stats",                    authMiddleware, hand
 router.get("/transport/rapport-campagne",       authMiddleware, handleRapportCampagne);
 router.get("/transport/rapport-vehicule/:id",   authMiddleware, handleRapportVehicule);
 
-router.get("/transport/stations-carburant",                    authMiddleware, handleGetStationsCarburant);
-router.post("/transport/stations-carburant",                   authMiddleware, handleCreateStationCarburant);
+router.get("/transport/stations-carburant",                      authMiddleware, handleGetStationsCarburant);
+router.get("/transport/stations-carburant/historique-preview",   authMiddleware, handleGetHistoriquePreview);
+router.post("/transport/stations-carburant",                     authMiddleware, handleCreateStationCarburant);
 router.post("/transport/stations-carburant/importer-historique", authMiddleware, handleImporterStationsHistorique);
-router.put("/transport/stations-carburant/:id",                authMiddleware, handleUpdateStationCarburant);
-router.delete("/transport/stations-carburant/:id",             authMiddleware, handleDeleteStationCarburant);
+router.put("/transport/stations-carburant/:id",                  authMiddleware, handleUpdateStationCarburant);
+router.delete("/transport/stations-carburant/:id",               authMiddleware, handleDeleteStationCarburant);
 
 export default router;
