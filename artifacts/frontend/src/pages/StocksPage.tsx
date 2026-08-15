@@ -55,9 +55,15 @@ interface LotissementStats {
   poidsNonLoti: number;
 }
 
-type PeriodeFilter = "all" | "today" | "week" | "month";
+type PeriodeFilter = "all" | "today" | "week" | "month" | "custom";
 
-function getPeriodeDates(periode: PeriodeFilter): { date_debut?: string; date_fin?: string } {
+function getPeriodeDates(periode: PeriodeFilter, customDebut = "", customFin = ""): { date_debut?: string; date_fin?: string } {
+  if (periode === "custom") {
+    return {
+      ...(customDebut ? { date_debut: customDebut } : {}),
+      ...(customFin   ? { date_fin:   customFin   } : {}),
+    };
+  }
   if (periode === "all") return {};
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -88,6 +94,8 @@ export default function StocksPage() {
   const [onglet, setOnglet] = useState<"entrepots" | "journal">("entrepots");
   const [filtreTransfert, setFiltreTransfert] = useState<string>("");
   const [periode, setPeriode] = useState<PeriodeFilter>("all");
+  const [dateDebut, setDateDebut] = useState("");
+  const [dateFin, setDateFin] = useState("");
   const [modalMouvement, setModalMouvement] = useState<"entree" | "sortie" | null>(null);
 
   useEffect(() => {
@@ -175,9 +183,9 @@ export default function StocksPage() {
   const { data: alertes = [] } = useGetStockAlertes();
 
   // Fetch mouvements avec filtre de période (bypass hook Orval pour supporter date_debut/date_fin)
-  const periodeDates = getPeriodeDates(periode);
+  const periodeDates = getPeriodeDates(periode, dateDebut, dateFin);
   const { data: mouvements = [], isLoading: isLoadingMouvements } = useQuery({
-    queryKey: ["stocks-mouvements", periode],
+    queryKey: ["stocks-mouvements", periode, dateDebut, dateFin],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (periodeDates.date_debut) params.set("date_debut", periodeDates.date_debut);
@@ -497,19 +505,16 @@ export default function StocksPage() {
       {onglet === "journal" && (
         <div className="space-y-3">
           {/* Filtres période */}
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              <CalendarDays size={14} />
-              <span>Période</span>
-            </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filtres rapides */}
             <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
               {(["all", "today", "week", "month"] as const).map((p) => {
-                const labels: Record<PeriodeFilter, string> = { all: "Tout", today: "Aujourd'hui", week: "Semaine", month: "Mois" };
+                const labels: Record<PeriodeFilter, string> = { all: "Tout", today: "Aujourd'hui", week: "Semaine", month: "Mois", custom: "Personnalisé" };
                 const active = periode === p;
                 return (
                   <button
                     key={p}
-                    onClick={() => setPeriode(p)}
+                    onClick={() => { setPeriode(p); setDateDebut(""); setDateFin(""); }}
                     className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                       active
                         ? "bg-white text-gray-900 shadow-sm"
@@ -520,6 +525,47 @@ export default function StocksPage() {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Séparateur */}
+            <span className="text-gray-300 text-xs hidden sm:inline">|</span>
+
+            {/* Plage de dates personnalisée */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <CalendarDays size={13} className="text-gray-400 shrink-0" />
+                <span className="text-xs text-gray-500">Du</span>
+                <input
+                  type="date"
+                  value={dateDebut}
+                  max={dateFin || undefined}
+                  onChange={(e) => { setDateDebut(e.target.value); setPeriode("custom"); }}
+                  className={`text-xs border rounded-md px-2 py-1.5 h-7 transition-colors outline-none focus:ring-1 focus:ring-[#1a4731] focus:border-[#1a4731] ${
+                    periode === "custom" && dateDebut ? "border-[#1a4731] bg-green-50" : "border-gray-200 bg-white"
+                  }`}
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-500">Au</span>
+                <input
+                  type="date"
+                  value={dateFin}
+                  min={dateDebut || undefined}
+                  onChange={(e) => { setDateFin(e.target.value); setPeriode("custom"); }}
+                  className={`text-xs border rounded-md px-2 py-1.5 h-7 transition-colors outline-none focus:ring-1 focus:ring-[#1a4731] focus:border-[#1a4731] ${
+                    periode === "custom" && dateFin ? "border-[#1a4731] bg-green-50" : "border-gray-200 bg-white"
+                  }`}
+                />
+              </div>
+              {periode === "custom" && (dateDebut || dateFin) && (
+                <button
+                  onClick={() => { setDateDebut(""); setDateFin(""); setPeriode("all"); }}
+                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Réinitialiser"
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
           </div>
 
