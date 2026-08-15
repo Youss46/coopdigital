@@ -925,7 +925,7 @@ export async function rembourserAvance(
 ): Promise<void> {
   try {
     const id = parseId(req.params["id"]);
-    const { montantRembourse } = req.body as { montantRembourse?: number };
+    const { montantRembourse, note } = req.body as { montantRembourse?: number; note?: string };
 
     const [av] = await db
       .select()
@@ -944,6 +944,17 @@ export async function rembourserAvance(
     const nouveauMontant = montantRembourse ?? av.montantFcfa;
     const nouveauStatut =
       nouveauMontant >= av.montantFcfa ? "rembourse" : "en_cours";
+
+    // Amount repaid in this specific operation (delta)
+    const montantCetteOperation = nouveauMontant - av.montantRembourse;
+
+    // Insert a history record so this manual repayment is visible in the deduction history
+    await db.insert(remboursementsAvanceTable).values({
+      avanceId: id,
+      bulletinId: null,
+      montantFcfa: montantCetteOperation,
+      note: note ? String(note) : null,
+    });
 
     const [updated] = await db
       .update(avancesPersonnelTable)
