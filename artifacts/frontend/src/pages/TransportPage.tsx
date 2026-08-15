@@ -2303,6 +2303,8 @@ interface StationAdminRow {
   nom: string;
   adresse: string | null;
   types_carburant: string[];
+  latitude: number | null;
+  longitude: number | null;
   actif: boolean;
 }
 
@@ -2312,6 +2314,7 @@ const TYPE_CARB_OPTS = [
   { value: "super",   label: "Super" },
 ];
 
+// hint: Logic changed on both sides. Requires understanding intent of each change.
 function TabStationsCarburant() {
   const BASE = import.meta.env.VITE_API_URL ?? "";
   const { toast } = useToast();
@@ -2327,7 +2330,7 @@ function TabStationsCarburant() {
 
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<StationAdminRow | null>(null);
-  const [form, setForm] = useState({ nom: "", adresse: "", types: ["gasoil"] });
+  const [form, setForm] = useState({ nom: "", adresse: "", types: ["gasoil"], latitude: "", longitude: "" });
 
   const authHeader = () => ({
     "Content-Type": "application/json",
@@ -2336,7 +2339,13 @@ function TabStationsCarburant() {
 
   const saveMut = useMutation({
     mutationFn: async () => {
-      const body = { nom: form.nom.trim(), adresse: form.adresse.trim() || null, types_carburant: form.types };
+      const body = {
+        nom: form.nom.trim(),
+        adresse: form.adresse.trim() || null,
+        types_carburant: form.types,
+        latitude:  form.latitude  !== "" ? Number(form.latitude)  : null,
+        longitude: form.longitude !== "" ? Number(form.longitude) : null,
+      };
       const url  = editing
         ? `${BASE}/api/transport/stations-carburant/${editing.id}`
         : `${BASE}/api/transport/stations-carburant`;
@@ -2430,12 +2439,18 @@ function TabStationsCarburant() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ nom: "", adresse: "", types: ["gasoil"] });
+    setForm({ nom: "", adresse: "", types: ["gasoil"], latitude: "", longitude: "" });
     setShowDialog(true);
   }
   function openEdit(s: StationAdminRow) {
     setEditing(s);
-    setForm({ nom: s.nom, adresse: s.adresse ?? "", types: [...s.types_carburant] });
+    setForm({
+      nom: s.nom,
+      adresse: s.adresse ?? "",
+      types: [...s.types_carburant],
+      latitude:  s.latitude  != null ? String(s.latitude)  : "",
+      longitude: s.longitude != null ? String(s.longitude) : "",
+    });
     setShowDialog(true);
   }
   function toggleType(t: string) {
@@ -2500,6 +2515,7 @@ function TabStationsCarburant() {
                       <TableHead>Nom</TableHead>
                       <TableHead>Adresse</TableHead>
                       <TableHead>Carburants</TableHead>
+                      <TableHead>GPS</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -2516,6 +2532,11 @@ function TabStationsCarburant() {
                               </Badge>
                             ))}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {s.latitude != null && s.longitude != null
+                            ? <Badge variant="outline" className="text-xs text-green-700 border-green-300 gap-1 whitespace-nowrap"><MapPin className="h-3 w-3" />{s.latitude.toFixed(4)}, {s.longitude.toFixed(4)}</Badge>
+                            : <span className="text-gray-400 text-xs">—</span>}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
@@ -2615,12 +2636,57 @@ function TabStationsCarburant() {
                 <p className="text-xs text-red-500">Sélectionnez au moins un type de carburant</p>
               )}
             </div>
+            <div className="space-y-1">
+              <Label className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                Coordonnées GPS (facultatif)
+              </Label>
+              <p className="text-xs text-gray-400">Permettent aux chauffeurs d'obtenir un itinéraire précis.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">Latitude</Label>
+                  <Input
+                    type="number" step="0.0000001" placeholder="5.3600000"
+                    value={form.latitude}
+                    onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Longitude</Label>
+                  <Input
+                    type="number" step="0.0000001" placeholder="-4.0080000"
+                    value={form.longitude}
+                    onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))}
+                  />
+                </div>
+              </div>
+              {/* Pair completeness */}
+              {(form.latitude !== "") !== (form.longitude !== "") && (
+                <p className="text-xs text-red-500">Latitude et longitude doivent être renseignées ensemble</p>
+              )}
+              {/* Range check */}
+              {form.latitude !== "" && form.longitude !== "" && (() => {
+                const lat = Number(form.latitude), lng = Number(form.longitude);
+                return (!isFinite(lat) || lat < -90 || lat > 90 || !isFinite(lng) || lng < -180 || lng > 180);
+              })() && (
+                <p className="text-xs text-red-500">Latitude entre -90 et 90, longitude entre -180 et 180</p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)}>Annuler</Button>
             <Button
               onClick={() => saveMut.mutate()}
-              disabled={!form.nom.trim() || form.types.length === 0 || saveMut.isPending}
+              disabled={(() => {
+                if (!form.nom.trim() || form.types.length === 0 || saveMut.isPending) return true;
+                const hasLat = form.latitude !== "", hasLng = form.longitude !== "";
+                if (hasLat !== hasLng) return true;
+                if (hasLat && hasLng) {
+                  const lat = Number(form.latitude), lng = Number(form.longitude);
+                  if (!isFinite(lat) || lat < -90 || lat > 90 || !isFinite(lng) || lng < -180 || lng > 180) return true;
+                }
+                return false;
+              })()}
             >
               {editing ? "Enregistrer" : "Ajouter"}
             </Button>

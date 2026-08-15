@@ -9,6 +9,8 @@ import BottomNavChauffeur from "@/components/BottomNavChauffeur";
 interface Station {
   nom: string;
   types_carburant: string[];
+  latitude:  number | null;
+  longitude: number | null;
 }
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
@@ -24,9 +26,11 @@ const TYPE_COLOR: Record<string, { bg: string; color: string }> = {
   super:   { bg: "var(--t-success-bg)", color: "var(--t-success)" },
 };
 
-function openMaps(nom: string) {
-  const q = encodeURIComponent(`station service ${nom} Côte d'Ivoire`);
-  window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, "_blank", "noopener");
+function openMaps(station: Station) {
+  const url = station.latitude != null && station.longitude != null
+    ? `https://www.google.com/maps/?q=${station.latitude},${station.longitude}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`station service ${station.nom} Côte d'Ivoire`)}`;
+  window.open(url, "_blank", "noopener");
 }
 
 /* ─── Composant ─────────────────────────────────────────────────────────── */
@@ -245,7 +249,7 @@ function StationCard({ station }: { station: Station }) {
 
       {/* Bouton directions */}
       <button
-        onClick={() => openMaps(station.nom)}
+        onClick={() => openMaps(station)}
         style={{
           flexShrink: 0, width: 40, height: 40,
           background: "var(--t-primary-light)", color: "var(--t-primary)",

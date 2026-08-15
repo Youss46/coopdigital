@@ -338,10 +338,17 @@ export async function getChauffeurStations(req: Request, res: Response): Promise
       )
       .orderBy(stationsCarburantTable.nom);
 
+    // Mémoriser les coordonnées GPS par nom de station
+    const coords = new Map<string, { latitude: number | null; longitude: number | null }>();
+
     for (const s of dbStations) {
       const types = s.typesCarburant.split(",").map((t: string) => t.trim()).filter(Boolean);
       if (!map.has(s.nom)) map.set(s.nom, new Set());
       for (const t of types) map.get(s.nom)!.add(t);
+      coords.set(s.nom, {
+        latitude:  s.latitude  != null ? Number(s.latitude)  : null,
+        longitude: s.longitude != null ? Number(s.longitude) : null,
+      });
     }
 
     res.json({
@@ -350,6 +357,8 @@ export async function getChauffeurStations(req: Request, res: Response): Promise
         .map(([nom, types]) => ({
           nom,
           types_carburant: [...types].sort(),
+          latitude:  coords.get(nom)?.latitude  ?? null,
+          longitude: coords.get(nom)?.longitude ?? null,
         })),
     });
   } catch (err) {

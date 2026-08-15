@@ -138,6 +138,8 @@ export const stationsCarburantTable = pgTable("stations_carburant", {
   adresse:        text("adresse"),
   /** Valeurs séparées par des virgules : "gasoil", "essence", "super" */
   typesCarburant: varchar("types_carburant", { length: 100 }).notNull().default("gasoil"),
+  latitude:       numeric("latitude",  { precision: 10, scale: 7 }),
+  longitude:      numeric("longitude", { precision: 10, scale: 7 }),
   actif:          boolean("actif").notNull().default(true),
   createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:      timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

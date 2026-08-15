@@ -4,6 +4,9 @@ import { authMiddleware } from "../middlewares/auth";
 // Rôles autorisés à approuver / annuler les bons de carburant
 const ROLES_APPROBATEUR = ["pca", "directeur", "comptable", "admin"];
 
+// Rôles autorisés à configurer les stations-service
+const ROLES_GESTIONNAIRE_STATION = ["pca", "directeur", "comptable", "admin"];
+
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const role = req.user?.role;
@@ -94,9 +97,9 @@ router.get("/transport/rapport-vehicule/:id",   authMiddleware, handleRapportVeh
 
 router.get("/transport/stations-carburant",                      authMiddleware, handleGetStationsCarburant);
 router.get("/transport/stations-carburant/historique-preview",   authMiddleware, handleGetHistoriquePreview);
-router.post("/transport/stations-carburant",                     authMiddleware, handleCreateStationCarburant);
-router.post("/transport/stations-carburant/importer-historique", authMiddleware, handleImporterStationsHistorique);
-router.put("/transport/stations-carburant/:id",                  authMiddleware, handleUpdateStationCarburant);
-router.delete("/transport/stations-carburant/:id",               authMiddleware, handleDeleteStationCarburant);
+router.post("/transport/stations-carburant",                     authMiddleware, requireRole(ROLES_GESTIONNAIRE_STATION), handleCreateStationCarburant);
+router.post("/transport/stations-carburant/importer-historique", authMiddleware, requireRole(ROLES_GESTIONNAIRE_STATION), handleImporterStationsHistorique);
+router.put("/transport/stations-carburant/:id",                  authMiddleware, requireRole(ROLES_GESTIONNAIRE_STATION), handleUpdateStationCarburant);
+router.delete("/transport/stations-carburant/:id",               authMiddleware, requireRole(ROLES_GESTIONNAIRE_STATION), handleDeleteStationCarburant);
 
 export default router;

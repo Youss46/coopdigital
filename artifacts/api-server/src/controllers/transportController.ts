@@ -1060,6 +1060,8 @@ export async function handleGetStationsCarburant(req: Request, res: Response): P
       nom:             s.nom,
       adresse:         s.adresse ?? null,
       types_carburant: s.typesCarburant.split(",").map((t: string) => t.trim()).filter(Boolean),
+      latitude:        s.latitude  != null ? Number(s.latitude)  : null,
+      longitude:       s.longitude != null ? Number(s.longitude) : null,
       actif:           s.actif,
       created_at:      s.createdAt.toISOString(),
     })) });
@@ -1073,17 +1075,33 @@ export async function handleCreateStationCarburant(req: Request, res: Response):
   try {
     const cooperativeId = req.user?.cooperativeId;
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
-    const body = req.body as { nom?: string; adresse?: string; types_carburant?: string[] };
+    const body = req.body as { nom?: string; adresse?: string; types_carburant?: string[]; latitude?: number | null; longitude?: number | null };
     if (!body.nom?.trim()) { res.status(400).json({ erreur: "Le nom est requis" }); return; }
+    // Validate GPS: both fields must be provided together and within valid geographic ranges
+    const latProvided = body.latitude != null;
+    const lngProvided = body.longitude != null;
+    if (latProvided !== lngProvided) {
+      res.status(400).json({ erreur: "Les coordonnées GPS doivent être fournies ensemble (latitude et longitude)" }); return;
+    }
+    if (latProvided) {
+      const lat = Number(body.latitude), lng = Number(body.longitude);
+      if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        res.status(400).json({ erreur: "Coordonnées GPS invalides — latitude entre -90 et 90, longitude entre -180 et 180" }); return;
+      }
+    }
     const types = (body.types_carburant ?? ["gasoil"]).filter(Boolean).join(",");
     const [row] = await db.insert(stationsCarburantTable).values({
       cooperativeId,
       nom:            body.nom.trim(),
       adresse:        body.adresse?.trim() || null,
       typesCarburant: types || "gasoil",
+      latitude:       body.latitude  != null ? String(body.latitude)  : null,
+      longitude:      body.longitude != null ? String(body.longitude) : null,
     }).returning();
     res.status(201).json({ id: row!.id, nom: row!.nom, adresse: row!.adresse ?? null,
       types_carburant: row!.typesCarburant.split(",").filter(Boolean),
+      latitude:  row!.latitude  != null ? Number(row!.latitude)  : null,
+      longitude: row!.longitude != null ? Number(row!.longitude) : null,
       actif: row!.actif });
   } catch (err) {
     req.log.error({ err }, "handleCreateStationCarburant");
@@ -1097,18 +1115,42 @@ export async function handleUpdateStationCarburant(req: Request, res: Response):
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
     const id = parseInt(String(req.params["id"]));
     if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
-    const body = req.body as { nom?: string; adresse?: string; types_carburant?: string[]; actif?: boolean };
+    const body = req.body as { nom?: string; adresse?: string; types_carburant?: string[]; actif?: boolean; latitude?: number | null; longitude?: number | null };
+    // GPS update rules: both keys must be present or neither; when present, both must be null (clear) or both non-null in range (set)
+    const latSet = "latitude"  in body;
+    const lngSet = "longitude" in body;
+    if (latSet !== lngSet) {
+      res.status(400).json({ erreur: "Les coordonnées GPS doivent être fournies ensemble (latitude et longitude)" }); return;
+    }
+    if (latSet && lngSet) {
+      const latNull = body.latitude  == null;
+      const lngNull = body.longitude == null;
+      if (latNull !== lngNull) {
+        res.status(400).json({ erreur: "Les coordonnées GPS doivent être fournies ensemble — les deux ou aucune" }); return;
+      }
+      if (!latNull) {
+        const lat = Number(body.latitude), lng = Number(body.longitude);
+        if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          res.status(400).json({ erreur: "Coordonnées GPS invalides — latitude entre -90 et 90, longitude entre -180 et 180" }); return;
+        }
+      }
+    }
     const set: Partial<typeof stationsCarburantTable.$inferInsert> = { updatedAt: new Date() };
     if (body.nom !== undefined)             set.nom            = body.nom.trim();
     if (body.adresse !== undefined)         set.adresse        = body.adresse?.trim() || null;
     if (body.types_carburant !== undefined) set.typesCarburant = body.types_carburant.filter(Boolean).join(",") || "gasoil";
     if (body.actif !== undefined)           set.actif          = body.actif;
+    if (latSet)                             set.latitude       = body.latitude  != null ? String(body.latitude)  : null;
+    if (lngSet)                             set.longitude      = body.longitude != null ? String(body.longitude) : null;
     const [row] = await db.update(stationsCarburantTable).set(set)
       .where(and(eq(stationsCarburantTable.id, id), eq(stationsCarburantTable.cooperativeId, cooperativeId)))
       .returning();
     if (!row) { res.status(404).json({ erreur: "Station introuvable" }); return; }
     res.json({ id: row.id, nom: row.nom, adresse: row.adresse ?? null,
-      types_carburant: row.typesCarburant.split(",").filter(Boolean), actif: row.actif });
+      types_carburant: row.typesCarburant.split(",").filter(Boolean),
+      latitude:  row.latitude  != null ? Number(row.latitude)  : null,
+      longitude: row.longitude != null ? Number(row.longitude) : null,
+      actif: row.actif });
   } catch (err) {
     req.log.error({ err }, "handleUpdateStationCarburant");
     res.status(500).json({ erreur: "Erreur interne" });
