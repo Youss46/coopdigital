@@ -479,12 +479,50 @@ function NouvelleParcelleDrawer({
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Member search state
+  const [memberSearch, setMemberSearch] = useState("");
+  const [memberSearchOpen, setMemberSearchOpen] = useState(false);
+  const [selectedMemberLabel, setSelectedMemberLabel] = useState("");
+  const memberSearchRef = useRef<HTMLDivElement>(null);
+
+  const membresQ = useQuery({
+    queryKey: ["membres-search-parcelle", memberSearch],
+    queryFn: () => apiFetch<{ membres: Array<{ id: number; nom: string; prenoms: string; village: string | null; section: string | null; codeMembre: string | null }> }>(
+      `/api/membres?search=${encodeURIComponent(memberSearch)}&limit=10&statut_membre=actif`,
+    ),
+    enabled: memberSearch.length >= 2,
+    staleTime: 30_000,
+  });
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (memberSearchRef.current && !memberSearchRef.current.contains(e.target as Node)) {
+        setMemberSearchOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  function selectMember(m: { id: number; nom: string; prenoms: string; village: string | null; section: string | null }) {
+    setForm(f => ({
+      ...f,
+      membre_id: String(m.id),
+      village: m.village ?? f.village,
+      section: m.section ?? f.section,
+    }));
+    setSelectedMemberLabel(`${m.nom} ${m.prenoms}`.trim());
+    setMemberSearch("");
+    setMemberSearchOpen(false);
+  }
+
   const field = (k: keyof NouvelleParcelleForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.membre_id) { setErr("L'identifiant du membre est requis."); return; }
+    if (!form.membre_id) { setErr("Veuillez sélectionner un producteur."); return; }
     setLoading(true); setErr("");
     try {
       await apiFetch("/api/parcelles", {
@@ -517,11 +555,66 @@ function NouvelleParcelleDrawer({
           {err && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{err}</div>
           )}
-          <label className="block">
-            <span className="text-sm font-medium text-gray-700">ID Membre *</span>
-            <input type="number" value={form.membre_id} onChange={field("membre_id")} required
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-          </label>
+
+          {/* Recherche producteur */}
+          <div className="block">
+            <span className="text-sm font-medium text-gray-700">Producteur *</span>
+            <div className="relative mt-1" ref={memberSearchRef}>
+              {/* Membre sélectionné */}
+              {selectedMemberLabel && !memberSearchOpen ? (
+                <div className="flex items-center gap-2 w-full border border-green-400 bg-green-50 rounded-lg px-3 py-2 text-sm">
+                  <CheckCircle2 size={14} className="text-green-600 shrink-0" />
+                  <span className="flex-1 font-medium text-green-800">{selectedMemberLabel}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedMemberLabel(""); setForm(f => ({ ...f, membre_id: "" })); setMemberSearchOpen(true); }}
+                    className="text-green-600 hover:text-red-500 transition-colors"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:border-transparent">
+                  <Search size={14} className="text-gray-400 shrink-0" />
+                  <input
+                    type="text"
+                    autoFocus={memberSearchOpen}
+                    placeholder="Taper le nom du producteur…"
+                    value={memberSearch}
+                    onChange={e => { setMemberSearch(e.target.value); setMemberSearchOpen(true); }}
+                    onFocus={() => setMemberSearchOpen(true)}
+                    className="flex-1 text-sm outline-none bg-transparent"
+                  />
+                  {membresQ.isFetching && <RefreshCw size={12} className="animate-spin text-gray-400 shrink-0" />}
+                </div>
+              )}
+
+              {/* Dropdown résultats */}
+              {memberSearchOpen && memberSearch.length >= 2 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                  {membresQ.data?.membres.length === 0 && (
+                    <p className="px-4 py-3 text-sm text-gray-400">Aucun producteur trouvé</p>
+                  )}
+                  {(membresQ.data?.membres ?? []).map(m => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onMouseDown={() => selectMember(m)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-green-50 transition-colors border-t first:border-t-0 border-gray-100"
+                    >
+                      <p className="text-sm font-medium text-gray-800">{m.nom} {m.prenoms}</p>
+                      <p className="text-xs text-gray-500">
+                        {[m.codeMembre, m.village, m.section].filter(Boolean).join(" · ")}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {memberSearchOpen && memberSearch.length > 0 && memberSearch.length < 2 && (
+                <p className="absolute top-full left-0 mt-1 text-xs text-gray-400 px-1">Tapez au moins 2 caractères…</p>
+              )}
+            </div>
+          </div>
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Nom de la parcelle</span>
             <input type="text" value={form.nom_parcelle} onChange={field("nom_parcelle")}
