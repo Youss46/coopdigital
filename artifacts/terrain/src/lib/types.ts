@@ -83,7 +83,7 @@ export interface ConversionLivraisonResult {
   avanceDeduiteFcfa: number;
   intrantsDeduitsFcfa: number;
   montantNetFcfa: number;
-  modePaiement: string;
+  modePaiement?: string;
 }
 
 export interface CommissionResume {

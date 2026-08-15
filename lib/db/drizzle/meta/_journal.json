@@ -624,6 +624,13 @@
       "when": 1787900000000,
       "tag": "0088_mode_paiement_virement",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1787950000000,
+      "tag": "0089_paiements_mode_nullable",
+      "breakpoints": true
     }
   ]
 }

@@ -319,8 +319,10 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     } else {
       // Base centrale : masquer les règlements en espèces enregistrés par un délégué
       // (ces règlements sont gérés dans la page Caisse du délégué concerné)
+      // Les paiements sans mode pré-sélectionné (pesée groupée) sont toujours visibles.
       conditions.push(
         or(
+          isNull(paiementsTable.modePaiement),
           sql`${paiementsTable.modePaiement} != 'especes'`,
           isNull(livraisonsTable.agentId),
           sql`${agentUserAlias.role} != 'delegue'`,
@@ -383,8 +385,10 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
       statsConditions.push(eq(membresTable.delegueId, req.user.id));
     } else {
       // Base centrale : exclure les règlements espèces des délégués des stats
+      // Les paiements sans mode (pesée groupée) sont toujours inclus.
       statsConditions.push(
         or(
+          isNull(paiementsTable.modePaiement),
           sql`${paiementsTable.modePaiement} != 'especes'`,
           isNull(livraisonsTable.agentId),
           sql`${agentUserAlias.role} != 'delegue'`,
@@ -500,12 +504,17 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       return;
     }
 
-    // Correction du mode uniquement pour les bons carburant
+    // Le mode peut être fourni si : (a) bon carburant, ou (b) paiement sans mode pré-sélectionné (pesée groupée)
     const isBonCarburantPaiement = !!row.paiement.bonCarburantId;
-    if (body.modePaiement && !isBonCarburantPaiement) {
+    const hasNoMode = row.paiement.modePaiement === null;
+    if (body.modePaiement && !isBonCarburantPaiement && !hasNoMode) {
       res.status(400).json({
-        erreur: "Le mode de paiement ne peut être modifié que pour les règlements de bons carburant.",
+        erreur: "Le mode de paiement ne peut être modifié que pour les règlements sans mode pré-sélectionné ou pour les bons carburant.",
       });
+      return;
+    }
+    if (hasNoMode && !body.modePaiement) {
+      res.status(400).json({ erreur: "Veuillez choisir un mode de paiement pour valider ce règlement." });
       return;
     }
     if (body.modePaiement && !MODES_VALIDES.includes(body.modePaiement as typeof MODES_VALIDES[number])) {
@@ -514,7 +523,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       });
       return;
     }
-    const modeOverride = isBonCarburantPaiement && body.modePaiement
+    const modeOverride = (isBonCarburantPaiement || hasNoMode) && body.modePaiement
       ? (body.modePaiement as typeof MODES_VALIDES[number])
       : null;
     const mode = (modeOverride ?? row.paiement.modePaiement) as string;

@@ -432,13 +432,9 @@ export async function handleConvertirSessionEnLivraison(req: Request, res: Respo
   const effectiveAgentId = req.agent?.delegueId ?? actorId;
   const peseurId = req.agent?.delegueId ? req.agent.id : undefined;
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
-  const { modePaiement, entrepotId } = req.body as {
-    modePaiement?: "especes" | "orange_money" | "mtn_momo" | "wave" | "cheque";
-    entrepotId?: number;
-  };
+  const { entrepotId } = req.body as { entrepotId?: number };
   try {
     const result = await creerLivraisonDepuisSession(cooperativeId, sessionId, {
-      modePaiement,
       entrepotId,
       agentId: effectiveAgentId,
       peseurId,

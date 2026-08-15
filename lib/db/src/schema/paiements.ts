@@ -45,7 +45,7 @@ export const paiementsTable = pgTable("paiements", {
 
   // Champs existants
   montantFcfa: integer("montant_fcfa").notNull(),
-  modePaiement: modePaiementEnum("mode_paiement").notNull().default("especes"),
+  modePaiement: modePaiementEnum("mode_paiement"),
   referenceTransaction: text("reference_transaction"),
   statut: paiementStatutEnum("statut").notNull().default("en_attente"),
   recuEnvoyeWhatsapp: boolean("recu_envoye_whatsapp").notNull().default(false),

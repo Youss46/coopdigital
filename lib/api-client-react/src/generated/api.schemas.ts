@@ -1000,7 +1000,8 @@ export interface PaiementListItem {
   /** @nullable */
   membreId?: number | null;
   montantFcfa: number;
-  modePaiement: PaiementListItemModePaiement;
+  /** @nullable */
+  modePaiement?: PaiementListItemModePaiement | null;
   /** @nullable */
   referenceTransaction?: string | null;
   statut: PaiementListItemStatut;

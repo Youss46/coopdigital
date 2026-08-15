@@ -328,7 +328,6 @@ export async function creerLivraisonDepuisSession(
   cooperativeId: number,
   sessionId: number,
   data: {
-    modePaiement?: "especes" | "orange_money" | "mtn_momo" | "wave" | "cheque";
     entrepotId?: number;
     agentId?: number;
     /** ID du peseur ayant physiquement réalisé la session (traçabilité) */
@@ -337,8 +336,6 @@ export async function creerLivraisonDepuisSession(
 ) {
   // 1. Get current price + active campaign (before transaction — read-only, safe)
   const { prixBordChampFcfa, campagneId } = await getPrixActuel(cooperativeId);
-
-  const modePaiement = data.modePaiement ?? "especes";
 
   // 2. Transaction: lock session row, validate, create livraison + paiement + stock atomically
   const result = await db.transaction(async (tx) => {
@@ -420,7 +417,7 @@ export async function creerLivraisonDepuisSession(
         livraisonId: livraison!.id,
         membreId: session.membreId,
         montantFcfa: montantNet,
-        modePaiement,
+        // modePaiement intentionally null — chosen by the gestionnaire at settlement time
         statut: "en_attente",
       })
       .returning();

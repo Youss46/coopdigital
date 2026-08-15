@@ -7372,7 +7372,7 @@ components:
 
     PaiementListItem:
       type: object
-      required: [id, montantFcfa, modePaiement, statut, createdAt]
+      required: [id, montantFcfa, statut, createdAt]
       properties:
         id:
           type: integer
@@ -7387,8 +7387,8 @@ components:
         montantFcfa:
           type: integer
         modePaiement:
-          type: string
-          enum: [orange_money, mtn_momo, especes, wave, cheque]
+          type: ["string", "null"]
+          enum: [orange_money, mtn_momo, especes, wave, cheque, null]
         referenceTransaction:
           type: ["string", "null"]
         statut:

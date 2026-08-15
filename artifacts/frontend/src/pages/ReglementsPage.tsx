@@ -80,7 +80,8 @@ function StatutBadge({ statut }: { statut: string }) {
   );
 }
 
-function ModeBadge({ mode }: { mode: string }) {
+function ModeBadge({ mode }: { mode: string | null | undefined }) {
+  if (!mode) return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-400">—</span>;
   const cfg = MODE_CONFIG[mode] ?? { label: mode, cls: "bg-gray-100 text-gray-500", icon: null };
   return (
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${cfg.cls}`}>
@@ -986,7 +987,7 @@ function PaiementRow({
   const showActions = p.statut === "en_attente";
   const showRecu = p.statut === "confirme" || p.statut === "effectue" || p.statut === "en_cours";
   const showRejet = p.statut === "rejete";
-  const isMobileMarchand = MODES_MOBILE_MARCHAND.has(p.modePaiement);
+  const isMobileMarchand = !!p.modePaiement && MODES_MOBILE_MARCHAND.has(p.modePaiement);
   const delegueBloque = isDelegue && isMobileMarchand;
   const isCarburant = isBonCarburant(p);
 

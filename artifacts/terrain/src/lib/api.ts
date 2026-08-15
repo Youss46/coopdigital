@@ -369,7 +369,6 @@ export async function annulerSessionPesee(sessionId: number): Promise<void> {
 
 export async function convertirSessionEnLivraison(
   sessionId: number,
-  data: { modePaiement?: string } = {},
 ): Promise<import("./types").ConversionLivraisonResult> {
   const result = await apiPeseeFetch<{
     livraison: {
@@ -381,10 +380,10 @@ export async function convertirSessionEnLivraison(
       intrantsDeduitsFcfa: number;
       montantNetFcfa: number;
     };
-    paiement: { modePaiement: string };
+    paiement: { modePaiement: string | null };
   }>(`/pesee/sessions/${sessionId}/livraison`, {
     method: "PUT",
-    body: JSON.stringify(data),
+    body: JSON.stringify({}),
   });
   return {
     livraisonId: result.livraison.id,
@@ -394,7 +393,7 @@ export async function convertirSessionEnLivraison(
     avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
     intrantsDeduitsFcfa: result.livraison.intrantsDeduitsFcfa,
     montantNetFcfa: result.livraison.montantNetFcfa,
-    modePaiement: result.paiement.modePaiement,
+    modePaiement: result.paiement.modePaiement ?? undefined,
   };
 }
 
