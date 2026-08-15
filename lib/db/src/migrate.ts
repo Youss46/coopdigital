@@ -36,9 +36,61 @@ async function applyHotfixes(client: pg.Client): Promise<void> {
 }
 
 /**
+ * Baseline timestamp : when de la migration 0023 — dernière migration appliquée
+ * via `drizzle-kit push` sur Railway lors de la mise en place initiale.
+ * Toutes les migrations dont le timestamp ≤ cette valeur sont déjà présentes
+ * en DB et ne doivent pas être ré-exécutées.
+ *
+ * Sans cette baseline, le migrator essaie de ré-appliquer 0000-0023
+ * (tables déjà existantes), échoue, et les migrations 0024+ ne sont jamais
+ * appliquées → colonnes manquantes en production.
+ */
+const BASELINE_CREATED_AT = 1781348700000n;
+
+/**
+ * S'assure que la table de tracking Drizzle existe et que le curseur baseline
+ * est positionné correctement pour éviter de re-exécuter les migrations déjà
+ * présentes via push.
+ */
+async function ensureBaseline(client: pg.Client): Promise<void> {
+  // Créer le schéma et la table de tracking si absents
+  await client.query("CREATE SCHEMA IF NOT EXISTS drizzle");
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (
+      id         SERIAL PRIMARY KEY,
+      hash       TEXT NOT NULL,
+      created_at BIGINT
+    )
+  `);
+
+  // Lire le curseur actuel
+  const { rows } = await client.query<{ last_ts: string | null }>(
+    `SELECT MAX(created_at)::text AS last_ts FROM drizzle.__drizzle_migrations`
+  );
+  const lastTs = rows[0]?.last_ts ? BigInt(rows[0].last_ts) : 0n;
+
+  if (lastTs < BASELINE_CREATED_AT) {
+    // Positionner le curseur sur 0023 pour sauter toutes les migrations push
+    await client.query(
+      "INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ($1, $2)",
+      ["baseline-up-to-0023-push-setup", BASELINE_CREATED_AT]
+    );
+    console.log(
+      `[migrate] Baseline insérée : migrations 0000-0023 marquées comme appliquées (lastTs=${lastTs} → ${BASELINE_CREATED_AT})`
+    );
+  } else {
+    console.log(`[migrate] Curseur déjà à jour (last_ts=${lastTs})`);
+  }
+}
+
+/**
  * Applique toutes les migrations SQL en attente depuis `migrationsFolder`.
  * Idempotent : chaque migration n'est exécutée qu'une seule fois
- * (suivi dans la table `__drizzle_migrations`).
+ * (suivi dans la table `drizzle.__drizzle_migrations`).
+ *
+ * Intègre la logique de baseline pour les DB initialisées via push
+ * (Railway, Replit) où les tables 0000-0023 existent déjà sans entrée
+ * dans la table de tracking.
  *
  * @param migrationsFolder - Chemin absolu vers le dossier contenant les fichiers SQL.
  */
@@ -52,8 +104,10 @@ export async function runMigrations(migrationsFolder: string): Promise<void> {
 
   try {
     await applyHotfixes(client);
+    await ensureBaseline(client);
     const db = drizzle(client);
     await migrate(db, { migrationsFolder });
+    console.log("[migrate] ✅ Toutes les migrations appliquées avec succès");
   } finally {
     await client.end();
   }
