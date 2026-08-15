@@ -34,9 +34,11 @@ import {
   getGetRapportCampagneTransportQueryKey,
   getGetDepensesTransportQueryKey,
   getGetBonsCarburantQueryKey,
+  getBonCarburantPdf,
 } from "@workspace/api-client-react";
 import type { DepenseVehicule, BonCarburant } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { openPdfViewer } from "@/lib/pdfViewer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1621,13 +1623,8 @@ function TabCarburant() {
 
   async function openPdf(bon: BonCarburant) {
     try {
-      const res = await fetch(`${BASE}/api/transport/carburant/bons/${bon.id}/pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`Erreur ${res.status}`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
+      const blob = await getBonCarburantPdf(bon.id);
+      openPdfViewer(URL.createObjectURL(blob), `bon-carburant-${bon.numero}.pdf`);
     } catch (e) {
       console.error(e);
       alert("Impossible de générer le PDF.");
