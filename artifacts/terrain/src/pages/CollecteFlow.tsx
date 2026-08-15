@@ -5,7 +5,7 @@ import OfflineBanner from "../components/OfflineBanner";
 import BottomNav from "../components/BottomNav";
 import ScaleWeightDisplay from "../components/ScaleWeightDisplay";
 import { useOffline } from "../contexts/OfflineContext";
-import { enregistrerCollecte, getPrix, telechargerRecuLivraison } from "../lib/api";
+import { enregistrerCollecte, getPrix, imprimerRecuLivraison } from "../lib/api";
 import { getCachedPrix, cachePrix } from "../lib/idb";
 import type { Fournisseur, CollecteResult, PrixActuel } from "../lib/types";
 
@@ -14,9 +14,9 @@ type Step = 1 | 2 | 3 | 4;
 function RecuButton({ livraisonId }: { livraisonId: number }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  async function handleDownload() {
+  async function handlePrint() {
     setLoading(true); setErr("");
-    try { await telechargerRecuLivraison(livraisonId); }
+    try { await imprimerRecuLivraison(livraisonId); }
     catch (e) { setErr((e as Error).message); }
     finally { setLoading(false); }
   }
@@ -25,10 +25,10 @@ function RecuButton({ livraisonId }: { livraisonId: number }) {
       <button
         className="t-btn t-btn--ghost"
         style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-        onClick={handleDownload}
+        onClick={handlePrint}
         disabled={loading}
       >
-        {loading ? "⏳ Génération…" : "📄 Télécharger le reçu"}
+        {loading ? "⏳ Génération…" : "🖨️ Imprimer le reçu"}
       </button>
       {err && <div style={{ color: "var(--t-danger)", fontSize: ".78rem", textAlign: "center", marginTop: 4 }}>{err}</div>}
     </div>
@@ -351,24 +351,22 @@ export default function CollecteFlow() {
         {step === 4 && (
           <div className="t-success-screen">
             <div className="t-success-screen__icon">
-              {!isOnline ? "📴" : result?.statutPaiement === "DIFFÉRÉ" ? "⏳" : "✅"}
+              {!isOnline ? "📴" : "✅"}
             </div>
             <div className="t-success-screen__title">
-              {!isOnline ? "Enregistré hors ligne" : result?.statutPaiement === "DIFFÉRÉ" ? "Collecte enregistrée — paiement différé" : "Collecte enregistrée !"}
+              {!isOnline ? "Enregistré hors ligne" : "Collecte enregistrée !"}
             </div>
             <div className="t-success-screen__sub">
               {!isOnline
                 ? "Sera synchronisé dès le retour du réseau."
-                : result?.statutPaiement === "DIFFÉRÉ"
-                  ? `Fonds insuffisants — ${isExterne ? "le fournisseur" : "le planteur"} sera payé dès que la caisse sera approvisionnée.`
-                  : "La collecte a été enregistrée et le paiement effectué."}
+                : "Le règlement sera confirmé depuis la page Règlements."}
             </div>
 
-            {result?.statutPaiement === "DIFFÉRÉ" && (
-              <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 12, padding: "12px 16px", margin: "0 24px", width: "100%", maxWidth: 320, boxSizing: "border-box" }}>
-                <div style={{ fontWeight: 700, color: "#dc2626", fontSize: ".9rem", marginBottom: 4 }}>⚠️ Paiement différé</div>
-                <div style={{ fontSize: ".85rem", color: "#b91c1c" }}>
-                  {result.montantNetFcfa.toLocaleString("fr-FR")} FCFA à payer à {result.membreNom} lors du prochain approvisionnement.
+            {result && (
+              <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 12, padding: "12px 16px", margin: "0 24px", width: "100%", maxWidth: 320, boxSizing: "border-box" }}>
+                <div style={{ fontWeight: 700, color: "#92400e", fontSize: ".9rem", marginBottom: 4 }}>⏳ En attente de règlement</div>
+                <div style={{ fontSize: ".85rem", color: "#78350f" }}>
+                  {result.montantNetFcfa.toLocaleString("fr-FR")} FCFA à régler à {result.membreNom || (isExterne ? "le fournisseur" : "le planteur")}.
                 </div>
               </div>
             )}

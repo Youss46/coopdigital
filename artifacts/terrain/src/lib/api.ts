@@ -220,7 +220,7 @@ export async function getStatsAgent(): Promise<StatsAgent> {
   return apiGet<StatsAgent>("/agent/stats");
 }
 
-export async function telechargerRecuLivraison(livraisonId: number): Promise<void> {
+export async function imprimerRecuLivraison(livraisonId: number): Promise<void> {
   const token = getToken();
   const res = await fetch(`${BASE}/recu/livraison/${livraisonId}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -231,12 +231,30 @@ export async function telechargerRecuLivraison(livraisonId: number): Promise<voi
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `recu_livraison_${livraisonId}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+
+  // Ouvrir dans un iframe caché et déclencher l'impression directement
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;";
+  iframe.src = url;
+  document.body.appendChild(iframe);
+
+  iframe.onload = () => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } finally {
+      // Nettoyage après un délai pour laisser le temps à la boîte d'impression
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        URL.revokeObjectURL(url);
+      }, 60_000);
+    }
+  };
+}
+
+/** @deprecated Utiliser imprimerRecuLivraison */
+export async function telechargerRecuLivraison(livraisonId: number): Promise<void> {
+  return imprimerRecuLivraison(livraisonId);
 }
 
 export async function getHistoriqueAgent(): Promise<MissionTerrain[]> {
