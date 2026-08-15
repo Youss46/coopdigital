@@ -941,10 +941,29 @@ export interface LivraisonInput {
   entrepotDelegueId?: number | null;
 }
 
+/**
+ * Permet de corriger le mode de règlement au moment de la validation. Uniquement accepté pour les paiements liés à un bon carburant (bonCarburantId présent).
+
+ */
+export type ValiderPaiementInputModePaiement = typeof ValiderPaiementInputModePaiement[keyof typeof ValiderPaiementInputModePaiement] | null;
+
+
+export const ValiderPaiementInputModePaiement = {
+  especes: 'especes',
+  cheque: 'cheque',
+  virement: 'virement',
+  orange_money: 'orange_money',
+  mtn_momo: 'mtn_momo',
+  wave: 'wave',
+} as const;
+
 export interface ValiderPaiementInput {
   referenceTransaction?: string | null;
   dateReglement?: string | null;
   telephone?: string | null;
+  /** Permet de corriger le mode de règlement au moment de la validation. Uniquement accepté pour les paiements liés à un bon carburant (bonCarburantId présent).
+   */
+  modePaiement?: ValiderPaiementInputModePaiement;
 }
 
 export type PaiementListItemModePaiement = typeof PaiementListItemModePaiement[keyof typeof PaiementListItemModePaiement];

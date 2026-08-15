@@ -63,10 +63,12 @@ const STATUT_CONFIG: Record<string, { label: string; cls: string; icon: React.Re
 };
 
 const MODE_CONFIG: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
-  orange_money: { label: "Orange Money", cls: "bg-orange-100 text-orange-700", icon: <Smartphone size={11} /> },
-  mtn_momo:     { label: "MTN MoMo",     cls: "bg-yellow-100 text-yellow-700", icon: <Smartphone size={11} /> },
-  especes:      { label: "Espèces",      cls: "bg-gray-100 text-gray-600",     icon: <Banknote size={11} /> },
-  wave:         { label: "Wave",         cls: "bg-blue-100 text-blue-700",     icon: <Smartphone size={11} /> },
+  orange_money: { label: "Orange Money",     cls: "bg-orange-100 text-orange-700", icon: <Smartphone size={11} /> },
+  mtn_momo:     { label: "MTN MoMo",         cls: "bg-yellow-100 text-yellow-700", icon: <Smartphone size={11} /> },
+  especes:      { label: "Espèces",          cls: "bg-gray-100 text-gray-600",     icon: <Banknote size={11} /> },
+  wave:         { label: "Wave",             cls: "bg-blue-100 text-blue-700",     icon: <Smartphone size={11} /> },
+  cheque:       { label: "Chèque",           cls: "bg-purple-100 text-purple-700", icon: <CreditCard size={11} /> },
+  virement:     { label: "Virement bancaire", cls: "bg-indigo-100 text-indigo-700", icon: <CreditCard size={11} /> },
 };
 
 function StatutBadge({ statut }: { statut: string }) {
@@ -89,31 +91,50 @@ function ModeBadge({ mode }: { mode: string }) {
 
 // ─── Modal Validation ────────────────────────────────────────────────────────
 
+const MODES_CARBURANT = [
+  { value: "especes",      label: "Espèces" },
+  { value: "cheque",       label: "Chèque" },
+  { value: "virement",     label: "Virement bancaire" },
+  { value: "orange_money", label: "Orange Money" },
+  { value: "mtn_momo",     label: "MTN MoMo" },
+  { value: "wave",         label: "Wave" },
+];
+
 function ModalValidation({
   paiement,
   onClose,
   onConfirm,
   loading,
   sessionCaisseOuverte,
+  isDelegue,
 }: {
   paiement: PaiementListItem;
   onClose: () => void;
-  onConfirm: (ref: string, telephone: string) => void;
+  onConfirm: (ref: string, telephone: string, mode?: string) => void;
   loading: boolean;
   sessionCaisseOuverte?: boolean | null;
+  isDelegue?: boolean;
 }) {
   const [ref, setRef] = useState("");
   const [telephone, setTelephone] = useState(telProducteur(paiement) ?? "");
   const [touched, setTouched] = useState(false);
-  const isMobile = paiement.modePaiement === "orange_money" || paiement.modePaiement === "mtn_momo" || paiement.modePaiement === "wave";
-  const isEspeces = paiement.modePaiement === "especes";
+  const isCarburant = isBonCarburant(paiement);
+  // Délégués can only validate cash; cap the initial mode to espèces for them
+  const initialMode = isDelegue ? "especes" : paiement.modePaiement;
+  const [selectedMode, setSelectedMode] = useState<string>(initialMode);
+  // Modes available in the selector depend on role
+  const modesDisponibles = isDelegue
+    ? MODES_CARBURANT.filter((m) => m.value === "especes")
+    : MODES_CARBURANT;
+  const isMobile = selectedMode === "orange_money" || selectedMode === "mtn_momo" || selectedMode === "wave";
+  const isEspeces = selectedMode === "especes";
   const sessionBloquee = isEspeces && sessionCaisseOuverte === false;
   const refManquante = isMobile && !ref.trim();
 
   function handleConfirm() {
     if (sessionBloquee) return;
     if (refManquante) { setTouched(true); return; }
-    onConfirm(ref, telephone);
+    onConfirm(ref, telephone, isCarburant ? selectedMode : undefined);
   }
 
   return (
@@ -156,12 +177,30 @@ function ModalValidation({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <ModeBadge mode={paiement.modePaiement} />
-            {paiement.dateLivraison && (
-              <span className="text-xs text-gray-400">Livr. {paiement.dateLivraison}</span>
-            )}
-          </div>
+          {/* Mode de règlement — sélectionnable pour les bons carburant */}
+          {isCarburant ? (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Mode de règlement station
+              </label>
+              <select
+                value={selectedMode}
+                onChange={(e) => { setSelectedMode(e.target.value); setRef(""); setTouched(false); }}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400 bg-white"
+              >
+                {modesDisponibles.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <ModeBadge mode={paiement.modePaiement} />
+              {paiement.dateLivraison && (
+                <span className="text-xs text-gray-400">Livr. {paiement.dateLivraison}</span>
+              )}
+            </div>
+          )}
 
           {/* Bandeau bloquant — aucune session de caisse ouverte */}
           {sessionBloquee && (
@@ -204,8 +243,8 @@ function ModalValidation({
               value={ref}
               onChange={(e) => { setRef(e.target.value); setTouched(false); }}
               placeholder={isMobile
-                ? paiement.modePaiement === "orange_money" ? "Ex: OM-2025-00123"
-                  : paiement.modePaiement === "mtn_momo" ? "Ex: MTN-2025-00456"
+                ? selectedMode === "orange_money" ? "Ex: OM-2025-00123"
+                  : selectedMode === "mtn_momo" ? "Ex: MTN-2025-00456"
                   : "Ex: WAVE-2025-00789"
                 : "Ex: REF-00123"}
               className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
@@ -540,20 +579,25 @@ export default function ReglementsPage() {
     qc.invalidateQueries({ queryKey: getGetPaiementsStatsQueryKey() });
   }
 
-  async function handleValider(ref: string, telephone: string) {
+  async function handleValider(ref: string, telephone: string, mode?: string) {
     if (modal?.type !== "valider") return;
     try {
       await validerMut.mutateAsync({
         id: modal.paiement.id,
-        data: { referenceTransaction: ref || null, telephone: telephone || null },
+        data: {
+          referenceTransaction: ref || null,
+          telephone: telephone || null,
+          ...(mode ? { modePaiement: mode } : {}),
+        },
       });
       invalidateAll();
       // Rafraîchir le solde caisse délégué après validation espèces
-      if (isDelegue && modal.paiement.modePaiement === "especes") {
+      const modeEffectif = mode ?? modal.paiement.modePaiement;
+      if (isDelegue && modeEffectif === "especes") {
         qc.invalidateQueries({ queryKey: ["caisse-delegue-solde", utilisateur?.id] });
       }
       // Rafraîchir le statut session Caisse Centrale après validation
-      if (!isDelegue && modal.paiement.modePaiement === "especes") {
+      if (!isDelegue && modeEffectif === "especes") {
         qc.invalidateQueries({ queryKey: ["caisse-centrale-session"] });
       }
       setModal(null);
@@ -864,6 +908,7 @@ export default function ReglementsPage() {
           onConfirm={handleValider}
           loading={validerMut.isPending}
           sessionCaisseOuverte={isDelegue ? sessionDelegueOuverte : sessionCentraleOuverte}
+          isDelegue={isDelegue}
         />
       )}
       {modal?.type === "rejeter" && (

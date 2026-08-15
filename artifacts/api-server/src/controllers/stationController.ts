@@ -150,6 +150,9 @@ export async function handleLivrerBonStation(
       return;
     }
 
+    const MODES_VALIDES = ["especes", "cheque", "virement", "orange_money", "mtn_momo", "wave"] as const;
+    type ModePaiement = typeof MODES_VALIDES[number];
+
     const body = req.body as {
       quantite_livree: number;
       prix_litre_fcfa?: number;
@@ -160,7 +163,19 @@ export async function handleLivrerBonStation(
       ticket_url?: string;
       qr_payload?: string;
       qr_sig?: string;
+      mode_paiement?: string;
     };
+
+    // Valider explicitement le mode si fourni ; sinon espèces par défaut
+    if (body.mode_paiement && !(MODES_VALIDES as readonly string[]).includes(body.mode_paiement)) {
+      res.status(400).json({
+        erreur: `Mode de paiement invalide. Valeurs acceptées : ${MODES_VALIDES.join(", ")}.`,
+      });
+      return;
+    }
+    const modePaiement: ModePaiement = body.mode_paiement
+      ? (body.mode_paiement as ModePaiement)
+      : "especes";
 
     // Le QR code signé est obligatoire — c'est la preuve d'autorisation du chauffeur
     if (!body.qr_payload || !body.qr_sig) {
@@ -251,7 +266,7 @@ export async function handleLivrerBonStation(
         await db.insert(paiementsTable).values({
           bonCarburantId: row.bon.id,
           montantFcfa: Math.round(montant),
-          modePaiement: "especes",
+          modePaiement: modePaiement,
           statut: "en_attente",
         });
       } catch (err) {

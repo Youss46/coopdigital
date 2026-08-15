@@ -463,7 +463,8 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     return;
   }
 
-  const body = (req.body ?? {}) as { referenceTransaction?: string | null; telephone?: string | null };
+  const MODES_VALIDES = ["especes", "cheque", "virement", "orange_money", "mtn_momo", "wave"] as const;
+  const body = (req.body ?? {}) as { referenceTransaction?: string | null; telephone?: string | null; modePaiement?: string | null };
 
   try {
     // Vérification appartenance + statut
@@ -499,14 +500,31 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       return;
     }
 
-    const mode = row.paiement.modePaiement;
+    // Correction du mode uniquement pour les bons carburant
+    const isBonCarburantPaiement = !!row.paiement.bonCarburantId;
+    if (body.modePaiement && !isBonCarburantPaiement) {
+      res.status(400).json({
+        erreur: "Le mode de paiement ne peut être modifié que pour les règlements de bons carburant.",
+      });
+      return;
+    }
+    if (body.modePaiement && !MODES_VALIDES.includes(body.modePaiement as typeof MODES_VALIDES[number])) {
+      res.status(400).json({
+        erreur: `Mode de paiement invalide. Valeurs acceptées : ${MODES_VALIDES.join(", ")}.`,
+      });
+      return;
+    }
+    const modeOverride = isBonCarburantPaiement && body.modePaiement
+      ? (body.modePaiement as typeof MODES_VALIDES[number])
+      : null;
+    const mode = (modeOverride ?? row.paiement.modePaiement) as string;
     const isMobileMarchand = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
 
-    // Un délégué ne peut valider que les paiements en espèces
-    if (req.user?.role === "delegue" && isMobileMarchand) {
+    // Un délégué ne peut valider que les paiements en espèces (toutes sources confondues)
+    if (req.user?.role === "delegue" && mode !== "especes") {
       res.status(403).json({
         erreur: "Accès refusé",
-        message: "Les paiements via compte Mobile Marchand ne peuvent être validés que par un Directeur, Comptable ou PCA.",
+        message: "Un délégué ne peut valider que des paiements en espèces. Les règlements par chèque, virement ou mobile money doivent être validés par un Directeur, Comptable ou PCA.",
       });
       return;
     }
@@ -612,7 +630,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     }
 
     await db.transaction(async (tx) => {
-      // 2. Mettre à jour le paiement
+      // 2. Mettre à jour le paiement (le mode peut être corrigé au moment de la validation)
       await tx
         .update(paiementsTable)
         .set({
@@ -620,6 +638,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
           validePar: userId ?? null,
           dateValidation: new Date(),
           referenceTransaction: body.referenceTransaction ?? row.paiement.referenceTransaction,
+          ...(modeOverride ? { modePaiement: modeOverride } : {}),
         })
         .where(eq(paiementsTable.id, id));
 

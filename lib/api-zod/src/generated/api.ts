@@ -2982,7 +2982,8 @@ export const ValiderPaiementParams = zod.object({
 export const ValiderPaiementBody = zod.object({
   "referenceTransaction": zod.string().nullish(),
   "dateReglement": zod.string().nullish(),
-  "telephone": zod.string().nullish()
+  "telephone": zod.string().nullish(),
+  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']).nullish().describe('Permet de corriger le mode de règlement au moment de la validation. Uniquement accepté pour les paiements liés à un bon carburant (bonCarburantId présent).\n')
 })
 
 export const ValiderPaiementResponse = zod.object({

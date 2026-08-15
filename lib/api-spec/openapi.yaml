@@ -7361,6 +7361,14 @@ components:
         telephone:
           type: string
           nullable: true
+        modePaiement:
+          type: string
+          nullable: true
+          enum: [especes, cheque, virement, orange_money, mtn_momo, wave]
+          description: >
+            Permet de corriger le mode de règlement au moment de la validation.
+            Uniquement accepté pour les paiements liés à un bon carburant
+            (bonCarburantId présent).
 
     PaiementListItem:
       type: object
