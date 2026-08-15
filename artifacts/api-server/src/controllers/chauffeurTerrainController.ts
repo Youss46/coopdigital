@@ -11,7 +11,7 @@ import {
   chauffeursTable,
   depensesVehiculeTable,
 } from "@workspace/db";
-import { and, eq, desc, inArray } from "drizzle-orm";
+import { and, eq, desc, inArray, isNotNull } from "drizzle-orm";
 import { proposerEcriture } from "../services/comptabiliteService.js";
 
 function cooperativeId(req: Request): number | null {
@@ -291,6 +291,48 @@ export async function getChauffeurAccueil(req: Request, res: Response): Promise<
     });
   } catch (err) {
     req.log.error({ err }, "getChauffeurAccueil");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── Stations-service connues ─────────────────────────────────────────────────
+
+export async function getChauffeurStations(req: Request, res: Response): Promise<void> {
+  try {
+    const coopId = cooperativeId(req);
+    if (!coopId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+    // Toutes les paires (station, type_carburant) utilisées par la coopérative
+    const rows = await db
+      .selectDistinct({
+        nom:           bonsCarburantTable.stationService,
+        typeCarburant: bonsCarburantTable.typeCarburant,
+      })
+      .from(bonsCarburantTable)
+      .where(
+        and(
+          eq(bonsCarburantTable.cooperativeId, coopId),
+          isNotNull(bonsCarburantTable.stationService),
+        ),
+      )
+      .orderBy(bonsCarburantTable.stationService);
+
+    // Agréger les types de carburant par station
+    const map = new Map<string, Set<string>>();
+    for (const r of rows) {
+      if (!r.nom) continue;
+      if (!map.has(r.nom)) map.set(r.nom, new Set());
+      map.get(r.nom)!.add(r.typeCarburant);
+    }
+
+    res.json({
+      stations: [...map.entries()].map(([nom, types]) => ({
+        nom,
+        types_carburant: [...types].sort(),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "getChauffeurStations");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

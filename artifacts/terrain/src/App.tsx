@@ -30,6 +30,7 @@ import EnquetesAgent from "./pages/EnquetesAgent";
 import MissionEnqueteDetail from "./pages/MissionEnqueteDetail";
 import CollecteEnquete from "./pages/CollecteEnquete";
 import StationService from "./pages/StationService";
+import StationChauffeur from "./pages/StationChauffeur";
 
 function AgentTerrainRoutes() {
   return (
@@ -69,6 +70,7 @@ function ChauffeurRoutes() {
       <Route path="/" component={AccueilChauffeur} />
       <Route path="/missions" component={MissionsChauffeur} />
       <Route path="/carburant" component={BonsCarburantChauffeur} />
+      <Route path="/station" component={StationChauffeur} />
       <Route><Redirect to="/" /></Route>
     </Switch>
   );
@@ -127,7 +129,7 @@ export default function App() {
           <OfflineBanner />
           {/* Route publique station-service — AVANT le guard auth */}
           <Switch>
-            <Route path="/station/:numero?" component={StationService} />
+            <Route path="/station/:numero" component={StationService} />
             <Route component={AppRoutes} />
           </Switch>
         </OfflineProvider>

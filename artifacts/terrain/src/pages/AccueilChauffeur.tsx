@@ -137,7 +137,7 @@ export default function AccueilChauffeur() {
           </div>
           <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 }}>
             {bons.map(bon => (
-              <BonCard key={bon.id} bon={bon} onUse={() => navigate("/carburant")} onStation={() => navigate(`/station/${encodeURIComponent(bon.numero)}`)} />
+              <BonCard key={bon.id} bon={bon} onUse={() => navigate("/carburant")} onStation={() => navigate(`/station?type=${bon.type_carburant}`)} />
             ))}
           </div>
         </>
