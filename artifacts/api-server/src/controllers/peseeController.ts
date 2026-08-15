@@ -323,7 +323,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
 export async function handleGetSessions(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
-  const { statut, membreId, limit } = req.query as { statut?: string; membreId?: string; limit?: string };
+  const { statut, membreId, limit, date_debut, date_fin } = req.query as { statut?: string; membreId?: string; limit?: string; date_debut?: string; date_fin?: string };
   // Peseur : ne voit que ses propres sessions (filtre par peseurId)
   const peseurId = req.agent?.role === "peseur" ? req.agent.id : undefined;
   try {
@@ -332,6 +332,8 @@ export async function handleGetSessions(req: Request, res: Response): Promise<vo
       membreId: membreId ? parseInt(membreId) : undefined,
       limit: limit ? parseInt(limit) : undefined,
       peseurId,
+      dateDebut: date_debut,
+      dateFin: date_fin,
     });
     res.json(sessions);
   } catch (err) {

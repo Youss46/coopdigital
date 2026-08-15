@@ -10,7 +10,7 @@ import {
   avancesTable,
   configPeseeTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, isNull, gte, lte } from "drizzle-orm";
 import { getPrixActuel } from "./terrainService.js";
 import { generateEcrituresLivraison } from "./comptabiliteService.js";
 import { getEncoursMembreTx, enregistrerRemboursementParLivraison } from "./intrantsService.js";
@@ -129,7 +129,7 @@ export async function createSession(
 // ─── Lister sessions (avec lignes count) ──────────────────────────────────────
 export async function getSessions(
   cooperativeId: number,
-  opts: { statut?: string; membreId?: number; limit?: number; peseurId?: number } = {},
+  opts: { statut?: string; membreId?: number; limit?: number; peseurId?: number; dateDebut?: string; dateFin?: string } = {},
 ) {
   const conditions = [eq(sessionsPeseeTable.cooperativeId, cooperativeId)];
   if (opts.statut) {
@@ -143,6 +143,12 @@ export async function getSessions(
   // Peseur : ne voit que ses propres sessions
   if (opts.peseurId !== undefined) {
     conditions.push(eq(sessionsPeseeTable.peseurId, opts.peseurId));
+  }
+  if (opts.dateDebut) {
+    conditions.push(gte(sessionsPeseeTable.dateDebut, new Date(opts.dateDebut)));
+  }
+  if (opts.dateFin) {
+    conditions.push(lte(sessionsPeseeTable.dateDebut, new Date(opts.dateFin)));
   }
 
   const sessions = await db

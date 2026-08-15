@@ -317,20 +317,45 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: number; onClose
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 type StatutFilter = "all" | "en_cours" | "terminee" | "annulee";
+type PeriodeFilter = "all" | "today" | "week" | "month";
+
+function getPeriodeDates(periode: PeriodeFilter): { date_debut?: string; date_fin?: string } {
+  if (periode === "all") return {};
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  if (periode === "today") {
+    const today = fmt(now);
+    return { date_debut: `${today}T00:00:00`, date_fin: `${today}T23:59:59` };
+  }
+  if (periode === "week") {
+    const day = now.getDay() === 0 ? 6 : now.getDay() - 1; // lundi = 0
+    const monday = new Date(now); monday.setDate(now.getDate() - day); monday.setHours(0, 0, 0, 0);
+    return { date_debut: monday.toISOString(), date_fin: now.toISOString() };
+  }
+  if (periode === "month") {
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { date_debut: first.toISOString(), date_fin: now.toISOString() };
+  }
+  return {};
+}
 
 export default function SessionsPeseePage() {
   const [search, setSearch] = useState("");
   const [statut, setStatut] = useState<StatutFilter>("all");
+  const [periode, setPeriode] = useState<PeriodeFilter>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const qc = useQueryClient();
 
-  const apiUrl = statut === "all"
-    ? `/api/pesee/sessions?limit=200`
-    : `/api/pesee/sessions?statut=${statut}&limit=200`;
+  const periodeDates = getPeriodeDates(periode);
+  const params = new URLSearchParams({ limit: "500" });
+  if (statut !== "all") params.set("statut", statut);
+  if (periodeDates.date_debut) params.set("date_debut", periodeDates.date_debut);
+  if (periodeDates.date_fin) params.set("date_fin", periodeDates.date_fin);
 
   const { data: sessions = [], isLoading } = useQuery<SessionPesee[]>({
-    queryKey: ["sessions-pesee", statut],
-    queryFn: () => apiFetch<SessionPesee[]>(apiUrl),
+    queryKey: ["sessions-pesee", statut, periode],
+    queryFn: () => apiFetch<SessionPesee[]>(`/api/pesee/sessions?${params.toString()}`),
     refetchInterval: 30_000,
   });
 
@@ -422,6 +447,30 @@ export default function SessionsPeseePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+        </div>
+
+        {/* Filtre période */}
+        <div style={{ display: "flex", gap: 5, background: "#f1f5f9", borderRadius: 8, padding: 3 }}>
+          {(["all", "today", "week", "month"] as const).map((p) => {
+            const labels: Record<PeriodeFilter, string> = { all: "Tout", today: "Aujourd'hui", week: "Semaine", month: "Mois" };
+            const active = periode === p;
+            return (
+              <button
+                key={p}
+                onClick={() => setPeriode(p)}
+                style={{
+                  padding: "5px 11px", borderRadius: 6, border: "none",
+                  background: active ? "#fff" : "transparent",
+                  color: active ? "#0f172a" : "#64748b",
+                  fontSize: ".78rem", fontWeight: active ? 700 : 400, cursor: "pointer",
+                  boxShadow: active ? "0 1px 3px rgba(0,0,0,.1)" : "none",
+                  transition: "all .15s",
+                }}
+              >
+                {labels[p]}
+              </button>
+            );
+          })}
         </div>
 
         {/* Filtre statut */}
