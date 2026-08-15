@@ -1546,6 +1546,15 @@ function TabCarburant() {
   const chauffeursQ = useGetChauffeurs();
   const chauffeurs  = chauffeursQ.data?.chauffeurs ?? [];
 
+  const tok = () => localStorage.getItem("terrain_token") ?? localStorage.getItem("auth_token") ?? "";
+  const stationsQ = useQuery<{ stations: StationAdminRow[] }>({
+    queryKey: ["transport-stations-select"],
+    queryFn:  () => fetch(`${BASE}/api/transport/stations-carburant`, {
+      headers: { Authorization: `Bearer ${tok()}` },
+    }).then(r => r.json() as Promise<{ stations: StationAdminRow[] }>),
+  });
+  const stationsActives = (stationsQ.data?.stations ?? []).filter(s => s.actif);
+
   // Filtres liste
   const [filterVehicule, setFilterVehicule] = useState("all");
   const [filterStatut,   setFilterStatut]   = useState("all");
@@ -1880,8 +1889,17 @@ function TabCarburant() {
               </div>
               <div>
                 <Label>Station-service</Label>
-                <Input placeholder="Nom de la station" value={form.station_service}
-                  onChange={e => setForm(f => ({ ...f, station_service: e.target.value }))} />
+                <Select value={form.station_service} onValueChange={v => setForm(f => ({ ...f, station_service: v === "__aucune__" ? "" : v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une station…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__aucune__">— Aucune —</SelectItem>
+                    {stationsActives.map(s => (
+                      <SelectItem key={s.id} value={s.nom}>{s.nom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div>
@@ -1938,8 +1956,17 @@ function TabCarburant() {
             </div>
             <div>
               <Label>Station-service</Label>
-              <Input placeholder="Nom de la station" value={uForm.station_service}
-                onChange={e => setUForm(f => ({ ...f, station_service: e.target.value }))} />
+              <Select value={uForm.station_service} onValueChange={v => setUForm(f => ({ ...f, station_service: v === "__aucune__" ? "" : v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner une station…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__aucune__">— Aucune —</SelectItem>
+                  {stationsActives.map(s => (
+                    <SelectItem key={s.id} value={s.nom}>{s.nom}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Observations</Label>
