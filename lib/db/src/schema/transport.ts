@@ -131,9 +131,22 @@ export const depensesVehiculeTable = pgTable("depenses_vehicule", {
   updatedAt:      timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const stationsCarburantTable = pgTable("stations_carburant", {
+  id:             serial("id").primaryKey(),
+  cooperativeId:  integer("cooperative_id").notNull().references(() => cooperativesTable.id),
+  nom:            varchar("nom", { length: 255 }).notNull(),
+  adresse:        text("adresse"),
+  /** Valeurs séparées par des virgules : "gasoil", "essence", "super" */
+  typesCarburant: varchar("types_carburant", { length: 100 }).notNull().default("gasoil"),
+  actif:          boolean("actif").notNull().default(true),
+  createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:      timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type Vehicule = typeof vehiculesTable.$inferSelect;
 export type Chauffeur = typeof chauffeursTable.$inferSelect;
 export type MissionTransport = typeof missionsTransportTable.$inferSelect;
 export type EntretienVehicule = typeof entretienVehiculeTable.$inferSelect;
 export type DepenseVehicule = typeof depensesVehiculeTable.$inferSelect;
 export type BonCarburant = typeof bonsCarburantTable.$inferSelect;
+export type StationCarburant = typeof stationsCarburantTable.$inferSelect;

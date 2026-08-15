@@ -2296,6 +2296,280 @@ function TabDepenses() {
   );
 }
 
+// ── Stations-service ──────────────────────────────────────────────────────────
+
+interface StationAdminRow {
+  id: number;
+  nom: string;
+  adresse: string | null;
+  types_carburant: string[];
+  actif: boolean;
+}
+
+const TYPE_CARB_OPTS = [
+  { value: "gasoil",  label: "Gasoil" },
+  { value: "essence", label: "Essence" },
+  { value: "super",   label: "Super" },
+];
+
+function TabStationsCarburant() {
+  const BASE = import.meta.env.VITE_API_URL ?? "";
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const QK = ["stations-carburant"];
+
+  const { data, isLoading } = useQuery<{ stations: StationAdminRow[] }>({
+    queryKey: QK,
+    queryFn: () => fetch(`${BASE}/api/transport/stations-carburant`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("terrain_token") ?? localStorage.getItem("auth_token") ?? ""}` },
+    }).then(r => r.json() as Promise<{ stations: StationAdminRow[] }>),
+  });
+
+  const [showDialog, setShowDialog] = useState(false);
+  const [editing, setEditing] = useState<StationAdminRow | null>(null);
+  const [form, setForm] = useState({ nom: "", adresse: "", types: ["gasoil"] });
+
+  const authHeader = () => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${localStorage.getItem("terrain_token") ?? localStorage.getItem("auth_token") ?? ""}`,
+  });
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const body = { nom: form.nom.trim(), adresse: form.adresse.trim() || null, types_carburant: form.types };
+      const url  = editing
+        ? `${BASE}/api/transport/stations-carburant/${editing.id}`
+        : `${BASE}/api/transport/stations-carburant`;
+      const res = await fetch(url, {
+        method: editing ? "PUT" : "POST",
+        headers: authHeader(),
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error((d as { erreur?: string }).erreur ?? "Erreur"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: QK });
+      toast({ title: editing ? "Station mise à jour" : "Station ajoutée" });
+      setShowDialog(false);
+    },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  const archiveMut = useMutation({
+    mutationFn: (id: number) => fetch(`${BASE}/api/transport/stations-carburant/${id}`, {
+      method: "DELETE", headers: authHeader(),
+    }).then(r => r.json()),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: QK }); toast({ title: "Station archivée" }); },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  const restoreMut = useMutation({
+    mutationFn: (s: StationAdminRow) => fetch(`${BASE}/api/transport/stations-carburant/${s.id}`, {
+      method: "PUT", headers: authHeader(),
+      body: JSON.stringify({ actif: true }),
+    }).then(r => r.json()),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: QK }); toast({ title: "Station réactivée" }); },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  function openCreate() {
+    setEditing(null);
+    setForm({ nom: "", adresse: "", types: ["gasoil"] });
+    setShowDialog(true);
+  }
+  function openEdit(s: StationAdminRow) {
+    setEditing(s);
+    setForm({ nom: s.nom, adresse: s.adresse ?? "", types: [...s.types_carburant] });
+    setShowDialog(true);
+  }
+  function toggleType(t: string) {
+    setForm(f => ({
+      ...f,
+      types: f.types.includes(t) ? f.types.filter(x => x !== t) : [...f.types, t],
+    }));
+  }
+
+  const stations = data?.stations ?? [];
+  const actives  = stations.filter(s => s.actif);
+  const archivees = stations.filter(s => !s.actif);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Stations-service partenaires</h2>
+          <p className="text-sm text-gray-500">
+            Ces stations apparaissent dans l'application chauffeur même avant la première utilisation de bon.
+          </p>
+        </div>
+        <Button onClick={openCreate} className="gap-2">
+          <Plus className="h-4 w-4" /> Ajouter une station
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="text-center py-12 text-gray-400">Chargement…</div>
+      ) : actives.length === 0 && archivees.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center py-12 gap-3 text-gray-500">
+            <MapPin className="h-10 w-10 text-gray-300" />
+            <p className="font-medium">Aucune station configurée</p>
+            <p className="text-sm text-center max-w-xs">
+              Ajoutez les stations-service partenaires de votre coopérative.
+              Les chauffeurs pourront les consulter depuis leur application.
+            </p>
+            <Button onClick={openCreate} variant="outline" className="mt-2 gap-2">
+              <Plus className="h-4 w-4" /> Ajouter la première station
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {/* Actives */}
+          {actives.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Stations actives ({actives.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nom</TableHead>
+                      <TableHead>Adresse</TableHead>
+                      <TableHead>Carburants</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {actives.map(s => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.nom}</TableCell>
+                        <TableCell className="text-gray-500 text-sm">{s.adresse ?? "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {s.types_carburant.map(t => (
+                              <Badge key={t} variant="secondary" className="text-xs">
+                                {TYPE_CARB_OPTS.find(o => o.value === t)?.label ?? t}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-2 justify-end">
+                            <Button size="sm" variant="outline" onClick={() => openEdit(s)}>
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="sm" variant="outline"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => archiveMut.mutate(s.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Archivées */}
+          {archivees.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base text-gray-500">Archivées ({archivees.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nom</TableHead>
+                      <TableHead>Adresse</TableHead>
+                      <TableHead>Carburants</TableHead>
+                      <TableHead className="text-right">Réactiver</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {archivees.map(s => (
+                      <TableRow key={s.id} className="opacity-60">
+                        <TableCell className="font-medium">{s.nom}</TableCell>
+                        <TableCell className="text-gray-500 text-sm">{s.adresse ?? "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {s.types_carburant.map(t => (
+                              <Badge key={t} variant="outline" className="text-xs">
+                                {TYPE_CARB_OPTS.find(o => o.value === t)?.label ?? t}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline" onClick={() => restoreMut.mutate(s)}>
+                            Réactiver
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Dialog ajouter / modifier */}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier la station" : "Nouvelle station-service"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Nom de la station *</Label>
+              <Input placeholder="Ex: Total Plateau" value={form.nom}
+                onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>Adresse (facultatif)</Label>
+              <Input placeholder="Ex: Avenue Chardy, Plateau" value={form.adresse}
+                onChange={e => setForm(f => ({ ...f, adresse: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Types de carburant distribués *</Label>
+              <div className="flex gap-3">
+                {TYPE_CARB_OPTS.map(opt => (
+                  <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input type="checkbox" checked={form.types.includes(opt.value)}
+                      onChange={() => toggleType(opt.value)}
+                      className="rounded" />
+                    <span className="text-sm">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+              {form.types.length === 0 && (
+                <p className="text-xs text-red-500">Sélectionnez au moins un type de carburant</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>Annuler</Button>
+            <Button
+              onClick={() => saveMut.mutate()}
+              disabled={!form.nom.trim() || form.types.length === 0 || saveMut.isPending}
+            >
+              {editing ? "Enregistrer" : "Ajouter"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function TransportPage() {
   return (
     <div className="space-y-6">
@@ -2305,7 +2579,7 @@ export default function TransportPage() {
       </div>
 
       <Tabs defaultValue="flotte">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="flotte" className="flex items-center gap-1.5">
             <Truck className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline truncate">Flotte</span>
@@ -2334,6 +2608,10 @@ export default function TransportPage() {
             <BarChart3 className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline truncate">Coûts</span>
           </TabsTrigger>
+          <TabsTrigger value="stations" className="flex items-center gap-1.5">
+            <MapPin className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Stations</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="flotte" className="mt-6"><TabFlotte /></TabsContent>
@@ -2343,6 +2621,7 @@ export default function TransportPage() {
         <TabsContent value="carburant" className="mt-6"><TabCarburant /></TabsContent>
         <TabsContent value="depenses" className="mt-6"><TabDepenses /></TabsContent>
         <TabsContent value="rapports" className="mt-6"><TabRapports /></TabsContent>
+        <TabsContent value="stations" className="mt-6"><TabStationsCarburant /></TabsContent>
       </Tabs>
     </div>
   );

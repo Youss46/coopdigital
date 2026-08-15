@@ -42,8 +42,8 @@ import {
   getStatsCarburant,
 } from "../services/transportService";
 import { generateBonCarburant } from "../services/bonCarburantPdf";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, stationsCarburantTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 
 function toDateStr(d: Date | null | undefined): string | null | undefined {
   if (d == null) return d;
@@ -1040,6 +1040,93 @@ export async function handleRapportVehicule(req: Request, res: Response): Promis
     res.json(rapport);
   } catch (err) {
     req.log.error({ err }, "Erreur rapportVehicule");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── Stations-service (configuration admin) ──────────────────────────────────
+
+export async function handleGetStationsCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const rows = await db
+      .select()
+      .from(stationsCarburantTable)
+      .where(eq(stationsCarburantTable.cooperativeId, cooperativeId))
+      .orderBy(stationsCarburantTable.nom);
+    res.json({ stations: rows.map(s => ({
+      id:              s.id,
+      nom:             s.nom,
+      adresse:         s.adresse ?? null,
+      types_carburant: s.typesCarburant.split(",").map((t: string) => t.trim()).filter(Boolean),
+      actif:           s.actif,
+      created_at:      s.createdAt.toISOString(),
+    })) });
+  } catch (err) {
+    req.log.error({ err }, "handleGetStationsCarburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleCreateStationCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const body = req.body as { nom?: string; adresse?: string; types_carburant?: string[] };
+    if (!body.nom?.trim()) { res.status(400).json({ erreur: "Le nom est requis" }); return; }
+    const types = (body.types_carburant ?? ["gasoil"]).filter(Boolean).join(",");
+    const [row] = await db.insert(stationsCarburantTable).values({
+      cooperativeId,
+      nom:            body.nom.trim(),
+      adresse:        body.adresse?.trim() || null,
+      typesCarburant: types || "gasoil",
+    }).returning();
+    res.status(201).json({ id: row!.id, nom: row!.nom, adresse: row!.adresse ?? null,
+      types_carburant: row!.typesCarburant.split(",").filter(Boolean),
+      actif: row!.actif });
+  } catch (err) {
+    req.log.error({ err }, "handleCreateStationCarburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleUpdateStationCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const body = req.body as { nom?: string; adresse?: string; types_carburant?: string[]; actif?: boolean };
+    const set: Partial<typeof stationsCarburantTable.$inferInsert> = { updatedAt: new Date() };
+    if (body.nom !== undefined)             set.nom            = body.nom.trim();
+    if (body.adresse !== undefined)         set.adresse        = body.adresse?.trim() || null;
+    if (body.types_carburant !== undefined) set.typesCarburant = body.types_carburant.filter(Boolean).join(",") || "gasoil";
+    if (body.actif !== undefined)           set.actif          = body.actif;
+    const [row] = await db.update(stationsCarburantTable).set(set)
+      .where(and(eq(stationsCarburantTable.id, id), eq(stationsCarburantTable.cooperativeId, cooperativeId)))
+      .returning();
+    if (!row) { res.status(404).json({ erreur: "Station introuvable" }); return; }
+    res.json({ id: row.id, nom: row.nom, adresse: row.adresse ?? null,
+      types_carburant: row.typesCarburant.split(",").filter(Boolean), actif: row.actif });
+  } catch (err) {
+    req.log.error({ err }, "handleUpdateStationCarburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleDeleteStationCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    await db.update(stationsCarburantTable)
+      .set({ actif: false, updatedAt: new Date() })
+      .where(and(eq(stationsCarburantTable.id, id), eq(stationsCarburantTable.cooperativeId, cooperativeId)));
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "handleDeleteStationCarburant");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

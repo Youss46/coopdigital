@@ -10,6 +10,7 @@ import {
   bonsCarburantTable,
   chauffeursTable,
   depensesVehiculeTable,
+  stationsCarburantTable,
 } from "@workspace/db";
 import { and, eq, desc, inArray, isNotNull } from "drizzle-orm";
 import { proposerEcriture } from "../services/comptabiliteService.js";
@@ -317,7 +318,7 @@ export async function getChauffeurStations(req: Request, res: Response): Promise
       )
       .orderBy(bonsCarburantTable.stationService);
 
-    // Agréger les types de carburant par station
+    // Agréger les types de carburant par station (bons historiques)
     const map = new Map<string, Set<string>>();
     for (const r of rows) {
       if (!r.nom) continue;
@@ -325,11 +326,31 @@ export async function getChauffeurStations(req: Request, res: Response): Promise
       map.get(r.nom)!.add(r.typeCarburant);
     }
 
+    // Fusionner avec les stations pré-configurées par le gestionnaire
+    const dbStations = await db
+      .select()
+      .from(stationsCarburantTable)
+      .where(
+        and(
+          eq(stationsCarburantTable.cooperativeId, coopId),
+          eq(stationsCarburantTable.actif, true),
+        ),
+      )
+      .orderBy(stationsCarburantTable.nom);
+
+    for (const s of dbStations) {
+      const types = s.typesCarburant.split(",").map((t: string) => t.trim()).filter(Boolean);
+      if (!map.has(s.nom)) map.set(s.nom, new Set());
+      for (const t of types) map.get(s.nom)!.add(t);
+    }
+
     res.json({
-      stations: [...map.entries()].map(([nom, types]) => ({
-        nom,
-        types_carburant: [...types].sort(),
-      })),
+      stations: [...map.entries()]
+        .sort(([a], [b]) => a.localeCompare(b, "fr"))
+        .map(([nom, types]) => ({
+          nom,
+          types_carburant: [...types].sort(),
+        })),
     });
   } catch (err) {
     req.log.error({ err }, "getChauffeurStations");

@@ -191,7 +191,7 @@ export default function StationChauffeur() {
             </p>
             {stations.length === 0 && (
               <p style={{ fontSize: "0.82rem", color: "var(--t-muted)", maxWidth: 260, textAlign: "center", lineHeight: 1.5 }}>
-                Les stations apparaissent ici au fur et à mesure que les bons de carburant sont utilisés.
+                Le gestionnaire de votre coopérative peut configurer la liste des stations partenaires depuis l'espace admin.
               </p>
             )}
           </div>
