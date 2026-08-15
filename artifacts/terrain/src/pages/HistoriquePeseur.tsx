@@ -113,7 +113,7 @@ export default function HistoriquePeseur() {
               <div className="t-stat__label">Kg total</div>
             </div>
             <div className="t-stat">
-              <div className="t-stat__value" style={{ fontSize: ".85rem" }}>{(totalMontant / 1000).toFixed(0)}k</div>
+              <div className="t-stat__value" style={{ fontSize: ".85rem" }}>{totalMontant.toLocaleString("fr-FR")}</div>
               <div className="t-stat__label">FCFA net</div>
             </div>
           </div>

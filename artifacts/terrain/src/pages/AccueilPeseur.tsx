@@ -90,11 +90,7 @@ export default function AccueilPeseur() {
               </div>
               <div style={{ textAlign: "center" }}>
                 <div style={{ fontSize: ".95rem", fontWeight: 800, color: "#f59e0b", lineHeight: 1.3 }}>
-                  {bilan.collectes.valeur >= 1_000_000
-                    ? (bilan.collectes.valeur / 1_000_000).toFixed(1) + " M"
-                    : bilan.collectes.valeur >= 1_000
-                      ? (bilan.collectes.valeur / 1_000).toFixed(0) + " k"
-                      : bilan.collectes.valeur.toLocaleString("fr-FR")}
+                  {bilan.collectes.valeur.toLocaleString("fr-FR")}
                 </div>
                 <div style={{ fontSize: ".68rem", color: "#94a3b8", marginTop: 2 }}>
                   FCFA brut
