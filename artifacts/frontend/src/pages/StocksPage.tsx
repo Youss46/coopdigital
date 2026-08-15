@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
   useGetEntrepots,
-  useGetMouvementsStock,
   useEntreeStock,
   useSortieStock,
   useGetStockAlertes,
@@ -13,7 +12,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
-import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle, PackageCheck, Clock, ArrowRight, Boxes, Pencil, Trash2, X } from "lucide-react";
+import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle, PackageCheck, Clock, ArrowRight, Boxes, Pencil, Trash2, X, CalendarDays } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
@@ -56,6 +55,29 @@ interface LotissementStats {
   poidsNonLoti: number;
 }
 
+type PeriodeFilter = "all" | "today" | "week" | "month";
+
+function getPeriodeDates(periode: PeriodeFilter): { date_debut?: string; date_fin?: string } {
+  if (periode === "all") return {};
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  if (periode === "today") {
+    const today = fmt(now);
+    return { date_debut: `${today}T00:00:00`, date_fin: `${today}T23:59:59` };
+  }
+  if (periode === "week") {
+    const day = now.getDay() === 0 ? 6 : now.getDay() - 1;
+    const monday = new Date(now); monday.setDate(now.getDate() - day); monday.setHours(0, 0, 0, 0);
+    return { date_debut: monday.toISOString(), date_fin: now.toISOString() };
+  }
+  if (periode === "month") {
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { date_debut: first.toISOString(), date_fin: now.toISOString() };
+  }
+  return {};
+}
+
 export default function StocksPage() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
@@ -64,6 +86,7 @@ export default function StocksPage() {
   const peutSortie = usePermission("stocks", "sortie");
   const [onglet, setOnglet] = useState<"entrepots" | "journal">("entrepots");
   const [filtreTransfert, setFiltreTransfert] = useState<string>("");
+  const [periode, setPeriode] = useState<PeriodeFilter>("all");
   const [modalMouvement, setModalMouvement] = useState<"entree" | "sortie" | null>(null);
 
   useEffect(() => {
@@ -148,8 +171,22 @@ export default function StocksPage() {
   }
 
   const { data: entrepots = [], isLoading } = useGetEntrepots();
-  const { data: mouvements = [] } = useGetMouvementsStock();
   const { data: alertes = [] } = useGetStockAlertes();
+
+  // Fetch mouvements avec filtre de période (bypass hook Orval pour supporter date_debut/date_fin)
+  const periodeDates = getPeriodeDates(periode);
+  const { data: mouvements = [], isLoading: isLoadingMouvements } = useQuery({
+    queryKey: ["stocks-mouvements", periode],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (periodeDates.date_debut) params.set("date_debut", periodeDates.date_debut);
+      if (periodeDates.date_fin) params.set("date_fin", periodeDates.date_fin);
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      const r = await fetch(`${BASE}/api/stocks/mouvements${qs}`, { headers: { Authorization: `Bearer ${tok()}` } });
+      if (!r.ok) throw new Error("Erreur chargement mouvements");
+      return r.json() as Promise<Array<{ id: number; entrepotNom: string | null; type: string; poidsKg: string; motif: string | null; createdAt: string; nombreSacs?: number | null }>>;
+    },
+  });
   const { data: lotStats } = useQuery<LotissementStats>({
     queryKey: ["stocks-lotissement-stats"],
     queryFn: async () => {
@@ -164,6 +201,7 @@ export default function StocksPage() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetMouvementsStockQueryKey() });
+        queryClient.invalidateQueries({ queryKey: ["stocks-mouvements"] });
         queryClient.invalidateQueries({ queryKey: getGetStockAlertesQueryKey() });
         setModalMouvement(null);
         setForm({ entrepotId: "", poidsKg: "", nombreSacs: "", motif: "" });
@@ -176,6 +214,7 @@ export default function StocksPage() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetMouvementsStockQueryKey() });
+        queryClient.invalidateQueries({ queryKey: ["stocks-mouvements"] });
         queryClient.invalidateQueries({ queryKey: getGetStockAlertesQueryKey() });
         setModalMouvement(null);
         setForm({ entrepotId: "", poidsKg: "", nombreSacs: "", motif: "" });
@@ -456,6 +495,33 @@ export default function StocksPage() {
       {/* Journal mouvements */}
       {onglet === "journal" && (
         <div className="space-y-3">
+          {/* Filtres période */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <CalendarDays size={14} />
+              <span>Période</span>
+            </div>
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              {(["all", "today", "week", "month"] as const).map((p) => {
+                const labels: Record<PeriodeFilter, string> = { all: "Tout", today: "Aujourd'hui", week: "Semaine", month: "Mois" };
+                const active = periode === p;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setPeriode(p)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      active
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {labels[p]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {filtreTransfert && (
             <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-800">
               <TrendingUp size={14} className="shrink-0" />
@@ -477,7 +543,11 @@ export default function StocksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {mouvements.length === 0 ? (
+                  {isLoadingMouvements ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">Chargement…</td>
+                    </tr>
+                  ) : mouvements.length === 0 ? (
                     <EmptyState
                       colSpan={6}
                       icone={Boxes}
