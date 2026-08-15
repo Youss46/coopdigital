@@ -595,14 +595,6 @@ export default function BonsCarburantChauffeur() {
 
               <p style={{ fontSize: "0.72rem", color: "var(--t-muted)", fontFamily: "monospace" }}>{qrBon.numero}</p>
 
-              {/* Open station page */}
-              <button
-                className="t-btn t-btn--ghost t-btn--sm"
-                onClick={() => navigate(`/station/${encodeURIComponent(qrBon.numero)}`)}
-              >
-                Ouvrir l'espace station →
-              </button>
-
               {/* Share / copy */}
               <button
                 className="t-btn t-btn--primary t-btn--sm"
