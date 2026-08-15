@@ -665,13 +665,21 @@ function OngletCarte({
         <div className="ml-auto flex items-center gap-2">
           {drawingMode ? (
             <>
-              <span className="text-xs text-blue-600 font-medium">{drawVertices.length} sommets — cliquez sur la carte</span>
+              <span className="text-xs text-blue-600 font-medium">{drawVertices.length} sommet{drawVertices.length > 1 ? "s" : ""} — cliquez sur la carte</span>
+              <button
+                onClick={() => setDrawVertices(v => v.slice(0, -1))}
+                disabled={drawVertices.length === 0}
+                title="Supprimer le dernier point"
+                className="px-3 py-1.5 border border-orange-300 text-orange-700 text-sm rounded-lg hover:bg-orange-50 disabled:opacity-40 transition-colors"
+              >
+                ↩ Annuler point
+              </button>
               <button onClick={finishDrawing} disabled={drawVertices.length < 3}
                 className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-300 transition-colors">
                 Fermer le polygone
               </button>
               <button onClick={cancelDrawing} className="px-3 py-1.5 border border-gray-300 text-sm rounded-lg hover:bg-gray-50 transition-colors">
-                Annuler
+                Tout annuler
               </button>
             </>
           ) : (
