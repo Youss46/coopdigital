@@ -1090,18 +1090,36 @@ export async function handleCreateStationCarburant(req: Request, res: Response):
       }
     }
     const types = (body.types_carburant ?? ["gasoil"]).filter(Boolean).join(",");
-    const [row] = await db.insert(stationsCarburantTable).values({
-      cooperativeId,
-      nom:            body.nom.trim(),
-      adresse:        body.adresse?.trim() || null,
-      typesCarburant: types || "gasoil",
-      latitude:       body.latitude  != null ? String(body.latitude)  : null,
-      longitude:      body.longitude != null ? String(body.longitude) : null,
-    }).returning();
+    // Tenter l'INSERT complet (avec GPS). Si les colonnes GPS n'existent pas encore
+    // en production (migration pending), retomber sur un INSERT sans GPS.
+    let row: typeof stationsCarburantTable.$inferSelect | undefined;
+    try {
+      [row] = await db.insert(stationsCarburantTable).values({
+        cooperativeId,
+        nom:            body.nom.trim(),
+        adresse:        body.adresse?.trim() || null,
+        typesCarburant: types || "gasoil",
+        latitude:       body.latitude  != null ? String(body.latitude)  : null,
+        longitude:      body.longitude != null ? String(body.longitude) : null,
+      }).returning();
+    } catch (firstErr) {
+      const msg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+      if (msg.includes("latitude") || msg.includes("longitude")) {
+        // Migration GPS pas encore appliquée en production — insérer sans GPS
+        [row] = await db.insert(stationsCarburantTable).values({
+          cooperativeId,
+          nom:            body.nom.trim(),
+          adresse:        body.adresse?.trim() || null,
+          typesCarburant: types || "gasoil",
+        }).returning();
+      } else {
+        throw firstErr;
+      }
+    }
     res.status(201).json({ id: row!.id, nom: row!.nom, adresse: row!.adresse ?? null,
       types_carburant: row!.typesCarburant.split(",").filter(Boolean),
-      latitude:  row!.latitude  != null ? Number(row!.latitude)  : null,
-      longitude: row!.longitude != null ? Number(row!.longitude) : null,
+      latitude:  (row as { latitude?: string | null }).latitude  != null ? Number((row as { latitude?: string | null }).latitude)  : null,
+      longitude: (row as { longitude?: string | null }).longitude != null ? Number((row as { longitude?: string | null }).longitude) : null,
       actif: row!.actif });
   } catch (err) {
     req.log.error({ err }, "handleCreateStationCarburant");
@@ -1143,14 +1161,28 @@ export async function handleUpdateStationCarburant(req: Request, res: Response):
     if (body.actif !== undefined)           set.actif          = body.actif;
     if (latSet)                             set.latitude       = body.latitude  != null ? String(body.latitude)  : null;
     if (lngSet)                             set.longitude      = body.longitude != null ? String(body.longitude) : null;
-    const [row] = await db.update(stationsCarburantTable).set(set)
-      .where(and(eq(stationsCarburantTable.id, id), eq(stationsCarburantTable.cooperativeId, cooperativeId)))
-      .returning();
+    let row: typeof stationsCarburantTable.$inferSelect | undefined;
+    try {
+      [row] = await db.update(stationsCarburantTable).set(set)
+        .where(and(eq(stationsCarburantTable.id, id), eq(stationsCarburantTable.cooperativeId, cooperativeId)))
+        .returning();
+    } catch (firstErr) {
+      const msg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+      if (msg.includes("latitude") || msg.includes("longitude")) {
+        // Migration GPS pas encore appliquée — mettre à jour sans GPS
+        const safeSet = { ...set };
+        delete safeSet.latitude;
+        delete safeSet.longitude;
+        [row] = await db.update(stationsCarburantTable).set(safeSet)
+          .where(and(eq(stationsCarburantTable.id, id), eq(stationsCarburantTable.cooperativeId, cooperativeId)))
+          .returning();
+      } else { throw firstErr; }
+    }
     if (!row) { res.status(404).json({ erreur: "Station introuvable" }); return; }
     res.json({ id: row.id, nom: row.nom, adresse: row.adresse ?? null,
       types_carburant: row.typesCarburant.split(",").filter(Boolean),
-      latitude:  row.latitude  != null ? Number(row.latitude)  : null,
-      longitude: row.longitude != null ? Number(row.longitude) : null,
+      latitude:  (row as { latitude?: string | null }).latitude  != null ? Number((row as { latitude?: string | null }).latitude)  : null,
+      longitude: (row as { longitude?: string | null }).longitude != null ? Number((row as { longitude?: string | null }).longitude) : null,
       actif: row.actif });
   } catch (err) {
     req.log.error({ err }, "handleUpdateStationCarburant");
