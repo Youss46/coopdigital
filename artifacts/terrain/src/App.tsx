@@ -31,6 +31,7 @@ import MissionEnqueteDetail from "./pages/MissionEnqueteDetail";
 import CollecteEnquete from "./pages/CollecteEnquete";
 import StationService from "./pages/StationService";
 import StationChauffeur from "./pages/StationChauffeur";
+import HistoriqueChauffeur from "./pages/HistoriqueChauffeur";
 
 function AgentTerrainRoutes() {
   return (
@@ -71,6 +72,7 @@ function ChauffeurRoutes() {
       <Route path="/missions" component={MissionsChauffeur} />
       <Route path="/carburant" component={BonsCarburantChauffeur} />
       <Route path="/station" component={StationChauffeur} />
+      <Route path="/historique" component={HistoriqueChauffeur} />
       <Route><Redirect to="/" /></Route>
     </Switch>
   );

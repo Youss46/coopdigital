@@ -157,7 +157,7 @@ export default function AccueilChauffeur() {
         <ActionTile icon="⛽" label="Carburant" sub="Gérer mes bons" onClick={() => navigate("/carburant")} />
         <ActionTile icon="🚚" label="Missions" sub="Toutes mes missions" onClick={() => navigate("/missions")} />
         <ActionTile icon="📍" label="Stations" sub="Trouver une station" onClick={() => navigate("/station")} />
-        <ActionTile icon="📋" label="Historique" sub="Activité passée" onClick={() => navigate("/missions")} />
+        <ActionTile icon="📋" label="Historique" sub="Activité passée" onClick={() => navigate("/historique")} />
       </div>
 
       <BottomNavChauffeur />
