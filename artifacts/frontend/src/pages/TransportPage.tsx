@@ -1822,39 +1822,44 @@ function TabCarburant() {
                       <TableCell className="text-right text-sm font-semibold">{bon.quantite_autorisee} L</TableCell>
                       <TableCell className="text-right text-sm">{bon.quantite_livree != null ? `${bon.quantite_livree} L` : "—"}</TableCell>
                       <TableCell className="text-sm text-gray-500 max-w-[100px] truncate">{bon.station_service ?? "—"}</TableCell>
-                      <TableCell>{statutBonBadge(bon.statut)}</TableCell>
                       <TableCell>
-                        <div className="flex gap-1 justify-end">
+                        <div className="flex flex-col gap-1 items-start">
+                          {statutBonBadge(bon.statut)}
+                          {/* Action primaire sous le badge — toujours visible */}
                           {bon.statut === "demande" && peutTraiter && (
-                            <Button size="sm" className="h-7 text-xs bg-orange-500 hover:bg-orange-600 text-white"
+                            <Button size="sm" className="h-6 text-xs px-2 bg-orange-500 hover:bg-orange-600 text-white"
                               onClick={() => { setTraiteBon(bon); setTraiterQte(bon.quantite_autorisee > 0 ? String(bon.quantite_autorisee) : ""); setShowTraiter(true); }}>
                               <CheckCircle2 className="h-3 w-3 mr-1" /> Traiter
                             </Button>
                           )}
                           {bon.statut === "demande" && !peutTraiter && (
-                            <Badge className="bg-orange-50 text-orange-700 text-xs">En attente de traitement</Badge>
+                            <span className="text-xs text-orange-600">En attente traitement</span>
                           )}
                           {bon.statut === "brouillon" && peutCreer && (
-                            <Button size="sm" variant="outline" className="h-7 text-xs"
+                            <Button size="sm" variant="outline" className="h-6 text-xs px-2"
                               onClick={() => soumMut.mutate({ id: bon.id })}>
                               <Send className="h-3 w-3 mr-1" /> Soumettre
                             </Button>
                           )}
                           {bon.statut === "soumis" && peutApprouver && (
-                            <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                            <Button size="sm" className="h-6 text-xs px-2 bg-green-600 hover:bg-green-700"
                               onClick={() => appMut.mutate({ id: bon.id })}>
                               <ThumbsUp className="h-3 w-3 mr-1" /> Approuver
                             </Button>
                           )}
                           {bon.statut === "soumis" && !peutApprouver && (
-                            <Badge className="bg-blue-50 text-blue-700 text-xs">En attente d'approbation</Badge>
+                            <span className="text-xs text-blue-600">Attente approbation</span>
                           )}
                           {bon.statut === "approuve" && (
-                            <Button size="sm" className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
+                            <Button size="sm" className="h-6 text-xs px-2 bg-blue-600 hover:bg-blue-700"
                               onClick={() => { setSelectedBon(bon); setUForm({ ...EMPTY_UTILISER_FORM, station_service: bon.station_service ?? "" }); setShowUtiliser(true); }}>
                               <Droplets className="h-3 w-3 mr-1" /> Utiliser
                             </Button>
                           )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1 justify-end">
                           {!["utilise","annule"].includes(bon.statut) && peutApprouver && (
                             <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500"
                               onClick={() => { if (confirm("Annuler ce bon ?")) annMut.mutate({ id: bon.id }); }}>
