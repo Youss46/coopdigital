@@ -300,10 +300,10 @@ export default function ChargesDiversesPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <Label className="text-xs text-gray-500">Statut</Label>
-              <Select value={filtreStatut} onValueChange={setFiltreStatut}>
+              <Select value={filtreStatut || "all"} onValueChange={v => setFiltreStatut(v === "all" ? "" : v)}>
                 <SelectTrigger><SelectValue placeholder="Tous" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tous</SelectItem>
+                  <SelectItem value="all">Tous</SelectItem>
                   <SelectItem value="brouillon">Brouillon</SelectItem>
                   <SelectItem value="valide">Validé</SelectItem>
                 </SelectContent>
@@ -311,10 +311,10 @@ export default function ChargesDiversesPage() {
             </div>
             <div>
               <Label className="text-xs text-gray-500">Catégorie</Label>
-              <Select value={filtreCategorie} onValueChange={setFiltreCategorie}>
+              <Select value={filtreCategorie || "all"} onValueChange={v => setFiltreCategorie(v === "all" ? "" : v)}>
                 <SelectTrigger><SelectValue placeholder="Toutes" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Toutes</SelectItem>
+                  <SelectItem value="all">Toutes</SelectItem>
                   {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                 </SelectContent>
               </Select>
