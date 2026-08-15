@@ -112,7 +112,10 @@ export async function verifierLicenceActive(cooperativeId: number): Promise<Lice
   }
 
   const today = new Date();
-  const refDate = licence.trialActif && licence.dateFinTrial
+  // N'utiliser dateFinTrial que si la licence est encore en période d'essai.
+  // Après activation d'un abonnement (statut="active"), toujours utiliser dateExpiration
+  // même si trialActif n'a pas été remis à false lors de la migration.
+  const refDate = licence.statut === "trial" && licence.trialActif && licence.dateFinTrial
     ? licence.dateFinTrial
     : licence.dateExpiration;
 
@@ -208,6 +211,7 @@ export async function activerLicence(cleLicence: string, cooperativeId: number, 
       statut: "active",
       dateActivation: todayStr,
       dateExpiration: expirationStr,
+      trialActif: false,   // clore la période d'essai lors de l'activation
       updatedAt: new Date(),
     })
     .where(eq(licencesTable.id, licence.id));
@@ -380,6 +384,7 @@ export async function renouvelerLicence(
       dureeAns,
       dateExpiration: expirationStr,
       statut: "active",
+      trialActif: false,   // clore le trial lors du renouvellement
       dateDernierRenouvellement: today.toISOString().slice(0, 10),
       nbRenouvellements: (licence.nbRenouvellements ?? 0) + 1,
       ...(paiement?.montant !== undefined && { montantPayeFcfa: String(paiement.montant) }),
