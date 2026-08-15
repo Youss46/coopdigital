@@ -97,9 +97,9 @@ router.get("/transport/rapport-vehicule/:id",   authMiddleware, handleRapportVeh
 
 router.get("/transport/stations-carburant",                      authMiddleware, handleGetStationsCarburant);
 router.get("/transport/stations-carburant/historique-preview",   authMiddleware, handleGetHistoriquePreview);
-router.post("/transport/stations-carburant",                     authMiddleware, requireRole(ROLES_GESTIONNAIRE_STATION), handleCreateStationCarburant);
-router.post("/transport/stations-carburant/importer-historique", authMiddleware, requireRole(ROLES_GESTIONNAIRE_STATION), handleImporterStationsHistorique);
-router.put("/transport/stations-carburant/:id",                  authMiddleware, requireRole(ROLES_GESTIONNAIRE_STATION), handleUpdateStationCarburant);
-router.delete("/transport/stations-carburant/:id",               authMiddleware, requireRole(ROLES_GESTIONNAIRE_STATION), handleDeleteStationCarburant);
+router.post("/transport/stations-carburant",                     authMiddleware, handleCreateStationCarburant);
+router.post("/transport/stations-carburant/importer-historique", authMiddleware, handleImporterStationsHistorique);
+router.put("/transport/stations-carburant/:id",                  authMiddleware, handleUpdateStationCarburant);
+router.delete("/transport/stations-carburant/:id",               authMiddleware, handleDeleteStationCarburant);
 
 export default router;
