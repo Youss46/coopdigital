@@ -927,6 +927,14 @@ export async function rembourserAvance(
     const id = parseId(req.params["id"]);
     const { montantRembourse, note } = req.body as { montantRembourse?: number; note?: string };
 
+    // Guard: explicit partial repayment amount must be strictly positive
+    if (montantRembourse !== undefined && montantRembourse <= 0) {
+      res.status(400).json({
+        erreur: "Le montant remboursé doit être un montant positif",
+      });
+      return;
+    }
+
     const [av] = await db
       .select()
       .from(avancesPersonnelTable)
