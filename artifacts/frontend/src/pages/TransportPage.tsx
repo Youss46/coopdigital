@@ -1830,10 +1830,10 @@ function TabCarburant() {
               </div>
               <div>
                 <Label>Chauffeur</Label>
-                <Select value={form.chauffeur_id} onValueChange={v => setForm(f => ({ ...f, chauffeur_id: v }))}>
+                <Select value={form.chauffeur_id || "none"} onValueChange={v => setForm(f => ({ ...f, chauffeur_id: v === "none" ? "" : v }))}>
                   <SelectTrigger><SelectValue placeholder="Aucun" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucun</SelectItem>
+                    <SelectItem value="none">Aucun</SelectItem>
                     {chauffeurs.filter(c => c.statut === "actif").map(c => (
                       <SelectItem key={c.id} value={String(c.id)}>{c.prenoms ?? ""} {c.nom}</SelectItem>
                     ))}
