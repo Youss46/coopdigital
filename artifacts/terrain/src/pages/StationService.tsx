@@ -236,6 +236,7 @@ export default function StationService() {
       return "failed";
     }
 
+    // Affichage immédiat depuis le payload QR (offline)
     setBon({
       numero: rawData.num, statut: "approuve",
       type_carburant: rawData.type, quantite_autorisee: rawData.qte,
@@ -244,6 +245,17 @@ export default function StationService() {
       marque: rawData.marque, chauffeur_nom: rawData.chauffeur,
       offline: true,
     });
+
+    // Vérification du vrai statut depuis le serveur (le bon a peut-être déjà été utilisé)
+    try {
+      const res = await fetch(`${BASE}/station/carburant/bons/${encodeURIComponent(rawData.num)}`);
+      if (res.ok) {
+        const serverBon = await res.json() as BonInfo;
+        if (verifGenRef.current === gen) {
+          setBon(prev => prev ? { ...prev, statut: serverBon.statut } : serverBon);
+        }
+      }
+    } catch { /* réseau indisponible — on garde le statut offline */ }
 
     if (!pubKey) { setQrVerified("no-key"); return isExpired ? "expired" : "no-key"; }
     setQrVerified(true);
