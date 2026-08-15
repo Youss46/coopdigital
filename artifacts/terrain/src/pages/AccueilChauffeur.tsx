@@ -159,6 +159,8 @@ export default function AccueilChauffeur() {
         <ActionTile icon="📍" label="Stations" sub="Trouver une station" onClick={() => navigate("/station")} />
         <ActionTile icon="📋" label="Historique" sub="Activité passée" onClick={() => navigate("/missions")} />
       </div>
+
+      <BottomNavChauffeur />
     </div>
   );
 }

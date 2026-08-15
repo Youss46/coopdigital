@@ -1,14 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { apiGet, apiPut } from "@/lib/api";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
 import { Fuel, CheckCircle2, Clock, Droplets, QrCode, X, Share2, Copy, RefreshCw, AlertCircle } from "lucide-react";
 import BottomNavChauffeur from "@/components/BottomNavChauffeur";
 import { useToast } from "@/hooks/use-toast";
@@ -40,12 +32,42 @@ interface UtiliserForm {
   observations: string;
 }
 
-const STATUT_BON: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  brouillon: { label: "Brouillon",  color: "bg-gray-100 text-gray-600",    icon: <Clock className="h-3 w-3" /> },
-  soumis:    { label: "Soumis",     color: "bg-blue-100 text-blue-800",    icon: <Clock className="h-3 w-3" /> },
-  approuve:  { label: "Approuvé",   color: "bg-green-100 text-green-800",  icon: <CheckCircle2 className="h-3 w-3" /> },
-  utilise:   { label: "Utilisé",    color: "bg-emerald-100 text-emerald-800", icon: <Droplets className="h-3 w-3" /> },
-  annule:    { label: "Annulé",     color: "bg-red-100 text-red-800",      icon: null },
+const STATUT_BON: Record<string, {
+  label: string;
+  badgeClass: string;
+  cardClass: string;
+  icon: React.ReactNode;
+}> = {
+  brouillon: {
+    label: "Brouillon",
+    badgeClass: "t-badge--info",
+    cardClass: "",
+    icon: <Clock size={11} />,
+  },
+  soumis: {
+    label: "Soumis",
+    badgeClass: "t-badge--info",
+    cardClass: "t-card--info",
+    icon: <Clock size={11} />,
+  },
+  approuve: {
+    label: "Approuvé",
+    badgeClass: "t-badge--success",
+    cardClass: "t-card--success",
+    icon: <CheckCircle2 size={11} />,
+  },
+  utilise: {
+    label: "Utilisé",
+    badgeClass: "t-badge--success",
+    cardClass: "t-card--info",
+    icon: <Droplets size={11} />,
+  },
+  annule: {
+    label: "Annulé",
+    badgeClass: "t-badge--danger",
+    cardClass: "t-card--danger",
+    icon: null,
+  },
 };
 
 const TYPE_CARB: Record<string, string> = { gasoil: "Gasoil", essence: "Essence", super: "Super" };
@@ -72,9 +94,7 @@ export default function BonsCarburantChauffeur() {
   const [qrToken, setQrToken] = useState<{ payload: string; sig: string } | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
-  // qrExpMs: expiry timestamp (ms) parsed from the signed payload; null if unavailable.
   const [qrExpMs, setQrExpMs] = useState<number | null>(null);
-  // qrExpired: true once Date.now() >= qrExpMs; driven by a timer, not inline Date.now().
   const [qrExpired, setQrExpired] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<UtiliserForm>({
@@ -91,16 +111,12 @@ export default function BonsCarburantChauffeur() {
       .finally(() => setLoading(false));
   }, [tab]);
 
-  // Récupère (ou rafraîchit) un token QR signé depuis le serveur.
-  // Endpoint authentifié : seul le chauffeur propriétaire du bon peut le générer.
-  // Retourne false si le bon n'est plus éligible ou en cas d'erreur.
   const fetchQrToken = useCallback(async (bon: BonCarburant): Promise<boolean> => {
     setQrLoading(true);
     setQrError(null);
     setQrExpMs(null);
     setQrExpired(false);
     try {
-      // apiGet ajoute automatiquement le token Bearer terrain et cible /api/terrain/*
       const tok = await apiGet<{ payload: string; sig: string; spki?: string }>(
         `/chauffeur/bons-carburant/${encodeURIComponent(bon.numero)}/qr-token`,
       );
@@ -118,8 +134,6 @@ export default function BonsCarburantChauffeur() {
     }
   }, []);
 
-  // Parse exp from the QR payload whenever the token changes, and schedule a
-  // one-shot timer that flips qrExpired to true exactly when the token expires.
   useEffect(() => {
     if (!qrToken) {
       setQrExpMs(null);
@@ -137,7 +151,7 @@ export default function BonsCarburantChauffeur() {
     setQrExpired(exp !== null && exp < Date.now());
     if (exp === null) return;
     const delay = exp - Date.now();
-    if (delay <= 0) return; // already expired at parse time
+    if (delay <= 0) return;
     const timer = setTimeout(() => setQrExpired(true), delay);
     return () => clearTimeout(timer);
   }, [qrToken]);
@@ -170,276 +184,461 @@ export default function BonsCarburantChauffeur() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <header className="bg-green-700 text-white px-4 py-4">
-        <h1 className="text-lg font-bold flex items-center gap-2"><Fuel className="h-5 w-5" /> Bons carburant</h1>
-      </header>
+    <div style={{ minHeight: "100dvh", background: "var(--t-bg)", paddingBottom: 88 }}>
 
-      {/* Tabs */}
-      <div className="flex border-b bg-white sticky top-0 z-10">
+      {/* ── Header ── */}
+      <div style={{
+        background: "linear-gradient(145deg, #1a4731 0%, #16a34a 100%)",
+        padding: "48px 20px 32px",
+        position: "relative",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: "rgba(255,255,255,0.18)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Fuel size={20} color="#fff" />
+          </div>
+          <div>
+            <h1 style={{ color: "#fff", fontWeight: 800, fontSize: "1.25rem" }}>Bons carburant</h1>
+            <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.78rem", marginTop: 2 }}>
+              {loading ? "…" : `${bons.length} bon${bons.length !== 1 ? "s" : ""}`}
+            </p>
+          </div>
+        </div>
+        <svg
+          style={{ position: "absolute", bottom: 0, left: 0, right: 0, width: "100%", display: "block" }}
+          viewBox="0 0 375 20" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M0 20 C100 0 275 40 375 20 L375 20 L0 20Z" fill="var(--t-bg)" />
+        </svg>
+      </div>
+
+      {/* ── Filtres pill chips ── */}
+      <div style={{ display: "flex", gap: 8, padding: "14px 16px 4px", overflowX: "auto" }}>
         {FILTER_TABS.map(t => (
           <button
             key={t.value}
-            className={`flex-1 py-2.5 text-xs font-medium transition-colors border-b-2 ${
-              tab === t.value ? "border-green-700 text-green-700" : "border-transparent text-gray-400"
-            }`}
             onClick={() => setTab(t.value)}
+            style={{
+              flexShrink: 0,
+              padding: "6px 14px",
+              borderRadius: 999,
+              border: "none",
+              fontSize: "0.8rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              background: tab === t.value ? "var(--t-primary)" : "var(--t-card)",
+              color: tab === t.value ? "#fff" : "var(--t-muted)",
+              boxShadow: tab === t.value ? "none" : "0 1px 3px rgba(0,0,0,.07)",
+            }}
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      <div className="p-4 space-y-3">
+      {/* ── Liste ── */}
+      <div style={{ padding: "10px 16px 0", display: "flex", flexDirection: "column", gap: 10 }}>
         {loading ? (
-          <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-24 bg-gray-200 rounded-xl animate-pulse" />)}</div>
+          [1, 2, 3].map(i => (
+            <div key={i} style={{
+              height: 110, background: "var(--t-card)",
+              borderRadius: "var(--t-radius)", boxShadow: "0 1px 4px rgba(0,0,0,.08)",
+            }} />
+          ))
         ) : bons.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <Fuel className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">Aucun bon dans cette catégorie</p>
+          <div style={{ padding: "60px 24px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+            <Fuel size={44} color="var(--t-border)" />
+            <p style={{ color: "var(--t-muted)", fontSize: "0.9rem" }}>Aucun bon dans cette catégorie</p>
           </div>
         ) : (
           bons.map(bon => {
-            const s = STATUT_BON[bon.statut] ?? { label: bon.statut, color: "bg-gray-100 text-gray-600", icon: null };
+            const s = STATUT_BON[bon.statut] ?? {
+              label: bon.statut,
+              badgeClass: "t-badge--info",
+              cardClass: "",
+              icon: null,
+            };
             return (
-              <Card key={bon.id} className={bon.statut === "approuve" ? "border-green-300 bg-green-50" : ""}>
-                <CardContent className="p-3 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-mono text-sm font-bold text-green-700">{bon.numero}</p>
-                      <p className="text-xs text-gray-500">{bon.immatriculation ?? "—"} · {TYPE_CARB[bon.type_carburant] ?? bon.type_carburant}</p>
-                    </div>
-                    <Badge className={`${s.color} flex items-center gap-1 text-xs`}>{s.icon}{s.label}</Badge>
-                  </div>
+              <div key={bon.id} className={`t-card ${s.cardClass}`} style={{ padding: 14 }}>
 
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
-                    <div className="text-gray-400">Qté autorisée</div>
-                    <div className="font-semibold">{bon.quantite_autorisee} L</div>
-                    {bon.quantite_livree != null && <>
-                      <div className="text-gray-400">Qté livrée</div>
-                      <div className="font-semibold text-emerald-700">{bon.quantite_livree} L</div>
-                    </>}
-                    {bon.montant_fcfa != null && <>
-                      <div className="text-gray-400">Montant</div>
-                      <div className="font-semibold">{bon.montant_fcfa.toLocaleString("fr-FR")} FCFA</div>
-                    </>}
-                    <div className="text-gray-400">Date émission</div>
-                    <div>{fmt(bon.date_emission)}</div>
-                    {bon.station_service && <>
-                      <div className="text-gray-400">Station</div>
-                      <div className="truncate">{bon.station_service}</div>
-                    </>}
-                    {bon.motif && <>
-                      <div className="text-gray-400">Motif</div>
-                      <div className="truncate italic">{bon.motif}</div>
-                    </>}
+                {/* Top row: numero + badge */}
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <p style={{ fontFamily: "monospace", fontSize: "0.95rem", fontWeight: 800, color: "var(--t-primary)" }}>
+                      {bon.numero}
+                    </p>
+                    <p style={{ fontSize: "0.75rem", color: "var(--t-muted)", marginTop: 2 }}>
+                      {bon.immatriculation ?? "—"} · {TYPE_CARB[bon.type_carburant] ?? bon.type_carburant}
+                    </p>
                   </div>
+                  <span className={`t-badge ${s.badgeClass}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                    {s.icon}
+                    {s.label}
+                  </span>
+                </div>
 
-                  {bon.statut === "approuve" && (
-                    <div className="flex gap-2 mt-1">
-                      <Button className="flex-1 bg-green-700 hover:bg-green-800" size="sm"
-                        onClick={() => {
-                          setSelected(bon);
-                          setForm({ quantite_livree: "", prix_litre_fcfa: "",
-                            date_utilisation: new Date().toISOString().split("T")[0]!,
-                            station_service: bon.station_service ?? "", observations: "" });
-                        }}>
-                        <Droplets className="h-4 w-4 mr-1" /> Utilisation
-                      </Button>
-                      <Button variant="outline" size="sm" className="border-green-300 text-green-700"
-                        disabled={qrLoading}
-                        onClick={async () => {
-                          setQrBon(bon);
-                          setQrToken(null);
-                          await fetchQrToken(bon);
-                        }}>
-                        <QrCode className="h-4 w-4 mr-1" /> QR
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                {/* Data grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", rowGap: 4, columnGap: 16, fontSize: "0.78rem", marginBottom: 12 }}>
+                  <span style={{ color: "var(--t-muted)" }}>Qté autorisée</span>
+                  <span style={{ fontWeight: 700 }}>{bon.quantite_autorisee} L</span>
+
+                  {bon.quantite_livree != null && <>
+                    <span style={{ color: "var(--t-muted)" }}>Qté livrée</span>
+                    <span style={{ fontWeight: 700, color: "var(--t-success)" }}>{bon.quantite_livree} L</span>
+                  </>}
+
+                  {bon.montant_fcfa != null && <>
+                    <span style={{ color: "var(--t-muted)" }}>Montant</span>
+                    <span style={{ fontWeight: 700 }}>{bon.montant_fcfa.toLocaleString("fr-FR")} FCFA</span>
+                  </>}
+
+                  <span style={{ color: "var(--t-muted)" }}>Date émission</span>
+                  <span>{fmt(bon.date_emission)}</span>
+
+                  {bon.station_service && <>
+                    <span style={{ color: "var(--t-muted)" }}>Station</span>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bon.station_service}</span>
+                  </>}
+
+                  {bon.motif && <>
+                    <span style={{ color: "var(--t-muted)" }}>Motif</span>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontStyle: "italic" }}>{bon.motif}</span>
+                  </>}
+                </div>
+
+                {/* Actions — approved only */}
+                {bon.statut === "approuve" && (
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      className="t-btn t-btn--success t-btn--sm"
+                      style={{ flex: 1 }}
+                      onClick={() => {
+                        setSelected(bon);
+                        setForm({
+                          quantite_livree: "", prix_litre_fcfa: "",
+                          date_utilisation: new Date().toISOString().split("T")[0]!,
+                          station_service: bon.station_service ?? "", observations: "",
+                        });
+                      }}
+                    >
+                      <Droplets size={15} /> Utilisation
+                    </button>
+                    <button
+                      className="t-btn t-btn--ghost t-btn--sm"
+                      style={{ flex: 1 }}
+                      disabled={qrLoading}
+                      onClick={async () => {
+                        setQrBon(bon);
+                        setQrToken(null);
+                        await fetchQrToken(bon);
+                      }}
+                    >
+                      <QrCode size={15} /> QR code
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           })
         )}
       </div>
 
-      {/* Dialog utilisation */}
-      <Dialog open={!!selected} onOpenChange={o => { if (!o) setSelected(null); }}>
-        <DialogContent className="max-w-sm mx-4">
-          <DialogHeader>
-            <DialogTitle>Retour station</DialogTitle>
-            {selected && (
-              <p className="text-xs text-gray-500">
-                Bon {selected.numero} · Autorisé : <strong>{selected.quantite_autorisee} L</strong>
-              </p>
-            )}
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div>
-              <Label className="text-xs">Quantité livrée (L) *</Label>
-              <Input type="number" min={0} step="any" placeholder="Ex: 45"
-                value={form.quantite_livree}
-                onChange={e => setForm(f => ({ ...f, quantite_livree: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
+      {/* ── Modal utilisation ── */}
+      {selected && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 60,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex", alignItems: "flex-end", justifyContent: "center",
+          }}
+          onClick={() => setSelected(null)}
+        >
+          <div
+            style={{
+              background: "var(--t-card)",
+              borderRadius: "var(--t-radius) var(--t-radius) 0 0",
+              padding: "24px 20px",
+              width: "100%", maxWidth: 480,
+              display: "flex", flexDirection: "column", gap: 16,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <Label className="text-xs">Prix au litre (FCFA)</Label>
-                <Input type="number" min={0} step="any" placeholder="Prix/L"
-                  value={form.prix_litre_fcfa}
-                  onChange={e => setForm(f => ({ ...f, prix_litre_fcfa: e.target.value }))} />
+                <p style={{ fontWeight: 800, fontSize: "1.05rem", color: "var(--t-text)" }}>Retour station</p>
+                <p style={{ fontSize: "0.75rem", color: "var(--t-muted)", marginTop: 2 }}>
+                  Bon {selected.numero} · Autorisé : <strong>{selected.quantite_autorisee} L</strong>
+                </p>
               </div>
-              <div>
-                <Label className="text-xs">Montant estimé</Label>
-                <div className="h-9 flex items-center px-3 rounded-md border bg-gray-50 text-sm font-semibold">
+              <button
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t-muted)", padding: 4 }}
+                onClick={() => setSelected(null)}
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            {/* Fields */}
+            <div className="t-field">
+              <label className="t-label">Quantité livrée (L) *</label>
+              <input
+                className="t-input"
+                type="number" min={0} step="any" placeholder="Ex: 45"
+                value={form.quantite_livree}
+                onChange={e => setForm(f => ({ ...f, quantite_livree: e.target.value }))}
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className="t-field">
+                <label className="t-label">Prix au litre (FCFA)</label>
+                <input
+                  className="t-input"
+                  type="number" min={0} step="any" placeholder="Prix/L"
+                  value={form.prix_litre_fcfa}
+                  onChange={e => setForm(f => ({ ...f, prix_litre_fcfa: e.target.value }))}
+                />
+              </div>
+              <div className="t-field">
+                <label className="t-label">Montant estimé</label>
+                <div style={{
+                  height: 56, display: "flex", alignItems: "center",
+                  padding: "0 16px",
+                  background: "var(--t-bg)",
+                  border: "2px solid var(--t-border)",
+                  borderRadius: "var(--t-radius)",
+                  fontWeight: 700, fontSize: "0.95rem", color: "var(--t-primary)",
+                }}>
                   {montantEstime != null ? `${montantEstime.toLocaleString("fr-FR")} F` : "—"}
                 </div>
               </div>
             </div>
-            <div>
-              <Label className="text-xs">Date *</Label>
-              <Input type="date" value={form.date_utilisation}
-                onChange={e => setForm(f => ({ ...f, date_utilisation: e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs">Station-service</Label>
-              <Input placeholder="Nom de la station" value={form.station_service}
-                onChange={e => setForm(f => ({ ...f, station_service: e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs">Observations</Label>
-              <Input placeholder="Remarques éventuelles" value={form.observations}
-                onChange={e => setForm(f => ({ ...f, observations: e.target.value }))} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelected(null)}>Annuler</Button>
-            <Button onClick={handleUtiliser}
-              disabled={!form.quantite_livree || !form.date_utilisation || submitting}>
-              Confirmer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {/* Dialog QR code plein écran */}
-      {qrBon && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-6"
-          onClick={() => setQrBon(null)}>
-          <button
-            className="absolute top-4 right-4 text-white"
-            onClick={() => setQrBon(null)}
-          >
-            <X className="h-7 w-7" />
-          </button>
-          <div className="bg-white rounded-2xl p-6 flex flex-col items-center gap-4 max-w-xs w-full shadow-2xl"
-            onClick={e => e.stopPropagation()}>
-            <p className="font-mono text-lg font-bold text-green-700">{qrBon.numero}</p>
-            <p className="text-xs text-gray-500 text-center">
-              Présentez ce QR à la station-service
-            </p>
-            {/* QR avec payload signé si disponible, sinon URL simple */}
-            {(() => {
-              const base = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}`;
-              const stationUrl = qrToken
-                ? `${base}/station/${encodeURIComponent(qrBon.numero)}?p=${qrToken.payload}&s=${qrToken.sig}`
-                : `${base}/station/${encodeURIComponent(qrBon.numero)}`;
-              return (
-                <>
-                  {/* QR image — dimmed when expired */}
-                  <div className={`p-3 bg-white rounded-xl border border-gray-100 relative transition-opacity ${qrExpired ? "opacity-40" : ""}`}>
-                    {qrLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
-                        <div className="h-6 w-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-                      </div>
-                    )}
-                    <QRCode value={stationUrl} size={220} level="M" />
-                  </div>
+            <div className="t-field">
+              <label className="t-label">Date *</label>
+              <input
+                className="t-input"
+                type="date"
+                value={form.date_utilisation}
+                onChange={e => setForm(f => ({ ...f, date_utilisation: e.target.value }))}
+              />
+            </div>
 
-                  {/* Expiry / status line — driven by qrExpired state (timer-backed) */}
-                  {qrError ? (
-                    <div className="flex items-center gap-1.5 text-red-600 text-xs text-center">
-                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                      <span>{qrError}</span>
-                    </div>
-                  ) : qrToken ? (
-                    qrExpMs !== null ? (
-                      qrExpired ? (
-                        <p className="text-xs text-red-600 text-center font-medium flex items-center justify-center gap-1">
-                          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                          Expiré — rafraîchissez
-                        </p>
-                      ) : (
-                        <p className="text-xs text-green-600 text-center flex items-center justify-center gap-1">
-                          <span>🔒</span> Valide jusqu'au{" "}
-                          {new Date(qrExpMs).toLocaleString("fr-FR", {
-                            day: "2-digit", month: "short", year: "numeric",
-                            hour: "2-digit", minute: "2-digit",
-                          })}
-                        </p>
-                      )
-                    ) : (
-                      <p className="text-xs text-green-600 text-center flex items-center justify-center gap-1">
-                        <span>🔒</span> QR signé — lisible hors connexion
-                      </p>
-                    )
-                  ) : (
-                    <p className="text-xs text-amber-600 text-center">
-                      {qrLoading ? "Génération du QR sécurisé…" : "QR simple (connexion requise à la station)"}
-                    </p>
-                  )}
+            <div className="t-field">
+              <label className="t-label">Station-service</label>
+              <input
+                className="t-input"
+                placeholder="Nom de la station"
+                value={form.station_service}
+                onChange={e => setForm(f => ({ ...f, station_service: e.target.value }))}
+              />
+            </div>
 
-                  {/* Rafraîchir — highlighted in red when expired */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={`w-full ${qrExpired ? "border-red-400 text-red-600 hover:bg-red-50" : ""}`}
-                    disabled={qrLoading}
-                    onClick={async () => { await fetchQrToken(qrBon); }}>
-                    <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${qrLoading ? "animate-spin" : ""}`} />
-                    Rafraîchir le QR
-                  </Button>
-                  <p className="text-xs text-gray-400 text-center font-mono">{qrBon.numero}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => navigate(`/station/${encodeURIComponent(qrBon.numero)}`)}>
-                    Ouvrir l'espace station →
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="w-full bg-green-700 hover:bg-green-800"
-                    onClick={async () => {
-                      if (navigator.share) {
-                        try {
-                          await navigator.share({
-                            title: `Bon carburant ${qrBon.numero}`,
-                            text: `Bon carburant ${qrBon.numero} — ${qrBon.quantite_autorisee} L`,
-                            url: stationUrl,
-                          });
-                        } catch {
-                          // user cancelled or share failed silently
-                        }
-                      } else {
-                        try {
-                          await navigator.clipboard.writeText(stationUrl);
-                          toast({ title: "Lien copié dans le presse-papiers ✓" });
-                        } catch {
-                          toast({ title: "Impossible de copier le lien", variant: "destructive" });
-                        }
-                      }
-                    }}>
-                    {"share" in navigator
-                      ? <><Share2 className="h-4 w-4 mr-1" /> Partager</>
-                      : <><Copy className="h-4 w-4 mr-1" /> Copier le lien</>}
-                  </Button>
-                </>
-              );
-            })()}
+            <div className="t-field">
+              <label className="t-label">Observations</label>
+              <input
+                className="t-input"
+                placeholder="Remarques éventuelles"
+                value={form.observations}
+                onChange={e => setForm(f => ({ ...f, observations: e.target.value }))}
+              />
+            </div>
+
+            {/* Footer */}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                className="t-btn t-btn--ghost t-btn--sm"
+                style={{ flex: 1 }}
+                onClick={() => setSelected(null)}
+              >
+                Annuler
+              </button>
+              <button
+                className="t-btn t-btn--success t-btn--sm"
+                style={{ flex: 1 }}
+                disabled={!form.quantite_livree || !form.date_utilisation || submitting}
+                onClick={handleUtiliser}
+              >
+                {submitting ? "Enregistrement…" : "Confirmer"}
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* ── Modal QR plein écran ── */}
+      {qrBon && (() => {
+        const base = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}`;
+        const stationUrl = qrToken
+          ? `${base}/station/${encodeURIComponent(qrBon.numero)}?p=${qrToken.payload}&s=${qrToken.sig}`
+          : `${base}/station/${encodeURIComponent(qrBon.numero)}`;
+
+        return (
+          <div
+            style={{
+              position: "fixed", inset: 0, zIndex: 70,
+              background: "rgba(0,0,0,0.88)",
+              display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center",
+              padding: 24,
+            }}
+            onClick={() => setQrBon(null)}
+          >
+            {/* Close button */}
+            <button
+              style={{
+                position: "absolute", top: 16, right: 16,
+                background: "rgba(255,255,255,0.15)", border: "none",
+                borderRadius: 8, width: 40, height: 40,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer",
+              }}
+              onClick={() => setQrBon(null)}
+            >
+              <X size={22} color="#fff" />
+            </button>
+
+            <div
+              style={{
+                background: "var(--t-card)",
+                borderRadius: "var(--t-radius)",
+                padding: 24,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
+                maxWidth: 320, width: "100%",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Bon number */}
+              <p style={{ fontFamily: "monospace", fontSize: "1.1rem", fontWeight: 800, color: "var(--t-primary)" }}>
+                {qrBon.numero}
+              </p>
+              <p style={{ fontSize: "0.78rem", color: "var(--t-muted)", textAlign: "center" }}>
+                Présentez ce QR à la station-service
+              </p>
+
+              {/* QR code */}
+              <div style={{
+                padding: 12, background: "#fff",
+                borderRadius: "var(--t-radius)",
+                border: "1px solid var(--t-border)",
+                position: "relative",
+                opacity: qrExpired ? 0.4 : 1,
+                transition: "opacity .2s",
+              }}>
+                {qrLoading && (
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "rgba(255,255,255,0.8)",
+                    borderRadius: "var(--t-radius)",
+                  }}>
+                    <div style={{
+                      width: 28, height: 28,
+                      border: "3px solid var(--t-primary)",
+                      borderTopColor: "transparent",
+                      borderRadius: "50%",
+                      animation: "spin 0.7s linear infinite",
+                    }} />
+                  </div>
+                )}
+                <QRCode value={stationUrl} size={220} level="M" />
+              </div>
+
+              {/* Status line */}
+              {qrError ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--t-danger)", fontSize: "0.78rem", textAlign: "center" }}>
+                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                  <span>{qrError}</span>
+                </div>
+              ) : qrToken ? (
+                qrExpMs !== null ? (
+                  qrExpired ? (
+                    <p style={{ fontSize: "0.78rem", color: "var(--t-danger)", textAlign: "center", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                      <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                      Expiré — rafraîchissez
+                    </p>
+                  ) : (
+                    <p style={{ fontSize: "0.78rem", color: "var(--t-success)", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                      <span>🔒</span> Valide jusqu'au{" "}
+                      {new Date(qrExpMs).toLocaleString("fr-FR", {
+                        day: "2-digit", month: "short", year: "numeric",
+                        hour: "2-digit", minute: "2-digit",
+                      })}
+                    </p>
+                  )
+                ) : (
+                  <p style={{ fontSize: "0.78rem", color: "var(--t-success)", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <span>🔒</span> QR signé — lisible hors connexion
+                  </p>
+                )
+              ) : (
+                <p style={{ fontSize: "0.78rem", color: "var(--t-warning)", textAlign: "center" }}>
+                  {qrLoading ? "Génération du QR sécurisé…" : "QR simple (connexion requise à la station)"}
+                </p>
+              )}
+
+              {/* Refresh button */}
+              <button
+                className="t-btn t-btn--ghost t-btn--sm"
+                disabled={qrLoading}
+                style={qrExpired ? { borderColor: "var(--t-danger)", color: "var(--t-danger)" } : {}}
+                onClick={async () => { await fetchQrToken(qrBon); }}
+              >
+                <RefreshCw size={14} style={{ animation: qrLoading ? "spin 0.7s linear infinite" : "none" }} />
+                Rafraîchir le QR
+              </button>
+
+              <p style={{ fontSize: "0.72rem", color: "var(--t-muted)", fontFamily: "monospace" }}>{qrBon.numero}</p>
+
+              {/* Open station page */}
+              <button
+                className="t-btn t-btn--ghost t-btn--sm"
+                onClick={() => navigate(`/station/${encodeURIComponent(qrBon.numero)}`)}
+              >
+                Ouvrir l'espace station →
+              </button>
+
+              {/* Share / copy */}
+              <button
+                className="t-btn t-btn--primary t-btn--sm"
+                onClick={async () => {
+                  if (navigator.share) {
+                    try {
+                      await navigator.share({
+                        title: `Bon carburant ${qrBon.numero}`,
+                        text: `Bon carburant ${qrBon.numero} — ${qrBon.quantite_autorisee} L`,
+                        url: stationUrl,
+                      });
+                    } catch {
+                      // user cancelled or share failed silently
+                    }
+                  } else {
+                    try {
+                      await navigator.clipboard.writeText(stationUrl);
+                      toast({ title: "Lien copié dans le presse-papiers ✓" });
+                    } catch {
+                      toast({ title: "Impossible de copier le lien", variant: "destructive" });
+                    }
+                  }
+                }}
+              >
+                {"share" in navigator
+                  ? <><Share2 size={15} /> Partager</>
+                  : <><Copy size={15} /> Copier le lien</>}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
 
       <BottomNavChauffeur />
     </div>
