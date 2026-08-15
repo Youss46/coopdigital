@@ -2,10 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiGet } from "@/lib/api";
-import {
-  Truck, Fuel, MapPin, AlertTriangle, ChevronRight,
-  ArrowRight, ClipboardList, History, Circle,
-} from "lucide-react";
+import { Truck, Fuel, MapPin, AlertTriangle, ChevronRight, ClipboardList, History, ArrowRight } from "lucide-react";
 import BottomNavChauffeur from "@/components/BottomNavChauffeur";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
@@ -18,7 +15,6 @@ interface MissionResume {
   date_depart: string;
   statut: string;
   immatriculation: string | null;
-  marque: string | null;
 }
 
 interface BonResume {
@@ -45,18 +41,18 @@ const TYPE_LABEL: Record<string, string> = {
   autre: "Autre",
 };
 
-const STATUT_COLOR: Record<string, string> = {
-  planifiee: "text-blue-600",
-  en_cours: "text-amber-600",
-  terminee: "text-green-600",
-  annulee: "text-red-500",
-};
-
 const STATUT_LABEL: Record<string, string> = {
   planifiee: "Planifiée",
   en_cours: "En cours",
   terminee: "Terminée",
   annulee: "Annulée",
+};
+
+const STATUT_COLOR: Record<string, string> = {
+  planifiee: "var(--t-info)",
+  en_cours: "var(--t-warning)",
+  terminee: "var(--t-success)",
+  annulee: "var(--t-danger)",
 };
 
 function initials(prenoms?: string, nom?: string) {
@@ -65,9 +61,7 @@ function initials(prenoms?: string, nom?: string) {
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+    day: "numeric", month: "long", year: "numeric",
   });
 }
 
@@ -87,28 +81,26 @@ export default function AccueilChauffeur() {
   }, []);
 
   const heure = new Date().getHours();
-  const salutation =
-    heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
+  const salutation = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
 
   const bons = data?.bons_en_attente ?? [];
   const missions = data?.missions_en_cours ?? [];
   const prochaineMission = missions[0] ?? null;
   const totalLitres = bons.reduce((s, b) => s + b.quantite_autorisee, 0);
 
-  /* ── Compte non rattaché ── */
+  /* ── Non rattaché ── */
   if (!data?.chauffeur_rattache && !loading) {
     return (
-      <div className="min-h-screen bg-slate-50 pb-28 flex flex-col">
-        <Header salutation={salutation} user={user} missionCount={0} />
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-4">
-          <div className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center">
-            <AlertTriangle className="h-9 w-9 text-amber-500" />
+      <div style={{ minHeight: "100dvh", background: "var(--t-bg)", paddingBottom: 88 }}>
+        <ChauffeurHeader salutation={salutation} user={user} missionCount={0} />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 24px", textAlign: "center", gap: 16 }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--t-warning-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <AlertTriangle size={36} color="var(--t-warning)" />
           </div>
           <div>
-            <p className="text-gray-800 font-semibold text-lg">Compte non rattaché</p>
-            <p className="text-gray-500 text-sm mt-1 leading-relaxed max-w-xs mx-auto">
-              Votre compte n'est pas encore lié à un chauffeur de la flotte.
-              Contactez votre responsable transport.
+            <p style={{ fontWeight: 700, fontSize: "1.1rem", color: "var(--t-text)" }}>Compte non rattaché</p>
+            <p style={{ color: "var(--t-muted)", fontSize: "0.9rem", marginTop: 6, maxWidth: 280, lineHeight: 1.5 }}>
+              Votre compte n'est pas encore lié à un chauffeur de la flotte. Contactez votre responsable transport.
             </p>
           </div>
         </div>
@@ -118,133 +110,63 @@ export default function AccueilChauffeur() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-28">
-      {/* ── Header ── */}
-      <Header salutation={salutation} user={user} missionCount={missions.length} loading={loading} />
+    <div style={{ minHeight: "100dvh", background: "var(--t-bg)", paddingBottom: 88 }}>
+      <ChauffeurHeader salutation={salutation} user={user} missionCount={missions.length} loading={loading} />
 
-      <div className="px-4 pt-3 space-y-4">
-
-        {/* ── Section « Aujourd'hui » ── */}
-        <div>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">
-            Aujourd'hui
-          </p>
-
-          {/* Prochaine mission */}
-          {loading ? (
-            <div className="h-36 bg-white rounded-2xl animate-pulse shadow-sm" />
-          ) : prochaineMission ? (
-            <NextMissionCard m={prochaineMission} onNavigate={() => navigate("/missions")} />
-          ) : (
-            <EmptyMissionCard onNavigate={() => navigate("/missions")} />
-          )}
-        </div>
-
-        {/* ── Bons carburant en attente ── */}
-        {bons.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                Bons carburant à utiliser
-              </p>
-              <button
-                onClick={() => navigate("/carburant")}
-                className="text-xs text-amber-600 font-medium flex items-center gap-0.5"
-              >
-                Voir <ChevronRight className="h-3 w-3" />
-              </button>
-            </div>
-            <div className="space-y-2">
-              {bons.map((bon) => (
-                <FuelVoucherCard
-                  key={bon.id}
-                  bon={bon}
-                  onUse={() => navigate("/carburant")}
-                  onStation={() => navigate(`/station/${encodeURIComponent(bon.numero)}`)}
-                />
-              ))}
-            </div>
-          </div>
+      {/* ── Aujourd'hui ── */}
+      <p className="t-section-title">Aujourd'hui</p>
+      <div style={{ padding: "0 16px 0" }}>
+        {loading ? (
+          <div style={{ height: 140, background: "var(--t-card)", borderRadius: "var(--t-radius)", boxShadow: "0 1px 4px rgba(0,0,0,.08)" }} />
+        ) : prochaineMission ? (
+          <MissionCard m={prochaineMission} onNavigate={() => navigate("/missions")} />
+        ) : (
+          <EmptyMissionCard onNavigate={() => navigate("/missions")} />
         )}
-
-        {/* ── Stats rapides ── */}
-        <div>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">
-            Mon activité
-          </p>
-          <div className="grid grid-cols-3 gap-2.5">
-            <StatCard
-              icon={<Truck className="h-5 w-5 text-green-700" />}
-              value={loading ? "…" : String(missions.length)}
-              label="Mission(s)"
-              bg="bg-green-50"
-            />
-            <StatCard
-              icon={<Fuel className="h-5 w-5 text-amber-600" />}
-              value={loading ? "…" : `${totalLitres} L`}
-              label="Carburant"
-              bg="bg-amber-50"
-            />
-            <StatCard
-              icon={<ClipboardList className="h-5 w-5 text-blue-600" />}
-              value={loading ? "…" : String(bons.length)}
-              label="Bon(s)"
-              bg="bg-blue-50"
-            />
-          </div>
-        </div>
-
-        {/* ── Actions rapides ── */}
-        <div>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">
-            Actions rapides
-          </p>
-          <div className="grid grid-cols-2 gap-2.5">
-            <QuickAction
-              icon={<Fuel className="h-5 w-5 text-amber-600" />}
-              label="Bons carburant"
-              sub="Gérer mes bons"
-              color="bg-amber-50"
-              onClick={() => navigate("/carburant")}
-            />
-            <QuickAction
-              icon={<Truck className="h-5 w-5 text-green-700" />}
-              label="Mes missions"
-              sub="Voir toutes"
-              color="bg-green-50"
-              onClick={() => navigate("/missions")}
-            />
-            <QuickAction
-              icon={<MapPin className="h-5 w-5 text-blue-600" />}
-              label="Stations"
-              sub="Trouver une station"
-              color="bg-blue-50"
-              onClick={() => navigate("/station")}
-            />
-            <QuickAction
-              icon={<History className="h-5 w-5 text-purple-600" />}
-              label="Historique"
-              sub="Activité passée"
-              color="bg-purple-50"
-              onClick={() => navigate("/missions")}
-            />
-          </div>
-        </div>
-
       </div>
 
-      <BottomNavChauffeur />
+      {/* ── Bons carburant ── */}
+      {bons.length > 0 && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 8px" }}>
+            <p className="t-section-title" style={{ padding: 0, margin: 0 }}>Bons carburant à utiliser</p>
+            <button onClick={() => navigate("/carburant")}
+              style={{ background: "none", border: "none", color: "var(--t-warning)", fontWeight: 700, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 2, cursor: "pointer" }}>
+              Voir <ChevronRight size={14} />
+            </button>
+          </div>
+          <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+            {bons.map(bon => (
+              <BonCard key={bon.id} bon={bon} onUse={() => navigate("/carburant")} onStation={() => navigate(`/station/${encodeURIComponent(bon.numero)}`)} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── Mon activité ── */}
+      <p className="t-section-title">Mon activité</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, padding: "0 16px" }}>
+        <StatTile icon={<Truck size={22} color="var(--t-primary)" />} value={loading ? "…" : String(missions.length)} label="Mission(s)" />
+        <StatTile icon={<Fuel size={22} color="var(--t-warning)" />} value={loading ? "…" : `${totalLitres} L`} label="Carburant" />
+        <StatTile icon={<ClipboardList size={22} color="var(--t-info)" />} value={loading ? "…" : String(bons.length)} label="Bon(s)" />
+      </div>
+
+      {/* ── Actions rapides ── */}
+      <p className="t-section-title">Actions rapides</p>
+      <div className="t-actions">
+        <ActionTile icon="⛽" label="Carburant" sub="Gérer mes bons" onClick={() => navigate("/carburant")} />
+        <ActionTile icon="🚚" label="Missions" sub="Toutes mes missions" onClick={() => navigate("/missions")} />
+        <ActionTile icon="📍" label="Stations" sub="Trouver une station" onClick={() => navigate("/station")} />
+        <ActionTile icon="📋" label="Historique" sub="Activité passée" onClick={() => navigate("/missions")} />
+      </div>
     </div>
   );
 }
 
 /* ─── Sous-composants ────────────────────────────────────────────────────── */
 
-function Header({
-  salutation,
-  user,
-  missionCount,
-  loading = false,
+function ChauffeurHeader({
+  salutation, user, missionCount, loading = false,
 }: {
   salutation: string;
   user: { prenoms?: string; nom?: string } | null;
@@ -252,112 +174,128 @@ function Header({
   loading?: boolean;
 }) {
   return (
-    <div
-      className="relative px-5 pt-12 pb-8"
-      style={{ background: "linear-gradient(145deg, #1a4731 0%, #16a34a 100%)" }}
-    >
-      <div className="flex items-start justify-between gap-3">
+    <div style={{
+      background: "linear-gradient(145deg, #1a4731 0%, #16a34a 100%)",
+      padding: "48px 20px 36px",
+      position: "relative",
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
         {/* Identité */}
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white font-bold text-base ring-2 ring-white/25 uppercase">
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: 14,
+            background: "rgba(255,255,255,0.2)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontWeight: 800, fontSize: "1.1rem",
+            textTransform: "uppercase",
+            border: "2px solid rgba(255,255,255,0.25)",
+          }}>
             {initials(user?.prenoms, user?.nom)}
           </div>
           <div>
-            <p className="text-green-200 text-sm">{salutation} 👋</p>
-            <h1 className="text-white font-bold text-xl leading-tight">
+            <p style={{ color: "rgba(255,255,255,0.75)", fontSize: "0.85rem" }}>{salutation} 👋</p>
+            <h1 style={{ color: "#fff", fontWeight: 800, fontSize: "1.3rem", lineHeight: 1.2, margin: "2px 0 3px" }}>
               {user?.prenoms} {user?.nom}
             </h1>
-            <p className="text-green-300 text-xs">Chauffeur</p>
+            <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.75rem" }}>Chauffeur</p>
           </div>
         </div>
-        {/* Statut + missions */}
-        <div className="flex flex-col items-end gap-1.5 pt-1">
-          <span className="flex items-center gap-1 bg-white/15 rounded-full px-2.5 py-1 text-xs text-white font-medium">
-            <Circle className="h-2 w-2 fill-green-400 text-green-400" />
+        {/* Statut */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, paddingTop: 4 }}>
+          <span style={{
+            display: "flex", alignItems: "center", gap: 5,
+            background: "rgba(255,255,255,0.18)", borderRadius: 999,
+            padding: "4px 10px", fontSize: "0.75rem", color: "#fff", fontWeight: 600,
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#4ade80", display: "inline-block" }} />
             Disponible
           </span>
           {!loading && (
-            <span className="text-green-200 text-xs">
+            <span style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.75rem" }}>
               {missionCount} mission{missionCount !== 1 ? "s" : ""} en cours
             </span>
           )}
         </div>
       </div>
-
       {/* Vague */}
-      <svg
-        className="absolute bottom-0 left-0 right-0 w-full"
-        viewBox="0 0 375 28"
-        preserveAspectRatio="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path d="M0 28 C100 0 275 56 375 28 L375 28 L0 28Z" fill="#f8fafc" />
+      <svg style={{ position: "absolute", bottom: 0, left: 0, right: 0, width: "100%", display: "block" }}
+        viewBox="0 0 375 24" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0 24 C100 0 275 48 375 24 L375 24 L0 24Z" fill="var(--t-bg)" />
       </svg>
     </div>
   );
 }
 
-function NextMissionCard({
-  m,
-  onNavigate,
+function MissionCard({
+  m, onNavigate,
 }: {
-  m: { type_mission: string; lieu_depart: string; lieu_arrivee: string; date_depart: string; statut: string; immatriculation: string | null };
+  m: MissionResume;
   onNavigate: () => void;
 }) {
-  const statutColor = STATUT_COLOR[m.statut] ?? "text-gray-500";
+  const statutColor = STATUT_COLOR[m.statut] ?? "var(--t-muted)";
   const statutLabel = STATUT_LABEL[m.statut] ?? m.statut;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="h-1 bg-gradient-to-r from-green-600 to-emerald-500" />
-      <div className="px-4 pt-3 pb-4">
-        {/* Type + statut */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-green-50 flex items-center justify-center">
-              <Truck className="h-4 w-4 text-green-700" />
+    <div className="t-card" style={{ padding: 0, overflow: "hidden" }}>
+      {/* Barre colorée */}
+      <div style={{ height: 4, background: `linear-gradient(to right, ${statutColor}, ${statutColor}aa)` }} />
+      <div style={{ padding: "14px 16px" }}>
+        {/* Titre + statut */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "var(--t-primary-light)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Truck size={18} color="var(--t-primary)" />
             </div>
             <div>
-              <p className="text-xs font-bold text-gray-800">Prochaine mission</p>
-              <p className="text-xs text-gray-400">{TYPE_LABEL[m.type_mission] ?? m.type_mission}</p>
+              <p style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--t-text)" }}>Prochaine mission</p>
+              <p style={{ fontSize: "0.75rem", color: "var(--t-muted)" }}>{TYPE_LABEL[m.type_mission] ?? m.type_mission}</p>
             </div>
           </div>
-          <span className={`text-xs font-semibold ${statutColor}`}>{statutLabel}</span>
+          <span style={{
+            fontSize: "0.72rem", fontWeight: 700,
+            padding: "3px 10px", borderRadius: 999,
+            background: `${statutColor}18`, color: statutColor,
+          }}>
+            {statutLabel}
+          </span>
         </div>
 
         {/* Route */}
-        <div className="bg-slate-50 rounded-xl px-3 py-2.5 flex items-center gap-2 mb-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-gray-400 mb-0.5">Départ</p>
-            <p className="text-sm font-semibold text-gray-800 truncate">{m.lieu_depart}</p>
+        <div style={{
+          background: "var(--t-bg)", borderRadius: 10,
+          padding: "10px 14px", display: "flex", alignItems: "center",
+          gap: 10, marginBottom: 10,
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: "0.7rem", color: "var(--t-muted)", marginBottom: 2 }}>Départ</p>
+            <p style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--t-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.lieu_depart}</p>
           </div>
-          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center">
-            <ArrowRight className="h-3.5 w-3.5 text-green-700" />
+          <div style={{
+            width: 28, height: 28, borderRadius: "50%",
+            background: "var(--t-card)", boxShadow: "0 1px 4px rgba(0,0,0,.1)",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <ArrowRight size={14} color="var(--t-primary)" />
           </div>
-          <div className="flex-1 min-w-0 text-right">
-            <p className="text-xs text-gray-400 mb-0.5">Arrivée</p>
-            <p className="text-sm font-semibold text-gray-800 truncate">{m.lieu_arrivee}</p>
+          <div style={{ flex: 1, minWidth: 0, textAlign: "right" }}>
+            <p style={{ fontSize: "0.7rem", color: "var(--t-muted)", marginBottom: 2 }}>Arrivée</p>
+            <p style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--t-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.lieu_arrivee}</p>
           </div>
         </div>
 
-        {/* Date + véhicule */}
-        <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
-          <span>📅 {fmtDate(m.date_depart)}</span>
-          {m.immatriculation && (
-            <>
-              <span className="text-gray-200">·</span>
-              <span className="font-mono">{m.immatriculation}</span>
-            </>
-          )}
-        </div>
+        {/* Date */}
+        <p style={{ fontSize: "0.78rem", color: "var(--t-muted)", marginBottom: 14 }}>
+          📅 {fmtDate(m.date_depart)}
+          {m.immatriculation && <span style={{ fontFamily: "monospace", marginLeft: 8 }}>· {m.immatriculation}</span>}
+        </p>
 
         {/* CTA */}
-        <button
-          onClick={onNavigate}
-          className="w-full py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-1.5"
-          style={{ backgroundColor: "#1a4731" }}
-        >
-          Voir la mission <ChevronRight className="h-4 w-4" />
+        <button className="t-btn t-btn--primary" onClick={onNavigate} style={{ height: 44, fontSize: "0.9rem" }}>
+          Voir la mission <ChevronRight size={16} style={{ marginLeft: 4 }} />
         </button>
       </div>
     </div>
@@ -366,69 +304,76 @@ function NextMissionCard({
 
 function EmptyMissionCard({ onNavigate }: { onNavigate: () => void }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-5">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
-          <Truck className="h-5 w-5 text-slate-400" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-700">Aucune mission planifiée</p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Vous n'avez aucune mission à effectuer aujourd'hui.
-          </p>
-        </div>
+    <div className="t-card" style={{ textAlign: "center" }}>
+      <div style={{
+        width: 52, height: 52, borderRadius: "50%",
+        background: "var(--t-bg)", margin: "0 auto 12px",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <Truck size={24} color="var(--t-muted)" />
       </div>
+      <p style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--t-text)" }}>Aucune mission planifiée</p>
+      <p style={{ color: "var(--t-muted)", fontSize: "0.85rem", marginTop: 6, lineHeight: 1.5 }}>
+        Vous n'avez aucune mission à effectuer aujourd'hui.
+      </p>
       <button
         onClick={onNavigate}
-        className="w-full py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-gray-50 transition-colors"
+        className="t-btn t-btn--ghost"
+        style={{ height: 44, fontSize: "0.88rem", marginTop: 16 }}
       >
-        Voir toutes mes missions <ChevronRight className="h-4 w-4 text-gray-400" />
+        Voir toutes mes missions <ChevronRight size={16} style={{ marginLeft: 4 }} />
       </button>
     </div>
   );
 }
 
-function FuelVoucherCard({
-  bon,
-  onUse,
-  onStation,
+function BonCard({
+  bon, onUse, onStation,
 }: {
   bon: BonResume;
   onUse: () => void;
   onStation: () => void;
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-amber-100 overflow-hidden">
-      <div className="h-1 bg-gradient-to-r from-amber-400 to-amber-500" />
-      <div className="px-4 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
-            <Fuel className="h-4 w-4 text-amber-500" />
-          </div>
-          <div className="min-w-0">
-            <p className="font-mono text-xs font-bold text-green-700 truncate">{bon.numero}</p>
-            <p className="text-xs text-gray-600 truncate">
-              {bon.immatriculation ?? "—"} ·{" "}
-              <span className="font-semibold">{bon.quantite_autorisee} L</span>{" "}
-              {bon.type_carburant}
-            </p>
-            {bon.station_service && (
-              <p className="text-xs text-gray-400 truncate">{bon.station_service}</p>
-            )}
-          </div>
+    <div className="t-card t-card--warning" style={{ padding: 0, overflow: "hidden" }}>
+      <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 10,
+          background: "var(--t-warning-bg)",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <Fuel size={20} color="var(--t-warning)" />
         </div>
-        <div className="flex gap-1.5 flex-shrink-0">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: "monospace", fontWeight: 700, fontSize: "0.8rem", color: "var(--t-primary)" }}>{bon.numero}</p>
+          <p style={{ fontSize: "0.8rem", color: "var(--t-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {bon.immatriculation ?? "—"} · <strong>{bon.quantite_autorisee} L</strong> {bon.type_carburant}
+          </p>
+          {bon.station_service && (
+            <p style={{ fontSize: "0.75rem", color: "var(--t-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {bon.station_service}
+            </p>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
           <button
             onClick={onUse}
-            className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-semibold"
+            style={{
+              background: "var(--t-warning)", color: "#fff",
+              border: "none", borderRadius: 8, padding: "8px 14px",
+              fontWeight: 700, fontSize: "0.8rem", cursor: "pointer",
+            }}
           >
             Utiliser
           </button>
           <button
             onClick={onStation}
-            className="px-2.5 py-1.5 rounded-lg border border-amber-200 text-amber-700"
+            style={{
+              background: "var(--t-warning-bg)", color: "var(--t-warning)",
+              border: "none", borderRadius: 8, padding: "8px 10px", cursor: "pointer",
+            }}
           >
-            <MapPin className="h-3.5 w-3.5" />
+            <MapPin size={16} />
           </button>
         </div>
       </div>
@@ -436,53 +381,22 @@ function FuelVoucherCard({
   );
 }
 
-function StatCard({
-  icon,
-  value,
-  label,
-  bg,
-}: {
-  icon: React.ReactNode;
-  value: string;
-  label: string;
-  bg: string;
-}) {
+function StatTile({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-3 py-3 flex flex-col items-center gap-1.5">
-      <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center`}>
-        {icon}
-      </div>
-      <p className="text-base font-bold text-gray-900 leading-none">{value}</p>
-      <p className="text-[10px] text-gray-400 font-medium text-center leading-tight">{label}</p>
+    <div className="t-stat">
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>{icon}</div>
+      <p className="t-stat__value" style={{ fontSize: "1.3rem" }}>{value}</p>
+      <p className="t-stat__label">{label}</p>
     </div>
   );
 }
 
-function QuickAction({
-  icon,
-  label,
-  sub,
-  color,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  sub: string;
-  color: string;
-  onClick: () => void;
-}) {
+function ActionTile({ icon, label, sub, onClick }: { icon: string; label: string; sub: string; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
-      className="bg-white rounded-2xl shadow-sm border border-gray-100 px-3.5 py-3.5 flex items-center gap-3 text-left active:scale-[0.98] transition-transform w-full"
-    >
-      <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center flex-shrink-0`}>
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-gray-800 leading-tight">{label}</p>
-        <p className="text-xs text-gray-400 truncate">{sub}</p>
-      </div>
+    <button className="t-action" onClick={onClick} style={{ minHeight: 100, padding: "18px 12px" }}>
+      <span className="t-action__icon">{icon}</span>
+      <span className="t-action__label">{label}</span>
+      <span style={{ fontSize: "0.72rem", color: "var(--t-muted)", fontWeight: 500 }}>{sub}</span>
     </button>
   );
 }
