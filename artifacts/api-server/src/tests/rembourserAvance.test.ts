@@ -6,7 +6,8 @@
  *  2. montantRembourse: 0     → 400  same message
  *  3. montantRembourse > avance.montantFcfa → 400 "ne peut pas dépasser"
  *  4. Valid partial repayment              → 200
- *  5. Full repayment (omitting montantRembourse) → 200
+ *  5. Concurrent update path              → 409, no history row inserted
+ *  6. Full repayment (omitting montantRembourse) → 200
  *
  * The DB is mocked via the workspace alias so no real database is needed.
  */
@@ -266,7 +267,74 @@ describe("rembourserAvance — guard clauses", () => {
     expect(mockDb.transaction).toHaveBeenCalledOnce();
   });
 
-  // ── 5. Full repayment (omitting montantRembourse) → 200 ──────────────────
+  // ── 5. Concurrent update → 409, no history row inserted ──────────────────
+  //
+  // Scenario: two requests race to repay the same advance for 3 000 FCFA.
+  // The outer db.select() still sees montantRembourse = 0 (stale READ COMMITTED
+  // snapshot), but by the time the transaction acquires the FOR UPDATE lock
+  // the DB row has been updated by the winning request (montantRembourse = 3 000).
+  //
+  // The guard `nouveauMontant <= current.montantRembourse` (line ~988 of
+  // salairesController.ts) must fire, and the controller must:
+  //   - return 409
+  //   - never call tx.insert (no duplicate remboursements_avance row)
+  //   - never call tx.update
+  it("returns 409 and skips the history insert when FOR UPDATE lock reveals a stale montantRembourse", async () => {
+    // Outer read still shows the un-repaid state (stale snapshot)
+    const avance = makeAvance({ montantFcfa: 10_000, montantRembourse: 0 });
+    makeSelectChain([avance]);
+
+    // Captured inside the mockImplementation so we can assert on them afterwards
+    let capturedTxInsert: ReturnType<typeof vi.fn> | undefined;
+    let capturedTxUpdate: ReturnType<typeof vi.fn> | undefined;
+
+    mockDb.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+      const txInsert = vi.fn();
+      const txUpdate = vi.fn();
+      capturedTxInsert = txInsert;
+      capturedTxUpdate = txUpdate;
+
+      const tx = {
+        select: vi.fn(),
+        insert: txInsert,
+        update: txUpdate,
+      };
+
+      // FOR UPDATE read returns the already-updated montantRembourse (3 000):
+      // a concurrent request already applied the same repayment amount.
+      // nouveauMontant (3 000) <= current.montantRembourse (3 000) → guard fires.
+      const txSelectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        for: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([{ montantRembourse: 3_000 }]),
+      };
+      tx.select.mockReturnValue(txSelectChain);
+
+      // Run the real controller callback so its internal guard logic executes.
+      // The callback throws CONCURRENT_UPDATE; we re-throw so the controller's
+      // outer catch block can map it to a 409 response.
+      await callback(tx);
+    });
+
+    const req = makeReq(5, { montantRembourse: 3_000 });
+    const res = makeRes();
+
+    await rembourserAvance(req as Request, res as Response);
+
+    // Controller must return 409
+    expect(res._status).toBe(409);
+    expect((res._body as { erreur: string }).erreur).toMatch(/simultan[eé]/i);
+
+    // The transaction was entered
+    expect(mockDb.transaction).toHaveBeenCalledOnce();
+
+    // Critical: no history row was inserted and no update was applied
+    expect(capturedTxInsert).not.toHaveBeenCalled();
+    expect(capturedTxUpdate).not.toHaveBeenCalled();
+  });
+
+  // ── 6. Full repayment (omitting montantRembourse) → 200 ──────────────────
   it("accepts full repayment when montantRembourse is omitted and marks avance rembourse", async () => {
     const avance = makeAvance({ montantFcfa: 10_000, montantRembourse: 0 });
     makeSelectChain([avance]);
