@@ -1748,6 +1748,10 @@ export const GetPersonnelHistoriqueResponse = zod.object({
   "motif": zod.string().nullish(),
   "statut": zod.enum(['en_cours', 'rembourse']),
   "montantRembourse": zod.number(),
+  "planType": zod.enum(['integral', 'mensuel', 'reporte']),
+  "montantMensuelFcfa": zod.number().nullish(),
+  "reportMois": zod.number().nullish(),
+  "reportAnnee": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 }))
 })
@@ -1994,6 +1998,10 @@ export const GetAvancesPersonnelResponseItem = zod.object({
   "motif": zod.string().nullish(),
   "statut": zod.enum(['en_cours', 'rembourse']),
   "montantRembourse": zod.number(),
+  "planType": zod.enum(['integral', 'mensuel', 'reporte']),
+  "montantMensuelFcfa": zod.number().nullish(),
+  "reportMois": zod.number().nullish(),
+  "reportAnnee": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 }),
   "personnel": zod.object({
@@ -2037,6 +2045,10 @@ export const RembourserAvancePersonnelResponse = zod.object({
   "motif": zod.string().nullish(),
   "statut": zod.enum(['en_cours', 'rembourse']),
   "montantRembourse": zod.number(),
+  "planType": zod.enum(['integral', 'mensuel', 'reporte']),
+  "montantMensuelFcfa": zod.number().nullish(),
+  "reportMois": zod.number().nullish(),
+  "reportAnnee": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 })
 

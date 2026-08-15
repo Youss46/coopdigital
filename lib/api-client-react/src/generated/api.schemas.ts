@@ -1776,6 +1776,15 @@ export const AvancePersonnelStatut = {
   rembourse: 'rembourse',
 } as const;
 
+export type AvancePersonnelPlanType = typeof AvancePersonnelPlanType[keyof typeof AvancePersonnelPlanType];
+
+
+export const AvancePersonnelPlanType = {
+  integral: 'integral',
+  mensuel: 'mensuel',
+  reporte: 'reporte',
+} as const;
+
 export interface AvancePersonnel {
   id: number;
   personnelId: number;
@@ -1786,6 +1795,13 @@ export interface AvancePersonnel {
   motif?: string | null;
   statut: AvancePersonnelStatut;
   montantRembourse: number;
+  planType: AvancePersonnelPlanType;
+  /** @nullable */
+  montantMensuelFcfa?: number | null;
+  /** @nullable */
+  reportMois?: number | null;
+  /** @nullable */
+  reportAnnee?: number | null;
   createdAt: string;
 }
 

@@ -8599,7 +8599,7 @@ components:
 
     AvancePersonnel:
       type: object
-      required: [id, personnelId, cooperativeId, montantFcfa, dateOctroi, statut, montantRembourse, createdAt]
+      required: [id, personnelId, cooperativeId, montantFcfa, dateOctroi, statut, montantRembourse, planType, createdAt]
       properties:
         id:
           type: integer
@@ -8618,6 +8618,15 @@ components:
           enum: [en_cours, rembourse]
         montantRembourse:
           type: integer
+        planType:
+          type: string
+          enum: [integral, mensuel, reporte]
+        montantMensuelFcfa:
+          type: ["integer", "null"]
+        reportMois:
+          type: ["integer", "null"]
+        reportAnnee:
+          type: ["integer", "null"]
         createdAt:
           type: string
           format: date-time

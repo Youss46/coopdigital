@@ -30,6 +30,8 @@ import {
   Personnel,
   BulletinAvecPersonnel,
   AvanceAvecPersonnel,
+  AvancePersonnel,
+  AvanceAvecPersonnelPersonnel,
   CreatePersonnelInput,
   UpdatePersonnelInput,
 } from "@workspace/api-client-react";
@@ -1027,8 +1029,7 @@ function TabAvances() {
   const { confirm, ConfirmDialog } = useConfirm();
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [planTarget, setPlanTarget] = useState<{ avance: any; personnel: any } | null>(null);
+  const [planTarget, setPlanTarget] = useState<{ avance: AvancePersonnel; personnel: AvanceAvecPersonnelPersonnel } | null>(null);
   const canGerer = usePermission("salaires", "gerer_avances");
 
   const { data: avances, refetch, isLoading } = useGetAvancesPersonnel({ statut: "en_cours" });
@@ -1104,13 +1105,11 @@ function TabAvances() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                {list.map((row: any) => {
-                  const { avance, personnel } = row as AvanceAvecPersonnel & { avance: { planType?: string; montantMensuelFcfa?: number; reportMois?: number; reportAnnee?: number } };
+                {list.map(({ avance, personnel }: AvanceAvecPersonnel) => {
                   const restant = avance.montantFcfa - avance.montantRembourse;
                   const octroiDate = toDate(avance.createdAt);
                   const isOld = octroiDate ? (now - octroiDate.getTime() > deuxMoisMs) : false;
-                  const planKey = avance.planType ?? "integral";
+                  const planKey = avance.planType;
                   const badge = PLAN_BADGE[planKey] ?? PLAN_BADGE["integral"];
                   return (
                     <tr key={avance.id} className="hover:bg-gray-50 transition-colors">
@@ -1216,10 +1215,8 @@ function PlanAvanceModal({
   onClose,
   onSaved,
 }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  avance: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  personnel: any;
+  avance: AvancePersonnel;
+  personnel: AvanceAvecPersonnelPersonnel;
   onClose: () => void;
   onSaved: () => void;
 }) {
