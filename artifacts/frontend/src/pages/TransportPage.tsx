@@ -2354,7 +2354,12 @@ function TabStationsCarburant() {
         headers: authHeader(),
         body: JSON.stringify(body),
       });
-      if (!res.ok) { const d = await res.json(); throw new Error((d as { erreur?: string }).erreur ?? "Erreur"); }
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = `HTTP ${res.status}`;
+        try { const d = JSON.parse(text) as { erreur?: string }; msg = d.erreur ? `${res.status} — ${d.erreur}` : `${res.status} — ${text}`; } catch { msg = `${res.status} — ${text}`; }
+        throw new Error(msg);
+      }
       return res.json();
     },
     onSuccess: () => {
