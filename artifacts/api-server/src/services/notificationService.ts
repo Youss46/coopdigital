@@ -354,7 +354,7 @@ export async function notifDemandeCarburant(
 export async function notifBonSoumisCarburant(
   cooperativeId: number,
   numero:        string,
-  chauffeurNom:  string,
+  auteurLabel:   string,
   bonId:         number,
 ): Promise<void> {
   const roles = ["pca", "directeur"];
@@ -362,7 +362,7 @@ export async function notifBonSoumisCarburant(
     type:         "bon_soumis_carburant",
     gravite:      "attention",
     titre:        "Nouveau bon carburant à approuver",
-    message:      `Le chauffeur ${chauffeurNom} a soumis le bon ${numero} pour approbation`,
+    message:      `${auteurLabel} a soumis le bon ${numero} pour approbation`,
     lien:         "/transport",
     lienLibelle:  "Aller au transport",
     sourceModule: "transport",

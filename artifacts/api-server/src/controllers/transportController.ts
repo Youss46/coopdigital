@@ -796,13 +796,16 @@ export async function handleSoumettresBonCarburant(req: Request, res: Response):
     if (row.bon.statut !== "brouillon") { res.status(400).json({ erreur: "Le bon n'est pas en brouillon" }); return; }
     await transitionBon(cooperativeId, id, "soumis");
 
-    // Notification push + in-app → comptable/directeur (fire-and-forget)
-    void notifBonSoumisCarburant(
-      cooperativeId,
-      row.bon.numero,
-      `${row.chauffeurPrenoms ?? ""} ${row.chauffeurNom ?? ""}`.trim() || "Chauffeur",
-      id,
-    );
+    // Notification push + in-app → PCA/directeur (fire-and-forget)
+    void (async () => {
+      const roleLabels: Record<string, string> = { pca: "Le PCA", directeur: "Le directeur", magasinier: "Le magasinier" };
+      const [u] = await db.select({ nom: usersTable.nom, prenoms: usersTable.prenoms })
+        .from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
+      const roleLabel = roleLabels[req.user!.role] ?? "L'utilisateur";
+      const nomComplet = `${u?.prenoms ?? ""} ${u?.nom ?? ""}`.trim();
+      const auteurLabel = nomComplet ? `${roleLabel} ${nomComplet}` : roleLabel;
+      await notifBonSoumisCarburant(cooperativeId, row.bon.numero, auteurLabel, id);
+    })();
 
     res.json(mapBon({ ...row, bon: { ...row.bon, statut: "soumis", updatedAt: new Date() } }));
   } catch (err) {
@@ -827,6 +830,18 @@ export async function handleTraiterDemande(req: Request, res: Response): Promise
     await transitionBon(cooperativeId, id, "soumis", {
       quantiteAutorisee: String(body.quantite_autorisee),
     });
+
+    // Notification push + in-app → PCA/directeur (fire-and-forget)
+    void (async () => {
+      const roleLabels: Record<string, string> = { pca: "Le PCA", directeur: "Le directeur", magasinier: "Le magasinier" };
+      const [u] = await db.select({ nom: usersTable.nom, prenoms: usersTable.prenoms })
+        .from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
+      const roleLabel = roleLabels[req.user!.role] ?? "L'utilisateur";
+      const nomComplet = `${u?.prenoms ?? ""} ${u?.nom ?? ""}`.trim();
+      const auteurLabel = nomComplet ? `${roleLabel} ${nomComplet}` : roleLabel;
+      await notifBonSoumisCarburant(cooperativeId, row.bon.numero, auteurLabel, id);
+    })();
+
     const updated = await getBonCarburant(cooperativeId, id);
     res.json(mapBon(updated!));
   } catch (err) {
