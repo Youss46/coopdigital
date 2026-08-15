@@ -195,6 +195,7 @@ async function debiterCaisseCentralePaiement(
   montantFcfa: number,
   paiementId: number,
   userId: number | null | undefined,
+  opts?: { compteDebitOverride?: string; libelle?: string },
 ): Promise<void> {
   try {
     const [caisse] = await db
@@ -218,8 +219,9 @@ async function debiterCaisseCentralePaiement(
       type: "sortie",
       motif: "paiement_producteur",
       montantFcfa,
-      libelle: `Paiement producteur — règlement #${paiementId}`,
+      libelle: opts?.libelle ?? `Paiement producteur — règlement #${paiementId}`,
       userId: userId ?? undefined,
+      compteDebitOverride: opts?.compteDebitOverride,
     });
 
     // Notifier si le solde passe sous le fond minimum configuré
@@ -630,6 +632,12 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       }
     });
 
+    // 4–7. Déterminer si c'est un bon carburant (impacte les comptes OHADA)
+    const isBonCarburant = !!row.paiement.bonCarburantId;
+    const caisseOpts = isBonCarburant
+      ? { compteDebitOverride: "6042", libelle: `Carburant — règlement #${id}` }
+      : undefined;
+
     // 4. Débiter la caisse principale du délégué si paiement espèces
     //    (hors tx DB car enregistrerMouvement gère sa propre cohérence interne)
     if (isDelegueEspeces && userId && cooperativeId) {
@@ -639,6 +647,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         row.paiement.montantFcfa,
         id,
         row.paiement.livraisonId,
+        caisseOpts,
       );
     }
 
@@ -655,24 +664,25 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     }
 
     // 6. Débiter la Caisse Centrale si paiement espèces par un rôle non-délégué
-    //    pour un membre rattaché à la base centrale (delegueId IS NULL)
+    //    Pour les bons carburant : isMembreBaseCentrale = true (pas de membre → delegueId null)
+    //    Le caisseOpts contient compteDebitOverride: "6042" si bon carburant
     if (isNonDelegueEspeces && isMembreBaseCentrale && cooperativeId) {
       await debiterCaisseCentralePaiement(
         cooperativeId,
         row.paiement.montantFcfa,
         id,
         userId,
+        caisseOpts,
       );
     }
 
-    // 7. Écriture comptable décaissement
-    //    Producteur espèces → enregistrerMouvement crée 401/571 via source "caisse"
+    // 7. Écriture comptable décaissement (mobile / chèque uniquement)
+    //    Espèces : enregistrerMouvement l'a déjà créée (avec compteDebitOverride si carburant)
     //    Producteur mobile  → 401/552  |  Producteur chèque → 401/521
-    //    Carburant espèces  → 6042/571 |  Carburant mobile  → 6042/552  |  Carburant chèque → 6042/521
-    const isBonCarburant = !!row.paiement.bonCarburantId;
-    if (mode !== "especes" || isBonCarburant) {
+    //    Carburant mobile   → 6042/552 |  Carburant chèque  → 6042/521
+    if (mode !== "especes") {
       const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
-      const compteCredit = mode === "especes" ? "571" : isMobile ? "552" : "521";
+      const compteCredit = isMobile ? "552" : "521";
       const compteDebit  = isBonCarburant ? "6042" : "401";
       const dateStr = new Date().toISOString().slice(0, 10);
       const libelle = isBonCarburant

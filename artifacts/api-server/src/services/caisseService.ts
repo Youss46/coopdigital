@@ -162,6 +162,8 @@ export interface MouvementInput {
   libelle?: string;
   referenceOperation?: string;
   userId?: number;
+  /** Remplace le compte débit calculé depuis le motif (ex: "6042" pour charges carburant) */
+  compteDebitOverride?: string;
 }
 
 export async function enregistrerMouvement(
@@ -215,7 +217,7 @@ export async function enregistrerMouvement(
     source:      "caisse",
     sourceId:    mouvement?.id ?? undefined,
     libelle:     data.libelle ?? `Caisse — ${data.motif}`,
-    compteDebit: comptes.debit,
+    compteDebit: data.compteDebitOverride ?? comptes.debit,
     compteCredit:comptes.credit,
     montantFcfa: montant,
     date:        today(),
@@ -833,6 +835,7 @@ export async function debiterCaisseParResponsable(
   montantFcfa: number,
   paiementId: number,
   livraisonId: number | null,
+  opts?: { compteDebitOverride?: string; libelle?: string },
 ): Promise<{ nouveauSolde: number; alerte?: string }> {
   const [caisse] = await db
     .select()
@@ -848,13 +851,18 @@ export async function debiterCaisseParResponsable(
     throw new Error("Aucune caisse ne vous est assignée. Contactez votre administrateur.");
   }
 
+  const defaultLibelle = livraisonId
+    ? `Paiement producteur PAI-${paiementId} / LIV-${livraisonId}`
+    : `Paiement producteur PAI-${paiementId}`;
+
   const result = await enregistrerMouvement(caisse.id, {
     type: "sortie",
     motif: "paiement_producteur",
     montantFcfa,
-    libelle: `Paiement producteur PAI-${paiementId}${livraisonId ? ` / LIV-${livraisonId}` : ""}`,
+    libelle: opts?.libelle ?? defaultLibelle,
     referenceOperation: `PAI-${paiementId}`,
     userId,
+    compteDebitOverride: opts?.compteDebitOverride,
   });
 
   logger.info(
