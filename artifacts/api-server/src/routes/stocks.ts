@@ -9,6 +9,8 @@ import {
   sortieStock,
   getAlertes,
   createEntrepot,
+  updateEntrepot,
+  deleteEntrepot,
   getLotissementStats,
 } from "../controllers/stocksController";
 
@@ -18,6 +20,8 @@ router.use(authMiddleware);
 
 router.get("/stocks/entrepots", checkPermission("stocks", "lire"), getEntrepots);
 router.post("/stocks/entrepots", checkPermission("stocks", "entree"), auditMiddleware("stocks", "CREATE", { entiteType: "entrepot" }), createEntrepot);
+router.put("/stocks/entrepots/:id", checkPermission("stocks", "entree"), auditMiddleware("stocks", "UPDATE", { entiteIdParam: "id", entiteType: "entrepot" }), updateEntrepot);
+router.delete("/stocks/entrepots/:id", checkPermission("stocks", "entree"), auditMiddleware("stocks", "DELETE", { entiteIdParam: "id", entiteType: "entrepot" }), deleteEntrepot);
 router.get("/stocks/mouvements", checkPermission("stocks", "lire"), getMouvements);
 router.post("/stocks/entree", checkPermission("stocks", "entree"), auditMiddleware("stocks", "CREATE", { entiteType: "stock_entree" }), entreeStock);
 router.post("/stocks/sortie", checkPermission("stocks", "sortie"), auditMiddleware("stocks", "CREATE", { entiteType: "stock_sortie" }), sortieStock);

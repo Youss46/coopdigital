@@ -13,7 +13,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
-import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle, PackageCheck, Clock, ArrowRight, Boxes } from "lucide-react";
+import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle, PackageCheck, Clock, ArrowRight, Boxes, Pencil, Trash2, X } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
@@ -25,6 +25,15 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { method: "POST", headers: hdr(), body: JSON.stringify(body) });
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erreur ?? r.statusText);
   return r.json();
+}
+async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  const r = await fetch(`${BASE}${path}`, { method: "PUT", headers: hdr(), body: JSON.stringify(body) });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erreur ?? r.statusText);
+  return r.json();
+}
+async function apiDelete(path: string): Promise<void> {
+  const r = await fetch(`${BASE}${path}`, { method: "DELETE", headers: hdr() });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erreur ?? r.statusText);
 }
 
 function formaterDate(d: string) {
@@ -70,6 +79,14 @@ export default function StocksPage() {
   const [modalEntrepot, setModalEntrepot] = useState(false);
   const [formEntrepot, setFormEntrepot] = useState({ nom: "", ville: "", capaciteKg: "", capaciteSacs: "", seuilAlerteKg: "", pourFournisseursExt: false });
   const [errEntrepot, setErrEntrepot] = useState("");
+  const FORM_VIDE = { nom: "", ville: "", capaciteKg: "", capaciteSacs: "", seuilAlerteKg: "", pourFournisseursExt: false };
+
+  // Edit / delete state
+  type EntrepotItem = { id: number; nom: string; ville: string; capaciteKg: string | number; capaciteSacs?: number | null; seuilAlerteKg?: string | number | null; pourFournisseursExt?: boolean };
+  const [editingEntrepot, setEditingEntrepot] = useState<EntrepotItem | null>(null);
+  const [deletingEntrepot, setDeletingEntrepot] = useState<EntrepotItem | null>(null);
+  const [errEdit, setErrEdit] = useState("");
+  const [errDelete, setErrDelete] = useState("");
 
   const mutCreerEntrepot = useMutation({
     mutationFn: () => apiPost("/api/stocks/entrepots", {
@@ -83,11 +100,52 @@ export default function StocksPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
       setModalEntrepot(false);
-      setFormEntrepot({ nom: "", ville: "", capaciteKg: "", capaciteSacs: "", seuilAlerteKg: "", pourFournisseursExt: false });
+      setFormEntrepot(FORM_VIDE);
       setErrEntrepot("");
     },
     onError: (e: Error) => setErrEntrepot(e.message),
   });
+
+  const mutModifierEntrepot = useMutation({
+    mutationFn: () => apiPut(`/api/stocks/entrepots/${editingEntrepot!.id}`, {
+      nom: formEntrepot.nom,
+      ville: formEntrepot.ville,
+      capaciteKg: parseFloat(formEntrepot.capaciteKg),
+      capaciteSacs: formEntrepot.capaciteSacs ? parseInt(formEntrepot.capaciteSacs) : "",
+      seuilAlerteKg: formEntrepot.seuilAlerteKg ? parseFloat(formEntrepot.seuilAlerteKg) : "",
+      pourFournisseursExt: formEntrepot.pourFournisseursExt,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
+      setEditingEntrepot(null);
+      setFormEntrepot(FORM_VIDE);
+      setErrEdit("");
+    },
+    onError: (e: Error) => setErrEdit(e.message),
+  });
+
+  const mutSupprimerEntrepot = useMutation({
+    mutationFn: () => apiDelete(`/api/stocks/entrepots/${deletingEntrepot!.id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
+      setDeletingEntrepot(null);
+      setErrDelete("");
+    },
+    onError: (e: Error) => setErrDelete(e.message),
+  });
+
+  function ouvrirEdition(e: EntrepotItem) {
+    setFormEntrepot({
+      nom: e.nom,
+      ville: e.ville,
+      capaciteKg: String(parseFloat(String(e.capaciteKg))),
+      capaciteSacs: e.capaciteSacs != null ? String(e.capaciteSacs) : "",
+      seuilAlerteKg: e.seuilAlerteKg != null ? String(parseFloat(String(e.seuilAlerteKg))) : "",
+      pourFournisseursExt: e.pourFournisseursExt ?? false,
+    });
+    setErrEdit("");
+    setEditingEntrepot(e);
+  }
 
   const { data: entrepots = [], isLoading } = useGetEntrepots();
   const { data: mouvements = [] } = useGetMouvementsStock();
@@ -351,13 +409,33 @@ export default function StocksPage() {
                         </p>
                       )}
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-gray-900">{formaterPoids(e.stockActuelKg)}</p>
-                      <p className="text-xs text-gray-400">/ {formaterPoids(e.capaciteKg)}</p>
-                      {(e as typeof e & { capaciteSacs?: number | null }).capaciteSacs != null && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          / {(e as typeof e & { capaciteSacs?: number | null }).capaciteSacs} sacs max
-                        </p>
+                    <div className="flex items-start gap-2">
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-gray-900">{formaterPoids(e.stockActuelKg)}</p>
+                        <p className="text-xs text-gray-400">/ {formaterPoids(e.capaciteKg)}</p>
+                        {(e as typeof e & { capaciteSacs?: number | null }).capaciteSacs != null && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            / {(e as typeof e & { capaciteSacs?: number | null }).capaciteSacs} sacs max
+                          </p>
+                        )}
+                      </div>
+                      {peutEntree && (
+                        <div className="flex flex-col gap-1 ml-1">
+                          <button
+                            onClick={() => ouvrirEdition(e as EntrepotItem)}
+                            title="Modifier l'entrepôt"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => { setDeletingEntrepot(e as EntrepotItem); setErrDelete(""); }}
+                            title="Supprimer l'entrepôt"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -614,6 +692,103 @@ export default function StocksPage() {
                 className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50"
                 style={{ backgroundColor: "#1a4731" }}>
                 {mutCreerEntrepot.isPending ? "Enregistrement…" : "Créer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal modifier entrepôt */}
+      {editingEntrepot && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Modifier l'entrepôt</h3>
+              <button onClick={() => { setEditingEntrepot(null); setFormEntrepot(FORM_VIDE); }} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
+                <input type="text" value={formEntrepot.nom}
+                  onChange={(e) => setFormEntrepot((f) => ({ ...f, nom: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Ville *</label>
+                <input type="text" value={formEntrepot.ville}
+                  onChange={(e) => setFormEntrepot((f) => ({ ...f, ville: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Capacité (kg) *</label>
+                  <input type="number" value={formEntrepot.capaciteKg}
+                    onChange={(e) => setFormEntrepot((f) => ({ ...f, capaciteKg: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Capacité (sacs)</label>
+                  <input type="number" value={formEntrepot.capaciteSacs}
+                    onChange={(e) => setFormEntrepot((f) => ({ ...f, capaciteSacs: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Seuil alerte (kg)</label>
+                <input type="number" value={formEntrepot.seuilAlerteKg}
+                  onChange={(e) => setFormEntrepot((f) => ({ ...f, seuilAlerteKg: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={formEntrepot.pourFournisseursExt}
+                  onChange={(e) => setFormEntrepot((f) => ({ ...f, pourFournisseursExt: e.target.checked }))}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <span className="text-xs text-gray-700">Entrepôt dédié pisteurs / fournisseurs externes</span>
+              </label>
+              {errEdit && <p className="text-xs text-red-600">{errEdit}</p>}
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button onClick={() => { setEditingEntrepot(null); setFormEntrepot(FORM_VIDE); }}
+                className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Annuler
+              </button>
+              <button
+                onClick={() => mutModifierEntrepot.mutate()}
+                disabled={mutModifierEntrepot.isPending || !formEntrepot.nom || !formEntrepot.ville || !formEntrepot.capaciteKg}
+                className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50"
+                style={{ backgroundColor: "#1a4731" }}>
+                {mutModifierEntrepot.isPending ? "Enregistrement…" : "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal supprimer entrepôt */}
+      {deletingEntrepot && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">Supprimer l'entrepôt</h3>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <p className="text-sm text-gray-700">
+                Êtes-vous sûr de vouloir supprimer <span className="font-semibold">{deletingEntrepot.nom}</span> ?
+              </p>
+              <p className="text-xs text-gray-500">
+                Cette action est irréversible. Un entrepôt ayant des mouvements de stock ne peut pas être supprimé.
+              </p>
+              {errDelete && <p className="text-xs text-red-600">{errDelete}</p>}
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button onClick={() => { setDeletingEntrepot(null); setErrDelete(""); }}
+                className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Annuler
+              </button>
+              <button
+                onClick={() => mutSupprimerEntrepot.mutate()}
+                disabled={mutSupprimerEntrepot.isPending}
+                className="flex-1 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50">
+                {mutSupprimerEntrepot.isPending ? "Suppression…" : "Supprimer"}
               </button>
             </div>
           </div>

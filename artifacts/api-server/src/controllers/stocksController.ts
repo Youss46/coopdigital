@@ -231,6 +231,51 @@ export async function entreeStock(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function updateEntrepot(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Non autorisé" }); return; }
+  const id = parseInt(req.params["id"] ?? "");
+  if (!id) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  const { nom, ville, capaciteKg, capaciteSacs, seuilAlerteKg, pourFournisseursExt } = req.body as Record<string, unknown>;
+  try {
+    const [existing] = await db.select({ id: entrepotsTable.id })
+      .from(entrepotsTable).where(and(eq(entrepotsTable.id, id), eq(entrepotsTable.cooperativeId, cooperativeId))).limit(1);
+    if (!existing) { res.status(404).json({ erreur: "Entrepôt introuvable" }); return; }
+    const updates: Partial<typeof entrepotsTable.$inferInsert> = {};
+    if (nom != null)                updates.nom = String(nom);
+    if (ville != null)              updates.ville = String(ville);
+    if (capaciteKg != null)         updates.capaciteKg = String(parseFloat(String(capaciteKg)));
+    if (capaciteSacs != null)       updates.capaciteSacs = capaciteSacs === "" ? null : parseInt(String(capaciteSacs));
+    if (seuilAlerteKg != null)      updates.seuilAlerteKg = seuilAlerteKg === "" ? null : String(parseFloat(String(seuilAlerteKg)));
+    if (pourFournisseursExt != null) updates.pourFournisseursExt = Boolean(pourFournisseursExt);
+    const [updated] = await db.update(entrepotsTable).set(updates).where(eq(entrepotsTable.id, id)).returning();
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "Erreur updateEntrepot");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function deleteEntrepot(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Non autorisé" }); return; }
+  const id = parseInt(req.params["id"] ?? "");
+  if (!id) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    const [existing] = await db.select({ id: entrepotsTable.id })
+      .from(entrepotsTable).where(and(eq(entrepotsTable.id, id), eq(entrepotsTable.cooperativeId, cooperativeId))).limit(1);
+    if (!existing) { res.status(404).json({ erreur: "Entrepôt introuvable" }); return; }
+    const [mouvement] = await db.select({ id: mouvementsStockTable.id })
+      .from(mouvementsStockTable).where(eq(mouvementsStockTable.entrepotId, id)).limit(1);
+    if (mouvement) { res.status(409).json({ erreur: "Impossible de supprimer un entrepôt ayant des mouvements de stock" }); return; }
+    await db.delete(entrepotsTable).where(eq(entrepotsTable.id, id));
+    res.status(204).end();
+  } catch (err) {
+    req.log.error({ err }, "Erreur deleteEntrepot");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 export async function sortieStock(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) {
