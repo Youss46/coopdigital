@@ -25,6 +25,7 @@ function comptesForMouvement(type: string, motif: string): CompteMapping {
   // sortie
   const debits: Record<string, string> = {
     paiement_producteur:  "401",   // Fournisseurs
+    carburant:            "6042",  // Charges de carburant
     avance:               "4091",  // Fournisseurs, avances et acomptes versés
     achat_intrants:       "604",   // Achats stockés de matières et fournitures
     frais_fonctionnement: "638",   // Autres charges externes
@@ -857,7 +858,7 @@ export async function debiterCaisseParResponsable(
 
   const result = await enregistrerMouvement(caisse.id, {
     type: "sortie",
-    motif: "paiement_producteur",
+    motif: opts?.compteDebitOverride === "6042" ? "carburant" : "paiement_producteur",
     montantFcfa,
     libelle: opts?.libelle ?? defaultLibelle,
     referenceOperation: `PAI-${paiementId}`,

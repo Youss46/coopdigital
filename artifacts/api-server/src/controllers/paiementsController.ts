@@ -217,7 +217,7 @@ async function debiterCaisseCentralePaiement(
 
     const result = await enregistrerMouvement(caisse.id, {
       type: "sortie",
-      motif: "paiement_producteur",
+      motif: opts?.compteDebitOverride === "6042" ? "carburant" : "paiement_producteur",
       montantFcfa,
       libelle: opts?.libelle ?? `Paiement producteur — règlement #${paiementId}`,
       userId: userId ?? undefined,

@@ -19,6 +19,7 @@ const MOTIFS_ENTREE = [
 ];
 const MOTIFS_SORTIE = [
   { value: "paiement_producteur",  label: "Paiement producteur" },
+  { value: "carburant",            label: "Carburant" },
   { value: "avance",               label: "Avance à un membre" },
   { value: "achat_intrants",       label: "Achat intrants" },
   { value: "frais_fonctionnement", label: "Frais de fonctionnement" },
@@ -26,6 +27,11 @@ const MOTIFS_SORTIE = [
   { value: "remboursement",        label: "Remboursement" },
   { value: "autre",                label: "Autre sortie" },
 ];
+
+const ALL_MOTIFS_CAISSE = [...MOTIFS_ENTREE, ...MOTIFS_SORTIE];
+function labelMotifCaisse(motif: string): string {
+  return ALL_MOTIFS_CAISSE.find(m => m.value === motif)?.label ?? motif.replace(/_/g, " ");
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -836,7 +842,7 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
                         {m.type === "entree" ? "↑ Entrée" : "↓ Sortie"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{m.motif.replace(/_/g, " ")}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{labelMotifCaisse(m.motif)}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{m.libelle ?? "—"}</td>
                     <td className={`px-4 py-3 text-right font-semibold ${m.type === "entree" ? "text-green-600" : "text-red-600"}`}>
                       {m.type === "entree" ? "+" : "-"}{FCFA(m.montant_fcfa)}
@@ -1038,7 +1044,7 @@ function HistoriqueSessions({ caisses }: { caisses: Caisse[] | null }) {
                           {m.type === "entree" ? "↑" : "↓"}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-gray-600 text-xs">{m.motif.replace(/_/g, " ")}</td>
+                      <td className="px-3 py-2 text-gray-600 text-xs">{labelMotifCaisse(m.motif)}</td>
                       <td className={`px-3 py-2 text-right font-semibold text-xs ${m.type === "entree" ? "text-green-600" : "text-red-600"}`}>
                         {m.type === "entree" ? "+" : "-"}{FCFA(m.montant_fcfa)}
                       </td>
