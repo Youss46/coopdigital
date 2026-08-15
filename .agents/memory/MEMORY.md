@@ -48,3 +48,4 @@
 - [Commissions délégués — architecture](commissions-delegues-arch.md) — Option A (délégué du membre via membres.delegue_id); 2 tables; hook dans enregistrerCollecte; résolution taux par priorité.
 - [Rôle Peseur — pattern ajout terrain role](terrain-peseur-role.md) — peseur = 4e rôle terrain (phone auth); 6 fichiers à toucher; backend delegueOnly guard déjà protège avance/paiement.
 - [Licence guard dev testing](licence-guard-dev-testing.md) — tenantGuard 402 sans licence active; le check négatif est caché en mémoire → redémarrer l'API après seed.
+- [Avances membres — plan déduction flexible](avances-membres-plan.md) — planType/montantPartielFcfa/reportDate sur avancesTable; remboursementsAvancesMembresTable pour historique; livraisonsController itère TOUTES les avances en_cours par dateOctroi ASC (pas limit 1).

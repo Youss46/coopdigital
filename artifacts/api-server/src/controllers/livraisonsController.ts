@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, livraisonsTable, avancesTable, paiementsTable, membresTable, fournisseursTable, lotLivraisonsTable, lotsTable, campagnesTable, entrepotsTable, mouvementsStockTable, usersTable } from "@workspace/db";
+import { db, livraisonsTable, avancesTable, remboursementsAvancesMembresTable, paiementsTable, membresTable, fournisseursTable, lotLivraisonsTable, lotsTable, campagnesTable, entrepotsTable, mouvementsStockTable, usersTable } from "@workspace/db";
 import { alias } from "drizzle-orm/pg-core";
 
 // Alias pour la jointure agent saisie (évite conflit avec d'éventuels autres joins usersTable)
@@ -179,20 +179,45 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       let intrantsDeduits = 0;
       let avanceEnCours: typeof avancesTable.$inferSelect | undefined;
 
+      const dateStr = dateLivraison ?? new Date().toISOString().split("T")[0]!;
+
+      // Plan flexible par avance — on traite toutes les avances en_cours par ordre d'octroi
+      type AvancePasse = { av: typeof avancesTable.$inferSelect; montant: number };
+      const avancesATraiter: AvancePasse[] = [];
+
       if (membreId) {
-        const rows = await tx
+        const avancesEnCours = await tx
           .select().from(avancesTable)
           .where(and(eq(avancesTable.membreId, membreId), eq(avancesTable.statut, "en_cours")))
-          .orderBy(desc(avancesTable.dateOctroi))
-          .limit(1);
-        avanceEnCours = rows[0];
-        avanceDeduite = avanceEnCours ? Math.min(avanceEnCours.soldeRestantFcfa, montantBrut) : 0;
-        const apresAvance = montantBrut - avanceDeduite;
-        intrantsDeduits = Math.min(encoursIntrants, Math.max(0, apresAvance));
+          .orderBy(avancesTable.dateOctroi); // plus ancienne en premier
+
+        let budgetRestant = montantBrut;
+        for (const av of avancesEnCours) {
+          if (budgetRestant <= 0) break;
+          const planType = av.planType ?? "integral";
+
+          // Reporté : sauter si la livraison est avant la date de report
+          if (planType === "reporte" && av.reportDate) {
+            if (dateStr < av.reportDate) continue;
+          }
+
+          const montantCePeriode = planType === "partiel" && av.montantPartielFcfa
+            ? Math.min(av.montantPartielFcfa, av.soldeRestantFcfa, budgetRestant)
+            : Math.min(av.soldeRestantFcfa, budgetRestant);
+
+          if (montantCePeriode <= 0) continue;
+          avanceDeduite += montantCePeriode;
+          budgetRestant -= montantCePeriode;
+          avancesATraiter.push({ av, montant: montantCePeriode });
+        }
+
+        // Pour compatibilité avec le champ avanceEnCours utilisé plus bas
+        avanceEnCours = avancesATraiter[0]?.av;
+        const apresAvances = montantBrut - avanceDeduite;
+        intrantsDeduits = Math.min(encoursIntrants, Math.max(0, apresAvances));
       }
 
       const montantNet = montantBrut - avanceDeduite - intrantsDeduits;
-      const dateStr = dateLivraison ?? new Date().toISOString().split("T")[0]!;
 
       const [livraison] = await tx
         .insert(livraisonsTable)
@@ -232,16 +257,25 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         })
         .returning();
 
+      // Mettre à jour chaque avance déduite + enregistrer l'historique
       let avanceMaj = null;
-      if (avanceEnCours && avanceDeduite > 0) {
-        const nouveauRembourse = avanceEnCours.montantRembourse_fcfa + avanceDeduite;
-        const nouveauSolde = avanceEnCours.soldeRestantFcfa - avanceDeduite;
+      for (const { av, montant } of avancesATraiter) {
+        const nouveauRembourse = av.montantRembourse_fcfa + montant;
+        const nouveauSolde = av.soldeRestantFcfa - montant;
         const [updated] = await tx
           .update(avancesTable)
           .set({ montantRembourse_fcfa: nouveauRembourse, soldeRestantFcfa: nouveauSolde, statut: nouveauSolde === 0 ? "rembourse" : "en_cours" })
-          .where(eq(avancesTable.id, avanceEnCours.id))
+          .where(eq(avancesTable.id, av.id))
           .returning();
-        avanceMaj = updated;
+        if (!avanceMaj) avanceMaj = updated;
+
+        // Historique de déduction
+        await tx.insert(remboursementsAvancesMembresTable).values({
+          avanceId: av.id,
+          livraisonId: livraison!.id,
+          montantFcfa: montant,
+          note: "Déduction automatique sur livraison",
+        });
       }
 
       if (membreId && intrantsDeduits > 0) {

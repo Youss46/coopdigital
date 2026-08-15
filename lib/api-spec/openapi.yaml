@@ -7221,7 +7221,7 @@ components:
 
     Avance:
       type: object
-      required: [id, membreId, montantOctroyeFcfa, montantRembourseFcfa, soldeRestantFcfa, dateOctroi, statut, createdAt]
+      required: [id, membreId, montantOctroyeFcfa, montantRembourseFcfa, soldeRestantFcfa, dateOctroi, statut, planType, createdAt]
       properties:
         id:
           type: integer
@@ -7242,6 +7242,13 @@ components:
         statut:
           type: string
           enum: [en_cours, rembourse, en_retard]
+        planType:
+          type: string
+          enum: [integral, partiel, reporte]
+        montantPartielFcfa:
+          type: ["integer", "null"]
+        reportDate:
+          type: ["string", "null"]
         agentId:
           type: ["integer", "null"]
         createdAt:

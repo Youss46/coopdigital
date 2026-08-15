@@ -3,8 +3,10 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { membresTable } from "./membres";
 import { usersTable } from "./users";
+import { livraisonsTable } from "./livraisons";
 
 export const avanceStatutEnum = pgEnum("avance_statut", ["en_cours", "rembourse", "en_retard"]);
+export const avancePlanTypeEnum = pgEnum("avance_plan_type", ["integral", "partiel", "reporte"]);
 
 export const avancesTable = pgTable("avances", {
   id: serial("id").primaryKey(),
@@ -19,8 +21,28 @@ export const avancesTable = pgTable("avances", {
   motif: text("motif"),
   statut: avanceStatutEnum("statut").notNull().default("en_cours"),
   agentId: integer("agent_id").references(() => usersTable.id),
+  // Plan de déduction flexible
+  planType: avancePlanTypeEnum("plan_type").notNull().default("integral"),
+  montantPartielFcfa: integer("montant_partiel_fcfa"),
+  reportDate: date("report_date"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ─── Historique des remboursements d'avances membres ────────────────────────
+
+export const remboursementsAvancesMembresTable = pgTable("remboursements_avances_membres", {
+  id: serial("id").primaryKey(),
+  avanceId: integer("avance_id")
+    .notNull()
+    .references(() => avancesTable.id, { onDelete: "cascade" }),
+  livraisonId: integer("livraison_id")
+    .references(() => livraisonsTable.id, { onDelete: "set null" }),
+  montantFcfa: integer("montant_fcfa").notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type RemboursementAvanceMembre = typeof remboursementsAvancesMembresTable.$inferSelect;
 
 export const insertAvanceSchema = createInsertSchema(avancesTable).omit({
   id: true,

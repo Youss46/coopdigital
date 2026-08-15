@@ -816,6 +816,15 @@ export const AvanceStatut = {
   en_retard: 'en_retard',
 } as const;
 
+export type AvancePlanType = typeof AvancePlanType[keyof typeof AvancePlanType];
+
+
+export const AvancePlanType = {
+  integral: 'integral',
+  partiel: 'partiel',
+  reporte: 'reporte',
+} as const;
+
 export interface Avance {
   id: number;
   membreId: number;
@@ -828,6 +837,11 @@ export interface Avance {
   /** @nullable */
   motif?: string | null;
   statut: AvanceStatut;
+  planType: AvancePlanType;
+  /** @nullable */
+  montantPartielFcfa?: number | null;
+  /** @nullable */
+  reportDate?: string | null;
   /** @nullable */
   agentId?: number | null;
   createdAt: string;

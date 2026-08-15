@@ -7,6 +7,8 @@ import {
   createAvance,
   getAvancesEncours,
   rembourserAvance,
+  updatePlanAvanceMembre,
+  getRemboursementsAvanceMembre,
 } from "../controllers/avancesController";
 
 const router: IRouter = Router();
@@ -17,5 +19,7 @@ router.get("/avances/encours", checkPermission("avances", "lire"), getAvancesEnc
 router.get("/avances", checkPermission("avances", "lire"), listAvances);
 router.post("/avances", checkPermission("avances", "octroyer"), auditMiddleware("avances", "CREATE", { entiteType: "avance" }), createAvance);
 router.put("/avances/:id/rembourser", checkPermission("avances", "rembourser"), auditMiddleware("avances", "UPDATE", { entiteIdParam: "id", entiteType: "avance" }), rembourserAvance);
+router.patch("/avances/:id/plan", checkPermission("avances", "rembourser"), updatePlanAvanceMembre);
+router.get("/avances/:id/remboursements", checkPermission("avances", "lire"), getRemboursementsAvanceMembre);
 
 export default router;

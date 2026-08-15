@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { checkAvance, creerAnomalies } from "../services/anomalieService";
-import { db, avancesTable, membresTable, campagnesTable } from "@workspace/db";
+import { db, avancesTable, membresTable, campagnesTable, remboursementsAvancesMembresTable } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneActiveExiste } from "../lib/campagneGuard";
 import { CreateAvanceBody, RembourserAvanceBody } from "@workspace/api-zod";
@@ -36,6 +36,9 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
         dateEcheance: avancesTable.dateEcheance,
         motif: avancesTable.motif,
         statut: avancesTable.statut,
+        planType: avancesTable.planType,
+        montantPartielFcfa: avancesTable.montantPartielFcfa,
+        reportDate: avancesTable.reportDate,
         agentId: avancesTable.agentId,
         createdAt: avancesTable.createdAt,
         membreNom: membresTable.nom,
@@ -244,9 +247,96 @@ export async function rembourserAvance(req: Request, res: Response): Promise<voi
       .where(eq(avancesTable.id, id))
       .returning();
 
+    // Enregistrer dans l'historique
+    await db.insert(remboursementsAvancesMembresTable).values({
+      avanceId: id,
+      montantFcfa: montantReel,
+      note: "Remboursement manuel",
+    });
+
     res.json(avanceMaj);
   } catch (err) {
     req.log.error({ err }, "Erreur rembourserAvance");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── Plan de déduction ────────────────────────────────────────────────────────
+
+export async function updatePlanAvanceMembre(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  const { plan_type, montant_partiel_fcfa, report_date } = req.body as {
+    plan_type?: string;
+    montant_partiel_fcfa?: number | null;
+    report_date?: string | null;
+  };
+
+  const validPlans = ["integral", "partiel", "reporte"];
+  if (plan_type && !validPlans.includes(plan_type)) {
+    res.status(400).json({ erreur: "plan_type invalide (integral | partiel | reporte)" });
+    return;
+  }
+
+  try {
+    const [row] = await db
+      .select({ avance: avancesTable, coopId: membresTable.cooperativeId })
+      .from(avancesTable)
+      .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+      .where(eq(avancesTable.id, id))
+      .limit(1);
+
+    if (!row) { res.status(404).json({ erreur: "Avance introuvable" }); return; }
+    if (row.coopId !== cooperativeId) { res.status(403).json({ erreur: "Accès refusé" }); return; }
+    if (row.avance.statut === "rembourse") {
+      res.status(400).json({ erreur: "Cette avance est déjà remboursée" }); return;
+    }
+
+    const [updated] = await db
+      .update(avancesTable)
+      .set({
+        ...(plan_type != null && { planType: plan_type as "integral" | "partiel" | "reporte" }),
+        ...(montant_partiel_fcfa !== undefined && { montantPartielFcfa: montant_partiel_fcfa }),
+        ...(report_date !== undefined && { reportDate: report_date }),
+      })
+      .where(eq(avancesTable.id, id))
+      .returning();
+
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "updatePlanAvanceMembre");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function getRemboursementsAvanceMembre(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+
+  const id = parseInt(String(req.params["id"] ?? "0"));
+
+  try {
+    const [row] = await db
+      .select({ coopId: membresTable.cooperativeId })
+      .from(avancesTable)
+      .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+      .where(eq(avancesTable.id, id))
+      .limit(1);
+
+    if (!row) { res.status(404).json({ erreur: "Avance introuvable" }); return; }
+    if (row.coopId !== cooperativeId) { res.status(403).json({ erreur: "Accès refusé" }); return; }
+
+    const rows = await db
+      .select()
+      .from(remboursementsAvancesMembresTable)
+      .where(eq(remboursementsAvancesMembresTable.avanceId, id))
+      .orderBy(desc(remboursementsAvancesMembresTable.createdAt));
+
+    res.json(rows);
+  } catch (err) {
+    req.log.error({ err }, "getRemboursementsAvanceMembre");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
