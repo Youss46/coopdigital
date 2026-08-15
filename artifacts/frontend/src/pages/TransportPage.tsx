@@ -1474,6 +1474,7 @@ function TabMaintenance() {
 // ─── Onglet Bons de carburant ─────────────────────────────────────────────────
 
 const STATUT_BON: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  demande:   { label: "Demande",    color: "bg-orange-100 text-orange-700", icon: <Send className="h-3 w-3" /> },
   brouillon: { label: "Brouillon",  color: "bg-gray-100 text-gray-700",   icon: <FileText className="h-3 w-3" /> },
   soumis:    { label: "Soumis",     color: "bg-blue-100 text-blue-800",    icon: <Send className="h-3 w-3" /> },
   approuve:  { label: "Approuvé",   color: "bg-green-100 text-green-800",  icon: <ThumbsUp className="h-3 w-3" /> },
@@ -1574,8 +1575,13 @@ function TabCarburant() {
   const stats  = statsQ.data;
 
   // Dialogs
+  const peutTraiter = ["pca", "directeur", "magasinier"].includes(role);
+
   const [showCreate, setShowCreate]       = useState(false);
   const [showUtiliser, setShowUtiliser]   = useState(false);
+  const [showTraiter, setShowTraiter]     = useState(false);
+  const [traiteBon, setTraiteBon]         = useState<BonCarburant | null>(null);
+  const [traiterQte, setTraiterQte]       = useState<string>("");
   const [selectedBon, setSelectedBon]     = useState<BonCarburant | null>(null);
   const [form,   setForm]   = useState<BonForm>(EMPTY_BON_FORM);
   const [uForm,  setUForm]  = useState<UtiliserForm>(EMPTY_UTILISER_FORM);
@@ -1602,6 +1608,29 @@ function TabCarburant() {
     onSuccess: () => { toast({ title: "Bon annulé" }); invalidate(); },
     onError:   () => toast({ title: "Erreur", variant: "destructive" }),
   }});
+
+  const traiterMut = useMutation({
+    mutationFn: ({ id, quantite_autorisee }: { id: number; quantite_autorisee: number }) =>
+      fetch(`${BASE}/api/transport/carburant/bons/${id}/traiter`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("auth_token") ?? ""}`,
+        },
+        body: JSON.stringify({ quantite_autorisee }),
+      }).then(async r => {
+        if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as {erreur?:string}).erreur ?? "Erreur"); }
+        return r.json();
+      }),
+    onSuccess: () => {
+      toast({ title: "Demande traitée — bon soumis pour approbation" });
+      setShowTraiter(false);
+      setTraiteBon(null);
+      setTraiterQte("");
+      invalidate();
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
 
   // Calcul montant auto
   const montantEstime = uForm.quantite_livree !== "" && uForm.prix_litre_fcfa !== ""
@@ -1796,6 +1825,15 @@ function TabCarburant() {
                       <TableCell>{statutBonBadge(bon.statut)}</TableCell>
                       <TableCell>
                         <div className="flex gap-1 justify-end">
+                          {bon.statut === "demande" && peutTraiter && (
+                            <Button size="sm" className="h-7 text-xs bg-orange-500 hover:bg-orange-600 text-white"
+                              onClick={() => { setTraiteBon(bon); setTraiterQte(bon.quantite_autorisee > 0 ? String(bon.quantite_autorisee) : ""); setShowTraiter(true); }}>
+                              <CheckCircle2 className="h-3 w-3 mr-1" /> Traiter
+                            </Button>
+                          )}
+                          {bon.statut === "demande" && !peutTraiter && (
+                            <Badge className="bg-orange-50 text-orange-700 text-xs">En attente de traitement</Badge>
+                          )}
                           {bon.statut === "brouillon" && peutCreer && (
                             <Button size="sm" variant="outline" className="h-7 text-xs"
                               onClick={() => soumMut.mutate({ id: bon.id })}>
@@ -1836,6 +1874,50 @@ function TabCarburant() {
           )}
         </div>
       )}
+
+      {/* ── Dialog traitement demande ── */}
+      <Dialog open={showTraiter} onOpenChange={v => { setShowTraiter(v); if (!v) { setTraiteBon(null); setTraiterQte(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Traiter la demande</DialogTitle>
+            {traiteBon && (
+              <p className="text-sm text-gray-500">
+                Bon {traiteBon.numero} — {traiteBon.immatriculation ?? "—"} — demandé par <strong>{traiteBon.chauffeur_nom ?? "Chauffeur"}</strong>
+              </p>
+            )}
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {traiteBon && (
+              <div className="rounded-lg bg-orange-50 border border-orange-200 px-4 py-3 text-sm space-y-1">
+                <p><span className="text-gray-500">Carburant :</span> <strong>{CARBURANT_TYPES.find(t => t.value === traiteBon.type_carburant)?.label ?? traiteBon.type_carburant}</strong></p>
+                {traiteBon.motif && <p><span className="text-gray-500">Motif :</span> {traiteBon.motif}</p>}
+                {traiteBon.station_service && <p><span className="text-gray-500">Station :</span> {traiteBon.station_service}</p>}
+                {traiteBon.quantite_autorisee > 0 && <p><span className="text-gray-500">Qté demandée :</span> {traiteBon.quantite_autorisee} L</p>}
+              </div>
+            )}
+            <div>
+              <Label>Quantité autorisée (L) *</Label>
+              <Input
+                type="number" min={1} step="any" placeholder="Ex : 50"
+                value={traiterQte}
+                onChange={e => setTraiterQte(e.target.value)}
+                autoFocus
+              />
+              <p className="text-xs text-gray-400 mt-1">Le bon sera soumis pour approbation PCA/directeur.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTraiter(false)}>Annuler</Button>
+            <Button
+              className="bg-orange-500 hover:bg-orange-600"
+              disabled={!traiterQte || parseFloat(traiterQte) <= 0 || traiterMut.isPending}
+              onClick={() => traiteBon && traiterMut.mutate({ id: traiteBon.id, quantite_autorisee: parseFloat(traiterQte) })}
+            >
+              {traiterMut.isPending ? "Traitement…" : "Valider & soumettre"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Dialog création ── */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>

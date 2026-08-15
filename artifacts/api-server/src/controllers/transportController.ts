@@ -811,6 +811,30 @@ export async function handleSoumettresBonCarburant(req: Request, res: Response):
   }
 }
 
+export async function handleTraiterDemande(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const row = await getBonCarburant(cooperativeId, id);
+    if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
+    if (row.bon.statut !== "demande") { res.status(400).json({ erreur: "Ce bon n'est pas une demande en attente" }); return; }
+    const body = req.body as { quantite_autorisee?: number };
+    if (!body.quantite_autorisee || body.quantite_autorisee <= 0) {
+      res.status(400).json({ erreur: "Quantité autorisée requise" }); return;
+    }
+    await transitionBon(cooperativeId, id, "soumis", {
+      quantiteAutorisee: String(body.quantite_autorisee),
+    });
+    const updated = await getBonCarburant(cooperativeId, id);
+    res.json(mapBon(updated!));
+  } catch (err) {
+    req.log.error({ err }, "Erreur handleTraiterDemande");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 export async function handleApprouverBonCarburant(req: Request, res: Response): Promise<void> {
   try {
     const cooperativeId = req.user?.cooperativeId;

@@ -582,6 +582,20 @@ export async function getBonCarburant(cooperativeId: number, id: number) {
   return rows[0] ?? null;
 }
 
+/** Crée un bon en statut "demande" (initié par le chauffeur depuis le terrain). */
+export async function createDemandeBon(
+  cooperativeId: number,
+  createdBy: number,
+  data: { vehiculeId: number; chauffeurId?: number | null; typeCarburant: string; quantiteAutorisee: string; stationService?: string | null; motif?: string | null; dateEmission: string },
+) {
+  const numero = await genNumero(cooperativeId);
+  const [row] = await db
+    .insert(bonsCarburantTable)
+    .values({ cooperativeId, createdBy, numero, statut: "demande", ...data })
+    .returning();
+  return row!;
+}
+
 export async function createBonCarburant(
   cooperativeId: number,
   createdBy: number,

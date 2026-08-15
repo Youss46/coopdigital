@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
-import { apiGet, apiPut } from "@/lib/api";
-import { Fuel, CheckCircle2, Clock, Droplets, QrCode, X, Share2, Copy, RefreshCw, AlertCircle } from "lucide-react";
+import { apiGet, apiPost, apiPut } from "@/lib/api";
+import { Fuel, CheckCircle2, Clock, Droplets, QrCode, X, Share2, Copy, RefreshCw, AlertCircle, Plus, Send } from "lucide-react";
 import BottomNavChauffeur from "@/components/BottomNavChauffeur";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "react-qr-code";
@@ -32,12 +32,32 @@ interface UtiliserForm {
   observations: string;
 }
 
+interface DemandeForm {
+  vehicule_id: string;
+  type_carburant: string;
+  quantite_demandee: string;
+  motif: string;
+  station_service: string;
+}
+
+interface VehiculeItem {
+  id: number;
+  immatriculation: string;
+  marque: string | null;
+}
+
 const STATUT_BON: Record<string, {
   label: string;
   badgeClass: string;
   cardClass: string;
   icon: React.ReactNode;
 }> = {
+  demande: {
+    label: "Demande en attente",
+    badgeClass: "t-badge--warning",
+    cardClass: "",
+    icon: <Send size={11} />,
+  },
   brouillon: {
     label: "Brouillon",
     badgeClass: "t-badge--info",
@@ -78,10 +98,15 @@ function fmt(d: string | null) {
 }
 
 const FILTER_TABS = [
+  { value: "demande",                   label: "Mes demandes" },
   { value: "approuve,soumis,brouillon", label: "En cours" },
   { value: "utilise",                   label: "Utilisés" },
   { value: "annule",                    label: "Annulés"  },
 ];
+
+const EMPTY_DEMANDE: DemandeForm = {
+  vehicule_id: "", type_carburant: "gasoil", quantite_demandee: "", motif: "", station_service: "",
+};
 
 export default function BonsCarburantChauffeur() {
   const { toast } = useToast();
@@ -102,6 +127,44 @@ export default function BonsCarburantChauffeur() {
     date_utilisation: new Date().toISOString().split("T")[0]!,
     station_service: "", observations: "",
   });
+
+  // ── État demande carburant ──
+  const [showDemande, setShowDemande]   = useState(false);
+  const [demandeForm, setDemandeForm]   = useState<DemandeForm>(EMPTY_DEMANDE);
+  const [vehicules, setVehicules]       = useState<VehiculeItem[]>([]);
+  const [submittingDemande, setSubmittingDemande] = useState(false);
+
+  useEffect(() => {
+    apiGet<{ vehicules: VehiculeItem[] }>("/chauffeur/vehicules")
+      .then(r => {
+        setVehicules(r.vehicules);
+        if (r.vehicules[0]) setDemandeForm(f => ({ ...f, vehicule_id: String(r.vehicules[0]!.id) }));
+      })
+      .catch(() => {/* silencieux */});
+  }, []);
+
+  async function handleDemande() {
+    if (!demandeForm.vehicule_id) return;
+    setSubmittingDemande(true);
+    try {
+      await apiPost("/chauffeur/bons-carburant/demande", {
+        vehicule_id:       parseInt(demandeForm.vehicule_id),
+        type_carburant:    demandeForm.type_carburant,
+        ...(demandeForm.quantite_demandee ? { quantite_demandee: parseFloat(demandeForm.quantite_demandee) } : {}),
+        ...(demandeForm.motif             ? { motif: demandeForm.motif }                       : {}),
+        ...(demandeForm.station_service   ? { station_service: demandeForm.station_service }   : {}),
+      });
+      toast({ title: "Demande envoyée ✓", description: "Le responsable sera notifié." });
+      setShowDemande(false);
+      setDemandeForm({ ...EMPTY_DEMANDE, vehicule_id: demandeForm.vehicule_id });
+      if (tab === "demande") load();
+      else setTab("demande");
+    } catch (err) {
+      toast({ title: (err as Error).message ?? "Erreur", variant: "destructive" });
+    } finally {
+      setSubmittingDemande(false);
+    }
+  }
 
   const load = useCallback(() => {
     setLoading(true);
@@ -192,20 +255,34 @@ export default function BonsCarburantChauffeur() {
         padding: "48px 20px 32px",
         position: "relative",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: "rgba(255,255,255,0.18)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <Fuel size={20} color="#fff" />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: "rgba(255,255,255,0.18)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Fuel size={20} color="#fff" />
+            </div>
+            <div>
+              <h1 style={{ color: "#fff", fontWeight: 800, fontSize: "1.25rem" }}>Bons carburant</h1>
+              <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.78rem", marginTop: 2 }}>
+                {loading ? "…" : `${bons.length} bon${bons.length !== 1 ? "s" : ""}`}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 style={{ color: "#fff", fontWeight: 800, fontSize: "1.25rem" }}>Bons carburant</h1>
-            <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.78rem", marginTop: 2 }}>
-              {loading ? "…" : `${bons.length} bon${bons.length !== 1 ? "s" : ""}`}
-            </p>
-          </div>
+          <button
+            onClick={() => setShowDemande(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "rgba(255,255,255,0.2)",
+              border: "1.5px solid rgba(255,255,255,0.4)",
+              borderRadius: 10, padding: "8px 14px",
+              color: "#fff", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer",
+            }}
+          >
+            <Plus size={15} /> Demander
+          </button>
         </div>
         <svg
           style={{ position: "absolute", bottom: 0, left: 0, right: 0, width: "100%", display: "block" }}
@@ -627,6 +704,111 @@ export default function BonsCarburantChauffeur() {
           </div>
         );
       })()}
+
+      {/* ── Modal nouvelle demande carburant ── */}
+      {showDemande && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+          onClick={() => setShowDemande(false)}
+        >
+          <div
+            style={{ background: "var(--t-card)", borderRadius: "var(--t-radius) var(--t-radius) 0 0", padding: "24px 20px", width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 16 }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <p style={{ fontWeight: 800, fontSize: "1.05rem", color: "var(--t-text)" }}>Demande de carburant</p>
+                <p style={{ fontSize: "0.75rem", color: "var(--t-muted)", marginTop: 2 }}>Le magasinier et la direction seront notifiés</p>
+              </div>
+              <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t-muted)", padding: 4 }} onClick={() => setShowDemande(false)}>
+                <X size={22} />
+              </button>
+            </div>
+
+            {/* Véhicule */}
+            <div className="t-field">
+              <label className="t-label">Véhicule *</label>
+              <select
+                className="t-input"
+                value={demandeForm.vehicule_id}
+                onChange={e => setDemandeForm(f => ({ ...f, vehicule_id: e.target.value }))}
+                style={{ appearance: "none" }}
+              >
+                <option value="">— Choisir —</option>
+                {vehicules.map(v => (
+                  <option key={v.id} value={String(v.id)}>
+                    {v.immatriculation}{v.marque ? ` — ${v.marque}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Type carburant + Quantité */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className="t-field">
+                <label className="t-label">Type</label>
+                <select
+                  className="t-input"
+                  value={demandeForm.type_carburant}
+                  onChange={e => setDemandeForm(f => ({ ...f, type_carburant: e.target.value }))}
+                  style={{ appearance: "none" }}
+                >
+                  <option value="gasoil">Gasoil</option>
+                  <option value="essence">Essence</option>
+                  <option value="super">Super</option>
+                </select>
+              </div>
+              <div className="t-field">
+                <label className="t-label">Quantité (L)</label>
+                <input
+                  className="t-input"
+                  type="number" min={1} step="any" placeholder="Ex : 50"
+                  value={demandeForm.quantite_demandee}
+                  onChange={e => setDemandeForm(f => ({ ...f, quantite_demandee: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Motif */}
+            <div className="t-field">
+              <label className="t-label">Motif</label>
+              <input
+                className="t-input"
+                placeholder="Ex : Mission de collecte à Agboville"
+                value={demandeForm.motif}
+                onChange={e => setDemandeForm(f => ({ ...f, motif: e.target.value }))}
+              />
+            </div>
+
+            {/* Station */}
+            <div className="t-field">
+              <label className="t-label">Station souhaitée</label>
+              <input
+                className="t-input"
+                placeholder="Optionnel"
+                value={demandeForm.station_service}
+                onChange={e => setDemandeForm(f => ({ ...f, station_service: e.target.value }))}
+              />
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="t-btn t-btn--ghost t-btn--sm" style={{ flex: 1 }} onClick={() => setShowDemande(false)}>
+                Annuler
+              </button>
+              <button
+                className="t-btn t-btn--primary t-btn--sm"
+                style={{ flex: 1 }}
+                disabled={!demandeForm.vehicule_id || submittingDemande}
+                onClick={handleDemande}
+              >
+                {submittingDemande ? "Envoi…" : <><Send size={14} /> Envoyer la demande</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }

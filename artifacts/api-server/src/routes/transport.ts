@@ -19,6 +19,7 @@ function requireRole(roles: string[]) {
 }
 
 import {
+  handleTraiterDemande,
   handleGetVehicules,
   handleCreateVehicule,
   handleUpdateVehicule,
@@ -85,6 +86,7 @@ router.delete("/transport/depenses/:id",                authMiddleware, handleDe
 router.get("/transport/carburant/bons",                     authMiddleware, handleGetBonsCarburant);
 router.post("/transport/carburant/bons",                    authMiddleware, handleCreateBonCarburant);
 router.get("/transport/carburant/bons/:id",                 authMiddleware, handleGetBonCarburant);
+router.put("/transport/carburant/bons/:id/traiter",         authMiddleware, handleTraiterDemande);
 router.put("/transport/carburant/bons/:id/soumettre",       authMiddleware, handleSoumettresBonCarburant);
 router.put("/transport/carburant/bons/:id/approuver",       authMiddleware, requireRole(ROLES_APPROBATEUR), handleApprouverBonCarburant);
 router.put("/transport/carburant/bons/:id/utiliser",        authMiddleware, handleUtiliserBonCarburant);

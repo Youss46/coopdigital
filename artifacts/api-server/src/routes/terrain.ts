@@ -94,6 +94,8 @@ import {
   getChauffeurBons,
   utiliserBonChauffeur,
   getChauffeurStations,
+  getChauffeurVehicules,
+  creerDemandeCarburant,
 } from "../controllers/chauffeurTerrainController.js";
 import { handleQrTokenBonStation } from "../controllers/stationController.js";
 
@@ -104,6 +106,8 @@ router.put("/terrain/chauffeur/bons-carburant/:id/utiliser",          terrainAut
 // QR token : réservé au chauffeur propriétaire du bon (ownership vérifié dans le contrôleur)
 router.get("/terrain/chauffeur/bons-carburant/:numero/qr-token",      terrainAuthMiddleware, handleQrTokenBonStation);
 router.get("/terrain/chauffeur/stations",                             terrainAuthMiddleware, getChauffeurStations);
+router.get("/terrain/chauffeur/vehicules",                            terrainAuthMiddleware, getChauffeurVehicules);
+router.post("/terrain/chauffeur/bons-carburant/demande",              terrainAuthMiddleware, creerDemandeCarburant);
 
 // Push notifications
 router.get("/terrain/push/vapid-key", getVapidPublicKey);

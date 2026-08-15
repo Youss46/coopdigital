@@ -14,6 +14,8 @@ import {
   paiementsTable,
 } from "@workspace/db";
 import { and, eq, desc, inArray, isNotNull } from "drizzle-orm";
+import { createDemandeBon, getVehicules } from "../services/transportService.js";
+import { notifDemandeCarburant } from "../services/notificationService.js";
 
 function cooperativeId(req: Request): number | null {
   return req.agent?.cooperativeId ?? null;
@@ -393,6 +395,75 @@ export async function getChauffeurStations(req: Request, res: Response): Promise
     });
   } catch (err) {
     req.log.error({ err }, "getChauffeurStations");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── Véhicules disponibles (pour formulaire demande) ──────────────────────────
+
+export async function getChauffeurVehicules(req: Request, res: Response): Promise<void> {
+  try {
+    const coopId = cooperativeId(req);
+    if (!coopId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+    const vehicules = await getVehicules(coopId);
+    res.json({
+      vehicules: vehicules
+        .filter(v => v.statut !== "hors_service")
+        .map(v => ({
+          id:             v.id,
+          immatriculation: v.immatriculation,
+          marque:         v.marque ?? null,
+          modele:         v.modele ?? null,
+        })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "getChauffeurVehicules");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── Créer une demande de carburant depuis le terrain ────────────────────────
+
+export async function creerDemandeCarburant(req: Request, res: Response): Promise<void> {
+  try {
+    const coopId = cooperativeId(req);
+    const chId   = chauffeurId(req);
+    const agentId = req.agent?.id;
+    if (!coopId || !agentId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+    if (!chId) { res.status(400).json({ erreur: "Compte non rattaché à un chauffeur" }); return; }
+
+    const body = req.body as {
+      vehicule_id: number;
+      type_carburant?: string;
+      quantite_demandee?: number;
+      motif?: string;
+      station_service?: string;
+    };
+    if (!body.vehicule_id) { res.status(400).json({ erreur: "Véhicule requis" }); return; }
+
+    const today = new Date().toISOString().split("T")[0]!;
+    const bon = await createDemandeBon(coopId, agentId, {
+      vehiculeId:        body.vehicule_id,
+      chauffeurId:       chId,
+      typeCarburant:     body.type_carburant ?? "gasoil",
+      quantiteAutorisee: body.quantite_demandee ? String(body.quantite_demandee) : "0",
+      stationService:    body.station_service ?? null,
+      motif:             body.motif ?? null,
+      dateEmission:      today,
+    });
+
+    // Récupérer nom chauffeur pour la notification
+    const [ch] = await db
+      .select({ nom: chauffeursTable.nom, prenoms: chauffeursTable.prenoms })
+      .from(chauffeursTable)
+      .where(eq(chauffeursTable.id, chId));
+    const nomChauffeur = `${ch?.prenoms ?? ""} ${ch?.nom ?? ""}`.trim() || "Chauffeur";
+
+    void notifDemandeCarburant(coopId, bon.numero, nomChauffeur, bon.id);
+
+    res.status(201).json({ id: bon.id, numero: bon.numero, statut: bon.statut });
+  } catch (err) {
+    req.log.error({ err }, "creerDemandeCarburant");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
