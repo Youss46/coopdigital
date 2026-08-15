@@ -5,6 +5,7 @@ import OfflineBanner from "../components/OfflineBanner";
 import BottomNavPeseur from "../components/BottomNavPeseur";
 import ScaleWeightDisplay from "../components/ScaleWeightDisplay";
 import { useOffline } from "../contexts/OfflineContext";
+import { useAuth } from "../contexts/AuthContext";
 import {
   createSessionPesee,
   getSessionsEnCours,
@@ -69,6 +70,8 @@ function fmtPoids(kg: number): string {
 export default function SessionPeseeFlow({ params }: { params?: { sessionId?: string } }) {
   const [, setLocation] = useLocation();
   const { isOnline } = useOffline();
+  const { user } = useAuth();
+  const machinePeseeObligatoire = user?.machinePeseeObligatoire === true;
 
   const [step, setStep] = useState<Step>("membre");
   const [fournisseur, setFournisseur] = useState<Fournisseur | null>(null);
@@ -583,15 +586,23 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
               <div className="t-field" style={{ marginBottom: 8 }}>
                 <label className="t-label">Poids brut (kg) *</label>
+                {machinePeseeObligatoire && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: ".75rem", color: "#64748b", marginBottom: 4 }}>
+                    <span>🔒</span>
+                    <span>Saisie manuelle désactivée — utilisez la balance</span>
+                  </div>
+                )}
                 <input
                   type="number"
                   className="t-input t-input--lg"
                   value={poidsBrut}
-                  onChange={(e) => setPoidsBrut(e.target.value)}
+                  onChange={(e) => { if (!machinePeseeObligatoire) setPoidsBrut(e.target.value); }}
                   inputMode="decimal"
                   step="0.001"
                   min="0"
-                  placeholder="Ex : 247.500"
+                  placeholder={machinePeseeObligatoire ? "Poids depuis la balance" : "Ex : 247.500"}
+                  readOnly={machinePeseeObligatoire}
+                  style={machinePeseeObligatoire ? { background: "#f1f5f9", color: "#94a3b8", cursor: "not-allowed" } : undefined}
                 />
               </div>
 

@@ -6,6 +6,7 @@ import BottomNav from "../components/BottomNav";
 import ScaleWeightDisplay from "../components/ScaleWeightDisplay";
 import { useOffline } from "../contexts/OfflineContext";
 import { enregistrerCollecte, getPrix, imprimerRecuLivraison } from "../lib/api";
+import { useAuth } from "../contexts/AuthContext";
 import { getCachedPrix, cachePrix } from "../lib/idb";
 import type { Fournisseur, CollecteResult, PrixActuel } from "../lib/types";
 
@@ -37,6 +38,8 @@ function RecuButton({ livraisonId }: { livraisonId: number }) {
 export default function CollecteFlow() {
   const [, setLocation] = useLocation();
   const { isOnline } = useOffline();
+  const { user } = useAuth();
+  const machinePeseeObligatoire = user?.machinePeseeObligatoire === true;
   const [step, setStep] = useState<Step>(1);
   const [fournisseur, setFournisseur] = useState<Fournisseur | null>(null);
   const [prix, setPrix] = useState<PrixActuel | null>(null);
@@ -198,15 +201,23 @@ export default function CollecteFlow() {
 
               <div className="t-field">
                 <label className="t-label">Poids brut (kg)</label>
+                {machinePeseeObligatoire && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: ".75rem", color: "#64748b", marginBottom: 4 }}>
+                    <span>🔒</span>
+                    <span>Saisie manuelle désactivée — utilisez la balance</span>
+                  </div>
+                )}
                 <input
                   type="number"
                   className="t-input t-input--lg"
                   value={poidsBrut}
-                  onChange={(e) => setPoidsBrut(e.target.value)}
+                  onChange={(e) => { if (!machinePeseeObligatoire) setPoidsBrut(e.target.value); }}
                   inputMode="decimal"
                   step="0.1"
                   min="0"
-                  placeholder="Ex: 125.5"
+                  placeholder={machinePeseeObligatoire ? "Poids depuis la balance" : "Ex: 125.5"}
+                  readOnly={machinePeseeObligatoire}
+                  style={machinePeseeObligatoire ? { background: "#f1f5f9", color: "#94a3b8", cursor: "not-allowed" } : undefined}
                 />
               </div>
 

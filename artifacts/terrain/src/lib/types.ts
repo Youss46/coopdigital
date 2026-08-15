@@ -12,6 +12,8 @@ export interface AgentUser {
   motDePasseTemporaire?: boolean;
   /** Peseur uniquement : ID du délégué de rattachement (null = base centrale) */
   delegueId?: number | null;
+  /** Si true : la saisie manuelle du poids est désactivée — balance obligatoire */
+  machinePeseeObligatoire?: boolean;
   /** Chauffeur uniquement : ID dans la table chauffeurs (transport) */
   chauffeurId?: number | null;
 }

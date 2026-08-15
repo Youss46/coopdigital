@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -7,6 +7,8 @@ export const cooperativesTable = pgTable("cooperatives", {
   nom: text("nom").notNull(),
   ville: text("ville").notNull(),
   region: text("region").notNull(),
+  /** Si true, le poids des pesées doit provenir uniquement de la machine — saisie manuelle désactivée */
+  machinePeseeObligatoire: boolean("machine_pesee_obligatoire").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

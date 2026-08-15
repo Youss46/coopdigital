@@ -3,7 +3,7 @@ import {
   usersTable, membresTable, fournisseursTable, avancesTable, livraisonsTable, paiementsTable,
   distributionsIntrantsTable, historiquePrixTable, campagnesTable,
   caissesTable, mouvementsCaisseTable, sessionsPeseeTable,
-  entrepotsTable, mouvementsStockTable,
+  entrepotsTable, mouvementsStockTable, cooperativesTable,
 } from "@workspace/db";
 import { and, eq, sql, desc, or, isNull } from "drizzle-orm";
 import { creerCommissionSiTaux } from "./commissionService.js";
@@ -40,6 +40,17 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
   const ok = await bcrypt.compare(motDePasse, user.passwordHash);
   if (!ok) return null;
 
+  // Récupérer le paramètre machine_pesee_obligatoire depuis la coopérative
+  let machinePeseeObligatoire = false;
+  if (user.cooperativeId) {
+    const [coop] = await db
+      .select({ machinePeseeObligatoire: cooperativesTable.machinePeseeObligatoire })
+      .from(cooperativesTable)
+      .where(eq(cooperativesTable.id, user.cooperativeId))
+      .limit(1);
+    machinePeseeObligatoire = coop?.machinePeseeObligatoire ?? false;
+  }
+
   const payload = {
     id: user.id,
     role: user.role,
@@ -66,6 +77,7 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
       zoneType: user.zoneType ?? null,
       zoneNom: user.zoneNom ?? null,
       motDePasseTemporaire: user.motDePasseTemporaire,
+      machinePeseeObligatoire,
       ...(user.role === "peseur"   ? { delegueId:   user.delegueId   ?? null } : {}),
       ...(user.role === "chauffeur" ? { chauffeurId: (user as typeof user & { chauffeurId?: number | null }).chauffeurId ?? null } : {}),
     },
