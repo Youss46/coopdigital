@@ -767,16 +767,13 @@ body {
     top: 0;
   }
 
-  /* Zone principale — laisse le body scroller, limite la largeur */
+  /* Zone principale — occupe toute la 2e colonne */
   .t-main {
     grid-area: main;
     overflow-y: visible;
-    padding-bottom: 48px;
-    max-width: 880px;
+    padding: 16px 28px 48px;
     width: 100%;
-    margin: 0 auto;
-    padding-left: 32px;
-    padding-right: 32px;
+    min-width: 0; /* évite le débordement du contenu flex/grid */
   }
 
   .t-main--no-nav { padding-bottom: 48px; }
