@@ -101,12 +101,32 @@ export default function Avances() {
     },
   });
 
+  const [montantErreur, setMontantErreur] = useState<string | null>(null);
+
+  const handleMontantPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData("text");
+    const isNegativeOrZero =
+      text.trim().startsWith("-") ||
+      Number(text.replace(/\s/g, "").replace(",", ".")) <= 0;
+    if (isNegativeOrZero) {
+      e.preventDefault();
+      setForm((prev) => ({ ...prev, montantOctroyeFcfa: "" }));
+      setMontantErreur("Le montant doit être supérieur à 0");
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.membreId || !form.montantOctroyeFcfa) return;
+    const montant = parseInt(form.montantOctroyeFcfa.replace(/\D/g, ""), 10);
+    if (!montant || montant <= 0) {
+      setMontantErreur("Le montant doit être supérieur à 0");
+      return;
+    }
+    setMontantErreur(null);
     const payload = {
       membreId: parseInt(form.membreId),
-      montantOctroyeFcfa: parseInt(form.montantOctroyeFcfa),
+      montantOctroyeFcfa: montant,
       dateOctroi: form.dateOctroi,
       dateEcheance: form.dateEcheance || undefined,
       motif: form.motif || undefined,
@@ -413,10 +433,14 @@ export default function Avances() {
                 <MoneyInput
                   required
                   value={form.montantOctroyeFcfa}
-                  onChange={(raw) => setForm({ ...form, montantOctroyeFcfa: raw })}
+                  onChange={(raw) => { setForm({ ...form, montantOctroyeFcfa: raw }); setMontantErreur(null); }}
+                  onPaste={handleMontantPaste}
                   placeholder="150 000"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+                  className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none ${montantErreur ? "border-red-400" : "border-gray-200"}`}
                 />
+                {montantErreur && (
+                  <p className="text-xs text-red-600 mt-1">{montantErreur}</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

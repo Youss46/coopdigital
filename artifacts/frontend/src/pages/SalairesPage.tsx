@@ -1922,6 +1922,19 @@ function AvanceModal({
     dateOctroi: new Date().toISOString().slice(0, 10),
     motif: "",
   });
+  const [montantErreur, setMontantErreur] = useState<string | null>(null);
+
+  function handleMontantPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData("text");
+    const isNegativeOrZero =
+      text.trim().startsWith("-") ||
+      Number(text.replace(/\s/g, "").replace(",", ".")) <= 0;
+    if (isNegativeOrZero) {
+      e.preventDefault();
+      setForm((f) => ({ ...f, montantFcfa: "" }));
+      setMontantErreur("Le montant doit être supérieur à 0");
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -1929,11 +1942,17 @@ function AvanceModal({
       toast({ title: "Renseignez tous les champs obligatoires", variant: "destructive" });
       return;
     }
+    const montant = Number(form.montantFcfa);
+    if (!montant || montant <= 0) {
+      setMontantErreur("Le montant doit être supérieur à 0");
+      return;
+    }
+    setMontantErreur(null);
     try {
       await create.mutateAsync({
         data: {
           personnelId: Number(form.personnelId),
-          montantFcfa: Number(form.montantFcfa),
+          montantFcfa: montant,
           dateOctroi: form.dateOctroi,
           motif: form.motif || undefined,
         },
@@ -1971,11 +1990,15 @@ function AvanceModal({
           </Field>
           <Field label="Montant (FCFA)" required>
             <MoneyInput
-              className={INPUT_CLS}
+              className={`${INPUT_CLS} ${montantErreur ? "border-red-400 focus:ring-red-400" : ""}`}
               value={form.montantFcfa}
-              onChange={(raw) => setForm((f) => ({ ...f, montantFcfa: raw }))}
+              onChange={(raw) => { setForm((f) => ({ ...f, montantFcfa: raw })); setMontantErreur(null); }}
+              onPaste={handleMontantPaste}
               required
             />
+            {montantErreur && (
+              <p className="text-xs text-red-600 mt-1">{montantErreur}</p>
+            )}
           </Field>
           <Field label="Date d'octroi" required>
             <input
