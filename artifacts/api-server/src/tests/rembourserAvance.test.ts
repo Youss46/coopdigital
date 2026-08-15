@@ -334,7 +334,31 @@ describe("rembourserAvance — guard clauses", () => {
     expect(capturedTxUpdate).not.toHaveBeenCalled();
   });
 
-  // ── 6. Full repayment (omitting montantRembourse) → 200 ──────────────────
+  // ── 6. Already fully-repaid advance → 400, no transaction started ────────
+  it("returns 400 and never starts a transaction when avance.statut is already 'rembourse'", async () => {
+    // DB returns an advance that is already fully repaid
+    const alreadyRepaid = makeAvance({
+      statut: "rembourse",
+      montantFcfa: 10_000,
+      montantRembourse: 10_000,
+    });
+    makeSelectChain([alreadyRepaid]);
+
+    const req = makeReq(5, { montantRembourse: 5_000 });
+    const res = makeRes();
+
+    await rembourserAvance(req as Request, res as Response);
+
+    expect(res._status).toBe(400);
+    expect((res._body as { erreur: string }).erreur).toMatch(
+      /d[eé]j[aà] rembours[eé]/i,
+    );
+
+    // The guard must fire before any transaction is opened
+    expect(mockDb.transaction).not.toHaveBeenCalled();
+  });
+
+  // ── 7. Full repayment (omitting montantRembourse) → 200 ──────────────────
   it("accepts full repayment when montantRembourse is omitted and marks avance rembourse", async () => {
     const avance = makeAvance({ montantFcfa: 10_000, montantRembourse: 0 });
     makeSelectChain([avance]);

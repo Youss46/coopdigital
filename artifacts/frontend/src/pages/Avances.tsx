@@ -69,6 +69,7 @@ export default function Avances() {
     dateEcheance: "",
     motif: "",
   });
+  const [montantErreur, setMontantErreur] = useState<string | null>(null);
   const [membreSearch, setMembreSearch] = useState("");
   const [membreDropdownOuvert, setMembreDropdownOuvert] = useState(false);
   const membreInputRef = useRef<HTMLInputElement>(null);
@@ -87,6 +88,7 @@ export default function Avances() {
         queryClient.invalidateQueries({ queryKey: getGetAvancesEncoursQueryKey() });
         setModalOuvert(false);
         setForm({ membreId: "", montantOctroyeFcfa: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+        setMontantErreur(null);
         setMembreSearch("");
       },
     },
@@ -100,8 +102,6 @@ export default function Avances() {
       },
     },
   });
-
-  const [montantErreur, setMontantErreur] = useState<string | null>(null);
 
   const handleMontantPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     const text = e.clipboardData.getData("text");
@@ -117,16 +117,16 @@ export default function Avances() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const montantVal = parseInt(form.montantOctroyeFcfa.replace(/\D/g, ""), 10);
     if (!form.membreId || !form.montantOctroyeFcfa) return;
-    const montant = parseInt(form.montantOctroyeFcfa.replace(/\D/g, ""), 10);
-    if (!montant || montant <= 0) {
+    if (!montantVal || montantVal <= 0) {
       setMontantErreur("Le montant doit être supérieur à 0");
       return;
     }
     setMontantErreur(null);
     const payload = {
       membreId: parseInt(form.membreId),
-      montantOctroyeFcfa: montant,
+      montantOctroyeFcfa: parseInt(form.montantOctroyeFcfa),
       dateOctroi: form.dateOctroi,
       dateEcheance: form.dateEcheance || undefined,
       motif: form.motif || undefined,
@@ -135,6 +135,7 @@ export default function Avances() {
       void queueOp({ localId: crypto.randomUUID(), type: "avance", data: payload });
       setModalOuvert(false);
       setForm({ membreId: "", montantOctroyeFcfa: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+      setMontantErreur(null);
       setMembreSearch("");
       setNotifHorsLigne("Avance enregistrée hors ligne — sera synchronisée dès le retour en ligne");
       setTimeout(() => setNotifHorsLigne(null), 6000);
@@ -352,7 +353,7 @@ export default function Avances() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-in zoom-in-95 fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-bold text-gray-900">Octroyer une avance</h3>
-              <button onClick={() => { setModalOuvert(false); setMembreSearch(""); setMembreDropdownOuvert(false); }} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+              <button onClick={() => { setModalOuvert(false); setMontantErreur(null); setMembreSearch(""); setMembreDropdownOuvert(false); }} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
               <div className="relative">
@@ -436,10 +437,10 @@ export default function Avances() {
                   onChange={(raw) => { setForm({ ...form, montantOctroyeFcfa: raw }); setMontantErreur(null); }}
                   onPaste={handleMontantPaste}
                   placeholder="150 000"
-                  className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none ${montantErreur ? "border-red-400" : "border-gray-200"}`}
+                  className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none ${montantErreur ? "border-red-400 focus:ring-red-400" : "border-gray-200"}`}
                 />
                 {montantErreur && (
-                  <p className="text-xs text-red-600 mt-1">{montantErreur}</p>
+                  <p className="mt-1 text-xs text-red-600">{montantErreur}</p>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -490,7 +491,7 @@ export default function Avances() {
               <div className="flex gap-3 pt-1">
                 <button
                   type="button"
-                  onClick={() => { setModalOuvert(false); setMembreSearch(""); setMembreDropdownOuvert(false); }}
+                  onClick={() => { setModalOuvert(false); setMontantErreur(null); setMembreSearch(""); setMembreDropdownOuvert(false); }}
                   className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Annuler
