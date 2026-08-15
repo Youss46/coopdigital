@@ -13,6 +13,26 @@ interface Station {
   longitude: number | null;
 }
 
+/* ─── Haversine ──────────────────────────────────────────────────────────── */
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatKm(km: number): string {
+  if (km < 1) return `${Math.round(km * 1000)} m`;
+  if (km < 10) return `~${km.toFixed(1)} km`;
+  return `~${Math.round(km)} km`;
+}
+
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
 const TYPE_LABEL: Record<string, string> = {
@@ -44,6 +64,7 @@ export default function StationChauffeur() {
   const [loading, setLoading]     = useState(true);
   const [query, setQuery]         = useState("");
   const [typeFilter, setTypeFilter] = useState(initType);
+  const [userPos, setUserPos]     = useState<{ lat: number; lon: number } | null>(null);
 
   /* ── Chargement ── */
   useEffect(() => {
@@ -53,6 +74,28 @@ export default function StationChauffeur() {
       .finally(() => setLoading(false));
   }, []);
 
+  /* ── Géolocalisation ── */
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      pos => setUserPos({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      () => { /* permission refusée — silencieux */ },
+      { timeout: 8000, maximumAge: 60000 },
+    );
+  }, []);
+
+  /* ── Distances ── */
+  const distanceMap = useMemo(() => {
+    if (!userPos) return new Map<string, number>();
+    const map = new Map<string, number>();
+    stations.forEach(s => {
+      if (s.latitude != null && s.longitude != null) {
+        map.set(s.nom, haversineKm(userPos.lat, userPos.lon, s.latitude, s.longitude));
+      }
+    });
+    return map;
+  }, [stations, userPos]);
+
   /* ── Types disponibles (pour chips) ── */
   const availableTypes = useMemo(() => {
     const set = new Set<string>();
@@ -60,14 +103,22 @@ export default function StationChauffeur() {
     return [...set].sort();
   }, [stations]);
 
-  /* ── Filtrage ── */
+  /* ── Filtrage + tri par distance ── */
   const filtered = useMemo(() => {
-    return stations.filter(s => {
+    const list = stations.filter(s => {
       const matchType = typeFilter === "all" || s.types_carburant.includes(typeFilter);
       const matchQ    = !query.trim() || s.nom.toLowerCase().includes(query.trim().toLowerCase());
       return matchType && matchQ;
     });
-  }, [stations, typeFilter, query]);
+    if (userPos) {
+      list.sort((a, b) => {
+        const da = distanceMap.get(a.nom) ?? Infinity;
+        const db = distanceMap.get(b.nom) ?? Infinity;
+        return da - db;
+      });
+    }
+    return list;
+  }, [stations, typeFilter, query, userPos, distanceMap]);
 
   const filterChips = [
     { value: "all", label: "Toutes" },
@@ -201,7 +252,7 @@ export default function StationChauffeur() {
           </div>
         ) : (
           filtered.map((station, idx) => (
-            <StationCard key={idx} station={station} />
+            <StationCard key={idx} station={station} distanceKm={distanceMap.get(station.nom)} />
           ))
         )}
       </div>
@@ -213,7 +264,7 @@ export default function StationChauffeur() {
 
 /* ─── Carte station ──────────────────────────────────────────────────────── */
 
-function StationCard({ station }: { station: Station }) {
+function StationCard({ station, distanceKm }: { station: Station; distanceKm?: number }) {
   return (
     <div className="t-card" style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 16px" }}>
       {/* Avatar */}
@@ -245,6 +296,16 @@ function StationCard({ station }: { station: Station }) {
             );
           })}
         </div>
+
+        {/* Badge distance */}
+        {distanceKm !== undefined && (
+          <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
+            <Navigation size={12} color="var(--t-muted)" />
+            <span style={{ fontSize: "0.78rem", color: "var(--t-muted)", fontWeight: 600 }}>
+              {formatKm(distanceKm)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Bouton directions */}
