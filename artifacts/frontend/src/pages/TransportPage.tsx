@@ -2373,6 +2373,21 @@ function TabStationsCarburant() {
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
+  const importMut = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`${BASE}/api/transport/stations-carburant/importer-historique`, {
+        method: "POST", headers: authHeader(),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error((d as { erreur?: string }).erreur ?? "Erreur"); }
+      return res.json() as Promise<{ importees: number }>;
+    },
+    onSuccess: (d) => {
+      void qc.invalidateQueries({ queryKey: QK });
+      toast({ title: d.importees > 0 ? `${d.importees} station${d.importees > 1 ? "s" : ""} importée${d.importees > 1 ? "s" : ""}` : "Aucune nouvelle station à importer" });
+    },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
   function openCreate() {
     setEditing(null);
     setForm({ nom: "", adresse: "", types: ["gasoil"] });
@@ -2403,9 +2418,15 @@ function TabStationsCarburant() {
             Ces stations apparaissent dans l'application chauffeur même avant la première utilisation de bon.
           </p>
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Ajouter une station
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => importMut.mutate()} disabled={importMut.isPending} className="gap-2">
+            <History className="h-4 w-4" />
+            {importMut.isPending ? "Importation…" : "Importer depuis l'historique"}
+          </Button>
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="h-4 w-4" /> Ajouter une station
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

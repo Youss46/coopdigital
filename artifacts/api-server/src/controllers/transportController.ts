@@ -42,8 +42,8 @@ import {
   getStatsCarburant,
 } from "../services/transportService";
 import { generateBonCarburant } from "../services/bonCarburantPdf";
-import { db, usersTable, stationsCarburantTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { db, usersTable, stationsCarburantTable, bonsCarburantTable } from "@workspace/db";
+import { eq, and, isNotNull } from "drizzle-orm";
 
 function toDateStr(d: Date | null | undefined): string | null | undefined {
   if (d == null) return d;
@@ -1127,6 +1127,58 @@ export async function handleDeleteStationCarburant(req: Request, res: Response):
     res.json({ success: true });
   } catch (err) {
     req.log.error({ err }, "handleDeleteStationCarburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleImporterStationsHistorique(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+
+    // Lire les paires (station, type_carburant) distinctes depuis les bons historiques
+    const bonsRows = await db
+      .selectDistinct({
+        nom:          bonsCarburantTable.stationService,
+        typeCarburant: bonsCarburantTable.typeCarburant,
+      })
+      .from(bonsCarburantTable)
+      .where(and(
+        eq(bonsCarburantTable.cooperativeId, cooperativeId),
+        isNotNull(bonsCarburantTable.stationService),
+      ));
+
+    // Agréger les types par station
+    const fromBons = new Map<string, Set<string>>();
+    for (const r of bonsRows) {
+      if (!r.nom) continue;
+      if (!fromBons.has(r.nom)) fromBons.set(r.nom, new Set());
+      fromBons.get(r.nom)!.add(r.typeCarburant);
+    }
+
+    // Noms déjà configurés (toutes statuts confondus pour éviter les doublons)
+    const existing = await db
+      .select({ nom: stationsCarburantTable.nom })
+      .from(stationsCarburantTable)
+      .where(eq(stationsCarburantTable.cooperativeId, cooperativeId));
+    const existingNames = new Set(existing.map(e => e.nom));
+
+    // Insérer les nouvelles stations uniquement
+    const toInsert = [...fromBons.entries()]
+      .filter(([nom]) => !existingNames.has(nom))
+      .map(([nom, types]) => ({
+        cooperativeId,
+        nom,
+        typesCarburant: [...types].sort().join(","),
+      }));
+
+    if (toInsert.length > 0) {
+      await db.insert(stationsCarburantTable).values(toInsert);
+    }
+
+    res.json({ importees: toInsert.length });
+  } catch (err) {
+    req.log.error({ err }, "handleImporterStationsHistorique");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
