@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { getPeseurCollectes, telechargerRecuLivraison } from "../lib/api";
 import { useOffline } from "../contexts/OfflineContext";
 import type { PeseurCollecte } from "../lib/types";
+import BottomNavPeseur from "../components/BottomNavPeseur";
 
 const CACHE_KEY = "peseur_collectes_cache";
 
@@ -231,6 +232,7 @@ export default function HistoriquePeseur() {
           })}
         </div>
       </main>
+      <BottomNavPeseur />
     </div>
   );
 }

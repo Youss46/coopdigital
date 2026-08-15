@@ -725,6 +725,147 @@ body {
   padding: 8px 0;
 }
 
+/* Brand masqué sur mobile — visible seulement via la sidebar desktop */
+.t-nav__brand { display: none; }
+
+/* ── Responsive — Tablette (≥ 768px) ───────────────────────── */
+@media (min-width: 768px) {
+  html { font-size: 16px; }
+
+  .t-app { max-width: 100%; }
+
+  /* Nav pleine largeur sur tablette */
+  .t-nav { max-width: 100%; }
+
+  /* Centrer le contenu des formulaires */
+  .t-form  { max-width: 640px; margin-left: auto; margin-right: auto; }
+  .t-recap { max-width: 640px; margin-left: auto; margin-right: auto; }
+}
+
+/* ── Responsive — Desktop (≥ 1024px) — sidebar layout ──────── */
+@media (min-width: 1024px) {
+  html { font-size: 15px; }
+
+  /* Grille principale : colonne nav + zone contenu */
+  .t-app {
+    max-width: none;
+    width: 100%;
+    min-height: 100dvh;
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "nav header"
+      "nav main";
+    background: #f0f9f4;
+  }
+
+  /* Header dans la zone de contenu */
+  .t-header {
+    grid-area: header;
+    position: sticky;
+    top: 0;
+  }
+
+  /* Zone principale — laisse le body scroller, limite la largeur */
+  .t-main {
+    grid-area: main;
+    overflow-y: visible;
+    padding-bottom: 48px;
+    max-width: 880px;
+    width: 100%;
+    margin: 0 auto;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+
+  .t-main--no-nav { padding-bottom: 48px; }
+
+  /* Sidebar navigation */
+  .t-nav {
+    grid-area: nav;
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    width: 200px;
+    max-width: 200px;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    /* désactiver le fixed-bottom mobile */
+    bottom: auto;
+    left: auto;
+    right: auto;
+    padding: 16px 8px 24px;
+    gap: 2px;
+    box-shadow: 2px 0 12px rgba(0,0,0,.18);
+    overflow-y: auto;
+  }
+
+  /* Éléments nav horizontaux dans la sidebar */
+  .t-nav__item {
+    flex-direction: row;
+    justify-content: flex-start;
+    height: 46px;
+    padding: 0 14px;
+    gap: 12px;
+    font-size: .82rem;
+    border-radius: 10px;
+    width: 100%;
+    flex: 0 0 auto;
+  }
+
+  .t-nav__item .t-nav__icon {
+    font-size: 18px;
+    width: 22px;
+    flex-shrink: 0;
+    text-align: center;
+  }
+
+  .t-nav__item--active,
+  .t-nav__item.active {
+    background: rgba(255,255,255,.18);
+  }
+
+  /* Brand logo en haut de la sidebar */
+  .t-nav__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 14px 18px;
+    border-bottom: 1px solid rgba(255,255,255,.15);
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+
+  .t-nav__brand-icon { font-size: 1.6rem; line-height: 1; }
+
+  .t-nav__brand-name {
+    font-weight: 800;
+    font-size: .9rem;
+    color: #fff;
+    line-height: 1.2;
+  }
+
+  .t-nav__brand-sub {
+    font-size: .65rem;
+    color: rgba(255,255,255,.6);
+    font-weight: 500;
+  }
+
+  /* Grilles plus larges sur desktop */
+  .t-stats   { grid-template-columns: repeat(3, 1fr); }
+  .t-actions { grid-template-columns: repeat(4, 1fr); }
+
+  /* Formulaires centrés et plus larges */
+  .t-form  { max-width: 720px; margin-left: auto; margin-right: auto; }
+  .t-recap { max-width: 720px; margin-left: auto; margin-right: auto; }
+
+  /* Recherche fournisseur pleine largeur */
+  .t-search-wrap { max-width: none; }
+  .t-fournisseur-list { padding-left: 0; padding-right: 0; }
+}
+
 /* ── Curseur pointeur global sur tous les cliquables ── */
 
 button,

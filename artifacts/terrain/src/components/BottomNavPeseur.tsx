@@ -12,6 +12,14 @@ export default function BottomNavPeseur() {
 
   return (
     <nav className="t-nav">
+      {/* Brand — visible uniquement en sidebar desktop (caché sur mobile via CSS) */}
+      <div className="t-nav__brand">
+        <span className="t-nav__brand-icon">🌱</span>
+        <div>
+          <div className="t-nav__brand-name">CoopDigital</div>
+          <div className="t-nav__brand-sub">Espace Peseur</div>
+        </div>
+      </div>
       {ITEMS.map((item) => {
         const isActive = item.path === "/"
           ? location === "/"

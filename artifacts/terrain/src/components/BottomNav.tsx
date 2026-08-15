@@ -13,6 +13,14 @@ export default function BottomNav() {
 
   return (
     <nav className="t-nav">
+      {/* Brand — visible uniquement en sidebar desktop */}
+      <div className="t-nav__brand">
+        <span className="t-nav__brand-icon">🌱</span>
+        <div>
+          <div className="t-nav__brand-name">CoopDigital</div>
+          <div className="t-nav__brand-sub">Espace Terrain</div>
+        </div>
+      </div>
       {ITEMS.map((item) => {
         const isActive = item.path === "/"
           ? location === "/"
