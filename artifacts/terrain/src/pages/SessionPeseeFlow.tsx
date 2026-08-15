@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
@@ -90,6 +90,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const [confirmConvertir, setConfirmConvertir] = useState(false);
   const [convertirLoading, setConvertirLoading] = useState(false);
   const [livraisonResult, setLivraisonResult] = useState<ConversionLivraisonResult | null>(null);
+  // Synchronous guard — prevents a second tap from entering handleConvertir before the first resolves
+  const convertirInProgressRef = useRef(false);
 
   // Estimation avant conversion
   const [estimeLoading, setEstimeLoading] = useState(false);
@@ -343,16 +345,38 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   // ── Convertir la session terminée en livraison ─────────────────────────────
   async function handleConvertir() {
     if (!sessionTerminee) return;
+    // Synchronous guard: block any second invocation until the first resolves.
+    // State-based guards (convertirLoading) are insufficient on mobile because
+    // React may not re-render between two rapid taps.
+    if (convertirInProgressRef.current) return;
+    convertirInProgressRef.current = true;
+
     setConvertirLoading(true);
     setErreur("");
     try {
       const result = await convertirSessionEnLivraison(sessionTerminee.id);
       setLivraisonResult(result);
+      setConfirmConvertir(false);
     } catch (err) {
-      setErreur((err as Error).message);
+      const msg = (err as Error).message ?? "";
+      // The backend (FOR UPDATE + livraisonId check) throws this when a concurrent
+      // request already created the livraison. Instead of showing a confusing error,
+      // reload the session so the UI transitions to the receipt screen.
+      if (msg.includes("Une livraison a déjà été créée")) {
+        try {
+          const updated = await getSessionDetail(sessionTerminee.id);
+          setSessionTerminee(updated);
+        } catch {
+          // silencieux — la session restera telle quelle
+        }
+        setConfirmConvertir(false);
+      } else {
+        setErreur(msg);
+        setConfirmConvertir(false);
+      }
     } finally {
       setConvertirLoading(false);
-      setConfirmConvertir(false);
+      convertirInProgressRef.current = false;
     }
   }
 
