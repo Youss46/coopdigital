@@ -361,7 +361,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
       setLivraisonResult(result);
       setConfirmConvertir(false);
     } catch (err) {
-      const msg = (err as Error).message ?? "";
+      const msg = (err instanceof Error && err.message) ? err.message : "Erreur lors de la conversion — réessayez.";
       // The backend (FOR UPDATE + livraisonId check) throws this when a concurrent
       // request already created the livraison. Instead of showing a confusing error,
       // reload the session so the UI transitions to the receipt screen.
@@ -374,8 +374,9 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
         }
         setConfirmConvertir(false);
       } else {
+        // Afficher l'erreur DANS la modale (ne pas fermer) pour que l'utilisateur la voit
         setErreur(msg);
-        setConfirmConvertir(false);
+        // La modale reste ouverte — l'utilisateur voit l'erreur et peut réessayer
       }
     } finally {
       setConvertirLoading(false);
@@ -868,11 +869,16 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: ".85rem", color: "#78350f" }}>
               ⏳ Le mode de paiement sera choisi lors du règlement.
             </div>
+            {erreur && (
+              <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: ".85rem", color: "#dc2626" }}>
+                ⚠️ {erreur}
+              </div>
+            )}
             <button className="t-btn t-btn--primary" style={{ width: "100%", marginBottom: 10 }}
               disabled={convertirLoading} onClick={handleConvertir}>
-              {convertirLoading ? "Création en cours…" : "✔ Confirmer la livraison"}
+              {convertirLoading ? "Création en cours…" : erreur ? "↩ Réessayer" : "✔ Confirmer la livraison"}
             </button>
-            <button className="t-btn t-btn--ghost" style={{ width: "100%" }} onClick={() => setConfirmConvertir(false)}>
+            <button className="t-btn t-btn--ghost" style={{ width: "100%" }} onClick={() => { setConfirmConvertir(false); setErreur(""); }}>
               Annuler
             </button>
           </div>
