@@ -5,8 +5,6 @@ import {
   membresTable,
   livraisonsTable,
   paiementsTable,
-  entrepotsTable,
-  mouvementsStockTable,
   avancesTable,
   configPeseeTable,
 } from "@workspace/db";
@@ -439,40 +437,6 @@ export async function creerLivraisonDepuisSession(
     // ── Remboursement intrants ────────────────────────────────────────────
     if (intrantsDeduits > 0) {
       await enregistrerRemboursementParLivraison(tx, cooperativeId, session.membreId, intrantsDeduits, dateStr);
-    }
-
-    // Stock movement — resolve entrepot scoped to this cooperative
-    let entrepotId: number | null = null;
-    if (data.entrepotId) {
-      // Validate that the supplied entrepot belongs to this cooperative
-      const [entrepot] = await tx
-        .select({ id: entrepotsTable.id })
-        .from(entrepotsTable)
-        .where(and(eq(entrepotsTable.id, data.entrepotId), eq(entrepotsTable.cooperativeId, cooperativeId)))
-        .limit(1);
-      if (!entrepot) throw new Error("Entrepôt introuvable ou n'appartient pas à votre coopérative");
-      entrepotId = entrepot.id;
-    } else {
-      // Fall back to first entrepot of cooperative
-      const [entrepot] = await tx
-        .select({ id: entrepotsTable.id })
-        .from(entrepotsTable)
-        .where(eq(entrepotsTable.cooperativeId, cooperativeId))
-        .orderBy(entrepotsTable.id)
-        .limit(1);
-      entrepotId = entrepot?.id ?? null;
-    }
-
-    if (entrepotId) {
-      await tx.insert(mouvementsStockTable).values({
-        entrepotId,
-        lotId: null,
-        type: "entree",
-        poidsKg: String(poidsKg),
-        nombreSacs: session.nbSacsTotal ?? null,
-        motif: `Livraison depuis session pesée #${sessionId}`,
-        agentId: data.agentId ?? null,
-      });
     }
 
     // Link livraison back to session (session is locked — no concurrent writer)
