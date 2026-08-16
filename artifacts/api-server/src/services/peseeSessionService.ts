@@ -326,7 +326,6 @@ export async function creerLivraisonDepuisSession(
   cooperativeId: number,
   sessionId: number,
   data: {
-    entrepotId?: number;
     agentId?: number;
     /** ID du peseur ayant physiquement réalisé la session (traçabilité) */
     peseurId?: number;

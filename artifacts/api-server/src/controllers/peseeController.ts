@@ -432,10 +432,8 @@ export async function handleConvertirSessionEnLivraison(req: Request, res: Respo
   const effectiveAgentId = req.agent?.delegueId ?? actorId;
   const peseurId = req.agent?.delegueId ? req.agent.id : undefined;
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
-  const { entrepotId } = req.body as { entrepotId?: number };
   try {
     const result = await creerLivraisonDepuisSession(cooperativeId, sessionId, {
-      entrepotId,
       agentId: effectiveAgentId,
       peseurId,
     });
