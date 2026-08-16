@@ -7,6 +7,7 @@ import {
   campagnesTable,
   entrepotsTable,
   mouvementsStockTable,
+  sessionsPeseeTable,
 } from "@workspace/db";
 import { and, eq, desc, sql, count, sum } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
@@ -549,6 +550,111 @@ export async function confirmerDepart(
   return updated!;
 }
 
+// ─── Signaler arrivée physique (en_cours → arrive) ──────────────────────────
+
+/**
+ * Signale que le camion est arrivé physiquement au magasin central.
+ * Passe le transfert de `en_cours` → `arrive` et notifie la direction
+ * qu'un peseur doit effectuer la pesée de réception.
+ */
+/**
+ * Vérifie qu'un transfert appartient à l'entrepôt d'un délégué donné.
+ * Un délégué (ou peseur rattaché) ne peut signaler l'arrivée que d'un transfert
+ * dont il est l'expéditeur (delegueId = callerDelegueId).
+ * Les peseurs centraux (callerDelegueId = null) peuvent tout voir.
+ */
+export async function verifierAppartenanceTransfert(
+  transfertId: number,
+  cooperativeId: number,
+  callerDelegueId: number | null,
+): Promise<boolean> {
+  // Peseur central : accès total
+  if (callerDelegueId == null) return true;
+  const [t] = await db
+    .select({ delegueId: transfertsStockTable.delegueId })
+    .from(transfertsStockTable)
+    .where(and(eq(transfertsStockTable.id, transfertId), eq(transfertsStockTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  return t?.delegueId === callerDelegueId;
+}
+
+export async function signalerArriveePhysique(
+  transfertId: number,
+  cooperativeId: number,
+  parId: number,
+  data?: { notes?: string },
+) {
+  const [t] = await db
+    .select()
+    .from(transfertsStockTable)
+    .where(and(eq(transfertsStockTable.id, transfertId), eq(transfertsStockTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!t) throw new Error("Transfert introuvable");
+  if (t.statut !== "en_cours") throw new Error("Ce transfert n'est pas en transit (statut actuel : " + t.statut + ")");
+
+  const [updated] = await db
+    .update(transfertsStockTable)
+    .set({
+      statut: "arrive",
+      dateArrivee: new Date(),
+      notes: data?.notes ?? t.notes,
+      updatedAt: new Date(),
+    })
+    .where(eq(transfertsStockTable.id, transfertId))
+    .returning();
+
+  await notifierParRole(cooperativeId, ["directeur", "pca"], {
+    type: "transfert_planifie",
+    titre: `📥 Transfert ${t.numeroTransfert} arrivé — pesée requise`,
+    message: `${parseFloat(String(t.poidsDepart_kg ?? 0)).toLocaleString("fr-FR")} kg arrivés au magasin central. Un peseur doit effectuer la pesée de réception.`,
+    lien: "/entrepots",
+    lienLibelle: "Voir les transferts",
+    gravite: "info",
+    sourceModule: "entrepots",
+    sourceId: transfertId,
+  });
+
+  logger.info({ transfertId, parId }, "Arrivée physique signalée — en attente de pesée");
+  return updated!;
+}
+
+// ─── Liste transferts en attente de pesée (peseur central) ──────────────────
+
+/**
+ * Retourne les transferts en statut `arrive` ou `en_pesee` pour la coopérative.
+ * Utilisé par le peseur central pour voir sa file d'attente.
+ */
+export async function listTransfertsEnAttentePesee(cooperativeId: number) {
+  return db
+    .select({
+      id:               transfertsStockTable.id,
+      numeroTransfert:  transfertsStockTable.numeroTransfert,
+      statut:           transfertsStockTable.statut,
+      poidsDepart_kg:   transfertsStockTable.poidsDepart_kg,
+      nombreSacs:       transfertsStockTable.nombreSacs,
+      dateDepart:       transfertsStockTable.dateDepart,
+      dateArrivee:      transfertsStockTable.dateArrivee,
+      notes:            transfertsStockTable.notes,
+      sessionPeseeId:   transfertsStockTable.sessionPeseeId,
+      entrepotNom:      entrepotsDeleguesTable.nom,
+      zoneNom:          entrepotsDeleguesTable.zoneNom,
+      delegueNom:       usersTable.nom,
+      deleguePrenoms:   usersTable.prenoms,
+    })
+    .from(transfertsStockTable)
+    .leftJoin(entrepotsDeleguesTable, eq(entrepotsDeleguesTable.id, transfertsStockTable.entrepotSourceId))
+    .leftJoin(usersTable, eq(usersTable.id, transfertsStockTable.delegueId))
+    .where(
+      and(
+        eq(transfertsStockTable.cooperativeId, cooperativeId),
+        sql`${transfertsStockTable.statut} IN ('arrive', 'en_pesee')`,
+      ),
+    )
+    .orderBy(transfertsStockTable.dateArrivee);
+}
+
+// ─── Confirmation manuelle arrivée (backward-compat) ────────────────────────
+
 export async function confirmerArrivee(
   transfertId: number,
   cooperativeId: number,
@@ -566,7 +672,13 @@ export async function confirmerArrivee(
     )
     .limit(1);
   if (!t) throw new Error("Transfert introuvable");
-  if (t.statut !== "en_cours") throw new Error("Ce transfert n'est pas en transit");
+  // La pesée physique est obligatoire : la confirmation manuelle n'est plus autorisée.
+  // La réception se confirme exclusivement via la clôture d'une session de pesée.
+  throw new Error(
+    "La confirmation manuelle est désactivée — " +
+    "toute réception doit passer par une pesée physique sac-par-sac par le peseur central. " +
+    "Signalez d'abord l'arrivée du camion, puis démarrez une session de pesée.",
+  );
 
   const poidsDepart = toNum(t.poidsDepart_kg);
   const ecartKg = poidsDepart - data.poidsArrivee_kg;
@@ -654,6 +766,40 @@ export async function signalerLitige(
   motifEcart: string,
   notes: string,
 ) {
+  // La pesée physique est obligatoire : le litige ne peut être signalé manuellement que si
+  // le transfert a déjà effectué une session de pesée (sessionPeseeId != null).
+  // Les transferts sans pesée atteignent 'litige' automatiquement via finaliserReceptionTransfertTx.
+  const [t] = await db
+    .select({ statut: transfertsStockTable.statut, sessionPeseeId: transfertsStockTable.sessionPeseeId })
+    .from(transfertsStockTable)
+    .where(and(eq(transfertsStockTable.id, transfertId), eq(transfertsStockTable.cooperativeId, cooperativeId)))
+    .limit(1);
+
+  if (!t) throw new Error("Transfert introuvable");
+
+  if (t.sessionPeseeId == null) {
+    throw new Error(
+      "Ce transfert n'a pas encore effectué de pesée physique obligatoire. " +
+      "Le statut 'litige' est défini automatiquement lors de la clôture de la session de pesée par le peseur central.",
+    );
+  }
+
+  // Vérifier que la session de pesée est terminée : le litige ne peut être annoté
+  // manuellement que APRÈS que le finaliseur atomique a déterminé le statut final.
+  // Cela empêche de passer un transfert en_pesee en litige sans pesée complète.
+  const [peseeSession] = await db
+    .select({ statut: sessionsPeseeTable.statut })
+    .from(sessionsPeseeTable)
+    .where(eq(sessionsPeseeTable.id, t.sessionPeseeId))
+    .limit(1);
+
+  if (!peseeSession || peseeSession.statut !== "terminee") {
+    throw new Error(
+      "La session de pesée n'est pas encore clôturée. " +
+      "Le statut 'litige' est défini automatiquement à la clôture — attendez que le peseur central termine la session.",
+    );
+  }
+
   const [updated] = await db
     .update(transfertsStockTable)
     .set({

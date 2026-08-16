@@ -71,6 +71,7 @@ interface Transfert {
   datePrevue: string | null; typeVehicule: string | null; immatriculation: string | null;
   nomChauffeur: string | null; entrepotNom: string | null; entrepotId: number | null;
   zoneNom: string | null; delegueNom: string | null; deleguePrenoms: string | null; notes: string | null;
+  sessionPeseeId?: number | null;
 }
 interface Mouvement {
   id: number;
@@ -87,11 +88,12 @@ interface Mouvement {
 }
 
 const STATUT_LABEL: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  planifie:  { label: "Planifié",   color: "bg-blue-100 text-blue-800",   icon: <Clock className="w-3 h-3" /> },
-  en_cours:  { label: "En transit", color: "bg-amber-100 text-amber-800", icon: <Truck className="w-3 h-3" /> },
-  arrive:    { label: "Arrivé",     color: "bg-purple-100 text-purple-800", icon: <Package className="w-3 h-3" /> },
-  confirme:  { label: "Confirmé",   color: "bg-green-100 text-green-800", icon: <CheckCircle2 className="w-3 h-3" /> },
-  litige:    { label: "Litige",     color: "bg-red-100 text-red-800",     icon: <AlertTriangle className="w-3 h-3" /> },
+  planifie:  { label: "Planifié",        color: "bg-blue-100 text-blue-800",   icon: <Clock className="w-3 h-3" /> },
+  en_cours:  { label: "En transit",      color: "bg-amber-100 text-amber-800", icon: <Truck className="w-3 h-3" /> },
+  arrive:    { label: "Arrivé",          color: "bg-purple-100 text-purple-800", icon: <Package className="w-3 h-3" /> },
+  en_pesee:  { label: "Pesée en cours",  color: "bg-blue-100 text-blue-800",   icon: <RefreshCw className="w-3 h-3" /> },
+  confirme:  { label: "Confirmé",        color: "bg-green-100 text-green-800", icon: <CheckCircle2 className="w-3 h-3" /> },
+  litige:    { label: "Litige",          color: "bg-red-100 text-red-800",     icon: <AlertTriangle className="w-3 h-3" /> },
 };
 
 function StatutBadge({ statut }: { statut: string }) {
@@ -141,7 +143,7 @@ export default function EntrepotsPage() {
   const peutGerer = usePermission("stocks", "creer_entrepot");
   const peutModifier = usePermission("stocks", "modifier_entrepot");
   const [onglet, setOnglet] = useState<"stocks" | "transferts">("stocks");
-  const [filtreStatut, setFiltreStatut] = useState<"tous" | "confirme" | "litige" | "arrive">("tous");
+  const [filtreStatut, setFiltreStatut] = useState<"tous" | "confirme" | "litige">("tous");
   const [showArrivee, setShowArrivee] = useState<Transfert | null>(null);
   const [formArrivee, setFormArrivee] = useState({ poidsArrivee_kg: "", nombreSacsArrivee: "", motifEcart: "", notes: "" });
   const [showCreer, setShowCreer] = useState(false);
@@ -189,6 +191,17 @@ export default function EntrepotsPage() {
     queryKey: ["transferts"],
     queryFn: () => apiFetch("/transferts"),
     enabled: onglet === "transferts" || !!showDetail,
+  });
+
+  const mutArriveePhysique = useMutation({
+    mutationFn: (id: number) =>
+      apiFetch(`/transferts/${id}/arrivee-physique`, { method: "PUT", body: JSON.stringify({}) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transferts"] });
+      qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
+      toast({ title: "Arrivée signalée", description: "Le peseur central sera notifié pour effectuer la pesée." });
+    },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
   const mutArrivee = useMutation({
@@ -284,8 +297,8 @@ export default function EntrepotsPage() {
   }
 
   const entrepots = stats?.entrepots ?? [];
-  const enCours = transferts.filter((t) => ["planifie", "en_cours"].includes(t.statut));
-  const historiqueTous = transferts.filter((t) => ["arrive", "confirme", "litige"].includes(t.statut));
+  const enCours = transferts.filter((t) => ["planifie", "en_cours", "arrive", "en_pesee"].includes(t.statut));
+  const historiqueTous = transferts.filter((t) => ["confirme", "litige"].includes(t.statut));
   const historique = filtreStatut === "tous" ? historiqueTous : historiqueTous.filter((t) => t.statut === filtreStatut);
   const comptesStatut = {
     confirme: historiqueTous.filter((t) => t.statut === "confirme").length,
@@ -468,10 +481,21 @@ export default function EntrepotsPage() {
                       </div>
                       {t.statut === "en_cours" && (
                         <button
-                          onClick={() => { setShowArrivee(t); setFormArrivee({ poidsArrivee_kg: "", nombreSacsArrivee: t.nombreSacs != null ? String(t.nombreSacs) : "", motifEcart: "", notes: "" }); }}
-                          className="flex items-center gap-1.5 bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-800 whitespace-nowrap">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Confirmer arrivée
+                          onClick={() => mutArriveePhysique.mutate(t.id)}
+                          disabled={mutArriveePhysique.isPending}
+                          className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-700 whitespace-nowrap">
+                          <Package className="w-3.5 h-3.5" /> Signaler arrivée
                         </button>
+                      )}
+                      {t.statut === "arrive" && (
+                        <span className="flex items-center gap-1.5 bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg text-xs font-medium border border-purple-200 whitespace-nowrap">
+                          <Package className="w-3.5 h-3.5" /> En attente du peseur
+                        </span>
+                      )}
+                      {t.statut === "en_pesee" && (
+                        <span className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium border border-blue-200 whitespace-nowrap">
+                          <RefreshCw className="w-3.5 h-3.5" /> Pesée en cours…
+                        </span>
                       )}
                     </div>
                   </div>
@@ -497,7 +521,6 @@ export default function EntrepotsPage() {
                     [
                       { key: "tous", label: "Tous", count: historiqueTous.length, color: "gray" },
                       { key: "confirme", label: "Confirmés", count: comptesStatut.confirme, color: "green" },
-                      { key: "arrive", label: "Arrivés", count: comptesStatut.arrive, color: "blue" },
                       { key: "litige", label: "Litiges", count: comptesStatut.litige, color: "red" },
                     ] as const
                   ).map(({ key, label, count, color }) => {
@@ -1120,7 +1143,7 @@ export default function EntrepotsPage() {
 
               {detailOnglet === "transferts" && (() => {
                 const trEntrepot = transferts.filter((t) => t.entrepotId === showDetail.id);
-                const enCoursDrawer = trEntrepot.filter((t) => t.statut === "en_cours");
+                const enCoursDrawer = trEntrepot.filter((t) => ["planifie", "en_cours", "arrive", "en_pesee"].includes(t.statut));
                 return trEntrepot.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-32 text-gray-400 text-sm gap-2">
                     <Truck className="w-8 h-8 opacity-30" />
@@ -1158,14 +1181,24 @@ export default function EntrepotsPage() {
                           <p className="text-xs text-gray-400 mt-0.5">{fmtDate(t.dateDepart ?? t.datePrevue)}</p>
                           {t.statut === "en_cours" && (
                             <button
-                              onClick={() => {
-                                setShowArrivee(t);
-                                setFormArrivee({ poidsArrivee_kg: "", nombreSacsArrivee: t.nombreSacs != null ? String(t.nombreSacs) : "", motifEcart: "", notes: "" });
-                              }}
-                              className="mt-2 w-full flex items-center justify-center gap-1.5 bg-green-700 hover:bg-green-800 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              Confirmer l'arrivée au central
+                              onClick={() => mutArriveePhysique.mutate(t.id)}
+                              disabled={mutArriveePhysique.isPending}
+                              className="mt-2 w-full flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                              <Package className="w-3.5 h-3.5" />
+                              Signaler arrivée physique
                             </button>
+                          )}
+                          {t.statut === "arrive" && (
+                            <div className="mt-2 w-full flex items-center justify-center gap-1.5 bg-purple-50 text-purple-700 text-xs font-medium px-3 py-2 rounded-lg border border-purple-200">
+                              <Package className="w-3.5 h-3.5" />
+                              En attente du peseur central
+                            </div>
+                          )}
+                          {t.statut === "en_pesee" && (
+                            <div className="mt-2 w-full flex items-center justify-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-medium px-3 py-2 rounded-lg border border-blue-200">
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              Pesée physique en cours par le peseur central
+                            </div>
                           )}
                         </div>
                       );

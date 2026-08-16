@@ -10,6 +10,7 @@ import {
   creerLivraisonDepuisSession,
   expirerSessionsStales,
   SessionEnCoursError,
+  SessionTransfertExistanteError,
 } from "../services/peseeSessionService";
 import {
   CreateBalanceBody,
@@ -296,13 +297,24 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const actorId = req.agent?.id ?? req.user?.id;
-  const { membreId, produit, operation, balanceId, notes } = req.body as {
-    membreId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string;
+  const { membreId, produit, operation, balanceId, notes, transfertId } = req.body as {
+    membreId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string; transfertId?: number;
   };
+
+  // ── Guard : seul le peseur central (delegueId === null) peut démarrer une session de réception de transfert
+  if (transfertId != null) {
+    const isCentralPeseur = req.agent?.role === "peseur" && (req.agent.delegueId == null);
+    if (!isCentralPeseur) {
+      res.status(403).json({ erreur: "Seul le peseur central peut démarrer une session de réception de transfert" });
+      return;
+    }
+  }
+
   try {
     const session = await createSession(cooperativeId, {
       membreId, produit, operation, balanceId, notes,
       peseurId: actorId,
+      transfertId: transfertId ? Number(transfertId) : undefined,
     });
     res.status(201).json(session);
   } catch (err) {
@@ -312,6 +324,14 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
         code: "SESSION_EN_COURS",
         sessionId: err.sessionId,
         numeroSession: err.numeroSession,
+      });
+      return;
+    }
+    if (err instanceof SessionTransfertExistanteError) {
+      res.status(409).json({
+        erreur: err.message,
+        code: "SESSION_TRANSFERT_EXISTANTE",
+        sessionId: err.sessionId,
       });
       return;
     }
@@ -356,6 +376,21 @@ export async function handleGetSession(req: Request, res: Response): Promise<voi
   }
 }
 
+async function guardCentralPeseurForTransfertSession(
+  req: Request, res: Response, cooperativeId: number, sessionId: number,
+): Promise<boolean> {
+  const s = await getSessionDetail(cooperativeId, sessionId);
+  if (!s) { res.status(404).json({ erreur: "Session introuvable" }); return false; }
+  if (s.operation === "reception_transfert") {
+    const isCentralPeseur = req.agent?.role === "peseur" && (req.agent.delegueId == null);
+    if (!isCentralPeseur) {
+      res.status(403).json({ erreur: "Seul le peseur central peut modifier une session de réception de transfert" });
+      return false;
+    }
+  }
+  return true;
+}
+
 export async function handleAddLigne(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
@@ -364,6 +399,7 @@ export async function handleAddLigne(req: Request, res: Response): Promise<void>
     nbSacs?: number; poidsBrutKg?: number; tareKg?: number; notes?: string;
   };
   if (!poidsBrutKg || poidsBrutKg <= 0) { res.status(400).json({ erreur: "Poids invalide" }); return; }
+  if (!await guardCentralPeseurForTransfertSession(req, res, cooperativeId, sessionId)) return;
   try {
     const ligne = await addLigne(cooperativeId, sessionId, {
       nbSacs: nbSacs ?? 0,
@@ -385,6 +421,7 @@ export async function handleDeleteLigne(req: Request, res: Response): Promise<vo
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
   const ligneId = parseInt(String(req.params["ligneId"] ?? "0"));
+  if (!await guardCentralPeseurForTransfertSession(req, res, cooperativeId, sessionId)) return;
   try {
     await deleteLigne(cooperativeId, sessionId, ligneId);
     const session = await getSessionDetail(cooperativeId, sessionId);
@@ -400,6 +437,7 @@ export async function handleTerminerSession(req: Request, res: Response): Promis
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
+  if (!await guardCentralPeseurForTransfertSession(req, res, cooperativeId, sessionId)) return;
   try {
     const session = await terminerSession(cooperativeId, sessionId);
     res.json(session);
@@ -414,6 +452,7 @@ export async function handleAnnulerSession(req: Request, res: Response): Promise
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
+  if (!await guardCentralPeseurForTransfertSession(req, res, cooperativeId, sessionId)) return;
   try {
     await annulerSession(cooperativeId, sessionId);
     res.json({ ok: true });

@@ -19,6 +19,7 @@ import Commissions from "./pages/Commissions";
 import AccueilAgent from "./pages/AccueilAgent";
 import AccueilPeseur from "./pages/AccueilPeseur";
 import HistoriquePeseur from "./pages/HistoriquePeseur";
+import ReceptionsTransfertsPage from "./pages/ReceptionsTransfertsPage";
 import AccueilChauffeur from "./pages/AccueilChauffeur";
 import MissionsChauffeur from "./pages/MissionsChauffeur";
 import BonsCarburantChauffeur from "./pages/BonsCarburantChauffeur";
@@ -82,6 +83,7 @@ function PeseurRoutes() {
   return (
     <Switch>
       <Route path="/" component={AccueilPeseur} />
+      <Route path="/receptions" component={ReceptionsTransfertsPage} />
       <Route path="/collecte" component={CollecteFlow} />
       <Route path="/pesee-session/:sessionId" component={SessionPeseeFlow} />
       <Route path="/pesee-session" component={SessionPeseeFlow} />

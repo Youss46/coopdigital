@@ -304,8 +304,17 @@ export class SessionEnCoursError extends Error {
   }
 }
 
+export class SessionTransfertExistanteError extends Error {
+  constructor(public readonly sessionId: number) {
+    super(`Une session de pesée est déjà associée à ce transfert (session #${sessionId})`);
+    this.name = "SessionTransfertExistanteError";
+  }
+}
+
 export async function createSessionPesee(data: {
   membreId?: number; produit?: string; operation?: string; notes?: string;
+  /** Pour les sessions de réception de transfert */
+  transfertId?: number;
 }): Promise<import("./types").SessionPesee> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -319,9 +328,13 @@ export async function createSessionPesee(data: {
   });
   if (res.status === 409) {
     const body = await res.json().catch(() => ({})) as {
+      code?: string;
       sessionId?: number;
       numeroSession?: string;
     };
+    if (body.code === "SESSION_TRANSFERT_EXISTANTE") {
+      throw new SessionTransfertExistanteError(body.sessionId!);
+    }
     throw new SessionEnCoursError(body.sessionId!, body.numeroSession ?? "");
   }
   if (!res.ok) {
@@ -334,6 +347,19 @@ export async function createSessionPesee(data: {
     throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
   }
   return res.json();
+}
+
+// ─── Transferts en attente de pesée (peseur central) ─────────────────────────
+
+export async function getTransfertsEnAttentePesee(): Promise<import("./types").TransfertEnAttente[]> {
+  return apiPeseeFetch<import("./types").TransfertEnAttente[]>("/terrain/transferts/en_attente_pesee");
+}
+
+export async function signalerArriveePhysique(transfertId: number, data?: { notes?: string }): Promise<void> {
+  await apiPeseeFetch<void>(
+    `/terrain/entrepot/transferts/${transfertId}/arrivee-physique`,
+    { method: "PUT", body: JSON.stringify(data ?? {}) },
+  );
 }
 
 export async function getSessionsEnCours(membreId?: number): Promise<import("./types").SessionPesee[]> {

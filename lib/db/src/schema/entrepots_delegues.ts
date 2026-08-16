@@ -11,6 +11,7 @@ export const transfertStatutEnum = pgEnum("transfert_statut", [
   "planifie",
   "en_cours",
   "arrive",
+  "en_pesee",
   "confirme",
   "litige",
 ]);
@@ -110,6 +111,9 @@ export const transfertsStockTable = pgTable("transferts_stock", {
 
   confirmePar:       integer("confirme_par").references(() => usersTable.id),
   confirme_le:       timestamp("confirme_le", { withTimezone: true }),
+
+  /** Session de pesée physique liée à la réception de ce transfert (nullable — optionnel) */
+  sessionPeseeId:    integer("session_pesee_id"),
 
   documents:         jsonb("documents").default([]),
   notes:             text("notes"),

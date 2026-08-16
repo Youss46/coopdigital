@@ -208,6 +208,54 @@ export async function creerTransfertAdminHandler(req: Request, res: Response): P
   }
 }
 
+// ─── Signaler arrivée physique (terrain ou admin) ─────────────────────────────
+
+export async function signalerArriveePhysiqueHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
+  const parId = req.agent?.id ?? req.user?.id;
+  if (!cooperativeId || !parId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const id = Number(req.params["id"]);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  const { notes } = req.body as Record<string, unknown>;
+
+  // Guard d'appartenance : un délégué (terrain) ne peut signaler l'arrivée que des transferts issus de son entrepôt source
+  if (req.agent) {
+    const callerDelegueId = req.agent.role === "peseur" ? req.agent.delegueId : req.agent.id;
+    const ok = await svc.verifierAppartenanceTransfert(id, cooperativeId, callerDelegueId ?? null);
+    if (!ok) {
+      res.status(403).json({ erreur: "Ce transfert n'appartient pas à votre entrepôt" });
+      return;
+    }
+  }
+
+  try {
+    const updated = await svc.signalerArriveePhysique(id, cooperativeId, parId, { notes: notes ? String(notes) : undefined });
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "signalerArriveePhysique");
+    res.status(400).json({ erreur: (err as Error).message });
+  }
+}
+
+// ─── Liste transferts en attente de pesée (peseur central) ───────────────────
+
+export async function listTransfertsEnAttentePeseeHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.agent?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  // Réservé STRICTEMENT au peseur central (role='peseur' ET delegueId=null)
+  const isCentralPeseur = req.agent?.role === "peseur" && (req.agent.delegueId == null);
+  if (!isCentralPeseur) {
+    res.status(403).json({ erreur: "Réservé aux peseurs rattachés à la base centrale" }); return;
+  }
+  try {
+    const transferts = await svc.listTransfertsEnAttentePesee(cooperativeId);
+    res.json(transferts);
+  } catch (err) {
+    req.log.error({ err }, "listTransfertsEnAttentePesee");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 // ─── Vue délégué (terrain JWT) ────────────────────────────────────────────────
 
 export async function getMonEntrepotHandler(req: Request, res: Response): Promise<void> {

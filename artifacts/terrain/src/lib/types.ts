@@ -348,7 +348,29 @@ export interface SessionPesee {
   dateFin: string | null;
   notes: string | null;
   livraisonId: number | null;
+  /** Pour les sessions de type 'reception_transfert' */
+  transfertId?: number | null;
   createdAt: string;
+}
+
+// ─── Transferts en attente de pesée (peseur central) ─────────────────────────
+
+export type TransfertStatut = "planifie" | "en_cours" | "arrive" | "en_pesee" | "confirme" | "litige";
+
+export interface TransfertEnAttente {
+  id: number;
+  numeroTransfert: string;
+  statut: TransfertStatut;
+  poidsDepart_kg: string;
+  nombreSacs: number | null;
+  dateDepart: string | null;
+  dateArrivee: string | null;
+  notes: string | null;
+  sessionPeseeId: number | null;
+  entrepotNom: string | null;
+  zoneNom: string | null;
+  delegueNom: string | null;
+  deleguePrenoms: string | null;
 }
 
 export interface SessionDetail extends SessionPesee {

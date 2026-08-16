@@ -181,6 +181,32 @@ export default function AccueilPeseur() {
           </div>
         )}
 
+        {/* ── Réceptions de transferts (peseur central uniquement) ─────── */}
+        {user?.delegueId == null && (
+          <Link href="/receptions">
+            <div className="t-card" style={{
+              marginBottom: 12,
+              background: "linear-gradient(135deg, #172554 0%, #1e3a6e 100%)",
+              borderLeft: "4px solid #3b82f6",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+            }}>
+              <span style={{ fontSize: "1.8rem" }}>🚛</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 800, fontSize: ".95rem", color: "#93c5fd" }}>
+                  Réceptions de transferts
+                </div>
+                <div style={{ fontSize: ".75rem", color: "#64748b", marginTop: 2 }}>
+                  Peser les arrivages des délégués
+                </div>
+              </div>
+              <span style={{ fontSize: "1.2rem", color: "#3b82f6" }}>›</span>
+            </div>
+          </Link>
+        )}
+
         {/* ── Actions pesée ─────────────────────────────────────────────── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <Link href="/collecte">
@@ -307,7 +333,7 @@ export default function AccueilPeseur() {
         </div>
       )}
 
-      <BottomNavPeseur />
+      <BottomNavPeseur delegueId={user?.delegueId} />
     </div>
   );
 }

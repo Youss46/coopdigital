@@ -149,6 +149,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             derniereLivraison: null,
           });
         }
+        // Pour les sessions de réception de transfert (membreId=null), fournisseur reste null
+        // La session s'affiche en mode "transfert" (sans membre)
         if (detail.statut === "terminee") {
           // Session clôturée — aller directement à l'écran de succès pour permettre la conversion
           setSessionTerminee(detail);
@@ -465,15 +467,27 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
         )}
 
         {/* ─── STEP : Session active ────────────────────────────────────── */}
-        {step === "session" && session && fournisseur && (
+        {step === "session" && session && (fournisseur != null || session.operation === "reception_transfert") && (
           <>
-            {/* Info membre */}
-            <div className="t-card" style={{ margin: "16px 16px 8px", borderLeft: "4px solid var(--t-primary)" }}>
-              <div style={{ fontWeight: 800, fontSize: "1rem" }}>
-                {fournisseur.nom} {fournisseur.prenoms}
+            {/* Info membre OU info transfert */}
+            {session.operation === "reception_transfert" ? (
+              <div className="t-card" style={{ margin: "16px 16px 8px", borderLeft: "4px solid #3b82f6", background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)" }}>
+                <div style={{ fontSize: ".68rem", color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>
+                  🚛 Réception de transfert
+                </div>
+                <div style={{ fontWeight: 800, fontSize: "1rem", color: "#e2e8f0" }}>
+                  Pesée sac par sac
+                </div>
+                <div className="t-text-muted">Session · {session.numeroSession}</div>
               </div>
-              <div className="t-text-muted">{fournisseur.code}</div>
-            </div>
+            ) : fournisseur && (
+              <div className="t-card" style={{ margin: "16px 16px 8px", borderLeft: "4px solid var(--t-primary)" }}>
+                <div style={{ fontWeight: 800, fontSize: "1rem" }}>
+                  {fournisseur.nom} {fournisseur.prenoms}
+                </div>
+                <div className="t-text-muted">{fournisseur.code}</div>
+              </div>
+            )}
 
             {/* Cumul session */}
             <div className="t-card" style={{ margin: "0 16px 8px", background: "linear-gradient(135deg, #0f2417 0%, #1a3a28 100%)" }}>
@@ -658,17 +672,37 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
         )}
 
         {/* ─── STEP : Succès ────────────────────────────────────────────── */}
-        {step === "succes" && sessionTerminee && (
+        {step === "succes" && sessionTerminee && (() => {
+          const isTransfertReception = sessionTerminee.operation === "reception_transfert";
+          return (
           <div style={{ padding: "24px 16px", textAlign: "center" }}>
-            <div style={{ fontSize: "3rem", marginBottom: 12 }}>{livraisonResult ? "🎉" : "✅"}</div>
+            <div style={{ fontSize: "3rem", marginBottom: 12 }}>
+              {isTransfertReception ? "⚖️" : livraisonResult ? "🎉" : "✅"}
+            </div>
             <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "#22c55e", marginBottom: 4 }}>
-              {livraisonResult ? "Livraison créée" : "Pesée terminée"}
+              {isTransfertReception ? "Pesée de réception clôturée" : livraisonResult ? "Livraison créée" : "Pesée terminée"}
             </div>
             <div style={{ fontSize: ".82rem", color: "#94a3b8", fontFamily: "monospace", marginBottom: 20 }}>
               {sessionTerminee.numeroSession}
             </div>
 
-            {/* Récap session */}
+            {/* Message spécifique réception de transfert */}
+            {isTransfertReception && (
+              <div style={{
+                background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.3)",
+                borderRadius: 10, padding: 14, marginBottom: 20, fontSize: ".85rem", color: "#86efac", textAlign: "left",
+              }}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                  ✅ Poids officiel enregistré : {fmtPoids(parseFloat(String(sessionTerminee.poidsTotalKg)))}
+                </div>
+                <div style={{ fontSize: ".78rem", color: "#64748b" }}>
+                  Le transfert a été mis à jour avec le poids pesé. Le stock central a été crédité automatiquement (ou un litige a été ouvert si l'écart dépasse 0,5 %).
+                </div>
+              </div>
+            )}
+
+            {/* Récap session — pour sessions membres uniquement */}
+            {!isTransfertReception && (
             <div className="t-recap" style={{ textAlign: "left", marginBottom: 20 }}>
               <div className="t-recap-row">
                 <span className="t-recap-row__label">Producteur</span>
@@ -694,6 +728,28 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                 </span>
               </div>
             </div>
+            )}
+
+            {/* Récap pesées pour sessions transfert (simplifié) */}
+            {isTransfertReception && (
+              <div className="t-recap" style={{ textAlign: "left", marginBottom: 20 }}>
+                <div className="t-recap-row">
+                  <span className="t-recap-row__label">Nombre de passages</span>
+                  <span className="t-recap-row__value">{sessionTerminee.lignes?.length ?? 0}</span>
+                </div>
+                <div className="t-recap-row">
+                  <span className="t-recap-row__label">Total sacs</span>
+                  <span className="t-recap-row__value">{sessionTerminee.nbSacsTotal} sacs</span>
+                </div>
+                <div className="t-divider" />
+                <div className="t-recap-row t-recap-row--total">
+                  <span className="t-recap-row__label" style={{ fontWeight: 700 }}>Poids pesé (officiel)</span>
+                  <span className="t-recap-row__value" style={{ color: "#22c55e", fontWeight: 800, fontSize: "1.1rem" }}>
+                    {fmtPoids(parseFloat(String(sessionTerminee.poidsTotalKg)))}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* ── Détail de la livraison (après conversion) ─────────────── */}
             {livraisonResult && (
@@ -766,8 +822,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               <RecuButton livraisonId={sessionTerminee.livraisonId} />
             )}
 
-            {/* Bouton conversion (si pas encore convertie) */}
-            {!livraisonResult && !sessionTerminee?.livraisonId && isOnline && (
+            {/* Bouton conversion (si pas encore convertie, sessions membres uniquement) */}
+            {!isTransfertReception && !livraisonResult && !sessionTerminee?.livraisonId && isOnline && (
               <button
                 className="t-btn t-btn--primary"
                 style={{ width: "100%", marginBottom: 10, background: "linear-gradient(135deg, #16a34a, #15803d)" }}
@@ -777,14 +833,21 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               </button>
             )}
 
-            <button className="t-btn t-btn--primary" style={{ width: "100%", marginBottom: 10, background: livraisonResult ? undefined : "#334155" }} onClick={reset}>
-              ⊕ Nouvelle session
-            </button>
+            {isTransfertReception ? (
+              <button className="t-btn t-btn--ghost" style={{ width: "100%", marginBottom: 10 }} onClick={() => setLocation("/receptions")}>
+                ← Retour aux réceptions
+              </button>
+            ) : (
+              <button className="t-btn t-btn--primary" style={{ width: "100%", marginBottom: 10, background: livraisonResult ? undefined : "#334155" }} onClick={reset}>
+                ⊕ Nouvelle session
+              </button>
+            )}
             <button className="t-btn t-btn--ghost" style={{ width: "100%" }} onClick={() => setLocation("/")}>
               Retour à l'accueil
             </button>
           </div>
-        )}
+          );
+        })()}
       </main>
 
       <BottomNavPeseur />

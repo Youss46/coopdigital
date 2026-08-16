@@ -24,6 +24,8 @@ export const sessionsPeseeTable = pgTable("sessions_pesee", {
   nbSacsTotal:    integer("nb_sacs_total").notNull().default(0),
   notes:          text("notes"),
   livraisonId:    integer("livraison_id"),
+  /** Pour les sessions de type 'reception_transfert' : ID du transfert concerné */
+  transfertId:    integer("transfert_id"),
   dateDebut:      timestamp("date_debut", { withTimezone: true }).defaultNow().notNull(),
   dateFin:        timestamp("date_fin", { withTimezone: true }),
   createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

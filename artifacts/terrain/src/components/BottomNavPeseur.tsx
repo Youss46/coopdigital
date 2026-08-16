@@ -1,14 +1,25 @@
 import { Link, useLocation } from "wouter";
 
-const ITEMS = [
+const ITEMS_BASE = [
   { path: "/",                icon: "🏠", label: "Accueil"    },
   { path: "/collecte",        icon: "⚖️", label: "Simple"     },
   { path: "/pesee-session",   icon: "📦", label: "Groupée"    },
   { path: "/historique",      icon: "📋", label: "Historique" },
 ];
 
-export default function BottomNavPeseur() {
+const ITEM_RECEPTIONS = { path: "/receptions", icon: "🚛", label: "Réceptions" };
+
+interface Props {
+  /** delegueId provenant de AgentUser. null/undefined = peseur central → ajoute l'onglet Réceptions */
+  delegueId?: number | null;
+}
+
+export default function BottomNavPeseur({ delegueId }: Props = {}) {
   const [location] = useLocation();
+  const isCentral = delegueId == null;
+  const items = isCentral
+    ? [...ITEMS_BASE.slice(0, 1), ITEM_RECEPTIONS, ...ITEMS_BASE.slice(1)]
+    : ITEMS_BASE;
 
   return (
     <nav className="t-nav">
@@ -20,7 +31,7 @@ export default function BottomNavPeseur() {
           <div className="t-nav__brand-sub">Espace Peseur</div>
         </div>
       </div>
-      {ITEMS.map((item) => {
+      {items.map((item) => {
         const isActive = item.path === "/"
           ? location === "/"
           : location.startsWith(item.path);

@@ -7,11 +7,15 @@ import {
   paiementsTable,
   avancesTable,
   configPeseeTable,
+  transfertsStockTable,
+  mouvementsStockTable,
+  entrepotsTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, isNull, gte, lte } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, isNull, inArray } from "drizzle-orm";
 import { getPrixActuel } from "./terrainService.js";
 import { generateEcrituresLivraison } from "./comptabiliteService.js";
 import { getEncoursMembreTx, enregistrerRemboursementParLivraison } from "./intrantsService.js";
+import { creerNotification, notifierParRole } from "./notificationService.js";
 import { logger } from "../lib/logger.js";
 
 // ─── Génération numéro de session ─────────────────────────────────────────────
@@ -45,6 +49,15 @@ export class SessionEnCoursError extends Error {
   }
 }
 
+/** Thrown when a weighing session already exists for the given transfer. */
+export class SessionTransfertExistanteError extends Error {
+  readonly code = "SESSION_TRANSFERT_EXISTANTE";
+  constructor(public readonly sessionId: number) {
+    super(`Une session de pesée est déjà associée à ce transfert (session #${sessionId})`);
+    this.name = "SessionTransfertExistanteError";
+  }
+}
+
 export async function createSession(
   cooperativeId: number,
   data: {
@@ -54,9 +67,74 @@ export async function createSession(
     peseurId?: number;
     balanceId?: number;
     notes?: string;
+    /** ID du transfert pour une session de type 'reception_transfert' */
+    transfertId?: number;
   },
 ) {
-  // Guard: refuse to create a second concurrent session for the same member
+  // ── Cas 1 : session de réception de transfert (atomique) ─────────────────
+  if (data.transfertId) {
+    const transfertId = data.transfertId;
+    const numeroSession = await generateNumeroSession(cooperativeId);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const session = await db.transaction(async (tx: any) => {
+      // Lire le transfert avec verrou implicite (dans la transaction)
+      const [t] = await tx
+        .select({ id: transfertsStockTable.id, statut: transfertsStockTable.statut, sessionPeseeId: transfertsStockTable.sessionPeseeId })
+        .from(transfertsStockTable)
+        .where(and(eq(transfertsStockTable.id, transfertId), eq(transfertsStockTable.cooperativeId, cooperativeId)))
+        .limit(1);
+
+      if (!t) throw new Error("Transfert introuvable");
+      if (t.statut !== "arrive") {
+        throw new Error(`Le transfert doit être en statut 'arrivé' pour démarrer une pesée (statut actuel : ${t.statut})`);
+      }
+      if (t.sessionPeseeId != null) throw new SessionTransfertExistanteError(t.sessionPeseeId);
+
+      // Créer la session
+      const [s] = await tx
+        .insert(sessionsPeseeTable)
+        .values({
+          cooperativeId,
+          numeroSession,
+          membreId: null,
+          produit: data.produit ?? "cacao",
+          operation: "reception_transfert",
+          peseurId: data.peseurId,
+          balanceId: data.balanceId,
+          notes: data.notes,
+          transfertId,
+        })
+        .returning();
+
+      // Conditional update : n'accepte que les transferts encore 'arrive' sans session
+      const claimed = await tx
+        .update(transfertsStockTable)
+        .set({ statut: "en_pesee", sessionPeseeId: s!.id, updatedAt: new Date() })
+        .where(and(
+          eq(transfertsStockTable.id, transfertId),
+          eq(transfertsStockTable.statut, "arrive"),
+          isNull(transfertsStockTable.sessionPeseeId),
+        ))
+        .returning({ id: transfertsStockTable.id });
+
+      if (claimed.length === 0) {
+        // Une autre requête parallèle a revendiqué le transfert entre le SELECT et l'UPDATE
+        const [rival] = await tx
+          .select({ sessionPeseeId: transfertsStockTable.sessionPeseeId })
+          .from(transfertsStockTable)
+          .where(eq(transfertsStockTable.id, transfertId))
+          .limit(1);
+        throw new SessionTransfertExistanteError(rival?.sessionPeseeId ?? 0);
+      }
+
+      return s!;
+    });
+
+    return session;
+  }
+
+  // ── Cas 2 : session membre — vérifier l'unicité en cours ────────────────
   if (data.membreId) {
     const [existing] = await db
       .select({
@@ -85,20 +163,20 @@ export async function createSession(
       .values({
         cooperativeId,
         numeroSession,
-        membreId: data.membreId,
+        membreId: data.membreId ?? null,
         produit: data.produit ?? "cacao",
         operation: data.operation ?? "reception",
         peseurId: data.peseurId,
         balanceId: data.balanceId,
         notes: data.notes,
+        transfertId: null,
       })
       .returning();
+
     return session!;
   } catch (err) {
     // PostgreSQL unique-constraint violation (23505) means a concurrent request
     // won the race and already inserted an en_cours session for the same member.
-    // Re-read that session and surface it as SessionEnCoursError so the caller
-    // can return a 409 with the existing session id.
     if (
       data.membreId &&
       typeof err === "object" &&
@@ -199,6 +277,7 @@ export async function getSessionDetail(cooperativeId: number, sessionId: number)
       dateFin: sessionsPeseeTable.dateFin,
       notes: sessionsPeseeTable.notes,
       livraisonId: sessionsPeseeTable.livraisonId,
+      transfertId: sessionsPeseeTable.transfertId,
       createdAt: sessionsPeseeTable.createdAt,
     })
     .from(sessionsPeseeTable)
@@ -228,81 +307,89 @@ export async function addLigne(
   sessionId: number,
   data: { nbSacs: number; poidsBrutKg: number; tareKg?: number; notes?: string },
 ) {
-  // Vérifie que la session appartient à la coop et est en cours
-  const [session] = await db
-    .select({ id: sessionsPeseeTable.id, statut: sessionsPeseeTable.statut, nbSacsTotal: sessionsPeseeTable.nbSacsTotal, poidsTotalKg: sessionsPeseeTable.poidsTotalKg })
-    .from(sessionsPeseeTable)
-    .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.cooperativeId, cooperativeId)))
-    .limit(1);
+  // Tout est dans une transaction avec verrou FOR UPDATE sur la session.
+  // Cela sérialise avec finaliserReceptionTransfertTx (qui prend le même verrou).
+  return db.transaction(async (tx: any) => {
+    // Verrouillage de la ligne session — bloque finalisation concurrente et vice-versa
+    const [session] = await tx
+      .select({ id: sessionsPeseeTable.id, statut: sessionsPeseeTable.statut, nbSacsTotal: sessionsPeseeTable.nbSacsTotal, poidsTotalKg: sessionsPeseeTable.poidsTotalKg })
+      .from(sessionsPeseeTable)
+      .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.cooperativeId, cooperativeId)))
+      .for("update")
+      .limit(1);
 
-  if (!session) throw new Error("Session introuvable");
-  if (session.statut !== "en_cours") throw new Error("Session déjà terminée ou annulée");
+    if (!session) throw new Error("Session introuvable");
+    if (session.statut !== "en_cours") throw new Error("Session déjà terminée ou annulée");
 
-  // Numéro de passage
-  const [{ maxPassage }] = await db
-    .select({ maxPassage: sql<number>`coalesce(max(${lignesPeseeTable.numeroPassage}), 0)::int` })
-    .from(lignesPeseeTable)
-    .where(eq(lignesPeseeTable.sessionId, sessionId));
+    // Numéro de passage
+    const [{ maxPassage }] = await tx
+      .select({ maxPassage: sql<number>`coalesce(max(${lignesPeseeTable.numeroPassage}), 0)::int` })
+      .from(lignesPeseeTable)
+      .where(eq(lignesPeseeTable.sessionId, sessionId));
 
-  const [ligne] = await db
-    .insert(lignesPeseeTable)
-    .values({
-      sessionId,
-      numeroPassage: maxPassage + 1,
-      nbSacs: data.nbSacs,
-      poidsBrutKg: String(data.poidsBrutKg),
-      tareKg: String(data.tareKg ?? 0),
-      notes: data.notes,
-    })
-    .returning();
+    const [ligne] = await tx
+      .insert(lignesPeseeTable)
+      .values({
+        sessionId,
+        numeroPassage: maxPassage + 1,
+        nbSacs: data.nbSacs,
+        poidsBrutKg: String(data.poidsBrutKg),
+        tareKg: String(data.tareKg ?? 0),
+        notes: data.notes,
+      })
+      .returning();
 
-  // Mise à jour des totaux
-  const poidsNet = data.poidsBrutKg - (data.tareKg ?? 0);
-  await db
-    .update(sessionsPeseeTable)
-    .set({
-      nbSacsTotal: (session.nbSacsTotal ?? 0) + data.nbSacs,
-      poidsTotalKg: String(parseFloat(String(session.poidsTotalKg ?? 0)) + poidsNet),
-    })
-    .where(eq(sessionsPeseeTable.id, sessionId));
+    const poidsNet = data.poidsBrutKg - (data.tareKg ?? 0);
+    await tx
+      .update(sessionsPeseeTable)
+      .set({
+        nbSacsTotal: (session.nbSacsTotal ?? 0) + data.nbSacs,
+        poidsTotalKg: String(parseFloat(String(session.poidsTotalKg ?? 0)) + poidsNet),
+      })
+      .where(eq(sessionsPeseeTable.id, sessionId));
 
-  return ligne!;
+    return ligne!;
+  });
 }
 
 // ─── Supprimer une ligne ──────────────────────────────────────────────────────
 export async function deleteLigne(cooperativeId: number, sessionId: number, ligneId: number) {
-  const [session] = await db
-    .select({ id: sessionsPeseeTable.id, statut: sessionsPeseeTable.statut })
-    .from(sessionsPeseeTable)
-    .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.cooperativeId, cooperativeId)))
-    .limit(1);
+  await db.transaction(async (tx: any) => {
+    // Verrou FOR UPDATE — sérialise avec finaliserReceptionTransfertTx
+    const [session] = await tx
+      .select({ id: sessionsPeseeTable.id, statut: sessionsPeseeTable.statut })
+      .from(sessionsPeseeTable)
+      .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.cooperativeId, cooperativeId)))
+      .for("update")
+      .limit(1);
 
-  if (!session) throw new Error("Session introuvable");
-  if (session.statut !== "en_cours") throw new Error("Session déjà terminée ou annulée");
+    if (!session) throw new Error("Session introuvable");
+    if (session.statut !== "en_cours") throw new Error("Session déjà terminée ou annulée");
 
-  const [ligne] = await db
-    .select()
-    .from(lignesPeseeTable)
-    .where(and(eq(lignesPeseeTable.id, ligneId), eq(lignesPeseeTable.sessionId, sessionId)))
-    .limit(1);
+    const [ligne] = await tx
+      .select()
+      .from(lignesPeseeTable)
+      .where(and(eq(lignesPeseeTable.id, ligneId), eq(lignesPeseeTable.sessionId, sessionId)))
+      .limit(1);
 
-  if (!ligne) throw new Error("Ligne introuvable");
+    if (!ligne) throw new Error("Ligne introuvable");
 
-  await db.delete(lignesPeseeTable).where(eq(lignesPeseeTable.id, ligneId));
+    await tx.delete(lignesPeseeTable).where(eq(lignesPeseeTable.id, ligneId));
 
-  // Recalcul des totaux depuis les lignes restantes
-  const [totaux] = await db
-    .select({
-      nbSacs: sql<number>`coalesce(sum(${lignesPeseeTable.nbSacs}), 0)::int`,
-      poids: sql<number>`coalesce(sum(${lignesPeseeTable.poidsBrutKg}::numeric - ${lignesPeseeTable.tareKg}::numeric), 0)::float`,
-    })
-    .from(lignesPeseeTable)
-    .where(eq(lignesPeseeTable.sessionId, sessionId));
+    // Recalcul des totaux depuis les lignes restantes
+    const [totaux] = await tx
+      .select({
+        nbSacs: sql<number>`coalesce(sum(${lignesPeseeTable.nbSacs}), 0)::int`,
+        poids: sql<number>`coalesce(sum(${lignesPeseeTable.poidsBrutKg}::numeric - ${lignesPeseeTable.tareKg}::numeric), 0)::float`,
+      })
+      .from(lignesPeseeTable)
+      .where(eq(lignesPeseeTable.sessionId, sessionId));
 
-  await db
-    .update(sessionsPeseeTable)
-    .set({ nbSacsTotal: totaux?.nbSacs ?? 0, poidsTotalKg: String(totaux?.poids ?? 0) })
-    .where(eq(sessionsPeseeTable.id, sessionId));
+    await tx
+      .update(sessionsPeseeTable)
+      .set({ nbSacsTotal: totaux?.nbSacs ?? 0, poidsTotalKg: String(totaux?.poids ?? 0) })
+      .where(eq(sessionsPeseeTable.id, sessionId));
+  });
 }
 
 // ─── Terminer une session ─────────────────────────────────────────────────────
@@ -312,6 +399,21 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
   if (detail.statut !== "en_cours") throw new Error("Session déjà terminée ou annulée");
   if ((detail.lignes?.length ?? 0) === 0) throw new Error("Aucune pesée enregistrée dans cette session");
 
+  // ── Réception de transfert : finalisation atomique dans une transaction ───
+  // IMPORTANT: poidsPeseKg est calculé depuis les lignes DANS la transaction (pas depuis
+  // le total mis en cache sur la session, qui pourrait être modifié par un addLigne concurrent)
+  if (detail.operation === "reception_transfert" && detail.transfertId) {
+    const result = await db.transaction(async (tx) => {
+      return finaliserReceptionTransfertTx(tx, cooperativeId, sessionId, detail.transfertId!);
+    });
+
+    // Notifications HORS transaction (non-critiques pour la cohérence)
+    void envoyerNotificationsReception(cooperativeId, result.transfert, result.poidsPeseKg, result.ecartKg, result.pctEcart, sessionId);
+
+    return { ...detail, statut: "terminee" as const, dateFin: result.dateFin, receptionConfirmee: true as const, statutTransfert: result.statutFinal };
+  }
+
+  // ── Session membre classique ──────────────────────────────────────────────
   const [updated] = await db
     .update(sessionsPeseeTable)
     .set({ statut: "terminee", dateFin: new Date() })
@@ -319,6 +421,163 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
     .returning();
 
   return { ...detail, statut: "terminee" as const, dateFin: updated?.dateFin };
+}
+
+// ─── Finalisation atomique (dans une transaction) ────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function finaliserReceptionTransfertTx(
+  // biome-ignore lint/suspicious/noExplicitAny: Drizzle transaction type not directly importable
+  tx: any,
+  cooperativeId: number,
+  sessionId: number,
+  transfertId: number,
+) {
+  const now = new Date();
+
+  // 0. Verrouiller la ligne session (SELECT FOR UPDATE) — sérialise avec addLigne/deleteLigne
+  //    qui prennent le même verrou. Le premier arrivé impose sa vue des lignes.
+  const [lockedSession] = await tx
+    .select({ id: sessionsPeseeTable.id, statut: sessionsPeseeTable.statut })
+    .from(sessionsPeseeTable)
+    .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.cooperativeId, cooperativeId)))
+    .for("update")
+    .limit(1);
+
+  if (!lockedSession) throw new Error("Session introuvable");
+  if (lockedSession.statut !== "en_cours") {
+    throw new Error("Session déjà annulée ou terminée — la clôture est impossible");
+  }
+
+  // 0b. Calculer le poids officiel depuis les lignes SOUS le verrou (cohérence garantie)
+  const [totauxLignes] = await tx
+    .select({
+      poids: sql<number>`coalesce(sum(${lignesPeseeTable.poidsBrutKg}::numeric - ${lignesPeseeTable.tareKg}::numeric), 0)::float`,
+      nbSacs: sql<number>`coalesce(sum(${lignesPeseeTable.nbSacs}), 0)::int`,
+    })
+    .from(lignesPeseeTable)
+    .where(eq(lignesPeseeTable.sessionId, sessionId));
+
+  const poidsPeseKg: number = totauxLignes?.poids ?? 0;
+  if (poidsPeseKg <= 0) {
+    throw new Error("Aucun poids pesé dans cette session — impossible de finaliser");
+  }
+
+  // 1. Charger le transfert (dans la transaction pour cohérence)
+  const [t] = await tx
+    .select()
+    .from(transfertsStockTable)
+    .where(and(eq(transfertsStockTable.id, transfertId), eq(transfertsStockTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  if (!t) throw new Error(`Transfert #${transfertId} introuvable — impossible de clôturer la session`);
+
+  const poidsDepart = parseFloat(String(t.poidsDepart_kg ?? 0));
+  const ecartKg = poidsDepart - poidsPeseKg;
+  const pctEcart = poidsDepart > 0 ? Math.abs(ecartKg / poidsDepart) * 100 : 0;
+  const estLitige = pctEcart > 0.5;
+  const statutFinal = estLitige ? "litige" : "confirme";
+
+  // 2. Clôturer la session — conditionnel : doit toujours être en_cours (pas annulée)
+  const [updatedSession] = await tx
+    .update(sessionsPeseeTable)
+    .set({ statut: "terminee", dateFin: now })
+    .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.statut, "en_cours")))
+    .returning();
+
+  if (!updatedSession) {
+    throw new Error("Session déjà annulée ou terminée — la clôture est impossible (annulation concurrent ?)");
+  }
+
+  // 3. Mettre à jour le transfert — conditionnel : doit toujours être 'en_pesee' lié à CETTE session
+  const updatedTransfert = await tx
+    .update(transfertsStockTable)
+    .set({
+      statut: statutFinal,
+      poidsArrivee_kg: String(poidsPeseKg),
+      ecartKg: String(ecartKg),
+      dateArrivee: t.dateArrivee ?? now,
+      confirme_le: now,
+      updatedAt: now,
+    })
+    .where(and(
+      eq(transfertsStockTable.id, transfertId),
+      eq(transfertsStockTable.statut, "en_pesee"),
+      eq(transfertsStockTable.sessionPeseeId, sessionId),
+    ))
+    .returning({ id: transfertsStockTable.id });
+
+  if (updatedTransfert.length === 0) {
+    throw new Error(
+      `Finalisation refusée : le transfert #${transfertId} n'est plus en attente de cette session ` +
+      `(statut ou session_pesee_id incohérent). Annulation de la transaction.`,
+    );
+  }
+
+  // 4. Si confirmé (pas de litige) : entrée en stock central
+  if (!estLitige) {
+    const [entrepotCentral] = await tx
+      .select({ id: entrepotsTable.id })
+      .from(entrepotsTable)
+      .where(eq(entrepotsTable.cooperativeId, cooperativeId))
+      .orderBy(entrepotsTable.id)
+      .limit(1);
+
+    if (!entrepotCentral) {
+      throw new Error(
+        `Aucun entrepôt central configuré pour la coopérative #${cooperativeId} — ` +
+        `impossible de créditer le stock. La transaction est annulée; veuillez créer un entrepôt central avant de clôturer la réception.`,
+      );
+    }
+    await tx.insert(mouvementsStockTable).values({
+      entrepotId: entrepotCentral.id,
+      type: "entree",
+      poidsKg: String(poidsPeseKg),
+      motif: `Transfert ${t.numeroTransfert} — pesée physique réception (session #${sessionId})`,
+      agentId: null,
+    });
+    logger.info({ transfertId, sessionId, entrepotId: entrepotCentral.id, poidsPeseKg }, "Entrée stock central créée");
+  }
+
+  logger.info({ transfertId, sessionId, statutFinal, ecartKg, pctEcart }, "Réception transfert finalisée (atomique)");
+  return { transfert: t, poidsPeseKg, ecartKg, pctEcart, statutFinal, dateFin: updatedSession?.dateFin ?? now };
+}
+
+// ─── Notifications post-transaction (non-critiques) ───────────────────────────
+async function envoyerNotificationsReception(
+  cooperativeId: number,
+  t: { numeroTransfert: string; delegueId: number | null },
+  poidsPeseKg: number,
+  ecartKg: number,
+  pctEcart: number,
+  sessionId: number,
+) {
+  try {
+    if (pctEcart > 0.5) {
+      const poidsDepart = poidsPeseKg + ecartKg;
+      await notifierParRole(cooperativeId, ["directeur", "pca"], {
+        type: "transfert_litige",
+        titre: `🔴 Écart transfert ${t.numeroTransfert} (pesée)`,
+        message: `Départ : ${poidsDepart.toLocaleString("fr-FR")} kg — Pesé : ${poidsPeseKg.toLocaleString("fr-FR")} kg — Écart : ${Math.abs(ecartKg).toLocaleString("fr-FR")} kg (${pctEcart.toFixed(1)}%)`,
+        lien: "/entrepots",
+        lienLibelle: "Voir les transferts",
+        gravite: "critique",
+        sourceModule: "entrepots",
+        sourceId: sessionId,
+      });
+    } else {
+      await creerNotification(cooperativeId, t.delegueId != null ? [t.delegueId] : [], {
+        type: "transfert_confirme",
+        titre: `✅ Transfert ${t.numeroTransfert} confirmé par pesée`,
+        message: `${poidsPeseKg.toLocaleString("fr-FR")} kg pesés et intégrés au magasin central.`,
+        lien: "/entrepots",
+        lienLibelle: "Voir les transferts",
+        gravite: "info",
+        sourceModule: "entrepots",
+        sourceId: sessionId,
+      });
+    }
+  } catch (err) {
+    logger.warn({ err, sessionId }, "Erreur notification post-pesée (non bloquante)");
+  }
 }
 
 // ─── Convertir une session terminée en livraison ─────────────────────────────
@@ -490,19 +749,78 @@ export async function expirerSessionsStales(cooperativeId: number): Promise<numb
 
   const heures = config?.delai ?? 8;
 
-  const expired = await db
-    .update(sessionsPeseeTable)
-    .set({ statut: "annulee", dateFin: new Date() })
+  const now = new Date();
+  const cutoff = sql`NOW() - interval '1 hour' * ${heures}`;
+
+  // ── Étape 1 : trouver les sessions stales, séparées par type ────────────────
+  const staleSessions = await db
+    .select({
+      id: sessionsPeseeTable.id,
+      operation: sessionsPeseeTable.operation,
+      transfertId: sessionsPeseeTable.transfertId,
+    })
+    .from(sessionsPeseeTable)
     .where(
       and(
         eq(sessionsPeseeTable.cooperativeId, cooperativeId),
         sql`${sessionsPeseeTable.statut}::text = 'en_cours'`,
-        sql`${sessionsPeseeTable.createdAt} < NOW() - interval '1 hour' * ${heures}`,
+        sql`${sessionsPeseeTable.createdAt} < ${cutoff}`,
       ),
-    )
-    .returning({ id: sessionsPeseeTable.id });
+    );
 
-  return expired.length;
+  if (staleSessions.length === 0) return 0;
+
+  type StaleRow = { id: number; operation: string; transfertId: number | null };
+  const regularIds = (staleSessions as StaleRow[])
+    .filter((s: StaleRow) => !s.transfertId)
+    .map((s: StaleRow) => s.id);
+  const transfertSessions = (staleSessions as StaleRow[]).filter(
+    (s: StaleRow): s is { id: number; operation: string; transfertId: number } => s.transfertId != null,
+  );
+
+  let expiredCount = 0;
+
+  // ── Étape 2 : expirer les sessions membres en bulk (sans transfert) ──────────
+  if (regularIds.length > 0) {
+    const bulkExpired = await db
+      .update(sessionsPeseeTable)
+      .set({ statut: "annulee", dateFin: now })
+      .where(and(inArray(sessionsPeseeTable.id, regularIds), eq(sessionsPeseeTable.statut, "en_cours")))
+      .returning({ id: sessionsPeseeTable.id });
+    expiredCount += bulkExpired.length;
+  }
+
+  // ── Étape 3 : expirer les sessions reception_transfert atomiquement ──────────
+  for (const s of transfertSessions) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await db.transaction(async (tx: any) => {
+        // Annuler la session (conditionnel — résiste à une clôture concurrente)
+        const cancelled = await tx
+          .update(sessionsPeseeTable)
+          .set({ statut: "annulee", dateFin: now })
+          .where(and(eq(sessionsPeseeTable.id, s.id), eq(sessionsPeseeTable.statut, "en_cours")))
+          .returning({ id: sessionsPeseeTable.id });
+
+        if (cancelled.length === 0) return; // clôturée entre-temps — pas d'erreur, on ignore
+
+        // Restaurer le transfert uniquement s'il est toujours lié à CETTE session et en_pesee
+        await tx
+          .update(transfertsStockTable)
+          .set({ statut: "arrive", sessionPeseeId: null, updatedAt: now })
+          .where(and(
+            eq(transfertsStockTable.id, s.transfertId),
+            eq(transfertsStockTable.sessionPeseeId, s.id),
+            eq(transfertsStockTable.statut, "en_pesee"),
+          ));
+      });
+      expiredCount += 1;
+    } catch (txErr) {
+      logger.error({ txErr, sessionId: s.id, transfertId: s.transfertId }, "[pesee] Erreur atomique expiration session transfert");
+    }
+  }
+
+  return expiredCount;
 }
 
 /**
@@ -530,16 +848,62 @@ export async function expirerToutesSessionsStales(): Promise<void> {
 // ─── Annuler une session ──────────────────────────────────────────────────────
 export async function annulerSession(cooperativeId: number, sessionId: number) {
   const [session] = await db
-    .select({ id: sessionsPeseeTable.id, statut: sessionsPeseeTable.statut })
+    .select({
+      id: sessionsPeseeTable.id,
+      statut: sessionsPeseeTable.statut,
+      operation: sessionsPeseeTable.operation,
+      transfertId: sessionsPeseeTable.transfertId,
+    })
     .from(sessionsPeseeTable)
     .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.cooperativeId, cooperativeId)))
     .limit(1);
 
   if (!session) throw new Error("Session introuvable");
-  if (session.statut === "terminee") throw new Error("Session déjà terminée");
 
-  await db
+  // Pour les sessions de réception de transfert : annulation atomique + restauration du transfert
+  if (session.operation === "reception_transfert" && session.transfertId != null) {
+    const transfertId = session.transfertId;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await db.transaction(async (tx: any) => {
+      // Annulation conditionnelle : seulement si toujours en_cours (pas terminee par une clôture concurrente)
+      const cancelled = await tx
+        .update(sessionsPeseeTable)
+        .set({ statut: "annulee", dateFin: new Date() })
+        .where(and(
+          eq(sessionsPeseeTable.id, sessionId),
+          eq(sessionsPeseeTable.statut, "en_cours"),
+        ))
+        .returning({ id: sessionsPeseeTable.id });
+
+      if (cancelled.length === 0) {
+        // La session a déjà été terminée ou annulée (clôture concurrente gagnante)
+        throw new Error("Session déjà terminée ou annulée — impossible d'annuler");
+      }
+
+      // Restaurer le transfert en 'arrive' uniquement s'il est toujours en_pesee et lié à cette session
+      await tx
+        .update(transfertsStockTable)
+        .set({ statut: "arrive", sessionPeseeId: null, updatedAt: new Date() })
+        .where(and(
+          eq(transfertsStockTable.id, transfertId),
+          eq(transfertsStockTable.sessionPeseeId, sessionId),
+          eq(transfertsStockTable.statut, "en_pesee"),
+        ));
+    });
+    return;
+  }
+
+  // Session membre classique : annulation conditionnelle
+  const cancelled = await db
     .update(sessionsPeseeTable)
     .set({ statut: "annulee", dateFin: new Date() })
-    .where(eq(sessionsPeseeTable.id, sessionId));
+    .where(and(
+      eq(sessionsPeseeTable.id, sessionId),
+      sql`${sessionsPeseeTable.statut}::text NOT IN ('terminee', 'annulee')`,
+    ))
+    .returning({ id: sessionsPeseeTable.id });
+
+  if (cancelled.length === 0) {
+    throw new Error("Session déjà terminée ou annulée");
+  }
 }
