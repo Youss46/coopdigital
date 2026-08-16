@@ -471,14 +471,55 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
           <>
             {/* Info membre OU info transfert */}
             {session.operation === "reception_transfert" ? (
-              <div className="t-card" style={{ margin: "16px 16px 8px", borderLeft: "4px solid #3b82f6", background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)" }}>
-                <div style={{ fontSize: ".68rem", color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>
-                  🚛 Réception de transfert
+              <div className="t-card" style={{ margin: "16px 16px 8px", borderLeft: "4px solid #3b82f6", background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)", padding: 0, overflow: "hidden" }}>
+                {/* Titre */}
+                <div style={{ background: "rgba(59,130,246,.12)", padding: "10px 14px", borderBottom: "1px solid rgba(59,130,246,.2)", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: "1.2rem" }}>🚛</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: ".68rem", color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>Réception de transfert</div>
+                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: "#e2e8f0" }}>
+                      {session.transfertNumero ?? `Session ${session.numeroSession}`}
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontWeight: 800, fontSize: "1rem", color: "#e2e8f0" }}>
-                  Pesée sac par sac
+                {/* Métriques */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                  <div style={{ padding: "10px 14px", borderRight: "1px solid rgba(255,255,255,.05)" }}>
+                    <div style={{ fontSize: ".68rem", color: "#64748b", marginBottom: 2 }}>Poids déclaré</div>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#22c55e" }}>
+                      {session.transfertPoidsDeclaréKg
+                        ? (parseFloat(session.transfertPoidsDeclaréKg) >= 1000
+                            ? (parseFloat(session.transfertPoidsDeclaréKg) / 1000).toFixed(2) + " T"
+                            : parseFloat(session.transfertPoidsDeclaréKg).toLocaleString("fr-FR") + " kg")
+                        : "—"}
+                    </div>
+                  </div>
+                  <div style={{ padding: "10px 14px" }}>
+                    <div style={{ fontSize: ".68rem", color: "#64748b", marginBottom: 2 }}>Sacs déclarés</div>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f59e0b" }}>
+                      {session.transfertNombreSacs ?? "—"}
+                    </div>
+                  </div>
                 </div>
-                <div className="t-text-muted">Session · {session.numeroSession}</div>
+                {/* Source */}
+                <div style={{ padding: "8px 14px" }}>
+                  <div style={{ fontSize: ".7rem", color: "#64748b" }}>
+                    <span>Source : </span>
+                    <span style={{ color: "#93c5fd", fontWeight: 600 }}>
+                      {session.transfertEntrepotNom ?? "Entrepôt délégué"}
+                      {session.transfertZoneNom ? ` · ${session.transfertZoneNom}` : ""}
+                    </span>
+                  </div>
+                  {(session.transfertDelegueNom ?? session.transfertDeleguePrenoms) && (
+                    <div style={{ fontSize: ".7rem", color: "#64748b", marginTop: 2 }}>
+                      <span>Délégué : </span>
+                      <span style={{ color: "#94a3b8", fontWeight: 600 }}>
+                        {session.transfertDelegueNom ?? ""} {session.transfertDeleguePrenoms ?? ""}
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ fontSize: ".65rem", color: "#475569", marginTop: 4 }}>Session · {session.numeroSession}</div>
+                </div>
               </div>
             ) : fournisseur && (
               <div className="t-card" style={{ margin: "16px 16px 8px", borderLeft: "4px solid var(--t-primary)" }}>

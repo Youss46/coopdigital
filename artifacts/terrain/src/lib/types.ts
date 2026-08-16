@@ -375,4 +375,12 @@ export interface TransfertEnAttente {
 
 export interface SessionDetail extends SessionPesee {
   lignes: LignePesee[];
+  /** Contexte transfert (renseigné quand operation = 'reception_transfert') */
+  transfertNumero?: string | null;
+  transfertPoidsDeclaréKg?: string | null;
+  transfertNombreSacs?: number | null;
+  transfertEntrepotNom?: string | null;
+  transfertZoneNom?: string | null;
+  transfertDelegueNom?: string | null;
+  transfertDeleguePrenoms?: string | null;
 }

@@ -10,6 +10,8 @@ import {
   transfertsStockTable,
   mouvementsStockTable,
   entrepotsTable,
+  entrepotsDeleguesTable,
+  usersTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, gte, lte, isNull, inArray } from "drizzle-orm";
 import { getPrixActuel } from "./terrainService.js";
@@ -74,6 +76,22 @@ export async function createSession(
   // ── Cas 1 : session de réception de transfert (atomique) ─────────────────
   if (data.transfertId) {
     const transfertId = data.transfertId;
+
+    // #16 — Vérifier que la config pesée est configurée avant de démarrer
+    const [peseeConfigCheck] = await db
+      .select({ id: configPeseeTable.id, ecartMaxAutorisePct: configPeseeTable.ecartMaxAutorisePct })
+      .from(configPeseeTable)
+      .where(eq(configPeseeTable.cooperativeId, cooperativeId))
+      .limit(1);
+
+    if (!peseeConfigCheck) {
+      throw new Error(
+        "La configuration de pesée n'est pas encore définie pour cette coopérative. " +
+        "Veuillez configurer les paramètres de pesée (seuil d'écart autorisé, délai d'expiration) " +
+        "dans l'espace gestionnaire avant de démarrer une session de réception de transfert.",
+      );
+    }
+
     const numeroSession = await generateNumeroSession(cooperativeId);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -279,9 +297,20 @@ export async function getSessionDetail(cooperativeId: number, sessionId: number)
       livraisonId: sessionsPeseeTable.livraisonId,
       transfertId: sessionsPeseeTable.transfertId,
       createdAt: sessionsPeseeTable.createdAt,
+      // ── Contexte transfert (#15) ──────────────────────────────────────
+      transfertNumero:           transfertsStockTable.numeroTransfert,
+      transfertPoidsDeclaréKg:   transfertsStockTable.poidsDepart_kg,
+      transfertNombreSacs:       transfertsStockTable.nombreSacs,
+      transfertEntrepotNom:      entrepotsDeleguesTable.nom,
+      transfertZoneNom:          entrepotsDeleguesTable.zoneNom,
+      transfertDelegueNom:       usersTable.nom,
+      transfertDeleguePrenoms:   usersTable.prenoms,
     })
     .from(sessionsPeseeTable)
     .leftJoin(membresTable, eq(membresTable.id, sessionsPeseeTable.membreId))
+    .leftJoin(transfertsStockTable, eq(transfertsStockTable.id, sessionsPeseeTable.transfertId))
+    .leftJoin(entrepotsDeleguesTable, eq(entrepotsDeleguesTable.id, transfertsStockTable.entrepotSourceId))
+    .leftJoin(usersTable, eq(usersTable.id, transfertsStockTable.delegueId))
     .where(
       and(
         eq(sessionsPeseeTable.id, sessionId),
@@ -470,11 +499,21 @@ async function finaliserReceptionTransfertTx(
     .limit(1);
   if (!t) throw new Error(`Transfert #${transfertId} introuvable — impossible de clôturer la session`);
 
+  // #16 — Charger le seuil d'écart autorisé depuis la config (dans la tx pour cohérence)
+  const [peseeConfig] = await tx
+    .select({ ecartMaxAutorisePct: configPeseeTable.ecartMaxAutorisePct })
+    .from(configPeseeTable)
+    .where(eq(configPeseeTable.cooperativeId, cooperativeId))
+    .limit(1);
+  // La config a déjà été vérifiée dans createSession ; le default 0.5 est une dernière protection
+  const ecartSeuilPct = parseFloat(String(peseeConfig?.ecartMaxAutorisePct ?? 0.5));
+
   const poidsDepart = parseFloat(String(t.poidsDepart_kg ?? 0));
   const ecartKg = poidsDepart - poidsPeseKg;
   const pctEcart = poidsDepart > 0 ? Math.abs(ecartKg / poidsDepart) * 100 : 0;
-  const estLitige = pctEcart > 0.5;
+  const estLitige = pctEcart > ecartSeuilPct;
   const statutFinal = estLitige ? "litige" : "confirme";
+  logger.info({ transfertId, sessionId, pctEcart, ecartSeuilPct, estLitige }, "Calcul écart réception");
 
   // 2. Clôturer la session — conditionnel : doit toujours être en_cours (pas annulée)
   const [updatedSession] = await tx
