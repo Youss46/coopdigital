@@ -28,6 +28,8 @@ export const fournisseursTable = pgTable("fournisseurs", {
   dateAgrement: date("date_agrement", { mode: "string" }),
   dateExpirationAgrement: date("date_expiration_agrement", { mode: "string" }),
   actif: boolean("actif").notNull().default(true),
+  /** Délégué de localité ayant créé ce fournisseur externe (traçabilité) */
+  creeParDelegueId: integer("cree_par_delegue_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [

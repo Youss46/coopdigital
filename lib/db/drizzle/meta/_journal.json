@@ -645,6 +645,13 @@
       "when": 1788046400000,
       "tag": "0091_pesee_reception_transfert",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1788046410000,
+      "tag": "0092_fournisseur_cree_par_delegue",
+      "breakpoints": true
     }
   ]
 }

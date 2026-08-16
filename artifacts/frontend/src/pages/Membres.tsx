@@ -162,6 +162,9 @@ export default function Membres() {
   const [modalOuvert, setModalOuvert] = useState(false);
   const [modalRejet, setModalRejet] = useState<{ id: number; nom: string } | null>(null);
   const [motifRejetText, setMotifRejetText] = useState("");
+  /** Toggle visible uniquement pour les délégués : "membre" ou "fournisseur_externe" */
+  const [typeCreation, setTypeCreation] = useState<"membre" | "fournisseur_externe">("membre");
+  const [formExt, setFormExt] = useState({ nom: "", prenoms: "", telephone: "" });
 
   const [form, setForm] = useState<Partial<MembreInput> & { rattachementType: "delegue" | "base_centrale"; delegueId?: number }>({
     cooperativeId: COOP_ID_PAR_DEFAUT,
@@ -253,10 +256,32 @@ export default function Membres() {
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
+  /** Création directe d'un fournisseur externe par un délégué (sans validation) */
+  const fournisseurExtMutation = useMutation({
+    mutationFn: async (data: { nom: string; prenoms: string; telephone: string }) => {
+      const r = await apiFetch("/api/fournisseurs", {
+        method: "POST",
+        body: JSON.stringify({ typeFournisseur: "externe", ...data }),
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as { erreur?: string }).erreur ?? "Erreur création fournisseur"); }
+      return r.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["fournisseurs"] });
+      toast({ title: "Fournisseur externe enregistré ✓", description: "Visible dans l'onglet « Externes occasionnels »." });
+      setModalOuvert(false);
+      resetForm();
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
-  const resetForm = () =>
+  const resetForm = () => {
+    setTypeCreation("membre");
+    setFormExt({ nom: "", prenoms: "", telephone: "" });
     setForm({ cooperativeId: COOP_ID_PAR_DEFAUT, statut: "actif", dateAdhesion: new Date().toISOString().split("T")[0], rattachementType: "delegue", delegueId: undefined });
+  };
 
   async function handleExportPdf() {
     setExportPending(true);
@@ -272,6 +297,15 @@ export default function Membres() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // ── Fournisseur externe (délégué uniquement) ──────────────────────────────
+    if (typeCreation === "fournisseur_externe") {
+      if (!formExt.nom.trim() || !formExt.prenoms.trim() || !formExt.telephone.trim()) return;
+      fournisseurExtMutation.mutate(formExt);
+      return;
+    }
+
+    // ── Membre coopérant (flux existant) ─────────────────────────────────────
     if (!form.sexe) { alert("Veuillez sélectionner une civilité (Monsieur / Madame)."); return; }
     if (!form.nom || !form.prenoms || !form.telephone || !form.superficieHa) return;
     const delegueIdFinal = estDelegue ? utilisateur?.id : form.delegueId;
@@ -614,12 +648,71 @@ export default function Membres() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95 fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-gray-900">{estDelegue ? "Soumettre une demande" : "Nouveau membre"}</h3>
-                {estDelegue && <p className="text-xs text-yellow-700 mt-0.5">⏳ La demande sera examinée par le responsable traçabilité.</p>}
+                <h3 className="font-bold text-gray-900">
+                  {!estDelegue
+                    ? "Nouveau membre"
+                    : typeCreation === "fournisseur_externe"
+                      ? "Nouveau fournisseur externe"
+                      : "Soumettre une demande"}
+                </h3>
+                {estDelegue && typeCreation === "membre" && (
+                  <p className="text-xs text-yellow-700 mt-0.5">⏳ La demande sera examinée par le responsable traçabilité.</p>
+                )}
+                {estDelegue && typeCreation === "fournisseur_externe" && (
+                  <p className="text-xs text-green-700 mt-0.5">✅ Enregistrement immédiat sans validation.</p>
+                )}
               </div>
               <button onClick={() => setModalOuvert(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+
+              {/* ── Toggle type création (délégué uniquement) ──────────────── */}
+              {estDelegue && (
+                <div className="flex rounded-xl border border-gray-200 overflow-hidden">
+                  {(["membre", "fournisseur_externe"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTypeCreation(t)}
+                      className="flex-1 py-2.5 text-sm font-medium transition-colors"
+                      style={typeCreation === t
+                        ? { background: t === "membre" ? "#1a4731" : "#7c3aed", color: "#fff" }
+                        : { background: "#f9fafb", color: "#374151" }}
+                    >
+                      {t === "membre" ? "👤 Membre coopérant" : "🏪 Fournisseur externe"}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Formulaire simplifié — fournisseur externe ─────────────── */}
+              {typeCreation === "fournisseur_externe" && (
+                <>
+                  <div className="bg-purple-50 border border-purple-100 rounded-lg px-4 py-3 text-xs text-purple-800">
+                    Cet individu sera enregistré directement en tant que <strong>fournisseur externe occasionnel</strong> dans la coopérative. Aucune validation requise.
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
+                      <input required value={formExt.nom} onChange={(e) => setFormExt({ ...formExt, nom: e.target.value })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="TRAORE" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Prénoms *</label>
+                      <input required value={formExt.prenoms} onChange={(e) => setFormExt({ ...formExt, prenoms: e.target.value })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="Lass" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone *</label>
+                    <input required value={formExt.telephone} onChange={(e) => setFormExt({ ...formExt, telephone: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="07 XX XX XX XX" />
+                  </div>
+                </>
+              )}
+
+              {/* ── Formulaire complet — membre coopérant ──────────────────── */}
+              {typeCreation === "membre" && <>
 
               {/* Civilité */}
               <div>
@@ -775,26 +868,40 @@ export default function Membres() {
                   </>
                 )}
               </div>
+              </>}
 
-              {mutation.isError && (
+              {/* Erreurs */}
+              {typeCreation === "membre" && mutation.isError && (
                 <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">Erreur lors de la création</p>
               )}
+              {typeCreation === "fournisseur_externe" && fournisseurExtMutation.isError && (
+                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                  {(fournisseurExtMutation.error as Error)?.message ?? "Erreur lors de la création"}
+                </p>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setModalOuvert(false); resetForm(); }}
                   className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
                   Annuler
                 </button>
-                <button type="submit" disabled={mutation.isPending}
-                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-90 flex items-center justify-center gap-2 transition-colors duration-200"
-                  style={{ backgroundColor: mutation.isError ? "#b91c1c" : "#1a4731" }}>
-                  {mutation.isPending && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />}
-                  {mutation.isSuccess && !mutation.isPending && <Check size={16} />}
-                  {mutation.isPending
-                    ? "Enregistrement…"
-                    : mutation.isError
-                      ? "Réessayer"
-                      : estDelegue ? "Soumettre la demande →" : "Créer le membre →"}
-                </button>
+                {typeCreation === "membre" ? (
+                  <button type="submit" disabled={mutation.isPending}
+                    className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-90 flex items-center justify-center gap-2 transition-colors duration-200"
+                    style={{ backgroundColor: mutation.isError ? "#b91c1c" : "#1a4731" }}>
+                    {mutation.isPending && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />}
+                    {mutation.isSuccess && !mutation.isPending && <Check size={16} />}
+                    {mutation.isPending ? "Enregistrement…" : mutation.isError ? "Réessayer" : estDelegue ? "Soumettre la demande →" : "Créer le membre →"}
+                  </button>
+                ) : (
+                  <button type="submit" disabled={fournisseurExtMutation.isPending}
+                    className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-90 flex items-center justify-center gap-2 transition-colors duration-200"
+                    style={{ backgroundColor: fournisseurExtMutation.isError ? "#b91c1c" : "#7c3aed" }}>
+                    {fournisseurExtMutation.isPending && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />}
+                    {fournisseurExtMutation.isSuccess && !fournisseurExtMutation.isPending && <Check size={16} />}
+                    {fournisseurExtMutation.isPending ? "Enregistrement…" : fournisseurExtMutation.isError ? "Réessayer" : "Enregistrer le fournisseur →"}
+                  </button>
+                )}
               </div>
             </form>
           </div>

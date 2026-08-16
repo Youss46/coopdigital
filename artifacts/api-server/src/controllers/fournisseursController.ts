@@ -182,6 +182,10 @@ export async function createFournisseur(req: Request, res: Response) {
       return d.toISOString().slice(0, 10);
     };
 
+    // Traçabilité : enregistrer le délégué qui crée un fournisseur externe
+    const creeParDelegueId =
+      req.user?.role === "delegue" ? req.user.id : undefined;
+
     const [fournisseur] = await db
       .insert(fournisseursTable)
       .values({
@@ -201,6 +205,7 @@ export async function createFournisseur(req: Request, res: Response) {
         statutAgrement: type === "pisteur" ? "agree" : undefined,
         dateAgrement: toDate(body.dateAgrement),
         dateExpirationAgrement: toDate(body.dateExpirationAgrement),
+        creeParDelegueId,
       })
       .returning();
 
