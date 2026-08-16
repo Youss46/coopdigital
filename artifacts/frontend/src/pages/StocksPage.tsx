@@ -12,7 +12,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
-import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle, PackageCheck, Clock, ArrowRight, Boxes, Pencil, Trash2, X, CalendarDays } from "lucide-react";
+import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle, PackageCheck, Clock, ArrowRight, Boxes, Pencil, Trash2, X, CalendarDays, MapPin } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
@@ -231,6 +231,21 @@ export default function StocksPage() {
     },
   });
 
+  // Stock chez les délégués de terrain (entrepôts délégués — distinct des entrepôts centraux)
+  const { data: statsDelegues } = useQuery<{
+    stockTotalEntrepotsKg: number;
+    totalSacsEntrepots: number;
+    transfertsEnCours: number;
+  }>({
+    queryKey: ["entrepots-delegues-stats"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/entrepots/stats`, { headers: { Authorization: `Bearer ${tok()}` } });
+      if (!r.ok) return { stockTotalEntrepotsKg: 0, totalSacsEntrepots: 0, transfertsEnCours: 0 };
+      return r.json();
+    },
+    staleTime: 60_000,
+  });
+
   const stockTotal = entrepots.reduce((s, e) => s + e.stockActuelKg, 0);
   const entreesTotal = mouvements
     .filter((m) => m.type === "entree")
@@ -342,6 +357,40 @@ export default function StocksPage() {
           </div>
         ))}
       </div>
+
+      {/* Encart stock chez les délégués */}
+      {statsDelegues && statsDelegues.stockTotalEntrepotsKg > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="rounded-lg p-2 bg-blue-100 shrink-0">
+            <MapPin size={16} className="text-blue-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-blue-900">
+              {formaterPoids(statsDelegues.stockTotalEntrepotsKg)} chez les délégués de terrain
+              {statsDelegues.totalSacsEntrepots > 0 && (
+                <span className="font-normal text-blue-700 ml-1">
+                  · {statsDelegues.totalSacsEntrepots} sac{statsDelegues.totalSacsEntrepots > 1 ? "s" : ""}
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-blue-600 mt-0.5">
+              Ce stock n'est pas encore dans un entrepôt central — il sera intégré ici après le transfert physique.
+              {statsDelegues.transfertsEnCours > 0 && (
+                <span className="ml-1 font-medium">
+                  {statsDelegues.transfertsEnCours} transfert{statsDelegues.transfertsEnCours > 1 ? "s" : ""} en cours.
+                </span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={() => setLocation("/entrepots")}
+            className="shrink-0 text-xs font-medium text-blue-700 hover:text-blue-900 flex items-center gap-1 whitespace-nowrap"
+          >
+            Voir les délégués
+            <ArrowRight size={12} />
+          </button>
+        </div>
+      )}
 
       {/* Lotissement des stocks */}
       {(() => {
