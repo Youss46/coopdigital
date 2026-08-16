@@ -81,7 +81,11 @@ function StatutBadge({ statut }: { statut: string }) {
 }
 
 function ModeBadge({ mode }: { mode: string | null | undefined }) {
-  if (!mode) return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-400">—</span>;
+  if (!mode) return (
+    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700 border border-amber-200">
+      <AlertCircle size={11} />À régler
+    </span>
+  );
   const cfg = MODE_CONFIG[mode] ?? { label: mode, cls: "bg-gray-100 text-gray-500", icon: null };
   return (
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${cfg.cls}`}>
@@ -516,6 +520,7 @@ export default function ReglementsPage() {
 
   const [filtreStatut, setFiltreStatut] = useState<string>("en_attente");
   const [filtrePeriode, setFiltrePeriode] = useState<string>("");
+  const [filtreSansMode, setFiltreSansMode] = useState(false);
   const [recherche, setRecherche] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
 
@@ -630,6 +635,7 @@ export default function ReglementsPage() {
   }
 
   const filtres = (paiements ?? []).filter((p) => {
+    if (filtreSansMode && !!p.modePaiement) return false;
     if (!recherche) return true;
     const r = recherche.toLowerCase();
     return (
@@ -842,8 +848,8 @@ export default function ReglementsPage() {
       </div>
 
       {/* ── Filtres ── */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[180px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="search"
@@ -877,6 +883,20 @@ export default function ReglementsPage() {
           </select>
           <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
         </div>
+        <button
+          onClick={() => setFiltreSansMode((v) => !v)}
+          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors whitespace-nowrap ${
+            filtreSansMode
+              ? "bg-amber-100 border-amber-300 text-amber-800"
+              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          <AlertCircle size={13} />
+          À compléter
+          {filtreSansMode && (
+            <X size={12} className="ml-0.5 opacity-60" />
+          )}
+        </button>
       </div>
 
       {/* ── Liste ── */}
