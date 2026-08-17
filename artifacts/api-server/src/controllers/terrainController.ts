@@ -142,6 +142,9 @@ export async function postCollecteHandler(req: Request, res: Response): Promise<
   if (!ids) { res.status(403).json({ erreur: "Délégué cible invalide ou non géré centralement" }); return; }
   const { effectiveAgentId, peseurId } = ids;
 
+  // Mode proxy : l'agent connecté saisit pour le compte d'un délégué
+  const agentSaisiseurId = effectiveAgentId !== agent.id ? agent.id : undefined;
+
   try {
     const result = await terrainService.enregistrerCollecte(effectiveAgentId, cooperativeId, {
       membreId: membreId ? Number(membreId) : undefined,
@@ -150,7 +153,7 @@ export async function postCollecteHandler(req: Request, res: Response): Promise<
       poidsBrutKg,
       retenueKg: retenueKg ?? 0,
       peseurId,
-    });
+    }, agentSaisiseurId);
     res.status(201).json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur enregistrement collecte terrain");

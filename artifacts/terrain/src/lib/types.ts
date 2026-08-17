@@ -85,6 +85,7 @@ export interface CollecteResult {
   statutPaiement?: "PAYÉ" | "DIFFÉRÉ";
   soldeCaisseApres?: number;
   commissionFcfa?: number | null;
+  saisiePour?: string | null;
 }
 
 export interface ConversionLivraisonResult {

@@ -385,12 +385,24 @@ export default function CollecteFlow() {
               </div>
             )}
 
+            {(result?.saisiePour || (!result && proxy)) && (
+              <div style={{ background: "rgba(99,102,241,.08)", border: "1px solid rgba(99,102,241,.25)", borderRadius: 10, padding: "10px 14px", margin: "0 24px", width: "100%", maxWidth: 320, boxSizing: "border-box", fontSize: ".85rem", color: "#4338ca", fontWeight: 600 }}>
+                🔁 Saisie pour : {result?.saisiePour ?? `${proxy!.nom} ${proxy!.prenoms}`}
+              </div>
+            )}
+
             {result && (
               <div className="t-success-screen__card t-gap">
                 <div className="t-recap-row">
                   <span className="t-recap-row__label">Référence</span>
                   <span className="t-recap-row__value">{result.ref}</span>
                 </div>
+                {result.saisiePour && (
+                  <div className="t-recap-row">
+                    <span className="t-recap-row__label">Saisie pour</span>
+                    <span className="t-recap-row__value" style={{ color: "#4338ca", fontWeight: 700 }}>{result.saisiePour}</span>
+                  </div>
+                )}
                 <div className="t-recap-row">
                   <span className="t-recap-row__label">Planteur</span>
                   <span className="t-recap-row__value">{result.membreNom}</span>

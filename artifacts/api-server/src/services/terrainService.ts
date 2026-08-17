@@ -6,6 +6,7 @@ import {
   cooperativesTable,
 } from "@workspace/db";
 import { and, eq, sql, desc, or, isNull } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { creerCommissionSiTaux } from "./commissionService.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -376,7 +377,9 @@ export async function enregistrerCollecte(
     retenueKg: number;
     /** ID du peseur ayant physiquement enregistré la collecte (traçabilité) */
     peseurId?: number;
-  }
+  },
+  /** Utilisateur réellement connecté (mode proxy) — différent de agentId si saisie pour un délégué */
+  agentSaisiseurId?: number,
 ) {
   const prix = await getPrixActuel(cooperativeId);
   const prixUnitaire = prix.prixBordChampFcfa;
@@ -505,6 +508,18 @@ export async function enregistrerCollecte(
     }
   }
 
+  // Résolution saisiePour (mode proxy : gérant qui saisit pour le compte d'un délégué)
+  const proxyModeCollecte = agentSaisiseurId !== undefined && agentSaisiseurId !== agentId;
+  let saisiePour: string | null = null;
+  if (proxyModeCollecte) {
+    const [delegue] = await db
+      .select({ nom: usersTable.nom, prenoms: usersTable.prenoms })
+      .from(usersTable)
+      .where(eq(usersTable.id, agentId))
+      .limit(1);
+    saisiePour = delegue ? `${delegue.nom} ${delegue.prenoms}` : null;
+  }
+
   return {
     livraisonId: livraison.id,
     ref: `LIV-${new Date().getFullYear()}-${String(livraison.id).padStart(4, "0")}`,
@@ -518,6 +533,7 @@ export async function enregistrerCollecte(
     prixUnitaireFcfa: prixUnitaire,
     statutPaiement,
     commissionFcfa,
+    saisiePour,
   };
 }
 
@@ -658,16 +674,22 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       sql`DATE(${avancesTable.createdAt}) = ${todayStr}::date`,
     ));
 
+  const delegueUserAlias = alias(usersTable, "delegue_user");
+
   const recentesLivraisons = await db
     .select({
       id: livraisonsTable.id,
       membreId: livraisonsTable.membreId,
+      agentId: livraisonsTable.agentId,
       poidsKg: livraisonsTable.poidsKg,
       createdAt: livraisonsTable.createdAt,
       fromSession: sessionsPeseeTable.id,
+      delegueNom: delegueUserAlias.nom,
+      deleguePrenoms: delegueUserAlias.prenoms,
     })
     .from(livraisonsTable)
     .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
+    .leftJoin(delegueUserAlias, eq(delegueUserAlias.id, livraisonsTable.agentId))
     .where(and(
       or(
         eq(livraisonsTable.agentId, agentId),
@@ -720,7 +742,9 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       type: l.fromSession !== null ? "session_collecte" : "collecte",
       label: `${l.fromSession !== null ? "Session groupée" : "Collecte"} ${(l.membreId ? nomMap.get(l.membreId) : null) ?? ""} — ${toNum(l.poidsKg)} kg`,
       montant: 0,
-      saisiePour: null as string | null,
+      saisiePour: (l.agentId !== null && l.agentId !== agentId && l.delegueNom)
+        ? `${l.delegueNom} ${l.deleguePrenoms ?? ""}`.trim()
+        : null as string | null,
     })),
     ...recentesPaiements.map((p) => ({
       heure: new Date(p.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
@@ -785,7 +809,8 @@ export async function syncOperations(
     try {
       if (op.type === "collecte") {
         const effectiveIdCollecte = await resolveOpAgent(op.data);
-        await enregistrerCollecte(effectiveIdCollecte, cooperativeId, { ...(op.data as Parameters<typeof enregistrerCollecte>[2]), peseurId });
+        const saisCollecte = saisiseurId !== undefined && effectiveIdCollecte !== saisiseurId ? saisiseurId : undefined;
+        await enregistrerCollecte(effectiveIdCollecte, cooperativeId, { ...(op.data as Parameters<typeof enregistrerCollecte>[2]), peseurId }, saisCollecte);
       } else if (op.type === "paiement") {
         const effectiveId = await resolveOpAgent(op.data);
         const sais = saisiseurId !== undefined && effectiveId !== saisiseurId ? saisiseurId : undefined;
