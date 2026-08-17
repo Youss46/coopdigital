@@ -175,40 +175,49 @@ export async function payerCommissions(
     ? `${delegueRow.prenoms ?? ""} ${delegueRow.nom}`.trim()
     : `Délégué #${delegueId}`;
 
-  // Marquer les commissions comme payées avec le moyen de paiement choisi
-  await db
-    .update(commissionsDeleguesTable)
-    .set({
-      statut: "payé",
-      datePaiement: new Date(),
-      modePaiement,
-      referencePaiement: referencePaiement ?? null,
-    })
-    .where(inArray(commissionsDeleguesTable.id, commissions.map((c) => c.id)));
-
   const today = new Date().toISOString().slice(0, 10);
   const libelleMvt = `Paiement commissions délégué (${commissions.length} livraison${commissions.length > 1 ? "s" : ""})`;
 
-  // ── Espèces → débiter la caisse centrale ─────────────────────────────────
-  if (modePaiement === "especes") {
-    const [caisse] = await db
-      .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
-      .from(caissesTable)
-      .where(
-        and(
-          eq(caissesTable.cooperativeId, cooperativeId),
-          eq(caissesTable.typeCaisse, "centrale"),
-          eq(caissesTable.actif, true),
-        )
-      )
-      .limit(1);
+  // ── Transaction atomique : marquer payé + débiter le compte ──────────────
+  // Si le débit échoue (solde insuffisant, compte manquant…), le statut des
+  // commissions est automatiquement rollbacké à "en_attente".
+  await db.transaction(async (tx) => {
+    // 1. Marquer les commissions comme payées
+    await tx
+      .update(commissionsDeleguesTable)
+      .set({
+        statut: "payé",
+        datePaiement: new Date(),
+        modePaiement,
+        referencePaiement: referencePaiement ?? null,
+      })
+      .where(inArray(commissionsDeleguesTable.id, commissions.map((c) => c.id)));
 
-    if (caisse) {
+    // 2. Débiter la source de financement selon le mode de paiement
+
+    // ── Espèces → caisse centrale ───────────────────────────────────────────
+    if (modePaiement === "especes") {
+      const [caisse] = await tx
+        .select({ id: caissesTable.id, solde: caissesTable.soldeActuelFcfa })
+        .from(caissesTable)
+        .where(
+          and(
+            eq(caissesTable.cooperativeId, cooperativeId),
+            eq(caissesTable.typeCaisse, "centrale"),
+            eq(caissesTable.actif, true),
+          )
+        )
+        .limit(1);
+
+      if (!caisse) {
+        throw new Error("Aucune caisse centrale active trouvée. Créez ou activez une caisse principale avant de payer des commissions en espèces.");
+      }
+
       const nouveauSolde = toNum(caisse.solde) - montantTotal;
-      await db.update(caissesTable)
+      await tx.update(caissesTable)
         .set({ soldeActuelFcfa: String(nouveauSolde) })
         .where(eq(caissesTable.id, caisse.id));
-      await db.insert(mouvementsCaisseTable).values({
+      await tx.insert(mouvementsCaisseTable).values({
         caisseId:       caisse.id,
         cooperativeId,
         type:           "sortie",
@@ -217,96 +226,42 @@ export async function payerCommissions(
         libelle:        libelleMvt,
         soldeApresFcfa: String(nouveauSolde),
       });
-    } else {
-      throw new Error("Aucune caisse centrale active trouvée. Créez ou activez une caisse principale avant de payer des commissions en espèces.");
     }
-  }
 
-  // ── Mobile money → débiter le compte marchand correspondant ──────────────
-  const OPERATEURS_MOBILE = ["wave", "orange_money", "mtn_momo"] as const;
-  type OperateurMobile = typeof OPERATEURS_MOBILE[number];
+    // ── Mobile money → compte marchand ─────────────────────────────────────
+    const OPERATEURS_MOBILE = ["wave", "orange_money", "mtn_momo"] as const;
+    type OperateurMobile = typeof OPERATEURS_MOBILE[number];
 
-  if (OPERATEURS_MOBILE.includes(modePaiement as OperateurMobile)) {
-    const operateur = modePaiement as OperateurMobile;
+    if (OPERATEURS_MOBILE.includes(modePaiement as OperateurMobile)) {
+      const operateur = modePaiement as OperateurMobile;
 
-    const [compte] = await db
-      .select({ id: comptesMobilesMarchandsTable.id, solde: comptesMobilesMarchandsTable.soldeActuelFcfa, nom: comptesMobilesMarchandsTable.nom })
-      .from(comptesMobilesMarchandsTable)
-      .where(
-        and(
-          eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
-          eq(comptesMobilesMarchandsTable.operateur, operateur),
-          eq(comptesMobilesMarchandsTable.actif, true),
+      const [compte] = await tx
+        .select({ id: comptesMobilesMarchandsTable.id, solde: comptesMobilesMarchandsTable.soldeActuelFcfa, nom: comptesMobilesMarchandsTable.nom })
+        .from(comptesMobilesMarchandsTable)
+        .where(
+          and(
+            eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
+            eq(comptesMobilesMarchandsTable.operateur, operateur),
+            eq(comptesMobilesMarchandsTable.actif, true),
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!compte) {
-      throw new Error(`Aucun compte marchand ${operateur.replace("_", " ")} actif trouvé. Créez-en un dans le module Mobile Marchand avant de payer via ce canal.`);
-    }
+      if (!compte) {
+        throw new Error(`Aucun compte marchand ${operateur.replace("_", " ")} actif trouvé. Créez-en un dans le module Mobile Marchand avant de payer via ce canal.`);
+      }
 
-    const soldeActuel = toNum(compte.solde);
-    if (soldeActuel < montantTotal) {
-      throw new Error(`Solde insuffisant sur le compte ${compte.nom} — disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA, requis : ${montantTotal.toLocaleString("fr-FR")} FCFA.`);
-    }
+      const soldeActuel = toNum(compte.solde);
+      if (soldeActuel < montantTotal) {
+        throw new Error(`Solde insuffisant sur le compte ${compte.nom} — disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA, requis : ${montantTotal.toLocaleString("fr-FR")} FCFA.`);
+      }
 
-    const nouveauSolde = soldeActuel - montantTotal;
-    await db.update(comptesMobilesMarchandsTable)
-      .set({ soldeActuelFcfa: String(nouveauSolde) })
-      .where(eq(comptesMobilesMarchandsTable.id, compte.id));
+      const nouveauSolde = soldeActuel - montantTotal;
+      await tx.update(comptesMobilesMarchandsTable)
+        .set({ soldeActuelFcfa: String(nouveauSolde) })
+        .where(eq(comptesMobilesMarchandsTable.id, compte.id));
 
-    await db.insert(mouvementsMobileMarchandTable).values({
-      compteId:       compte.id,
-      cooperativeId,
-      type:           "debit",
-      motif:          "commission_delegue",
-      montantFcfa:    String(montantTotal),
-      libelle:        libelleMvt,
-      reference:      referencePaiement ?? null,
-      dateOperation:  today,
-      soldeApresFcfa: String(nouveauSolde),
-    });
-  }
-
-  // ── Virement / Chèque → débiter le compte bancaire ───────────────────────
-  if (modePaiement === "virement" || modePaiement === "cheque") {
-    const [compte] = await db
-      .select({
-        id:    comptesBancairesTable.id,
-        solde: comptesBancairesTable.soldeActuelFcfa,
-        nom:   comptesBancairesTable.nom,
-      })
-      .from(comptesBancairesTable)
-      .where(
-        and(
-          eq(comptesBancairesTable.cooperativeId, cooperativeId),
-          eq(comptesBancairesTable.actif, true),
-        )
-      )
-      .limit(1);
-
-    if (!compte) {
-      throw new Error(
-        "Aucun compte bancaire actif trouvé. Créez ou activez un compte bancaire avant de payer des commissions par virement ou chèque."
-      );
-    }
-
-    const soldeActuel = toNum(compte.solde);
-    if (soldeActuel < montantTotal) {
-      throw new Error(
-        `Solde insuffisant sur le compte ${compte.nom} — disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA, requis : ${montantTotal.toLocaleString("fr-FR")} FCFA.`
-      );
-    }
-
-    const nouveauSolde = soldeActuel - montantTotal;
-    await db
-      .update(comptesBancairesTable)
-      .set({ soldeActuelFcfa: String(nouveauSolde) })
-      .where(eq(comptesBancairesTable.id, compte.id));
-
-    const [mvt] = await db
-      .insert(mouvementsBanqueTable)
-      .values({
+      await tx.insert(mouvementsMobileMarchandTable).values({
         compteId:       compte.id,
         cooperativeId,
         type:           "debit",
@@ -316,25 +271,76 @@ export async function payerCommissions(
         reference:      referencePaiement ?? null,
         dateOperation:  today,
         soldeApresFcfa: String(nouveauSolde),
-      })
-      .returning({ id: mouvementsBanqueTable.id });
-
-    // Pour un chèque : créer aussi l'enregistrement dans cheques_emis
-    if (modePaiement === "cheque") {
-      await db.insert(chequesEmisTable).values({
-        cooperativeId,
-        numeroCheque:     referencePaiement ?? null,
-        beneficiaire:     delegueNom,
-        montantFcfa:      montantTotal,
-        compteBancaireId: compte.id,
-        dateEmission:     today,
-        statut:           "emis",
-        mouvementBanqueId: mvt?.id ?? null,
       });
     }
-  }
 
-  // ── Écriture comptable OHADA (fire-and-forget) ───────────────────────────
+    // ── Virement / Chèque → compte bancaire ────────────────────────────────
+    if (modePaiement === "virement" || modePaiement === "cheque") {
+      const [compte] = await tx
+        .select({
+          id:    comptesBancairesTable.id,
+          solde: comptesBancairesTable.soldeActuelFcfa,
+          nom:   comptesBancairesTable.nom,
+        })
+        .from(comptesBancairesTable)
+        .where(
+          and(
+            eq(comptesBancairesTable.cooperativeId, cooperativeId),
+            eq(comptesBancairesTable.actif, true),
+          )
+        )
+        .limit(1);
+
+      if (!compte) {
+        throw new Error(
+          "Aucun compte bancaire actif trouvé. Créez ou activez un compte bancaire avant de payer des commissions par virement ou chèque."
+        );
+      }
+
+      const soldeActuel = toNum(compte.solde);
+      if (soldeActuel < montantTotal) {
+        throw new Error(
+          `Solde insuffisant sur le compte ${compte.nom} — disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA, requis : ${montantTotal.toLocaleString("fr-FR")} FCFA.`
+        );
+      }
+
+      const nouveauSolde = soldeActuel - montantTotal;
+      await tx
+        .update(comptesBancairesTable)
+        .set({ soldeActuelFcfa: String(nouveauSolde) })
+        .where(eq(comptesBancairesTable.id, compte.id));
+
+      const [mvt] = await tx
+        .insert(mouvementsBanqueTable)
+        .values({
+          compteId:       compte.id,
+          cooperativeId,
+          type:           "debit",
+          motif:          "commission_delegue",
+          montantFcfa:    String(montantTotal),
+          libelle:        libelleMvt,
+          reference:      referencePaiement ?? null,
+          dateOperation:  today,
+          soldeApresFcfa: String(nouveauSolde),
+        })
+        .returning({ id: mouvementsBanqueTable.id });
+
+      if (modePaiement === "cheque") {
+        await tx.insert(chequesEmisTable).values({
+          cooperativeId,
+          numeroCheque:     referencePaiement ?? null,
+          beneficiaire:     delegueNom,
+          montantFcfa:      montantTotal,
+          compteBancaireId: compte.id,
+          dateEmission:     today,
+          statut:           "emis",
+          mouvementBanqueId: mvt?.id ?? null,
+        });
+      }
+    }
+  }); // fin transaction
+
+  // ── Écriture comptable OHADA (fire-and-forget, hors transaction) ──────────
   // 6625 Commissions versées / 571 Caisse | 554 Mobile | 521 Banque
   generateEcrituresCommission(cooperativeId, {
     delegueId,
