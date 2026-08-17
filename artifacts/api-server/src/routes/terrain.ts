@@ -15,6 +15,7 @@ import {
   postRapportHandler,
   changePasswordHandler,
   getPeseurCollectesHandler,
+  getDeleguesCentrauxHandler,
 } from "../controllers/terrainController.js";
 import { getTerrainRecuLivraison, getTerrainReleveCommissions } from "../controllers/rapportsController.js";
 import {
@@ -49,6 +50,9 @@ router.post("/terrain/sync", terrainAuthMiddleware, postSyncHandler);
 
 // Commissions du délégué connecté
 router.get("/terrain/mes-commissions", terrainAuthMiddleware, delegueOnly, getMesCommissionsHandler);
+
+// Délégués centraux (proxy pour saisie en leur nom)
+router.get("/terrain/delegues-centraux", terrainAuthMiddleware, getDeleguesCentrauxHandler);
 
 // Fournisseurs : délégué ET peseur (le service filtre par périmètre du peseur)
 router.get("/terrain/fournisseurs", terrainAuthMiddleware, peseurOrDelegueOnly, getFournisseursHandler);

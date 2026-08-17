@@ -7,6 +7,7 @@ import ScaleWeightDisplay from "../components/ScaleWeightDisplay";
 import { useOffline } from "../contexts/OfflineContext";
 import { enregistrerCollecte, getPrix, imprimerRecuLivraison } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
+import { useProxy } from "../contexts/ProxyContext";
 import { getCachedPrix, cachePrix } from "../lib/idb";
 import type { Fournisseur, CollecteResult, PrixActuel } from "../lib/types";
 
@@ -39,6 +40,7 @@ export default function CollecteFlow() {
   const [, setLocation] = useLocation();
   const { isOnline } = useOffline();
   const { user } = useAuth();
+  const { proxy } = useProxy();
   const machinePeseeObligatoire = user?.machinePeseeObligatoire === true;
   const [step, setStep] = useState<Step>(1);
   const [fournisseur, setFournisseur] = useState<Fournisseur | null>(null);
@@ -96,6 +98,7 @@ export default function CollecteFlow() {
           poidsBrutKg: poidsBrutNum,
           retenueKg: retenueNum,
           localId,
+          ...(proxy ? { targetDelegueId: proxy.id } : {}),
         },
         isOnline
       );

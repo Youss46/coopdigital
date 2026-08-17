@@ -40,6 +40,11 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
   const ok = await bcrypt.compare(motDePasse, user.passwordHash);
   if (!ok) return null;
 
+  // Délégué géré centralement : connexion terrain bloquée
+  if (user.role === "delegue" && (user as typeof user & { modeGestion?: string | null }).modeGestion === "central") {
+    return { blockedMode: "central" as const };
+  }
+
   // Récupérer le paramètre machine_pesee_obligatoire depuis la coopérative
   let machinePeseeObligatoire = false;
   if (user.cooperativeId) {
@@ -813,4 +818,26 @@ Avances : ${bilan.avances.nb} (${formatFcfa(bilan.avances.total)})`;
   logger.info({ agentId, rapport }, "Rapport journalier terrain");
 
   return { message: rapport };
+}
+
+// ─── Délégués centraux ──────────────────────────────────────────────────────
+
+export async function getDeleguesCentraux(cooperativeId: number) {
+  return db
+    .select({
+      id: usersTable.id,
+      nom: usersTable.nom,
+      prenoms: usersTable.prenoms,
+      section: usersTable.section,
+      zoneNom: usersTable.zoneNom,
+    })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.cooperativeId, cooperativeId),
+        eq(usersTable.role, "delegue"),
+        eq(sql`${usersTable}.mode_gestion`, "central"),
+        eq(usersTable.actif, true),
+      ),
+    );
 }

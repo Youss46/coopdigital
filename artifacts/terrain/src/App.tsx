@@ -1,6 +1,7 @@
 import { Switch, Route, Redirect, Router as WouterRouter } from "wouter";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
+import { ProxyProvider } from "./contexts/ProxyContext";
 import { EnqueteBadgeProvider } from "./contexts/EnqueteBadgeContext";
 import { usePushSubscription } from "./hooks/usePushSubscription";
 import OfflineBanner from "./components/OfflineBanner";
@@ -128,15 +129,17 @@ export default function App() {
   return (
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <AuthProvider>
-        <OfflineProvider>
-          <SystemBanner />
-          <OfflineBanner />
-          {/* Route publique station-service — AVANT le guard auth */}
-          <Switch>
-            <Route path="/station/:numero" component={StationService} />
-            <Route component={AppRoutes} />
-          </Switch>
-        </OfflineProvider>
+        <ProxyProvider>
+          <OfflineProvider>
+            <SystemBanner />
+            <OfflineBanner />
+            {/* Route publique station-service — AVANT le guard auth */}
+            <Switch>
+              <Route path="/station/:numero" component={StationService} />
+              <Route component={AppRoutes} />
+            </Switch>
+          </OfflineProvider>
+        </ProxyProvider>
       </AuthProvider>
     </WouterRouter>
   );

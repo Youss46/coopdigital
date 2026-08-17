@@ -59,6 +59,16 @@ export interface CollecteInput {
   /** Mode de paiement — optionnel au niveau terrain, le règlement se fait via la page Règlements */
   modePaiement?: "orange_money" | "mtn_momo" | "especes";
   localId?: string;
+  /** Si renseigné : la livraison est imputée à ce délégué central (saisie proxy) */
+  targetDelegueId?: number;
+}
+
+export interface DelegueProxy {
+  id: number;
+  nom: string;
+  prenoms: string;
+  section: string | null;
+  zoneNom: string | null;
 }
 
 export interface CollecteResult {

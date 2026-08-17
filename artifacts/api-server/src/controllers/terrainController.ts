@@ -18,6 +18,10 @@ export async function loginTerrainHandler(req: Request, res: Response): Promise<
       res.status(401).json({ erreur: "Numéro ou mot de passe incorrect" });
       return;
     }
+    if ("blockedMode" in result && result.blockedMode === "central") {
+      res.status(403).json({ erreur: "COMPTE_CENTRAL", message: "Ce compte est géré par la base centrale. Contactez votre coopérative." });
+      return;
+    }
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur login terrain");
@@ -89,25 +93,55 @@ export async function getFournisseurRecapHandler(req: Request, res: Response): P
   }
 }
 
+export async function getDeleguesCentrauxHandler(req: Request, res: Response): Promise<void> {
+  const { cooperativeId } = req.agent!;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
+  try {
+    const delegues = await terrainService.getDeleguesCentraux(cooperativeId);
+    res.json(delegues);
+  } catch (err) {
+    req.log.error({ err }, "Erreur liste délégués centraux");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+async function resolveEffectiveAgent(
+  agent: NonNullable<Request["agent"]>,
+  cooperativeId: number,
+  targetDelegueId?: number,
+): Promise<{ effectiveAgentId: number; peseurId: number | undefined } | null> {
+  if (targetDelegueId) {
+    // Valider que la cible est bien un délégué central de la même coopérative
+    const cibles = await terrainService.getDeleguesCentraux(cooperativeId);
+    const cible = cibles.find((d) => d.id === Number(targetDelegueId));
+    if (!cible) return null; // 403
+    return { effectiveAgentId: cible.id, peseurId: agent.id };
+  }
+  return { effectiveAgentId: agent.delegueId ?? agent.id, peseurId: agent.delegueId ? agent.id : undefined };
+}
+
 export async function postCollecteHandler(req: Request, res: Response): Promise<void> {
   const agent = req.agent!;
   const { cooperativeId } = agent;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
-  // Peseur rattaché à un délégué : les livraisons sont imputées au délégué (agentId = delegueId)
-  // et le peseur est conservé pour la traçabilité (peseurId)
-  const effectiveAgentId = agent.delegueId ?? agent.id;
-  const peseurId = agent.delegueId ? agent.id : undefined;
-  const { membreId, fournisseurId, nombreSacs, poidsBrutKg, retenueKg } = req.body as {
+
+  const { membreId, fournisseurId, nombreSacs, poidsBrutKg, retenueKg, targetDelegueId } = req.body as {
     membreId?: number;
     fournisseurId?: number;
     nombreSacs?: number;
     poidsBrutKg?: number;
     retenueKg?: number;
+    targetDelegueId?: number;
   };
   if ((!membreId && !fournisseurId) || !poidsBrutKg) {
     res.status(400).json({ erreur: "Données manquantes (membreId ou fournisseurId requis)" });
     return;
   }
+
+  const ids = await resolveEffectiveAgent(agent, cooperativeId, targetDelegueId);
+  if (!ids) { res.status(403).json({ erreur: "Délégué cible invalide ou non géré centralement" }); return; }
+  const { effectiveAgentId, peseurId } = ids;
+
   try {
     const result = await terrainService.enregistrerCollecte(effectiveAgentId, cooperativeId, {
       membreId: membreId ? Number(membreId) : undefined,
@@ -182,10 +216,12 @@ export async function postSyncHandler(req: Request, res: Response): Promise<void
   const agent = req.agent!;
   const { cooperativeId } = agent;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
-  // Peseur rattaché : les opérations sont imputées au délégué
-  const effectiveAgentId = agent.delegueId ?? agent.id;
-  const peseurId = agent.delegueId ? agent.id : undefined;
-  const { operations } = req.body as { operations?: unknown[] };
+
+  const { operations, targetDelegueId } = req.body as { operations?: unknown[]; targetDelegueId?: number };
+
+  const ids = await resolveEffectiveAgent(agent, cooperativeId, targetDelegueId);
+  if (!ids) { res.status(403).json({ erreur: "Délégué cible invalide ou non géré centralement" }); return; }
+  const { effectiveAgentId, peseurId } = ids;
   if (!Array.isArray(operations)) {
     res.status(400).json({ erreur: "operations doit être un tableau" });
     return;

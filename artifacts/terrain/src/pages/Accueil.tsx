@@ -1,20 +1,24 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { getProfil, getCaisse, getMesCommissions } from "../lib/api";
+import { getProfil, getCaisse, getMesCommissions, getDeleguesCentraux } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useOffline } from "../contexts/OfflineContext";
+import { useProxy } from "../contexts/ProxyContext";
 import OfflineBanner from "../components/OfflineBanner";
-import type { BilanJour, PrixActuel, CaisseDelegue, CommissionResume } from "../lib/types";
+import type { BilanJour, PrixActuel, CaisseDelegue, CommissionResume, DelegueProxy } from "../lib/types";
 
 export default function Accueil() {
   const { user, logout } = useAuth();
   const { isOnline, pendingCount } = useOffline();
+  const { proxy, setProxy } = useProxy();
   const [bilan, setBilan] = useState<BilanJour | null>(null);
   const [prix, setPrix] = useState<PrixActuel | null>(null);
   const [caisse, setCaisse] = useState<CaisseDelegue | null>(null);
   const [commissions, setCommissions] = useState<CommissionResume | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
+  const [deleguesCentraux, setDeleguesCentraux] = useState<DelegueProxy[]>([]);
+  const [showProxyModal, setShowProxyModal] = useState(false);
 
   useEffect(() => {
     if (!isOnline) { setLoading(false); return; }
@@ -22,6 +26,7 @@ export default function Accueil() {
       getProfil().then((p) => { setBilan(p.statsJour); setPrix(p.prixActuel); }),
       getCaisse().then(setCaisse).catch(() => {}),
       getMesCommissions().then(setCommissions).catch(() => {}),
+      getDeleguesCentraux().then(setDeleguesCentraux).catch(() => {}),
     ])
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -59,6 +64,71 @@ export default function Accueil() {
       </header>
 
       <OfflineBanner />
+
+      {/* ─── Bandeau proxy délégué central ─── */}
+      {proxy && (
+        <div style={{ background: "#1d4ed8", color: "#fff", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ fontSize: ".82rem" }}>
+            <span style={{ opacity: .75 }}>Saisie pour :</span>{" "}
+            <strong>{proxy.nom} {proxy.prenoms}</strong>
+            {proxy.zoneNom && <span style={{ opacity: .75 }}> · {proxy.zoneNom}</span>}
+          </div>
+          <button
+            onClick={() => setProxy(null)}
+            style={{ background: "rgba(255,255,255,.2)", border: "none", borderRadius: 8, color: "#fff", padding: "4px 10px", fontSize: ".75rem", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}
+          >
+            ✕ Désactiver
+          </button>
+        </div>
+      )}
+
+      {/* ─── Sélecteur délégué central (si disponibles et pas de proxy actif) ─── */}
+      {!proxy && deleguesCentraux.length > 0 && (
+        <div style={{ background: "#eff6ff", borderBottom: "1px solid #bfdbfe", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ fontSize: ".82rem", color: "#1e40af" }}>
+            {deleguesCentraux.length} délégué{deleguesCentraux.length > 1 ? "s" : ""} central{deleguesCentraux.length > 1 ? "aux" : ""} à gérer
+          </div>
+          <button
+            onClick={() => setShowProxyModal(true)}
+            style={{ background: "#2563eb", border: "none", borderRadius: 8, color: "#fff", padding: "6px 14px", fontSize: ".8rem", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}
+          >
+            Saisir pour…
+          </button>
+        </div>
+      )}
+
+      {/* ─── Modal sélection délégué central ─── */}
+      {showProxyModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "flex-end" }}
+          onClick={() => setShowProxyModal(false)}>
+          <div style={{ width: "100%", background: "#fff", borderRadius: "20px 20px 0 0", padding: "20px 0 32px" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ textAlign: "center", fontWeight: 800, fontSize: "1rem", color: "#1e293b", marginBottom: 16, paddingInline: 20 }}>
+              Saisir pour un délégué central
+            </div>
+            {deleguesCentraux.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => { setProxy(d); setShowProxyModal(false); }}
+                style={{ display: "block", width: "100%", background: "none", border: "none", borderTop: "1px solid #f1f5f9", padding: "14px 20px", textAlign: "left", cursor: "pointer" }}
+              >
+                <div style={{ fontWeight: 700, color: "#1e293b", fontSize: ".95rem" }}>{d.nom} {d.prenoms}</div>
+                {(d.zoneNom ?? d.section) && (
+                  <div style={{ fontSize: ".78rem", color: "#64748b", marginTop: 2 }}>{d.zoneNom ?? d.section}</div>
+                )}
+              </button>
+            ))}
+            <div style={{ paddingInline: 20, marginTop: 10 }}>
+              <button
+                onClick={() => setShowProxyModal(false)}
+                style={{ width: "100%", background: "#f1f5f9", border: "none", borderRadius: 10, padding: "12px", fontSize: ".9rem", fontWeight: 700, color: "#64748b", cursor: "pointer" }}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="t-main">
         {prix && (

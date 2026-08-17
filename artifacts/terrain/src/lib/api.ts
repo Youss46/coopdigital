@@ -55,6 +55,10 @@ export async function getFournisseurs(search?: string) {
   return apiGet<import("./types").Fournisseur[]>(`/fournisseurs${qs}`);
 }
 
+export async function getDeleguesCentraux() {
+  return apiGet<import("./types").DelegueProxy[]>("/delegues-centraux");
+}
+
 export async function getFournisseurRecap(id: number) {
   return apiGet<import("./types").FournisseurRecap>(`/fournisseur/${id}/recap`);
 }

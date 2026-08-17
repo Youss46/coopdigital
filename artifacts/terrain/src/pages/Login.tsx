@@ -39,7 +39,12 @@ export default function Login() {
       login(result.token, result.agent);
       setLocation("/");
     } catch (err) {
-      setErreur((err as Error).message || "Numéro ou mot de passe incorrect");
+      const msg = (err as Error).message || "";
+      if (msg === "COMPTE_CENTRAL") {
+        setErreur("Ce compte est géré par la base centrale. Vous ne pouvez pas vous connecter directement. Contactez votre coopérative.");
+      } else {
+        setErreur(msg || "Numéro ou mot de passe incorrect");
+      }
     } finally {
       setLoading(false);
     }
