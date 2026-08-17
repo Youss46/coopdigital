@@ -134,9 +134,26 @@ export async function creerCommissionTransfert(
     const taux = await getTauxActif(cooperativeId, campagneId, delegueId);
     if (!taux) return null;
 
-    const montant = Math.round(poidsKg * taux.tauxFcfaParKg * 100) / 100;
-    if (montant <= 0) return null;
+    const montantBrut = Math.round(poidsKg * taux.tauxFcfaParKg * 100) / 100;
+    if (montantBrut <= 0) return null;
 
+    // Récupérer les charges de transport du transfert pour les déduire
+    const [transfert] = await db
+      .select({
+        fraisCarburantFcfa: transfertsStockTable.fraisCarburantFcfa,
+        autresChargesFcfa: transfertsStockTable.autresChargesFcfa,
+      })
+      .from(transfertsStockTable)
+      .where(eq(transfertsStockTable.id, transfertId))
+      .limit(1);
+
+    const chargesDéduites =
+      (transfert?.fraisCarburantFcfa ?? 0) + (transfert?.autresChargesFcfa ?? 0);
+
+    const montantNet = Math.max(0, montantBrut - chargesDéduites);
+
+    // Si les charges absorbent toute la commission, on enregistre quand même
+    // à 0 pour la traçabilité (le délégué a travaillé mais les charges couvrent tout)
     await db.insert(commissionsDeleguesTable).values({
       delegueId,
       livraisonId: null,
@@ -144,12 +161,17 @@ export async function creerCommissionTransfert(
       campagneId: campagneId ?? undefined,
       tauxFcfaParKg: String(taux.tauxFcfaParKg),
       poidsKg: String(poidsKg),
-      montantFcfa: String(montant),
+      montantBrutFcfa: String(montantBrut),
+      chargesDeduitesFcfa: chargesDéduites > 0 ? chargesDéduites : null,
+      montantFcfa: String(montantNet),
       statut: "en_attente",
     });
 
-    logger.info({ transfertId, delegueId, poidsKg, montant }, "Commission transfert créée");
-    return montant;
+    logger.info(
+      { transfertId, delegueId, poidsKg, montantBrut, chargesDéduites, montantNet },
+      "Commission transfert créée"
+    );
+    return montantNet;
   } catch (err) {
     logger.error({ err, transfertId, delegueId }, "Erreur création commission transfert");
     return null;

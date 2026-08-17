@@ -42,9 +42,11 @@ export const commissionsDeleguesTable = pgTable("commissions_delegues", {
   livraisonId:     integer("livraison_id").references(() => livraisonsTable.id), // nullable
   transfertId:     integer("transfert_id").references(() => transfertsStockTable.id), // nouveau
   campagneId:      integer("campagne_id").references(() => campagnesTable.id),
-  tauxFcfaParKg:   numeric("taux_fcfa_par_kg", { precision: 10, scale: 4 }).notNull(),
-  poidsKg:         numeric("poids_kg", { precision: 10, scale: 2 }).notNull(),
-  montantFcfa:     numeric("montant_fcfa", { precision: 14, scale: 2 }).notNull(),
+  tauxFcfaParKg:      numeric("taux_fcfa_par_kg", { precision: 10, scale: 4 }).notNull(),
+  poidsKg:            numeric("poids_kg", { precision: 10, scale: 2 }).notNull(),
+  montantBrutFcfa:    numeric("montant_brut_fcfa", { precision: 14, scale: 2 }),  // poidsKg × taux avant déduction charges
+  chargesDeduitesFcfa: integer("charges_deduites_fcfa"),                          // total carburant + autres charges
+  montantFcfa:        numeric("montant_fcfa", { precision: 14, scale: 2 }).notNull(), // net après déduction
   // en_attente | payé | annulé
   statut:             text("statut").notNull().default("en_attente"),
   datePaiement:       timestamp("date_paiement", { withTimezone: true }),
