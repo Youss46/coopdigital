@@ -376,6 +376,7 @@ export default function FournisseursPage() {
                       <th className="text-right px-4 py-3 font-medium text-gray-600 hidden lg:table-cell">Livraisons</th>
                       <th className="text-right px-4 py-3 font-medium text-gray-600 hidden lg:table-cell">Tonnage</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-600 hidden lg:table-cell">Dernière livraison</th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Délégué</th>
                       <th className="text-center px-4 py-3 font-medium text-gray-600">Actions</th>
                     </tr>
                   </thead>
@@ -400,6 +401,9 @@ export default function FournisseursPage() {
                         </td>
                         <td className="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">
                           {f.derniereLivraison ? new Date(f.derniereLivraison).toLocaleDateString("fr-FR") : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 text-xs hidden md:table-cell">
+                          {(f as Fournisseur & { creeParDelegueNom?: string | null }).creeParDelegueNom ?? "—"}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-1">

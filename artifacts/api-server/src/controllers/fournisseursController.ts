@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { fournisseursTable, membresTable, livraisonsTable, lotsTable, lotLivraisonsTable, ventesExportateursTable, campagnesTable, exportateursTable } from "@workspace/db";
+import { fournisseursTable, membresTable, livraisonsTable, lotsTable, lotLivraisonsTable, ventesExportateursTable, campagnesTable, exportateursTable, usersTable } from "@workspace/db";
 import { eq, and, or, ilike, desc, sql, isNull, inArray } from "drizzle-orm";
 import { generateEcrituresVente } from "../services/comptabiliteService.js";
 
@@ -54,6 +54,8 @@ export async function listFournisseurs(req: Request, res: Response) {
       actif:                 fournisseursTable.actif,
       createdAt:             fournisseursTable.createdAt,
       updatedAt:             fournisseursTable.updatedAt,
+      creeParDelegueId:      fournisseursTable.creeParDelegueId,
+      creeParDelegueNom:     sql<string | null>`MAX(CASE WHEN ${usersTable.id} IS NOT NULL THEN trim(concat_ws(' ', ${usersTable.prenoms}, ${usersTable.nom})) END)`,
       nbLivraisons:  sql<number>`count(${livraisonsTable.id})::int`,
       tonnageTotal:  sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float`,
       derniereLivraison: sql<string | null>`max(${livraisonsTable.dateLivraison})`,
@@ -66,6 +68,7 @@ export async function listFournisseurs(req: Request, res: Response) {
         sql`${fournisseursTable.membreId} is not null`
       )
     )
+    .leftJoin(usersTable, eq(usersTable.id, fournisseursTable.creeParDelegueId))
     .where(
       and(
         eq(fournisseursTable.cooperativeId, cid),
