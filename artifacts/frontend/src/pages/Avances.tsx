@@ -13,7 +13,7 @@ import {
   Avance,
 } from "@workspace/api-client-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PlusCircle, TrendingDown, Banknote, Clock, FileDown, CloudOff, HandCoins, Loader2, Check, Settings2, History } from "lucide-react";
+import { PlusCircle, TrendingDown, Banknote, Clock, FileDown, CloudOff, HandCoins, Loader2, Check, Settings2, History, User, X } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
@@ -50,6 +50,7 @@ export default function Avances() {
   const peutRembourser = usePermission("avances", "rembourser");
   const [modalOuvert, setModalOuvert] = useState(false);
   const [filtreStatut, setFiltreStatut] = useState<"" | "en_cours" | "rembourse" | "en_retard">("");
+  const [filtreProxy, setFiltreProxy] = useState(false);
   const [modalRemboursement, setModalRemboursement] = useState<{ id: number; solde: number; nom: string } | null>(null);
   const [montantRemboursement, setMontantRemboursement] = useState("");
   const [planTarget, setPlanTarget] = useState<Avance | null>(null);
@@ -59,7 +60,8 @@ export default function Avances() {
   const { data: avancesData, isLoading } = useGetAvances({ statut: filtreStatut || undefined });
   const { data: membresData } = useGetMembres({ limit: 200 });
 
-  const avances = avancesData?.avances ?? [];
+  const avancesRaw = avancesData?.avances ?? [];
+  const avances = filtreProxy ? avancesRaw.filter((a) => !!a.agentSaisiseurId) : avancesRaw;
   const membres = membresData?.membres ?? [];
 
   const [form, setForm] = useState({
@@ -231,7 +233,7 @@ export default function Avances() {
       )}
 
       {/* Filtre */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {(["", "en_cours", "rembourse", "en_retard"] as const).map((s) => (
           <button
             key={s}
@@ -246,6 +248,18 @@ export default function Avances() {
             {s === "" ? "Tous" : s === "en_cours" ? "En cours" : s === "rembourse" ? "Remboursé" : "En retard"}
           </button>
         ))}
+        <button
+          onClick={() => setFiltreProxy((v) => !v)}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap ${
+            filtreProxy
+              ? "bg-indigo-100 border-indigo-300 text-indigo-800"
+              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          <User size={12} />
+          Proxy gérant
+          {filtreProxy && <X size={11} className="ml-0.5 opacity-60" />}
+        </button>
       </div>
 
       {/* Tableau */}

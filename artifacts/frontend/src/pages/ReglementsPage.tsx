@@ -521,6 +521,7 @@ export default function ReglementsPage() {
   const [filtreStatut, setFiltreStatut] = useState<string>("en_attente");
   const [filtrePeriode, setFiltrePeriode] = useState<string>("");
   const [filtreSansMode, setFiltreSansMode] = useState(false);
+  const [filtreProxy, setFiltreProxy] = useState(false);
   const [recherche, setRecherche] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
 
@@ -636,6 +637,7 @@ export default function ReglementsPage() {
 
   const filtres = (paiements ?? []).filter((p) => {
     if (filtreSansMode && !!p.modePaiement) return false;
+    if (filtreProxy && !p.agentSaisiseurId) return false;
     if (!recherche) return true;
     const r = recherche.toLowerCase();
     return (
@@ -894,6 +896,20 @@ export default function ReglementsPage() {
           <AlertCircle size={13} />
           À compléter
           {filtreSansMode && (
+            <X size={12} className="ml-0.5 opacity-60" />
+          )}
+        </button>
+        <button
+          onClick={() => setFiltreProxy((v) => !v)}
+          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors whitespace-nowrap ${
+            filtreProxy
+              ? "bg-indigo-100 border-indigo-300 text-indigo-800"
+              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          <User size={13} />
+          Proxy gérant
+          {filtreProxy && (
             <X size={12} className="ml-0.5 opacity-60" />
           )}
         </button>
