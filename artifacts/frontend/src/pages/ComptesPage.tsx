@@ -6,9 +6,10 @@ import {
   useDeleteUser,
   useToggleUserActif,
   useResetUserPassword,
+  useUpdateUser,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Trash2, ToggleLeft, ToggleRight, ShieldCheck, Copy, RefreshCw, CheckCheck, Share2, KeyRound } from "lucide-react";
+import { UserPlus, Trash2, ToggleLeft, ToggleRight, ShieldCheck, Copy, RefreshCw, CheckCheck, Share2, KeyRound, Pencil } from "lucide-react";
 
 // ——— Génération de mot de passe sécurisé ———
 function genererMotDePasse(): string {
@@ -547,6 +548,102 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
   );
 }
 
+// ——— Modal édition mode de gestion (délégués) ———
+interface EditModeGestionModalProps {
+  userId: number;
+  nom: string;
+  prenoms: string;
+  modeGestionActuel: "autonome" | "central";
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function EditModeGestionModal({ userId, nom, prenoms, modeGestionActuel, onClose, onSuccess }: EditModeGestionModalProps) {
+  const { toast } = useToast();
+  const updateMutation = useUpdateUser();
+  const [modeGestion, setModeGestion] = useState<"autonome" | "central">(modeGestionActuel);
+
+  function handleSave() {
+    updateMutation.mutate(
+      { id: userId, data: { modeGestion } as any },
+      {
+        onSuccess: () => {
+          toast({ title: "Mode de gestion mis à jour" });
+          onSuccess();
+          onClose();
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "Erreur";
+          toast({ title: "Erreur", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="px-6 py-5 border-b border-gray-100">
+          <h3 className="font-bold text-gray-900">Mode de gestion</h3>
+          <p className="text-xs text-gray-500 mt-0.5">{prenoms} {nom}</p>
+        </div>
+        <div className="px-6 py-5 space-y-3">
+          <label
+            className="flex items-start gap-3 cursor-pointer p-3 border rounded-xl transition-colors"
+            style={{ borderColor: modeGestion === "autonome" ? "#16a34a" : "#e5e7eb", background: modeGestion === "autonome" ? "#f0fdf4" : "#fff" }}
+          >
+            <input
+              type="radio"
+              name="modeGestion"
+              value="autonome"
+              checked={modeGestion === "autonome"}
+              onChange={() => setModeGestion("autonome")}
+              className="accent-green-600 mt-0.5"
+            />
+            <div>
+              <div className="text-sm font-medium text-gray-800">Autonome</div>
+              <div className="text-xs text-gray-500">Le délégué utilise la plateforme lui-même</div>
+            </div>
+          </label>
+          <label
+            className="flex items-start gap-3 cursor-pointer p-3 border rounded-xl transition-colors"
+            style={{ borderColor: modeGestion === "central" ? "#2563eb" : "#e5e7eb", background: modeGestion === "central" ? "#eff6ff" : "#fff" }}
+          >
+            <input
+              type="radio"
+              name="modeGestion"
+              value="central"
+              checked={modeGestion === "central"}
+              onChange={() => setModeGestion("central")}
+              className="accent-blue-600 mt-0.5"
+            />
+            <div>
+              <div className="text-sm font-medium text-gray-800">Géré centralement</div>
+              <div className="text-xs text-gray-500">La base centrale opère en son nom</div>
+            </div>
+          </label>
+        </div>
+        <div className="px-6 pb-5 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={updateMutation.isPending || modeGestion === modeGestionActuel}
+            className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
+            style={{ backgroundColor: "#1a4731" }}
+          >
+            {updateMutation.isPending ? "Enregistrement…" : "Enregistrer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ——— Modal confirmation suppression ———
 interface DeleteModalProps {
   nom: string;
@@ -849,6 +946,12 @@ export default function ComptesPage() {
     role: string;
     telephone?: string | null;
   } | null>(null);
+  const [editModeGestionTarget, setEditModeGestionTarget] = useState<{
+    id: number;
+    nom: string;
+    prenoms: string;
+    modeGestion: "autonome" | "central";
+  } | null>(null);
 
   // Accès refusé si pas PCA / Directeur
   if (!["pca", "directeur"].includes(requesterRole)) {
@@ -989,6 +1092,24 @@ export default function ComptesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          {/* Modifier le mode de gestion — délégués uniquement */}
+                          {(compte.role as string) === "delegue" && !isOwn && (
+                            <button
+                              onClick={() =>
+                                setEditModeGestionTarget({
+                                  id: compte.id,
+                                  nom: compte.nom,
+                                  prenoms: compte.prenoms,
+                                  modeGestion: ((compte as typeof compte & { modeGestion?: string }).modeGestion ?? "autonome") as "autonome" | "central",
+                                })
+                              }
+                              title="Mode de gestion"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+
                           {/* Réinitialiser le mot de passe */}
                           {canResetPwd && (
                             <button
@@ -1082,6 +1203,18 @@ export default function ComptesPage() {
           role={resetTarget.role}
           telephone={resetTarget.telephone}
           onClose={() => setResetTarget(null)}
+        />
+      )}
+
+      {/* Modal édition mode de gestion */}
+      {editModeGestionTarget && (
+        <EditModeGestionModal
+          userId={editModeGestionTarget.id}
+          nom={editModeGestionTarget.nom}
+          prenoms={editModeGestionTarget.prenoms}
+          modeGestionActuel={editModeGestionTarget.modeGestion}
+          onClose={() => setEditModeGestionTarget(null)}
+          onSuccess={() => void refetch()}
         />
       )}
     </div>
