@@ -794,6 +794,7 @@ export async function syncOperations(
   const sorted = [...operations].sort((a, b) => a.timestamp - b.timestamp);
   const succes: string[] = [];
   const echecs: Array<{ localId: string; erreur: string }> = [];
+  const collectesProxy: Array<{ localId: string; saisiePour: string }> = [];
 
   // Cache delegues centraux for per-op proxy resolution (lazy, once if needed)
   let deleguesCentrauxCache: Awaited<ReturnType<typeof getDeleguesCentraux>> | null = null;
@@ -810,7 +811,10 @@ export async function syncOperations(
       if (op.type === "collecte") {
         const effectiveIdCollecte = await resolveOpAgent(op.data);
         const saisCollecte = saisiseurId !== undefined && effectiveIdCollecte !== saisiseurId ? saisiseurId : undefined;
-        await enregistrerCollecte(effectiveIdCollecte, cooperativeId, { ...(op.data as Parameters<typeof enregistrerCollecte>[2]), peseurId }, saisCollecte);
+        const collecteRes = await enregistrerCollecte(effectiveIdCollecte, cooperativeId, { ...(op.data as Parameters<typeof enregistrerCollecte>[2]), peseurId }, saisCollecte);
+        if (collecteRes.saisiePour) {
+          collectesProxy.push({ localId: op.localId, saisiePour: collecteRes.saisiePour });
+        }
       } else if (op.type === "paiement") {
         const effectiveId = await resolveOpAgent(op.data);
         const sais = saisiseurId !== undefined && effectiveId !== saisiseurId ? saisiseurId : undefined;
@@ -837,7 +841,7 @@ export async function syncOperations(
     }
   }
 
-  return { succes, echecs };
+  return { succes, echecs, collectesProxy };
 }
 
 // ─── Historique collectes peseur ─────────────────────────────────────────

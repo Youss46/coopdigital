@@ -94,7 +94,11 @@ export async function octroierAvance(data: AvanceInput, online: boolean) {
 export async function getBilan() { return apiGet<import("./types").BilanJour>("/bilan-jour"); }
 
 export async function syncOps(operations: import("./types").PendingOp[]) {
-  return apiPost<{ succes: string[]; echecs: Array<{ localId: string; erreur: string }> }>(
+  return apiPost<{
+    succes: string[];
+    echecs: Array<{ localId: string; erreur: string }>;
+    collectesProxy: Array<{ localId: string; saisiePour: string }>;
+  }>(
     "/sync",
     { operations },
   );

@@ -8,12 +8,28 @@ export default function OfflineBanner() {
 
   // Synchronisation réussie → bannière verte temporaire
   if (syncStatus === "done" && syncResult) {
+    // Déduplique les délégués cibles pour l'affichage (plusieurs collectes peuvent concerner le même délégué)
+    const deleguesProxy = Array.from(
+      new Map(syncResult.collectesProxy.map((c) => [c.saisiePour, c.saisiePour])).values(),
+    );
     return (
       <div className="t-offline-banner t-offline-banner--done">
         <span>
           ✅ {syncResult.succes} opération{syncResult.succes !== 1 ? "s" : ""} synchronisée{syncResult.succes !== 1 ? "s" : ""}
           {syncResult.echecs > 0 && ` — ${syncResult.echecs} échec${syncResult.echecs !== 1 ? "s" : ""}`}
         </span>
+        {deleguesProxy.length > 0 && (
+          <div style={{ marginTop: "4px", fontSize: ".8rem", opacity: .9 }}>
+            {deleguesProxy.map((nom) => {
+              const count = syncResult.collectesProxy.filter((c) => c.saisiePour === nom).length;
+              return (
+                <span key={nom} style={{ display: "block" }}>
+                  👤 {count} collecte{count !== 1 ? "s" : ""} pour {nom}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }

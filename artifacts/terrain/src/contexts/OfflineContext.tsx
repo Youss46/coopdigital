@@ -13,6 +13,8 @@ import { syncOps, syncGpsOps, syncEnqueteOps } from "../lib/api";
 export interface SyncResult {
   succes: number;
   echecs: number;
+  /** Collectes enregistrées en mode proxy avec le nom du délégué concerné */
+  collectesProxy: Array<{ localId: string; saisiePour: string }>;
 }
 
 interface OfflineContextValue {
@@ -57,6 +59,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
     let nbSucces = 0;
     let nbEchecs = 0;
+    const allCollectesProxy: Array<{ localId: string; saisiePour: string }> = [];
 
     try {
       if (ops.length > 0) {
@@ -67,6 +70,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
           if (t >= 3) await markOpError(localId, `Échec définitif (${t} tentatives) : ${erreur}`);
           nbEchecs++;
         }
+        allCollectesProxy.push(...(result.collectesProxy ?? []));
       }
 
       if (gpsOps.length > 0) {
@@ -90,7 +94,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       }
 
       await refreshCount();
-      setSyncResult({ succes: nbSucces, echecs: nbEchecs });
+      setSyncResult({ succes: nbSucces, echecs: nbEchecs, collectesProxy: allCollectesProxy });
       setSyncStatus("done");
       clearTimerRef.current = setTimeout(() => {
         setSyncStatus("idle");
