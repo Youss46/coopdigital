@@ -185,7 +185,8 @@ export async function creerTransfertAdminHandler(req: Request, res: Response): P
   if (!coop) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
   const id = Number(req.params["id"]);
   if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
-  const { poidsKg, typeVehicule, immatriculation, nomChauffeur, telephoneChauffeur, transporteur, notes } =
+  const { poidsKg, typeVehicule, immatriculation, nomChauffeur, telephoneChauffeur, transporteur, notes,
+    fraisCarburantFcfa, autresChargesFcfa, autresChargesLibelle } =
     req.body as Record<string, unknown>;
   if (!poidsKg || Number(poidsKg) <= 0) {
     res.status(400).json({ erreur: "poidsKg est requis et doit être positif" });
@@ -200,6 +201,9 @@ export async function creerTransfertAdminHandler(req: Request, res: Response): P
       telephoneChauffeur: telephoneChauffeur ? String(telephoneChauffeur) : undefined,
       transporteur: transporteur ? String(transporteur) : undefined,
       notes: notes ? String(notes) : undefined,
+      fraisCarburantFcfa: fraisCarburantFcfa ? Number(fraisCarburantFcfa) : undefined,
+      autresChargesFcfa: autresChargesFcfa ? Number(autresChargesFcfa) : undefined,
+      autresChargesLibelle: autresChargesLibelle ? String(autresChargesLibelle) : undefined,
     });
     res.status(201).json(t);
   } catch (err) {

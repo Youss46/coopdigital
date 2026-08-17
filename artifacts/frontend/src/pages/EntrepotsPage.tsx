@@ -173,6 +173,9 @@ export default function EntrepotsPage() {
     immatriculation: "",
     nomChauffeur: "",
     notes: "",
+    fraisCarburantFcfa: "",
+    autresChargesFcfa: "",
+    autresChargesLibelle: "",
   });
 
   const { data: deleguesListe = [], isLoading: loadDelegues } = useQuery<DelegueListe[]>({
@@ -430,7 +433,7 @@ export default function EntrepotsPage() {
                       <button
                         onClick={() => {
                           setShowTransfert(e);
-                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "" });
+                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "", fraisCarburantFcfa: "", autresChargesFcfa: "", autresChargesLibelle: "" });
                         }}
                         className="mt-3 w-full flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors">
                         <Truck className="w-3.5 h-3.5" />
@@ -797,6 +800,36 @@ export default function EntrepotsPage() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 resize-none" />
               </div>
 
+              {/* Charges de transport */}
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Charges de transport</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Carburant (FCFA)</label>
+                    <input type="number" min="0" step="1" placeholder="0"
+                      value={formTransfert.fraisCarburantFcfa}
+                      onChange={(e) => setFormTransfert(f => ({ ...f, fraisCarburantFcfa: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Autres charges (FCFA)</label>
+                    <input type="number" min="0" step="1" placeholder="0"
+                      value={formTransfert.autresChargesFcfa}
+                      onChange={(e) => setFormTransfert(f => ({ ...f, autresChargesFcfa: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                  </div>
+                </div>
+                {formTransfert.autresChargesFcfa && (
+                  <div className="mt-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Libellé autres charges</label>
+                    <input type="text" placeholder="ex: Péage, manutention…"
+                      value={formTransfert.autresChargesLibelle}
+                      onChange={(e) => setFormTransfert(f => ({ ...f, autresChargesLibelle: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                  </div>
+                )}
+              </div>
+
               {/* Résumé */}
               {formTransfert.poidsKg && parseFloat(formTransfert.poidsKg) > 0 && parseFloat(formTransfert.poidsKg) <= parseFloat(showTransfert.stockActuelKg) && (
                 <div className="bg-green-50 border border-green-100 rounded-xl p-3 flex items-center gap-3 text-sm">
@@ -833,6 +866,9 @@ export default function EntrepotsPage() {
                     immatriculation: formTransfert.immatriculation || undefined,
                     nomChauffeur: formTransfert.nomChauffeur || undefined,
                     notes: formTransfert.notes || undefined,
+                    fraisCarburantFcfa: formTransfert.fraisCarburantFcfa ? parseInt(formTransfert.fraisCarburantFcfa) : undefined,
+                    autresChargesFcfa: formTransfert.autresChargesFcfa ? parseInt(formTransfert.autresChargesFcfa) : undefined,
+                    autresChargesLibelle: formTransfert.autresChargesLibelle || undefined,
                   },
                 })}
                 className="flex-1 bg-green-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2">

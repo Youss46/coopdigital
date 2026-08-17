@@ -885,6 +885,9 @@ export async function creerTransfertAdmin(
     datePrevue?: Date;
     campagneId?: number;
     notes?: string;
+    fraisCarburantFcfa?: number;
+    autresChargesFcfa?: number;
+    autresChargesLibelle?: string;
   },
 ) {
   const [entrepot] = await db
@@ -926,6 +929,9 @@ export async function creerTransfertAdmin(
       datePrevue: data.datePrevue ?? null,
       notes: data.notes ?? null,
       statut: "planifie",
+      fraisCarburantFcfa: data.fraisCarburantFcfa ?? null,
+      autresChargesFcfa: data.autresChargesFcfa ?? null,
+      autresChargesLibelle: data.autresChargesLibelle ?? null,
     })
     .returning();
 
