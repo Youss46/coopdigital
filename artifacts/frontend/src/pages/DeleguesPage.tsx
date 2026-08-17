@@ -80,6 +80,7 @@ interface Delegue {
   section: string | null;
   actif: boolean;
   modeGestion: "autonome" | "central";
+  derniereLivraison: string | null;
   caisse: { id: number | null; solde: number };
   paiementsDifferes: { nb: number; montantTotal: number };
   nbCollectes: number;
@@ -331,6 +332,14 @@ export default function DeleguesPage() {
                               ? <span style={{ background: "#dbeafe", color: "#1d4ed8", borderRadius: 10, padding: "2px 8px", fontSize: ".75rem", fontWeight: 700 }}>Base centrale</span>
                               : <span style={{ background: "#dcfce7", color: "#15803d", borderRadius: 10, padding: "2px 8px", fontSize: ".75rem", fontWeight: 700 }}>Autonome</span>
                             }
+                            {d.modeGestion === "central" && (() => {
+                              const inactif = !d.derniereLivraison || (Date.now() - new Date(d.derniereLivraison).getTime() > 7 * 24 * 60 * 60 * 1000);
+                              return inactif ? (
+                                <span title={d.derniereLivraison ? `Dernière livraison : ${new Date(d.derniereLivraison).toLocaleDateString("fr-FR")}` : "Aucune livraison enregistrée"} style={{ marginLeft: 4, background: "#fef2f2", color: "#dc2626", borderRadius: 10, padding: "2px 6px", fontSize: ".72rem", fontWeight: 700, cursor: "default" }}>
+                                  ⚠ Inactif
+                                </span>
+                              ) : null;
+                            })()}
                           </td>
                           <td style={{ padding: "12px 14px", fontSize: ".85rem", color: "#374151" }}>{d.section ?? "—"}</td>
                           <td style={{ padding: "12px 14px", fontSize: ".85rem", color: "#374151" }}>{d.nbCollectes}</td>

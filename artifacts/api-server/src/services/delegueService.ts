@@ -295,6 +295,11 @@ export async function listDelegues(cooperativeId: number) {
       .from(livraisonsTable)
       .where(eq(livraisonsTable.agentId, a.id));
 
+    const [derniereActivite] = await db
+      .select({ dateLivraison: sql<string | null>`MAX(${livraisonsTable.dateLivraison})` })
+      .from(livraisonsTable)
+      .where(eq(livraisonsTable.agentId, a.id));
+
     return {
       id: a.id,
       nom: a.nom,
@@ -303,6 +308,7 @@ export async function listDelegues(cooperativeId: number) {
       section: a.section ?? null,
       actif: a.actif,
       modeGestion: (a.modeGestion ?? "autonome") as "autonome" | "central",
+      derniereLivraison: derniereActivite?.dateLivraison ?? null,
       caisse: {
         id: caisseId,
         solde: soldeCaisse,

@@ -4,6 +4,8 @@ import { alias } from "drizzle-orm/pg-core";
 
 // Alias pour la jointure agent saisie (évite conflit avec d'éventuels autres joins usersTable)
 const agentUserAlias = alias(usersTable, "agent_user");
+// Alias pour la jointure peseur saisie physique (proxy délégué central)
+const peseurUserAlias = alias(usersTable, "peseur_user");
 import { creerChequeDepuisLivraison } from "../services/chequesService.js";
 import { eq, and, desc, notInArray, or } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
@@ -59,11 +61,14 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
         agentNom: agentUserAlias.nom,
         agentPrenoms: agentUserAlias.prenoms,
         agentRole: agentUserAlias.role,
+        peseurNom: peseurUserAlias.nom,
+        peseurPrenoms: peseurUserAlias.prenoms,
       })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
+      .leftJoin(peseurUserAlias, eq(livraisonsTable.peseurId, peseurUserAlias.id))
       .where(whereClause)
       .orderBy(desc(livraisonsTable.dateLivraison))
       .limit(limit);

@@ -78,6 +78,9 @@ interface Livraison {
   agentNom: string | null;
   agentPrenoms: string | null;
   agentRole: string | null;
+  /** Personne qui a physiquement saisi (proxy délégué central) — présent seulement si différent de l'agent */
+  peseurNom: string | null;
+  peseurPrenoms: string | null;
 }
 
 const ROLE_SAISIE_LABEL: Record<string, { label: string; color: string; bg: string }> = {
@@ -609,6 +612,14 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
                 </span>
               </>
             )}
+            {l.peseurNom && (
+              <>
+                <span className="text-xs text-gray-300">·</span>
+                <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: "#fef3c7", color: "#92400e" }}>
+                  🔄 Proxy
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -654,26 +665,41 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
             />
           </div>
           {l.agentNom && (
-            <div className="border-t border-gray-200 pt-1.5 mt-1.5 flex items-center justify-between text-xs">
-              <span className="text-gray-500 flex items-center gap-1">
-                <User size={11} /> Saisi par
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="text-gray-700 font-medium">
-                  {l.agentPrenoms} {l.agentNom}
+            <div className="border-t border-gray-200 pt-1.5 mt-1.5 space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500 flex items-center gap-1">
+                  <User size={11} /> {l.peseurNom ? "Délégué responsable" : "Saisi par"}
                 </span>
-                {l.agentRole && ROLE_SAISIE_LABEL[l.agentRole] && (
-                  <span
-                    className="px-1.5 py-0.5 rounded font-medium"
-                    style={{
-                      background: ROLE_SAISIE_LABEL[l.agentRole]!.bg,
-                      color: ROLE_SAISIE_LABEL[l.agentRole]!.color,
-                    }}
-                  >
-                    {ROLE_SAISIE_LABEL[l.agentRole]!.label}
+                <span className="flex items-center gap-1.5">
+                  <span className="text-gray-700 font-medium">
+                    {l.agentPrenoms} {l.agentNom}
                   </span>
-                )}
-              </span>
+                  {l.agentRole && ROLE_SAISIE_LABEL[l.agentRole] && (
+                    <span
+                      className="px-1.5 py-0.5 rounded font-medium"
+                      style={{
+                        background: ROLE_SAISIE_LABEL[l.agentRole]!.bg,
+                        color: ROLE_SAISIE_LABEL[l.agentRole]!.color,
+                      }}
+                    >
+                      {ROLE_SAISIE_LABEL[l.agentRole]!.label}
+                    </span>
+                  )}
+                </span>
+              </div>
+              {l.peseurNom && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500 flex items-center gap-1">
+                    <User size={11} /> Saisi physiquement par
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-gray-700 font-medium">{l.peseurPrenoms} {l.peseurNom}</span>
+                    <span className="px-1.5 py-0.5 rounded font-medium" style={{ background: "#fef3c7", color: "#92400e" }}>
+                      Base centrale
+                    </span>
+                  </span>
+                </div>
+              )}
             </div>
           )}
           <div className="mt-2 flex gap-2">
