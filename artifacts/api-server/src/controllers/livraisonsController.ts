@@ -15,6 +15,7 @@ import { generateEcrituresLivraison } from "../services/comptabiliteService";
 import { getEncoursMembre, enregistrerRemboursementParLivraison } from "../services/intrantsService";
 import { envoyerPushGroupePortail } from "../services/pushService";
 import { entrerStockSiDelegue, entrerStockLivraison } from "../services/entrepotDelegueService";
+import { genererNumeroRecu } from "../services/recuService.js";
 
 export async function listLivraisons(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -178,6 +179,9 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       if (dedié) resolvedEntrepotId = dedié.id;
     }
 
+    // Numéro de réçu attribué avant la transaction (gap acceptable si tx rollback)
+    const numeroRecu = await genererNumeroRecu(cooperativeId);
+
     const result = await db.transaction(async (tx) => {
       const montantBrut = Math.round(poidsKg * prixUnitaireFcfa);
       let avanceDeduite = 0;
@@ -259,6 +263,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
             ? "especes"
             : ((modePaiement as "orange_money" | "mtn_momo" | "especes" | "wave" | "cheque") ?? "especes"),
           statut: "en_attente",
+          numeroRecu,
         })
         .returning();
 

@@ -8,6 +8,7 @@ import {
 import { and, eq, sql, desc, or, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { creerCommissionSiTaux } from "./commissionService.js";
+import { genererNumeroRecu } from "./recuService.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { logger } from "../lib/logger.js";
@@ -455,6 +456,9 @@ export async function enregistrerCollecte(
       .where(eq(avancesTable.id, avance.id));
   }
 
+  // Numéro de réçu séquentiel — attribué à la création, persisté dans paiements.numero_recu
+  const numeroRecu = await genererNumeroRecu(cooperativeId);
+
   // Créer le paiement en_attente — le mode sera choisi lors du règlement
   await db.insert(paiementsTable).values({
     livraisonId: livraison.id,
@@ -462,6 +466,7 @@ export async function enregistrerCollecte(
     campagneId: prix.campagneId ?? undefined,
     montantFcfa: montantNet,
     statut: "en_attente",
+    numeroRecu,
   });
 
   // Résolution du nom et push portail (uniquement pour les membres)
@@ -554,6 +559,7 @@ export async function enregistrerPaiement(
   if (!livraison) throw new Error("Livraison introuvable");
 
   const proxyMode = agentSaisiseurId !== undefined && agentSaisiseurId !== agentId;
+  const numeroRecu = await genererNumeroRecu(cooperativeId);
 
   const [paiement] = await db.insert(paiementsTable).values({
     livraisonId: data.livraisonId,
@@ -564,6 +570,7 @@ export async function enregistrerPaiement(
     statut: "confirme",
     initialisePar: agentId,
     agentSaisiseurId: proxyMode ? agentSaisiseurId : null,
+    numeroRecu,
   }).returning();
 
   let saisiePour: string | null = null;
@@ -578,7 +585,7 @@ export async function enregistrerPaiement(
 
   return {
     paiementId: paiement?.id ?? 0,
-    ref: `PAI-${new Date().getFullYear()}-${String(paiement?.id ?? 0).padStart(4, "0")}`,
+    ref: paiement?.numeroRecu ?? `PAI-${new Date().getFullYear()}-${String(paiement?.id ?? 0).padStart(4, "0")}`,
     saisiePour,
   };
 }
