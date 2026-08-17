@@ -62,6 +62,9 @@ export async function createCampagne(req: Request, res: Response) {
     return res.status(400).json({ erreur: "Données manquantes" });
   }
 
+  const today = new Date().toISOString().slice(0, 10);
+  const statut = dateOuverture > today ? "programmee" : "ouverte";
+
   const [campagne] = await db
     .insert(campagnesTable)
     .values({
@@ -72,11 +75,36 @@ export async function createCampagne(req: Request, res: Response) {
       dateOuverture,
       dateFermeture: dateFermeture || null,
       tonnageCibleKg: tonnageCibleKg || null,
-      statut: "ouverte",
+      statut,
     })
     .returning();
 
   return res.status(201).json(campagne);
+}
+
+/** Ouvre manuellement une campagne programmée avant sa date prévue. */
+export async function ouvrirCampagneProgrammee(req: Request, res: Response) {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+  const id = parseInt(String(req.params["id"] ?? "0"));
+
+  const campagne = await db.query.campagnesTable.findFirst({
+    where: and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)),
+  });
+  if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
+  if (campagne.statut !== "programmee") {
+    return res.status(400).json({ erreur: "Cette campagne n'est pas en statut programmée." });
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [updated] = await db
+    .update(campagnesTable)
+    .set({ statut: "ouverte", dateOuverture: today })
+    .where(and(eq(campagnesTable.id, id), eq(campagnesTable.cooperativeId, cooperativeId)))
+    .returning();
+
+  req.log.info({ campagneId: id, cooperativeId }, "Campagne programmée ouverte manuellement");
+  return res.json(updated);
 }
 
 export async function fermerCampagne(req: Request, res: Response) {

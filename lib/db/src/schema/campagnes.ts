@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 import { cooperativesTable } from "./cooperatives";
 import { usersTable } from "./users";
 
-export const campagneStatutEnum = pgEnum("campagne_statut", ["ouverte", "fermee", "archivee"]);
+export const campagneStatutEnum = pgEnum("campagne_statut", ["programmee", "ouverte", "fermee", "archivee"]);
 
 export const campagnesTable = pgTable("campagnes", {
   id: serial("id").primaryKey(),

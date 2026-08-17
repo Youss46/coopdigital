@@ -93,6 +93,15 @@ cron.schedule("30 * * * *", () => {
   }).catch((err: unknown) => logger.error({ err }, "Import peseeSessionService"));
 });
 
+// CRON campagnes programmées : ouverture automatique à 7h quand la dateOuverture est atteinte
+cron.schedule("0 7 * * *", () => {
+  import("./services/campagneService.js").then(({ activerCampagnesProgrammees }) => {
+    activerCampagnesProgrammees().catch((err: unknown) => {
+      logger.error({ err }, "Erreur cron activerCampagnesProgrammees");
+    });
+  }).catch((err: unknown) => logger.error({ err }, "Import campagneService"));
+});
+
 // CRON support : alertes tickets haute priorité non pris en charge après 30 min (toutes les 5 min)
 cron.schedule("*/5 * * * *", () => {
   import("./services/supportService.js").then(({ envoyerAlertesHautePriorite }) => {

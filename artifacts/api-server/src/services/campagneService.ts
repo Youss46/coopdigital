@@ -453,6 +453,32 @@ export async function cloturerCampagne(cooperativeId: number, campagneId: number
   return bilanData;
 }
 
+/**
+ * Passe automatiquement les campagnes "programmee" en "ouverte"
+ * quand leur dateOuverture est atteinte. Appelé par le cron quotidien à 7h.
+ */
+export async function activerCampagnesProgrammees(): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { lte, eq: deq } = await import("drizzle-orm");
+  const updated = await db
+    .update(campagnesTable)
+    .set({ statut: "ouverte" })
+    .where(and(deq(campagnesTable.statut, "programmee"), lte(campagnesTable.dateOuverture, today)))
+    .returning({ id: campagnesTable.id, cooperativeId: campagnesTable.cooperativeId, libelle: campagnesTable.libelle });
+
+  for (const c of updated) {
+    logger.info({ campagneId: c.id, cooperativeId: c.cooperativeId }, "Campagne programmée activée automatiquement");
+    const admins = await getUsersAdminCooperative(c.cooperativeId);
+    if (admins.length > 0) {
+      await creerNotification(c.cooperativeId, admins.map(u => u.id), {
+        titre: "Campagne ouverte automatiquement",
+        message: `La campagne "${c.libelle}" a été ouverte automatiquement à sa date programmée.`,
+        type: "info",
+      });
+    }
+  }
+}
+
 export async function getComparaisonCampagnes(cooperativeId: number, ids: number[]) {
   if (ids.length === 0) {
     const campagnes = await db.query.campagnesTable.findMany({

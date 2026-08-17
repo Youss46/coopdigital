@@ -680,6 +680,13 @@
       "when": 1788480030000,
       "tag": "0096_numero_livraison_delegue",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1788480040000,
+      "tag": "0097_campagne_programmee",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@ import {
   createCampagne,
   fermerCampagne,
   rouvrirCampagne,
+  ouvrirCampagneProgrammee,
   verifierCampagne,
   cloturerCampagne,
   getBilan,
@@ -25,6 +26,7 @@ router.post("/campagnes",                  checkPermission("campagnes", "creer")
 router.get("/campagnes/:id",               checkPermission("campagnes", "lire"),      getCampagne);
 router.put("/campagnes/:id/fermer",               checkPermission("campagnes", "fermer"),    fermerCampagne);
 router.put("/campagnes/:id/rouvrir",              checkPermission("campagnes", "fermer"),    rouvrirCampagne);
+router.put("/campagnes/:id/ouvrir",               checkPermission("campagnes", "creer"),     ouvrirCampagneProgrammee);
 router.post("/campagnes/:id/desactiver-inactifs", checkPermission("campagnes", "fermer"),    desactiverMembresSansCampagne);
 router.post("/campagnes/:id/rattacher-livraisons", checkPermission("campagnes", "fermer"),   rattacherLivraisons);
 router.get("/campagnes/:id/verifier",      checkPermission("campagnes", "verifier"),  verifierCampagne);

@@ -39,6 +39,11 @@ const BTN =
 type Tab = "campagnes" | "cloture" | "bilans";
 
 function StatutBadge({ statut }: { statut: string }) {
+    if (statut === "programmee") return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+        <Clock className="w-3 h-3" /> Programmée
+      </span>
+    );
     if (statut === "ouverte") return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
         <CheckCircle2 className="w-3 h-3" /> En cours
@@ -184,6 +189,28 @@ export default function CampagnesPage() {
   const [rattachMsg, setRattachMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [downloadingBilans, setDownloadingBilans] = useState<Set<number>>(new Set());
   const [archiverPending, setArchiverPending] = useState<Set<number>>(new Set());
+  const [ouvrirPending, setOuvrirPending] = useState<Set<number>>(new Set());
+
+  async function handleOuvrirProgrammee(campagneId: number) {
+    if (ouvrirPending.has(campagneId)) return;
+    setOuvrirPending(prev => new Set(prev).add(campagneId));
+    try {
+      const BASE = import.meta.env.VITE_API_URL ?? "";
+      const tok = localStorage.getItem("coop_token") ?? "";
+      const r = await fetch(`${BASE}/api/campagnes/${campagneId}/ouvrir`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${tok}` },
+      });
+      const data = await r.json() as { erreur?: string };
+      if (!r.ok) throw new Error(data.erreur ?? `Erreur ${r.status}`);
+      await queryClient.invalidateQueries(getListCampagnesQueryOptions());
+      toast({ title: "Campagne ouverte avec succès" });
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : "Erreur inconnue", variant: "destructive" });
+    } finally {
+      setOuvrirPending(prev => { const s = new Set(prev); s.delete(campagneId); return s; });
+    }
+  }
 
   async function handleArchiver(campagneId: number) {
     if (archiverPending.has(campagneId)) return;
@@ -268,9 +295,14 @@ export default function CampagnesPage() {
     e.preventDefault();
     if (!form.libelle || !form.anneeDebut || !form.anneeFin || !form.dateOuverture) return;
     try {
-      await createMut.mutateAsync({ data: form as CampagneInput });
+      const result = await createMut.mutateAsync({ data: form as CampagneInput });
       await queryClient.invalidateQueries(getListCampagnesQueryOptions());
-      toast({ title: "Campagne créée avec succès" });
+      const isProgrammee = (result as { statut?: string }).statut === "programmee";
+      toast({
+        title: isProgrammee
+          ? `Campagne programmée pour le ${new Date(form.dateOuverture!).toLocaleDateString("fr-FR")}`
+          : "Campagne créée et ouverte avec succès",
+      });
       setShowForm(false);
       setForm({
         dateOuverture: new Date().toISOString().slice(0, 10),
@@ -486,19 +518,30 @@ export default function CampagnesPage() {
               <div className="absolute left-2 top-0 bottom-0 w-px bg-gray-200" />
               {(campagnes ?? []).map((c, i) => (
                 <div key={c.id} className="relative mb-4">
-                  <div className={`absolute -left-4 top-4 w-4 h-4 rounded-full border-2 ${c.statut === "ouverte" ? "bg-green-500 border-green-600" : c.statut === "archivee" ? "bg-purple-400 border-purple-500" : "bg-gray-300 border-gray-400"}`} />
-                  <div className={`rounded-xl border p-4 ${c.statut === "ouverte" ? "border-green-200 bg-green-50" : c.statut === "archivee" ? "border-purple-100 bg-purple-50/30" : "border-gray-200 bg-white"}`}>
+                  <div className={`absolute -left-4 top-4 w-4 h-4 rounded-full border-2 ${c.statut === "programmee" ? "bg-blue-400 border-blue-500" : c.statut === "ouverte" ? "bg-green-500 border-green-600" : c.statut === "archivee" ? "bg-purple-400 border-purple-500" : "bg-gray-300 border-gray-400"}`} />
+                  <div className={`rounded-xl border p-4 ${c.statut === "programmee" ? "border-blue-200 bg-blue-50/40" : c.statut === "ouverte" ? "border-green-200 bg-green-50" : c.statut === "archivee" ? "border-purple-100 bg-purple-50/30" : "border-gray-200 bg-white"}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-semibold text-gray-900 text-sm">{c.libelle}</div>
                         <div className="text-xs text-gray-500 mt-0.5">{c.anneeDebut}–{c.anneeFin}</div>
                         <div className="text-xs text-gray-400 mt-1">
-                          Ouverture : {new Date(c.dateOuverture).toLocaleDateString("fr-FR")}
+                          {c.statut === "programmee"
+                            ? <>Ouverture prévue le {new Date(c.dateOuverture).toLocaleDateString("fr-FR")}</>
+                            : <>Ouverture : {new Date(c.dateOuverture).toLocaleDateString("fr-FR")}</>}
                           {c.dateFermeture && <> · Clôture : {new Date(c.dateFermeture).toLocaleDateString("fr-FR")}</>}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
                         <StatutBadge statut={c.statut} />
+                        {c.statut === "programmee" && peutCreer && (
+                          <button
+                            onClick={() => handleOuvrirProgrammee(c.id)}
+                            disabled={ouvrirPending.has(c.id)}
+                            className={`${BTN} bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs px-3 py-1.5`}>
+                            {ouvrirPending.has(c.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                            Ouvrir maintenant
+                          </button>
+                        )}
                         {c.statut === "ouverte" && peutCloturer && (
                           <button onClick={() => setTab("cloture")}
                             className={`${BTN} bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs px-3 py-1.5`}>
