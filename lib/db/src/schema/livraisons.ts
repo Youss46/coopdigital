@@ -48,6 +48,9 @@ export const livraisonsTable = pgTable("livraisons", {
   doublePeseeEffectuee:  boolean("double_pesee_effectuee").default(false),
   litigePesee:           boolean("litige_pesee").default(false),
 
+  // Numérotation séquentielle par délégué — ex: LIV-D01-0001
+  numeroLivraison: text("numero_livraison"),
+
   // Paiement différé
   statutPaiement:       text("statut_paiement").default("PAYÉ"),
   montantRestant:       numeric("montant_restant", { precision: 12, scale: 2 }).default("0"),

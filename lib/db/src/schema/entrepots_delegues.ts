@@ -58,6 +58,9 @@ export const entrepotsDeleguesTable = pgTable("entrepots_delegues", {
   actif:             boolean("actif").default(true),
   createdAt:         timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:         timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+
+  // Compteur séquentiel de livraisons propre à chaque entrepôt délégué
+  dernierNumeroLivraison: integer("dernier_numero_livraison").notNull().default(0),
 });
 
 export const entrepotsMouvementsTable = pgTable("entrepot_mouvements", {

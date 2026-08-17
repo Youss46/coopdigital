@@ -8,12 +8,12 @@ import {
 import { and, eq, sql, desc, or, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { creerCommissionSiTaux } from "./commissionService.js";
-import { genererNumeroRecu } from "./recuService.js";
+import { genererNumeroRecu, genererNumeroLivraison } from "./recuService.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { logger } from "../lib/logger.js";
 import { envoyerPushGroupePortail } from "./pushService.js";
-import { entrerStockSiDelegue } from "./entrepotDelegueService.js";
+import { entrerStockSiDelegue, getEntrepotDuDelegue } from "./entrepotDelegueService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -420,6 +420,13 @@ export async function enregistrerCollecte(
   // le paiement est confirmé ultérieurement via la page Règlements.
   const statutPaiement = "DIFFÉRÉ" as const;
 
+  // Numéro de livraison séquentiel propre au délégué (ex: LIV-D01-0003)
+  // L'agent terrain est toujours un délégué — on résout son entrepôt
+  const entrepotDelegue = await getEntrepotDuDelegue(agentId, cooperativeId);
+  const numeroLivraison = entrepotDelegue
+    ? await genererNumeroLivraison(entrepotDelegue.id)
+    : null;
+
   const [livraison] = await db.insert(livraisonsTable).values({
     membreId: data.membreId ?? null,
     fournisseurId: data.fournisseurId ?? null,
@@ -439,6 +446,7 @@ export async function enregistrerCollecte(
     peseurId: data.peseurId ?? null,
     statutPaiement,
     montantRestant: String(montantNet),
+    numeroLivraison,
   }).returning();
 
   if (!livraison) throw new Error("Erreur lors de l'enregistrement de la collecte");
@@ -527,7 +535,8 @@ export async function enregistrerCollecte(
 
   return {
     livraisonId: livraison.id,
-    ref: `LIV-${new Date().getFullYear()}-${String(livraison.id).padStart(4, "0")}`,
+    ref: numeroLivraison ?? `LIV-${new Date().getFullYear()}-${String(livraison.id).padStart(4, "0")}`,
+    numeroLivraison,
     membreNom,
     poidsNetKg: poidsNet,
     montantBrutFcfa: montantBrut,

@@ -673,6 +673,13 @@
       "when": 1788480020000,
       "tag": "0095_numero_recu_counter",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1788480030000,
+      "tag": "0096_numero_livraison_delegue",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { db, cooperativesTable } from "@workspace/db";
+import { db, cooperativesTable, entrepotsDeleguesTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
 /**
@@ -16,4 +16,22 @@ export async function genererNumeroRecu(cooperativeId: number): Promise<string> 
   const n = updated?.n ?? 1;
   const year = new Date().getFullYear();
   return `REC-${year}-${String(n).padStart(5, "0")}`;
+}
+
+/**
+ * Génère un numéro de livraison séquentiel propre à un entrepôt délégué.
+ * Format : LIV-D{entrepotId zero-padded 2}-{NNNN}
+ * Ex : LIV-D01-0001, LIV-D02-0003
+ * L'incrément est atomique (UPDATE … RETURNING) — pas de double attribution.
+ */
+export async function genererNumeroLivraison(entrepotDelegueId: number): Promise<string> {
+  const [updated] = await db
+    .update(entrepotsDeleguesTable)
+    .set({ dernierNumeroLivraison: sql`dernier_numero_livraison + 1` })
+    .where(eq(entrepotsDeleguesTable.id, entrepotDelegueId))
+    .returning({ id: entrepotsDeleguesTable.id, n: entrepotsDeleguesTable.dernierNumeroLivraison });
+
+  const n = updated?.n ?? 1;
+  const code = String(updated?.id ?? entrepotDelegueId).padStart(2, "0");
+  return `LIV-D${code}-${String(n).padStart(4, "0")}`;
 }

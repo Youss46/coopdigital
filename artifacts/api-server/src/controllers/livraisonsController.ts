@@ -15,7 +15,7 @@ import { generateEcrituresLivraison } from "../services/comptabiliteService";
 import { getEncoursMembre, enregistrerRemboursementParLivraison } from "../services/intrantsService";
 import { envoyerPushGroupePortail } from "../services/pushService";
 import { entrerStockSiDelegue, entrerStockLivraison } from "../services/entrepotDelegueService";
-import { genererNumeroRecu } from "../services/recuService.js";
+import { genererNumeroRecu, genererNumeroLivraison } from "../services/recuService.js";
 
 export async function listLivraisons(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -181,6 +181,10 @@ export async function createLivraison(req: Request, res: Response): Promise<void
 
     // Numéro de réçu attribué avant la transaction (gap acceptable si tx rollback)
     const numeroRecu = await genererNumeroRecu(cooperativeId);
+    // Numéro de livraison délégué — uniquement quand l'entrepôt délégué est précisé
+    const numeroLivraison = entrepotDelegueId
+      ? await genererNumeroLivraison(entrepotDelegueId)
+      : null;
 
     const result = await db.transaction(async (tx) => {
       const montantBrut = Math.round(poidsKg * prixUnitaireFcfa);
@@ -245,6 +249,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
           nombreSacs: nombreSacs ?? null,
           retenueKg: retenueKg != null ? String(retenueKg) : null,
           sectionLivraison: sectionLivraison ?? null,
+          numeroLivraison: numeroLivraison ?? null,
           ...(estDiffere && {
             statutPaiement: "EN_ATTENTE",
             montantRestant: String(montantNet),
