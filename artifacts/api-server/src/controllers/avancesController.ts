@@ -1,7 +1,10 @@
 import { type Request, type Response } from "express";
 import { checkAvance, creerAnomalies } from "../services/anomalieService";
-import { db, avancesTable, membresTable, campagnesTable, remboursementsAvancesMembresTable } from "@workspace/db";
+import { db, avancesTable, membresTable, campagnesTable, remboursementsAvancesMembresTable, usersTable } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+
+const saisiseurAlias = alias(usersTable, "saisiseur_user");
 import { CampagneFermeeError, assertCampagneActiveExiste } from "../lib/campagneGuard";
 import { CreateAvanceBody, RembourserAvanceBody } from "@workspace/api-zod";
 import { generateEcrituresAvance } from "../services/comptabiliteService";
@@ -40,12 +43,15 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
         montantPartielFcfa: avancesTable.montantPartielFcfa,
         reportDate: avancesTable.reportDate,
         agentId: avancesTable.agentId,
+        agentSaisiseurId: avancesTable.agentSaisiseurId,
+        agentSaisiseurNom: saisiseurAlias.nom,
         createdAt: avancesTable.createdAt,
         membreNom: membresTable.nom,
         membrePrenoms: membresTable.prenoms,
       })
       .from(avancesTable)
       .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+      .leftJoin(saisiseurAlias, eq(avancesTable.agentSaisiseurId, saisiseurAlias.id))
       .where(and(...conditions))
       .orderBy(desc(avancesTable.createdAt));
 

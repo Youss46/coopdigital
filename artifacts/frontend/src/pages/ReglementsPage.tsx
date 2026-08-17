@@ -1044,6 +1044,12 @@ function PaiementRow({
             )}
           </div>
           )}
+          {/* Proxy gérant */}
+          {p.agentSaisiseurId && p.agentSaisiseurNom && (
+            <p className="text-xs text-indigo-600 mt-0.5">
+              Saisi par <span className="font-medium">{p.agentSaisiseurNom}</span> pour le délégué
+            </p>
+          )}
           {/* Motif rejet */}
           {showRejet && p.motifRejet && (
             <p className="text-xs text-red-500 italic mt-1">Motif : {p.motifRejet}</p>

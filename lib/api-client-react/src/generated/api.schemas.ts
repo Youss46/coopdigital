@@ -844,6 +844,10 @@ export interface Avance {
   reportDate?: string | null;
   /** @nullable */
   agentId?: number | null;
+  /** @nullable */
+  agentSaisiseurId?: number | null;
+  /** @nullable */
+  agentSaisiseurNom?: string | null;
   createdAt: string;
   /** @nullable */
   membreNom?: string | null;
@@ -966,7 +970,10 @@ export interface ValiderPaiementInput {
   modePaiement?: ValiderPaiementInputModePaiement;
 }
 
-export type PaiementListItemModePaiement = typeof PaiementListItemModePaiement[keyof typeof PaiementListItemModePaiement];
+/**
+ * @nullable
+ */
+export type PaiementListItemModePaiement = typeof PaiementListItemModePaiement[keyof typeof PaiementListItemModePaiement] | null;
 
 
 export const PaiementListItemModePaiement = {
@@ -1001,7 +1008,7 @@ export interface PaiementListItem {
   membreId?: number | null;
   montantFcfa: number;
   /** @nullable */
-  modePaiement?: PaiementListItemModePaiement | null;
+  modePaiement?: PaiementListItemModePaiement;
   /** @nullable */
   referenceTransaction?: string | null;
   statut: PaiementListItemStatut;
@@ -1038,6 +1045,10 @@ export interface PaiementListItem {
   montantNetFcfa?: number | null;
   /** @nullable */
   agentId?: number | null;
+  /** @nullable */
+  agentSaisiseurId?: number | null;
+  /** @nullable */
+  agentSaisiseurNom?: string | null;
 }
 
 export type PaiementsStatsEnAttente = {
@@ -1572,6 +1583,18 @@ export const UtilisateurCompteRole = {
   auditeur: 'auditeur',
 } as const;
 
+/**
+ * Mode de gestion du délégué. "autonome" = utilise la plateforme lui-même. "central" = géré par la base centrale (délégué illettré ou sans accès numérique).
+
+ */
+export type UtilisateurCompteModeGestion = typeof UtilisateurCompteModeGestion[keyof typeof UtilisateurCompteModeGestion] | null;
+
+
+export const UtilisateurCompteModeGestion = {
+  autonome: 'autonome',
+  central: 'central',
+} as const;
+
 export interface UtilisateurCompte {
   id: number;
   nom: string;
@@ -1582,6 +1605,9 @@ export interface UtilisateurCompte {
   actif: boolean;
   cooperativeId?: number | null;
   createdAt: string;
+  /** Mode de gestion du délégué. "autonome" = utilise la plateforme lui-même. "central" = géré par la base centrale (délégué illettré ou sans accès numérique).
+   */
+  modeGestion?: UtilisateurCompteModeGestion;
 }
 
 export type CreateUserInputRole = typeof CreateUserInputRole[keyof typeof CreateUserInputRole];
@@ -1600,6 +1626,14 @@ export const CreateUserInputRole = {
   peseur: 'peseur',
 } as const;
 
+export type CreateUserInputModeGestion = typeof CreateUserInputModeGestion[keyof typeof CreateUserInputModeGestion] | null;
+
+
+export const CreateUserInputModeGestion = {
+  autonome: 'autonome',
+  central: 'central',
+} as const;
+
 export interface CreateUserInput {
   nom: string;
   prenoms: string;
@@ -1608,13 +1642,23 @@ export interface CreateUserInput {
   role: CreateUserInputRole;
   /** @minLength 8 */
   motDePasse: string;
+  modeGestion?: CreateUserInputModeGestion;
 }
+
+export type UpdateUserInputModeGestion = typeof UpdateUserInputModeGestion[keyof typeof UpdateUserInputModeGestion] | null;
+
+
+export const UpdateUserInputModeGestion = {
+  autonome: 'autonome',
+  central: 'central',
+} as const;
 
 export interface UpdateUserInput {
   nom?: string;
   prenoms?: string;
   email?: string;
   telephone?: string;
+  modeGestion?: UpdateUserInputModeGestion;
 }
 
 export interface ResetPasswordInput {
@@ -2351,6 +2395,10 @@ export interface Fournisseur {
   derniereLivraison?: string | null;
   actif: boolean;
   createdAt: string;
+  /** @nullable */
+  creeParDelegueId?: number | null;
+  /** @nullable */
+  creeParDelegueNom?: string | null;
 }
 
 export type FournisseurInputTypeFournisseur = typeof FournisseurInputTypeFournisseur[keyof typeof FournisseurInputTypeFournisseur];

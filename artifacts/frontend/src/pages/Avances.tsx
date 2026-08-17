@@ -279,7 +279,12 @@ export default function Avances() {
                 const badge = PLAN_BADGE[planKey] ?? PLAN_BADGE["integral"]!;
                 return (
                   <tr key={a.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{a.membreNom} {a.membrePrenoms}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-900">{a.membreNom} {a.membrePrenoms}</p>
+                      {a.agentSaisiseurId && a.agentSaisiseurNom && (
+                        <p className="text-xs text-indigo-600 mt-0.5">Saisi par <span className="font-medium">{a.agentSaisiseurNom}</span> pour le délégué</p>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right text-gray-700">{formaterFCFA(a.montantOctroyeFcfa)}</td>
                     <td className="px-4 py-3 text-right text-green-700 hidden sm:table-cell">{formaterFCFA(a.montantRembourseFcfa)}</td>
                     <td className="px-4 py-3 text-right font-semibold text-amber-700">{formaterFCFA(a.soldeRestantFcfa)}</td>

@@ -294,6 +294,8 @@ export const GetMembreHistoriqueResponse = zod.object({
   "montantPartielFcfa": zod.number().nullish(),
   "reportDate": zod.string().nullish(),
   "agentId": zod.number().nullish(),
+  "agentSaisiseurId": zod.number().nullish(),
+  "agentSaisiseurNom": zod.string().nullish(),
   "createdAt": zod.string(),
   "membreNom": zod.string().nullish(),
   "membrePrenoms": zod.string().nullish()
@@ -335,6 +337,8 @@ export const GetAvancesResponse = zod.object({
   "montantPartielFcfa": zod.number().nullish(),
   "reportDate": zod.string().nullish(),
   "agentId": zod.number().nullish(),
+  "agentSaisiseurId": zod.number().nullish(),
+  "agentSaisiseurNom": zod.string().nullish(),
   "createdAt": zod.string(),
   "membreNom": zod.string().nullish(),
   "membrePrenoms": zod.string().nullish()
@@ -377,6 +381,8 @@ export const GetAvancesEncoursResponse = zod.object({
   "montantPartielFcfa": zod.number().nullish(),
   "reportDate": zod.string().nullish(),
   "agentId": zod.number().nullish(),
+  "agentSaisiseurId": zod.number().nullish(),
+  "agentSaisiseurNom": zod.string().nullish(),
   "createdAt": zod.string(),
   "membreNom": zod.string().nullish(),
   "membrePrenoms": zod.string().nullish()
@@ -409,6 +415,8 @@ export const RembourserAvanceResponse = zod.object({
   "montantPartielFcfa": zod.number().nullish(),
   "reportDate": zod.string().nullish(),
   "agentId": zod.number().nullish(),
+  "agentSaisiseurId": zod.number().nullish(),
+  "agentSaisiseurNom": zod.string().nullish(),
   "createdAt": zod.string(),
   "membreNom": zod.string().nullish(),
   "membrePrenoms": zod.string().nullish()
@@ -541,6 +549,8 @@ export const GetDashboardAvancesRetardResponseItem = zod.object({
   "montantPartielFcfa": zod.number().nullish(),
   "reportDate": zod.string().nullish(),
   "agentId": zod.number().nullish(),
+  "agentSaisiseurId": zod.number().nullish(),
+  "agentSaisiseurNom": zod.string().nullish(),
   "createdAt": zod.string(),
   "membreNom": zod.string().nullish(),
   "membrePrenoms": zod.string().nullish()
@@ -1445,7 +1455,8 @@ export const GetUsersResponseItem = zod.object({
   "role": zod.enum(['pca', 'directeur', 'comptable', 'caissier', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "modeGestion": zod.enum(['autonome', 'central']).nullish().describe('Mode de gestion du délégué. \"autonome\" = utilise la plateforme lui-même. \"central\" = géré par la base centrale (délégué illettré ou sans accès numérique).\n')
 })
 export const GetUsersResponse = zod.array(GetUsersResponseItem)
 
@@ -1463,7 +1474,8 @@ export const CreateUserBody = zod.object({
   "email": zod.string().email().optional(),
   "telephone": zod.string().optional(),
   "role": zod.enum(['pca', 'directeur', 'comptable', 'caissier', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur', 'delegue', 'peseur']),
-  "motDePasse": zod.string().min(createUserBodyMotDePasseMin)
+  "motDePasse": zod.string().min(createUserBodyMotDePasseMin),
+  "modeGestion": zod.enum(['autonome', 'central']).nullish()
 })
 
 
@@ -1478,7 +1490,8 @@ export const UpdateUserBody = zod.object({
   "nom": zod.string().optional(),
   "prenoms": zod.string().optional(),
   "email": zod.string().email().optional(),
-  "telephone": zod.string().optional()
+  "telephone": zod.string().optional(),
+  "modeGestion": zod.enum(['autonome', 'central']).nullish()
 })
 
 export const UpdateUserResponse = zod.object({
@@ -1490,7 +1503,8 @@ export const UpdateUserResponse = zod.object({
   "role": zod.enum(['pca', 'directeur', 'comptable', 'caissier', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "modeGestion": zod.enum(['autonome', 'central']).nullish().describe('Mode de gestion du délégué. \"autonome\" = utilise la plateforme lui-même. \"central\" = géré par la base centrale (délégué illettré ou sans accès numérique).\n')
 })
 
 
@@ -1542,7 +1556,8 @@ export const ToggleUserActifResponse = zod.object({
   "role": zod.enum(['pca', 'directeur', 'comptable', 'caissier', 'magasinier', 'responsable_tracabilite', 'agent_terrain', 'auditeur']),
   "actif": zod.boolean(),
   "cooperativeId": zod.number().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "modeGestion": zod.enum(['autonome', 'central']).nullish().describe('Mode de gestion du délégué. \"autonome\" = utilise la plateforme lui-même. \"central\" = géré par la base centrale (délégué illettré ou sans accès numérique).\n')
 })
 
 
@@ -2703,7 +2718,9 @@ export const SearchFournisseursResponseItem = zod.object({
   "tonnageTotal": zod.number().optional(),
   "derniereLivraison": zod.string().nullish(),
   "actif": zod.boolean(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "creeParDelegueId": zod.number().nullish(),
+  "creeParDelegueNom": zod.string().nullish()
 })
 export const SearchFournisseursResponse = zod.array(SearchFournisseursResponseItem)
 
@@ -2751,7 +2768,9 @@ export const ListFournisseursResponseItem = zod.object({
   "tonnageTotal": zod.number().optional(),
   "derniereLivraison": zod.string().nullish(),
   "actif": zod.boolean(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "creeParDelegueId": zod.number().nullish(),
+  "creeParDelegueNom": zod.string().nullish()
 })
 export const ListFournisseursResponse = zod.array(ListFournisseursResponseItem)
 
@@ -2806,7 +2825,9 @@ export const GetFournisseurByIdResponse = zod.object({
   "tonnageTotal": zod.number().optional(),
   "derniereLivraison": zod.string().nullish(),
   "actif": zod.boolean(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "creeParDelegueId": zod.number().nullish(),
+  "creeParDelegueNom": zod.string().nullish()
 })
 
 
@@ -2856,7 +2877,9 @@ export const UpdateFournisseurResponse = zod.object({
   "tonnageTotal": zod.number().optional(),
   "derniereLivraison": zod.string().nullish(),
   "actif": zod.boolean(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "creeParDelegueId": zod.number().nullish(),
+  "creeParDelegueNom": zod.string().nullish()
 })
 
 
@@ -2896,7 +2919,9 @@ export const UpdateAgrementResponse = zod.object({
   "tonnageTotal": zod.number().optional(),
   "derniereLivraison": zod.string().nullish(),
   "actif": zod.boolean(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "creeParDelegueId": zod.number().nullish(),
+  "creeParDelegueNom": zod.string().nullish()
 })
 
 
@@ -2948,7 +2973,7 @@ export const ListPaiementsResponseItem = zod.object({
   "bonCarburantNumero": zod.string().nullish(),
   "membreId": zod.number().nullish(),
   "montantFcfa": zod.number(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes', 'wave', 'cheque']),
+  "modePaiement": zod.union([zod.literal('orange_money'),zod.literal('mtn_momo'),zod.literal('especes'),zod.literal('wave'),zod.literal('cheque'),zod.literal(null)]).nullish(),
   "referenceTransaction": zod.string().nullish(),
   "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']),
   "createdAt": zod.string(),
@@ -2967,7 +2992,9 @@ export const ListPaiementsResponseItem = zod.object({
   "avanceDeduiteFcfa": zod.number().nullish(),
   "intrantsDeduitsFcfa": zod.number().nullish(),
   "montantNetFcfa": zod.number().nullish(),
-  "agentId": zod.number().nullish()
+  "agentId": zod.number().nullish(),
+  "agentSaisiseurId": zod.number().nullish(),
+  "agentSaisiseurNom": zod.string().nullish()
 })
 export const ListPaiementsResponse = zod.array(ListPaiementsResponseItem)
 
@@ -2993,7 +3020,7 @@ export const ValiderPaiementResponse = zod.object({
   "bonCarburantNumero": zod.string().nullish(),
   "membreId": zod.number().nullish(),
   "montantFcfa": zod.number(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes', 'wave', 'cheque']),
+  "modePaiement": zod.union([zod.literal('orange_money'),zod.literal('mtn_momo'),zod.literal('especes'),zod.literal('wave'),zod.literal('cheque'),zod.literal(null)]).nullish(),
   "referenceTransaction": zod.string().nullish(),
   "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']),
   "createdAt": zod.string(),
@@ -3012,7 +3039,9 @@ export const ValiderPaiementResponse = zod.object({
   "avanceDeduiteFcfa": zod.number().nullish(),
   "intrantsDeduitsFcfa": zod.number().nullish(),
   "montantNetFcfa": zod.number().nullish(),
-  "agentId": zod.number().nullish()
+  "agentId": zod.number().nullish(),
+  "agentSaisiseurId": zod.number().nullish(),
+  "agentSaisiseurNom": zod.string().nullish()
 })
 
 
@@ -3037,7 +3066,7 @@ export const RejeterPaiementResponse = zod.object({
   "bonCarburantNumero": zod.string().nullish(),
   "membreId": zod.number().nullish(),
   "montantFcfa": zod.number(),
-  "modePaiement": zod.enum(['orange_money', 'mtn_momo', 'especes', 'wave', 'cheque']),
+  "modePaiement": zod.union([zod.literal('orange_money'),zod.literal('mtn_momo'),zod.literal('especes'),zod.literal('wave'),zod.literal('cheque'),zod.literal(null)]).nullish(),
   "referenceTransaction": zod.string().nullish(),
   "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']),
   "createdAt": zod.string(),
@@ -3056,7 +3085,9 @@ export const RejeterPaiementResponse = zod.object({
   "avanceDeduiteFcfa": zod.number().nullish(),
   "intrantsDeduitsFcfa": zod.number().nullish(),
   "montantNetFcfa": zod.number().nullish(),
-  "agentId": zod.number().nullish()
+  "agentId": zod.number().nullish(),
+  "agentSaisiseurId": zod.number().nullish(),
+  "agentSaisiseurNom": zod.string().nullish()
 })
 
 

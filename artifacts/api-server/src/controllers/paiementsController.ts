@@ -244,6 +244,8 @@ async function debiterCaisseCentralePaiement(
 const agentAlias = usersTable;
 // Alias SQL pour joindre la table users sur livraisons.agent_id (séparation délégué / base centrale)
 const agentUserAlias = alias(usersTable, "agent_user");
+// Alias SQL pour joindre la table users sur paiements.agent_saisiseur_id (mode proxy gérant)
+const saisiseurUserAlias = alias(usersTable, "saisiseur_user");
 
 const SELECT_FIELDS = {
   id: paiementsTable.id,
@@ -275,6 +277,9 @@ const SELECT_FIELDS = {
   intrantsDeduitsFcfa: livraisonsTable.intrantsDeduitsFcfa,
   montantNetFcfa: livraisonsTable.montantNetFcfa,
   agentId: livraisonsTable.agentId,
+  // Attribution proxy gérant
+  agentSaisiseurId: paiementsTable.agentSaisiseurId,
+  agentSaisiseurNom: saisiseurUserAlias.nom,
 };
 
 async function fetchEnrichedPaiement(id: number) {
@@ -285,6 +290,7 @@ async function fetchEnrichedPaiement(id: number) {
     .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
     .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
     .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+    .leftJoin(saisiseurUserAlias, eq(paiementsTable.agentSaisiseurId, saisiseurUserAlias.id))
     .where(eq(paiementsTable.id, id))
     .limit(1);
   return row ?? null;
@@ -348,6 +354,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
       .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+      .leftJoin(saisiseurUserAlias, eq(paiementsTable.agentSaisiseurId, saisiseurUserAlias.id))
       .where(and(...conditions))
       .orderBy(desc(paiementsTable.createdAt))
       .limit(limit);

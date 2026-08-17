@@ -7251,6 +7251,10 @@ components:
           type: ["string", "null"]
         agentId:
           type: ["integer", "null"]
+        agentSaisiseurId:
+          type: ["integer", "null"]
+        agentSaisiseurNom:
+          type: ["string", "null"]
         createdAt:
           type: string
         membreNom:
@@ -7428,6 +7432,10 @@ components:
           type: ["integer", "null"]
         agentId:
           type: ["integer", "null"]
+        agentSaisiseurId:
+          type: ["integer", "null"]
+        agentSaisiseurNom:
+          type: ["string", "null"]
 
     PaiementsStats:
       type: object
