@@ -5,6 +5,7 @@ import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNav from "../components/BottomNav";
 import { useOffline } from "../contexts/OfflineContext";
+import { useProxy } from "../contexts/ProxyContext";
 import { getFournisseurRecap, enregistrerPaiement, getCaisse } from "../lib/api";
 import type { Fournisseur, FournisseurRecap, CaisseDelegue } from "../lib/types";
 
@@ -14,6 +15,7 @@ type ModePaiement = "especes" | "orange_money" | "mtn_momo";
 export default function PaiementFlow() {
   const [, setLocation] = useLocation();
   const { isOnline } = useOffline();
+  const { proxy } = useProxy();
   const [step, setStep] = useState<Step>(1);
   const [fournisseur, setFournisseur] = useState<Fournisseur | null>(null);
   const [recap, setRecap] = useState<FournisseurRecap | null>(null);
@@ -60,6 +62,7 @@ export default function PaiementFlow() {
           livraisonId: parseInt(livraisonId) || 0,
           modePaiement,
           localId,
+          ...(proxy ? { targetDelegueId: proxy.id } : {}),
         },
         isOnline
       );

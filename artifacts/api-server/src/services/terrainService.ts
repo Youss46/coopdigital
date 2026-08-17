@@ -542,6 +542,7 @@ export async function enregistrerPaiement(
     montantFcfa: livraison.montantNetFcfa,
     modePaiement: data.modePaiement as "orange_money" | "mtn_momo" | "especes",
     statut: "confirme",
+    initialisePar: agentId,
   }).returning();
 
   return {
@@ -574,6 +575,7 @@ export async function octroierAvance(
     motif: data.motif,
     statut: "en_cours",
     dateOctroi: new Date().toISOString().slice(0, 10),
+    agentId,
   }).returning();
 
   return { avanceId: avance?.id ?? 0 };
@@ -728,14 +730,26 @@ export async function syncOperations(
   const succes: string[] = [];
   const echecs: Array<{ localId: string; erreur: string }> = [];
 
+  // Cache delegues centraux for per-op proxy resolution (lazy, once if needed)
+  let deleguesCentrauxCache: Awaited<ReturnType<typeof getDeleguesCentraux>> | null = null;
+  async function resolveOpAgent(data: Record<string, unknown>): Promise<number> {
+    const targetId = typeof data.targetDelegueId === "number" ? data.targetDelegueId : undefined;
+    if (!targetId) return agentId;
+    if (!deleguesCentrauxCache) deleguesCentrauxCache = await getDeleguesCentraux(cooperativeId);
+    const cible = deleguesCentrauxCache.find((d) => d.id === targetId);
+    return cible ? cible.id : agentId; // fall back silently if target no longer valid
+  }
+
   for (const op of sorted) {
     try {
       if (op.type === "collecte") {
         await enregistrerCollecte(agentId, cooperativeId, { ...(op.data as Parameters<typeof enregistrerCollecte>[2]), peseurId });
       } else if (op.type === "paiement") {
-        await enregistrerPaiement(agentId, cooperativeId, op.data as Parameters<typeof enregistrerPaiement>[2]);
+        const effectiveId = await resolveOpAgent(op.data);
+        await enregistrerPaiement(effectiveId, cooperativeId, op.data as Parameters<typeof enregistrerPaiement>[2]);
       } else if (op.type === "avance") {
-        await octroierAvance(agentId, cooperativeId, op.data as Parameters<typeof octroierAvance>[2]);
+        const effectiveId = await resolveOpAgent(op.data);
+        await octroierAvance(effectiveId, cooperativeId, op.data as Parameters<typeof octroierAvance>[2]);
       } else if (op.type === "gps_collecte") {
         const { collecterParcelleAgent } = await import("./missionsAgentService.js");
         const d = op.data as { missionId: number; membreId: number; polygoneGps: object; photos: string[]; notes?: string; superficieCalculeeHa?: number; probleme?: { type: string; description: string } };

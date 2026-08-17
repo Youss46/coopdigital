@@ -5,6 +5,7 @@ import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNav from "../components/BottomNav";
 import { useOffline } from "../contexts/OfflineContext";
+import { useProxy } from "../contexts/ProxyContext";
 import { octroierAvance, getFournisseurRecap } from "../lib/api";
 import type { Fournisseur, FournisseurRecap } from "../lib/types";
 
@@ -21,6 +22,7 @@ const MOTIFS = [
 export default function AvanceFlow() {
   const [, setLocation] = useLocation();
   const { isOnline } = useOffline();
+  const { proxy } = useProxy();
   const [step, setStep] = useState<Step>(1);
   const [fournisseur, setFournisseur] = useState<Fournisseur | null>(null);
   const [recap, setRecap] = useState<FournisseurRecap | null>(null);
@@ -51,7 +53,13 @@ export default function AvanceFlow() {
     const localId = crypto.randomUUID();
     try {
       const res = await octroierAvance(
-        { membreId: fournisseur.id, montantFcfa: parseInt(montant), motif: motifFinal, localId },
+        {
+          membreId: fournisseur.id,
+          montantFcfa: parseInt(montant),
+          motif: motifFinal,
+          localId,
+          ...(proxy ? { targetDelegueId: proxy.id } : {}),
+        },
         isOnline
       );
       if (res) setAvanceId(res.avanceId);

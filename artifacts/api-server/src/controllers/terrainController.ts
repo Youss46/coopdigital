@@ -159,19 +159,24 @@ export async function postCollecteHandler(req: Request, res: Response): Promise<
 }
 
 export async function postPaiementHandler(req: Request, res: Response): Promise<void> {
-  const { id, cooperativeId } = getAgent(req);
+  const agent = req.agent!;
+  const { cooperativeId } = agent;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
-  const { membreId, livraisonId, modePaiement } = req.body as {
+  const { membreId, livraisonId, modePaiement, targetDelegueId } = req.body as {
     membreId?: number;
     livraisonId?: number;
     modePaiement?: string;
+    targetDelegueId?: number;
   };
   if (!membreId || !livraisonId || !modePaiement) {
     res.status(400).json({ erreur: "Données manquantes" });
     return;
   }
+  const ids = await resolveEffectiveAgent(agent, cooperativeId, targetDelegueId);
+  if (!ids) { res.status(403).json({ erreur: "Délégué cible invalide ou non géré centralement" }); return; }
+  const { effectiveAgentId } = ids;
   try {
-    const result = await terrainService.enregistrerPaiement(id, cooperativeId, { membreId, livraisonId, modePaiement });
+    const result = await terrainService.enregistrerPaiement(effectiveAgentId, cooperativeId, { membreId, livraisonId, modePaiement });
     res.status(201).json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur paiement terrain");
@@ -180,19 +185,24 @@ export async function postPaiementHandler(req: Request, res: Response): Promise<
 }
 
 export async function postAvanceHandler(req: Request, res: Response): Promise<void> {
-  const { id, cooperativeId } = getAgent(req);
+  const agent = req.agent!;
+  const { cooperativeId } = agent;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
-  const { membreId, montantFcfa, motif } = req.body as {
+  const { membreId, montantFcfa, motif, targetDelegueId } = req.body as {
     membreId?: number;
     montantFcfa?: number;
     motif?: string;
+    targetDelegueId?: number;
   };
   if (!membreId || !montantFcfa || !motif) {
     res.status(400).json({ erreur: "Données manquantes" });
     return;
   }
+  const ids = await resolveEffectiveAgent(agent, cooperativeId, targetDelegueId);
+  if (!ids) { res.status(403).json({ erreur: "Délégué cible invalide ou non géré centralement" }); return; }
+  const { effectiveAgentId } = ids;
   try {
-    const result = await terrainService.octroierAvance(id, cooperativeId, { membreId, montantFcfa, motif });
+    const result = await terrainService.octroierAvance(effectiveAgentId, cooperativeId, { membreId, montantFcfa, motif });
     res.status(201).json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur avance terrain");

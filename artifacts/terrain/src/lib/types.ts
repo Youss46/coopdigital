@@ -144,6 +144,7 @@ export interface PaiementInput {
   livraisonId: number;
   modePaiement: "orange_money" | "mtn_momo" | "especes";
   localId?: string;
+  targetDelegueId?: number;
 }
 
 export interface AvanceInput {
@@ -151,6 +152,7 @@ export interface AvanceInput {
   montantFcfa: number;
   motif: string;
   localId?: string;
+  targetDelegueId?: number;
 }
 
 export interface BilanJour {
