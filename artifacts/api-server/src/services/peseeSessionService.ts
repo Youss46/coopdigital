@@ -18,6 +18,7 @@ import { getPrixActuel } from "./terrainService.js";
 import { generateEcrituresLivraison } from "./comptabiliteService.js";
 import { getEncoursMembreTx, enregistrerRemboursementParLivraison } from "./intrantsService.js";
 import { creerNotification, notifierParRole } from "./notificationService.js";
+import { genererNumeroRecu } from "./recuService.js";
 import { logger } from "../lib/logger.js";
 
 // ─── Génération numéro de session ─────────────────────────────────────────────
@@ -706,12 +707,15 @@ export async function creerLivraisonDepuisSession(
       })
       .returning();
 
+    const numeroRecu = await genererNumeroRecu(cooperativeId);
+
     const [paiement] = await tx
       .insert(paiementsTable)
       .values({
         livraisonId: livraison!.id,
         membreId: session.membreId,
         montantFcfa: montantNet,
+        numeroRecu,
         // modePaiement intentionally null — chosen by the gestionnaire at settlement time
         statut: "en_attente",
       })
