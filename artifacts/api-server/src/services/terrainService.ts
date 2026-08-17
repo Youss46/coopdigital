@@ -743,7 +743,8 @@ export async function syncOperations(
   for (const op of sorted) {
     try {
       if (op.type === "collecte") {
-        await enregistrerCollecte(agentId, cooperativeId, { ...(op.data as Parameters<typeof enregistrerCollecte>[2]), peseurId });
+        const effectiveIdCollecte = await resolveOpAgent(op.data);
+        await enregistrerCollecte(effectiveIdCollecte, cooperativeId, { ...(op.data as Parameters<typeof enregistrerCollecte>[2]), peseurId });
       } else if (op.type === "paiement") {
         const effectiveId = await resolveOpAgent(op.data);
         await enregistrerPaiement(effectiveId, cooperativeId, op.data as Parameters<typeof enregistrerPaiement>[2]);
