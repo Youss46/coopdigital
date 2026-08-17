@@ -907,6 +907,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateRecuPaiement(paiementId: number, cooperativeId: number): Promise<Buffer> {
   const validateurAlias = alias(usersTable, "validateur");
+  const saisiseurPayAlias = alias(usersTable, "saisiseur_pay");
   const [row] = await db.select({
     id: paiementsTable.id,
     numeroRecu: paiementsTable.numeroRecu,
@@ -931,10 +932,14 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     validateurNom: validateurAlias.nom,
     validateurPrenoms: validateurAlias.prenoms,
     validateurRole: validateurAlias.role,
+    // Saisie proxy (gérant agissant pour un délégué)
+    agentSaisiseurId: paiementsTable.agentSaisiseurId,
+    agentSaisiseurNom: saisiseurPayAlias.nom,
   }).from(paiementsTable)
     .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
     .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
     .leftJoin(validateurAlias, eq(paiementsTable.validePar, validateurAlias.id))
+    .leftJoin(saisiseurPayAlias, eq(paiementsTable.agentSaisiseurId, saisiseurPayAlias.id))
     .where(eq(paiementsTable.id, paiementId));
   if (!row) throw new Error("Paiement introuvable");
 
@@ -1011,6 +1016,15 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
       .text("Validé par : ", MARGIN, y, { continued: true })
       .font("Helvetica-Bold").fillColor("black")
       .text(`${validateurFullName} (${roleLabel})`);
+  }
+
+  // — Ligne "Saisi par" si l'opération a été saisie par proxy (gérant pour délégué)
+  if (row.agentSaisiseurId && row.agentSaisiseurNom) {
+    y += 14;
+    doc.fontSize(9).font("Helvetica").fillColor(GRIS)
+      .text("Saisi par : ", MARGIN, y, { continued: true })
+      .font("Helvetica-Bold").fillColor("black")
+      .text(row.agentSaisiseurNom);
   }
 
   y = 700;
@@ -1386,6 +1400,7 @@ export async function generateBordereauPesee(livraisonId: number, cooperativeId:
 // 9. Reçu d'avance
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateRecuAvance(avanceId: number, cooperativeId: number): Promise<Buffer> {
+  const saisiseurAvcAlias = alias(usersTable, "saisiseur_avc");
   const [row] = await db.select({
     id: avancesTable.id,
     montantOctroyeFcfa: avancesTable.montantOctroyeFcfa,
@@ -1400,8 +1415,12 @@ export async function generateRecuAvance(avanceId: number, cooperativeId: number
     membreCni: membresTable.numeroCni,
     membreGroupement: membresTable.groupement,
     membreTel: membresTable.telephone,
+    // Saisie proxy (gérant agissant pour un délégué)
+    agentSaisiseurId: avancesTable.agentSaisiseurId,
+    agentSaisiseurNom: saisiseurAvcAlias.nom,
   }).from(avancesTable)
     .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+    .leftJoin(saisiseurAvcAlias, eq(avancesTable.agentSaisiseurId, saisiseurAvcAlias.id))
     .where(eq(avancesTable.id, avanceId));
   if (!row) throw new Error("Avance introuvable");
 
@@ -1453,6 +1472,15 @@ export async function generateRecuAvance(avanceId: number, cooperativeId: number
   const aStatutColor: Record<string, string> = { rembourse: "#16a34a", en_cours: "#f59e0b", en_retard: "#ef4444" };
   doc.fontSize(9).font("Helvetica-Bold").fillColor(aStatutColor[row.statut] ?? GRIS)
     .text(`Statut : ${row.statut.replace(/_/g, " ").toUpperCase()}`, MARGIN, y);
+
+  // — Ligne "Saisi par" si l'opération a été saisie par proxy (gérant pour délégué)
+  if (row.agentSaisiseurId && row.agentSaisiseurNom) {
+    y += 14;
+    doc.fontSize(9).font("Helvetica").fillColor(GRIS)
+      .text("Saisi par : ", MARGIN, y, { continued: true })
+      .font("Helvetica-Bold").fillColor("black")
+      .text(row.agentSaisiseurNom);
+  }
 
   y += 20;
   doc.fontSize(8).fillColor(GRIS).font("Helvetica-Oblique")
