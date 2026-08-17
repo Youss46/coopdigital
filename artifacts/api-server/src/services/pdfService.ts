@@ -34,6 +34,9 @@ import {
   commissionsDeleguesTable,
   certificationsTable,
   certificationsMembresTable,
+  sessionsPeseeTable,
+  lignesPeseeTable,
+  historiquePrixTable,
 } from "@workspace/db";
 import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -3880,6 +3883,284 @@ export async function generateReleveCommissions(
       lineBreak: false,
     });
   }
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bordereau d'achat — Session de pesée (transfert délégué → central)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateBordereauAchatSession(
+  sessionId: number,
+  cooperativeId: number,
+): Promise<Buffer> {
+  // 1. Session
+  const [session] = await db
+    .select({
+      id:            sessionsPeseeTable.id,
+      numeroSession: sessionsPeseeTable.numeroSession,
+      produit:       sessionsPeseeTable.produit,
+      poidsTotalKg:  sessionsPeseeTable.poidsTotalKg,
+      nbSacsTotal:   sessionsPeseeTable.nbSacsTotal,
+      dateFin:       sessionsPeseeTable.dateFin,
+      transfertId:   sessionsPeseeTable.transfertId,
+    })
+    .from(sessionsPeseeTable)
+    .where(and(
+      eq(sessionsPeseeTable.id, sessionId),
+      eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+    ))
+    .limit(1);
+  if (!session) throw new Error("Session introuvable");
+
+  // 2. Lignes de pesée
+  const lignes = await db
+    .select()
+    .from(lignesPeseeTable)
+    .where(eq(lignesPeseeTable.sessionId, sessionId))
+    .orderBy(lignesPeseeTable.numeroPassage);
+
+  // 3. Transfert + délégué
+  let immatriculation = "—";
+  let nomChauffeur    = "—";
+  let delegueNom      = "—";
+  let deleguePrenoms  = "";
+  let delegueTel      = "—";
+  let delegueZone     = "—";
+  let carburantFcfa   = 0;
+
+  if (session.transfertId) {
+    const [t] = await db
+      .select({
+        immatriculation:    transfertsStockTable.immatriculation,
+        nomChauffeur:       transfertsStockTable.nomChauffeur,
+        delegueId:          transfertsStockTable.delegueId,
+        fraisCarburantFcfa: transfertsStockTable.fraisCarburantFcfa,
+      })
+      .from(transfertsStockTable)
+      .where(eq(transfertsStockTable.id, session.transfertId))
+      .limit(1);
+
+    if (t) {
+      immatriculation = t.immatriculation ?? "—";
+      nomChauffeur    = t.nomChauffeur    ?? "—";
+      carburantFcfa   = t.fraisCarburantFcfa ?? 0;
+
+      if (t.delegueId) {
+        const [[delegue], [entrepot]] = await Promise.all([
+          db.select({ nom: usersTable.nom, prenoms: usersTable.prenoms, telephone: usersTable.telephone })
+            .from(usersTable)
+            .where(eq(usersTable.id, t.delegueId))
+            .limit(1),
+          db.select({ zoneNom: entrepotsDeleguesTable.zoneNom })
+            .from(entrepotsDeleguesTable)
+            .where(and(
+              eq(entrepotsDeleguesTable.delegueId, t.delegueId),
+              eq(entrepotsDeleguesTable.cooperativeId, cooperativeId),
+            ))
+            .limit(1),
+        ]);
+        if (delegue) {
+          delegueNom     = delegue.nom      ?? "—";
+          deleguePrenoms = delegue.prenoms  ?? "";
+          delegueTel     = delegue.telephone ?? "—";
+        }
+        if (entrepot) delegueZone = entrepot.zoneNom ?? "—";
+      }
+    }
+  }
+
+  // 4. Prix bord-champ le plus récent
+  const [dernierPrix] = await db
+    .select({ prix: historiquePrixTable.prixBordChampFcfa })
+    .from(historiquePrixTable)
+    .where(eq(historiquePrixTable.cooperativeId, cooperativeId))
+    .orderBy(desc(historiquePrixTable.datePrix))
+    .limit(1);
+  const prixUnitaire = dernierPrix ? parseFloat(dernierPrix.prix) : 0;
+
+  // 5. Commission = frais de collecte
+  let fraisCollecteFcfa = 0;
+  if (session.transfertId) {
+    const [comm] = await db
+      .select({ montantFcfa: commissionsDeleguesTable.montantFcfa })
+      .from(commissionsDeleguesTable)
+      .where(eq(commissionsDeleguesTable.transfertId, session.transfertId))
+      .orderBy(desc(commissionsDeleguesTable.id))
+      .limit(1);
+    if (comm) fraisCollecteFcfa = Math.round(parseFloat(comm.montantFcfa ?? "0"));
+  }
+
+  // 6. Campagne
+  const campagne = await getCampagneEnCours(cooperativeId);
+
+  // 7. Totaux
+  const poidsNetKg    = parseFloat(session.poidsTotalKg ?? "0");
+  const poidsBrutKg   = lignes.reduce((s, l) => s + parseFloat(l.poidsBrutKg), 0);
+  const valeurProduit = Math.round(poidsNetKg * prixUnitaire);
+  const montantNet    = valeurProduit + fraisCollecteFcfa;
+
+  // 8. PDF
+  const { doc, endPromise } = makePdfDoc();
+  await drawHeader(doc, cooperativeId, { titre_document: "BORDEREAU D'ACHAT", reference: session.numeroSession });
+
+  // Bandeau Campagne / Date
+  let y = doc.y + 4;
+  if (campagne) {
+    doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 14).fill("#f0fdf4");
+    const dateStr = session.dateFin
+      ? new Date(session.dateFin).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
+      : new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica").text("Campagne :", MARGIN + 6, y + 3, { width: 78, lineBreak: false });
+    doc.font("Helvetica-Bold").fillColor(VERT).text(campagne, MARGIN + 86, y + 3, { lineBreak: false });
+    doc.font("Helvetica").fillColor(GRIS).text("Date :", PAGE_W - MARGIN - 130, y + 3, { width: 36, lineBreak: false });
+    doc.font("Helvetica-Bold").fillColor("black").text(dateStr, PAGE_W - MARGIN - 94, y + 3, { width: 94, lineBreak: false });
+    y += 18;
+  }
+  y += 6;
+
+  // ── IDENTIFICATION (gauche) + DÉTAILS PESÉE (droite) ───────────────────────
+  const LEFT_W  = 242;
+  const RIGHT_X = MARGIN + LEFT_W + 8;
+  const RIGHT_W = PAGE_W - RIGHT_X - MARGIN;
+  const topY    = y;
+
+  doc.fontSize(8).fillColor(VERT).font("Helvetica-Bold").text("IDENTIFICATION", MARGIN, y);
+  y += 13;
+
+  const fieldRow = (label: string, value: string) => {
+    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+      .text(`${label} :`, MARGIN, y, { width: 90, lineBreak: false });
+    doc.font("Helvetica-Bold").fillColor("black")
+      .text(value, MARGIN + 92, y, { width: LEFT_W - 92, lineBreak: false });
+    y += 12;
+  };
+
+  fieldRow("Délégué",       `${deleguePrenoms} ${delegueNom}`.trim());
+  fieldRow("Téléphone",     delegueTel);
+  fieldRow("Section",       delegueZone);
+  fieldRow("N° Camion",     immatriculation);
+  fieldRow("Nom Chauffeur", nomChauffeur);
+  fieldRow("Produit",       session.produit
+    ? session.produit.charAt(0).toUpperCase() + session.produit.slice(1)
+    : "Cacao");
+
+  const leftBottom = y;
+
+  // Tableau DÉTAILS PESÉE
+  let ry = topY;
+  doc.fontSize(8).fillColor(VERT).font("Helvetica-Bold").text("DÉTAILS PESÉE", RIGHT_X, ry);
+  ry += 13;
+
+  const dCols = [24, 58, 30, RIGHT_W - 112];
+  const dHdrs = ["N°", "POIDS BRUT", "SACS", "HORODATEUR"];
+  doc.rect(RIGHT_X, ry, RIGHT_W, 14).fill(VERT);
+  let cx = RIGHT_X;
+  dHdrs.forEach((h, i) => {
+    doc.fontSize(6.5).fillColor("white").font("Helvetica-Bold")
+      .text(h, cx + 2, ry + 4, { width: dCols[i]! - 4, lineBreak: false });
+    cx += dCols[i]!;
+  });
+  ry += 14;
+
+  for (let idx = 0; idx < lignes.length; idx++) {
+    const l = lignes[idx]!;
+    if (idx % 2 === 0) doc.rect(RIGHT_X, ry, RIGHT_W, 13).fill("#f0fdf4");
+    cx = RIGHT_X;
+    [
+      String(l.numeroPassage),
+      `${parseFloat(l.poidsBrutKg).toFixed(1)} kg`,
+      String(l.nbSacs),
+      formaterDateHeure(l.createdAt),
+    ].forEach((v, i) => {
+      doc.fontSize(6.5).fillColor("black").font("Helvetica")
+        .text(v, cx + 2, ry + 3, { width: dCols[i]! - 4, lineBreak: false });
+      cx += dCols[i]!;
+    });
+    ry += 13;
+  }
+
+  y = Math.max(leftBottom, ry) + 14;
+
+  // ── Tableau de calcul ───────────────────────────────────────────────────────
+  const tW   = PAGE_W - MARGIN * 2;
+  const colW = [65, 48, 65, 68, 78, 82, tW - 65 - 48 - 65 - 68 - 78 - 82];
+
+  const HDR_H = 28;
+  doc.rect(MARGIN, y, tW, HDR_H).fill(VERT);
+  cx = MARGIN;
+  [
+    "POIDS BRUT\n(KG)", "NBRE\nSACS", "POIDS NET\n(KG)",
+    "PRIX\nUNITAIRE", "VALEUR\nPRODUIT", "AUTRES FRAIS", "MONTANT NET\nA PAYER",
+  ].forEach((h, i) => {
+    doc.fontSize(7).fillColor("white").font("Helvetica-Bold")
+      .text(h, cx + 2, y + 6, { width: colW[i]! - 4, align: "center", lineBreak: true });
+    cx += colW[i]!;
+  });
+  y += HDR_H;
+
+  const autresLignes: { label: string; valeur: number }[] = [
+    { label: "FRAIS DE\nCOLLECTE", valeur: fraisCollecteFcfa },
+    { label: "CARBURANT",          valeur: carburantFcfa },
+    { label: "RETENUE\nAVANCE",    valeur: 0 },
+    { label: "SOLDE SUR\nAVANCES", valeur: 0 },
+  ];
+  const SUB_H = 18;
+  const ROW_H = autresLignes.length * SUB_H;
+
+  doc.rect(MARGIN, y, tW, ROW_H).fill("#f9fafb");
+  doc.rect(MARGIN, y, tW, ROW_H).stroke("#d1d5db");
+
+  cx = MARGIN;
+  for (let i = 0; i < colW.length - 1; i++) {
+    cx += colW[i]!;
+    doc.moveTo(cx, y).lineTo(cx, y + ROW_H).stroke("#d1d5db");
+  }
+
+  const cellMidY = y + ROW_H / 2 - 6;
+  cx = MARGIN;
+  [
+    `${poidsBrutKg.toFixed(1)} kg`,
+    String(session.nbSacsTotal ?? lignes.reduce((s, l) => s + l.nbSacs, 0)),
+    `${poidsNetKg.toFixed(1)} kg`,
+    prixUnitaire > 0 ? `${formaterNombre(prixUnitaire)} F` : "—",
+    valeurProduit > 0 ? `${formaterNombre(valeurProduit)} F` : "—",
+    "",
+    `${formaterNombre(montantNet)} F`,
+  ].forEach((v, i) => {
+    if (v) {
+      doc.fontSize(9).fillColor("black").font("Helvetica-Bold")
+        .text(v, cx + 3, cellMidY, { width: colW[i]! - 6, align: "center", lineBreak: false });
+    }
+    cx += colW[i]!;
+  });
+
+  // Sous-lignes AUTRES FRAIS
+  const autresX = MARGIN + colW.slice(0, 5).reduce((a, b) => a + b, 0);
+  const autresW = colW[5]!;
+  let ay = y;
+  autresLignes.forEach((al, idx) => {
+    if (idx > 0) doc.moveTo(autresX, ay).lineTo(autresX + autresW, ay).stroke("#e5e7eb");
+    doc.fontSize(6.5).fillColor(GRIS).font("Helvetica-Bold")
+      .text(al.label, autresX + 2, ay + 2, { width: autresW - 4, align: "center", lineBreak: true });
+    doc.fontSize(8).fillColor(al.valeur > 0 ? VERT : "black").font("Helvetica-Bold")
+      .text(`${formaterNombre(al.valeur)} F`, autresX + 2, ay + SUB_H - 9, { width: autresW - 4, align: "center", lineBreak: false });
+    ay += SUB_H;
+  });
+
+  y += ROW_H + 18;
+
+  // ── Signatures ───────────────────────────────────────────────────────────────
+  const sigY = Math.min(y, 710);
+  const sigW = (tW - 16) / 3;
+  ["PESEUR", "LIVREUR", "MAGASINIER"].forEach((lbl, i) => {
+    const sx = MARGIN + i * (sigW + 8);
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica-Bold")
+      .text(lbl, sx, sigY, { width: sigW, align: "center", lineBreak: false });
+    doc.rect(sx, sigY + 12, sigW, 46).stroke("#d1d5db");
+  });
 
   await addFooters(doc, cooperativeId);
   doc.end();

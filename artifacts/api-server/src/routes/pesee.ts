@@ -24,6 +24,7 @@ import {
   handleAnnulerSession,
   handleConvertirSessionEnLivraison,
   handleExpirerSessionsStales,
+  handleGetBordereauSession,
 } from "../controllers/peseeController";
 
 const router = Router();
@@ -60,5 +61,6 @@ router.delete("/pesee/sessions/:id/lignes/:ligneId",  terrainAuthMiddleware, pes
 router.put("/pesee/sessions/:id/terminer",            terrainAuthMiddleware, peseurOrDelegueOnly, handleTerminerSession);
 router.put("/pesee/sessions/:id/annuler",             terrainAuthMiddleware, peseurOrDelegueOnly, handleAnnulerSession);
 router.put("/pesee/sessions/:id/livraison",           terrainAuthMiddleware, peseurOrDelegueOnly, handleConvertirSessionEnLivraison);
+router.get("/pesee/sessions/:id/bordereau",           flexAuthMiddleware, handleGetBordereauSession);
 
 export default router;

@@ -1,4 +1,5 @@
 import { type Request, type Response } from "express";
+import { generateBordereauAchatSession } from "../services/pdfService.js";
 import {
   createSession,
   getSessions,
@@ -493,5 +494,21 @@ export async function handleExpirerSessionsStales(req: Request, res: Response): 
   } catch (err) {
     req.log.error(err, "handleExpirerSessionsStales");
     res.status(500).json({ erreur: "Erreur lors de l'expiration des sessions" });
+  }
+}
+
+export async function handleGetBordereauSession(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const sessionId = Number(req.params.id);
+  if (!sessionId) { res.status(400).json({ erreur: "ID session invalide" }); return; }
+  try {
+    const buf = await generateBordereauAchatSession(sessionId, cooperativeId);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="bordereau-pesee-${sessionId}.pdf"`);
+    res.send(buf);
+  } catch (err: any) {
+    req.log.error(err, "handleGetBordereauSession");
+    res.status(500).json({ erreur: err.message ?? "Erreur génération bordereau" });
   }
 }
