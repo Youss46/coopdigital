@@ -694,6 +694,13 @@
       "when": 1788480050000,
       "tag": "0098_commission_transfert",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1788480051000,
+      "tag": "0099_transfert_charges",
+      "breakpoints": true
     }
   ]
 }

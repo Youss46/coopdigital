@@ -302,6 +302,7 @@ export async function creerTransfertHandler(req: Request, res: Response): Promis
   const {
     entrepotId, poidsKg, nombreSacs, typeVehicule, immatriculation, nomChauffeur,
     telephoneChauffeur, transporteur, datePrevue, campagneId, notes,
+    fraisCarburantFcfa, autresChargesFcfa, autresChargesLibelle,
   } = req.body as Record<string, unknown>;
   if (!entrepotId || !poidsKg) { res.status(400).json({ erreur: "entrepotId et poidsKg sont requis" }); return; }
   try {
@@ -317,6 +318,9 @@ export async function creerTransfertHandler(req: Request, res: Response): Promis
       datePrevue: datePrevue ? new Date(String(datePrevue)) : undefined,
       campagneId: campagneId ? Number(campagneId) : undefined,
       notes: notes ? String(notes) : undefined,
+      fraisCarburantFcfa: fraisCarburantFcfa ? Number(fraisCarburantFcfa) : undefined,
+      autresChargesFcfa: autresChargesFcfa ? Number(autresChargesFcfa) : undefined,
+      autresChargesLibelle: autresChargesLibelle ? String(autresChargesLibelle) : undefined,
     });
     res.status(201).json(t);
   } catch (err) {

@@ -448,6 +448,9 @@ export async function creerTransfert(
     datePrevue?: Date;
     campagneId?: number;
     notes?: string;
+    fraisCarburantFcfa?: number;
+    autresChargesFcfa?: number;
+    autresChargesLibelle?: string;
   },
 ) {
   const entrepot = await getEntrepotDuDelegue(delegueId, cooperativeId);
@@ -479,6 +482,9 @@ export async function creerTransfert(
       datePrevue: data.datePrevue ?? null,
       notes: data.notes ?? null,
       statut: "planifie",
+      fraisCarburantFcfa: data.fraisCarburantFcfa ?? null,
+      autresChargesFcfa: data.autresChargesFcfa ?? null,
+      autresChargesLibelle: data.autresChargesLibelle ?? null,
     })
     .returning();
 

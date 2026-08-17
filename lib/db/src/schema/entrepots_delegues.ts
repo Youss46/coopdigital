@@ -98,6 +98,9 @@ export const transfertsStockTable = pgTable("transferts_stock", {
   nomChauffeur:      varchar("nom_chauffeur", { length: 200 }),
   telephoneChauffeur: varchar("telephone_chauffeur", { length: 30 }),
   transporteur:      varchar("transporteur", { length: 200 }),
+  fraisCarburantFcfa: integer("frais_carburant_fcfa"),
+  autresChargesFcfa:  integer("autres_charges_fcfa"),
+  autresChargesLibelle: varchar("autres_charges_libelle", { length: 300 }),
 
   nombreSacs:        integer("nombre_sacs"),
   nombreSacsArrivee: integer("nombre_sacs_arrivee"),
