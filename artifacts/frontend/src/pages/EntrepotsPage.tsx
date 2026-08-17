@@ -173,9 +173,8 @@ export default function EntrepotsPage() {
     immatriculation: "",
     nomChauffeur: "",
     notes: "",
-    fraisCarburantFcfa: "",
-    autresChargesFcfa: "",
-    autresChargesLibelle: "",
+    fraisCarburantFcfa: "", fraisCarburantPar: "cooperative",
+    autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative",
   });
 
   const { data: deleguesListe = [], isLoading: loadDelegues } = useQuery<DelegueListe[]>({
@@ -433,7 +432,7 @@ export default function EntrepotsPage() {
                       <button
                         onClick={() => {
                           setShowTransfert(e);
-                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "", fraisCarburantFcfa: "", autresChargesFcfa: "", autresChargesLibelle: "" });
+                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative" });
                         }}
                         className="mt-3 w-full flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors">
                         <Truck className="w-3.5 h-3.5" />
@@ -803,7 +802,8 @@ export default function EntrepotsPage() {
               {/* Charges de transport */}
               <div className="border-t border-gray-100 pt-3">
                 <p className="text-sm font-semibold text-gray-700 mb-2">Charges de transport</p>
-                <div className="grid grid-cols-2 gap-3">
+                {/* Carburant */}
+                <div className="grid grid-cols-2 gap-3 mb-2">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Carburant (FCFA)</label>
                     <input type="number" min="0" step="1" placeholder="0"
@@ -811,6 +811,20 @@ export default function EntrepotsPage() {
                       onChange={(e) => setFormTransfert(f => ({ ...f, fraisCarburantFcfa: e.target.value }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
                   </div>
+                  {formTransfert.fraisCarburantFcfa && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pris en charge par</label>
+                      <select value={formTransfert.fraisCarburantPar}
+                        onChange={(e) => setFormTransfert(f => ({ ...f, fraisCarburantPar: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                        <option value="cooperative">Coopérative (déduit commission)</option>
+                        <option value="delegue">Délégué (à sa charge)</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+                {/* Autres charges */}
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Autres charges (FCFA)</label>
                     <input type="number" min="0" step="1" placeholder="0"
@@ -818,6 +832,17 @@ export default function EntrepotsPage() {
                       onChange={(e) => setFormTransfert(f => ({ ...f, autresChargesFcfa: e.target.value }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
                   </div>
+                  {formTransfert.autresChargesFcfa && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pris en charge par</label>
+                      <select value={formTransfert.autresChargesPar}
+                        onChange={(e) => setFormTransfert(f => ({ ...f, autresChargesPar: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                        <option value="cooperative">Coopérative (déduit commission)</option>
+                        <option value="delegue">Délégué (à sa charge)</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
                 {formTransfert.autresChargesFcfa && (
                   <div className="mt-2">
@@ -867,8 +892,10 @@ export default function EntrepotsPage() {
                     nomChauffeur: formTransfert.nomChauffeur || undefined,
                     notes: formTransfert.notes || undefined,
                     fraisCarburantFcfa: formTransfert.fraisCarburantFcfa ? parseInt(formTransfert.fraisCarburantFcfa) : undefined,
+                    fraisCarburantPar: formTransfert.fraisCarburantFcfa ? formTransfert.fraisCarburantPar : undefined,
                     autresChargesFcfa: formTransfert.autresChargesFcfa ? parseInt(formTransfert.autresChargesFcfa) : undefined,
                     autresChargesLibelle: formTransfert.autresChargesLibelle || undefined,
+                    autresChargesPar: formTransfert.autresChargesFcfa ? formTransfert.autresChargesPar : undefined,
                   },
                 })}
                 className="flex-1 bg-green-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2">

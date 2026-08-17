@@ -78,7 +78,8 @@ export default function MonEntrepotPage() {
   const [form, setForm] = useState({
     poidsKg: "", nombreSacs: "", typeVehicule: "propre", immatriculation: "",
     nomChauffeur: "", telephoneChauffeur: "", datePrevue: "", notes: "",
-    fraisCarburantFcfa: "", autresChargesFcfa: "", autresChargesLibelle: "",
+    fraisCarburantFcfa: "", fraisCarburantPar: "cooperative",
+    autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative",
   });
   const [formDepart, setFormDepart] = useState({ poidsDepart_kg: "", immatriculation: "", nomChauffeur: "" });
 
@@ -107,7 +108,7 @@ export default function MonEntrepotPage() {
       qc.invalidateQueries({ queryKey: ["mes-transferts"] });
       qc.invalidateQueries({ queryKey: ["mon-entrepot"] });
       setShowTransfert(false);
-      setForm({ poidsKg: "", nombreSacs: "", typeVehicule: "propre", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", datePrevue: "", notes: "", fraisCarburantFcfa: "", autresChargesFcfa: "", autresChargesLibelle: "" });
+      setForm({ poidsKg: "", nombreSacs: "", typeVehicule: "propre", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", datePrevue: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative" });
       toast({ title: "Transfert soumis avec succès", description: "La direction a été notifiée." });
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -438,7 +439,8 @@ export default function MonEntrepotPage() {
               {/* Charges de transport */}
               <div className="border-t border-gray-100 pt-3">
                 <p className="text-sm font-semibold text-gray-700 mb-2">Charges de transport</p>
-                <div className="grid grid-cols-2 gap-3">
+                {/* Carburant */}
+                <div className="grid grid-cols-2 gap-3 mb-2">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Carburant (FCFA)</label>
                     <input type="number" min="0" step="1" placeholder="0"
@@ -446,6 +448,20 @@ export default function MonEntrepotPage() {
                       onChange={(e) => setForm(f => ({ ...f, fraisCarburantFcfa: e.target.value }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
                   </div>
+                  {form.fraisCarburantFcfa && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pris en charge par</label>
+                      <select value={form.fraisCarburantPar}
+                        onChange={(e) => setForm(f => ({ ...f, fraisCarburantPar: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500">
+                        <option value="cooperative">Coopérative (déduit commission)</option>
+                        <option value="delegue">Délégué (à sa charge)</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+                {/* Autres charges */}
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Autres charges (FCFA)</label>
                     <input type="number" min="0" step="1" placeholder="0"
@@ -453,6 +469,17 @@ export default function MonEntrepotPage() {
                       onChange={(e) => setForm(f => ({ ...f, autresChargesFcfa: e.target.value }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
                   </div>
+                  {form.autresChargesFcfa && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pris en charge par</label>
+                      <select value={form.autresChargesPar}
+                        onChange={(e) => setForm(f => ({ ...f, autresChargesPar: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500">
+                        <option value="cooperative">Coopérative (déduit commission)</option>
+                        <option value="delegue">Délégué (à sa charge)</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
                 {form.autresChargesFcfa && (
                   <div className="mt-2">
@@ -490,8 +517,10 @@ export default function MonEntrepotPage() {
                   datePrevue: form.datePrevue || undefined,
                   notes: form.notes || undefined,
                   fraisCarburantFcfa: form.fraisCarburantFcfa ? parseInt(form.fraisCarburantFcfa) : undefined,
+                  fraisCarburantPar: form.fraisCarburantFcfa ? form.fraisCarburantPar : undefined,
                   autresChargesFcfa: form.autresChargesFcfa ? parseInt(form.autresChargesFcfa) : undefined,
                   autresChargesLibelle: form.autresChargesLibelle || undefined,
+                  autresChargesPar: form.autresChargesFcfa ? form.autresChargesPar : undefined,
                 })}
                 className="flex-1 bg-green-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50">
                 {mutTransfert.isPending ? "Envoi…" : "Soumettre le transfert"}

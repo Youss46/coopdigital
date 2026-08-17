@@ -708,6 +708,13 @@
       "when": 1788480052000,
       "tag": "0100_commission_charges_deduction",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1788480053000,
+      "tag": "0101_transfert_charges_par",
+      "breakpoints": true
     }
   ]
 }

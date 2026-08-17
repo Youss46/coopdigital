@@ -449,8 +449,10 @@ export async function creerTransfert(
     campagneId?: number;
     notes?: string;
     fraisCarburantFcfa?: number;
+    fraisCarburantPar?: string;
     autresChargesFcfa?: number;
     autresChargesLibelle?: string;
+    autresChargesPar?: string;
   },
 ) {
   const entrepot = await getEntrepotDuDelegue(delegueId, cooperativeId);
@@ -483,8 +485,10 @@ export async function creerTransfert(
       notes: data.notes ?? null,
       statut: "planifie",
       fraisCarburantFcfa: data.fraisCarburantFcfa ?? null,
+      fraisCarburantPar: data.fraisCarburantPar ?? null,
       autresChargesFcfa: data.autresChargesFcfa ?? null,
       autresChargesLibelle: data.autresChargesLibelle ?? null,
+      autresChargesPar: data.autresChargesPar ?? null,
     })
     .returning();
 
@@ -886,8 +890,10 @@ export async function creerTransfertAdmin(
     campagneId?: number;
     notes?: string;
     fraisCarburantFcfa?: number;
+    fraisCarburantPar?: string;
     autresChargesFcfa?: number;
     autresChargesLibelle?: string;
+    autresChargesPar?: string;
   },
 ) {
   const [entrepot] = await db
@@ -930,8 +936,10 @@ export async function creerTransfertAdmin(
       notes: data.notes ?? null,
       statut: "planifie",
       fraisCarburantFcfa: data.fraisCarburantFcfa ?? null,
+      fraisCarburantPar: data.fraisCarburantPar ?? null,
       autresChargesFcfa: data.autresChargesFcfa ?? null,
       autresChargesLibelle: data.autresChargesLibelle ?? null,
+      autresChargesPar: data.autresChargesPar ?? null,
     })
     .returning();
 

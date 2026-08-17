@@ -186,7 +186,7 @@ export async function creerTransfertAdminHandler(req: Request, res: Response): P
   const id = Number(req.params["id"]);
   if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
   const { poidsKg, typeVehicule, immatriculation, nomChauffeur, telephoneChauffeur, transporteur, notes,
-    fraisCarburantFcfa, autresChargesFcfa, autresChargesLibelle } =
+    fraisCarburantFcfa, fraisCarburantPar, autresChargesFcfa, autresChargesLibelle, autresChargesPar } =
     req.body as Record<string, unknown>;
   if (!poidsKg || Number(poidsKg) <= 0) {
     res.status(400).json({ erreur: "poidsKg est requis et doit être positif" });
@@ -202,8 +202,10 @@ export async function creerTransfertAdminHandler(req: Request, res: Response): P
       transporteur: transporteur ? String(transporteur) : undefined,
       notes: notes ? String(notes) : undefined,
       fraisCarburantFcfa: fraisCarburantFcfa ? Number(fraisCarburantFcfa) : undefined,
+      fraisCarburantPar: fraisCarburantPar ? String(fraisCarburantPar) : undefined,
       autresChargesFcfa: autresChargesFcfa ? Number(autresChargesFcfa) : undefined,
       autresChargesLibelle: autresChargesLibelle ? String(autresChargesLibelle) : undefined,
+      autresChargesPar: autresChargesPar ? String(autresChargesPar) : undefined,
     });
     res.status(201).json(t);
   } catch (err) {
@@ -306,7 +308,7 @@ export async function creerTransfertHandler(req: Request, res: Response): Promis
   const {
     entrepotId, poidsKg, nombreSacs, typeVehicule, immatriculation, nomChauffeur,
     telephoneChauffeur, transporteur, datePrevue, campagneId, notes,
-    fraisCarburantFcfa, autresChargesFcfa, autresChargesLibelle,
+    fraisCarburantFcfa, fraisCarburantPar, autresChargesFcfa, autresChargesLibelle, autresChargesPar,
   } = req.body as Record<string, unknown>;
   if (!entrepotId || !poidsKg) { res.status(400).json({ erreur: "entrepotId et poidsKg sont requis" }); return; }
   try {
@@ -323,8 +325,10 @@ export async function creerTransfertHandler(req: Request, res: Response): Promis
       campagneId: campagneId ? Number(campagneId) : undefined,
       notes: notes ? String(notes) : undefined,
       fraisCarburantFcfa: fraisCarburantFcfa ? Number(fraisCarburantFcfa) : undefined,
+      fraisCarburantPar: fraisCarburantPar ? String(fraisCarburantPar) : undefined,
       autresChargesFcfa: autresChargesFcfa ? Number(autresChargesFcfa) : undefined,
       autresChargesLibelle: autresChargesLibelle ? String(autresChargesLibelle) : undefined,
+      autresChargesPar: autresChargesPar ? String(autresChargesPar) : undefined,
     });
     res.status(201).json(t);
   } catch (err) {

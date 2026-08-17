@@ -137,18 +137,25 @@ export async function creerCommissionTransfert(
     const montantBrut = Math.round(poidsKg * taux.tauxFcfaParKg * 100) / 100;
     if (montantBrut <= 0) return null;
 
-    // Récupérer les charges de transport du transfert pour les déduire
+    // Récupérer les charges de transport du transfert.
+    // Seules les charges "cooperative" sont déduites de la commission —
+    // les charges "delegue" sont à sa charge personnelle, sans impact sur la commission.
     const [transfert] = await db
       .select({
         fraisCarburantFcfa: transfertsStockTable.fraisCarburantFcfa,
-        autresChargesFcfa: transfertsStockTable.autresChargesFcfa,
+        fraisCarburantPar:  transfertsStockTable.fraisCarburantPar,
+        autresChargesFcfa:  transfertsStockTable.autresChargesFcfa,
+        autresChargesPar:   transfertsStockTable.autresChargesPar,
       })
       .from(transfertsStockTable)
       .where(eq(transfertsStockTable.id, transfertId))
       .limit(1);
 
-    const chargesDéduites =
-      (transfert?.fraisCarburantFcfa ?? 0) + (transfert?.autresChargesFcfa ?? 0);
+    const carburantDeductible =
+      transfert?.fraisCarburantPar === "cooperative" ? (transfert.fraisCarburantFcfa ?? 0) : 0;
+    const autresDeductible =
+      transfert?.autresChargesPar === "cooperative" ? (transfert.autresChargesFcfa ?? 0) : 0;
+    const chargesDéduites = carburantDeductible + autresDeductible;
 
     const montantNet = Math.max(0, montantBrut - chargesDéduites);
 
