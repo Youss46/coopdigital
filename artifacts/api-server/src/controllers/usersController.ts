@@ -82,6 +82,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
   const zoneType     = (rawBody["zoneType"]     ?? undefined) as string | undefined;
   const zoneNom      = (rawBody["zoneNom"]      ?? undefined) as string | undefined;
   const zoneVillages = (rawBody["zoneVillages"] ?? undefined) as string | undefined;
+  const modeGestion  = (rawBody["modeGestion"]  ?? undefined) as "autonome" | "central" | undefined;
 
   if (!canCreateUser(requesterRole, role)) {
     res.status(403).json({ erreur: "Vous ne pouvez pas créer un compte avec ce rôle" });
@@ -120,6 +121,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
         zoneType: zoneType ?? null,
         zoneNom: zoneNom ?? null,
         zoneVillages: zoneVillages ?? null,
+        modeGestion: role === "delegue" ? (modeGestion ?? "autonome") : null,
       })
       .returning({
         id: usersTable.id,
@@ -130,6 +132,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
         role: usersTable.role,
         actif: usersTable.actif,
         cooperativeId: usersTable.cooperativeId,
+        modeGestion: usersTable.modeGestion,
         createdAt: usersTable.createdAt,
       });
 
@@ -179,6 +182,10 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
     if (parse.data.prenoms !== undefined) updateData.prenoms = parse.data.prenoms;
     if (parse.data.email !== undefined) updateData.email = parse.data.email;
     if (parse.data.telephone !== undefined) updateData.telephone = parse.data.telephone;
+    const rawUpdateBody = req.body as Record<string, unknown>;
+    if (rawUpdateBody["modeGestion"] !== undefined && existing.role === "delegue") {
+      updateData.modeGestion = (rawUpdateBody["modeGestion"] as "autonome" | "central") ?? null;
+    }
 
     const [updated] = await db
       .update(usersTable)
@@ -193,6 +200,7 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
         role: usersTable.role,
         actif: usersTable.actif,
         cooperativeId: usersTable.cooperativeId,
+        modeGestion: usersTable.modeGestion,
         createdAt: usersTable.createdAt,
       });
 

@@ -652,6 +652,13 @@
       "when": 1788046410000,
       "tag": "0092_fournisseur_cree_par_delegue",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1788480000000,
+      "tag": "0093_mode_gestion_delegue",
+      "breakpoints": true
     }
   ]
 }

@@ -136,6 +136,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
     zoneType: "" as "section" | "groupement" | "village" | "",
     zoneNom: "",
     zoneVillages: "",
+    modeGestion: "autonome" as "autonome" | "central",
   });
 
   const rolesDisponibles = getRolesCreables(requesterRole);
@@ -215,6 +216,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
           zoneType: (form.zoneType || undefined) as "section" | "groupement" | "village" | undefined,
           zoneNom: form.zoneNom || undefined,
           zoneVillages: form.zoneVillages || undefined,
+          modeGestion: form.role === "delegue" ? form.modeGestion : undefined,
         } as any,
       },
       {
@@ -401,6 +403,41 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
 
               {form.role === "delegue" && (
                 <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Mode de gestion <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-start gap-2 cursor-pointer p-3 border rounded-lg flex-1 transition-colors" style={{ borderColor: form.modeGestion === "autonome" ? "#16a34a" : "#e5e7eb", background: form.modeGestion === "autonome" ? "#f0fdf4" : "#fff" }}>
+                        <input
+                          type="radio"
+                          name="modeGestion"
+                          value="autonome"
+                          checked={form.modeGestion === "autonome"}
+                          onChange={() => setForm({ ...form, modeGestion: "autonome" })}
+                          className="accent-green-600 mt-0.5"
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-gray-800">Autonome</div>
+                          <div className="text-xs text-gray-500">Utilise la plateforme lui-même</div>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-2 cursor-pointer p-3 border rounded-lg flex-1 transition-colors" style={{ borderColor: form.modeGestion === "central" ? "#2563eb" : "#e5e7eb", background: form.modeGestion === "central" ? "#eff6ff" : "#fff" }}>
+                        <input
+                          type="radio"
+                          name="modeGestion"
+                          value="central"
+                          checked={form.modeGestion === "central"}
+                          onChange={() => setForm({ ...form, modeGestion: "central" })}
+                          className="accent-blue-600 mt-0.5"
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-gray-800">Géré centralement</div>
+                          <div className="text-xs text-gray-500">Base centrale opère en son nom</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Type de zone <span className="text-gray-400">(optionnel)</span>

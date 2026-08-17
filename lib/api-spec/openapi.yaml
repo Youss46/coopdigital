@@ -8278,6 +8278,14 @@ components:
         createdAt:
           type: string
           format: date-time
+        modeGestion:
+          type: string
+          enum: [autonome, central]
+          nullable: true
+          description: >
+            Mode de gestion du délégué.
+            "autonome" = utilise la plateforme lui-même.
+            "central" = géré par la base centrale (délégué illettré ou sans accès numérique).
 
     CreateUserInput:
       type: object
@@ -8298,6 +8306,10 @@ components:
         motDePasse:
           type: string
           minLength: 8
+        modeGestion:
+          type: string
+          enum: [autonome, central]
+          nullable: true
 
     UpdateUserInput:
       type: object
@@ -8311,6 +8323,10 @@ components:
           format: email
         telephone:
           type: string
+        modeGestion:
+          type: string
+          enum: [autonome, central]
+          nullable: true
 
     ResetPasswordInput:
       type: object

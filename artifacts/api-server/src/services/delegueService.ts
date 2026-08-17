@@ -257,6 +257,7 @@ export async function listDelegues(cooperativeId: number) {
       telephone: usersTable.telephone,
       section: usersTable.section,
       actif: usersTable.actif,
+      modeGestion: usersTable.modeGestion,
     })
     .from(usersTable)
     .where(and(
@@ -301,6 +302,7 @@ export async function listDelegues(cooperativeId: number) {
       telephone: a.telephone ?? null,
       section: a.section ?? null,
       actif: a.actif,
+      modeGestion: (a.modeGestion ?? "autonome") as "autonome" | "central",
       caisse: {
         id: caisseId,
         solde: soldeCaisse,

@@ -37,6 +37,12 @@ export const usersTable = pgTable("users", {
   photoUrl: text("photo_url"),
   delegueId:   integer("delegue_id").references((): AnyPgColumn => usersTable.id),
   chauffeurId: integer("chauffeur_id"),  // FK vers chauffeurs (transport) — défini sans .references() pour éviter la dépendance circulaire entre schémas
+  /**
+   * Mode de gestion du délégué :
+   *  - "autonome"  → utilise la plateforme lui-même (par défaut)
+   *  - "central"   → géré par la base centrale (délégué illettré ou sans accès numérique)
+   */
+  modeGestion: text("mode_gestion").$type<"autonome" | "central">().default("autonome"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

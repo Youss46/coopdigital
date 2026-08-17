@@ -79,6 +79,7 @@ interface Delegue {
   telephone: string | null;
   section: string | null;
   actif: boolean;
+  modeGestion: "autonome" | "central";
   caisse: { id: number | null; solde: number };
   paiementsDifferes: { nb: number; montantTotal: number };
   nbCollectes: number;
@@ -313,7 +314,7 @@ export default function DeleguesPage() {
                   <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 620 }}>
                     <thead>
                       <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                        {["Délégué", "Section", "Collectes", "Solde caisse", "Différés", "Actions"].map((h) => (
+                        {["Délégué", "Mode", "Section", "Collectes", "Solde caisse", "Différés", "Actions"].map((h) => (
                           <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: ".78rem", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".05em" }}>{h}</th>
                         ))}
                       </tr>
@@ -324,6 +325,12 @@ export default function DeleguesPage() {
                           <td style={{ padding: "12px 14px" }}>
                             <div style={{ fontWeight: 700, fontSize: ".9rem" }}>{d.nom} {d.prenoms}</div>
                             <div style={{ fontSize: ".78rem", color: "#9ca3af" }}>{d.telephone ?? "—"}</div>
+                          </td>
+                          <td style={{ padding: "12px 14px" }}>
+                            {d.modeGestion === "central"
+                              ? <span style={{ background: "#dbeafe", color: "#1d4ed8", borderRadius: 10, padding: "2px 8px", fontSize: ".75rem", fontWeight: 700 }}>Base centrale</span>
+                              : <span style={{ background: "#dcfce7", color: "#15803d", borderRadius: 10, padding: "2px 8px", fontSize: ".75rem", fontWeight: 700 }}>Autonome</span>
+                            }
                           </td>
                           <td style={{ padding: "12px 14px", fontSize: ".85rem", color: "#374151" }}>{d.section ?? "—"}</td>
                           <td style={{ padding: "12px 14px", fontSize: ".85rem", color: "#374151" }}>{d.nbCollectes}</td>
