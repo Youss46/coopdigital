@@ -163,6 +163,7 @@ export async function getProfilMembre(membreId: number) {
 // ─── Livraisons ───────────────────────────────────────────────────────────────
 
 const agentUserPortail = alias(usersTable, "agent_user_portail");
+const saisiseurPortail = alias(usersTable, "saisiseur_portail");
 
 export async function getLivraisonsMembre(membreId: number) {
   const rows = await db
@@ -196,8 +197,19 @@ export async function getLivraisonsMembre(membreId: number) {
 
 export async function getAvancesMembre(membreId: number) {
   const rows = await db
-    .select()
+    .select({
+      id: avancesTable.id,
+      montantOctroyeFcfa: avancesTable.montantOctroyeFcfa,
+      montantRembourse_fcfa: avancesTable.montantRembourse_fcfa,
+      soldeRestantFcfa: avancesTable.soldeRestantFcfa,
+      dateOctroi: avancesTable.dateOctroi,
+      dateEcheance: avancesTable.dateEcheance,
+      motif: avancesTable.motif,
+      statut: avancesTable.statut,
+      agentSaisiseurNom: saisiseurPortail.nom,
+    })
     .from(avancesTable)
+    .leftJoin(saisiseurPortail, eq(avancesTable.agentSaisiseurId, saisiseurPortail.id))
     .where(eq(avancesTable.membreId, membreId))
     .orderBy(desc(avancesTable.dateOctroi));
 
@@ -210,6 +222,7 @@ export async function getAvancesMembre(membreId: number) {
     dateEcheance: a.dateEcheance,
     motif: a.motif,
     statut: a.statut,
+    agentSaisiseurNom: a.agentSaisiseurNom ?? null,
     pctRembourse: a.montantOctroyeFcfa > 0
       ? Math.round((a.montantRembourse_fcfa / a.montantOctroyeFcfa) * 100)
       : 0,

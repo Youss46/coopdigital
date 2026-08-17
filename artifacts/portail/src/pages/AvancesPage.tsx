@@ -66,6 +66,9 @@ export default function AvancesPage() {
                         <div>
                           <div className="text-base text-gray-500">Accordé le {fmtDate(a.dateOctroi)}</div>
                           {a.motif && <div className="text-sm text-gray-400 mt-0.5">{a.motif}</div>}
+                          {a.agentSaisiseurNom && (
+                            <div className="text-xs text-indigo-600 mt-1">Saisi par {a.agentSaisiseurNom}</div>
+                          )}
                         </div>
                         <StatutBadge statut={a.statut} />
                       </div>
@@ -123,6 +126,9 @@ export default function AvancesPage() {
                         <div className="text-base font-semibold text-gray-800">{fmt(a.montantOctroyeFcfa)} FCFA</div>
                         <div className="text-sm text-gray-500">{fmtDate(a.dateOctroi)}</div>
                         {a.motif && <div className="text-xs text-gray-400">{a.motif}</div>}
+                        {a.agentSaisiseurNom && (
+                          <div className="text-xs text-indigo-600 mt-1">Saisi par {a.agentSaisiseurNom}</div>
+                        )}
                       </div>
                       <StatutBadge statut={a.statut} />
                     </div>

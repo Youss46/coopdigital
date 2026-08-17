@@ -61,6 +61,7 @@ export type Avance = {
   id: number; montantOctroyeFcfa: number; montantRembourseFcfa: number;
   soldeRestantFcfa: number; dateOctroi: string; dateEcheance: string | null;
   motif: string | null; statut: string; pctRembourse: number;
+  agentSaisiseurNom: string | null;
 };
 
 export type Intrant = {
