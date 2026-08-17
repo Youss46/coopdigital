@@ -164,6 +164,8 @@ export interface BilanJour {
     type: string;
     label: string;
     montant: number;
+    /** Nom du délégué pour lequel l'opération a été saisie (mode proxy), sinon null */
+    saisiePour?: string | null;
   }>;
 }
 

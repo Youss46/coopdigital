@@ -21,6 +21,8 @@ export const avancesTable = pgTable("avances", {
   motif: text("motif"),
   statut: avanceStatutEnum("statut").notNull().default("en_cours"),
   agentId: integer("agent_id").references(() => usersTable.id),
+  /** Utilisateur réellement connecté ayant saisi l'opération (mode proxy gérant) */
+  agentSaisiseurId: integer("agent_saisiseur_id").references(() => usersTable.id),
   // Plan de déduction flexible
   planType: avancePlanTypeEnum("plan_type").notNull().default("integral"),
   montantPartielFcfa: integer("montant_partiel_fcfa"),

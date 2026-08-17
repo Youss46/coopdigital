@@ -56,6 +56,8 @@ export const paiementsTable = pgTable("paiements", {
   dateValidation: timestamp("date_validation", { withTimezone: true }),
   motifRejet: text("motif_rejet"),
   initialisePar: integer("initialise_par").references(() => usersTable.id),
+  /** Utilisateur réellement connecté ayant saisi l'opération (mode proxy gérant) */
+  agentSaisiseurId: integer("agent_saisiseur_id").references(() => usersTable.id),
 });
 
 export const insertPaiementSchema = createInsertSchema(paiementsTable).omit({

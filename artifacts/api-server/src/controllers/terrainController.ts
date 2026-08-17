@@ -176,7 +176,12 @@ export async function postPaiementHandler(req: Request, res: Response): Promise<
   if (!ids) { res.status(403).json({ erreur: "Délégué cible invalide ou non géré centralement" }); return; }
   const { effectiveAgentId } = ids;
   try {
-    const result = await terrainService.enregistrerPaiement(effectiveAgentId, cooperativeId, { membreId, livraisonId, modePaiement });
+    const result = await terrainService.enregistrerPaiement(
+      effectiveAgentId,
+      cooperativeId,
+      { membreId, livraisonId, modePaiement },
+      effectiveAgentId !== agent.id ? agent.id : undefined,
+    );
     res.status(201).json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur paiement terrain");
@@ -202,7 +207,12 @@ export async function postAvanceHandler(req: Request, res: Response): Promise<vo
   if (!ids) { res.status(403).json({ erreur: "Délégué cible invalide ou non géré centralement" }); return; }
   const { effectiveAgentId } = ids;
   try {
-    const result = await terrainService.octroierAvance(effectiveAgentId, cooperativeId, { membreId, montantFcfa, motif });
+    const result = await terrainService.octroierAvance(
+      effectiveAgentId,
+      cooperativeId,
+      { membreId, montantFcfa, motif },
+      effectiveAgentId !== agent.id ? agent.id : undefined,
+    );
     res.status(201).json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur avance terrain");
@@ -252,6 +262,7 @@ export async function postSyncHandler(req: Request, res: Response): Promise<void
       cooperativeId,
       filtered as Parameters<typeof terrainService.syncOperations>[2],
       peseurId,
+      agent.id,
     );
     res.json(result);
   } catch (err) {

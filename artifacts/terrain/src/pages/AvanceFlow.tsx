@@ -32,6 +32,7 @@ export default function AvanceFlow() {
   const [submitting, setSubmitting] = useState(false);
   const [erreur, setErreur] = useState("");
   const [avanceId, setAvanceId] = useState<number | null>(null);
+  const [saisiePour, setSaisiePour] = useState<string | null>(null);
 
   const motifFinal = motif === "Autre urgence" ? autreMotif : motif;
 
@@ -62,7 +63,13 @@ export default function AvanceFlow() {
         },
         isOnline
       );
-      if (res) setAvanceId(res.avanceId);
+      if (res) {
+        setAvanceId(res.avanceId);
+        setSaisiePour(res.saisiePour ?? null);
+      } else if (proxy) {
+        // Hors ligne : afficher le délégué cible localement
+        setSaisiePour(`${proxy.nom} ${proxy.prenoms}`);
+      }
       setStep(3);
     } catch (err) {
       setErreur((err as Error).message);
@@ -79,6 +86,7 @@ export default function AvanceFlow() {
     setMotif("");
     setAutreMotif("");
     setAvanceId(null);
+    setSaisiePour(null);
     setErreur("");
   }
 
@@ -219,6 +227,14 @@ export default function AvanceFlow() {
                 <span className="t-recap-row__label">Motif</span>
                 <span className="t-recap-row__value">{motifFinal}</span>
               </div>
+              {saisiePour && (
+                <div className="t-recap-row">
+                  <span className="t-recap-row__label">Saisie pour</span>
+                  <span className="t-recap-row__value" style={{ color: "var(--t-warning)", fontWeight: 700 }}>
+                    👤 {saisiePour}
+                  </span>
+                </div>
+              )}
               {avanceId && (
                 <div className="t-recap-row">
                   <span className="t-recap-row__label">Réf.</span>

@@ -80,7 +80,7 @@ export async function enregistrerPaiement(data: PaiementInput, online: boolean) 
     await queueOp({ type: "paiement" as PendingOpType, data, localId: data.localId ?? crypto.randomUUID() });
     return null;
   }
-  return apiPost<{ paiementId: number; ref: string }>("/paiement", data);
+  return apiPost<{ paiementId: number; ref: string; saisiePour: string | null }>("/paiement", data);
 }
 
 export async function octroierAvance(data: AvanceInput, online: boolean) {
@@ -88,7 +88,7 @@ export async function octroierAvance(data: AvanceInput, online: boolean) {
     await queueOp({ type: "avance" as PendingOpType, data, localId: data.localId ?? crypto.randomUUID() });
     return null;
   }
-  return apiPost<{ avanceId: number }>("/avance", data);
+  return apiPost<{ avanceId: number; saisiePour: string | null }>("/avance", data);
 }
 
 export async function getBilan() { return apiGet<import("./types").BilanJour>("/bilan-jour"); }

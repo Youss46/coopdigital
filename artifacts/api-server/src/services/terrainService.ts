@@ -526,7 +526,9 @@ export async function enregistrerCollecte(
 export async function enregistrerPaiement(
   agentId: number,
   cooperativeId: number,
-  data: { membreId: number; livraisonId: number; modePaiement: string }
+  data: { membreId: number; livraisonId: number; modePaiement: string },
+  /** Utilisateur réellement connecté (mode proxy) — différent de agentId si saisie pour un délégué */
+  agentSaisiseurId?: number,
 ) {
   const [livraison] = await db
     .select()
@@ -534,6 +536,8 @@ export async function enregistrerPaiement(
     .where(and(eq(livraisonsTable.id, data.livraisonId), eq(livraisonsTable.membreId, data.membreId)));
 
   if (!livraison) throw new Error("Livraison introuvable");
+
+  const proxyMode = agentSaisiseurId !== undefined && agentSaisiseurId !== agentId;
 
   const [paiement] = await db.insert(paiementsTable).values({
     livraisonId: data.livraisonId,
@@ -543,11 +547,23 @@ export async function enregistrerPaiement(
     modePaiement: data.modePaiement as "orange_money" | "mtn_momo" | "especes",
     statut: "confirme",
     initialisePar: agentId,
+    agentSaisiseurId: proxyMode ? agentSaisiseurId : null,
   }).returning();
+
+  let saisiePour: string | null = null;
+  if (proxyMode) {
+    const [delegue] = await db
+      .select({ nom: usersTable.nom, prenoms: usersTable.prenoms })
+      .from(usersTable)
+      .where(eq(usersTable.id, agentId))
+      .limit(1);
+    saisiePour = delegue ? `${delegue.nom} ${delegue.prenoms}` : null;
+  }
 
   return {
     paiementId: paiement?.id ?? 0,
     ref: `PAI-${new Date().getFullYear()}-${String(paiement?.id ?? 0).padStart(4, "0")}`,
+    saisiePour,
   };
 }
 
@@ -556,7 +572,9 @@ export async function enregistrerPaiement(
 export async function octroierAvance(
   agentId: number,
   cooperativeId: number,
-  data: { membreId: number; montantFcfa: number; motif: string }
+  data: { membreId: number; montantFcfa: number; motif: string },
+  /** Utilisateur réellement connecté (mode proxy) — différent de agentId si saisie pour un délégué */
+  agentSaisiseurId?: number,
 ) {
   const [existing] = await db
     .select()
@@ -568,6 +586,8 @@ export async function octroierAvance(
     throw new Error(`Ce membre a déjà une avance en cours de ${formatFcfa(existing.soldeRestantFcfa)}`);
   }
 
+  const proxyMode = agentSaisiseurId !== undefined && agentSaisiseurId !== agentId;
+
   const [avance] = await db.insert(avancesTable).values({
     membreId: data.membreId,
     montantOctroyeFcfa: data.montantFcfa,
@@ -576,9 +596,20 @@ export async function octroierAvance(
     statut: "en_cours",
     dateOctroi: new Date().toISOString().slice(0, 10),
     agentId,
+    agentSaisiseurId: proxyMode ? agentSaisiseurId : null,
   }).returning();
 
-  return { avanceId: avance?.id ?? 0 };
+  let saisiePour: string | null = null;
+  if (proxyMode) {
+    const [delegue] = await db
+      .select({ nom: usersTable.nom, prenoms: usersTable.prenoms })
+      .from(usersTable)
+      .where(eq(usersTable.id, agentId))
+      .limit(1);
+    saisiePour = delegue ? `${delegue.nom} ${delegue.prenoms}` : null;
+  }
+
+  return { avanceId: avance?.id ?? 0, saisiePour };
 }
 
 // ─── Bilan journée ────────────────────────────────────────────────────────
@@ -654,9 +685,13 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       membreId: paiementsTable.membreId,
       montantFcfa: paiementsTable.montantFcfa,
       createdAt: paiementsTable.createdAt,
+      agentSaisiseurId: paiementsTable.agentSaisiseurId,
+      delegueNom: usersTable.nom,
+      deleguePrenoms: usersTable.prenoms,
     })
     .from(paiementsTable)
     .innerJoin(membresTable, eq(membresTable.id, paiementsTable.membreId))
+    .leftJoin(usersTable, eq(usersTable.id, paiementsTable.initialisePar))
     .where(and(
       eq(membresTable.cooperativeId, cooperativeId),
       sql`DATE(${paiementsTable.createdAt}) = ${todayStr}::date`,
@@ -685,12 +720,16 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       type: l.fromSession !== null ? "session_collecte" : "collecte",
       label: `${l.fromSession !== null ? "Session groupée" : "Collecte"} ${(l.membreId ? nomMap.get(l.membreId) : null) ?? ""} — ${toNum(l.poidsKg)} kg`,
       montant: 0,
+      saisiePour: null as string | null,
     })),
     ...recentesPaiements.map((p) => ({
       heure: new Date(p.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
       type: "paiement",
       label: `Paiement ${(p.membreId ? nomMap.get(p.membreId) : null) ?? ""} — ${formatFcfa(p.montantFcfa)}`,
       montant: p.montantFcfa,
+      saisiePour: p.agentSaisiseurId !== null && p.delegueNom
+        ? `${p.delegueNom} ${p.deleguePrenoms ?? ""}`.trim()
+        : null,
     })),
   ].sort((a, b) => b.heure.localeCompare(a.heure)).slice(0, 8);
 
@@ -725,6 +764,8 @@ export async function syncOperations(
   }>,
   /** ID du peseur rattaché à un délégué (traçabilité) */
   peseurId?: number,
+  /** Utilisateur réellement connecté (mode proxy) — pour tracer la saisie pour un délégué */
+  saisiseurId?: number,
 ) {
   const sorted = [...operations].sort((a, b) => a.timestamp - b.timestamp);
   const succes: string[] = [];
@@ -747,10 +788,12 @@ export async function syncOperations(
         await enregistrerCollecte(effectiveIdCollecte, cooperativeId, { ...(op.data as Parameters<typeof enregistrerCollecte>[2]), peseurId });
       } else if (op.type === "paiement") {
         const effectiveId = await resolveOpAgent(op.data);
-        await enregistrerPaiement(effectiveId, cooperativeId, op.data as Parameters<typeof enregistrerPaiement>[2]);
+        const sais = saisiseurId !== undefined && effectiveId !== saisiseurId ? saisiseurId : undefined;
+        await enregistrerPaiement(effectiveId, cooperativeId, op.data as Parameters<typeof enregistrerPaiement>[2], sais);
       } else if (op.type === "avance") {
         const effectiveId = await resolveOpAgent(op.data);
-        await octroierAvance(effectiveId, cooperativeId, op.data as Parameters<typeof octroierAvance>[2]);
+        const sais = saisiseurId !== undefined && effectiveId !== saisiseurId ? saisiseurId : undefined;
+        await octroierAvance(effectiveId, cooperativeId, op.data as Parameters<typeof octroierAvance>[2], sais);
       } else if (op.type === "gps_collecte") {
         const { collecterParcelleAgent } = await import("./missionsAgentService.js");
         const d = op.data as { missionId: number; membreId: number; polygoneGps: object; photos: string[]; notes?: string; superficieCalculeeHa?: number; probleme?: { type: string; description: string } };

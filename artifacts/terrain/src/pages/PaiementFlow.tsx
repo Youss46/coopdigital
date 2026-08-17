@@ -27,6 +27,7 @@ export default function PaiementFlow() {
   const [erreur, setErreur] = useState("");
   const [success, setSuccess] = useState(false);
   const [ref, setRef] = useState("");
+  const [saisiePour, setSaisiePour] = useState<string | null>(null);
 
   useEffect(() => {
     if (step === 2 && isOnline) {
@@ -66,7 +67,13 @@ export default function PaiementFlow() {
         },
         isOnline
       );
-      if (res) setRef(res.ref);
+      if (res) {
+        setRef(res.ref);
+        setSaisiePour(res.saisiePour ?? null);
+      } else if (proxy) {
+        // Hors ligne : afficher le délégué cible localement
+        setSaisiePour(`${proxy.nom} ${proxy.prenoms}`);
+      }
       setSuccess(true);
       setStep(3);
     } catch (err) {
@@ -86,6 +93,7 @@ export default function PaiementFlow() {
     setModePaiement("especes");
     setSuccess(false);
     setRef("");
+    setSaisiePour(null);
     setErreur("");
   }
 
@@ -249,6 +257,14 @@ export default function PaiementFlow() {
                   <span className="t-recap-row__label">Membre</span>
                   <span className="t-recap-row__value">{fournisseur?.nom} {fournisseur?.prenoms}</span>
                 </div>
+                {saisiePour && (
+                  <div className="t-recap-row">
+                    <span className="t-recap-row__label">Saisie pour</span>
+                    <span className="t-recap-row__value" style={{ color: "var(--t-warning)", fontWeight: 700 }}>
+                      👤 {saisiePour}
+                    </span>
+                  </div>
+                )}
                 <div className="t-recap-row">
                   <span className="t-recap-row__label">Mode</span>
                   <span className="t-recap-row__value">

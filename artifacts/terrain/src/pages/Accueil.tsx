@@ -249,6 +249,11 @@ export default function Accueil() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: ".9rem" }}>{op.label}</div>
                     <div className="t-text-muted">{op.heure}</div>
+                    {op.saisiePour && (
+                      <div style={{ marginTop: 4 }}>
+                        <span className="t-badge t-badge--info">👤 Saisie pour {op.saisiePour}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
