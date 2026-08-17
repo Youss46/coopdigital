@@ -57,8 +57,16 @@ export async function getFournisseursHandler(req: Request, res: Response): Promi
   const section = req.query["section"] as string | undefined;
   // Peseur : filtrer selon le périmètre de rattachement (delegueId du peseur dans le JWT)
   const peseurScopeDelegueId = agent.role === "peseur" ? (agent.delegueId ?? null) : undefined;
+  // Fournisseurs externes : scoper par délégué créateur
+  //   - délégué : ses propres externals (agent.id)
+  //   - peseur rattaché : les externals du délégué auquel il est rattaché
+  //   - agent_terrain / autre : tous les externals de la coopérative (undefined)
+  const delegueIdForExternals =
+    agent.role === "delegue" ? agent.id :
+    agent.role === "peseur" && agent.delegueId ? agent.delegueId :
+    undefined;
   try {
-    const fournisseurs = await terrainService.getFournisseurs(cooperativeId, section, search, peseurScopeDelegueId);
+    const fournisseurs = await terrainService.getFournisseurs(cooperativeId, section, search, peseurScopeDelegueId, delegueIdForExternals);
     res.json(fournisseurs);
   } catch (err) {
     req.log.error({ err }, "Erreur fournisseurs terrain");

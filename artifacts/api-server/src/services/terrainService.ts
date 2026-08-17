@@ -174,6 +174,12 @@ export async function getFournisseurs(
    *  - undefined → pas de filtre (délégué, agent_terrain)
    */
   peseurScopeDelegueId?: number | null,
+  /**
+   * ID du délégué pour filtrer les fournisseurs externes par créateur :
+   *  - number → externals créés par ce délégué uniquement
+   *  - undefined → tous les externals actifs de la coopérative
+   */
+  delegueId?: number,
 ) {
   const whereConditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
   if (peseurScopeDelegueId !== undefined) {
@@ -205,7 +211,7 @@ export async function getFournisseurs(
     );
   }
 
-  const result = await Promise.all(
+  const membresResult = await Promise.all(
     filtered.slice(0, 50).map(async (m) => {
       const [avance] = await db
         .select({ solde: avancesTable.soldeRestantFcfa })
@@ -238,13 +244,64 @@ export async function getFournisseurs(
         village: m.village ?? null,
         typeMembre: (m.typeFournisseur ?? "membre") as string,
         avanceEnCours: avance ? toNum(avance.solde) : 0,
+        avanceId: null as number | null,
         intrantsDus: toNum(intrantsDus?.total),
         derniereLivraison: lastLiv?.date ?? null,
+        nbJoursDepuisLivraison: null as number | null,
       };
     })
   );
 
-  return result;
+  // ── Fournisseurs externes créés par ce délégué ──────────────────────────
+  const extConditions = [
+    eq(fournisseursTable.cooperativeId, cooperativeId),
+    eq(fournisseursTable.typeFournisseur, "externe"),
+    eq(fournisseursTable.actif, true),
+  ];
+  if (delegueId !== undefined) {
+    extConditions.push(eq(fournisseursTable.creeParDelegueId, delegueId) as ReturnType<typeof eq>);
+  }
+
+  let externals = await db
+    .select()
+    .from(fournisseursTable)
+    .where(and(...extConditions))
+    .orderBy(fournisseursTable.nom);
+
+  if (section) {
+    externals = externals.filter((f) => f.section === section);
+  }
+  if (search) {
+    const s = search.toLowerCase();
+    externals = externals.filter(
+      (f) =>
+        f.nom.toLowerCase().includes(s) ||
+        (f.prenoms ?? "").toLowerCase().includes(s) ||
+        (f.telephone ?? "").includes(s) ||
+        (f.code ?? "").toLowerCase().includes(s),
+    );
+  }
+
+  const externalsResult = externals.slice(0, 50).map((f) => ({
+    id: f.id,
+    code: f.code ?? `EXT-${String(f.id).padStart(4, "0")}`,
+    nom: f.nom,
+    prenoms: f.prenoms ?? "",
+    telephone: f.telephone ?? "",
+    section: f.section ?? null,
+    village: null as string | null,
+    typeMembre: "externe",
+    avanceEnCours: 0,
+    avanceId: null as number | null,
+    intrantsDus: 0,
+    derniereLivraison: null as string | null,
+    nbJoursDepuisLivraison: null as number | null,
+  }));
+
+  // Membres en premier, puis externaux — les deux triés par nom
+  return [...membresResult, ...externalsResult].sort((a, b) =>
+    a.nom.localeCompare(b.nom, "fr"),
+  );
 }
 
 // ─── Recap fournisseur ────────────────────────────────────────────────────

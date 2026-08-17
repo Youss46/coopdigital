@@ -89,7 +89,7 @@ export default function FournisseurSearch({
       {!loading && filtered.length === 0 && (
         <div className="t-empty">
           <div className="t-empty__icon">🔍</div>
-          <div className="t-empty__text">Aucun membre trouvé</div>
+          <div className="t-empty__text">Aucun résultat trouvé</div>
         </div>
       )}
 
@@ -115,6 +115,11 @@ export default function FournisseurSearch({
                   {f.section && ` · ${f.section}`}
                 </div>
                 <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {f.typeMembre === "externe" && (
+                    <span className="t-badge" style={{ background: "#e0f2fe", color: "#0369a1" }}>
+                      Fournisseur externe
+                    </span>
+                  )}
                   {hasSession && (
                     <span className="t-badge t-badge--warning" style={{ fontWeight: 700 }}>
                       🟡 Session en cours — Reprendre
