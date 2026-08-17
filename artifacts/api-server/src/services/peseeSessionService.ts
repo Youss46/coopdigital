@@ -19,6 +19,7 @@ import { generateEcrituresLivraison } from "./comptabiliteService.js";
 import { getEncoursMembreTx, enregistrerRemboursementParLivraison } from "./intrantsService.js";
 import { creerNotification, notifierParRole } from "./notificationService.js";
 import { genererNumeroRecu } from "./recuService.js";
+import { creerCommissionTransfert } from "./commissionService.js";
 import { logger } from "../lib/logger.js";
 
 // ─── Génération numéro de session ─────────────────────────────────────────────
@@ -439,6 +440,17 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
 
     // Notifications HORS transaction (non-critiques pour la cohérence)
     void envoyerNotificationsReception(cooperativeId, result.transfert, result.poidsPeseKg, result.ecartKg, result.pctEcart, sessionId);
+
+    // Commission délégué sur poids net pesé — uniquement si réception confirmée (pas de litige)
+    if (result.statutFinal === "confirme" && result.transfert.delegueId) {
+      void creerCommissionTransfert(
+        detail.transfertId!,
+        result.transfert.delegueId,
+        result.transfert.campagneId ?? null,
+        result.poidsPeseKg,
+        cooperativeId,
+      );
+    }
 
     return { ...detail, statut: "terminee" as const, dateFin: result.dateFin, receptionConfirmee: true as const, statutTransfert: result.statutFinal };
   }

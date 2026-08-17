@@ -687,6 +687,13 @@
       "when": 1788480040000,
       "tag": "0097_campagne_programmee",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1788480050000,
+      "tag": "0098_commission_transfert",
+      "breakpoints": true
     }
   ]
 }

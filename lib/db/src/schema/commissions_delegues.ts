@@ -12,6 +12,7 @@ import { usersTable } from "./users";
 import { cooperativesTable } from "./cooperatives";
 import { campagnesTable } from "./campagnes";
 import { livraisonsTable } from "./livraisons";
+import { transfertsStockTable } from "./entrepots_delegues";
 import { mouvementsCaisseDelegueTable } from "./caisses_delegues";
 
 // ─── Taux de commission par coopérative / campagne / délégué ──────────────
@@ -31,12 +32,15 @@ export const tauxCommissionsDeleguesTable = pgTable("taux_commissions_delegues",
   updatedAt:       timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// ─── Commission gagnée par livraison ─────────────────────────────────────
-// Une ligne par livraison × délégué concerné (via membres.delegue_id)
+// ─── Commission gagnée par livraison ou par transfert pesé ───────────────
+// - livraisonId : commission terrain (ancien comportement — conservé pour rétrocompat)
+// - transfertId  : commission sur poids net après pesée physique au central (nouveau)
+// Une seule des deux colonnes est renseignée à la fois.
 export const commissionsDeleguesTable = pgTable("commissions_delegues", {
   id:              serial("id").primaryKey(),
   delegueId:       integer("delegue_id").notNull().references(() => usersTable.id),
-  livraisonId:     integer("livraison_id").notNull().references(() => livraisonsTable.id),
+  livraisonId:     integer("livraison_id").references(() => livraisonsTable.id), // nullable
+  transfertId:     integer("transfert_id").references(() => transfertsStockTable.id), // nouveau
   campagneId:      integer("campagne_id").references(() => campagnesTable.id),
   tauxFcfaParKg:   numeric("taux_fcfa_par_kg", { precision: 10, scale: 4 }).notNull(),
   poidsKg:         numeric("poids_kg", { precision: 10, scale: 2 }).notNull(),

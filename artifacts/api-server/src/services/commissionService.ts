@@ -23,6 +23,7 @@ import {
   chequesEmisTable,
   usersTable,
   campagnesTable,
+  transfertsStockTable,
 } from "@workspace/db";
 import { and, eq, isNull, or, desc, inArray, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
@@ -113,6 +114,44 @@ export async function creerCommissionSiTaux(
     return montant;
   } catch (err) {
     logger.error({ err, livraisonId, delegueId }, "Erreur création commission délégué");
+    return null;
+  }
+}
+
+/**
+ * Crée une commission sur le poids net confirmé après pesée physique au magasin central.
+ * Appelé après la confirmation d'un transfert (terminerSession), fire-and-forget acceptable.
+ * Aucune commission si statut = litige (poids contesté).
+ */
+export async function creerCommissionTransfert(
+  transfertId: number,
+  delegueId: number,
+  campagneId: number | null | undefined,
+  poidsKg: number,
+  cooperativeId: number
+): Promise<number | null> {
+  try {
+    const taux = await getTauxActif(cooperativeId, campagneId, delegueId);
+    if (!taux) return null;
+
+    const montant = Math.round(poidsKg * taux.tauxFcfaParKg * 100) / 100;
+    if (montant <= 0) return null;
+
+    await db.insert(commissionsDeleguesTable).values({
+      delegueId,
+      livraisonId: null,
+      transfertId,
+      campagneId: campagneId ?? undefined,
+      tauxFcfaParKg: String(taux.tauxFcfaParKg),
+      poidsKg: String(poidsKg),
+      montantFcfa: String(montant),
+      statut: "en_attente",
+    });
+
+    logger.info({ transfertId, delegueId, poidsKg, montant }, "Commission transfert créée");
+    return montant;
+  } catch (err) {
+    logger.error({ err, transfertId, delegueId }, "Erreur création commission transfert");
     return null;
   }
 }

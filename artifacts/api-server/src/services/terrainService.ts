@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { and, eq, sql, desc, or, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { creerCommissionSiTaux } from "./commissionService.js";
+// commissionService — creerCommissionSiTaux retiré : commissions calculées à la pesée centrale
 import { genererNumeroRecu, genererNumeroLivraison } from "./recuService.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -502,24 +502,9 @@ export async function enregistrerCollecte(
   // Entrée stock entrepôt délégué — poids BRUT (fire-and-forget — non bloquant)
   void entrerStockSiDelegue(agentId, cooperativeId, data.poidsBrutKg, livraison.id);
 
-  // Commission délégué — uniquement pour les membres (Option A : délégué du membre)
-  let commissionFcfa: number | null = null;
-  if (data.membreId) {
-    const [membreDelegue] = await db
-      .select({ delegueId: membresTable.delegueId })
-      .from(membresTable)
-      .where(eq(membresTable.id, data.membreId))
-      .limit(1);
-    if (membreDelegue?.delegueId) {
-      commissionFcfa = await creerCommissionSiTaux(
-        livraison.id,
-        membreDelegue.delegueId,
-        prix.campagneId ?? null,
-        poidsNet,
-        cooperativeId
-      );
-    }
-  }
+  // Commission délégué : désormais calculée sur le poids net après pesée physique
+  // au magasin central (à la confirmation du transfert). Pas de commission à la collecte.
+  const commissionFcfa: number | null = null;
 
   // Résolution saisiePour (mode proxy : gérant qui saisit pour le compte d'un délégué)
   const proxyModeCollecte = agentSaisiseurId !== undefined && agentSaisiseurId !== agentId;
