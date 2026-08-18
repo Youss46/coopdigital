@@ -83,6 +83,7 @@ interface Livraison {
   peseurPrenoms: string | null;
   /** Plan de déduction d'avance : null = aucune avance, "integral", "partiel", "reporte" */
   planAvanceType?: string | null;
+  nombreSacs?: number | null;
 }
 
 const ROLE_SAISIE_LABEL: Record<string, { label: string; color: string; bg: string }> = {
@@ -641,6 +642,13 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
       {/* Détail dépliable */}
       {ouvert && (
         <div className="px-4 pb-4 pt-1 bg-gray-50 border-t border-gray-100 space-y-1.5">
+          {(l.nombreSacs ?? 0) > 0 && (
+            <DetailLine
+              label="Nombre de sacs"
+              value={`${l.nombreSacs} sac${(l.nombreSacs ?? 0) > 1 ? "s" : ""}`}
+              icon={<Package size={11} className="text-gray-400" />}
+            />
+          )}
           <DetailLine label="Montant brut"   value={fmt(l.montantBrutFcfa)} />
           {l.planAvanceType === "reporte" && (
             <div className="flex items-center justify-between text-xs py-0.5">
