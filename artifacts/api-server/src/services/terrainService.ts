@@ -672,6 +672,7 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       nb: sql<number>`COUNT(*)`,
       tonnage: sql<string>`COALESCE(SUM(${livraisonsTable.poidsKg}), 0)`,
       valeur: sql<string>`COALESCE(SUM(${livraisonsTable.montantBrutFcfa}), 0)`,
+      sacs: sql<number>`COALESCE(SUM(${livraisonsTable.nombreSacs}), 0)::int`,
     })
     .from(livraisonsTable)
     .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
@@ -689,6 +690,7 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
     .select({
       nb:      sql<number>`COUNT(*)`,
       tonnage: sql<string>`COALESCE(SUM(${sessionsPeseeTable.poidsTotalKg}), 0)`,
+      sacs:    sql<number>`COALESCE(SUM(${sessionsPeseeTable.nbSacsTotal}), 0)::int`,
     })
     .from(sessionsPeseeTable)
     .where(and(
@@ -705,6 +707,7 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
     .select({
       nb:      sql<number>`COUNT(*)`,
       tonnage: sql<string>`COALESCE(SUM(${sessionsPeseeTable.poidsTotalKg}), 0)`,
+      sacs:    sql<number>`COALESCE(SUM(${sessionsPeseeTable.nbSacsTotal}), 0)::int`,
     })
     .from(sessionsPeseeTable)
     .where(and(
@@ -862,9 +865,10 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
 
   return {
     collectes: {
-      nb:      Number(collectesStats?.nb ?? 0) + Number(transfertReceptionStats?.nb ?? 0) + Number(fournisseurSessionStats?.nb ?? 0),
-      tonnage: toNum(collectesStats?.tonnage)  + toNum(transfertReceptionStats?.tonnage)  + toNum(fournisseurSessionStats?.tonnage),
-      valeur:  toNum(collectesStats?.valeur),
+      nb:         Number(collectesStats?.nb ?? 0) + Number(transfertReceptionStats?.nb ?? 0) + Number(fournisseurSessionStats?.nb ?? 0),
+      tonnage:    toNum(collectesStats?.tonnage)  + toNum(transfertReceptionStats?.tonnage)  + toNum(fournisseurSessionStats?.tonnage),
+      valeur:     toNum(collectesStats?.valeur),
+      nombreSacs: Number(collectesStats?.sacs ?? 0) + Number(transfertReceptionStats?.sacs ?? 0) + Number(fournisseurSessionStats?.sacs ?? 0),
     },
     paiements: {
       nb: Number(paiementsStats?.nb ?? 0),

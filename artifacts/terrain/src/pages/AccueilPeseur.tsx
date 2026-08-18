@@ -104,7 +104,7 @@ export default function AccueilPeseur() {
             }}>
               Aujourd'hui
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {/* Collectes */}
               <div className="t-kpi">
                 <div className="t-kpi__icon" style={{ background: "rgba(26,71,49,.1)" }}>
@@ -125,6 +125,17 @@ export default function AccueilPeseur() {
                   {fmtPoids(bilan.collectes.tonnage)}
                 </div>
                 <div className="t-kpi__label">Tonnage</div>
+              </div>
+
+              {/* Nombre de sacs */}
+              <div className="t-kpi">
+                <div className="t-kpi__icon" style={{ background: "rgba(124,58,237,.1)" }}>
+                  <Layers size={18} color="#7c3aed" />
+                </div>
+                <div className="t-kpi__value" style={{ color: "#7c3aed" }}>
+                  {bilan.collectes.nombreSacs > 0 ? bilan.collectes.nombreSacs : "—"}
+                </div>
+                <div className="t-kpi__label">Sac{bilan.collectes.nombreSacs !== 1 ? "s" : ""}</div>
               </div>
 
               {/* FCFA */}

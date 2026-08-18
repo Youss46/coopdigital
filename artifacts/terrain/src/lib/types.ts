@@ -161,7 +161,7 @@ export interface AvanceInput {
 }
 
 export interface BilanJour {
-  collectes: { nb: number; tonnage: number; valeur: number };
+  collectes: { nb: number; tonnage: number; valeur: number; nombreSacs: number };
   paiements: { nb: number; total: number };
   avances: { nb: number; total: number };
   dernieresOps: Array<{
