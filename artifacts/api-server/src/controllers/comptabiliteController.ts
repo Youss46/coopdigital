@@ -129,6 +129,7 @@ export async function getJournalComptable(req: Request, res: Response): Promise<
     const source = req.query["source"] as string | undefined;
     const dateDebut = req.query["date_debut"] as string | undefined;
     const dateFin = req.query["date_fin"] as string | undefined;
+    const typeEcriture = req.query["type_ecriture"] as string | undefined;
 
     const conditions = [
       eq(ecrituresComptablesTable.cooperativeId, coopId(req)),
@@ -137,6 +138,7 @@ export async function getJournalComptable(req: Request, res: Response): Promise<
     if (source) conditions.push(eq(ecrituresComptablesTable.source, source as "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock"));
     if (dateDebut) conditions.push(gte(ecrituresComptablesTable.dateEcriture, dateDebut));
     if (dateFin) conditions.push(lte(ecrituresComptablesTable.dateEcriture, dateFin));
+    if (typeEcriture) conditions.push(eq(ecrituresComptablesTable.typeEcriture, typeEcriture));
 
     const where = and(...conditions);
 

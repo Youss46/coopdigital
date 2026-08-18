@@ -629,22 +629,42 @@ function OngletEnAttente() {
 function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
   const [page, setPage] = useState(1);
   const [filtreSource, setFiltreSource] = useState(defaultSource);
+  const [filtreType, setFiltreType] = useState("");
   const [filtreDebut, setFiltreDebut] = useState("");
   const [filtreFin, setFiltreFin] = useState("");
   const [exporting, setExporting] = useState(false);
   const LIMIT = 50;
   const annee = new Date().getFullYear();
 
+  const TYPE_LABELS: Record<string, string> = {
+    normale:                 "Normale",
+    regularisation:          "Régularisation",
+    extourne_regularisation: "Extourne régul.",
+    cloture:                 "Clôture",
+    a_nouveau:               "À-nouveau",
+    affectation:             "Affectation",
+  };
+
+  const TYPE_BADGE_STYLE: Record<string, { bg: string; color: string }> = {
+    normale:                 { bg: "#f3f4f6", color: "#6b7280" },
+    regularisation:          { bg: "#f3e8ff", color: "#7e22ce" },
+    extourne_regularisation: { bg: "#ede9fe", color: "#5b21b6" },
+    cloture:                 { bg: "#fee2e2", color: "#991b1b" },
+    a_nouveau:               { bg: "#dbeafe", color: "#1e40af" },
+    affectation:             { bg: "#d1fae5", color: "#065f46" },
+  };
+
   const buildParams = () => {
     const p: Record<string, string> = { exercice: String(annee), page: String(page), limit: String(LIMIT) };
     if (filtreSource) p["source"] = filtreSource;
+    if (filtreType) p["type_ecriture"] = filtreType;
     if (filtreDebut) p["date_debut"] = filtreDebut;
     if (filtreFin) p["date_fin"] = filtreFin;
     return p;
   };
 
-  const { data, isLoading } = useQuery<{ ecritures: Array<{ id: number; dateEcriture: string; numeroPiece?: string | null; libelle: string; compteDebit: string; compteCredit: string; montantFcfa: number; source: string; }>; total: number; page: number; limit: number }>({
-    queryKey: ["journal-comptable", annee, page, filtreSource, filtreDebut, filtreFin],
+  const { data, isLoading } = useQuery<{ ecritures: Array<{ id: number; dateEcriture: string; numeroPiece?: string | null; libelle: string; compteDebit: string; compteCredit: string; montantFcfa: number; source: string; typeEcriture: string; }>; total: number; page: number; limit: number }>({
+    queryKey: ["journal-comptable", annee, page, filtreSource, filtreType, filtreDebut, filtreFin],
     queryFn: () => apiFetch(`/api/comptabilite/journal?${new URLSearchParams(buildParams()).toString()}`),
   });
 
@@ -653,17 +673,19 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
   const handleSourceChange = (v: string) => { setFiltreSource(v); setPage(1); };
+  const handleTypeChange   = (v: string) => { setFiltreType(v);   setPage(1); };
   const handleDebutChange = (v: string) => { setFiltreDebut(v); setPage(1); };
   const handleFinChange   = (v: string) => { setFiltreFin(v);   setPage(1); };
-  const hasFilters = !!(filtreSource || filtreDebut || filtreFin);
+  const hasFilters = !!(filtreSource || filtreType || filtreDebut || filtreFin);
 
-  const resetFiltres = () => { setFiltreSource(""); setFiltreDebut(""); setFiltreFin(""); setPage(1); };
+  const resetFiltres = () => { setFiltreSource(""); setFiltreType(""); setFiltreDebut(""); setFiltreFin(""); setPage(1); };
 
   const handleExport = async () => {
     setExporting(true);
     try {
       const params = new URLSearchParams({ exercice: String(annee) });
       if (filtreSource) params.set("source", filtreSource);
+      if (filtreType) params.set("type_ecriture", filtreType);
       if (filtreDebut) params.set("date_debut", filtreDebut);
       if (filtreFin) params.set("date_fin", filtreFin);
       const url = `${import.meta.env.VITE_API_URL ?? ""}/api/comptabilite/journal/export?${params.toString()}`;
@@ -702,6 +724,18 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
         >
           <option value="">Toutes les sources</option>
           {Object.entries(SOURCE_LABELS).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+
+        {/* Type d'écriture */}
+        <select
+          value={filtreType}
+          onChange={(e) => handleTypeChange(e.target.value)}
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+        >
+          <option value="">Tous les types</option>
+          {Object.entries(TYPE_LABELS).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
           ))}
         </select>
@@ -769,7 +803,8 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
         >
           <Filter size={14} />
           <span>
-            {filtreSource && <><strong>{SOURCE_LABELS[filtreSource] ?? filtreSource}</strong>{(filtreDebut || filtreFin) ? " · " : ""}</>}
+            {filtreSource && <><strong>{SOURCE_LABELS[filtreSource] ?? filtreSource}</strong>{(filtreType || filtreDebut || filtreFin) ? " · " : ""}</>}
+            {filtreType && <><strong>{TYPE_LABELS[filtreType] ?? filtreType}</strong>{(filtreDebut || filtreFin) ? " · " : ""}</>}
             {filtreDebut && <>à partir du <strong>{new Date(filtreDebut).toLocaleDateString("fr-FR")}</strong></>}
             {filtreDebut && filtreFin && " "}
             {filtreFin && <>jusqu&apos;au <strong>{new Date(filtreFin).toLocaleDateString("fr-FR")}</strong></>}
@@ -803,11 +838,13 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
               <tbody>
                 {list.map((e) => {
                   const isManuel = e.source === "manuel";
+                  const isRegul = e.typeEcriture === "regularisation" || e.typeEcriture === "extourne_regularisation";
+                  const typeBadge = TYPE_BADGE_STYLE[e.typeEcriture] ?? { bg: "#f3f4f6", color: "#6b7280" };
                   return (
                     <tr
                       key={e.id}
                       className="border-b border-gray-50 hover:bg-gray-50/50"
-                      style={isManuel && filtreSource === "manuel" ? { backgroundColor: "#fffbeb" } : undefined}
+                      style={isRegul ? { backgroundColor: "#faf5ff" } : (isManuel && filtreSource === "manuel" ? { backgroundColor: "#fffbeb" } : undefined)}
                     >
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                         {new Date(e.dateEcriture).toLocaleDateString("fr-FR")}
@@ -825,16 +862,26 @@ function OngletJournal({ defaultSource = "" }: { defaultSource?: string }) {
                       <td className="px-4 py-3 font-mono text-gray-700">{e.compteCredit}</td>
                       <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{FCFA(e.montantFcfa)}</td>
                       <td className="px-4 py-3">
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full"
-                          style={
-                            isManuel
-                              ? { backgroundColor: "#fef3c7", color: "#92400e" }
-                              : { backgroundColor: "#f3f4f6", color: "#6b7280" }
-                          }
-                        >
-                          {SOURCE_LABELS[e.source] ?? e.source}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span
+                            className="text-xs px-2 py-0.5 rounded-full w-fit"
+                            style={
+                              isManuel
+                                ? { backgroundColor: "#fef3c7", color: "#92400e" }
+                                : { backgroundColor: "#f3f4f6", color: "#6b7280" }
+                            }
+                          >
+                            {SOURCE_LABELS[e.source] ?? e.source}
+                          </span>
+                          {e.typeEcriture && e.typeEcriture !== "normale" && (
+                            <span
+                              className="text-[10px] font-semibold px-2 py-0.5 rounded-full w-fit"
+                              style={{ backgroundColor: typeBadge.bg, color: typeBadge.color }}
+                            >
+                              {TYPE_LABELS[e.typeEcriture] ?? e.typeEcriture}
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
