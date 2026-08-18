@@ -4194,7 +4194,8 @@ export async function generateBordereauAchatSession(
     { label: "RETENUE\nAVANCE",    valeur: retenueEstimeeFcfa },
     { label: "SOLDE SUR\nAVANCES", valeur: soldeAvancesFcfa },
   ];
-  const SUB_H = 20;
+  // SUB_H doit loger : label sur 2 lignes à 7 pt (≈18 pt) + valeur à 8.5 pt + marges
+  const SUB_H = 32;
   const ROW_H = autresLignes.length * SUB_H;
 
   doc.rect(M, y, tW, ROW_H).fill("#f9fafb");
@@ -4244,16 +4245,18 @@ export async function generateBordereauAchatSession(
     }
   }
 
-  // Sous-lignes AUTRES FRAIS
+  // Sous-lignes AUTRES FRAIS — label (2 lignes) en haut, valeur en bas de chaque cellule
   const autresX = M + colW.slice(0, 5).reduce((a, b) => a + b, 0);
   const autresW = colW[5]!;
   let ay = y;
   autresLignes.forEach((al, idx) => {
     if (idx > 0) doc.moveTo(autresX, ay).lineTo(autresX + autresW, ay).stroke("#e5e7eb");
+    // Label sur 2 lignes, ancré en haut de la cellule
     doc.fontSize(7).fillColor(GRIS).font("Helvetica-Bold")
-      .text(al.label, autresX + 2, ay + 3, { width: autresW - 4, align: "center", lineBreak: true });
-    doc.fontSize(8.5).fillColor(al.valeur > 0 ? VERT : "black").font("Helvetica-Bold")
-      .text(`${formaterNombre(al.valeur)} F`, autresX + 2, ay + SUB_H - 10, { width: autresW - 4, align: "center", lineBreak: false });
+      .text(al.label, autresX + 2, ay + 4, { width: autresW - 4, align: "center", lineBreak: true });
+    // Valeur ancrée en bas de la cellule (SUB_H - 11 laisse 11 pt depuis le bas)
+    doc.fontSize(9).fillColor(al.valeur > 0 ? VERT : "black").font("Helvetica-Bold")
+      .text(`${formaterNombre(al.valeur)} F`, autresX + 2, ay + SUB_H - 13, { width: autresW - 4, align: "center", lineBreak: false });
     ay += SUB_H;
   });
 
