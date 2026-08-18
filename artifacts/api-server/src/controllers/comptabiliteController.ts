@@ -219,6 +219,7 @@ export async function exportJournalCsv(req: Request, res: Response): Promise<voi
     const source = req.query["source"] as string | undefined;
     const dateDebut = req.query["date_debut"] as string | undefined;
     const dateFin = req.query["date_fin"] as string | undefined;
+    const typeEcriture = req.query["type_ecriture"] as string | undefined;
 
     const conditions = [
       eq(ecrituresComptablesTable.cooperativeId, coopId(req)),
@@ -227,6 +228,7 @@ export async function exportJournalCsv(req: Request, res: Response): Promise<voi
     if (source) conditions.push(eq(ecrituresComptablesTable.source, source as "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock"));
     if (dateDebut) conditions.push(gte(ecrituresComptablesTable.dateEcriture, dateDebut));
     if (dateFin) conditions.push(lte(ecrituresComptablesTable.dateEcriture, dateFin));
+    if (typeEcriture) conditions.push(eq(ecrituresComptablesTable.typeEcriture, typeEcriture));
 
     const ecritures = await db
       .select()
@@ -298,7 +300,7 @@ export async function exportJournalCsv(req: Request, res: Response): Promise<voi
     ws.views      = [{ state: "frozen", ySplit: 1 }];
     ws.autoFilter = { from: "A1", to: "G1" };
 
-    const filename = `journal-${exercice}${source ? `-${source}` : ""}.xlsx`;
+    const filename = `journal-${exercice}${source ? `-${source}` : ""}${typeEcriture ? `-${typeEcriture}` : ""}.xlsx`;
     const buf      = await wb.xlsx.writeBuffer();
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
