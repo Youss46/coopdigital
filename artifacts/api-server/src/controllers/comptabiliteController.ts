@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { checkEcriture, creerAnomalies } from "../services/anomalieService";
-import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable, membresTable } from "@workspace/db";
+import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable, membresTable, usersTable, personnelTable } from "@workspace/db";
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
 import { assignerNumeroPiece, assignerNumerosPieces } from "../lib/numeroPiece";
@@ -917,45 +917,100 @@ export async function cloturerExercice(req: Request, res: Response): Promise<voi
   }
 }
 
-// ─── Balance auxiliaire membres (solde par tiers) ────────────────────────────
+// ─── Balance auxiliaire (solde par tiers : membre / delegue / personnel) ─────
 export async function getBalanceAuxiliaire(req: Request, res: Response): Promise<void> {
   try {
-    const coop = coopId(req);
-    const exercice = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : undefined;
+    const coop      = coopId(req);
+    const exercice  = req.query["exercice"]  ? parseInt(String(req.query["exercice"])) : undefined;
+    const tiersType = (req.query["tiersType"] as string) || "membre";
     const exerciceCond = exercice ? sql`AND e.exercice = ${exercice}` : sql``;
 
-    const result = await db.execute<{
+    type Row = {
       tiersId: number; nom: string; prenoms: string; code: string;
       totalDu: number; totalPaye: number;
       totalIntrantsDus: number; totalIntrantsRemb: number; soldeNet: number;
-    }>(sql`
-      SELECT
-        e.tiers_id                                                             AS "tiersId",
-        COALESCE(m.nom,          '—')                                          AS nom,
-        COALESCE(m.prenoms,      '')                                           AS prenoms,
-        COALESCE(m.carte_numero, '')                                           AS code,
-        SUM(CASE WHEN e.compte_credit IN ('401','4091','4092')
-                 THEN e.montant_fcfa ELSE 0 END)::integer                     AS "totalDu",
-        SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') AND e.source = 'paiement'
-                 THEN e.montant_fcfa ELSE 0 END)::integer                     AS "totalPaye",
-        SUM(CASE WHEN e.compte_debit  = '4091'
-                 THEN e.montant_fcfa ELSE 0 END)::integer                     AS "totalIntrantsDus",
-        SUM(CASE WHEN e.compte_credit = '4091'
-                 THEN e.montant_fcfa ELSE 0 END)::integer                     AS "totalIntrantsRemb",
-        (SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
-         - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END))::integer
-                                                                               AS "soldeNet"
-      FROM ecritures_comptables e
-      LEFT JOIN membres m ON m.id = e.tiers_id
-      WHERE e.cooperative_id = ${coop}
-        AND e.tiers_type = 'membre'
-        ${exerciceCond}
-      GROUP BY e.tiers_id, m.nom, m.prenoms, m.carte_numero
-      ORDER BY
-        ABS(SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
-            - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)) DESC,
-        m.nom
-    `);
+    };
+
+    let result: { rows: Row[] };
+
+    if (tiersType === "personnel") {
+      // Compte 421 — Rémunérations dues au personnel
+      result = await db.execute<Row>(sql`
+        SELECT
+          e.tiers_id                                                            AS "tiersId",
+          COALESCE(p.nom, '—')                                                  AS nom,
+          COALESCE(p.prenoms, '')                                               AS prenoms,
+          COALESCE(p.poste, '')                                                 AS code,
+          SUM(CASE WHEN e.compte_credit = '421' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
+          SUM(CASE WHEN e.compte_debit  = '421' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalPaye",
+          0::integer                                                            AS "totalIntrantsDus",
+          0::integer                                                            AS "totalIntrantsRemb",
+          (SUM(CASE WHEN e.compte_credit = '421' THEN e.montant_fcfa ELSE 0 END)
+           - SUM(CASE WHEN e.compte_debit  = '421' THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
+        FROM ecritures_comptables e
+        LEFT JOIN personnel p ON p.id = e.tiers_id
+        WHERE e.cooperative_id = ${coop}
+          AND e.tiers_type = 'personnel'
+          ${exerciceCond}
+        GROUP BY e.tiers_id, p.nom, p.prenoms, p.poste
+        ORDER BY
+          ABS(SUM(CASE WHEN e.compte_credit = '421' THEN e.montant_fcfa ELSE 0 END)
+              - SUM(CASE WHEN e.compte_debit = '421'  THEN e.montant_fcfa ELSE 0 END)) DESC,
+          p.nom
+      `);
+    } else if (tiersType === "delegue") {
+      // Comptes 401/4091/4092 — Fournisseurs/avances (délégués)
+      result = await db.execute<Row>(sql`
+        SELECT
+          e.tiers_id                                                            AS "tiersId",
+          COALESCE(u.nom, '—')                                                  AS nom,
+          COALESCE(u.prenoms, '')                                               AS prenoms,
+          ''                                                                    AS code,
+          SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
+          SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') AND e.source = 'paiement'
+                   THEN e.montant_fcfa ELSE 0 END)::integer                    AS "totalPaye",
+          SUM(CASE WHEN e.compte_debit  = '4091' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsDus",
+          SUM(CASE WHEN e.compte_credit = '4091' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsRemb",
+          (SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
+           - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
+        FROM ecritures_comptables e
+        LEFT JOIN users u ON u.id = e.tiers_id
+        WHERE e.cooperative_id = ${coop}
+          AND e.tiers_type = 'delegue'
+          ${exerciceCond}
+        GROUP BY e.tiers_id, u.nom, u.prenoms
+        ORDER BY
+          ABS(SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
+              - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)) DESC,
+          u.nom
+      `);
+    } else {
+      // membre (défaut) — Comptes 401/4091/4092
+      result = await db.execute<Row>(sql`
+        SELECT
+          e.tiers_id                                                            AS "tiersId",
+          COALESCE(m.nom,          '—')                                         AS nom,
+          COALESCE(m.prenoms,      '')                                          AS prenoms,
+          COALESCE(m.carte_numero, '')                                          AS code,
+          SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
+          SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') AND e.source = 'paiement'
+                   THEN e.montant_fcfa ELSE 0 END)::integer                    AS "totalPaye",
+          SUM(CASE WHEN e.compte_debit  = '4091' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsDus",
+          SUM(CASE WHEN e.compte_credit = '4091' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsRemb",
+          (SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
+           - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
+        FROM ecritures_comptables e
+        LEFT JOIN membres m ON m.id = e.tiers_id
+        WHERE e.cooperative_id = ${coop}
+          AND e.tiers_type = 'membre'
+          ${exerciceCond}
+        GROUP BY e.tiers_id, m.nom, m.prenoms, m.carte_numero
+        ORDER BY
+          ABS(SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
+              - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)) DESC,
+          m.nom
+      `);
+    }
 
     res.json(result.rows);
   } catch (err) {

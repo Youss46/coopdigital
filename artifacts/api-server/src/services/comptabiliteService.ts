@@ -37,7 +37,7 @@ interface ProposerEcriturePayload {
   /** Tiers individualisé : id du membre / fournisseur / exportateur / délégué */
   tiersId?: number;
   /** Type du tiers : "membre" | "fournisseur" | "exportateur" | "delegue" */
-  tiersType?: "membre" | "fournisseur" | "exportateur" | "delegue";
+  tiersType?: "membre" | "fournisseur" | "exportateur" | "delegue" | "personnel";
 }
 
 const AUTO_KEY_MAP: Record<SourceEcriture, keyof typeof configComptableTable.$inferSelect> = {
@@ -346,14 +346,16 @@ export async function generateEcrituresEncaissement(cooperativeId: number, param
 export async function generateEcrituresSalaire(cooperativeId: number, params: {
   bulletinId: number;
   personnelNom: string;
+  personnelId?: number;
   salaireNetFcfa: number;
   salaireBrutFcfa: number;
   cotisationsSalarieFcfa: number;
   datePaiement: string;
   compteCredit?: string;
 }) {
-  const { bulletinId, personnelNom, salaireNetFcfa, salaireBrutFcfa, cotisationsSalarieFcfa, datePaiement, compteCredit = "521" } = params;
+  const { bulletinId, personnelNom, personnelId, salaireNetFcfa, salaireBrutFcfa, cotisationsSalarieFcfa, datePaiement, compteCredit = "521" } = params;
   const piece = `SAL-${bulletinId}`;
+  const tiers = personnelId ? { tiersId: personnelId, tiersType: "personnel" as const } : {};
 
   const [cBrut, cNet] = await Promise.all([
     resolveComptes(cooperativeId, "salaires", "salaire_brut", "661", "421"),
@@ -372,6 +374,7 @@ export async function generateEcrituresSalaire(cooperativeId: number, params: {
       libelle: `Versement salaire net – ${personnelNom}`,
       compteDebit: cNet.compteDebit, compteCredit: compteCredit,
       montantFcfa: salaireNetFcfa, date: datePaiement, numeroPiece: piece,
+      ...tiers,
     }),
   ];
 
@@ -395,13 +398,14 @@ export async function generateEcrituresSalaire(cooperativeId: number, params: {
 export async function insererEcrituresSalaireDirectes(cooperativeId: number, params: {
   bulletinId: number;
   personnelNom: string;
+  personnelId?: number;
   salaireNetFcfa: number;
   salaireBrutFcfa: number;
   cotisationsSalarieFcfa: number;
   datePaiement: string;
   compteCredit?: string;
 }) {
-  const { bulletinId, personnelNom, salaireNetFcfa, salaireBrutFcfa, cotisationsSalarieFcfa, datePaiement, compteCredit = "521" } = params;
+  const { bulletinId, personnelNom, personnelId, salaireNetFcfa, salaireBrutFcfa, cotisationsSalarieFcfa, datePaiement, compteCredit = "521" } = params;
   const piece = `SAL-${bulletinId}`;
   const exercice = new Date(datePaiement).getFullYear();
 
@@ -411,7 +415,7 @@ export async function insererEcrituresSalaireDirectes(cooperativeId: number, par
     resolveComptes(cooperativeId, "salaires", "cotisations_salarie", "431", "421"),
   ]);
 
-  async function inserer(libelle: string, d: string, cr: string, montantFcfa: number) {
+  async function inserer(libelle: string, d: string, cr: string, montantFcfa: number, extraTiers?: { tiersId: number; tiersType: string }) {
     const [inserted] = await db.insert(ecrituresComptablesTable).values({
       cooperativeId,
       dateEcriture: datePaiement,
@@ -423,13 +427,16 @@ export async function insererEcrituresSalaireDirectes(cooperativeId: number, par
       source: "salaire",
       sourceId: bulletinId,
       exercice,
+      tiersId: extraTiers?.tiersId ?? null,
+      tiersType: extraTiers?.tiersType ?? null,
     }).returning({ id: ecrituresComptablesTable.id });
     if (inserted) await assignerNumeroPiece(inserted.id, "salaire", exercice, cooperativeId);
   }
 
+  const tiersArg = personnelId ? { tiersId: personnelId, tiersType: "personnel" } : undefined;
   const taches = [
     inserer(`Charge de personnel – ${personnelNom}`, cBrut.compteDebit, cBrut.compteCredit, salaireBrutFcfa),
-    inserer(`Versement salaire net – ${personnelNom}`, cNet.compteDebit, compteCredit, salaireNetFcfa),
+    inserer(`Versement salaire net – ${personnelNom}`, cNet.compteDebit, compteCredit, salaireNetFcfa, tiersArg),
   ];
   if (cotisationsSalarieFcfa > 0) {
     taches.push(inserer(`Cotisations CNPS salarié – ${personnelNom}`, cCotis.compteDebit, cCotis.compteCredit, cotisationsSalarieFcfa));

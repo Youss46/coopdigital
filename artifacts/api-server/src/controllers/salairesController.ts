@@ -600,6 +600,7 @@ export async function payerBulletin(
           await generateEcrituresSalaire(cid, {
             bulletinId: updated.id,
             personnelNom,
+            personnelId: updated.personnelId,
             salaireNetFcfa: updated.salaireNetFcfa,
             salaireBrutFcfa: updated.salaireBrutFcfa,
             cotisationsSalarieFcfa: updated.salaireBrutFcfa - updated.salaireNetFcfa,
@@ -713,6 +714,7 @@ export async function payerBulletinsGroupe(req: Request, res: Response): Promise
               await generateEcrituresSalaire(cid, {
                 bulletinId: updated.id,
                 personnelNom: p ? `${p.prenoms} ${p.nom}` : `Personnel #${b.personnelId}`,
+                personnelId: b.personnelId,
                 salaireNetFcfa: updated.salaireNetFcfa,
                 salaireBrutFcfa: updated.salaireBrutFcfa,
                 cotisationsSalarieFcfa: updated.salaireBrutFcfa - updated.salaireNetFcfa,

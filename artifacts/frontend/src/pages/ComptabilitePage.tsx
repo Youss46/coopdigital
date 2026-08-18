@@ -2334,22 +2334,30 @@ function OngletBalance() {
   );
 }
 
-// ─── Onglet Balance auxiliaire (solde par membre) ────────────────────────────
+// ─── Onglet Balance auxiliaire (solde par tiers) ─────────────────────────────
 interface BalanceAuxLigne {
   tiersId: number; nom: string; prenoms: string; code: string;
   totalDu: number; totalPaye: number;
   totalIntrantsDus: number; totalIntrantsRemb: number; soldeNet: number;
 }
 
+const TYPES_TIERS = [
+  { id: "membre",    label: "Membres",    labelDu: "Dû au membre",     labelPaye: "Payé",          showIntrants: true,  lienBase: "/membres/" },
+  { id: "delegue",   label: "Délégués",   labelDu: "Dû au délégué",    labelPaye: "Payé",          showIntrants: false, lienBase: null },
+  { id: "personnel", label: "Personnel",  labelDu: "Salaire dû (421)", labelPaye: "Versé",         showIntrants: false, lienBase: null },
+] as const;
+
 function OngletBalanceAuxiliaire() {
   const anneeActuelle = new Date().getFullYear();
   const [exercice, setExercice]   = useState(anneeActuelle);
   const [recherche, setRecherche] = useState("");
+  const [tiersType, setTiersType] = useState<"membre" | "delegue" | "personnel">("membre");
   const annees = Array.from({ length: 5 }, (_, i) => anneeActuelle - i);
+  const typeMeta = TYPES_TIERS.find(t => t.id === tiersType)!;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["balance-aux", exercice],
-    queryFn: () => apiFetch<BalanceAuxLigne[]>(`/api/comptabilite/balance-auxiliaire?exercice=${exercice}`),
+    queryKey: ["balance-aux", exercice, tiersType],
+    queryFn: () => apiFetch<BalanceAuxLigne[]>(`/api/comptabilite/balance-auxiliaire?exercice=${exercice}&tiersType=${tiersType}`),
   });
 
   const list = (data ?? []).filter((l) => {
@@ -2365,32 +2373,49 @@ function OngletBalanceAuxiliaire() {
   const totalSolde = list.reduce((s, l) => s + l.soldeNet, 0);
 
   const handleExport = () => void exportExcel(
-    `balance_auxiliaire_membres_${exercice}.xlsx`,
-    "Balance auxiliaire membres",
+    `balance_auxiliaire_${tiersType}_${exercice}.xlsx`,
+    `Balance auxiliaire — ${typeMeta.label}`,
     [
-      { header: "Membre",            key: "nom",            width: 28 },
+      { header: "Nom",               key: "nom",            width: 28 },
       { header: "Prénoms",           key: "prenoms",        width: 22 },
-      { header: "Code",              key: "code",           width: 14 },
-      { header: "Dû au membre",      key: "totalDu",        width: 18, numFmt: "#,##0", align: "right" as const },
-      { header: "Payé",              key: "totalPaye",      width: 18, numFmt: "#,##0", align: "right" as const },
-      { header: "Intrants dus",      key: "intrantsDus",    width: 16, numFmt: "#,##0", align: "right" as const },
-      { header: "Intrants remb.",    key: "intrantsRemb",   width: 16, numFmt: "#,##0", align: "right" as const },
+      { header: tiersType === "personnel" ? "Poste" : tiersType === "membre" ? "Code carte" : "—",
+                                       key: "code",           width: 16 },
+      { header: typeMeta.labelDu,    key: "totalDu",        width: 18, numFmt: "#,##0", align: "right" as const },
+      { header: typeMeta.labelPaye,  key: "totalPaye",      width: 18, numFmt: "#,##0", align: "right" as const },
+      ...(typeMeta.showIntrants ? [
+        { header: "Intrants dus",    key: "intrantsDus",    width: 16, numFmt: "#,##0", align: "right" as const },
+        { header: "Intrants remb.",  key: "intrantsRemb",   width: 16, numFmt: "#,##0", align: "right" as const },
+      ] : []),
       { header: "Solde net",         key: "soldeNet",       width: 18, numFmt: "#,##0;[Red]-#,##0", align: "right" as const },
     ],
     list.map((l) => ({
-      nom:         l.nom,
-      prenoms:     l.prenoms,
-      code:        l.code,
-      totalDu:     Number(l.totalDu),
-      totalPaye:   Number(l.totalPaye),
+      nom:          l.nom,
+      prenoms:      l.prenoms,
+      code:         l.code,
+      totalDu:      Number(l.totalDu),
+      totalPaye:    Number(l.totalPaye),
       intrantsDus:  Number(l.totalIntrantsDus),
       intrantsRemb: Number(l.totalIntrantsRemb),
-      soldeNet:    Number(l.soldeNet),
+      soldeNet:     Number(l.soldeNet),
     }))
   );
 
   return (
     <div>
+      {/* Sélecteur de type de tiers */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-5">
+        {TYPES_TIERS.map((t) => (
+          <button key={t.id}
+            onClick={() => { setTiersType(t.id); setRecherche(""); }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tiersType === t.id ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap items-end gap-3 mb-5">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Exercice</label>
@@ -2406,13 +2431,13 @@ function OngletBalanceAuxiliaire() {
             <input
               value={recherche}
               onChange={(e) => setRecherche(e.target.value)}
-              placeholder="Nom, prénoms ou code…"
+              placeholder="Nom, prénoms…"
               className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
             />
           </div>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <p className="text-sm text-gray-500">{list.length} membre{list.length > 1 ? "s" : ""}</p>
+          <p className="text-sm text-gray-500">{list.length} {typeMeta.label.toLowerCase()}</p>
           <button onClick={handleExport} disabled={list.length === 0}
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-40">
             <Download size={14} /> Exporter Excel
@@ -2425,7 +2450,7 @@ function OngletBalanceAuxiliaire() {
       ) : list.length === 0 ? (
         <div className="text-center py-16">
           <Users className="mx-auto mb-3 text-gray-300" size={40} />
-          <p className="text-gray-500 text-sm">Aucun membre avec des mouvements pour l'exercice {exercice}</p>
+          <p className="text-gray-500 text-sm">Aucun tiers avec des mouvements pour l'exercice {exercice}</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -2433,11 +2458,15 @@ function OngletBalanceAuxiliaire() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Membre</th>
-                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden sm:table-cell">Code</th>
-                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Dû au membre</th>
-                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden lg:table-cell">Payé</th>
-                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden lg:table-cell">Intrants nets</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">{typeMeta.label}</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden sm:table-cell">
+                    {tiersType === "personnel" ? "Poste" : "Code"}
+                  </th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">{typeMeta.labelDu}</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden lg:table-cell">{typeMeta.labelPaye}</th>
+                  {typeMeta.showIntrants && (
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden lg:table-cell">Intrants nets</th>
+                  )}
                   <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Solde net</th>
                   <th className="px-3 py-3"></th>
                 </tr>
@@ -2451,21 +2480,22 @@ function OngletBalanceAuxiliaire() {
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-800">{l.nom} {l.prenoms}</div>
                       </td>
-                      <td className="px-4 py-3 text-gray-500 font-mono text-xs hidden sm:table-cell">{l.code || "—"}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs hidden sm:table-cell font-mono">{l.code || "—"}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{FCFA(l.totalDu)}</td>
                       <td className="px-4 py-3 text-right text-green-700 hidden lg:table-cell">{FCFA(l.totalPaye)}</td>
-                      <td className={`px-4 py-3 text-right hidden lg:table-cell ${intrantsNet > 0 ? "text-amber-600" : "text-gray-400"}`}>{FCFA(intrantsNet)}</td>
+                      {typeMeta.showIntrants && (
+                        <td className={`px-4 py-3 text-right hidden lg:table-cell ${intrantsNet > 0 ? "text-amber-600" : "text-gray-400"}`}>{FCFA(intrantsNet)}</td>
+                      )}
                       <td className={`px-4 py-3 text-right font-bold ${positif ? "text-green-700" : "text-red-600"}`}>
                         {positif ? "+" : ""}{FCFA(l.soldeNet)}
                       </td>
                       <td className="px-3 py-3">
-                        <a
-                          href={`/membres/${l.tiersId}`}
-                          className="text-xs text-blue-600 hover:underline whitespace-nowrap"
-                          title="Voir la fiche membre"
-                        >
-                          Fiche →
-                        </a>
+                        {typeMeta.lienBase && (
+                          <a href={`${typeMeta.lienBase}${l.tiersId}`}
+                            className="text-xs text-blue-600 hover:underline whitespace-nowrap">
+                            Fiche →
+                          </a>
+                        )}
                       </td>
                     </tr>
                   );
@@ -2473,8 +2503,10 @@ function OngletBalanceAuxiliaire() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-gray-200 bg-gray-50">
-                  <td colSpan={2} className="px-4 py-3 font-bold text-gray-700 text-sm">TOTAUX ({list.length} membres)</td>
-                  <td colSpan={3} className="hidden lg:table-cell"></td>
+                  <td colSpan={typeMeta.showIntrants ? 2 : 2} className="px-4 py-3 font-bold text-gray-700 text-sm">
+                    TOTAUX ({list.length})
+                  </td>
+                  <td colSpan={typeMeta.showIntrants ? 3 : 2} className="hidden lg:table-cell"></td>
                   <td className={`px-4 py-3 text-right font-bold ${totalSolde >= 0 ? "text-green-700" : "text-red-600"}`}>
                     {totalSolde >= 0 ? "+" : ""}{FCFA(totalSolde)}
                   </td>
@@ -2484,8 +2516,8 @@ function OngletBalanceAuxiliaire() {
             </table>
           </div>
           <div className="px-4 py-3 border-t border-gray-100 flex gap-6 text-xs text-gray-500">
-            <span><span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>Solde positif = coop doit encore au membre</span>
-            <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1"></span>Solde négatif = membre doit à la coop</span>
+            <span><span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>Solde positif = coop doit au tiers</span>
+            <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1"></span>Solde négatif = tiers doit à la coop</span>
           </div>
         </div>
       )}
