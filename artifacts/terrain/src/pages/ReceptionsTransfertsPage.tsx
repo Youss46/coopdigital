@@ -9,6 +9,10 @@
 
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import {
+  ChevronLeft, Truck, Scale, Package, RefreshCw,
+  AlertTriangle, CheckCircle, Play, RotateCcw,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import {
   getTransfertsEnAttentePesee,
@@ -29,13 +33,14 @@ function fmtPoids(kg: string | number): string {
 function fmtDate(d: string | null): string {
   if (!d) return "—";
   return new Date(d).toLocaleString("fr-FR", {
-    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
   });
 }
 
-const STATUT_LABEL: Record<string, { label: string; color: string; bg: string }> = {
-  arrive:   { label: "Arrivé — à peser", color: "var(--t-warning)", bg: "var(--t-warning-bg)" },
-  en_pesee: { label: "Pesée en cours",   color: "var(--t-info)",    bg: "var(--t-info-bg)"    },
+const STATUT_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  arrive:   { label: "Arrivé — à peser", color: "var(--t-warning)",  bg: "var(--t-warning-bg)"  },
+  en_pesee: { label: "Pesée en cours",   color: "var(--t-peseur)",   bg: "var(--t-peseur-bg)"   },
 };
 
 export default function ReceptionsTransfertsPage() {
@@ -44,7 +49,7 @@ export default function ReceptionsTransfertsPage() {
   const [transferts, setTransfertsState] = useState<TransfertEnAttente[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
-  const [busy, setBusy]         = useState<number | null>(null); // transfert id en cours d'action
+  const [busy, setBusy]         = useState<number | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -61,7 +66,6 @@ export default function ReceptionsTransfertsPage() {
 
   useEffect(() => { void reload(); }, []);
 
-  // Signaler arrivée physique (en_cours → arrive) — peut être fait par peseur ou délégué présent
   async function handleSignalerArrivee(t: TransfertEnAttente) {
     setBusy(t.id);
     try {
@@ -74,14 +78,11 @@ export default function ReceptionsTransfertsPage() {
     }
   }
 
-  // Démarrer / reprendre la session de pesée pour ce transfert
   async function handleDemarrerPesee(t: TransfertEnAttente) {
-    // Si session déjà créée, aller directement dessus
     if (t.sessionPeseeId) {
       navigate(`/pesee-session/${t.sessionPeseeId}`);
       return;
     }
-
     setBusy(t.id);
     try {
       const session = await createSessionPesee({
@@ -92,7 +93,6 @@ export default function ReceptionsTransfertsPage() {
       navigate(`/pesee-session/${session.id}`);
     } catch (e) {
       if (e instanceof SessionTransfertExistanteError) {
-        // session créée en parallèle — aller dessus
         navigate(`/pesee-session/${e.sessionId}`);
         return;
       }
@@ -104,64 +104,107 @@ export default function ReceptionsTransfertsPage() {
 
   return (
     <div className="t-app">
-      <header className="t-header">
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <header className="t-header t-header--peseur">
+        <button
+          className="t-header__back"
+          onClick={() => navigate("/")}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <ChevronLeft size={22} />
+        </button>
         <div style={{ flex: 1 }}>
-          <div className="t-header__title">Réceptions de transferts</div>
-          <div className="t-header__sub">Pesée physique obligatoire</div>
+          <div className="t-header__title">Réceptions</div>
+          <div className="t-header__sub">Transferts en attente de pesée</div>
         </div>
         <button
-          onClick={() => navigate("/")}
-          style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, color: "#fff", padding: "6px 12px", fontSize: ".8rem", fontWeight: 700, cursor: "pointer" }}
+          onClick={reload}
+          style={{
+            background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.25)",
+            borderRadius: 8, color: "#fff", padding: "7px", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
         >
-          ← Retour
+          <RefreshCw size={16} />
         </button>
       </header>
 
-      <main className="t-main">
-        {/* Bannière rôle */}
+      <main className="t-main" style={{ padding: "16px 16px 0" }}>
+        {/* Bannière rôle peseur */}
         {user && (
           <div style={{
             background: "var(--t-card)",
-            borderRadius: 12, padding: 12, marginBottom: 12,
+            borderRadius: 12, padding: "10px 14px", marginBottom: 12,
             border: "1px solid var(--t-border)", display: "flex", alignItems: "center", gap: 10,
+            boxShadow: "0 1px 4px rgba(0,0,0,.06)",
           }}>
-            <span style={{ fontSize: "1.4rem" }}>⚖️</span>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "var(--t-peseur-bg)",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>
+              <Scale size={18} color="var(--t-peseur)" />
+            </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: ".88rem", color: "var(--t-text)" }}>{user.nom} {user.prenoms}</div>
-              <div style={{ fontSize: ".72rem", color: "var(--t-muted)" }}>Peseur — Base centrale · {user.cooperativeId ? `Coop #${user.cooperativeId}` : ""}</div>
+              <div style={{ fontWeight: 700, fontSize: ".88rem", color: "var(--t-text)" }}>
+                {user.nom} {user.prenoms}
+              </div>
+              <div style={{ fontSize: ".72rem", color: "var(--t-muted)" }}>
+                Peseur · Base centrale
+              </div>
             </div>
           </div>
         )}
 
-        {/* Infobannière */}
+        {/* Info */}
         <div style={{
-          background: "var(--t-info-bg)", border: "1px solid var(--t-info)",
-          borderRadius: 10, padding: 12, marginBottom: 16, fontSize: ".78rem", color: "var(--t-info)",
+          background: "var(--t-peseur-bg)", border: "1px solid rgba(8,145,178,.2)",
+          borderRadius: 10, padding: "10px 14px", marginBottom: 16,
+          fontSize: ".78rem", color: "var(--t-peseur-dark)", lineHeight: 1.5,
         }}>
           Les transferts expédiés par les délégués sont pesés sac par sac à la réception.
           Le poids pesé est le poids officiel enregistré en stock central.
         </div>
 
+        {/* Spinner */}
         {loading && (
-          <div style={{ textAlign: "center", color: "var(--t-muted)", padding: 40 }}>
-            Chargement…
+          <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
+            <div className="t-spinner" style={{ margin: 0 }} />
           </div>
         )}
 
+        {/* Erreur */}
         {error && (
-          <div style={{ background: "var(--t-danger-bg)", border: "1px solid var(--t-danger)", borderRadius: 10, padding: 12, color: "var(--t-danger)", marginBottom: 12 }}>
-            {error}
-            <button onClick={reload} style={{ marginLeft: 8, background: "none", border: "none", color: "var(--t-info)", cursor: "pointer", fontSize: ".85rem" }}>Réessayer</button>
+          <div style={{
+            background: "var(--t-danger-bg)", border: "1px solid var(--t-danger)",
+            borderRadius: 10, padding: "10px 14px", color: "var(--t-danger)", marginBottom: 12,
+            display: "flex", gap: 8, alignItems: "center",
+          }}>
+            <AlertTriangle size={15} />
+            <span style={{ flex: 1 }}>{error}</span>
+            <button
+              onClick={reload}
+              style={{ background: "none", border: "none", color: "var(--t-peseur)", cursor: "pointer", fontSize: ".85rem", fontWeight: 600 }}
+            >
+              Réessayer
+            </button>
           </div>
         )}
 
+        {/* Liste vide */}
         {!loading && !error && transferts.length === 0 && (
           <div style={{
-            background: "var(--t-card)",
-            borderRadius: 14, padding: 32, textAlign: "center",
-            border: "1px solid var(--t-border)",
+            background: "var(--t-card)", borderRadius: 16, padding: "32px 24px",
+            textAlign: "center", border: "1px solid var(--t-border)",
+            boxShadow: "0 2px 8px rgba(0,0,0,.05)",
           }}>
-            <div style={{ fontSize: "2.5rem", marginBottom: 12 }}>✅</div>
+            <div style={{
+              width: 60, height: 60, borderRadius: 16, margin: "0 auto 12px",
+              background: "var(--t-success-bg)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <CheckCircle size={28} color="var(--t-success)" />
+            </div>
             <div style={{ fontWeight: 700, color: "var(--t-text)", marginBottom: 4 }}>
               Aucun transfert en attente
             </div>
@@ -171,33 +214,46 @@ export default function ReceptionsTransfertsPage() {
           </div>
         )}
 
+        {/* Cartes transferts */}
         {transferts.map((t) => {
-          const statutInfo = STATUT_LABEL[t.statut] ?? { label: t.statut, color: "var(--t-muted)", bg: "var(--t-bg)" };
+          const statutInfo = STATUT_CONFIG[t.statut] ?? { label: t.statut, color: "var(--t-muted)", bg: "var(--t-bg)" };
           const isBusy = busy === t.id;
           const poidsKg = parseFloat(String(t.poidsDepart_kg ?? 0));
 
           return (
-            <div key={t.id} className="t-card" style={{ marginBottom: 12, padding: 0, overflow: "hidden" }}>
+            <div
+              key={t.id}
+              style={{
+                background: "var(--t-card)", borderRadius: 16, marginBottom: 12,
+                boxShadow: "0 2px 10px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04)",
+                overflow: "hidden",
+              }}
+            >
               {/* Header carte */}
               <div style={{
-                background: "var(--t-bg)",
-                padding: "12px 16px",
-                borderBottom: "1px solid var(--t-border)",
+                padding: "12px 16px", borderBottom: "1px solid var(--t-border)",
                 display: "flex", alignItems: "center", gap: 10,
               }}>
-                <span style={{ fontSize: "1.4rem" }}>🚛</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800, fontSize: ".92rem", color: "var(--t-text)" }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                  background: "var(--t-peseur-bg)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Truck size={18} color="var(--t-peseur)" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: ".95rem", color: "var(--t-text)" }}>
                     {t.numeroTransfert}
                   </div>
-                  <div style={{ fontSize: ".72rem", color: "var(--t-muted)", marginTop: 2 }}>
-                    {t.entrepotNom ?? "Entrepôt délégué"} · {t.zoneNom ?? ""}
+                  <div style={{ fontSize: ".72rem", color: "var(--t-muted)", marginTop: 1 }}>
+                    {t.entrepotNom ?? "Entrepôt délégué"}{t.zoneNom ? ` · ${t.zoneNom}` : ""}
                   </div>
                 </div>
                 <span style={{
-                  background: statutInfo.bg, borderRadius: 6, padding: "3px 8px",
-                  fontSize: ".7rem", fontWeight: 700, color: statutInfo.color,
-                  border: `1px solid ${statutInfo.color}`,
+                  padding: "4px 10px", borderRadius: 20,
+                  fontSize: ".7rem", fontWeight: 700,
+                  color: statutInfo.color, background: statutInfo.bg,
+                  border: `1px solid ${statutInfo.color}22`,
                 }}>
                   {statutInfo.label}
                 </span>
@@ -206,37 +262,52 @@ export default function ReceptionsTransfertsPage() {
               {/* Corps */}
               <div style={{ padding: "12px 16px" }}>
                 {/* Poids + sacs */}
-                <div style={{ display: "flex", gap: 16, marginBottom: 10 }}>
-                  <div style={{ flex: 1, textAlign: "center" }}>
-                    <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--t-success)" }}>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: t.nombreSacs != null ? "1fr 1fr" : "1fr",
+                  gap: 10, marginBottom: 12,
+                }}>
+                  <div style={{
+                    background: "var(--t-success-bg)", borderRadius: 10, padding: "10px 14px",
+                  }}>
+                    <div style={{ fontSize: ".68rem", color: "var(--t-muted)", marginBottom: 2 }}>
+                      Poids déclaré
+                    </div>
+                    <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--t-success)" }}>
                       {fmtPoids(poidsKg)}
                     </div>
-                    <div style={{ fontSize: ".68rem", color: "var(--t-muted)" }}>Poids déclaré</div>
                   </div>
                   {t.nombreSacs != null && (
-                    <div style={{ flex: 1, textAlign: "center" }}>
-                      <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--t-warning)" }}>
+                    <div style={{
+                      background: "var(--t-warning-bg)", borderRadius: 10, padding: "10px 14px",
+                    }}>
+                      <div style={{ fontSize: ".68rem", color: "var(--t-muted)", marginBottom: 2 }}>
+                        Sacs déclarés
+                      </div>
+                      <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--t-warning)" }}>
                         {t.nombreSacs}
                       </div>
-                      <div style={{ fontSize: ".68rem", color: "var(--t-muted)" }}>Sacs</div>
                     </div>
                   )}
                 </div>
 
                 {/* Méta */}
                 <div style={{ fontSize: ".73rem", color: "var(--t-muted)", marginBottom: 4 }}>
-                  <span>Délégué : </span>
-                  <span style={{ color: "var(--t-text)", fontWeight: 600 }}>
+                  Délégué : <span style={{ color: "var(--t-text)", fontWeight: 600 }}>
                     {t.delegueNom ?? "—"} {t.deleguePrenoms ?? ""}
                   </span>
                 </div>
                 {t.dateArrivee && (
                   <div style={{ fontSize: ".73rem", color: "var(--t-muted)", marginBottom: 4 }}>
-                    Arrivée signalée : <span style={{ color: "var(--t-text)" }}>{fmtDate(t.dateArrivee)}</span>
+                    Arrivée : <span style={{ color: "var(--t-text)" }}>{fmtDate(t.dateArrivee)}</span>
                   </div>
                 )}
                 {t.notes && (
-                  <div style={{ fontSize: ".73rem", color: "var(--t-muted)", fontStyle: "italic", marginBottom: 8 }}>
+                  <div style={{
+                    fontSize: ".73rem", color: "var(--t-muted)", fontStyle: "italic",
+                    marginBottom: 8, padding: "6px 10px", background: "var(--t-bg)",
+                    borderRadius: 6, borderLeft: "2px solid var(--t-border)",
+                  }}>
                     « {t.notes} »
                   </div>
                 )}
@@ -247,19 +318,31 @@ export default function ReceptionsTransfertsPage() {
                     onClick={() => handleDemarrerPesee(t)}
                     disabled={isBusy}
                     className="t-btn t-btn--primary"
-                    style={{ width: "100%", marginTop: 8 }}
+                    style={{
+                      width: "100%", marginTop: 8, height: 52,
+                      background: "linear-gradient(135deg, var(--t-peseur-dark) 0%, var(--t-peseur) 100%)",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    }}
                   >
-                    {isBusy ? "Démarrage…" : "⚖️ Démarrer la pesée"}
+                    {isBusy
+                      ? <RefreshCw size={16} style={{ animation: "t-spin .8s linear infinite" }} />
+                      : <Play size={16} fill="#fff" />}
+                    {isBusy ? "Démarrage…" : "Démarrer la pesée"}
                   </button>
                 )}
 
                 {t.statut === "en_pesee" && t.sessionPeseeId && (
                   <button
                     onClick={() => navigate(`/pesee-session/${t.sessionPeseeId}`)}
-                    className="t-btn t-btn--secondary"
-                    style={{ width: "100%", marginTop: 8 }}
+                    className="t-btn t-btn--ghost"
+                    style={{
+                      width: "100%", marginTop: 8, height: 52,
+                      borderColor: "var(--t-peseur)", color: "var(--t-peseur)",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    }}
                   >
-                    ▶ Reprendre la session de pesée
+                    <RotateCcw size={16} />
+                    Reprendre la session de pesée
                   </button>
                 )}
               </div>
@@ -267,16 +350,21 @@ export default function ReceptionsTransfertsPage() {
           );
         })}
 
-        <button
-          onClick={reload}
-          style={{
-            width: "100%", background: "transparent", border: "1px dashed var(--t-border)",
-            borderRadius: 10, color: "var(--t-muted)", padding: 10, fontSize: ".78rem", cursor: "pointer",
-            marginTop: 8,
-          }}
-        >
-          🔄 Rafraîchir la liste
-        </button>
+        {/* Bouton rafraîchir discret */}
+        {!loading && transferts.length > 0 && (
+          <button
+            onClick={reload}
+            style={{
+              width: "100%", background: "transparent", border: "1px dashed var(--t-border)",
+              borderRadius: 10, color: "var(--t-muted)", padding: "10px",
+              fontSize: ".78rem", cursor: "pointer", marginBottom: 16,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}
+          >
+            <RefreshCw size={13} />
+            Rafraîchir la liste
+          </button>
+        )}
       </main>
 
       <BottomNavPeseur delegueId={user?.delegueId} />

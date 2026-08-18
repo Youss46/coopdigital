@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
+import {
+  ChevronLeft, Loader2, CheckCircle2, Scale, Package,
+  Truck, Plus, Trash2, CheckCheck, X, AlertTriangle,
+  WifiOff,
+} from "lucide-react";
 import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNavPeseur from "../components/BottomNavPeseur";
@@ -637,13 +642,19 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   if (resumeLoading) {
     return (
       <div className="t-app">
-        <header className="t-header">
-          <button className="t-header__back" onClick={() => setLocation("/")}>‹</button>
+        <header className="t-header t-header--peseur">
+          <button
+            className="t-header__back"
+            onClick={() => setLocation("/")}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <ChevronLeft size={22} />
+          </button>
           <div><div className="t-header__title">Pesée groupée</div></div>
         </header>
         <main className="t-main" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
           <div style={{ textAlign: "center", color: "var(--t-muted)" }}>
-            <div style={{ fontSize: "2rem", marginBottom: 12 }}>⏳</div>
+            <Loader2 size={36} style={{ margin: "0 auto 12px", animation: "t-spin .8s linear infinite" }} color="var(--t-peseur)" />
             <div style={{ fontSize: ".9rem" }}>Chargement de la session…</div>
           </div>
         </main>
@@ -653,9 +664,15 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
   return (
     <div className="t-app">
-      <header className="t-header">
+      <header className="t-header t-header--peseur">
         {step !== "succes" ? (
-          <button className="t-header__back" onClick={() => step === "session" ? setLocation("/") : setLocation("/")}>‹</button>
+          <button
+            className="t-header__back"
+            onClick={() => setLocation("/")}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <ChevronLeft size={22} />
+          </button>
         ) : null}
         <div>
           <div className="t-header__title">Pesée groupée</div>
@@ -675,18 +692,30 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
         {step === "membre" && (
           <>
             {!isOnline && (
-              <div className="t-card" style={{ margin: "16px 16px 0", borderLeft: "4px solid var(--t-info)", background: "var(--t-info-bg)" }}>
-                <div style={{ color: "var(--t-info)", fontWeight: 700, fontSize: ".9rem" }}>
-                  📴 Mode hors ligne
-                </div>
-                <div style={{ color: "var(--t-muted)", fontSize: ".8rem", marginTop: 4 }}>
-                  Sélectionnez un planteur pour démarrer une pesée. Elle sera synchronisée à la reconnexion.
+              <div style={{
+                margin: "16px 16px 0", padding: "12px 14px", borderRadius: 12,
+                borderLeft: "4px solid var(--t-peseur)", background: "var(--t-peseur-bg)",
+                display: "flex", gap: 10, alignItems: "flex-start",
+              }}>
+                <WifiOff size={18} color="var(--t-peseur)" style={{ flexShrink: 0, marginTop: 1 }} />
+                <div>
+                  <div style={{ color: "var(--t-peseur-dark)", fontWeight: 700, fontSize: ".88rem" }}>
+                    Mode hors ligne
+                  </div>
+                  <div style={{ color: "var(--t-muted)", fontSize: ".78rem", marginTop: 2 }}>
+                    Sélectionnez un planteur pour démarrer une pesée. Elle sera synchronisée à la reconnexion.
+                  </div>
                 </div>
               </div>
             )}
             {erreur && (
-              <div className="t-card" style={{ margin: "12px 16px 0", borderLeft: "4px solid var(--t-danger)", background: "var(--t-danger-bg)" }}>
-                <span style={{ color: "var(--t-danger)", fontSize: ".85rem" }}>⚠️ {erreur}</span>
+              <div style={{
+                margin: "12px 16px 0", padding: "10px 14px", borderRadius: 10,
+                borderLeft: "4px solid var(--t-danger)", background: "var(--t-danger-bg)",
+                display: "flex", gap: 8, alignItems: "center",
+              }}>
+                <AlertTriangle size={15} color="var(--t-danger)" style={{ flexShrink: 0 }} />
+                <span style={{ color: "var(--t-danger)", fontSize: ".85rem" }}>{erreur}</span>
               </div>
             )}
             <FournisseurSearch
@@ -764,44 +793,74 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
             {/* Bannière hors ligne */}
             {brouillon && (
-              <div style={{ margin: "0 16px 8px", background: "var(--t-warning-bg)", borderLeft: "3px solid var(--t-warning)", borderRadius: 8, padding: "8px 12px" }}>
-                <span style={{ color: "var(--t-warning)", fontSize: ".82rem", fontWeight: 600 }}>
-                  📴 Pesée hors ligne — sera synchronisée à la reconnexion
+              <div style={{
+                margin: "0 16px 8px", padding: "8px 12px", borderRadius: 10,
+                background: "var(--t-warning-bg)", borderLeft: "3px solid var(--t-warning)",
+                display: "flex", gap: 8, alignItems: "center",
+              }}>
+                <WifiOff size={14} color="var(--t-warning)" style={{ flexShrink: 0 }} />
+                <span style={{ color: "var(--t-warning)", fontSize: ".8rem", fontWeight: 600 }}>
+                  Pesée hors ligne — sera synchronisée à la reconnexion
                 </span>
               </div>
             )}
 
             {/* Cumul session */}
-            <div className="t-card" style={{ margin: "0 16px 8px", background: "var(--t-primary-light)", border: "1px solid var(--t-border)" }}>
-              <div style={{ fontSize: ".72rem", color: "var(--t-primary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
-                Cumul session
+            <div style={{
+              margin: "0 16px 10px", background: "var(--t-card)", borderRadius: 14,
+              border: "1px solid rgba(26,71,49,.12)",
+              boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+              overflow: "hidden",
+            }}>
+              <div style={{
+                background: "linear-gradient(135deg, var(--t-primary) 0%, var(--t-peseur-dark) 100%)",
+                padding: "8px 14px",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}>
+                <span style={{ fontSize: ".68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "rgba(255,255,255,.8)" }}>
+                  Cumul session
+                </span>
+                <span style={{ fontSize: ".68rem", color: "rgba(255,255,255,.6)", fontFamily: "monospace" }}>
+                  {session.numeroSession}
+                </span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, textAlign: "center" }}>
-                <div>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--t-primary)" }}>
-                    {session.lignes.length}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0 }}>
+                {[
+                  { label: "Passages", value: session.lignes.length, color: "var(--t-primary)" },
+                  { label: "Sacs", value: session.nbSacsTotal, color: "var(--t-peseur)" },
+                  { label: fmtPoids(poidsTotalNum), value: null, color: "var(--t-success)", big: true },
+                ].map((stat, i) => (
+                  <div key={i} style={{
+                    padding: "12px 8px", textAlign: "center",
+                    borderRight: i < 2 ? "1px solid var(--t-border)" : undefined,
+                  }}>
+                    {stat.big ? (
+                      <>
+                        <div style={{ fontSize: "1.2rem", fontWeight: 800, color: stat.color, lineHeight: 1.1 }}>
+                          {stat.label}
+                        </div>
+                        <div style={{ fontSize: ".62rem", color: "var(--t-muted)", marginTop: 3 }}>Total net</div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: "1.5rem", fontWeight: 800, color: stat.color }}>
+                          {stat.value}
+                        </div>
+                        <div style={{ fontSize: ".62rem", color: "var(--t-muted)", marginTop: 1 }}>{stat.label}</div>
+                      </>
+                    )}
                   </div>
-                  <div style={{ fontSize: ".68rem", color: "var(--t-muted)" }}>Pesée{session.lignes.length > 1 ? "s" : ""}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--t-primary)" }}>
-                    {session.nbSacsTotal}
-                  </div>
-                  <div style={{ fontSize: ".68rem", color: "var(--t-muted)" }}>Sacs</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--t-success)" }}>
-                    {fmtPoids(poidsTotalNum)}
-                  </div>
-                  <div style={{ fontSize: ".68rem", color: "var(--t-muted)" }}>Total net</div>
-                </div>
+                ))}
               </div>
             </div>
 
             {/* Lignes existantes */}
             {session.lignes.length > 0 && (
-              <div style={{ margin: "0 16px 8px" }}>
-                <div style={{ fontSize: ".72rem", color: "var(--t-muted)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
+              <div style={{ margin: "0 16px 10px" }}>
+                <div style={{
+                  fontSize: ".68rem", color: "var(--t-muted)", fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6,
+                }}>
                   Pesées enregistrées
                 </div>
                 {session.lignes.map((l) => {
@@ -809,32 +868,42 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                   return (
                     <div key={l.id} style={{
                       display: "flex", alignItems: "center", gap: 10,
-                      background: "var(--t-bg)", border: "1px solid var(--t-border)", borderRadius: 10, padding: "10px 12px", marginBottom: 6,
+                      background: "var(--t-card)", border: "1px solid var(--t-border)",
+                      borderRadius: 10, padding: "10px 12px", marginBottom: 6,
+                      boxShadow: "0 1px 3px rgba(0,0,0,.05)",
                     }}>
                       <div style={{
-                        width: 28, height: 28, borderRadius: "50%", background: "var(--t-primary-light)",
+                        width: 30, height: 30, borderRadius: 8, background: "var(--t-peseur-bg)",
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: ".75rem", fontWeight: 800, color: "var(--t-primary)", flexShrink: 0,
+                        fontSize: ".75rem", fontWeight: 800, color: "var(--t-peseur)", flexShrink: 0,
                       }}>
                         {l.numeroPassage}
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: ".88rem", fontWeight: 700, color: "var(--t-text)" }}>
+                        <div style={{ fontSize: ".9rem", fontWeight: 700, color: "var(--t-text)" }}>
                           {fmtPoids(net)}
-                          {l.nbSacs > 0 && <span style={{ color: "var(--t-muted)", fontWeight: 400, marginLeft: 6 }}>· {l.nbSacs} sac{l.nbSacs > 1 ? "s" : ""}</span>}
+                          {l.nbSacs > 0 && (
+                            <span style={{ color: "var(--t-muted)", fontWeight: 400, fontSize: ".8rem", marginLeft: 6 }}>
+                              · {l.nbSacs} sac{l.nbSacs > 1 ? "s" : ""}
+                            </span>
+                          )}
                         </div>
                         {parseFloat(l.tareKg ?? "0") > 0 && (
-                          <div style={{ fontSize: ".72rem", color: "var(--t-muted)" }}>
+                          <div style={{ fontSize: ".7rem", color: "var(--t-muted)", marginTop: 1 }}>
                             Brut {parseFloat(l.poidsBrutKg).toFixed(3)} kg − tare {parseFloat(l.tareKg ?? "0").toFixed(3)} kg
                           </div>
                         )}
                       </div>
                       <button
                         onClick={() => handleSupprimerLigne(l.id)}
-                        style={{ background: "none", border: "none", color: "var(--t-danger)", fontSize: "1rem", cursor: "pointer", padding: 4 }}
+                        style={{
+                          background: "rgba(220,38,38,.08)", border: "none", borderRadius: 8,
+                          color: "var(--t-danger)", cursor: "pointer", padding: "6px",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}
                         title="Supprimer cette pesée"
                       >
-                        ✕
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   );
@@ -844,8 +913,13 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
             {/* Formulaire nouvelle pesée */}
             <div className="t-form" style={{ margin: "0 16px" }}>
-              <div style={{ fontSize: ".75rem", color: "var(--t-primary)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>
-                ⊕ Nouveau passage
+              <div style={{
+                fontSize: ".68rem", color: "var(--t-peseur-dark)", fontWeight: 700,
+                textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 8,
+                display: "flex", alignItems: "center", gap: 5,
+              }}>
+                <Plus size={13} />
+                Nouveau passage
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
@@ -919,34 +993,55 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               )}
 
               {erreur && (
-                <div style={{ color: "#ef4444", fontSize: ".82rem", marginBottom: 8 }}>⚠️ {erreur}</div>
+                <div style={{
+                  display: "flex", gap: 6, alignItems: "center",
+                  color: "var(--t-danger)", fontSize: ".82rem", marginBottom: 8,
+                }}>
+                  <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                  {erreur}
+                </div>
               )}
 
               <button
                 className="t-btn t-btn--primary"
-                style={{ width: "100%", marginBottom: 10 }}
+                style={{
+                  width: "100%", marginBottom: 10,
+                  background: "linear-gradient(135deg, var(--t-peseur-dark) 0%, var(--t-peseur) 100%)",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                }}
                 disabled={!poidsBrut || parseFloat(poidsBrut) <= 0 || ajoutLoading}
                 onClick={handleAjouterLigne}
               >
-                {ajoutLoading ? "Enregistrement…" : "⊕ Enregistrer ce passage"}
+                {ajoutLoading
+                  ? <Loader2 size={16} style={{ animation: "t-spin .8s linear infinite" }} />
+                  : <Plus size={16} />}
+                {ajoutLoading ? "Enregistrement…" : "Enregistrer ce passage"}
               </button>
 
               {/* Actions session */}
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   className="t-btn t-btn--ghost"
-                  style={{ flex: 1, color: "#ef4444", borderColor: "#ef4444" }}
+                  style={{ flex: 1, color: "var(--t-danger)", borderColor: "var(--t-danger)", height: 52, fontSize: ".85rem" }}
                   onClick={() => setConfirmAnnuler(true)}
                 >
-                  Annuler session
+                  <X size={15} style={{ marginRight: 4 }} />
+                  Annuler
                 </button>
                 <button
                   className="t-btn t-btn--primary"
-                  style={{ flex: 2, background: session.lignes.length === 0 ? "#334155" : undefined }}
+                  style={{
+                    flex: 2, height: 52,
+                    background: session.lignes.length === 0
+                      ? "#334155"
+                      : "linear-gradient(135deg, var(--t-primary) 0%, var(--t-success) 100%)",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}
                   disabled={session.lignes.length === 0 || terminerLoading}
                   onClick={() => setConfirmTerminer(true)}
                 >
-                  ✔ Terminer la pesée
+                  <CheckCheck size={16} />
+                  Terminer la pesée
                 </button>
               </div>
             </div>
@@ -958,13 +1053,30 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
           const isTransfertReception = sessionTerminee.operation === "reception_transfert";
           return (
           <div style={{ padding: "24px 16px", textAlign: "center" }}>
-            <div style={{ fontSize: "3rem", marginBottom: 12 }}>
-              {isTransfertReception ? "⚖️" : livraisonResult ? "🎉" : "✅"}
+            {/* Icon success */}
+            <div style={{
+              width: 72, height: 72, borderRadius: 20, margin: "0 auto 16px",
+              background: livraisonResult
+                ? "linear-gradient(135deg, var(--t-success) 0%, #4ade80 100%)"
+                : isTransfertReception
+                  ? "linear-gradient(135deg, var(--t-peseur-dark) 0%, var(--t-peseur) 100%)"
+                  : "linear-gradient(135deg, var(--t-primary) 0%, var(--t-success) 100%)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 6px 20px rgba(22,163,74,.3)",
+            }}>
+              {isTransfertReception
+                ? <Scale size={32} color="#fff" strokeWidth={1.8} />
+                : livraisonResult
+                  ? <CheckCircle2 size={32} color="#fff" strokeWidth={2} />
+                  : <CheckCheck size={32} color="#fff" strokeWidth={2} />}
             </div>
-            <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--t-success)", marginBottom: 4 }}>
-              {isTransfertReception ? "Pesée de réception clôturée" : livraisonResult ? "Livraison créée" : "Pesée terminée"}
+            <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--t-primary)", marginBottom: 4 }}>
+              {isTransfertReception ? "Pesée de réception clôturée" : livraisonResult ? "Livraison créée !" : "Pesée terminée"}
             </div>
-            <div style={{ fontSize: ".82rem", color: "var(--t-muted)", fontFamily: "monospace", marginBottom: 20 }}>
+            <div style={{
+              display: "inline-block", fontSize: ".75rem", color: "var(--t-peseur)", fontFamily: "monospace",
+              background: "var(--t-peseur-bg)", padding: "3px 10px", borderRadius: 8, marginBottom: 20,
+            }}>
               {sessionTerminee.numeroSession}
             </div>
 

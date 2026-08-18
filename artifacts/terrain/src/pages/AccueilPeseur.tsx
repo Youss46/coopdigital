@@ -1,5 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import {
+  Scale, Package, Layers, History, Truck,
+  LogOut, RefreshCw, AlertTriangle, Play,
+  PackageCheck, WifiOff, TrendingUp, Banknote,
+  ChevronRight,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useOffline } from "../contexts/OfflineContext";
 import { getBilan, getSessionsEnCours, getSessionsAConvertir } from "../lib/api";
@@ -12,8 +18,10 @@ function fmtPoids(kg: number): string {
   return kg.toFixed(1) + " kg";
 }
 
-function fmtFcfa(n: number): string {
-  return n.toLocaleString("fr-FR") + " FCFA";
+function initiales(nom?: string, prenoms?: string): string {
+  const n = (nom?.[0] ?? "").toUpperCase();
+  const p = (prenoms?.[0] ?? "").toUpperCase();
+  return n + p || "P";
 }
 
 export default function AccueilPeseur() {
@@ -26,29 +34,24 @@ export default function AccueilPeseur() {
   const [sessionsAConvertir, setSessionsAConvertir] = useState<SessionPesee[]>([]);
   const [brouillons, setBrouillons] = useState<BrouillonPesee[]>([]);
 
-  // Rafraîchit le bilan à chaque fois que la route revient sur "/" (retour depuis collecte, historique…)
-  // et à chaque changement de connectivité
   useEffect(() => {
     if (isOnline) {
       getBilan().then(setBilan).catch(() => {});
     }
   }, [location, isOnline]);
 
-  // Rafraîchit aussi après chaque sync réussie (collectes hors-ligne)
   useEffect(() => {
     if (syncStatus === "done" && isOnline) {
       getBilan().then(setBilan).catch(() => {});
     }
   }, [syncStatus, isOnline]);
 
-  // Récupère les sessions de pesée en cours + terminées sans livraison pour les afficher en raccourci
   useEffect(() => {
     if (!isOnline) { setSessionsEnCours([]); setSessionsAConvertir([]); return; }
     getSessionsEnCours().then(setSessionsEnCours).catch(() => setSessionsEnCours([]));
     getSessionsAConvertir().then(setSessionsAConvertir).catch(() => setSessionsAConvertir([]));
   }, [location, isOnline]);
 
-  // Charge les brouillons hors-ligne depuis IndexedDB (toujours, connecté ou non)
   useEffect(() => {
     getBrouillons()
       .then((all) => setBrouillons(all.filter((b) => b.statut !== "annulee" && b.syncStatus !== "synced")))
@@ -57,319 +60,432 @@ export default function AccueilPeseur() {
 
   return (
     <div className="t-app">
-      <header className="t-header">
-        <div style={{ flex: 1 }}>
-          <div className="t-header__title">Bonjour, {user?.nom} 👋</div>
-          <div className="t-header__sub">
-            {user?.section ? `Section : ${user.section}` : "Peseur"}
+      {/* ── Header gradient peseur ──────────────────────────────── */}
+      <header className="t-header t-header--peseur">
+        <div className="t-avatar">{initiales(user?.nom, user?.prenoms)}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="t-header__title" style={{ fontSize: "1rem" }}>
+            {user?.nom} {user?.prenoms}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 1 }}>
+            <span className={`t-dot ${isOnline ? "t-dot--online" : "t-dot--offline"}`} />
+            <span className="t-header__sub">
+              {user?.section ? `Section ${user.section}` : "Peseur"}
+              {!isOnline && " · Hors ligne"}
+            </span>
           </div>
         </div>
+
         {pendingCount > 0 && (
-          <span className="t-header__badge">📴 {pendingCount}</span>
+          <span className="t-header__badge">{pendingCount}</span>
         )}
+
         <button
           onClick={() => setConfirmDeconnexion(true)}
-          style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, color: "#fff", padding: "6px 12px", fontSize: ".8rem", fontWeight: 700, cursor: "pointer" }}
+          style={{
+            background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.25)",
+            borderRadius: 8, color: "#fff", padding: "7px", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          title="Déconnexion"
         >
-          ⎋
+          <LogOut size={16} />
         </button>
       </header>
 
-      <main className="t-main">
-        {/* ── Bilan du jour ─────────────────────────────────────────────── */}
+      <main className="t-main" style={{ padding: "16px 16px 0" }}>
+
+        {/* ── Bilan du jour ─────────────────────────────────────── */}
         {bilan && (
-          <div className="t-card" style={{ marginBottom: 12 }}>
-            <div className="t-card__title" style={{ marginBottom: 10 }}>📊 Aujourd'hui</div>
+          <section style={{ marginBottom: 14 }}>
+            <div style={{
+              fontSize: ".7rem", fontWeight: 700, textTransform: "uppercase",
+              letterSpacing: ".06em", color: "var(--t-muted)", marginBottom: 8,
+            }}>
+              Aujourd'hui
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--t-success)" }}>
+              {/* Collectes */}
+              <div className="t-kpi">
+                <div className="t-kpi__icon" style={{ background: "rgba(26,71,49,.1)" }}>
+                  <Scale size={18} color="var(--t-primary)" />
+                </div>
+                <div className="t-kpi__value" style={{ color: "var(--t-primary)" }}>
                   {bilan.collectes.nb}
                 </div>
-                <div style={{ fontSize: ".68rem", color: "var(--t-muted)", marginTop: 2 }}>
-                  Collecte{bilan.collectes.nb !== 1 ? "s" : ""}
-                </div>
+                <div className="t-kpi__label">Pesée{bilan.collectes.nb !== 1 ? "s" : ""}</div>
               </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--t-info)" }}>
+
+              {/* Tonnage */}
+              <div className="t-kpi">
+                <div className="t-kpi__icon" style={{ background: "rgba(8,145,178,.1)" }}>
+                  <TrendingUp size={18} color="var(--t-peseur)" />
+                </div>
+                <div className="t-kpi__value" style={{ color: "var(--t-peseur)", fontSize: "1.2rem" }}>
                   {fmtPoids(bilan.collectes.tonnage)}
                 </div>
-                <div style={{ fontSize: ".68rem", color: "var(--t-muted)", marginTop: 2 }}>
-                  Tonnage
-                </div>
+                <div className="t-kpi__label">Tonnage</div>
               </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: ".95rem", fontWeight: 800, color: "var(--t-warning)", lineHeight: 1.3 }}>
-                  {bilan.collectes.valeur.toLocaleString("fr-FR")}
+
+              {/* FCFA */}
+              <div className="t-kpi">
+                <div className="t-kpi__icon" style={{ background: "rgba(22,163,74,.1)" }}>
+                  <Banknote size={18} color="var(--t-success)" />
                 </div>
-                <div style={{ fontSize: ".68rem", color: "var(--t-muted)", marginTop: 2 }}>
-                  FCFA brut
+                <div className="t-kpi__value" style={{ fontSize: ".9rem", color: "var(--t-success)" }}>
+                  {bilan.collectes.valeur > 0
+                    ? (bilan.collectes.valeur >= 1_000_000
+                      ? (bilan.collectes.valeur / 1_000_000).toFixed(1) + "M"
+                      : (bilan.collectes.valeur >= 1000
+                        ? (bilan.collectes.valeur / 1000).toFixed(0) + "k"
+                        : bilan.collectes.valeur.toLocaleString("fr-FR")))
+                    : "—"}
                 </div>
+                <div className="t-kpi__label">FCFA brut</div>
               </div>
             </div>
+
             {bilan.collectes.nb === 0 && (
-              <div style={{ textAlign: "center", color: "var(--t-muted)", fontSize: ".8rem", marginTop: 8 }}>
+              <div style={{
+                marginTop: 8, textAlign: "center", fontSize: ".78rem",
+                color: "var(--t-muted)", padding: "6px 0",
+              }}>
                 Aucune collecte enregistrée pour l'instant
               </div>
             )}
-          </div>
+          </section>
         )}
 
-        {/* ── Brouillons hors-ligne (pesées non encore synchronisées) ─────── */}
+        {/* ── Brouillons hors-ligne ─────────────────────────────── */}
         {brouillons.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            {brouillons.map((b) => (
-              <Link key={b.localId} href={`/pesee-session/b-${b.localId}`}>
-                <div className="t-card" style={{
-                  marginBottom: 8,
-                  background: b.syncStatus === "error" ? "var(--t-danger-bg)" : "var(--t-warning-bg)",
-                  borderLeft: `4px solid ${b.syncStatus === "error" ? "var(--t-danger)" : "var(--t-warning)"}`,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                }}>
-                  <span style={{ fontSize: "1.6rem" }}>{b.syncStatus === "error" ? "⚠️" : "📴"}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: b.syncStatus === "error" ? "var(--t-danger)" : "var(--t-warning)" }}>
-                      {b.statut === "terminee" ? "Pesée clôturée hors ligne" : "Pesée en cours hors ligne"}
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "var(--t-text)", marginTop: 2 }}>
-                      {b.membreNom} {b.membrePrenoms}
-                    </div>
-                    <div style={{ fontSize: ".72rem", color: "var(--t-muted)", marginTop: 2 }}>
-                      {b.lignes.length} pesée{b.lignes.length !== 1 ? "s" : ""} · {b.poidsTotalKg.toFixed(1)} kg
-                      {b.syncStatus === "error" && b.errorMsg && (
-                        <span style={{ color: "var(--t-danger)", marginLeft: 6 }}>— {b.errorMsg}</span>
-                      )}
+          <section style={{ marginBottom: 12 }}>
+            {brouillons.map((b) => {
+              const isErr = b.syncStatus === "error";
+              const accentColor = isErr ? "var(--t-danger)" : "var(--t-warning)";
+              const bgColor = isErr ? "var(--t-danger-bg)" : "var(--t-warning-bg)";
+              return (
+                <Link key={b.localId} href={`/pesee-session/b-${b.localId}`}>
+                  <div className="t-session-card" style={{ marginBottom: 8, background: bgColor }}>
+                    <div className="t-session-card__stripe" style={{ background: accentColor }} />
+                    <div className="t-session-card__body">
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                        background: isErr ? "rgba(220,38,38,.15)" : "rgba(217,119,6,.15)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {isErr
+                          ? <AlertTriangle size={18} color="var(--t-danger)" />
+                          : <WifiOff size={18} color="var(--t-warning)" />}
+                      </div>
+                      <div className="t-session-card__text">
+                        <div className="t-session-card__title" style={{ color: accentColor }}>
+                          {b.statut === "terminee" ? "Pesée clôturée hors ligne" : "Pesée en cours hors ligne"}
+                        </div>
+                        <div className="t-session-card__name">
+                          {b.membreNom} {b.membrePrenoms}
+                        </div>
+                        <div className="t-session-card__meta">
+                          {b.lignes.length} pesée{b.lignes.length !== 1 ? "s" : ""} · {b.poidsTotalKg.toFixed(1)} kg
+                          {isErr && b.errorMsg && (
+                            <span style={{ color: "var(--t-danger)", marginLeft: 4 }}>— {b.errorMsg}</span>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight size={18} color={accentColor} style={{ flexShrink: 0 }} />
                     </div>
                   </div>
-                  <span style={{ fontSize: "1.1rem", color: b.syncStatus === "error" ? "var(--t-danger)" : "var(--t-warning)" }}>›</span>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              );
+            })}
+          </section>
         )}
 
-        {/* ── Sessions en cours — raccourcis de reprise ─────────────────── */}
+        {/* ── Sessions en cours ─────────────────────────────────── */}
         {sessionsEnCours.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
+          <section style={{ marginBottom: 12 }}>
             {sessionsEnCours.map((s) => (
               <Link key={s.id} href={`/pesee-session/${s.id}`}>
-                <div className="t-card" style={{
-                  marginBottom: 8,
-                  background: "var(--t-info-bg)",
-                  borderLeft: "4px solid var(--t-info)",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                }}>
-                  <span style={{ fontSize: "1.6rem" }}>▶</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: "var(--t-info)" }}>
-                      Session en cours
+                <div className="t-session-card" style={{ marginBottom: 8 }}>
+                  <div className="t-session-card__stripe" style={{ background: "var(--t-peseur)" }} />
+                  <div className="t-session-card__body">
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                      background: "var(--t-peseur-bg)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <Play size={18} color="var(--t-peseur)" fill="var(--t-peseur)" />
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "var(--t-text)", marginTop: 2 }}>
-                      {s.membreNom} {s.membrePrenoms}
+                    <div className="t-session-card__text">
+                      <div className="t-session-card__title" style={{ color: "var(--t-peseur)" }}>
+                        Session en cours
+                      </div>
+                      <div className="t-session-card__name">
+                        {s.membreNom} {s.membrePrenoms}
+                      </div>
+                      <div className="t-session-card__meta">
+                        {s.numeroSession}
+                        {(s.nbLignes ?? 0) > 0 && ` · ${s.nbLignes} passage${(s.nbLignes ?? 0) > 1 ? "s" : ""}`}
+                      </div>
                     </div>
-                    <div style={{ fontSize: ".72rem", color: "var(--t-muted)", marginTop: 2, fontFamily: "monospace" }}>
-                      {s.numeroSession} · {s.nbLignes ?? 0} pesée{(s.nbLignes ?? 0) !== 1 ? "s" : ""}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: ".85rem", fontWeight: 700, color: "var(--t-success)" }}>
+                    <span style={{
+                      fontSize: ".72rem", fontWeight: 700, padding: "4px 8px", borderRadius: 20,
+                      background: "var(--t-peseur-light)", color: "var(--t-peseur-dark)",
+                      whiteSpace: "nowrap", flexShrink: 0,
+                    }}>
                       Reprendre
-                    </div>
-                    <span style={{ fontSize: "1.1rem", color: "var(--t-info)" }}>›</span>
+                    </span>
                   </div>
                 </div>
               </Link>
             ))}
-          </div>
+          </section>
         )}
 
-        {/* ── Sessions terminées sans livraison — à convertir ────────────── */}
+        {/* ── Sessions terminées à convertir ───────────────────── */}
         {sessionsAConvertir.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
+          <section style={{ marginBottom: 12 }}>
             {sessionsAConvertir.map((s) => (
               <Link key={s.id} href={`/pesee-session/${s.id}`}>
-                <div className="t-card" style={{
-                  marginBottom: 8,
-                  background: "var(--t-success-bg)",
-                  borderLeft: "4px solid var(--t-success)",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                }}>
-                  <span style={{ fontSize: "1.6rem" }}>📦</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: "var(--t-success)" }}>
-                      Pesée clôturée · à convertir
+                <div className="t-session-card" style={{ marginBottom: 8 }}>
+                  <div className="t-session-card__stripe" style={{ background: "var(--t-success)" }} />
+                  <div className="t-session-card__body">
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                      background: "var(--t-success-bg)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <PackageCheck size={18} color="var(--t-success)" />
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "var(--t-text)", marginTop: 2 }}>
-                      {s.membreNom} {s.membrePrenoms}
+                    <div className="t-session-card__text">
+                      <div className="t-session-card__title" style={{ color: "var(--t-success)" }}>
+                        Pesée clôturée · à convertir
+                      </div>
+                      <div className="t-session-card__name">
+                        {s.membreNom} {s.membrePrenoms}
+                      </div>
+                      <div className="t-session-card__meta">
+                        {s.numeroSession} · {fmtPoids(parseFloat(s.poidsTotalKg))}
+                      </div>
                     </div>
-                    <div style={{ fontSize: ".72rem", color: "var(--t-muted)", marginTop: 2, fontFamily: "monospace" }}>
-                      {s.numeroSession} · {fmtPoids(parseFloat(s.poidsTotalKg))}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: ".85rem", fontWeight: 700, color: "var(--t-success)" }}>
+                    <span style={{
+                      fontSize: ".72rem", fontWeight: 700, padding: "4px 8px", borderRadius: 20,
+                      background: "var(--t-success-bg)", color: "var(--t-success)",
+                      border: "1px solid rgba(22,163,74,.3)",
+                      whiteSpace: "nowrap", flexShrink: 0,
+                    }}>
                       Convertir
-                    </div>
-                    <span style={{ fontSize: "1.1rem", color: "var(--t-success)" }}>›</span>
+                    </span>
                   </div>
                 </div>
               </Link>
             ))}
-          </div>
+          </section>
         )}
 
-        {/* ── Réceptions de transferts (peseur central uniquement) ─────── */}
+        {/* ── Réceptions de transferts (peseur central) ─────────── */}
         {user?.delegueId == null && (
           <Link href="/receptions">
-            <div className="t-card" style={{
-              marginBottom: 12,
-              background: "var(--t-info-bg)",
-              borderLeft: "4px solid var(--t-info)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-            }}>
-              <span style={{ fontSize: "1.8rem" }}>🚛</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 800, fontSize: ".95rem", color: "var(--t-info)" }}>
-                  Réceptions de transferts
+            <div className="t-session-card" style={{ marginBottom: 14 }}>
+              <div className="t-session-card__stripe" style={{ background: "var(--t-peseur)" }} />
+              <div className="t-session-card__body">
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  background: "var(--t-peseur-bg)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Truck size={18} color="var(--t-peseur)" />
                 </div>
-                <div style={{ fontSize: ".75rem", color: "var(--t-muted)", marginTop: 2 }}>
-                  Peser les arrivages des délégués
+                <div className="t-session-card__text">
+                  <div className="t-session-card__title" style={{ color: "var(--t-peseur)" }}>
+                    Réceptions de transferts
+                  </div>
+                  <div className="t-session-card__meta">Peser les arrivages des délégués</div>
                 </div>
+                <ChevronRight size={18} color="var(--t-peseur)" style={{ flexShrink: 0 }} />
               </div>
-              <span style={{ fontSize: "1.2rem", color: "var(--t-info)" }}>›</span>
             </div>
           </Link>
         )}
 
-        {/* ── Actions pesée ─────────────────────────────────────────────── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-          <Link href="/collecte">
-            <div className="t-card" style={{
-              background: "var(--t-primary)",
-              cursor: "pointer", textAlign: "center", padding: "18px 12px",
-            }}>
-              <span style={{ fontSize: "2rem" }}>⚖️</span>
-              <div style={{ fontWeight: 800, fontSize: ".95rem", color: "#fff", marginTop: 6 }}>
-                Pesée simple
-              </div>
-              <div style={{ fontSize: ".72rem", color: "rgba(255,255,255,.75)", marginTop: 2 }}>
-                1 membre · 1 pesée
-              </div>
-            </div>
-          </Link>
-          <Link href="/pesee-session">
-            <div className="t-card" style={{
-              background: "var(--t-info)",
-              cursor: "pointer", textAlign: "center", padding: "18px 12px",
-            }}>
-              <span style={{ fontSize: "2rem" }}>📦</span>
-              <div style={{ fontWeight: 800, fontSize: ".95rem", color: "#fff", marginTop: 6 }}>
-                Pesée groupée
-              </div>
-              <div style={{ fontSize: ".72rem", color: "rgba(255,255,255,.75)", marginTop: 2 }}>
-                Plusieurs passages cumulés
-              </div>
-            </div>
-          </Link>
-        </div>
-
-        {/* ── Opérations en attente de sync ────────────────────────────── */}
-        {pendingCount > 0 && (
-          <div className="t-card" style={{ marginBottom: 12, borderLeft: "3px solid var(--t-warning)", background: "var(--t-warning-bg)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: "1.4rem" }}>📴</span>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: ".9rem", color: "var(--t-warning)" }}>
-                  {pendingCount} opération{pendingCount > 1 ? "s" : ""} en attente
-                </div>
-                <div style={{ fontSize: ".78rem", color: "var(--t-muted)", marginTop: 2 }}>
-                  {isOnline
-                    ? "Synchronisation en cours…"
-                    : "Hors ligne — sera synchronisé à la reconnexion"}
-                </div>
-              </div>
-              <Link href="/historique" style={{ marginLeft: "auto", fontSize: ".78rem", color: "var(--t-info)", fontWeight: 600 }}>
-                Voir →
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* ── Hors ligne sans opérations en attente ────────────────────── */}
-        {!isOnline && pendingCount === 0 && (
-          <div className="t-card" style={{ background: "var(--t-warning-bg)", borderLeft: "3px solid var(--t-warning)" }}>
-            <div style={{ fontSize: ".85rem", color: "var(--t-warning)" }}>
-              📡 Hors ligne — les collectes saisies seront synchronisées à la reconnexion.
-            </div>
-          </div>
-        )}
-
-        {/* ── Lien vers l'historique ────────────────────────────────────── */}
-        <Link href="/historique">
-          <div className="t-card" style={{
-            marginBottom: 12,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
+        {/* ── Actions pesée ─────────────────────────────────────── */}
+        <section style={{ marginBottom: 14 }}>
+          <div style={{
+            fontSize: ".7rem", fontWeight: 700, textTransform: "uppercase",
+            letterSpacing: ".06em", color: "var(--t-muted)", marginBottom: 8,
           }}>
-            <span style={{ fontSize: "1.6rem" }}>📋</span>
+            Nouvelle pesée
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Link href="/collecte">
+              <div
+                className="t-peseur-tile"
+                style={{ background: "linear-gradient(145deg, #1a4731 0%, #16a34a 100%)" }}
+              >
+                <div style={{
+                  width: 48, height: 48, borderRadius: 14,
+                  background: "rgba(255,255,255,.18)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Scale size={26} color="#fff" strokeWidth={1.8} />
+                </div>
+                <div>
+                  <div className="t-peseur-tile__label">Pesée simple</div>
+                  <div className="t-peseur-tile__sub">1 membre · 1 pesée</div>
+                </div>
+              </div>
+            </Link>
+
+            <Link href="/pesee-session">
+              <div
+                className="t-peseur-tile"
+                style={{ background: "linear-gradient(145deg, #0e7490 0%, #0891b2 100%)" }}
+              >
+                <div style={{
+                  width: 48, height: 48, borderRadius: 14,
+                  background: "rgba(255,255,255,.18)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Layers size={26} color="#fff" strokeWidth={1.8} />
+                </div>
+                <div>
+                  <div className="t-peseur-tile__label">Pesée groupée</div>
+                  <div className="t-peseur-tile__sub">Passages cumulés</div>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </section>
+
+        {/* ── Opérations en attente de sync ────────────────────── */}
+        {pendingCount > 0 && (
+          <div style={{
+            marginBottom: 12, padding: "12px 14px", borderRadius: 12,
+            background: "var(--t-warning-bg)", border: "1px solid rgba(217,119,6,.2)",
+            display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10, background: "rgba(217,119,6,.15)",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>
+              <RefreshCw size={18} color="var(--t-warning)" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: ".88rem", color: "var(--t-warning)" }}>
+                {pendingCount} opération{pendingCount > 1 ? "s" : ""} en attente
+              </div>
+              <div style={{ fontSize: ".75rem", color: "var(--t-muted)", marginTop: 1 }}>
+                {isOnline ? "Synchronisation en cours…" : "Hors ligne — sera synchronisé à la reconnexion"}
+              </div>
+            </div>
+            <Link href="/historique" style={{ fontSize: ".78rem", color: "var(--t-peseur)", fontWeight: 700 }}>
+              Voir →
+            </Link>
+          </div>
+        )}
+
+        {/* ── Hors ligne sans ops en attente ───────────────────── */}
+        {!isOnline && pendingCount === 0 && (
+          <div style={{
+            marginBottom: 12, padding: "10px 14px", borderRadius: 12,
+            background: "var(--t-warning-bg)", border: "1px solid rgba(217,119,6,.2)",
+            display: "flex", alignItems: "center", gap: 8,
+            fontSize: ".82rem", color: "var(--t-warning)",
+          }}>
+            <WifiOff size={16} />
+            <span>Hors ligne — les collectes saisies seront synchronisées à la reconnexion.</span>
+          </div>
+        )}
+
+        {/* ── Historique ──────────────────────────────────────── */}
+        <Link href="/historique">
+          <div style={{
+            marginBottom: 16, padding: "14px 16px", borderRadius: 14,
+            background: "var(--t-card)",
+            boxShadow: "0 2px 8px rgba(0,0,0,.06), 0 0 0 1px rgba(0,0,0,.04)",
+            display: "flex", alignItems: "center", gap: 12,
+          }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10,
+              background: "rgba(26,71,49,.08)",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>
+              <History size={18} color="var(--t-primary)" />
+            </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: ".9rem", color: "var(--t-text)" }}>
                 Mes collectes
               </div>
-              <div style={{ fontSize: ".78rem", color: "var(--t-muted)", marginTop: 2 }}>
+              <div style={{ fontSize: ".75rem", color: "var(--t-muted)", marginTop: 1 }}>
                 Consulter l'historique de vos livraisons
               </div>
             </div>
-            <span style={{ fontSize: "1.2rem", color: "var(--t-muted)" }}>›</span>
+            <ChevronRight size={18} color="var(--t-muted)" />
           </div>
         </Link>
       </main>
 
-      {/* ── Modal déconnexion ─────────────────────────────────────────────── */}
+      {/* ── Modal déconnexion ─────────────────────────────────────── */}
       {confirmDeconnexion && (
         <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,.5)",
+            zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center",
+            padding: "0 0 env(safe-area-inset-bottom)",
+          }}
           onClick={() => setConfirmDeconnexion(false)}
         >
           <div
-            style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 320, boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}
+            style={{
+              background: "#fff", borderRadius: "20px 20px 0 0",
+              width: "100%", maxWidth: 480,
+              boxShadow: "0 -8px 40px rgba(0,0,0,.2)",
+              padding: "8px 0 0",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f0f0f0" }}>
-              <div style={{ fontWeight: 700, fontSize: "1rem", color: "#111" }}>Déconnexion</div>
-            </div>
-            <div style={{ padding: "16px 24px" }}>
-              <div style={{ fontSize: ".9rem", color: "#555" }}>Voulez-vous vraiment vous déconnecter ?</div>
+            {/* Handle */}
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: "#e5e7eb", margin: "0 auto 16px" }} />
+
+            <div style={{ padding: "0 24px 8px" }}>
+              <div style={{ fontWeight: 800, fontSize: "1.05rem", color: "#111", marginBottom: 4 }}>
+                Déconnexion
+              </div>
+              <div style={{ fontSize: ".9rem", color: "#555" }}>
+                Voulez-vous vraiment vous déconnecter ?
+              </div>
               {pendingCount > 0 && (
-                <div style={{ marginTop: 8, fontSize: ".85rem", color: "var(--t-warning)" }}>
-                  ⚠️ {pendingCount} opération(s) en attente de synchronisation.
+                <div style={{
+                  marginTop: 10, fontSize: ".82rem", color: "var(--t-warning)",
+                  background: "var(--t-warning-bg)", borderRadius: 8,
+                  padding: "8px 12px", display: "flex", gap: 6, alignItems: "center",
+                }}>
+                  <AlertTriangle size={14} />
+                  {pendingCount} opération(s) en attente de synchronisation.
                 </div>
               )}
             </div>
-            <div style={{ padding: "0 24px 20px", display: "flex", gap: 12 }}>
+
+            <div style={{ padding: "16px 24px 24px", display: "flex", gap: 10 }}>
               <button
                 onClick={() => setConfirmDeconnexion(false)}
-                style={{ flex: 1, padding: "10px", border: "1px solid #e0e0e0", borderRadius: 10, fontSize: ".85rem", fontWeight: 600, cursor: "pointer", background: "#fff", color: "#333" }}
+                style={{
+                  flex: 1, padding: "12px", border: "1.5px solid #e0e0e0",
+                  borderRadius: 12, fontSize: ".9rem", fontWeight: 600,
+                  cursor: "pointer", background: "#fff", color: "#333",
+                }}
               >
                 Annuler
               </button>
               <button
                 onClick={logout}
-                style={{ flex: 1, padding: "10px", border: "none", borderRadius: 10, fontSize: ".85rem", fontWeight: 600, cursor: "pointer", background: "#dc2626", color: "#fff" }}
+                style={{
+                  flex: 1, padding: "12px", border: "none", borderRadius: 12,
+                  fontSize: ".9rem", fontWeight: 700, cursor: "pointer",
+                  background: "#dc2626", color: "#fff",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                }}
               >
+                <LogOut size={16} />
                 Déconnecter
               </button>
             </div>

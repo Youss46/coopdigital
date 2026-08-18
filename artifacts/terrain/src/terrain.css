@@ -868,6 +868,159 @@ body {
   .t-fournisseur-list { padding-left: 0; padding-right: 0; }
 }
 
+/* ── Espace peseur — tokens & composants ───────────────────── */
+:root {
+  --t-peseur:        #0891b2;   /* sky-600 — précision / balance */
+  --t-peseur-dark:   #0e7490;   /* sky-700 */
+  --t-peseur-mid:    #06b6d4;   /* cyan-500 */
+  --t-peseur-light:  #cffafe;   /* cyan-100 */
+  --t-peseur-bg:     #f0fdff;   /* cyan-50  */
+}
+
+/* Header gradient peseur */
+.t-header--peseur {
+  background: linear-gradient(135deg, var(--t-primary-dark) 0%, var(--t-primary) 55%, var(--t-peseur-dark) 100%);
+}
+
+/* Avatar initiales dans le header */
+.t-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .85rem;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  letter-spacing: -.5px;
+  border: 1.5px solid rgba(255,255,255,.35);
+}
+
+/* Indicateur connectivité */
+.t-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.t-dot--online  { background: #4ade80; box-shadow: 0 0 0 2px rgba(74,222,128,.3); }
+.t-dot--offline { background: #f97316; box-shadow: 0 0 0 2px rgba(249,115,22,.3); }
+
+/* Nav — indicateur actif pill */
+.t-nav__item--active .t-nav-pill {
+  background: rgba(255,255,255,.18);
+  border-radius: 8px;
+}
+.t-nav-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  transition: background .15s;
+}
+
+/* Peseur stat tile */
+.t-kpi {
+  background: var(--t-card);
+  border-radius: 14px;
+  padding: 14px 10px 12px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,.07), 0 0 0 1px rgba(0,0,0,.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.t-kpi__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.t-kpi__value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--t-text);
+}
+
+.t-kpi__label {
+  font-size: .65rem;
+  font-weight: 600;
+  color: var(--t-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* Peseur action tile */
+.t-peseur-tile {
+  border-radius: 16px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px 12px;
+  transition: transform .12s, box-shadow .12s;
+  box-shadow: 0 4px 16px rgba(0,0,0,.15);
+}
+.t-peseur-tile:active {
+  transform: scale(.97);
+  box-shadow: 0 2px 8px rgba(0,0,0,.1);
+}
+.t-peseur-tile__label {
+  font-size: .92rem;
+  font-weight: 800;
+  color: #fff;
+  text-align: center;
+}
+.t-peseur-tile__sub {
+  font-size: .7rem;
+  color: rgba(255,255,255,.75);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* Peseur session card */
+.t-session-card {
+  background: var(--t-card);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,.07);
+  display: flex;
+  text-decoration: none;
+  color: inherit;
+}
+.t-session-card__stripe {
+  width: 4px;
+  flex-shrink: 0;
+}
+.t-session-card__body {
+  flex: 1;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.t-session-card__text { flex: 1; min-width: 0; }
+.t-session-card__title { font-size: .88rem; font-weight: 800; }
+.t-session-card__name  { font-size: .92rem; font-weight: 700; color: var(--t-text); margin-top: 1px; }
+.t-session-card__meta  { font-size: .72rem; color: var(--t-muted); margin-top: 3px; }
+
 /* ── Curseur pointeur global sur tous les cliquables ── */
 
 button,

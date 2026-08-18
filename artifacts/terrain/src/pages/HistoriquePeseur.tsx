@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
+import {
+  ChevronLeft, RefreshCw, Scale, Truck, Download,
+  FileText, AlertTriangle, Package, Layers,
+} from "lucide-react";
 import { getPeseurCollectes, telechargerRecuLivraison, telechargerBordereauSession } from "../lib/api";
 import { useOffline } from "../contexts/OfflineContext";
 import type { PeseurCollecte } from "../lib/types";
@@ -12,14 +16,10 @@ function formatDate(d: string) {
   return `${day}/${m}/${y?.slice(2)}`;
 }
 
-function formatMontant(n: number) {
-  return n.toLocaleString("fr-FR") + " FCFA";
-}
-
-function statutStyle(s: string): { color: string; bg: string; label: string } {
-  if (s === "PAYÉ") return { color: "#16a34a", bg: "rgba(22,163,74,.12)", label: "Payé" };
-  if (s === "DIFFÉRÉ") return { color: "#f59e0b", bg: "rgba(245,158,11,.12)", label: "Différé" };
-  return { color: "var(--t-muted)", bg: "rgba(148,163,184,.1)", label: s };
+function statutChip(s: string): { color: string; bg: string; label: string } {
+  if (s === "PAYÉ")     return { color: "#16a34a", bg: "rgba(22,163,74,.12)",  label: "Payé" };
+  if (s === "DIFFÉRÉ")  return { color: "#d97706", bg: "rgba(245,158,11,.12)", label: "Différé" };
+  return { color: "#6b7280", bg: "rgba(148,163,184,.1)", label: s };
 }
 
 export default function HistoriquePeseur() {
@@ -39,10 +39,8 @@ export default function HistoriquePeseur() {
       const data = await getPeseurCollectes();
       setCollectes(data);
       setFromCache(false);
-      // Cache for offline use
       try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch {}
     } catch (e) {
-      // Try cache
       try {
         const cached = localStorage.getItem(CACHE_KEY);
         if (cached) {
@@ -57,7 +55,6 @@ export default function HistoriquePeseur() {
     }
   }, []);
 
-  // Load from cache immediately while fetching
   useEffect(() => {
     try {
       const cached = localStorage.getItem(CACHE_KEY);
@@ -70,69 +67,123 @@ export default function HistoriquePeseur() {
     void charger();
   }, [charger]);
 
-  const totalPoids = collectes.reduce((s, c) => s + c.poidsKg, 0);
+  const totalPoids   = collectes.reduce((s, c) => s + c.poidsKg, 0);
   const totalMontant = collectes.filter((c) => c.type !== "reception_transfert").reduce((s, c) => s + c.montantNetFcfa, 0);
 
   return (
     <div className="t-app">
-      <header className="t-header">
-        <button className="t-header__back" onClick={() => setLocation("/")}>‹</button>
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <header className="t-header t-header--peseur">
+        <button
+          className="t-header__back"
+          onClick={() => setLocation("/")}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <ChevronLeft size={22} />
+        </button>
         <div style={{ flex: 1 }}>
           <div className="t-header__title">Mes collectes</div>
           <div className="t-header__sub">
-            {loading ? "Chargement…" : `${collectes.length} livraison${collectes.length !== 1 ? "s" : ""}`}
+            {loading ? "Chargement…" : `${collectes.length} entrée${collectes.length !== 1 ? "s" : ""}`}
           </div>
         </div>
         {!loading && isOnline && (
           <button
             onClick={() => void charger()}
-            style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, color: "#fff", padding: "6px 12px", fontSize: ".8rem", fontWeight: 700, cursor: "pointer" }}
+            style={{
+              background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.25)",
+              borderRadius: 8, color: "#fff", padding: "7px", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
           >
-            🔄
+            <RefreshCw size={16} />
           </button>
         )}
       </header>
 
-      <main className="t-main" style={{ paddingBottom: 24 }}>
+      <main className="t-main" style={{ padding: "16px 16px 0" }}>
         {/* Bannière hors-ligne/cache */}
         {(fromCache || !isOnline) && (
-          <div style={{ margin: "0 0 12px", padding: "8px 14px", background: "var(--t-warning-bg)", borderLeft: "3px solid var(--t-warning)", borderRadius: 8, fontSize: ".8rem", color: "var(--t-warning)" }}>
-            📡 {isOnline ? "Données en cache — actualisation en cours…" : "Hors ligne — données en cache"}
+          <div style={{
+            marginBottom: 12, padding: "8px 14px",
+            background: "var(--t-warning-bg)", border: "1px solid rgba(217,119,6,.2)",
+            borderRadius: 10, fontSize: ".8rem", color: "var(--t-warning)",
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <RefreshCw size={13} />
+            {isOnline ? "Données en cache — actualisation en cours…" : "Hors ligne — données en cache"}
           </div>
         )}
 
-        {/* KPIs */}
+        {/* KPI band */}
         {collectes.length > 0 && (
-          <div className="t-stats" style={{ marginBottom: 16 }}>
-            <div className="t-stat">
-              <div className="t-stat__value">{collectes.length}</div>
-              <div className="t-stat__label">Livraisons</div>
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 8, marginBottom: 14,
+          }}>
+            <div className="t-kpi">
+              <div className="t-kpi__icon" style={{ background: "rgba(26,71,49,.08)" }}>
+                <Scale size={16} color="var(--t-primary)" />
+              </div>
+              <div className="t-kpi__value" style={{ color: "var(--t-primary)" }}>
+                {collectes.length}
+              </div>
+              <div className="t-kpi__label">Livraisons</div>
             </div>
-            <div className="t-stat">
-              <div className="t-stat__value">{totalPoids.toLocaleString("fr-FR")}</div>
-              <div className="t-stat__label">Kg total</div>
+            <div className="t-kpi">
+              <div className="t-kpi__icon" style={{ background: "rgba(8,145,178,.08)" }}>
+                <Layers size={16} color="var(--t-peseur)" />
+              </div>
+              <div className="t-kpi__value" style={{ fontSize: "1.1rem", color: "var(--t-peseur)" }}>
+                {totalPoids >= 1000
+                  ? (totalPoids / 1000).toFixed(2) + "T"
+                  : totalPoids.toLocaleString("fr-FR") + "kg"}
+              </div>
+              <div className="t-kpi__label">Total</div>
             </div>
-            <div className="t-stat">
-              <div className="t-stat__value" style={{ fontSize: ".85rem" }}>{totalMontant.toLocaleString("fr-FR")}</div>
-              <div className="t-stat__label">FCFA net</div>
+            <div className="t-kpi">
+              <div className="t-kpi__icon" style={{ background: "rgba(22,163,74,.08)" }}>
+                <Package size={16} color="var(--t-success)" />
+              </div>
+              <div className="t-kpi__value" style={{ fontSize: ".85rem", color: "var(--t-success)" }}>
+                {totalMontant >= 1_000_000
+                  ? (totalMontant / 1_000_000).toFixed(1) + "M"
+                  : totalMontant >= 1000
+                    ? (totalMontant / 1000).toFixed(0) + "k"
+                    : totalMontant.toLocaleString("fr-FR")}
+              </div>
+              <div className="t-kpi__label">FCFA net</div>
             </div>
           </div>
         )}
 
         {/* Erreur chargement */}
         {erreur && (
-          <div style={{ margin: "0 0 12px", padding: "10px 14px", background: "var(--t-danger-bg)", border: "1px solid var(--t-danger)", borderRadius: 8, fontSize: ".85rem", color: "var(--t-danger)" }}>
-            ⚠️ {erreur}
+          <div style={{
+            marginBottom: 12, padding: "10px 14px",
+            background: "var(--t-danger-bg)", border: "1px solid var(--t-danger)",
+            borderRadius: 10, fontSize: ".85rem", color: "var(--t-danger)",
+            display: "flex", gap: 8, alignItems: "center",
+          }}>
+            <AlertTriangle size={15} />
+            <span style={{ flex: 1 }}>{erreur}</span>
           </div>
         )}
 
-        {/* Erreur téléchargement reçu */}
+        {/* Erreur téléchargement */}
         {downloadErreur && (
           <div
-            style={{ margin: "0 0 12px", padding: "10px 14px", background: "var(--t-danger-bg)", border: "1px solid var(--t-danger)", borderRadius: 8, fontSize: ".85rem", color: "var(--t-danger)", cursor: "pointer" }}
+            style={{
+              marginBottom: 12, padding: "10px 14px",
+              background: "var(--t-danger-bg)", border: "1px solid var(--t-danger)",
+              borderRadius: 10, fontSize: ".85rem", color: "var(--t-danger)", cursor: "pointer",
+              display: "flex", gap: 8, alignItems: "center",
+            }}
             onClick={() => setDownloadErreur(null)}
           >
-            ⚠️ {downloadErreur} — appuyez pour fermer
+            <AlertTriangle size={15} />
+            <span style={{ flex: 1 }}>{downloadErreur}</span>
+            <span style={{ opacity: .6, fontSize: ".75rem" }}>fermer</span>
           </div>
         )}
 
@@ -144,152 +195,178 @@ export default function HistoriquePeseur() {
         {/* Liste vide */}
         {!loading && collectes.length === 0 && !erreur && (
           <div className="t-empty" style={{ marginTop: 40 }}>
-            <div className="t-empty__icon">📋</div>
+            <div className="t-empty__icon">
+              <Scale size={44} color="var(--t-muted)" strokeWidth={1.2} />
+            </div>
             <div className="t-empty__text">Aucune collecte enregistrée</div>
           </div>
         )}
 
         {/* Liste des collectes */}
-        <div>
+        <div style={{ paddingBottom: 24 }}>
           {collectes.map((c) => {
             const isTransfert = c.type === "reception_transfert";
-            const st = statutStyle(c.statutPaiement);
+            const st = statutChip(c.statutPaiement);
+            const isDownloading = downloadingId === c.id;
+
             return (
-              <div key={`${isTransfert ? "tr" : "lv"}-${c.id}`} className="t-card" style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                  <span style={{ fontSize: "1.4rem", lineHeight: 1 }}>{isTransfert ? "🚛" : "⚖️"}</span>
+              <div
+                key={`${isTransfert ? "tr" : "lv"}-${c.id}`}
+                style={{
+                  background: "var(--t-card)",
+                  borderRadius: 14, marginBottom: 8,
+                  boxShadow: "0 1px 4px rgba(0,0,0,.07), 0 0 0 1px rgba(0,0,0,.04)",
+                  overflow: "hidden",
+                }}
+              >
+                <div style={{
+                  display: "flex", alignItems: "flex-start",
+                  gap: 12, padding: "12px 14px",
+                }}>
+                  {/* Icône type */}
+                  <div style={{
+                    width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                    background: isTransfert ? "var(--t-peseur-bg)" : "rgba(26,71,49,.08)",
+                    display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1,
+                  }}>
+                    {isTransfert
+                      ? <Truck size={18} color="var(--t-peseur)" />
+                      : <Scale size={18} color="var(--t-primary)" />}
+                  </div>
+
+                  {/* Contenu */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {isTransfert ? (
                       <>
-                        <div style={{ fontWeight: 700, fontSize: ".9rem", marginBottom: 2 }}>
+                        <div style={{ fontWeight: 700, fontSize: ".9rem", marginBottom: 1 }}>
                           Réception transfert
                         </div>
-                        <div style={{ fontSize: ".78rem", color: "var(--t-muted)", marginBottom: 4 }}>
+                        <div style={{ fontSize: ".76rem", color: "var(--t-muted)", marginBottom: 4 }}>
                           {c.entrepotNom ?? "—"}{c.transfertNumero ? ` · ${c.transfertNumero}` : ""}
                         </div>
                       </>
                     ) : (
                       <>
-                        <div style={{ fontWeight: 700, fontSize: ".9rem", marginBottom: 2 }}>
+                        <div style={{ fontWeight: 700, fontSize: ".9rem", marginBottom: 1 }}>
                           {c.membreNom} {c.membrePrenoms}
                         </div>
                         {c.membreCode && (
-                          <div style={{ fontSize: ".75rem", color: "var(--t-muted)", marginBottom: 4 }}>
+                          <div style={{ fontSize: ".72rem", color: "var(--t-muted)", marginBottom: 4, fontFamily: "monospace" }}>
                             {c.membreCode}
                           </div>
                         )}
                       </>
                     )}
-                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: ".82rem", color: "var(--t-text)" }}>
-                        🌿 {c.poidsKg.toLocaleString("fr-FR")} kg
+
+                    {/* Métriques */}
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: ".82rem" }}>
+                      <span style={{ color: "var(--t-text)", fontWeight: 600 }}>
+                        {c.poidsKg.toLocaleString("fr-FR")} kg
                       </span>
                       {!isTransfert && (
-                        <span style={{ fontSize: ".82rem", color: "var(--t-text)" }}>
-                          💵 {formatMontant(c.montantNetFcfa)}
+                        <span style={{ color: "var(--t-muted)" }}>
+                          {c.montantNetFcfa.toLocaleString("fr-FR")} FCFA
                         </span>
                       )}
                     </div>
+
+                    {/* Tags */}
                     {!isTransfert && (
-                      <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <div style={{ marginTop: 5, display: "flex", gap: 4, flexWrap: "wrap" }}>
                         {c.fromSession && (
                           <span style={{
-                            fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
-                            color: "#818cf8", background: "rgba(129,140,248,.15)",
-                            border: "1px solid rgba(129,140,248,.3)",
+                            fontSize: ".68rem", fontWeight: 700, padding: "2px 6px", borderRadius: 8,
+                            color: "var(--t-peseur)", background: "var(--t-peseur-bg)",
                           }}>
-                            ⚖️ Session groupée
+                            Groupée
                           </span>
                         )}
                         {c.planAvanceType === "reporte" && (
                           <span style={{
-                            fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                            fontSize: ".68rem", fontWeight: 700, padding: "2px 6px", borderRadius: 8,
                             color: "var(--t-warning)", background: "var(--t-warning-bg)",
-                            border: "1px solid var(--t-warning)",
                           }}>
-                            ⏸ Avance reportée
+                            Avance reportée
                           </span>
                         )}
                         {c.planAvanceType === "partiel" && (
                           <span style={{
-                            fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                            fontSize: ".68rem", fontWeight: 700, padding: "2px 6px", borderRadius: 8,
                             color: "#fb923c", background: "rgba(251,146,60,.12)",
-                            border: "1px solid rgba(251,146,60,.35)",
                           }}>
-                            ⚡ Avance partielle
+                            Avance partielle
                           </span>
                         )}
                       </div>
                     )}
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+
+                  {/* Droite : date + statut + bouton */}
+                  <div style={{
+                    display: "flex", flexDirection: "column",
+                    alignItems: "flex-end", gap: 5, flexShrink: 0,
+                  }}>
                     <span style={{ fontSize: ".7rem", color: "var(--t-muted)" }}>
                       {formatDate(c.dateLivraison)}
                     </span>
+
                     {!isTransfert && (
                       <span style={{
-                        fontSize: ".72rem", fontWeight: 700, padding: "3px 8px", borderRadius: 12,
+                        fontSize: ".7rem", fontWeight: 700, padding: "3px 8px", borderRadius: 10,
                         color: st.color, background: st.bg,
                       }}>
                         {st.label}
                       </span>
                     )}
+
+                    {/* Bouton téléchargement */}
                     {isOnline && !isTransfert && (
                       <button
-                        disabled={downloadingId === c.id}
+                        disabled={isDownloading}
                         onClick={async () => {
                           setDownloadingId(c.id);
                           setDownloadErreur(null);
-                          try {
-                            await telechargerRecuLivraison(c.id);
-                          } catch (e) {
-                            setDownloadErreur((e as Error).message || "Erreur téléchargement");
-                          }
+                          try { await telechargerRecuLivraison(c.id); }
+                          catch (e) { setDownloadErreur((e as Error).message || "Erreur téléchargement"); }
                           setDownloadingId(null);
                         }}
                         style={{
-                          marginTop: 2,
-                          background: downloadingId === c.id ? "var(--t-bg)" : "var(--t-success-bg)",
-                          border: "1px solid var(--t-success)",
-                          borderRadius: 8,
-                          color: downloadingId === c.id ? "var(--t-muted)" : "var(--t-success)",
-                          fontSize: ".7rem",
-                          fontWeight: 700,
-                          padding: "4px 10px",
-                          cursor: downloadingId === c.id ? "default" : "pointer",
-                          whiteSpace: "nowrap",
+                          background: isDownloading ? "var(--t-bg)" : "rgba(26,71,49,.08)",
+                          border: "1px solid rgba(26,71,49,.2)",
+                          borderRadius: 8, color: "var(--t-primary)",
+                          fontSize: ".7rem", fontWeight: 700,
+                          padding: "5px 8px", cursor: isDownloading ? "default" : "pointer",
+                          display: "flex", alignItems: "center", gap: 4,
                         }}
                       >
-                        {downloadingId === c.id ? "…" : "📄 Reçu"}
+                        {isDownloading
+                          ? <RefreshCw size={12} style={{ animation: "t-spin .8s linear infinite" }} />
+                          : <FileText size={12} />}
+                        {isDownloading ? "…" : "Reçu"}
                       </button>
                     )}
+
                     {isOnline && isTransfert && c.sessionId && (
                       <button
-                        disabled={downloadingId === c.id}
+                        disabled={isDownloading}
                         onClick={async () => {
                           setDownloadingId(c.id);
                           setDownloadErreur(null);
-                          try {
-                            await telechargerBordereauSession(c.sessionId!);
-                          } catch (e) {
-                            setDownloadErreur((e as Error).message || "Erreur téléchargement");
-                          }
+                          try { await telechargerBordereauSession(c.sessionId!); }
+                          catch (e) { setDownloadErreur((e as Error).message || "Erreur téléchargement"); }
                           setDownloadingId(null);
                         }}
                         style={{
-                          marginTop: 2,
-                          background: downloadingId === c.id ? "var(--t-bg)" : "var(--t-primary-light)",
-                          border: "1px solid var(--t-success)",
-                          borderRadius: 8,
-                          color: downloadingId === c.id ? "var(--t-muted)" : "var(--t-primary)",
-                          fontSize: ".7rem",
-                          fontWeight: 700,
-                          padding: "4px 10px",
-                          cursor: downloadingId === c.id ? "default" : "pointer",
-                          whiteSpace: "nowrap",
+                          background: isDownloading ? "var(--t-bg)" : "var(--t-peseur-bg)",
+                          border: "1px solid rgba(8,145,178,.25)",
+                          borderRadius: 8, color: "var(--t-peseur)",
+                          fontSize: ".7rem", fontWeight: 700,
+                          padding: "5px 8px", cursor: isDownloading ? "default" : "pointer",
+                          display: "flex", alignItems: "center", gap: 4,
                         }}
                       >
-                        {downloadingId === c.id ? "…" : "📋 Bordereau"}
+                        <Download size={12} />
+                        {isDownloading ? "…" : "Bordereau"}
                       </button>
                     )}
                   </div>
@@ -299,6 +376,7 @@ export default function HistoriquePeseur() {
           })}
         </div>
       </main>
+
       <BottomNavPeseur />
     </div>
   );
