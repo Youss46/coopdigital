@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import * as terrainService from "../services/terrainService.js";
-import { db, avancesDeleguesTable, membresTable } from "@workspace/db";
+import { db, avancesDeleguesTable, membresTable, avancesTable } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 
 function getAgent(req: Request) {
