@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Search, User, Play, ChevronRight } from "lucide-react";
 import { getFournisseurs } from "../lib/api";
 import { cacheFournisseurs, getCachedFournisseurs } from "../lib/idb";
 import { useOffline } from "../contexts/OfflineContext";
@@ -69,11 +70,13 @@ export default function FournisseurSearch({
     <>
       <div className="t-search-wrap">
         <div className="t-search">
-          <span className="t-search__icon">🔍</span>
+          <span className="t-search__icon">
+            <Search size={18} />
+          </span>
           <input
             ref={inputRef}
             type="search"
-            className="t-search__input"
+            className="t-search__input t-search__input--peseur"
             placeholder="Nom, code ou téléphone…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -88,7 +91,9 @@ export default function FournisseurSearch({
 
       {!loading && filtered.length === 0 && (
         <div className="t-empty">
-          <div className="t-empty__icon">🔍</div>
+          <div className="t-empty__icon">
+            <Search size={32} strokeWidth={1.5} />
+          </div>
           <div className="t-empty__text">Aucun résultat trouvé</div>
         </div>
       )}
@@ -100,14 +105,16 @@ export default function FournisseurSearch({
           return (
             <button
               key={f.id}
-              className="t-fournisseur-item"
+              className={`t-fournisseur-item${hasSession ? " t-fournisseur-item--active-session" : ""}`}
               onClick={() =>
                 hasSession && onSelectActiveSession
                   ? onSelectActiveSession(f, sessionId)
                   : onSelect(f)
               }
             >
-              <div className="t-fournisseur-item__avatar">{initials(f)}</div>
+              <div className={`t-fournisseur-item__avatar${hasSession ? " t-fournisseur-item__avatar--peseur" : ""}`}>
+                {initials(f) || <User size={20} />}
+              </div>
               <div className="t-fournisseur-item__body">
                 <div className="t-fournisseur-item__name">{f.nom} {f.prenoms}</div>
                 <div className="t-fournisseur-item__sub">
@@ -116,13 +123,14 @@ export default function FournisseurSearch({
                 </div>
                 <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {f.typeMembre === "externe" && (
-                    <span className="t-badge" style={{ background: "#e0f2fe", color: "#0369a1" }}>
+                    <span className="t-badge t-badge--info">
                       Fournisseur externe
                     </span>
                   )}
                   {hasSession && (
-                    <span className="t-badge t-badge--warning" style={{ fontWeight: 700 }}>
-                      🟡 Session en cours — Reprendre
+                    <span className="t-badge t-badge--peseur">
+                      <Play size={10} fill="currentColor" style={{ marginRight: 4 }} />
+                      Session en cours — Reprendre
                     </span>
                   )}
                   {f.avanceEnCours > 0 && (
@@ -137,7 +145,7 @@ export default function FournisseurSearch({
                   )}
                 </div>
               </div>
-              <span style={{ color: "#9ca3af", fontSize: "1.2rem" }}>›</span>
+              <ChevronRight size={18} style={{ color: "var(--t-muted)", flexShrink: 0 }} />
             </button>
           );
         })}
