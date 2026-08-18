@@ -4128,9 +4128,13 @@ export async function generateBordereauAchatSession(
 
   // Formule :
   //   fonds_propres      → NET = valeur + frais collecte net − retenues avances
-  //   caisse_cooperative → NET = MAX(valeur − alims coop, 0) + frais collecte net − retenues avances
+  //   caisse_cooperative → NET = frais collecte net − retenues avances
+  //     (la valeur produit est déjà réglée par la coopérative via caisse ; le délégué
+  //      ne perçoit que sa commission nette de transport et d'avances)
   const resteValeurFcfa = caisseCoop ? Math.max(valeurProduit - montantCoopFcfa, 0) : valeurProduit;
-  const montantNet      = Math.max(0, resteValeurFcfa + fraisCollecteNet - retenueAvancesFcfa);
+  const montantNet = caisseCoop
+    ? Math.max(0, fraisCollecteNet - retenueAvancesFcfa)
+    : Math.max(0, resteValeurFcfa + fraisCollecteNet - retenueAvancesFcfa);
 
   // 8. PDF
   const { doc, endPromise } = makePdfDoc();
