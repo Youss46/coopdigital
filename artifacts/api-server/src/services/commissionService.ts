@@ -131,27 +131,13 @@ export async function creerCommissionTransfert(
   campagneId: number | null | undefined,
   poidsKg: number,
   cooperativeId: number
-): Promise<number | null> {
+): Promise<{ id: number; montantFcfa: number } | null> {
   try {
     const taux = await getTauxActif(cooperativeId, campagneId, delegueId);
     if (!taux) return null;
 
     const montantBrut = Math.round(poidsKg * taux.tauxFcfaParKg * 100) / 100;
     if (montantBrut <= 0) return null;
-
-    // Récupérer les charges de transport du transfert.
-    // Seules les charges "cooperative" sont déduites de la commission —
-    // les charges "delegue" sont à sa charge personnelle, sans impact sur la commission.
-    const [transfert] = await db
-      .select({
-        fraisCarburantFcfa: transfertsStockTable.fraisCarburantFcfa,
-        fraisCarburantPar:  transfertsStockTable.fraisCarburantPar,
-        autresChargesFcfa:  transfertsStockTable.autresChargesFcfa,
-        autresChargesPar:   transfertsStockTable.autresChargesPar,
-      })
-      .from(transfertsStockTable)
-      .where(eq(transfertsStockTable.id, transfertId))
-      .limit(1);
 
     // Les frais de transport du transfert sont gérés indépendamment —
     // la commission est simplement poids × taux, sans déduction de charges.
@@ -172,7 +158,7 @@ export async function creerCommissionTransfert(
       { transfertId, delegueId, poidsKg, montantBrut },
       "Commission transfert créée"
     );
-    return inserted ? { id: inserted.id, montantFcfa: montantNet } : null;
+    return inserted ? { id: inserted.id, montantFcfa: montantBrut } : null;
   } catch (err) {
     logger.error({ err, transfertId, delegueId }, "Erreur création commission transfert");
     return null;

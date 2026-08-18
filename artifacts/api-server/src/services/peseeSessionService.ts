@@ -7,6 +7,7 @@ import {
   livraisonsTable,
   paiementsTable,
   avancesTable,
+  remboursementsAvancesMembresTable,
   configPeseeTable,
   transfertsStockTable,
   mouvementsStockTable,
@@ -623,6 +624,69 @@ export async function deleteLigne(cooperativeId: number, sessionId: number, lign
   });
 }
 
+// ─── Déduction automatique des avances d'un membre-délégué ───────────────────
+/**
+ * Itère toutes les avances en_cours / en_retard du membre-délégué (par dateOctroi ASC)
+ * et déduit jusqu'à `plafondFcfa` (= commission nette − frais transport).
+ * Enregistre un remboursement dans remboursements_avances_membres pour chaque déduction.
+ * Même pattern que deduireAvancesApresCommission pour les délégués terrain.
+ */
+async function deduireAvancesMembreDelegue(
+  membreId: number,
+  plafondFcfa: number,
+  sessionId: number,
+): Promise<void> {
+  try {
+    const avances = await db
+      .select()
+      .from(avancesTable)
+      .where(
+        and(
+          eq(avancesTable.membreId, membreId),
+          inArray(avancesTable.statut, ["en_cours", "en_retard"]),
+        ),
+      )
+      .orderBy(avancesTable.dateOctroi); // plus ancienne en premier
+
+    let restant = plafondFcfa;
+    for (const avance of avances) {
+      if (restant <= 0) break;
+
+      // Respect du plan : si partiel, ne retenir que montantPartielFcfa ce cycle
+      const montantMaxCycle =
+        avance.planType === "partiel" && avance.montantPartielFcfa
+          ? avance.montantPartielFcfa
+          : avance.soldeRestantFcfa;
+
+      const retenue = Math.min(montantMaxCycle, avance.soldeRestantFcfa, restant);
+      if (retenue <= 0) continue;
+
+      const nouveauSolde    = avance.soldeRestantFcfa - retenue;
+      const nouveauRembourse = avance.montantRembourse_fcfa + retenue;
+
+      await db
+        .update(avancesTable)
+        .set({
+          montantRembourse_fcfa: nouveauRembourse,
+          soldeRestantFcfa:      nouveauSolde,
+          statut: nouveauSolde === 0 ? "rembourse" : avance.statut,
+        })
+        .where(eq(avancesTable.id, avance.id));
+
+      await db.insert(remboursementsAvancesMembresTable).values({
+        avanceId:    avance.id,
+        montantFcfa: retenue,
+        note:        `Retenue automatique — pesée #${sessionId}`,
+      });
+
+      restant -= retenue;
+    }
+  } catch (err) {
+    // Non-fatal : log mais ne bloque pas la clôture de session
+    logger.error({ err, membreId, sessionId }, "Erreur déduction avances membre délégué");
+  }
+}
+
 // ─── Terminer une session ─────────────────────────────────────────────────────
 export async function terminerSession(cooperativeId: number, sessionId: number) {
   const detail = await getSessionDetail(cooperativeId, sessionId);
@@ -692,13 +756,34 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
           // Pas de campagne active — commission sans campagne
         }
         // await (pas void) : la commission doit être en DB avant que le bordereau soit téléchargé
-        await creerCommissionMembreSiTaux(
+        const commission = await creerCommissionMembreSiTaux(
           sessionId,
           detail.membreId,
           campagneId,
           poidsKg,
           cooperativeId,
         );
+
+        // ── Déduction automatique des avances (même pattern que délégués terrain) ──
+        // Plafond = commission nette = commission brut − frais transport avancés par la coop
+        if (commission && commission.montantFcfa > 0) {
+          let fraisTransportFcfa = 0;
+          if (detail.bonReceptionId) {
+            const [bon] = await db
+              .select({
+                carburant: bonsReceptionMembresDeleguesTable.fraisCarburantFcfa,
+                autres:    bonsReceptionMembresDeleguesTable.autresChargesFcfa,
+              })
+              .from(bonsReceptionMembresDeleguesTable)
+              .where(eq(bonsReceptionMembresDeleguesTable.id, detail.bonReceptionId))
+              .limit(1);
+            fraisTransportFcfa = (bon?.carburant ?? 0) + (bon?.autres ?? 0);
+          }
+          const commissionNette = Math.max(0, commission.montantFcfa - fraisTransportFcfa);
+          if (commissionNette > 0) {
+            await deduireAvancesMembreDelegue(detail.membreId, commissionNette, sessionId);
+          }
+        }
       }
     }
   }

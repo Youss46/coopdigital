@@ -29,3 +29,20 @@ description: Architecture complète du flux bon de réception membre délégué 
 - Terrain page : `ReceptionsTransfertsPage.tsx` (onglet "Transferts délégués" + "Membres délégués")
 
 **Why:** frais transport avancés par la coop (carburant, autres charges) doivent être traçables et déduits du net membre sur le bordereau — table séparée pour isoler ce flux des transferts délégués classiques.
+
+## Avances — déduction automatique (ajouté)
+
+Pattern identique aux délégués terrain : `deduireAvancesMembreDelegue()` dans `peseeSessionService.ts`.
+
+**Plafond** = commission nette = `commission.montantFcfa − (fraisCarburantFcfa + autresChargesFcfa du bon)`.  
+Si pas de bon (pesée sans bon), plafond = commission brut entière.
+
+**Itération** : avances `en_cours` / `en_retard` par `dateOctroi ASC` ; respect du `planType` (partiel → `montantPartielFcfa` comme plafond cycle).
+
+**Tables touchées** :
+- `avances` — mise à jour `montantRembourse_fcfa`, `soldeRestantFcfa`, `statut → rembourse` si solde = 0
+- `remboursements_avances_membres` — ligne insérée pour chaque avance touchée, `note = "Retenue automatique — pesée #N"`
+
+**Bug corrigé en passant** : `creerCommissionTransfert` (commissionService.ts) avait return type `number | null` mais retournait `{ id, montantFcfa: montantNet }` avec `montantNet` indéfini → corrigé en `{ id: number; montantFcfa: number } | null` retournant `montantBrut`.
+
+**À faire** : le bordereau PDF utilise encore un calcul estimatif (`min(soldeAvances, fraisCollecte)`) pour `retenueAvancesFcfa`. Il devrait lire les lignes réelles de `remboursements_avances_membres` pour ce membre/session pour afficher le montant exact.
