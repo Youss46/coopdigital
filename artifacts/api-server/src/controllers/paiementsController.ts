@@ -319,9 +319,14 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     const conditions: SQL<unknown>[] = [coopFilter];
     if (statut) conditions.push(eq(paiementsTable.statut, statut as "en_attente" | "confirme" | "echec" | "rejete" | "en_cours" | "effectue"));
     if (membreId) conditions.push(eq(paiementsTable.membreId, membreId));
-    // Un délégué ne voit que les règlements des membres qui lui sont rattachés
+    // Un délégué ne voit que les règlements des membres/fournisseurs qui lui sont rattachés
     if (req.user?.role === "delegue" && req.user?.id) {
-      conditions.push(eq(membresTable.delegueId, req.user.id));
+      conditions.push(
+        or(
+          eq(membresTable.delegueId, req.user.id),
+          eq(fournisseursTable.creeParDelegueId, req.user.id),
+        )!,
+      );
     } else {
       // Base centrale : masquer les règlements en espèces enregistrés par un délégué
       // (ces règlements sont gérés dans la page Caisse du délégué concerné)
@@ -387,9 +392,14 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
       eq(bonsCarburantTable.cooperativeId, cooperativeId),
     )!;
     const statsConditions: SQL<unknown>[] = [statsCoopFilter];
-    // Un délégué ne voit que les stats des membres qui lui sont rattachés
+    // Un délégué ne voit que les stats des membres/fournisseurs qui lui sont rattachés
     if (req.user?.role === "delegue" && req.user?.id) {
-      statsConditions.push(eq(membresTable.delegueId, req.user.id));
+      statsConditions.push(
+        or(
+          eq(membresTable.delegueId, req.user.id),
+          eq(fournisseursTable.creeParDelegueId, req.user.id),
+        )!,
+      );
     } else {
       // Base centrale : exclure les règlements espèces des délégués des stats
       // Les paiements sans mode (pesée groupée) sont toujours inclus.

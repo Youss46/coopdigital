@@ -36,7 +36,13 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
     const extraConditions = [];
     if (membreId) extraConditions.push(eq(livraisonsTable.membreId, membreId));
     if (req.user?.role === "delegue" && req.user?.id) {
-      extraConditions.push(eq(membresTable.delegueId, req.user.id));
+      // Membres rattachés AU délégué OU fournisseurs externes créés PAR ce délégué
+      extraConditions.push(
+        or(
+          eq(membresTable.delegueId, req.user.id),
+          eq(fournisseursTable.creeParDelegueId, req.user.id),
+        )!,
+      );
     }
     const whereClause = extraConditions.length > 0
       ? and(coopCondition, ...extraConditions)
