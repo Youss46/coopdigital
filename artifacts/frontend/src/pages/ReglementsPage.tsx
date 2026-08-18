@@ -124,8 +124,10 @@ function ModalValidation({
   const [telephone, setTelephone] = useState(telProducteur(paiement) ?? "");
   const [touched, setTouched] = useState(false);
   const isCarburant = isBonCarburant(paiement);
-  // Délégués can only validate cash; others must pick explicitly (no default)
-  const initialMode = isDelegue ? "especes" : "";
+  // Pré-remplir avec le mode déjà fixé sur le paiement (livraisons normales)
+  // Pour les bons carburant ou les paiements sans mode, laisser la sélection libre
+  const modePreset = !isCarburant && paiement.modePaiement ? paiement.modePaiement : null;
+  const initialMode = modePreset ?? (isDelegue ? "especes" : "");
   const [selectedMode, setSelectedMode] = useState<string>(initialMode);
   // Modes available in the selector depend on role
   const modesDisponibles = isDelegue
@@ -184,26 +186,33 @@ function ModalValidation({
             </div>
           </div>
 
-          {/* Mode de règlement — toujours sélectionnable */}
+          {/* Mode de règlement */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
               Mode de paiement
-              {!isDelegue && <span className="text-red-500 font-semibold ml-1">*</span>}
+              {!isDelegue && !modePreset && <span className="text-red-500 font-semibold ml-1">*</span>}
             </label>
-            <select
-              value={selectedMode}
-              onChange={(e) => { setSelectedMode(e.target.value); setRef(""); setTouched(false); }}
-              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 bg-white ${
-                touched && modeManquant
-                  ? "border-red-400 focus:ring-red-400 bg-red-50"
-                  : "border-gray-200 focus:ring-green-400"
-              }`}
-            >
-              {!isDelegue && <option value="">— Choisir le mode de paiement —</option>}
-              {modesDisponibles.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
+            {modePreset ? (
+              /* Mode pré-sélectionné — lecture seule */
+              <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700">
+                {MODES_CARBURANT.find((m) => m.value === modePreset)?.label ?? modePreset}
+              </div>
+            ) : (
+              <select
+                value={selectedMode}
+                onChange={(e) => { setSelectedMode(e.target.value); setRef(""); setTouched(false); }}
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 bg-white ${
+                  touched && modeManquant
+                    ? "border-red-400 focus:ring-red-400 bg-red-50"
+                    : "border-gray-200 focus:ring-green-400"
+                }`}
+              >
+                {!isDelegue && <option value="">— Choisir le mode de paiement —</option>}
+                {modesDisponibles.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            )}
             {touched && modeManquant && (
               <p className="text-xs text-red-500 mt-1">Veuillez choisir un mode de paiement.</p>
             )}
@@ -593,13 +602,17 @@ export default function ReglementsPage() {
 
   async function handleValider(ref: string, telephone: string, mode?: string) {
     if (modal?.type !== "valider") return;
+    // Le backend n'accepte modePaiement que si : (a) pas de mode pré-sélectionné, ou (b) bon carburant
+    const hasPresetMode = !!modal.paiement.modePaiement;
+    const isCarburant = isBonCarburant(modal.paiement);
+    const sendMode = mode && (!hasPresetMode || isCarburant);
     try {
       await validerMut.mutateAsync({
         id: modal.paiement.id,
         data: {
           referenceTransaction: ref || null,
           telephone: telephone || null,
-          ...(mode ? { modePaiement: mode } : {}),
+          ...(sendMode ? { modePaiement: mode } : {}),
         },
       });
       invalidateAll();
