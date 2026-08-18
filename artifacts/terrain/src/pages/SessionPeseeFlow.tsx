@@ -21,6 +21,7 @@ import {
   getFournisseurRecap,
   getAvancesDeleguesTerrain,
   patchPlanAvanceDeleague,
+  patchPlanAvanceMembre,
 } from "../lib/api";
 import type { Fournisseur, SessionDetail, ConversionLivraisonResult } from "../lib/types";
 import type { AvanceDeleagueTerrain } from "../lib/api";
@@ -435,7 +436,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
           edit.montantPartiel === (original.montantPartielFcfa ? String(original.montantPartielFcfa) : "") &&
           edit.reportDate === (original.reportDate ?? "");
         if (unchanged) continue;
-        await patchPlanAvanceDeleague(avanceId, {
+        const patchFn = original.isMembreAvance ? patchPlanAvanceMembre : patchPlanAvanceDeleague;
+        await patchFn(avanceId, {
           plan_type: edit.planType,
           montant_partiel_fcfa: edit.planType === "partiel" && edit.montantPartiel ? Number(edit.montantPartiel) : null,
           report_date: edit.planType === "reporte" && edit.reportDate ? edit.reportDate : null,

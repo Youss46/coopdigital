@@ -340,8 +340,24 @@ export async function getAvancesDelegueTerrainHandler(req: Request, res: Respons
     delegueId = membre?.delegueId;
   }
 
+  // Membre rattaché à la base centrale (pas de délégué) → avances propres du membre
   if (!delegueId) {
-    res.json([]); // membre sans délégué assigné → rien à afficher
+    const membreId = req.query.membreId ? Number(req.query.membreId) : null;
+    if (!membreId) { res.json([]); return; }
+    try {
+      const avances = await db
+        .select()
+        .from(avancesTable)
+        .where(and(
+          eq(avancesTable.membreId, membreId),
+          inArray(avancesTable.statut, ["en_cours", "en_retard"]),
+        ))
+        .orderBy(avancesTable.dateOctroi);
+      res.json(avances.map((a) => ({ ...a, isMembreAvance: true })));
+    } catch (err) {
+      req.log.error({ err }, "getAvancesMembre base centrale");
+      res.status(500).json({ erreur: "Erreur lors de la récupération des avances du membre" });
+    }
     return;
   }
 
@@ -355,10 +371,56 @@ export async function getAvancesDelegueTerrainHandler(req: Request, res: Respons
         inArray(avancesDeleguesTable.statut, ["en_cours", "en_retard"]),
       ))
       .orderBy(avancesDeleguesTable.createdAt);
-    res.json(avances);
+    res.json(avances.map((a) => ({ ...a, isMembreAvance: false })));
   } catch (err) {
     req.log.error({ err }, "getAvancesDelegueTerrainHandler");
     res.status(500).json({ erreur: "Erreur lors de la récupération des avances" });
+  }
+}
+
+// ─── Modifier le plan d'une avance MEMBRE depuis le terrain (base centrale) ───
+export async function patchPlanAvanceMembreTerrainHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.agent?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Accès non autorisé" }); return; }
+
+  const avanceId = Number(req.params.avanceId);
+  const { plan_type, montant_partiel_fcfa, report_date } = req.body as {
+    plan_type?: string;
+    montant_partiel_fcfa?: number | null;
+    report_date?: string | null;
+  };
+
+  if (!plan_type || !["integral", "partiel", "reporte"].includes(plan_type)) {
+    res.status(400).json({ erreur: "plan_type invalide (integral | partiel | reporte)" });
+    return;
+  }
+
+  try {
+    // Vérifier que l'avance appartient à un membre de cette coopérative (via jointure)
+    const [row] = await db
+      .select({ id: avancesTable.id, statut: avancesTable.statut })
+      .from(avancesTable)
+      .innerJoin(membresTable, eq(membresTable.id, avancesTable.membreId))
+      .where(and(eq(avancesTable.id, avanceId), eq(membresTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!row) {
+      res.status(404).json({ erreur: "Avance introuvable" }); return;
+    }
+    if (row.statut === "rembourse") {
+      res.status(400).json({ erreur: "Impossible de modifier une avance déjà remboursée" }); return;
+    }
+
+    const [updated] = await db.update(avancesTable).set({
+      planType: plan_type as "integral" | "partiel" | "reporte",
+      montantPartielFcfa: plan_type === "partiel" && montant_partiel_fcfa ? montant_partiel_fcfa : null,
+      reportDate: plan_type === "reporte" && report_date ? report_date : null,
+    }).where(eq(avancesTable.id, avanceId)).returning();
+
+    res.json({ ...updated, isMembreAvance: true });
+  } catch (err) {
+    req.log.error({ err }, "patchPlanAvanceMembreTerrainHandler");
+    res.status(500).json({ erreur: "Erreur lors de la mise à jour du plan" });
   }
 }
 

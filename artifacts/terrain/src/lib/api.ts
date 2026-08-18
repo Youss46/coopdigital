@@ -298,6 +298,8 @@ export type AvanceDeleagueTerrain = {
   dateOctroi: string;
   motif: string | null;
   statut: string;
+  /** true = avance propre du membre (base centrale) ; false = avance du délégué */
+  isMembreAvance: boolean;
 };
 
 /**
@@ -310,12 +312,23 @@ export function getAvancesDeleguesTerrain(membreId?: number | null): Promise<Ava
   return apiGet<AvanceDeleagueTerrain[]>(`/avances-delegue${qs}`);
 }
 
-/** Met à jour le plan de remboursement d'une avance depuis le terrain (peseur ou délégué). */
+/** Met à jour le plan d'une avance délégué depuis le terrain. */
 export function patchPlanAvanceDeleague(
   avanceId: number,
   data: { plan_type: string; montant_partiel_fcfa?: number | null; report_date?: string | null },
 ): Promise<AvanceDeleagueTerrain> {
   return apiFetch<AvanceDeleagueTerrain>(`/avances-delegue/${avanceId}/plan`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+/** Met à jour le plan d'une avance membre (base centrale) depuis le terrain. */
+export function patchPlanAvanceMembre(
+  avanceId: number,
+  data: { plan_type: string; montant_partiel_fcfa?: number | null; report_date?: string | null },
+): Promise<AvanceDeleagueTerrain> {
+  return apiFetch<AvanceDeleagueTerrain>(`/avances-membre/${avanceId}/plan`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
