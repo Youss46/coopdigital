@@ -234,7 +234,7 @@ export default function FournisseursPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone</label>
-              <input className={INPUT_CLS} type="tel" inputMode="tel" maxLength={10} value={form.telephone ?? ""} onChange={(e) => handleField("telephone", e.target.value)} />
+              <input className={INPUT_CLS} type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" value={form.telephone ?? ""} onChange={(e) => handleField("telephone", e.target.value)} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Section / Zone</label>

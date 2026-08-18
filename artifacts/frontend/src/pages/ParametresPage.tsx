@@ -655,7 +655,7 @@ export default function ParametresPage() {
               </div>
               <div>
                 <Label>Téléphone principal</Label>
-                <Input type="tel" inputMode="tel" maxLength={10} disabled={!canEdit} value={v("telephone")} onChange={(e) => set("telephone", e.target.value)} placeholder="07 00 00 00 00" />
+                <Input type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" disabled={!canEdit} value={v("telephone")} onChange={(e) => set("telephone", e.target.value)} placeholder="07 00 00 00 00" />
               </div>
               <div>
                 <Label>Téléphone secondaire</Label>

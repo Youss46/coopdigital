@@ -475,7 +475,7 @@ export default function NouvelleExpeditionPage() {
               </div>
               <div>
                 <Label>Téléphone chauffeur</Label>
-                <Input type="tel" inputMode="tel" maxLength={10} value={telephoneChauffeurLibre} onChange={e => setTelephoneChauffeurLibre(e.target.value)} placeholder="07 XX XX XX XX" />
+                <Input type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" value={telephoneChauffeurLibre} onChange={e => setTelephoneChauffeurLibre(e.target.value)} placeholder="07 XX XX XX XX" />
               </div>
             </div>
           )}

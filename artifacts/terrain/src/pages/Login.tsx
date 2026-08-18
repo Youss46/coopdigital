@@ -71,7 +71,7 @@ export default function Login() {
               onChange={(e) => setTelephone(e.target.value)}
               autoComplete="tel"
               inputMode="tel"
-              maxLength={10}
+              minLength={10} maxLength={10} pattern="[0-9]{10}"
             />
           </div>
 

@@ -103,7 +103,7 @@ export default function ConnexionPage() {
                 value={tel}
                 onChange={e => setTel(e.target.value)}
                 required
-                maxLength={10}
+                minLength={10} maxLength={10} pattern="[0-9]{10}"
               />
             </div>
 

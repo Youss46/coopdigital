@@ -106,7 +106,7 @@ function CreerPeseurModal({ onClose }: { onClose: () => void }) {
             <label style={{ display: "block", fontSize: ".78rem", fontWeight: 600, color: "#374151", marginBottom: 4 }}>Téléphone *</label>
             <input
               value={telephone} onChange={(e) => setTelephone(e.target.value)}
-              type="tel" inputMode="tel" maxLength={10}
+              type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}"
               style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: ".88rem", boxSizing: "border-box", outline: "none" }}
               placeholder="07 00 00 00 00"
             />

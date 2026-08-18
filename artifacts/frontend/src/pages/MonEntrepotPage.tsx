@@ -424,7 +424,7 @@ export default function MonEntrepotPage() {
               ].map(({ key, label, placeholder, tel }) => (
                 <div key={key}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                  <input type={tel ? "tel" : "text"} inputMode={tel ? "tel" : undefined} maxLength={tel ? 10 : undefined} placeholder={placeholder}
+                  <input type={tel ? "tel" : "text"} inputMode={tel ? "tel" : undefined} minLength={tel ? 10 : undefined} maxLength={tel ? 10 : undefined} pattern={tel ? "[0-9]{10}" : undefined} placeholder={placeholder}
                     value={form[key as keyof typeof form]}
                     onChange={(e) => setForm(f => ({ ...f, [key]: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />

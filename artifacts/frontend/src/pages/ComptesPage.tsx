@@ -365,7 +365,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
                 <input
                   type="tel"
                   inputMode="tel"
-                  maxLength={10}
+                  minLength={10} maxLength={10} pattern="[0-9]{10}"
                   required
                   value={form.telephone}
                   onChange={(e) => setForm({ ...form, telephone: e.target.value })}

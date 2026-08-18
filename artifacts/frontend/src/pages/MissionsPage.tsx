@@ -213,7 +213,7 @@ function ModalCreerAgent({ onClose, onSuccess }: ModalAgentProps) {
 
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Téléphone *</label>
-                <input required type="tel" inputMode="tel" maxLength={10} value={form.telephone}
+                <input required type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" value={form.telephone}
                   onChange={(e) => setForm({ ...form, telephone: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
                   placeholder="07 00 00 00 00" />

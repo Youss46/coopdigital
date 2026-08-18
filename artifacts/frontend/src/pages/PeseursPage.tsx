@@ -151,7 +151,7 @@ function CreerPeseurModal({ onClose, delegues }: { onClose: () => void; delegues
 
           <div>
             <label style={{ display: "block", fontSize: ".78rem", fontWeight: 600, color: "#374151", marginBottom: 4 }}>Téléphone *</label>
-            <input value={telephone} onChange={(e) => setTelephone(e.target.value)} type="tel" inputMode="tel" maxLength={10} style={inputStyle} placeholder="07 00 00 00 00" />
+            <input value={telephone} onChange={(e) => setTelephone(e.target.value)} type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" style={inputStyle} placeholder="07 00 00 00 00" />
             <div style={{ fontSize: ".72rem", color: "#6b7280", marginTop: 3 }}>Ce numéro sera utilisé pour la connexion à l'app terrain</div>
           </div>
 

@@ -1579,7 +1579,7 @@ function PersonnelModal({
                   className={INPUT_CLS}
                   type="tel"
                   inputMode="tel"
-                  maxLength={10}
+                  minLength={10} maxLength={10} pattern="[0-9]{10}"
                   value={form.telephonePaiement}
                   onChange={(e) => f("telephonePaiement", e.target.value)}
                   placeholder="07 XX XX XX XX"

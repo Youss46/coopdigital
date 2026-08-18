@@ -243,7 +243,7 @@ function ModalValidation({
               <input
                 type="tel"
                 inputMode="tel"
-                maxLength={10}
+                minLength={10} maxLength={10} pattern="[0-9]{10}"
                 value={telephone}
                 onChange={(e) => setTelephone(e.target.value)}
                 placeholder="07 XX XX XX XX"
