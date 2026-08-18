@@ -418,13 +418,13 @@ export default function MonEntrepotPage() {
                 </div>
               </div>
               {[
-                { key: "immatriculation", label: "Immatriculation *", placeholder: "ex: CI 1234 AB" },
-                { key: "nomChauffeur", label: "Chauffeur *", placeholder: "Nom du chauffeur" },
-                { key: "telephoneChauffeur", label: "Téléphone chauffeur", placeholder: "07 XX XX XX XX" },
-              ].map(({ key, label, placeholder }) => (
+                { key: "immatriculation", label: "Immatriculation *", placeholder: "ex: CI 1234 AB", tel: false },
+                { key: "nomChauffeur", label: "Chauffeur *", placeholder: "Nom du chauffeur", tel: false },
+                { key: "telephoneChauffeur", label: "Téléphone chauffeur", placeholder: "07 XX XX XX XX", tel: true },
+              ].map(({ key, label, placeholder, tel }) => (
                 <div key={key}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                  <input type="text" placeholder={placeholder}
+                  <input type={tel ? "tel" : "text"} inputMode={tel ? "tel" : undefined} maxLength={tel ? 10 : undefined} placeholder={placeholder}
                     value={form[key as keyof typeof form]}
                     onChange={(e) => setForm(f => ({ ...f, [key]: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />

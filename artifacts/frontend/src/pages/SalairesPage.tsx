@@ -1577,6 +1577,9 @@ function PersonnelModal({
               <Field label="Téléphone de paiement">
                 <input
                   className={INPUT_CLS}
+                  type="tel"
+                  inputMode="tel"
+                  maxLength={10}
                   value={form.telephonePaiement}
                   onChange={(e) => f("telephonePaiement", e.target.value)}
                   placeholder="07 XX XX XX XX"

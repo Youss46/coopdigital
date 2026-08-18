@@ -764,7 +764,7 @@ export default function Membres() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone *</label>
-                    <input required type="tel" inputMode="tel" value={formExt.telephone} onChange={(e) => setFormExt({ ...formExt, telephone: e.target.value })}
+                    <input required type="tel" inputMode="tel" maxLength={10} value={formExt.telephone} onChange={(e) => setFormExt({ ...formExt, telephone: e.target.value })}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="07 XX XX XX XX" />
                   </div>
                 </>
@@ -805,7 +805,7 @@ export default function Membres() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone *</label>
-                  <input required type="tel" inputMode="tel" value={form.telephone ?? ""} onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                  <input required type="tel" inputMode="tel" maxLength={10} value={form.telephone ?? ""} onChange={(e) => setForm({ ...form, telephone: e.target.value })}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="07 XX XX XX XX" />
                 </div>
                 <div>

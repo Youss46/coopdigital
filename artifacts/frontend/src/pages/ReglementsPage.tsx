@@ -242,6 +242,8 @@ function ModalValidation({
               </label>
               <input
                 type="tel"
+                inputMode="tel"
+                maxLength={10}
                 value={telephone}
                 onChange={(e) => setTelephone(e.target.value)}
                 placeholder="07 XX XX XX XX"

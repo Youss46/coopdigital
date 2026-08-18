@@ -364,11 +364,13 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
                 </label>
                 <input
                   type="tel"
+                  inputMode="tel"
+                  maxLength={10}
                   required
                   value={form.telephone}
                   onChange={(e) => setForm({ ...form, telephone: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="+225 07 00 00 00 00"
+                  placeholder="07 00 00 00 00"
                 />
               </div>
 
