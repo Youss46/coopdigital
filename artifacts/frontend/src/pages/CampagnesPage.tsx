@@ -404,9 +404,21 @@ export default function CampagnesPage() {
           </div>
         </div>
         {tab === "campagnes" && peutCreer && (
-          <button onClick={() => setShowForm(v => !v)} className={`${BTN} bg-green-600 text-white hover:bg-green-700`}>
-            <Plus className="w-4 h-4" /> Nouvelle campagne
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={() => setShowForm(v => !v)}
+              disabled={!!active}
+              title={active ? `Clôturez "${active.libelle}" avant d'en créer une nouvelle` : undefined}
+              className={`${BTN} bg-green-600 text-white hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <Plus className="w-4 h-4" /> Nouvelle campagne
+            </button>
+            {active && (
+              <span className="text-xs text-amber-600 font-medium">
+                Clôturez la campagne en cours en premier
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -536,8 +548,9 @@ export default function CampagnesPage() {
                         {c.statut === "programmee" && peutCreer && (
                           <button
                             onClick={() => handleOuvrirProgrammee(c.id)}
-                            disabled={ouvrirPending.has(c.id)}
-                            className={`${BTN} bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs px-3 py-1.5`}>
+                            disabled={ouvrirPending.has(c.id) || !!active}
+                            title={active ? `Clôturez "${active.libelle}" avant d'ouvrir une nouvelle campagne` : undefined}
+                            className={`${BTN} bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs px-3 py-1.5`}>
                             {ouvrirPending.has(c.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                             Ouvrir maintenant
                           </button>
@@ -566,8 +579,11 @@ export default function CampagnesPage() {
                             </button>
                           )}
                           {c.statut === "fermee" && utilisateur?.role === "pca" && (
-                            <button onClick={() => { setRouvrirId(c.id); setRouvrirMotif(""); }}
-                              className={`${BTN} bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs px-3 py-1.5`}>
+                            <button
+                              onClick={() => { setRouvrirId(c.id); setRouvrirMotif(""); }}
+                              disabled={!!active}
+                              title={active ? `Clôturez "${active.libelle}" avant de réouvrir une autre campagne` : undefined}
+                              className={`${BTN} bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs px-3 py-1.5`}>
                               <RotateCcw className="w-3.5 h-3.5" /> Réouvrir
                             </button>
                           )}

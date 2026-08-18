@@ -65,6 +65,18 @@ export async function createCampagne(req: Request, res: Response) {
   const today = new Date().toISOString().slice(0, 10);
   const statut = dateOuverture > today ? "programmee" : "ouverte";
 
+  // Bloquer si une campagne est déjà ouverte et que la nouvelle serait ouverte immédiatement
+  if (statut === "ouverte") {
+    const dejaOuverte = await db.query.campagnesTable.findFirst({
+      where: and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")),
+    });
+    if (dejaOuverte) {
+      return res.status(409).json({
+        erreur: `Une campagne est déjà ouverte : "${dejaOuverte.libelle}". Clôturez-la avant d'en ouvrir une nouvelle.`,
+      });
+    }
+  }
+
   const [campagne] = await db
     .insert(campagnesTable)
     .values({
@@ -94,6 +106,19 @@ export async function ouvrirCampagneProgrammee(req: Request, res: Response) {
   if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
   if (campagne.statut !== "programmee") {
     return res.status(400).json({ erreur: "Cette campagne n'est pas en statut programmée." });
+  }
+
+  // Bloquer si une autre campagne est déjà ouverte
+  const dejaOuverte = await db.query.campagnesTable.findFirst({
+    where: and(
+      eq(campagnesTable.cooperativeId, cooperativeId),
+      eq(campagnesTable.statut, "ouverte"),
+    ),
+  });
+  if (dejaOuverte) {
+    return res.status(409).json({
+      erreur: `Une campagne est déjà ouverte : "${dejaOuverte.libelle}". Clôturez-la avant d'en ouvrir une nouvelle.`,
+    });
   }
 
   const today = new Date().toISOString().slice(0, 10);
@@ -456,6 +481,19 @@ export async function rattacherLivraisons(req: Request, res: Response) {
     if (!campagne) return res.status(404).json({ erreur: "Campagne introuvable" });
     if (campagne.statut === "ouverte") return res.status(400).json({ erreur: "Cette campagne est déjà ouverte." });
     if (campagne.statut === "archivee") return res.status(400).json({ erreur: "Une campagne archivée ne peut pas être réouverte. Les données sont verrouillées." });
+
+    // Bloquer si une autre campagne est déjà ouverte
+    const dejaOuverte = await db.query.campagnesTable.findFirst({
+      where: and(
+        eq(campagnesTable.cooperativeId, cooperativeId),
+        eq(campagnesTable.statut, "ouverte"),
+      ),
+    });
+    if (dejaOuverte) {
+      return res.status(409).json({
+        erreur: `Une campagne est déjà ouverte : "${dejaOuverte.libelle}". Clôturez-la avant d'en réouvrir une autre.`,
+      });
+    }
 
     const [updated] = await db
       .update(campagnesTable)
