@@ -4018,29 +4018,34 @@ export async function generateBordereauAchatSession(
     .limit(1);
   const prixUnitaire = dernierPrix ? parseFloat(dernierPrix.prix) : 0;
 
-  // 5. Commission = frais de collecte
+  // 5. Commission = frais de collecte (toujours affiché en montant BRUT = poids × taux)
   // Cherche d'abord le record en DB (créé juste après terminerSession).
-  // Fallback : calcule directement depuis le taux actif si le record n'existe pas encore.
+  // On lit montantBrutFcfa pour afficher la commission brute, indépendamment des
+  // éventuelles charges de transport qui sont déduites séparément sur le bordereau.
+  // Fallback : taux × poids net si le record n'existe pas encore.
   let fraisCollecteFcfa = 0;
   if (session.transfertId) {
     const [comm] = await db
-      .select({ montantFcfa: commissionsDeleguesTable.montantFcfa })
+      .select({
+        montantBrutFcfa: commissionsDeleguesTable.montantBrutFcfa,
+        montantFcfa:     commissionsDeleguesTable.montantFcfa,
+      })
       .from(commissionsDeleguesTable)
       .where(eq(commissionsDeleguesTable.transfertId, session.transfertId))
       .orderBy(desc(commissionsDeleguesTable.id))
       .limit(1);
     if (comm) {
-      fraisCollecteFcfa = Math.round(parseFloat(comm.montantFcfa ?? "0"));
+      // Préférer montantBrutFcfa (commission brute = poids × taux) ;
+      // si NULL (anciennes lignes sans ce champ), fallback sur montantFcfa.
+      const brut = parseFloat(comm.montantBrutFcfa ?? comm.montantFcfa ?? "0");
+      fraisCollecteFcfa = Math.round(brut);
     } else if (delegueIdSession) {
-      // Fallback : taux × poids net − charges coopérative (même logique que creerCommissionTransfert)
+      // Fallback : taux × poids net (commission brute, sans déduction de charges)
       const campagneActuelle = await getCampagneEnCours(cooperativeId);
       const taux = await getTauxActif(cooperativeId, campagneActuelle?.id ?? null, delegueIdSession);
       if (taux) {
         const poidsNetPourCommission = parseFloat(session.poidsTotalKg ?? "0");
-        const brut = Math.round(poidsNetPourCommission * taux.tauxFcfaParKg);
-        const chargesCoopCarb  = transfertCharges?.carburantPar  === "cooperative" ? (transfertCharges.carburantFcfa ?? 0) : 0;
-        const chargesCoopAutre = transfertCharges?.autresPar     === "cooperative" ? (transfertCharges.autresFcfa   ?? 0) : 0;
-        fraisCollecteFcfa = Math.max(0, brut - chargesCoopCarb - chargesCoopAutre);
+        fraisCollecteFcfa = Math.round(poidsNetPourCommission * taux.tauxFcfaParKg);
       }
     }
   }
