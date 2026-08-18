@@ -6,7 +6,8 @@
  * Le bon contient les informations de transport et les frais avancés par la coop.
  * Il est ensuite traité par le peseur depuis son app terrain.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Package, Truck, Plus, X, CheckCircle2, Clock, Scale, RefreshCw, AlertCircle, ChevronRight } from "lucide-react";
 import { useGetVehicules, useGetChauffeurs } from "@workspace/api-client-react";
@@ -103,14 +104,25 @@ const FORM_INIT = {
 
 export default function BonsReceptionMembresDeleguesPage() {
   const qc = useQueryClient();
+  const search = useSearch();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(FORM_INIT);
   const [filtreStatut, setFiltreStatut] = useState<string>("actifs");
 
+  // Pré-remplissage depuis ?membre_id=X (navigué depuis DeleguesLocalitesPage)
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const membreId = params.get("membre_id");
+    if (membreId) {
+      setForm(f => ({ ...f, membreDelegueId: membreId }));
+      setShowForm(true);
+    }
+  }, [search]);
+
   // ── Données ──────────────────────────────────────────────────────────────
   const { data: membresData } = useQuery({
     queryKey: ["membres-delegues-localites"],
-    queryFn: () => apiFetch<Membre[]>(`/api/membres?categorie_membre=d%C3%A9l%C3%A9gu%C3%A9+de+localit%C3%A9s&limit=200&statut_membre=actif`),
+    queryFn: () => apiFetch<Membre[]>(`/api/pesee/membres-delegues`),
   });
   const membres = membresData ?? [];
 

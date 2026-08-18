@@ -4,11 +4,12 @@ import { useLocation } from "wouter";
 import {
   Users, Search, Phone, MapPin, Wallet, PlusCircle, X,
   ChevronRight, AlertCircle, CalendarDays, TrendingUp, Settings,
-  CheckCircle2, Clock, Banknote, Trash2, ArrowDownCircle,
+  CheckCircle2, Clock, Banknote, Trash2, ArrowDownCircle, Package,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { usePermission } from "@/hooks/usePermission";
+import { useAuth } from "@/contexts/AuthContext";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -109,6 +110,8 @@ type Onglet = "membres" | "commissions" | "taux";
 export default function DeleguesLocalitesPage() {
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
+  const { utilisateur } = useAuth();
+  const isMagasinier = utilisateur?.role === "magasinier";
   const peutOctroyer   = usePermission("avances", "octroyer");
   const peutRembourser = usePermission("avances", "rembourser");
   const peutModifier   = usePermission("delegues", "modifier");
@@ -144,17 +147,31 @@ export default function DeleguesLocalitesPage() {
   const [errTaux, setErrTaux] = useState("");
 
   // ── Data fetching ─────────────────────────────────────────────────────────
-  const { data: result, isLoading } = useQuery<{ membres: MembreDelegue[]; total: number }>({
-    queryKey: ["delegues-localites"],
-    queryFn: () => apiFetch(`/api/membres?categorie_membre=d%C3%A9l%C3%A9gu%C3%A9+de+localit%C3%A9s&limit=200&statut_membre=actif`),
+  // Magasinier uses a narrow identity-only endpoint (stocks.lire);
+  // other roles use the full membres endpoint (membres.lire).
+  const { data: resultatMagasinier, isLoading: loadingMagasinier } = useQuery<MembreDelegue[]>({
+    queryKey: ["delegues-localites-magasinier"],
+    queryFn: () => apiFetch<MembreDelegue[]>(`/api/pesee/membres-delegues`),
+    enabled: isMagasinier,
     staleTime: 30_000,
   });
 
-  const membres = result?.membres ?? [];
+  const { data: resultatComplet, isLoading: loadingComplet } = useQuery<{ membres: MembreDelegue[]; total: number }>({
+    queryKey: ["delegues-localites"],
+    queryFn: () => apiFetch<{ membres: MembreDelegue[]; total: number }>(`/api/membres?categorie_membre=d%C3%A9l%C3%A9gu%C3%A9+de+localit%C3%A9s&limit=200&statut_membre=actif`),
+    enabled: !isMagasinier,
+    staleTime: 30_000,
+  });
+
+  const isLoading = isMagasinier ? loadingMagasinier : loadingComplet;
+  const membres: MembreDelegue[] = isMagasinier
+    ? (resultatMagasinier ?? [])
+    : (resultatComplet?.membres ?? []);
 
   const { data: toutesAvances = [] } = useQuery<Avance[]>({
     queryKey: ["avances-delegues-localites"],
     queryFn: () => apiFetch(`/api/avances`),
+    enabled: !isMagasinier,
     staleTime: 30_000,
   });
 
@@ -173,7 +190,7 @@ export default function DeleguesLocalitesPage() {
   const { data: avancesModal = [], isLoading: loadAvances } = useQuery<Avance[]>({
     queryKey: ["avances-membre", modalMembre?.id],
     queryFn: () => apiFetch(`/api/avances?membre_id=${modalMembre!.id}`),
-    enabled: !!modalMembre,
+    enabled: !!modalMembre && !isMagasinier,
     staleTime: 0,
   });
 
@@ -302,7 +319,7 @@ export default function DeleguesLocalitesPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Délégués de localités</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Membres de catégorie "Délégué de localités" — {result?.total ?? 0} au total
+            Membres de catégorie "Délégué de localités" — {membres.length} au total
           </p>
         </div>
       </div>
@@ -310,10 +327,10 @@ export default function DeleguesLocalitesPage() {
       {/* Onglets */}
       <div className="flex gap-1 border-b border-gray-200">
         {([
-          { id: "membres" as Onglet,     label: "Membres",     icon: Users },
-          { id: "commissions" as Onglet, label: "Commissions", icon: TrendingUp },
-          { id: "taux" as Onglet,        label: "Taux",        icon: Settings },
-        ] as const).map(({ id, label, icon: Icon }) => (
+          { id: "membres" as Onglet,     label: "Membres",     icon: Users,      hidden: false },
+          { id: "commissions" as Onglet, label: "Commissions", icon: TrendingUp, hidden: isMagasinier },
+          { id: "taux" as Onglet,        label: "Taux",        icon: Settings,   hidden: isMagasinier },
+        ] as const).filter(t => !t.hidden).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setOnglet(id)}
@@ -344,7 +361,7 @@ export default function DeleguesLocalitesPage() {
           </div>
 
           {isLoading ? (
-            <TableSkeleton />
+            <TableSkeleton colonnes={4} />
           ) : filtres.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200">
               <EmptyState
@@ -366,15 +383,17 @@ export default function DeleguesLocalitesPage() {
                 return (
                   <div
                     key={m.id}
-                    className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3 hover:border-gray-300 hover:shadow-sm transition-all cursor-pointer"
-                    onClick={() => setModalMembre(m)}
+                    className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3 hover:border-gray-300 hover:shadow-sm transition-all"
                   >
-                    <div className="w-10 h-10 rounded-full bg-[#1a4731]/10 flex items-center justify-center shrink-0">
+                    <div
+                      className="w-10 h-10 rounded-full bg-[#1a4731]/10 flex items-center justify-center shrink-0 cursor-pointer"
+                      onClick={() => setModalMembre(m)}
+                    >
                       <span className="text-sm font-bold text-[#1a4731]">
                         {(m.prenoms ?? m.nom).charAt(0).toUpperCase()}
                       </span>
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setModalMembre(m)}>
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-gray-900 truncate">{m.prenoms} {m.nom}</p>
                         {enRetard && <AlertCircle size={13} className="text-red-500 shrink-0" />}
@@ -398,7 +417,17 @@ export default function DeleguesLocalitesPage() {
                         </div>
                       )}
                     </div>
-                    <ChevronRight size={15} className="text-gray-300 shrink-0 mt-1" />
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        title="Créer un bon de réception"
+                        onClick={() => setLocation(`/bons-reception-membres?membre_id=${m.id}`)}
+                        className="flex items-center gap-1 text-xs font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 rounded-lg px-2 py-1 transition-colors"
+                      >
+                        <Package size={12} />
+                        Bon de réception
+                      </button>
+                      <ChevronRight size={15} className="text-gray-300 cursor-pointer" onClick={() => setModalMembre(m)} />
+                    </div>
                   </div>
                 );
               })}
@@ -425,7 +454,7 @@ export default function DeleguesLocalitesPage() {
           )}
 
           {loadRecap ? (
-            <TableSkeleton />
+            <TableSkeleton colonnes={4} />
           ) : recapCommissions.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200">
               <EmptyState
@@ -575,7 +604,7 @@ export default function DeleguesLocalitesPage() {
           )}
 
           {loadTaux ? (
-            <TableSkeleton />
+            <TableSkeleton colonnes={4} />
           ) : taux.length === 0 && !showTauxForm ? (
             <div className="bg-white rounded-xl border border-gray-200">
               <EmptyState
@@ -655,6 +684,16 @@ export default function DeleguesLocalitesPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => {
+                    setModalMembre(null);
+                    setLocation(`/bons-reception-membres?membre_id=${modalMembre.id}`);
+                  }}
+                  className="flex items-center gap-1 text-xs font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 rounded-lg px-2 py-1 transition-colors"
+                >
+                  <Package size={11} />
+                  Bon de réception
+                </button>
+                <button
                   onClick={() => { setLocation(`/membres/${modalMembre.id}`); }}
                   className="text-xs text-[#1a4731] font-medium hover:underline"
                 >
@@ -677,6 +716,8 @@ export default function DeleguesLocalitesPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {!isMagasinier && (
+              <>
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-gray-700">Avances</p>
                 {peutOctroyer && !showOctroi && (
@@ -857,6 +898,8 @@ export default function DeleguesLocalitesPage() {
                     );
                   })}
                 </div>
+              )}
+              </>
               )}
             </div>
           </div>
