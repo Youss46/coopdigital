@@ -73,15 +73,7 @@ export default function MonEntrepotPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [onglet, setOnglet] = useState<"stock" | "mouvements" | "transferts">("stock");
-  const [showTransfert, setShowTransfert] = useState(false);
   const [showDepart, setShowDepart] = useState<Transfert | null>(null);
-  const [form, setForm] = useState({
-    poidsKg: "", nombreSacs: "", typeVehicule: "propre", immatriculation: "",
-    nomChauffeur: "", telephoneChauffeur: "", datePrevue: "", notes: "",
-    fraisCarburantFcfa: "", fraisCarburantPar: "cooperative",
-    autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative",
-    modeFinancement: "fonds_propres",
-  });
   const [formDepart, setFormDepart] = useState({ poidsDepart_kg: "", immatriculation: "", nomChauffeur: "" });
 
   const { data: entrepot, isLoading, error } = useQuery<Entrepot>({
@@ -100,19 +92,6 @@ export default function MonEntrepotPage() {
     queryKey: ["mes-transferts"],
     queryFn: () => apiFetch("/terrain/entrepot/transferts"),
     enabled: onglet === "transferts" || onglet === "stock",
-  });
-
-  const mutTransfert = useMutation({
-    mutationFn: (body: object) =>
-      apiFetch("/terrain/entrepot/transferts", { method: "POST", body: JSON.stringify(body) }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mes-transferts"] });
-      qc.invalidateQueries({ queryKey: ["mon-entrepot"] });
-      setShowTransfert(false);
-      setForm({ poidsKg: "", nombreSacs: "", typeVehicule: "propre", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", datePrevue: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
-      toast({ title: "Transfert soumis avec succès", description: "La direction a été notifiée." });
-    },
-    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
   const mutDepart = useMutation({
@@ -210,7 +189,7 @@ export default function MonEntrepotPage() {
             <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-orange-800">Seuil d'alerte atteint</p>
-              <p className="text-xs text-orange-600">Planifiez un transfert vers le magasin central.</p>
+              <p className="text-xs text-orange-600">Contactez l'administration pour planifier un transfert vers le magasin central.</p>
             </div>
           </div>
         )}
@@ -266,13 +245,6 @@ export default function MonEntrepotPage() {
           </div>
         </div>
       )}
-
-      {/* Bouton nouveau transfert */}
-      <button
-        onClick={() => setShowTransfert(true)}
-        className="w-full flex items-center justify-center gap-2 bg-green-700 text-white py-3 rounded-xl font-medium hover:bg-green-800 transition-colors">
-        <Plus className="w-5 h-5" /> Nouveau transfert vers le central
-      </button>
 
       {/* Onglets */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
@@ -377,179 +349,6 @@ export default function MonEntrepotPage() {
                 )}
               </div>
             ))}
-        </div>
-      )}
-
-      {/* Modal nouveau transfert */}
-      {showTransfert && entrepot && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 overflow-y-auto max-h-[90vh]">
-            <h2 className="text-lg font-bold text-gray-900 mb-1">Nouveau transfert vers le central</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              Stock disponible : <strong className="text-gray-800">{kg(entrepot.stockActuelKg)}</strong>
-            </p>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Poids à transférer (kg) *</label>
-                  <input type="number" step="0.01" placeholder="0.00"
-                    value={form.poidsKg}
-                    onChange={(e) => setForm(f => ({ ...f, poidsKg: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de sacs</label>
-                  <input type="number" min="0" step="1" placeholder="0"
-                    value={form.nombreSacs}
-                    onChange={(e) => setForm(f => ({ ...f, nombreSacs: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type de transport</label>
-                <div className="flex gap-3">
-                  {["propre", "location"].map((v) => (
-                    <label key={v} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="typeVehicule" value={v} checked={form.typeVehicule === v}
-                        onChange={(e) => setForm(f => ({ ...f, typeVehicule: e.target.value }))} />
-                      <span className="text-sm text-gray-700">{v === "propre" ? "Camion propre" : "Location"}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {[
-                { key: "immatriculation", label: "Immatriculation *", placeholder: "ex: CI 1234 AB", tel: false },
-                { key: "nomChauffeur", label: "Chauffeur *", placeholder: "Nom du chauffeur", tel: false },
-                { key: "telephoneChauffeur", label: "Téléphone chauffeur", placeholder: "07 XX XX XX XX", tel: true },
-              ].map(({ key, label, placeholder, tel }) => (
-                <div key={key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                  <input type={tel ? "tel" : "text"} inputMode={tel ? "tel" : undefined} minLength={tel ? 10 : undefined} maxLength={tel ? 10 : undefined} pattern={tel ? "[0-9]{10}" : undefined} placeholder={placeholder}
-                    value={form[key as keyof typeof form]}
-                    onChange={(e) => setForm(f => ({ ...f, [key]: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
-                </div>
-              ))}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date prévue</label>
-                <input type="datetime-local"
-                  value={form.datePrevue}
-                  onChange={(e) => setForm(f => ({ ...f, datePrevue: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
-              </div>
-              {/* Mode de financement */}
-              <div className="border-t border-gray-100 pt-3">
-                <p className="text-sm font-semibold text-gray-700 mb-2">Mode de financement</p>
-                <div className="flex flex-col gap-2">
-                  {[
-                    { value: "fonds_propres", label: "🟢 Fonds propres", desc: "Le délégué avance ses fonds pour acheter le cacao" },
-                    { value: "caisse_cooperative", label: "🔵 Caisse coopérative créditée", desc: "La caisse déléguée a été approvisionnée avant la collecte" },
-                  ].map(({ value, label, desc }) => (
-                    <label key={value} className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${form.modeFinancement === value ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
-                      <input type="radio" name="modeFinancement" value={value} checked={form.modeFinancement === value}
-                        onChange={(e) => setForm(f => ({ ...f, modeFinancement: e.target.value }))}
-                        className="mt-0.5 accent-green-600" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{label}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Charges de transport */}
-              <div className="border-t border-gray-100 pt-3">
-                <p className="text-sm font-semibold text-gray-700 mb-2">Charges de transport</p>
-                {/* Carburant */}
-                <div className="grid grid-cols-2 gap-3 mb-2">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Carburant (FCFA)</label>
-                    <input type="number" min="0" step="1" placeholder="0"
-                      value={form.fraisCarburantFcfa}
-                      onChange={(e) => setForm(f => ({ ...f, fraisCarburantFcfa: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
-                  </div>
-                  {form.fraisCarburantFcfa && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Pris en charge par</label>
-                      <select value={form.fraisCarburantPar}
-                        onChange={(e) => setForm(f => ({ ...f, fraisCarburantPar: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500">
-                        <option value="cooperative">Coopérative (déduit commission)</option>
-                        <option value="delegue">Délégué (à sa charge)</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-                {/* Autres charges */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Autres charges (FCFA)</label>
-                    <input type="number" min="0" step="1" placeholder="0"
-                      value={form.autresChargesFcfa}
-                      onChange={(e) => setForm(f => ({ ...f, autresChargesFcfa: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
-                  </div>
-                  {form.autresChargesFcfa && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Pris en charge par</label>
-                      <select value={form.autresChargesPar}
-                        onChange={(e) => setForm(f => ({ ...f, autresChargesPar: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500">
-                        <option value="cooperative">Coopérative (déduit commission)</option>
-                        <option value="delegue">Délégué (à sa charge)</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-                {form.autresChargesFcfa && (
-                  <div className="mt-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Libellé autres charges</label>
-                    <input type="text" placeholder="ex: Péage, manutention…"
-                      value={form.autresChargesLibelle}
-                      onChange={(e) => setForm(f => ({ ...f, autresChargesLibelle: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <textarea rows={2} placeholder="Observations…"
-                  value={form.notes}
-                  onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 resize-none" />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowTransfert(false)}
-                className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50">
-                Annuler
-              </button>
-              <button
-                disabled={!form.poidsKg || !form.immatriculation || !form.nomChauffeur || mutTransfert.isPending}
-                onClick={() => mutTransfert.mutate({
-                  entrepotId: entrepot.id,
-                  poidsKg: parseFloat(form.poidsKg),
-                  nombreSacs: form.nombreSacs ? parseInt(form.nombreSacs) : undefined,
-                  typeVehicule: form.typeVehicule,
-                  immatriculation: form.immatriculation || undefined,
-                  nomChauffeur: form.nomChauffeur || undefined,
-                  telephoneChauffeur: form.telephoneChauffeur || undefined,
-                  datePrevue: form.datePrevue || undefined,
-                  notes: form.notes || undefined,
-                  fraisCarburantFcfa: form.fraisCarburantFcfa ? parseInt(form.fraisCarburantFcfa) : undefined,
-                  fraisCarburantPar: form.fraisCarburantFcfa ? form.fraisCarburantPar : undefined,
-                  autresChargesFcfa: form.autresChargesFcfa ? parseInt(form.autresChargesFcfa) : undefined,
-                  autresChargesLibelle: form.autresChargesLibelle || undefined,
-                  autresChargesPar: form.autresChargesFcfa ? form.autresChargesPar : undefined,
-                  modeFinancement: form.modeFinancement,
-                })}
-                className="flex-1 bg-green-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50">
-                {mutTransfert.isPending ? "Envoi…" : "Soumettre le transfert"}
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
