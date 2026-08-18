@@ -4044,8 +4044,9 @@ export default function ComptabilitePage() {
   ];
 
   return (
-    <div>
-      <div className="flex items-start justify-between mb-6">
+    <div className="flex flex-col h-full">
+      {/* En-tête fixe */}
+      <div className="flex-shrink-0 flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Comptabilité</h1>
           <p className="text-sm text-gray-500 mt-1">Gestion des écritures comptables OHADA</p>
@@ -4061,8 +4062,8 @@ export default function ComptabilitePage() {
         )}
       </div>
 
-      {/* Onglets */}
-      <div className="flex flex-wrap gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
+      {/* Onglets — fixes */}
+      <div className="flex-shrink-0 flex flex-wrap gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
         {tabs.map(({ id, label, icon: Icon, badge }) => (
           <button
             key={id}
@@ -4087,22 +4088,25 @@ export default function ComptabilitePage() {
 
       {/* Widget taux dans l'onglet devises (en tête de page si visible) */}
       {peutVoirTaux && onglet !== "devises" && (
-        <div className="mb-4">
+        <div className="flex-shrink-0 mb-4">
           <WidgetTauxChange />
         </div>
       )}
 
-      {onglet === "en_attente"    && <OngletEnAttente />}
-      {onglet === "journal"       && <OngletJournal defaultSource={journalDefaultSource} />}
-      {onglet === "grand_livre"   && peutGrandLivre && <OngletGrandLivre />}
-      {onglet === "balance"       && peutBalance    && <OngletBalance />}
-      {onglet === "balance_aux"   && peutBalance    && <OngletBalanceAuxiliaire />}
-      {onglet === "flux"          && <OngletFluxTresorerie />}
-      {onglet === "cloture"       && peutVoirConfig && <OngletCloture />}
-      {onglet === "devises"       && peutVoirTaux   && <OngletDevises />}
-      {onglet === "plan_comptable"&& peutVoirPlan   && <OngletPlanComptableContainer />}
-      {onglet === "config"        && peutVoirConfig && <OngletConfiguration />}
-      {onglet === "anomalies_ia"  && peutVoirAnomIA && <OngletAnomaliesIA />}
+      {/* Zone de contenu — scrollable */}
+      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+        {onglet === "en_attente"    && <OngletEnAttente />}
+        {onglet === "journal"       && <OngletJournal defaultSource={journalDefaultSource} />}
+        {onglet === "grand_livre"   && peutGrandLivre && <OngletGrandLivre />}
+        {onglet === "balance"       && peutBalance    && <OngletBalance />}
+        {onglet === "balance_aux"   && peutBalance    && <OngletBalanceAuxiliaire />}
+        {onglet === "flux"          && <OngletFluxTresorerie />}
+        {onglet === "cloture"       && peutVoirConfig && <OngletCloture />}
+        {onglet === "devises"       && peutVoirTaux   && <OngletDevises />}
+        {onglet === "plan_comptable"&& peutVoirPlan   && <OngletPlanComptableContainer />}
+        {onglet === "config"        && peutVoirConfig && <OngletConfiguration />}
+        {onglet === "anomalies_ia"  && peutVoirAnomIA && <OngletAnomaliesIA />}
+      </div>
 
       {showSaisie && (
         <ModalSaisieManuelle

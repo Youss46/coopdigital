@@ -394,8 +394,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <SystemBanner />
 
         {/* Contenu */}
-        <main className="flex-1 overflow-auto">
-          <div className="p-4 sm:p-6">{children}</div>
+        <main className="flex-1 overflow-hidden">
+          <div className="p-4 sm:p-6 h-full overflow-auto">{children}</div>
         </main>
       </div>
 
