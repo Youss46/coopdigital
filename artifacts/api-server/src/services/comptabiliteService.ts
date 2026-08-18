@@ -524,6 +524,48 @@ export async function generateEcrituresCommission(
 }
 
 /**
+ * Alimentation de la caisse d'un délégué depuis la caisse principale.
+ * SYSCOHADA :
+ *   Débit  571 Caisse déléguée (sous-caisse terrain)
+ *   Crédit 521 Banque / caisse principale coopérative
+ *
+ * Représente un reclassement d'actif : les fonds sortent de la caisse
+ * centrale (521) et entrent dans la sous-caisse terrain (571).
+ */
+export async function generateEcrituresAlimentationCaisse(
+  cooperativeId: number,
+  params: {
+    /** ID of the mouvements_caisse row recorded on the source caisse — used for reconciliation. */
+    mouvementSourceId: number;
+    delegueId: number;
+    delegueNom: string;
+    montantFcfa: number;
+    date: string;
+  },
+): Promise<void> {
+  const { mouvementSourceId, delegueId, delegueNom, montantFcfa, date } = params;
+  const c = await resolveComptes(
+    cooperativeId,
+    "delegues",
+    "alimentation_caisse_delegue",
+    "571",
+    "521",
+  );
+  await proposerEcriture(cooperativeId, {
+    source: "caisse",
+    sourceId: mouvementSourceId,
+    libelle: `Alimentation caisse délégué – ${delegueNom}`,
+    compteDebit: c.compteDebit,
+    compteCredit: c.compteCredit,
+    montantFcfa,
+    date,
+    numeroPiece: `ALIM-DEL-${delegueId}-${date}`,
+    tiersId: delegueId,
+    tiersType: "delegue",
+  });
+}
+
+/**
  * Paiement d'une prime à un producteur (complément prix d'achat cacao).
  * SYSCOHADA :
  *   Débit 6018 Complément d'achat

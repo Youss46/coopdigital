@@ -11,6 +11,7 @@ import {
 import { and, eq, sql, desc, lt, gte } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { creerNotification, notifierParRole } from "./notificationService.js";
+import { generateEcrituresAlimentationCaisse } from "./comptabiliteService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -481,7 +482,7 @@ export async function alimenterDepuisCaissePrincipale(
   `);
   const sessionId = sessionResult.rows[0]?.id;
 
-  await db.insert(mouvementsCaisseTable).values({
+  const [mvtSource] = await db.insert(mouvementsCaisseTable).values({
     caisseId: caisseSourceId,
     sessionId: sessionId ?? null,
     cooperativeId: coopId,
@@ -491,7 +492,7 @@ export async function alimenterDepuisCaissePrincipale(
     libelle: `Alimentation caisse délégué ${nomDelegue}`,
     soldeApresFcfa: String(nouveauSoldeSource),
     enregistrePar: adminId,
-  });
+  }).returning({ id: mouvementsCaisseTable.id });
 
   // 5. Créditer la caisse du délégué (caissesTable)
   await db.update(caissesTable)
@@ -509,7 +510,17 @@ export async function alimenterDepuisCaissePrincipale(
     enregistrePar: adminId,
   });
 
-  // 6. Log d'alimentation (traçabilité sans FK vers caisses_delegues)
+  // 6. Écriture comptable OHADA — reclassement actif 571/521
+  // Awaited so that an accounting failure is surfaced to the caller rather than
+  // silently swallowed while balances are already committed.
+  const today = new Date().toISOString().slice(0, 10);
+  await generateEcrituresAlimentationCaisse(coopId, {
+    mouvementSourceId: mvtSource.id,
+    delegueId: agentId,
+    delegueNom: nomDelegue,
+    montantFcfa,
+    date: today,
+  });
 
   // 7. Notification délégué (alimentation caisse)
   void creerNotification(coopId, [agentId], {
