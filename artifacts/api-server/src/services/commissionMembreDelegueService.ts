@@ -17,9 +17,12 @@ import {
   membresTable,
   campagnesTable,
   avancesTable,
+  sessionsPeseeTable,
+  bonsReceptionMembresDeleguesTable,
 } from "@workspace/db";
 import { and, eq, isNull, or, desc, sql, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { generateEcrituresCommission, proposerEcriture } from "./comptabiliteService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -405,5 +408,71 @@ export async function payerCommissionsMembreDelegue(
   }
 
   logger.info({ membreDelegueId, montantTotal, totalRetenu, montantNet, nb: aTraiter.length }, "Commissions membre délégué payées");
+
+  // ── Écritures OHADA — fire-and-forget ──────────────────────────────────────
+  const membreNomComplet = `${membre.nom} ${membre.prenoms ?? ""}`.trim();
+  const datePaiement = today; // alias pour clarté dans le bloc async
+  void (async () => {
+    try {
+      // 1. Commission nette versée — 6322 / [571|554|521]
+      if (montantNet > 0) {
+        await generateEcrituresCommission(cooperativeId, {
+          delegueId:     membreDelegueId,
+          delegueNom:    membreNomComplet,
+          montantFcfa:   montantNet,
+          modePaiement:  data.modePaiement,
+          date:          datePaiement,
+          nbCommissions: aTraiter.length,
+        });
+      }
+
+      // 2. Frais transport des bons de réception liés — 624 / 521
+      const sessionIds = aTraiter
+        .map(c => c.sessionPeseeId)
+        .filter((id): id is number => id != null);
+
+      if (sessionIds.length > 0) {
+        const sessions = await db
+          .select({ bonReceptionId: sessionsPeseeTable.bonReceptionId })
+          .from(sessionsPeseeTable)
+          .where(inArray(sessionsPeseeTable.id, sessionIds));
+
+        const bonIds = sessions
+          .map(s => s.bonReceptionId)
+          .filter((id): id is number => id != null);
+
+        if (bonIds.length > 0) {
+          const bons = await db
+            .select({
+              carburant: bonsReceptionMembresDeleguesTable.fraisCarburantFcfa,
+              autres:    bonsReceptionMembresDeleguesTable.autresChargesFcfa,
+            })
+            .from(bonsReceptionMembresDeleguesTable)
+            .where(inArray(bonsReceptionMembresDeleguesTable.id, bonIds));
+
+          const totalTransport = bons.reduce(
+            (s, b) => s + (b.carburant ?? 0) + (b.autres ?? 0),
+            0,
+          );
+
+          if (totalTransport > 0) {
+            await proposerEcriture(cooperativeId, {
+              source:       "transport",
+              libelle:      `Frais transport collecte – ${membreNomComplet} (${aTraiter.length} session${aTraiter.length > 1 ? "s" : ""})`,
+              compteDebit:  "624",
+              compteCredit: "521",
+              montantFcfa:  totalTransport,
+              date:         datePaiement,
+              tiersId:      membreDelegueId,
+              tiersType:    "membre",
+            });
+          }
+        }
+      }
+    } catch (err) {
+      logger.error({ err, membreDelegueId, cooperativeId }, "Erreur écritures comptables commission membre délégué");
+    }
+  })();
+
   return { montantTotal, totalRetenu, montantNet, nb: aTraiter.length };
 }
