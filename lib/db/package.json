@@ -14,7 +14,8 @@
     "ci-migrate": "tsx ./src/ci-migrate.ts",
     "fresh-migrate": "tsx ./src/fresh-migrate.ts",
     "push": "drizzle-kit push --config ./drizzle.config.ts",
-    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
+    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
+    "retroetiquetage": "tsx ../../scripts/retroetiquetage-tiers.ts"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",
