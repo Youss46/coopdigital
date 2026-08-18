@@ -6,23 +6,29 @@ import { getTransfertsEnAttentePesee } from "../lib/api";
 interface Props {
   /** delegueId provenant de AgentUser. null/undefined = peseur central → ajoute l'onglet Réceptions */
   delegueId?: number | null;
+  /**
+   * Nombre de transferts en attente pré-fetché par le parent (AccueilPeseur).
+   * Quand fourni, BottomNavPeseur n'effectue pas son propre appel réseau.
+   */
+  nbTransferts?: number;
 }
 
-export default function BottomNavPeseur({ delegueId }: Props = {}) {
+export default function BottomNavPeseur({ delegueId, nbTransferts: nbTransfertsProp }: Props = {}) {
   const [location] = useLocation();
   const isCentral = delegueId == null;
 
-  const [nbTransferts, setNbTransferts] = useState(0);
+  const [nbTransfertsLocal, setNbTransfertsLocal] = useState(0);
 
+  // Ne fetch que si le parent n'a pas fourni la valeur (pages autres qu'AccueilPeseur)
   useEffect(() => {
-    if (!isCentral) return;
+    if (!isCentral || nbTransfertsProp !== undefined) return;
 
     let cancelled = false;
 
     async function fetchCount() {
       try {
         const list = await getTransfertsEnAttentePesee();
-        if (!cancelled) setNbTransferts(list.length);
+        if (!cancelled) setNbTransfertsLocal(list.length);
       } catch {
         // silencieux — pas de badge si hors-ligne
       }
@@ -31,7 +37,9 @@ export default function BottomNavPeseur({ delegueId }: Props = {}) {
     void fetchCount();
     const interval = setInterval(() => void fetchCount(), 60_000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [isCentral]);
+  }, [isCentral, nbTransfertsProp]);
+
+  const nbTransferts = nbTransfertsProp ?? nbTransfertsLocal;
 
   const ITEMS_BASE = [
     { path: "/",              icon: <Home    size={20} strokeWidth={2} />, label: "Accueil"    },
@@ -66,7 +74,7 @@ export default function BottomNavPeseur({ delegueId }: Props = {}) {
         const isActive = item.path === "/"
           ? location === "/"
           : location.startsWith(item.path);
-        const badge = "badge" in item ? item.badge : 0;
+        const badge = "badge" in item ? (item.badge as number) : 0;
         return (
           <Link
             key={item.path}
