@@ -30,6 +30,7 @@ async function apiFetch<T>(path: string): Promise<T> {
 interface EntrepotDelegue { id: number; nom: string; zoneNom: string | null; actif: boolean; }
 import { getGetDashboardQueryKey, getGetDashboardLivraisonsQueryKey } from "@workspace/api-client-react";
 import { CheckCircle, Scale, Search, CalendarDays, ChevronDown, ChevronUp, Sprout, AlertTriangle, Tag, ArrowLeft, CloudOff } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { queueOp } from "@/lib/idb";
 
 function formaterFCFA(n: number) {
@@ -39,6 +40,8 @@ function formaterFCFA(n: number) {
 export default function NouvelleLivraison() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { utilisateur } = useAuth();
+  const estDelegue = utilisateur?.role === "delegue";
 
   const [membreRecherche, setMembreRecherche] = useState("");
   const [membreSelectionne, setMembreSelectionne] = useState<{ id: number; nom: string; prenoms: string; telephone: string } | null>(null);
@@ -324,24 +327,26 @@ export default function NouvelleLivraison() {
             Producteur
           </h2>
 
-          {/* Toggle type de source */}
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
-            <button
-              type="button"
-              onClick={() => { setSourceType("membre"); setFournisseurSelectionne(null); setFournisseurRecherche(""); }}
-              className={`flex-1 py-2 transition-colors ${sourceType === "membre" ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
-              style={sourceType === "membre" ? { backgroundColor: "#1a4731" } : {}}
-            >
-              Membre coopérateur
-            </button>
-            <button
-              type="button"
-              onClick={() => { setSourceType("fournisseur"); setMembreSelectionne(null); setMembreRecherche(""); }}
-              className={`flex-1 py-2 transition-colors border-l border-gray-200 ${sourceType === "fournisseur" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
-            >
-              Pisteur / Externe
-            </button>
-          </div>
+          {/* Toggle type de source — Pisteur/Externe masqué pour les délégués */}
+          {!estDelegue && (
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => { setSourceType("membre"); setFournisseurSelectionne(null); setFournisseurRecherche(""); }}
+                className={`flex-1 py-2 transition-colors ${sourceType === "membre" ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
+                style={sourceType === "membre" ? { backgroundColor: "#1a4731" } : {}}
+              >
+                Membre coopérateur
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSourceType("fournisseur"); setMembreSelectionne(null); setMembreRecherche(""); }}
+                className={`flex-1 py-2 transition-colors border-l border-gray-200 ${sourceType === "fournisseur" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+              >
+                Pisteur / Externe
+              </button>
+            </div>
+          )}
 
           {/* Sélection membre */}
           {sourceType === "membre" && (!membreSelectionne ? (
