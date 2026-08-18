@@ -641,6 +641,111 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
   }
 }
 
+// ─── Régularisations d'inventaire (408, 418, 486, 487) ───────────────────────
+
+const REGULARISATION_TYPES = {
+  "408": { label: "Charges à payer",            debitSide: "contrepartie", creditSide: "fixe" },
+  "418": { label: "Produits à recevoir",         debitSide: "fixe",         creditSide: "contrepartie" },
+  "486": { label: "Produits constatés d'avance", debitSide: "contrepartie", creditSide: "fixe" },
+  "487": { label: "Charges constatées d'avance", debitSide: "fixe",         creditSide: "contrepartie" },
+} as const;
+
+export async function listRegularisations(req: Request, res: Response): Promise<void> {
+  try {
+    const coop    = coopId(req);
+    const exercice = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : new Date().getFullYear() - 1;
+
+    const rows = await db.execute(sql`
+      SELECT id, date_ecriture AS "dateEcriture", libelle, compte_debit AS "compteDebit",
+             compte_credit AS "compteCredit", montant_fcfa AS "montantFcfa",
+             created_at AS "createdAt"
+      FROM ecritures_comptables
+      WHERE cooperative_id = ${coop}
+        AND exercice = ${exercice}
+        AND type_ecriture = 'regularisation'
+      ORDER BY date_ecriture, id
+    `);
+    res.json(rows.rows);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function createRegularisation(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+    const { type, compteContrepartie, libelle, montantFcfa, date, exercice } = req.body as {
+      type: "408" | "418" | "486" | "487";
+      compteContrepartie: string;
+      libelle: string;
+      montantFcfa: number;
+      date: string;
+      exercice: number;
+    };
+
+    if (!REGULARISATION_TYPES[type]) {
+      res.status(400).json({ erreur: "Type invalide (408 | 418 | 486 | 487)" }); return;
+    }
+    if (!compteContrepartie || !libelle || !montantFcfa || montantFcfa <= 0) {
+      res.status(400).json({ erreur: "Champs manquants ou montant invalide" }); return;
+    }
+
+    const cfg = REGULARISATION_TYPES[type];
+    const compteDebit  = cfg.debitSide  === "fixe" ? type : compteContrepartie;
+    const compteCredit = cfg.creditSide === "fixe" ? type : compteContrepartie;
+
+    const [inserted] = await db.insert(ecrituresComptablesTable).values({
+      cooperativeId: coop,
+      dateEcriture:  date,
+      libelle,
+      compteDebit,
+      compteCredit,
+      montantFcfa:   Math.round(montantFcfa),
+      source:        "manuel",
+      sourceId:      null,
+      exercice,
+      typeEcriture:  "regularisation",
+    }).returning();
+
+    if (inserted) await assignerNumeroPiece(inserted.id, "manuel", exercice, coop);
+    res.status(201).json(inserted);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur createRegularisation");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function deleteRegularisation(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+    const id   = parseInt(String(req.params["id"]));
+
+    // Vérifier que l'écriture appartient à la coop et est bien une régularisation
+    const [row] = await db.select({
+      id:          ecrituresComptablesTable.id,
+      exercice:    ecrituresComptablesTable.exercice,
+      typeEcriture: ecrituresComptablesTable.typeEcriture,
+    }).from(ecrituresComptablesTable)
+      .where(and(eq(ecrituresComptablesTable.id, id), eq(ecrituresComptablesTable.cooperativeId, coop)));
+
+    if (!row) { res.status(404).json({ erreur: "Écriture introuvable" }); return; }
+    if (row.typeEcriture !== "regularisation") { res.status(403).json({ erreur: "Cette écriture n'est pas une régularisation" }); return; }
+
+    // Vérifier que l'exercice n'est pas clôturé
+    const [ex] = await db.select({ statut: exercicesTable.statut }).from(exercicesTable)
+      .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, row.exercice)));
+    if (ex?.statut === "cloture") { res.status(409).json({ erreur: "L'exercice est clôturé — suppression impossible" }); return; }
+
+    await db.delete(ecrituresComptablesTable).where(eq(ecrituresComptablesTable.id, id));
+    res.json({ supprime: id });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 // ─── Aperçu clôture (simulation lecture seule) ───────────────────────────────
 export async function apercuCloture(req: Request, res: Response): Promise<void> {
   try {

@@ -2750,6 +2750,21 @@ interface ApercuCloture {
   tresorerie: number; fournisseurs: number; stockCacao: number;
 }
 
+// ─── Types régularisations ────────────────────────────────────────────────────
+const TYPES_REGUL = [
+  { code: "408", label: "408 — Charges à payer",            exemple: "Facture énergie déc. non reçue",    compteHint: "6xx (charge, ex: 624)",  debitSide: "contrepartie" },
+  { code: "418", label: "418 — Produits à recevoir",         exemple: "Intérêts courus sur placement",     compteHint: "7xx (produit, ex: 771)", debitSide: "fixe" },
+  { code: "486", label: "486 — Produits constatés d'avance", exemple: "Acompte reçu pour livraison N+1",   compteHint: "7xx (produit, ex: 701)", debitSide: "contrepartie" },
+  { code: "487", label: "487 — Charges constatées d'avance", exemple: "Prime d'assurance payée pour N+1",  compteHint: "6xx (charge, ex: 616)",  debitSide: "fixe" },
+] as const;
+
+type TypeRegul = typeof TYPES_REGUL[number]["code"];
+
+interface LigneRegul {
+  id: number; dateEcriture: string; libelle: string;
+  compteDebit: string; compteCredit: string; montantFcfa: number;
+}
+
 function OngletCloture() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -2760,6 +2775,52 @@ function OngletCloture() {
   const [confirm, setConfirm]       = useState(false);
   const [loading, setLoading]       = useState(false);
   const [resultat, setResultat]     = useState<{ message: string; ecrituresGenerees: number; soldes: ApercuCloture["soldes"] } | null>(null);
+
+  // ── Régularisations ────────────────────────────────────────────────────────
+  const [rType,    setRType]    = useState<TypeRegul>("408");
+  const [rCompte,  setRCompte]  = useState("");
+  const [rLibelle, setRLibelle] = useState("");
+  const [rMontant, setRMontant] = useState(0);
+  const [rLoading, setRLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const regulQuery = useQuery({
+    queryKey: ["regularisations", annee],
+    queryFn:  () => apiFetch<LigneRegul[]>(`/api/comptabilite/regularisations?exercice=${annee}`),
+  });
+  const reguls = regulQuery.data ?? [];
+
+  const handleAddRegul = async () => {
+    if (!rCompte.trim() || !rLibelle.trim() || rMontant <= 0) {
+      toast({ title: "Champs manquants", variant: "destructive" }); return;
+    }
+    setRLoading(true);
+    try {
+      await apiPost("/api/comptabilite/regularisations", {
+        type: rType, compteContrepartie: rCompte.trim(),
+        libelle: rLibelle.trim(), montantFcfa: rMontant,
+        date: `${annee}-12-31`, exercice: annee,
+      });
+      toast({ title: "Régularisation enregistrée" });
+      setRCompte(""); setRLibelle(""); setRMontant(0);
+      void regulQuery.refetch();
+      void apercu.refetch();
+    } catch (err) {
+      toast({ title: "Erreur", description: (err as Error).message, variant: "destructive" });
+    } finally { setRLoading(false); }
+  };
+
+  const handleDeleteRegul = async (id: number) => {
+    setDeletingId(id);
+    try {
+      await apiFetch(`/api/comptabilite/regularisations/${id}`, { method: "DELETE" });
+      toast({ title: "Régularisation supprimée" });
+      void regulQuery.refetch();
+      void apercu.refetch();
+    } catch (err) {
+      toast({ title: "Erreur", description: (err as Error).message, variant: "destructive" });
+    } finally { setDeletingId(null); }
+  };
 
   const annees = Array.from({ length: 6 }, (_, i) => anneeActuelle - 1 - i);
 
@@ -2876,6 +2937,97 @@ function OngletCloture() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ── Régularisations d'inventaire ──────────────────────────────────── */}
+      {!deja && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
+            <RotateCcw size={14} className="text-gray-400" /> Régularisations d'inventaire
+          </h3>
+          <p className="text-xs text-gray-400 mb-4">
+            Rattachez à l'exercice {annee} les charges/produits non encore enregistrés ou à neutraliser (OHADA art. 59).
+          </p>
+
+          {/* Formulaire ajout */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-gray-500 mb-1">Type</label>
+              <div className="grid grid-cols-2 gap-2">
+                {TYPES_REGUL.map((t) => (
+                  <button key={t.code} type="button"
+                    onClick={() => setRType(t.code)}
+                    className={`text-left px-3 py-2 rounded-lg border text-xs transition-colors ${rType === t.code ? "border-green-600 bg-green-50 text-green-800 font-semibold" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+                    <span className="block font-mono font-bold">{t.code}</span>
+                    <span className="block text-gray-500 mt-0.5">{t.label.split("—")[1]?.trim()}</span>
+                    <span className="block text-gray-400 mt-0.5 text-[10px]">{t.exemple}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Compte contrepartie <span className="text-gray-400">— {TYPES_REGUL.find((t) => t.code === rType)?.compteHint}</span>
+              </label>
+              <input value={rCompte} onChange={(e) => setRCompte(e.target.value)}
+                placeholder={TYPES_REGUL.find((t) => t.code === rType)?.compteHint}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+              {rCompte && (
+                <p className="text-xs text-gray-400 mt-1 font-mono">
+                  {TYPES_REGUL.find((t) => t.code === rType)?.debitSide === "contrepartie"
+                    ? `Débit ${rCompte} / Crédit ${rType}`
+                    : `Débit ${rType} / Crédit ${rCompte}`}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Libellé</label>
+              <input value={rLibelle} onChange={(e) => setRLibelle(e.target.value)}
+                placeholder={TYPES_REGUL.find((t) => t.code === rType)?.exemple}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Montant (FCFA)</label>
+              <MoneyInput value={rMontant} onChange={setRMontant} className="w-full" placeholder="0" />
+            </div>
+            <div className="flex items-end">
+              <button onClick={() => void handleAddRegul()} disabled={rLoading}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-50"
+                style={{ backgroundColor: VERT }}>
+                {rLoading
+                  ? <><div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" /> Enregistrement…</>
+                  : <><Plus size={14} /> Enregistrer</>}
+              </button>
+            </div>
+          </div>
+
+          {/* Liste existante */}
+          {reguls.length > 0 ? (
+            <div className="border border-gray-100 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-3 py-2 border-b border-gray-100 grid grid-cols-[1fr_2fr_auto_auto] gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <span>Comptes</span><span>Libellé</span><span className="text-right">Montant</span><span />
+              </div>
+              {reguls.map((r) => (
+                <div key={r.id} className="grid grid-cols-[1fr_2fr_auto_auto] gap-2 items-center px-3 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                  <span className="text-xs font-mono text-gray-500">{r.compteDebit} / {r.compteCredit}</span>
+                  <span className="text-sm text-gray-700">{r.libelle}</span>
+                  <span className="text-sm font-semibold text-gray-800 text-right">{FCFA(r.montantFcfa)}</span>
+                  <button onClick={() => void handleDeleteRegul(r.id)} disabled={deletingId === r.id}
+                    className="ml-2 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40">
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              <div className="px-3 py-2 bg-gray-50 border-t border-gray-100 flex justify-end">
+                <span className="text-xs font-semibold text-gray-600">
+                  Total : {FCFA(reguls.reduce((s, r) => s + r.montantFcfa, 0))}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 text-center py-3">Aucune régularisation saisie pour {annee}</p>
+          )}
         </div>
       )}
 

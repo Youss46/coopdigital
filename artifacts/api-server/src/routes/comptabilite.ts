@@ -21,6 +21,9 @@ import {
   getStatutsExercices,
   getGrandLivreTiers,
   getBalanceAuxiliaire,
+  listRegularisations,
+  createRegularisation,
+  deleteRegularisation,
 } from "../controllers/comptabiliteController";
 import {
   listPlanComptableHandler,
@@ -55,9 +58,12 @@ router.get("/comptabilite/marge-collecte",checkPermission("comptabilite", "lire"
 router.get("/comptabilite/tresorerie",    checkPermission("comptabilite", "lire"),                    getTresorerie);
 
 // ─── Clôture d'exercice ───────────────────────────────────────────────────────
-router.get("/comptabilite/exercices",        checkPermission("comptabilite", "voir_config"),    getStatutsExercices);
-router.get("/comptabilite/cloture/apercu",   checkPermission("comptabilite", "voir_config"),    apercuCloture);
-router.post("/comptabilite/cloture",         checkPermission("comptabilite", "modifier_config"), cloturerExercice);
+router.get("/comptabilite/exercices",                  checkPermission("comptabilite", "voir_config"),          getStatutsExercices);
+router.get("/comptabilite/cloture/apercu",             checkPermission("comptabilite", "voir_config"),          apercuCloture);
+router.post("/comptabilite/cloture",                   checkPermission("comptabilite", "modifier_config"),       cloturerExercice);
+router.get("/comptabilite/regularisations",            checkPermission("comptabilite", "voir_config"),          listRegularisations);
+router.post("/comptabilite/regularisations",           checkPermission("comptabilite", "saisir_ecriture_manuelle"), createRegularisation);
+router.delete("/comptabilite/regularisations/:id",     checkPermission("comptabilite", "saisir_ecriture_manuelle"), deleteRegularisation);
 
 // ─── Config comptable ─────────────────────────────────────────────────────────
 router.get("/comptabilite/config",  checkPermission("comptabilite", "voir_config"),    getConfigComptable);
