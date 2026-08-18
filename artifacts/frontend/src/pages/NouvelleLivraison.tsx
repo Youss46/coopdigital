@@ -113,7 +113,7 @@ export default function NouvelleLivraison() {
     queryKey: ["fournisseurs-search-livraison", fournisseurRecherche],
     queryFn: async () => {
       const result = await apiFetch<Array<{ id: number; nom: string; prenoms: string | null; typeFournisseur: string }>>(`/fournisseurs?q=${encodeURIComponent(fournisseurRecherche)}`);
-      return result.filter((f) => f.typeFournisseur !== "membre");
+      return result.filter((f) => f.typeFournisseur !== "membre" && (!estDelegue || f.typeFournisseur !== "pisteur"));
     },
     enabled: sourceType === "fournisseur" && fournisseurRecherche.length >= 2,
   });
@@ -327,26 +327,24 @@ export default function NouvelleLivraison() {
             Producteur
           </h2>
 
-          {/* Toggle type de source — Pisteur/Externe masqué pour les délégués */}
-          {!estDelegue && (
-            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
-              <button
-                type="button"
-                onClick={() => { setSourceType("membre"); setFournisseurSelectionne(null); setFournisseurRecherche(""); }}
-                className={`flex-1 py-2 transition-colors ${sourceType === "membre" ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
-                style={sourceType === "membre" ? { backgroundColor: "#1a4731" } : {}}
-              >
-                Membre coopérateur
-              </button>
-              <button
-                type="button"
-                onClick={() => { setSourceType("fournisseur"); setMembreSelectionne(null); setMembreRecherche(""); }}
-                className={`flex-1 py-2 transition-colors border-l border-gray-200 ${sourceType === "fournisseur" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
-              >
-                Pisteur / Externe
-              </button>
-            </div>
-          )}
+          {/* Toggle type de source */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => { setSourceType("membre"); setFournisseurSelectionne(null); setFournisseurRecherche(""); }}
+              className={`flex-1 py-2 transition-colors ${sourceType === "membre" ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
+              style={sourceType === "membre" ? { backgroundColor: "#1a4731" } : {}}
+            >
+              Membre coopérateur
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSourceType("fournisseur"); setMembreSelectionne(null); setMembreRecherche(""); }}
+              className={`flex-1 py-2 transition-colors border-l border-gray-200 ${sourceType === "fournisseur" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+            >
+              {estDelegue ? "Externe" : "Pisteur / Externe"}
+            </button>
+          </div>
 
           {/* Sélection membre */}
           {sourceType === "membre" && (!membreSelectionne ? (
