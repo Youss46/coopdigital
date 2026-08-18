@@ -426,6 +426,20 @@ export async function payerCommissionsMembreDelegue(
         });
       }
 
+      // 1b. Retenue avance au paiement — 401 / 4091
+      if (totalRetenu > 0) {
+        await proposerEcriture(cooperativeId, {
+          source:       "avance",
+          libelle:      `Retenue avance sur commission – ${membreNomComplet}`,
+          compteDebit:  "401",
+          compteCredit: "4091",
+          montantFcfa:  totalRetenu,
+          date:         datePaiement,
+          tiersId:      membreDelegueId,
+          tiersType:    "membre",
+        });
+      }
+
       // 2. Frais transport des bons de réception liés — 624 / 521
       const sessionIds = aTraiter
         .map(c => c.sessionPeseeId)
