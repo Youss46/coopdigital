@@ -4264,12 +4264,12 @@ export async function generateBordereauAchatSession(
   y += ROW_H + 16;
 
   // ── Signatures épinglées au pied de page ────────────────────────────────────
-  // addFooters dessine à pageHeight-32 ; le séparateur est à pageHeight-38.
-  // Les boîtes s'étendent depuis y (juste sous le tableau) jusqu'à 8 pt au-dessus du footer.
-  const footerSepY = doc.page.height - 38;        // ligne séparatrice du footer
-  const sigBoxH    = Math.max(72, footerSepY - 8 - 14 - y);  // 14 pt = label
+  // Hauteur fixe de 80 pt ; les boîtes sont ancrées juste au-dessus du footer
+  // (séparateur à pageHeight-38) quelle que soit la longueur du contenu.
+  const footerSepY = doc.page.height - 38;
+  const sigBoxH    = 80;
   const sigW       = (BW - 16) / 3;
-  const sigY       = y;                            // label commence juste sous le tableau
+  const sigY       = footerSepY - 8 - sigBoxH - 14; // label au-dessus de la boîte
   ["PESEUR", "LIVREUR", "MAGASINIER"].forEach((lbl, i) => {
     const sx = M + i * (sigW + 8);
     doc.fontSize(9).fillColor(GRIS).font("Helvetica-Bold")
