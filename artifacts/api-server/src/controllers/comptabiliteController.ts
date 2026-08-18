@@ -643,11 +643,16 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
 
 // ─── Régularisations d'inventaire (408, 418, 486, 487) ───────────────────────
 
+// Comptes SYSCOHADA OHADA (plan officiel) :
+// 408 = Fournisseurs, Factures non parvenues   → Débit charge / Crédit 408
+// 418 = Clients, Produits à recevoir           → Débit 418   / Crédit produit
+// 476 = Charges constatées d'avance            → Débit 476   / Crédit charge
+// 477 = Produits constatés d'avance            → Débit produit/ Crédit 477
 const REGULARISATION_TYPES = {
-  "408": { label: "Charges à payer",            debitSide: "contrepartie", creditSide: "fixe" },
-  "418": { label: "Produits à recevoir",         debitSide: "fixe",         creditSide: "contrepartie" },
-  "486": { label: "Produits constatés d'avance", debitSide: "contrepartie", creditSide: "fixe" },
-  "487": { label: "Charges constatées d'avance", debitSide: "fixe",         creditSide: "contrepartie" },
+  "408": { label: "Charges à payer",             debitSide: "contrepartie", creditSide: "fixe" },
+  "418": { label: "Produits à recevoir",          debitSide: "fixe",         creditSide: "contrepartie" },
+  "476": { label: "Charges constatées d'avance",  debitSide: "fixe",         creditSide: "contrepartie" },
+  "477": { label: "Produits constatés d'avance",  debitSide: "contrepartie", creditSide: "fixe" },
 } as const;
 
 export async function listRegularisations(req: Request, res: Response): Promise<void> {

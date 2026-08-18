@@ -2813,13 +2813,14 @@ function CompteAutocomplete({ value, onChange, placeholder, filter }: {
 }
 
 // ─── Types régularisations ────────────────────────────────────────────────────
-// Pas de défaut codé en dur — les numéros varient selon le plan de la coopérative.
-// L'utilisateur sélectionne depuis son plan via l'autocomplete.
+// Comptes SYSCOHADA officiels (plan OHADA) :
+// 408 = Fournisseurs, Factures non parvenues | 418 = Clients, Produits à recevoir
+// 476 = Charges constatées d'avance          | 477 = Produits constatés d'avance
 const TYPES_REGUL = [
-  { code: "408", label: "Charges à payer",             defaultRegul: "", exemple: "Facture énergie déc. non reçue",   compteHint: "charge (ex: 6xx, 4486…)", debitSide: "contrepartie" },
-  { code: "418", label: "Produits à recevoir",          defaultRegul: "", exemple: "Intérêts courus sur placement",    compteHint: "produit (ex: 7xx, 4487…)",  debitSide: "fixe" },
-  { code: "486", label: "Charges constatées d'avance",  defaultRegul: "", exemple: "Prime d'assurance payée pour N+1", compteHint: "charge (ex: 6xx…)",         debitSide: "fixe" },
-  { code: "487", label: "Produits constatés d'avance",  defaultRegul: "", exemple: "Acompte reçu pour livraison N+1",  compteHint: "produit (ex: 7xx…)",        debitSide: "contrepartie" },
+  { code: "408", label: "Charges à payer",             defaultRegul: "408", exemple: "Facture énergie déc. non reçue",   compteHint: "compte de charge (6xx)",  debitSide: "contrepartie" },
+  { code: "418", label: "Produits à recevoir",          defaultRegul: "418", exemple: "Intérêts courus sur placement",    compteHint: "compte de produit (7xx)", debitSide: "fixe" },
+  { code: "476", label: "Charges constatées d'avance",  defaultRegul: "476", exemple: "Prime d'assurance payée pour N+1", compteHint: "compte de charge (6xx)",  debitSide: "fixe" },
+  { code: "477", label: "Produits constatés d'avance",  defaultRegul: "477", exemple: "Acompte reçu pour livraison N+1",  compteHint: "compte de produit (7xx)", debitSide: "contrepartie" },
 ] as const;
 
 type TypeRegul = typeof TYPES_REGUL[number]["code"];
