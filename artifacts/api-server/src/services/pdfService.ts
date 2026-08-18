@@ -33,6 +33,7 @@ import {
   traitementsRefusTable,
   campagnesTable,
   commissionsDeleguesTable,
+  commissionsMembresDelaguesTable,
   remboursementsAvancesDeleguesTable,
   certificationsTable,
   certificationsMembresTable,
@@ -4034,6 +4035,49 @@ export async function generateBordereauAchatSession(
       deleguePrenoms   = membreDelegue.prenoms   ?? "";
       delegueTel       = membreDelegue.telephone ?? "—";
       delegueZone      = membreDelegue.section   ?? "—";
+
+      // Commission pour ce membre délégué (créée à terminerSession)
+      const [commMembre] = await db
+        .select({
+          montantFcfa:        commissionsMembresDelaguesTable.montantFcfa,
+          tauxFcfaParKg:      commissionsMembresDelaguesTable.tauxFcfaParKg,
+          retenueAvancesFcfa: commissionsMembresDelaguesTable.retenueAvancesFcfa,
+          statut:             commissionsMembresDelaguesTable.statut,
+        })
+        .from(commissionsMembresDelaguesTable)
+        .where(eq(commissionsMembresDelaguesTable.sessionPeseeId, session.id))
+        .orderBy(desc(commissionsMembresDelaguesTable.id))
+        .limit(1);
+
+      if (commMembre) {
+        fraisCollecteFcfa = Math.round(parseFloat(commMembre.montantFcfa));
+        // Si déjà payée : afficher la retenue réelle enregistrée
+        // Si en attente : afficher le solde avances actif (ce qui sera déduit au paiement)
+        if (commMembre.statut === "payé") {
+          retenueAvancesFcfa = commMembre.retenueAvancesFcfa ?? 0;
+        }
+      }
+
+      // Solde avances actif du membre (informatif)
+      const avancesMembre = await db
+        .select({ soldeRestantFcfa: avancesTable.soldeRestantFcfa })
+        .from(avancesTable)
+        .where(and(
+          eq(avancesTable.membreId, session.membreId!),
+          inArray(avancesTable.statut, ["en_cours", "en_retard"] as const),
+        ));
+      soldeAvancesFcfa = avancesMembre.reduce((s, a) => s + a.soldeRestantFcfa, 0);
+
+      // Si commission non encore payée : la retenue anticipée = solde actif des avances
+      // (capée au montant de la commission pour ne pas afficher un négatif)
+      if (commMembre?.statut !== "payé") {
+        retenueAvancesFcfa = Math.min(soldeAvancesFcfa, fraisCollecteFcfa);
+        // soldeAvancesFcfa = ce qu'il restera après la retenue
+        soldeAvancesFcfa = Math.max(0, soldeAvancesFcfa - retenueAvancesFcfa);
+      } else {
+        // Après paiement : solde = ce qui reste réellement
+        soldeAvancesFcfa = Math.max(0, soldeAvancesFcfa);
+      }
     }
   }
 

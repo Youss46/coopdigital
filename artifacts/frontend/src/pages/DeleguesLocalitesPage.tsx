@@ -71,6 +71,7 @@ interface Commission {
   tauxFcfaParKg: number;
   poidsKg: number;
   montantFcfa: number;
+  retenueAvancesFcfa: number;
   statut: string;
   datePaiement: string | null;
   modePaiement: string | null;
@@ -116,6 +117,7 @@ export default function DeleguesLocalitesPage() {
   // ── Commission : modal paiement ───────────────────────────────────────────
   const [modalCommission, setModalCommission] = useState<CommissionRecap | null>(null);
   const [detailCommissions, setDetailCommissions] = useState<Commission[]>([]);
+  const [avancesModalComm, setAvancesModalComm] = useState<Avance[]>([]);
   const [formPayer, setFormPayer] = useState({ modePaiement: "especes", referencePaiement: "" });
   const [errPayer, setErrPayer] = useState("");
 
@@ -198,14 +200,18 @@ export default function DeleguesLocalitesPage() {
   });
 
   const mutPayer = useMutation({
-    mutationFn: () => apiPost(`/api/delegues-localites/${modalCommission!.membreId}/commissions/payer`, {
-      modePaiement: formPayer.modePaiement,
-      referencePaiement: formPayer.referencePaiement || undefined,
-    }),
+    mutationFn: () => apiPost<{ montantTotal: number; totalRetenu: number; montantNet: number; nb: number }>(
+      `/api/delegues-localites/${modalCommission!.membreId}/commissions/payer`, {
+        modePaiement: formPayer.modePaiement,
+        referencePaiement: formPayer.referencePaiement || undefined,
+      }
+    ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["commissions-membres-delegues-recap"] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
       setModalCommission(null);
       setDetailCommissions([]);
+      setAvancesModalComm([]);
       setErrPayer("");
     },
     onError: (e: Error) => setErrPayer(e.message),
@@ -237,9 +243,14 @@ export default function DeleguesLocalitesPage() {
   async function ouvrirModalCommission(recap: CommissionRecap) {
     setModalCommission(recap);
     setErrPayer("");
+    setAvancesModalComm([]);
     try {
-      const data = await apiFetch<Commission[]>(`/api/delegues-localites/${recap.membreId}/commissions`);
-      setDetailCommissions(data.filter(c => c.statut === "en_attente"));
+      const [commData, avancesData] = await Promise.all([
+        apiFetch<Commission[]>(`/api/delegues-localites/${recap.membreId}/commissions`),
+        apiFetch<Avance[]>(`/api/avances?membre_id=${recap.membreId}`),
+      ]);
+      setDetailCommissions(commData.filter(c => c.statut === "en_attente"));
+      setAvancesModalComm(avancesData.filter(a => a.statut !== "rembourse"));
     } catch {
       setDetailCommissions([]);
     }
@@ -787,14 +798,34 @@ export default function DeleguesLocalitesPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-              {/* Résumé */}
-              <div className="bg-[#1a4731]/5 rounded-xl p-4 space-y-1">
-                <p className="text-xs text-gray-500">Total à payer</p>
-                <p className="text-2xl font-bold text-[#1a4731]">
-                  {formaterMontant(modalCommission.enAttenteFcfa)}
-                </p>
-                <p className="text-xs text-gray-400">{detailCommissions.length} session(s) de pesée</p>
-              </div>
+              {/* Résumé avec avances */}
+              {(() => {
+                const totalBrut = detailCommissions.reduce((s, c) => s + c.montantFcfa, 0);
+                const totalAvances = avancesModalComm.reduce((s, a) => s + a.soldeRestantFcfa, 0);
+                const retenue = Math.min(totalAvances, totalBrut);
+                const montantNet = Math.max(0, totalBrut - retenue);
+                return (
+                  <div className="bg-[#1a4731]/5 rounded-xl p-4 space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-500">Commissions brutes</span>
+                      <span className="font-medium text-gray-800">{formaterMontant(modalCommission.enAttenteFcfa)}</span>
+                    </div>
+                    {retenue > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-amber-600 flex items-center gap-1">
+                          <AlertCircle size={12} /> Retenue avances
+                        </span>
+                        <span className="font-medium text-amber-700">− {formaterMontant(retenue)}</span>
+                      </div>
+                    )}
+                    <div className="border-t border-[#1a4731]/20 pt-2 flex justify-between items-center">
+                      <span className="text-xs text-gray-500 font-medium">Net à décaisser</span>
+                      <span className="text-2xl font-bold text-[#1a4731]">{formaterMontant(montantNet)}</span>
+                    </div>
+                    <p className="text-xs text-gray-400">{detailCommissions.length} session(s) de pesée</p>
+                  </div>
+                );
+              })()}
 
               {/* Détail des commissions */}
               {detailCommissions.length > 0 && (
@@ -848,13 +879,23 @@ export default function DeleguesLocalitesPage() {
                 </p>
               )}
 
-              <button
-                onClick={() => mutPayer.mutate()}
-                disabled={mutPayer.isPending}
-                className="w-full bg-[#1a4731] text-white text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
-              >
-                {mutPayer.isPending ? "Paiement en cours…" : `Confirmer le paiement — ${formaterMontant(modalCommission.enAttenteFcfa)}`}
-              </button>
+              {(() => {
+                const totalBrut   = detailCommissions.reduce((s, c) => s + c.montantFcfa, 0);
+                const totalAvances = avancesModalComm.reduce((s, a) => s + a.soldeRestantFcfa, 0);
+                const retenue     = Math.min(totalAvances, totalBrut);
+                const montantNet  = Math.max(0, totalBrut - retenue);
+                return (
+                  <button
+                    onClick={() => mutPayer.mutate()}
+                    disabled={mutPayer.isPending}
+                    className="w-full bg-[#1a4731] text-white text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
+                  >
+                    {mutPayer.isPending
+                      ? "Paiement en cours…"
+                      : `Confirmer le paiement — ${formaterMontant(montantNet)}`}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -16,6 +16,7 @@ import {
   commissionsMembresDelaguesTable,
   membresTable,
   campagnesTable,
+  avancesTable,
 } from "@workspace/db";
 import { and, eq, isNull, or, desc, sql, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
@@ -291,7 +292,7 @@ export async function payerCommissionsMembreDelegue(
     modePaiement: string;
     referencePaiement?: string | null;
   }
-): Promise<{ montantTotal: number; nb: number }> {
+): Promise<{ montantTotal: number; totalRetenu: number; montantNet: number; nb: number }> {
   // Vérifier appartenance
   const [membre] = await db
     .select({ id: membresTable.id, nom: membresTable.nom, prenoms: membresTable.prenoms })
@@ -306,42 +307,103 @@ export async function payerCommissionsMembreDelegue(
 
   if (!membre) throw new Error("Membre délégué introuvable");
 
-  // Récupérer les commissions en attente
-  const conditions = [
-    eq(commissionsMembresDelaguesTable.membreDelegueId, membreDelegueId),
-    eq(commissionsMembresDelaguesTable.statut, "en_attente"),
-  ];
-
+  // Récupérer les commissions en attente (triées par date pour déduire avances des plus anciennes d'abord)
   const toutes = await db
     .select()
     .from(commissionsMembresDelaguesTable)
-    .where(and(...conditions));
+    .where(and(
+      eq(commissionsMembresDelaguesTable.membreDelegueId, membreDelegueId),
+      eq(commissionsMembresDelaguesTable.statut, "en_attente"),
+    ))
+    .orderBy(commissionsMembresDelaguesTable.createdAt);
 
   const aTraiter = data.commissionIds?.length
     ? toutes.filter((c) => data.commissionIds!.includes(c.id))
     : toutes;
 
-  if (aTraiter.length === 0) return { montantTotal: 0, nb: 0 };
+  if (aTraiter.length === 0) return { montantTotal: 0, totalRetenu: 0, montantNet: 0, nb: 0 };
 
+  // ── Déduction des avances membres ─────────────────────────────────────────
+  // Les avances sont déduites des commissions (oldest first) en appliquant planType.
+  const today = new Date().toISOString().slice(0, 10);
+  const avancesEnCours = await db
+    .select()
+    .from(avancesTable)
+    .where(and(
+      eq(avancesTable.membreId, membreDelegueId),
+      inArray(avancesTable.statut, ["en_cours", "en_retard"] as const),
+    ))
+    .orderBy(avancesTable.dateOctroi);
+
+  // Préparer une map commissionId → retenue à appliquer
+  const retenueParCommission = new Map<number, number>(aTraiter.map(c => [c.id, 0]));
+
+  // Itérer avances, déduire séquentiellement des commissions
+  let idxCommission = 0;
+  for (const avance of avancesEnCours) {
+    let retenueTotale: number;
+    if (avance.planType === "integral") {
+      retenueTotale = avance.soldeRestantFcfa;
+    } else if (avance.planType === "partiel" && avance.montantPartielFcfa) {
+      retenueTotale = Math.min(avance.montantPartielFcfa, avance.soldeRestantFcfa);
+    } else if (avance.planType === "reporte") {
+      if (!avance.reportDate || today < String(avance.reportDate)) continue;
+      retenueTotale = avance.soldeRestantFcfa;
+    } else {
+      continue;
+    }
+    if (retenueTotale <= 0) continue;
+
+    let resteAvance = retenueTotale;
+    // Distribuer la retenue sur les commissions dans l'ordre
+    while (resteAvance > 0 && idxCommission < aTraiter.length) {
+      const comm = aTraiter[idxCommission]!;
+      const montantComm = toNum(comm.montantFcfa);
+      const dejaRetenu  = retenueParCommission.get(comm.id) ?? 0;
+      const disponible  = montantComm - dejaRetenu; // montant restant non encore couvert par une retenue
+      if (disponible <= 0) { idxCommission++; continue; }
+      const prise = Math.min(resteAvance, disponible);
+      retenueParCommission.set(comm.id, dejaRetenu + prise);
+      resteAvance -= prise;
+      if (dejaRetenu + prise >= montantComm) idxCommission++;
+    }
+    if (resteAvance > 0) {
+      // Plus de commissions à couvrir — appliquer ce qui reste à la dernière commission
+      const derniere = aTraiter[aTraiter.length - 1]!;
+      retenueParCommission.set(derniere.id, Math.min(toNum(derniere.montantFcfa), (retenueParCommission.get(derniere.id) ?? 0) + resteAvance));
+    }
+
+    // Mettre à jour le solde de l'avance
+    const nouveauSolde     = avance.soldeRestantFcfa - retenueTotale;
+    const nouveauRembourse = avance.montantRembourse_fcfa + retenueTotale;
+    const nouveauStatut    = nouveauSolde === 0 ? "rembourse" : "en_cours";
+    await db.update(avancesTable).set({
+      montantRembourse_fcfa: nouveauRembourse,
+      soldeRestantFcfa:      nouveauSolde,
+      statut:                nouveauStatut as "en_cours" | "rembourse" | "en_retard",
+    }).where(eq(avancesTable.id, avance.id));
+  }
+
+  const totalRetenu = [...retenueParCommission.values()].reduce((s, v) => s + v, 0);
   const montantTotal = aTraiter.reduce((s, c) => s + toNum(c.montantFcfa), 0);
+  const montantNet   = Math.max(0, montantTotal - totalRetenu);
   const now = new Date();
 
-  // Marquer comme payées
-  const idsAMarquer = aTraiter.map(c => c.id);
-  await db
-    .update(commissionsMembresDelaguesTable)
-    .set({
-      statut:            "payé",
-      datePaiement:      now,
-      modePaiement:      data.modePaiement,
-      referencePaiement: data.referencePaiement ?? null,
-    })
-    .where(
-      and(
-        eq(commissionsMembresDelaguesTable.membreDelegueId, membreDelegueId),
-        inArray(commissionsMembresDelaguesTable.id, idsAMarquer),
-      )
-    );
+  // Marquer chaque commission comme payée avec sa retenue individuelle
+  for (const comm of aTraiter) {
+    const retenue = retenueParCommission.get(comm.id) ?? 0;
+    await db
+      .update(commissionsMembresDelaguesTable)
+      .set({
+        statut:             "payé",
+        datePaiement:       now,
+        modePaiement:       data.modePaiement,
+        referencePaiement:  data.referencePaiement ?? null,
+        retenueAvancesFcfa: retenue,
+      })
+      .where(eq(commissionsMembresDelaguesTable.id, comm.id));
+  }
 
-  return { montantTotal, nb: aTraiter.length };
+  logger.info({ membreDelegueId, montantTotal, totalRetenu, montantNet, nb: aTraiter.length }, "Commissions membre délégué payées");
+  return { montantTotal, totalRetenu, montantNet, nb: aTraiter.length };
 }

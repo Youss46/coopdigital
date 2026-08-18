@@ -623,7 +623,8 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
         } catch {
           // Pas de campagne active — commission sans campagne
         }
-        void creerCommissionMembreSiTaux(
+        // await (pas void) : la commission doit être en DB avant que le bordereau soit téléchargé
+        await creerCommissionMembreSiTaux(
           sessionId,
           detail.membreId,
           campagneId,

@@ -67,6 +67,8 @@ async function applyHotfixes(client: pg.Client): Promise<void> {
       reference_paiement  text,
       created_at          timestamptz NOT NULL DEFAULT now()
     )`,
+    // Colonne ajoutée après la création initiale de la table
+    `ALTER TABLE commissions_membres_delegues ADD COLUMN IF NOT EXISTS retenue_avances_fcfa integer NOT NULL DEFAULT 0`,
   ];
 
   for (const sql of hotfixes) {
