@@ -4092,8 +4092,8 @@ export async function generateBordereauAchatSession(
   if (campagne) {
     doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 14).fill("#f0fdf4");
     const dateStr = session.dateFin
-      ? new Date(session.dateFin).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
-      : new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+      ? formaterDateHeure(session.dateFin)
+      : formaterDateHeure(new Date());
     doc.fontSize(8).fillColor(GRIS).font("Helvetica").text("Campagne :", MARGIN + 6, y + 3, { width: 78, lineBreak: false });
     doc.font("Helvetica-Bold").fillColor(VERT).text(campagne, MARGIN + 86, y + 3, { lineBreak: false });
     doc.font("Helvetica").fillColor(GRIS).text("Date :", PAGE_W - MARGIN - 130, y + 3, { width: 36, lineBreak: false });
@@ -4127,6 +4127,8 @@ export async function generateBordereauAchatSession(
   fieldRow("Produit",       session.produit
     ? session.produit.charAt(0).toUpperCase() + session.produit.slice(1)
     : "Cacao");
+  fieldRow("Ouverture",     formaterDateHeure(session.createdAt));
+  fieldRow("Clôture",       session.dateFin ? formaterDateHeure(session.dateFin) : "—");
 
   const leftBottom = y;
 
