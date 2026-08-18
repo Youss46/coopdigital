@@ -19,8 +19,11 @@ import {
   SessionEnCoursError,
   getPrix,
   getFournisseurRecap,
+  getAvancesDeleguesTerrain,
+  patchPlanAvanceDeleague,
 } from "../lib/api";
 import type { Fournisseur, SessionDetail, ConversionLivraisonResult } from "../lib/types";
+import type { AvanceDeleagueTerrain } from "../lib/api";
 
 type Step = "membre" | "session" | "succes";
 
@@ -95,6 +98,14 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const [livraisonResult, setLivraisonResult] = useState<ConversionLivraisonResult | null>(null);
   // Synchronous guard — prevents a second tap from entering handleConvertir before the first resolves
   const convertirInProgressRef = useRef(false);
+
+  // Avances du délégué — chargées après clôture de la session, avant conversion
+  const [avancesDelegue, setAvancesDelegue] = useState<AvanceDeleagueTerrain[]>([]);
+  const [avancesLoading, setAvancesLoading] = useState(false);
+  // Éditions en cours par avance : avanceId → { planType, montantPartiel, reportDate }
+  const [avancePlanEdits, setAvancePlanEdits] = useState<Record<number, { planType: string; montantPartiel: string; reportDate: string }>>({});
+  const [plansSaving, setPlansSaving] = useState(false);
+  const [plansSaved, setPlansSaved] = useState(false);
 
   // Estimation avant conversion
   const [estimeLoading, setEstimeLoading] = useState(false);
@@ -386,6 +397,57 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     }
   }
 
+  // ── Charger les avances du délégué dès la clôture d'une session membre ───────
+  useEffect(() => {
+    if (step !== "succes" || !sessionTerminee || sessionTerminee.operation === "reception_transfert" || !isOnline) return;
+    setAvancesLoading(true);
+    getAvancesDeleguesTerrain()
+      .then((avances) => {
+        setAvancesDelegue(avances);
+        const edits: Record<number, { planType: string; montantPartiel: string; reportDate: string }> = {};
+        for (const a of avances) {
+          edits[a.id] = {
+            planType: a.planType,
+            montantPartiel: a.montantPartielFcfa ? String(a.montantPartielFcfa) : "",
+            reportDate: a.reportDate ?? "",
+          };
+        }
+        setAvancePlanEdits(edits);
+      })
+      .catch(() => { /* peseur sans délégué rattaché ou pas de connexion — silencieux */ })
+      .finally(() => setAvancesLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, sessionTerminee?.id]);
+
+  // ── Enregistrer les décisions de plan sur toutes les avances modifiées ───────
+  async function handleSavePlans() {
+    setPlansSaving(true);
+    setErreur("");
+    try {
+      for (const [avanceIdStr, edit] of Object.entries(avancePlanEdits)) {
+        const avanceId = Number(avanceIdStr);
+        const original = avancesDelegue.find((a) => a.id === avanceId);
+        if (!original) continue;
+        // Ne patcher que si le plan a changé
+        const unchanged =
+          edit.planType === original.planType &&
+          edit.montantPartiel === (original.montantPartielFcfa ? String(original.montantPartielFcfa) : "") &&
+          edit.reportDate === (original.reportDate ?? "");
+        if (unchanged) continue;
+        await patchPlanAvanceDeleague(avanceId, {
+          plan_type: edit.planType,
+          montant_partiel_fcfa: edit.planType === "partiel" && edit.montantPartiel ? Number(edit.montantPartiel) : null,
+          report_date: edit.planType === "reporte" && edit.reportDate ? edit.reportDate : null,
+        });
+      }
+      setPlansSaved(true);
+    } catch (err) {
+      setErreur((err as Error).message);
+    } finally {
+      setPlansSaving(false);
+    }
+  }
+
   function reset() {
     setStep("membre");
     setFournisseur(null);
@@ -397,6 +459,10 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     setPoidsBrut("");
     setTare("0");
     setNotesLigne("");
+    setAvancesDelegue([]);
+    setAvancePlanEdits({});
+    setPlansSaved(false);
+    setPlansSaving(false);
   }
 
   const poidsNet = (parseFloat(poidsBrut) || 0) - (parseFloat(tare) || 0);
@@ -861,6 +927,98 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             {/* Bouton reçu PDF (session déjà convertie lors d'une visite précédente) */}
             {!livraisonResult && sessionTerminee?.livraisonId && isOnline && (
               <RecuButton livraisonId={sessionTerminee.livraisonId} />
+            )}
+
+            {/* ── Avances du délégué — notification avant génération du reçu ── */}
+            {!isTransfertReception && !livraisonResult && !sessionTerminee?.livraisonId && (avancesLoading || avancesDelegue.length > 0) && (
+              <div style={{ marginBottom: 16, border: "2px solid #f59e0b", borderRadius: 12, overflow: "hidden" }}>
+                {/* En-tête alerte */}
+                <div style={{ background: "#f59e0b", padding: "10px 14px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: "1.2rem" }}>⚠️</span>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: ".9rem", color: "#1c1917" }}>Avances en cours sur ce délégué</div>
+                    <div style={{ fontSize: ".73rem", color: "#44403c" }}>Choisissez le plan de remboursement avant de générer le reçu</div>
+                  </div>
+                </div>
+                <div style={{ background: "#fefce8", padding: "12px 14px" }}>
+                  {avancesLoading ? (
+                    <div style={{ color: "#92400e", fontSize: ".82rem", textAlign: "center", padding: "8px 0" }}>Chargement…</div>
+                  ) : avancesDelegue.map((avance) => {
+                    const edit = avancePlanEdits[avance.id] ?? { planType: avance.planType, montantPartiel: "", reportDate: "" };
+                    return (
+                      <div key={avance.id} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid #fde68a" }}>
+                        <div style={{ fontSize: ".82rem", color: "#78350f", fontWeight: 700, marginBottom: 6 }}>
+                          {avance.motif || "Avance"} — Solde restant : {avance.soldeRestantFcfa.toLocaleString("fr-FR")} FCFA
+                        </div>
+                        <select
+                          value={edit.planType}
+                          onChange={(e) =>
+                            setAvancePlanEdits((prev) => ({
+                              ...prev,
+                              [avance.id]: { planType: e.target.value, montantPartiel: "", reportDate: "" },
+                            }))
+                          }
+                          style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid #d97706", background: "#fff", fontSize: ".85rem", marginBottom: 6 }}
+                        >
+                          <option value="integral">Déduire intégralement — {avance.soldeRestantFcfa.toLocaleString("fr-FR")} FCFA sur prochaine commission</option>
+                          <option value="partiel">Déduction partielle — montant fixe par commission</option>
+                          <option value="reporte">Reporter sur la prochaine pesée</option>
+                        </select>
+                        {edit.planType === "partiel" && (
+                          <input
+                            type="number"
+                            placeholder={`Montant par retenue (max ${avance.soldeRestantFcfa.toLocaleString("fr-FR")} FCFA)`}
+                            value={edit.montantPartiel}
+                            inputMode="numeric"
+                            min={1}
+                            max={avance.soldeRestantFcfa}
+                            onChange={(e) =>
+                              setAvancePlanEdits((prev) => ({
+                                ...prev,
+                                [avance.id]: { ...edit, montantPartiel: e.target.value },
+                              }))
+                            }
+                            style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid #d97706", fontSize: ".85rem" }}
+                          />
+                        )}
+                        {edit.planType === "reporte" && (
+                          <div>
+                            <div style={{ fontSize: ".73rem", color: "#92400e", marginBottom: 4 }}>Date de reprise de la retenue (optionnel)</div>
+                            <input
+                              type="date"
+                              value={edit.reportDate}
+                              onChange={(e) =>
+                                setAvancePlanEdits((prev) => ({
+                                  ...prev,
+                                  [avance.id]: { ...edit, reportDate: e.target.value },
+                                }))
+                              }
+                              style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid #d97706", fontSize: ".85rem" }}
+                            />
+                            <div style={{ fontSize: ".7rem", color: "#92400e", marginTop: 4 }}>
+                              Sans date : aucune retenue jusqu'à décision manuelle
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {!avancesLoading && avancesDelegue.length > 0 && (
+                    <button
+                      disabled={plansSaving || plansSaved}
+                      onClick={handleSavePlans}
+                      style={{
+                        width: "100%", padding: "10px", borderRadius: 8, border: "none",
+                        background: plansSaved ? "#16a34a" : "#d97706",
+                        color: "#fff", fontWeight: 700, fontSize: ".88rem", cursor: "pointer",
+                        opacity: plansSaving ? .7 : 1,
+                      }}
+                    >
+                      {plansSaving ? "Enregistrement…" : plansSaved ? "✔ Décisions enregistrées" : "Enregistrer les décisions"}
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
 
             {/* Bouton conversion (si pas encore convertie, sessions membres uniquement) */}

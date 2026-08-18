@@ -16,6 +16,8 @@ import {
   changePasswordHandler,
   getPeseurCollectesHandler,
   getDeleguesCentrauxHandler,
+  getAvancesDelegueTerrainHandler,
+  patchPlanAvanceDelegueTerrainHandler,
 } from "../controllers/terrainController.js";
 import { getTerrainRecuLivraison, getTerrainReleveCommissions } from "../controllers/rapportsController.js";
 import {
@@ -77,6 +79,10 @@ router.get("/terrain/historique", terrainAuthMiddleware, getHistoriqueAgentHandl
 
 // Routes peseur
 router.get("/terrain/peseur/collectes", terrainAuthMiddleware, getPeseurCollectesHandler);
+
+// Avances délégué — lecture et mise à jour du plan (peseur ou délégué)
+router.get("/terrain/avances-delegue",                          terrainAuthMiddleware, peseurOrDelegueOnly, getAvancesDelegueTerrainHandler);
+router.patch("/terrain/avances-delegue/:avanceId/plan",         terrainAuthMiddleware, peseurOrDelegueOnly, patchPlanAvanceDelegueTerrainHandler);
 
 // Missions d'enquête (agent terrain)
 router.get("/terrain/enquetes",                              terrainAuthMiddleware, getEnquetesAgentHandler);

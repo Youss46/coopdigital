@@ -1,5 +1,7 @@
 import { type Request, type Response } from "express";
 import * as terrainService from "../services/terrainService.js";
+import { db, avancesDeleguesTable } from "@workspace/db";
+import { eq, and, inArray } from "drizzle-orm";
 
 function getAgent(req: Request) {
   return req.agent!;
@@ -309,5 +311,85 @@ export async function postRapportHandler(req: Request, res: Response): Promise<v
   } catch (err) {
     req.log.error({ err }, "Erreur rapport terrain");
     res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── Avances du délégué — accessibles depuis le peseur ou le délégué lui-même ─
+export async function getAvancesDelegueTerrainHandler(req: Request, res: Response): Promise<void> {
+  const role = req.agent?.role;
+  // Peseur → avances du délégué auquel il est rattaché; Délégué → ses propres avances
+  const delegueId = role === "delegue" ? req.agent?.id : req.agent?.delegueId;
+  const cooperativeId = req.agent?.cooperativeId;
+
+  if (!delegueId || !cooperativeId) {
+    res.json([]); // peseur non rattaché à un délégué → rien à afficher
+    return;
+  }
+
+  try {
+    const avances = await db
+      .select()
+      .from(avancesDeleguesTable)
+      .where(and(
+        eq(avancesDeleguesTable.delegueId, delegueId),
+        eq(avancesDeleguesTable.cooperativeId, cooperativeId),
+        inArray(avancesDeleguesTable.statut, ["en_cours", "en_retard"]),
+      ))
+      .orderBy(avancesDeleguesTable.createdAt);
+    res.json(avances);
+  } catch (err) {
+    req.log.error({ err }, "getAvancesDelegueTerrainHandler");
+    res.status(500).json({ erreur: "Erreur lors de la récupération des avances" });
+  }
+}
+
+export async function patchPlanAvanceDelegueTerrainHandler(req: Request, res: Response): Promise<void> {
+  const role = req.agent?.role;
+  const delegueId = role === "delegue" ? req.agent?.id : req.agent?.delegueId;
+  const cooperativeId = req.agent?.cooperativeId;
+
+  if (!delegueId || !cooperativeId) {
+    res.status(403).json({ erreur: "Accès non autorisé" });
+    return;
+  }
+
+  const avanceId = Number(req.params.avanceId);
+  const { plan_type, montant_partiel_fcfa, report_date } = req.body as {
+    plan_type?: string;
+    montant_partiel_fcfa?: number | null;
+    report_date?: string | null;
+  };
+
+  if (!plan_type || !["integral", "partiel", "reporte"].includes(plan_type)) {
+    res.status(400).json({ erreur: "plan_type invalide (integral | partiel | reporte)" });
+    return;
+  }
+
+  try {
+    const [avance] = await db
+      .select({ id: avancesDeleguesTable.id, statut: avancesDeleguesTable.statut, delegueId: avancesDeleguesTable.delegueId })
+      .from(avancesDeleguesTable)
+      .where(and(eq(avancesDeleguesTable.id, avanceId), eq(avancesDeleguesTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!avance || avance.delegueId !== delegueId) {
+      res.status(404).json({ erreur: "Avance introuvable" });
+      return;
+    }
+    if (avance.statut === "rembourse") {
+      res.status(400).json({ erreur: "Impossible de modifier le plan d'une avance déjà remboursée" });
+      return;
+    }
+
+    const [updated] = await db.update(avancesDeleguesTable).set({
+      planType: plan_type as "integral" | "partiel" | "reporte",
+      montantPartielFcfa: plan_type === "partiel" && montant_partiel_fcfa ? montant_partiel_fcfa : null,
+      reportDate: plan_type === "reporte" && report_date ? report_date : null,
+    }).where(eq(avancesDeleguesTable.id, avanceId)).returning();
+
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "patchPlanAvanceDelegueTerrainHandler");
+    res.status(500).json({ erreur: "Erreur lors de la mise à jour du plan" });
   }
 }

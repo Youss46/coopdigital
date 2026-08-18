@@ -285,6 +285,37 @@ export async function getPeseurCollectes(): Promise<import("./types").PeseurColl
   return apiGet<import("./types").PeseurCollecte[]>("/peseur/collectes");
 }
 
+// ─── Avances du délégué (lecture depuis peseur / délégué) ─────────────────────
+
+export type AvanceDeleagueTerrain = {
+  id: number;
+  montantOctroyeFcfa: number;
+  soldeRestantFcfa: number;
+  montantRembourse: number;
+  planType: "integral" | "partiel" | "reporte";
+  montantPartielFcfa: number | null;
+  reportDate: string | null;
+  dateOctroi: string;
+  motif: string | null;
+  statut: string;
+};
+
+/** Retourne les avances en cours du délégué lié au peseur connecté (ou du délégué lui-même). */
+export function getAvancesDeleguesTerrain(): Promise<AvanceDeleagueTerrain[]> {
+  return apiGet<AvanceDeleagueTerrain[]>("/avances-delegue");
+}
+
+/** Met à jour le plan de remboursement d'une avance depuis le terrain (peseur ou délégué). */
+export function patchPlanAvanceDeleague(
+  avanceId: number,
+  data: { plan_type: string; montant_partiel_fcfa?: number | null; report_date?: string | null },
+): Promise<AvanceDeleagueTerrain> {
+  return apiFetch<AvanceDeleagueTerrain>(`/avances-delegue/${avanceId}/plan`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
 // ─── Sessions de pesée ─────────────────────────────────────────────────────────
 const PESEE_BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`;
 
