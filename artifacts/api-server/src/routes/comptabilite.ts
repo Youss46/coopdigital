@@ -19,6 +19,7 @@ import {
   cloturerExercice,
   getStatutsExercices,
   getGrandLivreTiers,
+  getBalanceAuxiliaire,
 } from "../controllers/comptabiliteController";
 import {
   listPlanComptableHandler,
@@ -44,7 +45,8 @@ router.use(authMiddleware);
 // ─── Grand livre / Balance / Journal ──────────────────────────────────────────
 router.get("/comptabilite/tiers/:id/grand-livre", authMiddleware, getGrandLivreTiers);
 router.get("/comptabilite/grand-livre",   checkPermission("comptabilite", "voir_grand_livre"),        getGrandLivre);
-router.get("/comptabilite/balance",       checkPermission("comptabilite", "voir_balance"),            getBalance);
+router.get("/comptabilite/balance",           checkPermission("comptabilite", "voir_balance"), getBalance);
+router.get("/comptabilite/balance-auxiliaire", checkPermission("comptabilite", "voir_balance"), getBalanceAuxiliaire);
 router.get("/comptabilite/journal",        checkPermission("comptabilite", "lire"), getJournalComptable);
 router.get("/comptabilite/journal/export", checkPermission("comptabilite", "lire"), exportJournalCsv);
 router.post("/comptabilite/ecriture",     checkPermission("comptabilite", "saisir_ecriture_manuelle"), createEcritureManuelle);

@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { checkEcriture, creerAnomalies } from "../services/anomalieService";
-import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable } from "@workspace/db";
+import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable, membresTable } from "@workspace/db";
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
 import { assignerNumeroPiece, assignerNumerosPieces } from "../lib/numeroPiece";
@@ -913,6 +913,54 @@ export async function cloturerExercice(req: Request, res: Response): Promise<voi
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur cloturerExercice");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── Balance auxiliaire membres (solde par tiers) ────────────────────────────
+export async function getBalanceAuxiliaire(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+    const exercice = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : undefined;
+    const exerciceCond = exercice ? sql`AND e.exercice = ${exercice}` : sql``;
+
+    const result = await db.execute<{
+      tiersId: number; nom: string; prenoms: string; code: string;
+      totalDu: number; totalPaye: number;
+      totalIntrantsDus: number; totalIntrantsRemb: number; soldeNet: number;
+    }>(sql`
+      SELECT
+        e.tiers_id                                                             AS "tiersId",
+        COALESCE(m.nom,          '—')                                          AS nom,
+        COALESCE(m.prenoms,      '')                                           AS prenoms,
+        COALESCE(m.carte_numero, '')                                           AS code,
+        SUM(CASE WHEN e.compte_credit IN ('401','4091','4092')
+                 THEN e.montant_fcfa ELSE 0 END)::integer                     AS "totalDu",
+        SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') AND e.source = 'paiement'
+                 THEN e.montant_fcfa ELSE 0 END)::integer                     AS "totalPaye",
+        SUM(CASE WHEN e.compte_debit  = '4091'
+                 THEN e.montant_fcfa ELSE 0 END)::integer                     AS "totalIntrantsDus",
+        SUM(CASE WHEN e.compte_credit = '4091'
+                 THEN e.montant_fcfa ELSE 0 END)::integer                     AS "totalIntrantsRemb",
+        (SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
+         - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END))::integer
+                                                                               AS "soldeNet"
+      FROM ecritures_comptables e
+      LEFT JOIN membres m ON m.id = e.tiers_id
+      WHERE e.cooperative_id = ${coop}
+        AND e.tiers_type = 'membre'
+        ${exerciceCond}
+      GROUP BY e.tiers_id, m.nom, m.prenoms, m.carte_numero
+      ORDER BY
+        ABS(SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
+            - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)) DESC,
+        m.nom
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur getBalanceAuxiliaire");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

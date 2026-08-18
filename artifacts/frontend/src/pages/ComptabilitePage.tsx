@@ -26,7 +26,7 @@ import {
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, RefreshCw, DollarSign, List, Sliders, RotateCcw, Plus, Pencil, Ban, ChevronDown, ChevronUp, Search, RotateCw, FileText, Scale, Droplets, Lock, Download, Filter } from "lucide-react";
+import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, RefreshCw, DollarSign, List, Sliders, RotateCcw, Plus, Pencil, Ban, ChevronDown, ChevronUp, Search, RotateCw, FileText, Scale, Droplets, Lock, Download, Filter, Users } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { type TauxChange } from "@workspace/api-client-react";
 
@@ -2334,6 +2334,165 @@ function OngletBalance() {
   );
 }
 
+// ─── Onglet Balance auxiliaire (solde par membre) ────────────────────────────
+interface BalanceAuxLigne {
+  tiersId: number; nom: string; prenoms: string; code: string;
+  totalDu: number; totalPaye: number;
+  totalIntrantsDus: number; totalIntrantsRemb: number; soldeNet: number;
+}
+
+function OngletBalanceAuxiliaire() {
+  const anneeActuelle = new Date().getFullYear();
+  const [exercice, setExercice]   = useState(anneeActuelle);
+  const [recherche, setRecherche] = useState("");
+  const annees = Array.from({ length: 5 }, (_, i) => anneeActuelle - i);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["balance-aux", exercice],
+    queryFn: () => apiFetch<BalanceAuxLigne[]>(`/api/comptabilite/balance-auxiliaire?exercice=${exercice}`),
+  });
+
+  const list = (data ?? []).filter((l) => {
+    if (!recherche) return true;
+    const q = recherche.toLowerCase();
+    return (
+      l.nom.toLowerCase().includes(q) ||
+      l.prenoms.toLowerCase().includes(q) ||
+      l.code.toLowerCase().includes(q)
+    );
+  });
+
+  const totalSolde = list.reduce((s, l) => s + l.soldeNet, 0);
+
+  const handleExport = () => void exportExcel(
+    `balance_auxiliaire_membres_${exercice}.xlsx`,
+    "Balance auxiliaire membres",
+    [
+      { header: "Membre",            key: "nom",            width: 28 },
+      { header: "Prénoms",           key: "prenoms",        width: 22 },
+      { header: "Code",              key: "code",           width: 14 },
+      { header: "Dû au membre",      key: "totalDu",        width: 18, numFmt: "#,##0", align: "right" as const },
+      { header: "Payé",              key: "totalPaye",      width: 18, numFmt: "#,##0", align: "right" as const },
+      { header: "Intrants dus",      key: "intrantsDus",    width: 16, numFmt: "#,##0", align: "right" as const },
+      { header: "Intrants remb.",    key: "intrantsRemb",   width: 16, numFmt: "#,##0", align: "right" as const },
+      { header: "Solde net",         key: "soldeNet",       width: 18, numFmt: "#,##0;[Red]-#,##0", align: "right" as const },
+    ],
+    list.map((l) => ({
+      nom:         l.nom,
+      prenoms:     l.prenoms,
+      code:        l.code,
+      totalDu:     Number(l.totalDu),
+      totalPaye:   Number(l.totalPaye),
+      intrantsDus:  Number(l.totalIntrantsDus),
+      intrantsRemb: Number(l.totalIntrantsRemb),
+      soldeNet:    Number(l.soldeNet),
+    }))
+  );
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-end gap-3 mb-5">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Exercice</label>
+          <select value={exercice} onChange={(e) => setExercice(Number(e.target.value))}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
+            {annees.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Recherche</label>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder="Nom, prénoms ou code…"
+              className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+            />
+          </div>
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          <p className="text-sm text-gray-500">{list.length} membre{list.length > 1 ? "s" : ""}</p>
+          <button onClick={handleExport} disabled={list.length === 0}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-40">
+            <Download size={14} /> Exporter Excel
+          </button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-green-600 border-t-transparent" /></div>
+      ) : list.length === 0 ? (
+        <div className="text-center py-16">
+          <Users className="mx-auto mb-3 text-gray-300" size={40} />
+          <p className="text-gray-500 text-sm">Aucun membre avec des mouvements pour l'exercice {exercice}</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Membre</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden sm:table-cell">Code</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Dû au membre</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden lg:table-cell">Payé</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden lg:table-cell">Intrants nets</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Solde net</th>
+                  <th className="px-3 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((l) => {
+                  const positif = l.soldeNet >= 0;
+                  const intrantsNet = l.totalIntrantsDus - l.totalIntrantsRemb;
+                  return (
+                    <tr key={l.tiersId} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-800">{l.nom} {l.prenoms}</div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 font-mono text-xs hidden sm:table-cell">{l.code || "—"}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{FCFA(l.totalDu)}</td>
+                      <td className="px-4 py-3 text-right text-green-700 hidden lg:table-cell">{FCFA(l.totalPaye)}</td>
+                      <td className={`px-4 py-3 text-right hidden lg:table-cell ${intrantsNet > 0 ? "text-amber-600" : "text-gray-400"}`}>{FCFA(intrantsNet)}</td>
+                      <td className={`px-4 py-3 text-right font-bold ${positif ? "text-green-700" : "text-red-600"}`}>
+                        {positif ? "+" : ""}{FCFA(l.soldeNet)}
+                      </td>
+                      <td className="px-3 py-3">
+                        <a
+                          href={`/membres/${l.tiersId}`}
+                          className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+                          title="Voir la fiche membre"
+                        >
+                          Fiche →
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-200 bg-gray-50">
+                  <td colSpan={2} className="px-4 py-3 font-bold text-gray-700 text-sm">TOTAUX ({list.length} membres)</td>
+                  <td colSpan={3} className="hidden lg:table-cell"></td>
+                  <td className={`px-4 py-3 text-right font-bold ${totalSolde >= 0 ? "text-green-700" : "text-red-600"}`}>
+                    {totalSolde >= 0 ? "+" : ""}{FCFA(totalSolde)}
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="px-4 py-3 border-t border-gray-100 flex gap-6 text-xs text-gray-500">
+            <span><span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>Solde positif = coop doit encore au membre</span>
+            <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1"></span>Solde négatif = membre doit à la coop</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Onglet Flux de trésorerie ────────────────────────────────────────────────
 interface FluxData {
   fluxOperationnelsFcfa: number; fluxFinancementFcfa: number;
@@ -2659,7 +2818,7 @@ function ClotureSection() {
 }
 
 // ─── Page principale ──────────────────────────────────────────────────────────
-type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable" | "grand_livre" | "balance" | "flux";
+type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable" | "grand_livre" | "balance" | "balance_aux" | "flux";
 
 export default function ComptabilitePage() {
   const [onglet, setOnglet] = useState<Onglet>("en_attente");
@@ -2682,7 +2841,8 @@ export default function ComptabilitePage() {
     { id: "en_attente",  label: "En attente",      icon: Clock,     badge: nbEnAttente > 0 ? nbEnAttente : undefined },
     { id: "journal",     label: "Journal",          icon: BookOpen },
     ...(peutGrandLivre ? [{ id: "grand_livre" as Onglet, label: "Grand-livre",  icon: FileText }] : []),
-    ...(peutBalance    ? [{ id: "balance"     as Onglet, label: "Balance",      icon: Scale }] : []),
+    ...(peutBalance    ? [{ id: "balance"     as Onglet, label: "Balance",         icon: Scale }] : []),
+    ...(peutBalance    ? [{ id: "balance_aux" as Onglet, label: "Balance tiers",   icon: Users }] : []),
     { id: "flux",        label: "Flux trésorerie",  icon: Droplets },
     ...(peutVoirTaux   ? [{ id: "devises"         as Onglet, label: "Devises",        icon: DollarSign }] : []),
     ...(peutVoirPlan   ? [{ id: "plan_comptable"  as Onglet, label: "Plan comptable", icon: List }] : []),
@@ -2742,6 +2902,7 @@ export default function ComptabilitePage() {
       {onglet === "journal"       && <OngletJournal defaultSource={journalDefaultSource} />}
       {onglet === "grand_livre"   && peutGrandLivre && <OngletGrandLivre />}
       {onglet === "balance"       && peutBalance    && <OngletBalance />}
+      {onglet === "balance_aux"   && peutBalance    && <OngletBalanceAuxiliaire />}
       {onglet === "flux"          && <OngletFluxTresorerie />}
       {onglet === "devises"       && peutVoirTaux   && <OngletDevises />}
       {onglet === "plan_comptable"&& peutVoirPlan   && <OngletPlanComptableContainer />}
