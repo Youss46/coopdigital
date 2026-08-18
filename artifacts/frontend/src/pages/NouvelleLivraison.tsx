@@ -87,6 +87,13 @@ export default function NouvelleLivraison() {
     }
   }, [prixActuelData?.prixBordChampFcfa]);
 
+  // Auto-sélection de l'entrepôt délégué dès le chargement (si délégué et pas encore sélectionné)
+  useEffect(() => {
+    if (estDelegue && entrepotsDelegues.length > 0 && !entrepotSelection) {
+      setEntrepotSelection(`delegue_${entrepotsDelegues[0]!.id}`);
+    }
+  }, [estDelegue, entrepotsDelegues.length, entrepotSelection]);
+
   const seuilDouble = Number(configPesee?.seuil_double_pesee_kg ?? 500);
   const ecartMaxPct = Number(configPesee?.ecart_max_autorise_pct ?? 2);
   const TAUX_HUMIDITE_STANDARD = 8;
