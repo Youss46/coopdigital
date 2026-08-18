@@ -56,6 +56,10 @@ export default function CollecteFlow() {
   const [submitting, setSubmitting] = useState(false);
   const [erreur, setErreur] = useState("");
 
+  // Plan de déduction de l'avance (Step 3)
+  const [avancePlan, setAvancePlan] = useState<"integral" | "partiel" | "reporte">("integral");
+  const [avanceMontantPartiel, setAvanceMontantPartiel] = useState("");
+
   useEffect(() => {
     const load = async () => {
       if (isOnline) {
@@ -78,8 +82,14 @@ export default function CollecteFlow() {
   const retenueNum = parseFloat(retenueKg) || 0;
   const poidsNet = Math.max(0, poidsBrutNum - retenueNum);
   const montantBrut = prix ? Math.round(poidsNet * prix.prixBordChampFcfa) : 0;
-  // Les fournisseurs externes n'ont pas d'avance ni d'intrants
-  const avanceDed = (!isExterne && fournisseur) ? Math.min(fournisseur.avanceEnCours, montantBrut) : 0;
+  // Plafond de l'avance (déduction maximale possible = intégral)
+  const avanceDedMax = (!isExterne && fournisseur) ? Math.min(fournisseur.avanceEnCours, montantBrut) : 0;
+  // Déduction effective selon le plan choisi par le délégué
+  const avanceDed = avanceDedMax === 0 ? 0
+    : avancePlan === "reporte" ? 0
+    : avancePlan === "partiel" && avanceMontantPartiel
+      ? Math.min(Number(avanceMontantPartiel), avanceDedMax)
+      : avanceDedMax; // integral
   const intrantsDed = (!isExterne && fournisseur) ? Math.min(fournisseur.intrantsDus, montantBrut - avanceDed) : 0;
   const montantNet = Math.max(0, montantBrut - avanceDed - intrantsDed);
 
@@ -99,6 +109,11 @@ export default function CollecteFlow() {
           retenueKg: retenueNum,
           localId,
           ...(proxy ? { targetDelegueId: proxy.id } : {}),
+          // Plan de déduction — transmis uniquement pour les membres avec avance
+          ...(!isExterne && avanceDedMax > 0 ? {
+            avancePlanType: avancePlan,
+            avanceMontantPartiel: avancePlan === "partiel" && avanceMontantPartiel ? Number(avanceMontantPartiel) : undefined,
+          } : {}),
         },
         isOnline
       );
@@ -123,6 +138,8 @@ export default function CollecteFlow() {
     setRetenueKg("0");
     setResult(null);
     setErreur("");
+    setAvancePlan("integral");
+    setAvanceMontantPartiel("");
   }
 
   return (
@@ -312,10 +329,49 @@ export default function CollecteFlow() {
                 <span className="t-recap-row__label">Montant brut</span>
                 <span className="t-recap-row__value">{montantBrut.toLocaleString("fr-FR")} FCFA</span>
               </div>
+            </div>
+
+            {/* ── Choix du plan de déduction de l'avance ── */}
+            {!isExterne && avanceDedMax > 0 && (
+              <div style={{ background: "#fefce8", border: "2px solid #f59e0b", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: ".85rem", color: "#92400e", marginBottom: 8 }}>
+                  ⚠️ Avance en cours : {fournisseur.avanceEnCours.toLocaleString("fr-FR")} FCFA
+                </div>
+                <select
+                  value={avancePlan}
+                  onChange={(e) => { setAvancePlan(e.target.value as "integral" | "partiel" | "reporte"); setAvanceMontantPartiel(""); }}
+                  style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid #d97706", background: "#fff", fontSize: ".85rem", marginBottom: 6 }}
+                >
+                  <option value="integral">Déduire intégralement — {avanceDedMax.toLocaleString("fr-FR")} FCFA</option>
+                  <option value="partiel">Déduction partielle — montant à définir</option>
+                  <option value="reporte">Reporter — pas de déduction sur cette livraison</option>
+                </select>
+                {avancePlan === "partiel" && (
+                  <input
+                    type="number"
+                    placeholder={`Montant à déduire (max ${avanceDedMax.toLocaleString("fr-FR")} FCFA)`}
+                    value={avanceMontantPartiel}
+                    inputMode="numeric"
+                    min={1}
+                    max={avanceDedMax}
+                    onChange={(e) => setAvanceMontantPartiel(e.target.value)}
+                    style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid #d97706", fontSize: ".85rem" }}
+                  />
+                )}
+              </div>
+            )}
+
+            <div className="t-recap">
               {avanceDed > 0 && (
                 <div className="t-recap-row t-recap-row--deduction">
                   <span className="t-recap-row__label">− Avance déduite</span>
                   <span className="t-recap-row__value">−{avanceDed.toLocaleString("fr-FR")} FCFA</span>
+                </div>
+              )}
+              {avancePlan === "reporte" && avanceDedMax > 0 && (
+                <div className="t-recap-row" style={{ color: "#f59e0b", fontSize: ".8rem" }}>
+                  <span className="t-recap-row__label">↩ Avance reportée</span>
+                  <span className="t-recap-row__value">{fournisseur.avanceEnCours.toLocaleString("fr-FR")} FCFA</span>
                 </div>
               )}
               {intrantsDed > 0 && (

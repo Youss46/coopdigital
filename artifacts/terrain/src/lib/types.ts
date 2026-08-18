@@ -61,6 +61,10 @@ export interface CollecteInput {
   localId?: string;
   /** Si renseigné : la livraison est imputée à ce délégué central (saisie proxy) */
   targetDelegueId?: number;
+  /** Plan de déduction de l'avance du membre — par défaut "integral" */
+  avancePlanType?: "integral" | "partiel" | "reporte";
+  /** Montant à déduire si planType = "partiel" */
+  avanceMontantPartiel?: number;
 }
 
 export interface DelegueProxy {

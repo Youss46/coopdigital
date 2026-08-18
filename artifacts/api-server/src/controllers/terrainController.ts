@@ -127,13 +127,15 @@ export async function postCollecteHandler(req: Request, res: Response): Promise<
   const { cooperativeId } = agent;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
 
-  const { membreId, fournisseurId, nombreSacs, poidsBrutKg, retenueKg, targetDelegueId } = req.body as {
+  const { membreId, fournisseurId, nombreSacs, poidsBrutKg, retenueKg, targetDelegueId, avancePlanType, avanceMontantPartiel } = req.body as {
     membreId?: number;
     fournisseurId?: number;
     nombreSacs?: number;
     poidsBrutKg?: number;
     retenueKg?: number;
     targetDelegueId?: number;
+    avancePlanType?: "integral" | "partiel" | "reporte";
+    avanceMontantPartiel?: number;
   };
   if ((!membreId && !fournisseurId) || !poidsBrutKg) {
     res.status(400).json({ erreur: "Données manquantes (membreId ou fournisseurId requis)" });
@@ -155,6 +157,8 @@ export async function postCollecteHandler(req: Request, res: Response): Promise<
       poidsBrutKg,
       retenueKg: retenueKg ?? 0,
       peseurId,
+      avancePlanType,
+      avanceMontantPartiel: avanceMontantPartiel ? Number(avanceMontantPartiel) : undefined,
     }, agentSaisiseurId);
     res.status(201).json(result);
   } catch (err) {

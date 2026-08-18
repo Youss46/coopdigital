@@ -378,6 +378,10 @@ export async function enregistrerCollecte(
     retenueKg: number;
     /** ID du peseur ayant physiquement enregistré la collecte (traçabilité) */
     peseurId?: number;
+    /** Plan de déduction choisi par le délégué — "integral" par défaut */
+    avancePlanType?: "integral" | "partiel" | "reporte";
+    /** Montant fixe à déduire si planType = "partiel" */
+    avanceMontantPartiel?: number;
   },
   /** Utilisateur réellement connecté (mode proxy) — différent de agentId si saisie pour un délégué */
   agentSaisiseurId?: number,
@@ -401,7 +405,18 @@ export async function enregistrerCollecte(
       .orderBy(desc(avancesTable.createdAt))
       .limit(1);
     avance = av;
-    avanceDeduite = avance ? Math.min(avance.soldeRestantFcfa, montantBrut) : 0;
+
+    if (avance) {
+      const planType = data.avancePlanType ?? "integral";
+      if (planType === "reporte") {
+        avanceDeduite = 0;
+      } else if (planType === "partiel" && data.avanceMontantPartiel) {
+        avanceDeduite = Math.min(data.avanceMontantPartiel, avance.soldeRestantFcfa, montantBrut);
+      } else {
+        // integral (défaut)
+        avanceDeduite = Math.min(avance.soldeRestantFcfa, montantBrut);
+      }
+    }
 
     const [intrantsDus] = await db
       .select({
@@ -451,17 +466,29 @@ export async function enregistrerCollecte(
 
   if (!livraison) throw new Error("Erreur lors de l'enregistrement de la collecte");
 
-  // Déduire avance
-  if (avance && avanceDeduite > 0) {
-    const nouveauSolde = avance.soldeRestantFcfa - avanceDeduite;
-    const nouveauRembourse = (avance.montantRembourse_fcfa ?? 0) + avanceDeduite;
-    await db.update(avancesTable)
-      .set({
-        montantRembourse_fcfa: nouveauRembourse,
-        soldeRestantFcfa: nouveauSolde,
-        statut: nouveauSolde <= 0 ? "rembourse" : "en_cours",
-      })
-      .where(eq(avancesTable.id, avance.id));
+  // Déduire avance + persister le plan choisi
+  if (avance) {
+    const planType = data.avancePlanType ?? "integral";
+    if (avanceDeduite > 0) {
+      const nouveauSolde = avance.soldeRestantFcfa - avanceDeduite;
+      const nouveauRembourse = (avance.montantRembourse_fcfa ?? 0) + avanceDeduite;
+      await db.update(avancesTable)
+        .set({
+          montantRembourse_fcfa: nouveauRembourse,
+          soldeRestantFcfa: nouveauSolde,
+          statut: nouveauSolde <= 0 ? "rembourse" : "en_cours",
+          // Persister le plan pour les livraisons suivantes
+          planType: planType === "integral" ? "integral" : planType,
+          montantPartielFcfa: planType === "partiel" && data.avanceMontantPartiel ? data.avanceMontantPartiel : null,
+          reportDate: null,
+        })
+        .where(eq(avancesTable.id, avance.id));
+    } else if (planType === "reporte") {
+      // Pas de déduction ce cycle — marquer le plan sur l'avance
+      await db.update(avancesTable)
+        .set({ planType: "reporte", reportDate: null })
+        .where(eq(avancesTable.id, avance.id));
+    }
   }
 
   // Numéro de réçu séquentiel — attribué à la création, persisté dans paiements.numero_recu
