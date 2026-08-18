@@ -5,7 +5,7 @@ import {
   Users, Search, Phone, MapPin, Wallet, PlusCircle, X,
   ChevronRight, AlertCircle, CalendarDays, TrendingUp, Settings,
   CheckCircle2, Clock, Banknote, Trash2, ArrowDownCircle, Package,
-  Download, ShoppingCart,
+  Download, ShoppingCart, Truck,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
@@ -110,6 +110,19 @@ interface LivraisonMembre {
   statutPaiement: string | null;
 }
 
+interface LivraisonDelegue {
+  id: number;
+  membreId: number | null;
+  poidsKg: string;
+  montantBrutFcfa: number;
+  avanceDeduiteFcfa: number;
+  montantNetFcfa: number;
+  dateLivraison: string;
+  statutPaiement: string | null;
+  membreNom: string | null;
+  membrePrenoms: string | null;
+}
+
 async function downloadBordereau(livraisonId: number) {
   const url = `${BASE}/api/rapports/recu/livraison/${livraisonId}`;
   const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
@@ -130,7 +143,8 @@ function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-type Onglet = "membres" | "commissions" | "taux";
+type Onglet = "membres" | "commissions" | "taux" | "livraisons";
+type FiltreStatutLivraison = "tous" | "EN_ATTENTE" | "PAYÉ";
 
 export default function DeleguesLocalitesPage() {
   const [, setLocation] = useLocation();
@@ -143,6 +157,8 @@ export default function DeleguesLocalitesPage() {
 
   const [onglet, setOnglet] = useState<Onglet>("membres");
   const [search, setSearch] = useState("");
+  const [filtreLivraisons, setFiltreLivraisons] = useState<FiltreStatutLivraison>("tous");
+  const [searchLivraisons, setSearchLivraisons] = useState("");
   const [modalMembre, setModalMembre] = useState<MembreDelegue | null>(null);
   const [showOctroi, setShowOctroi] = useState(false);
   const [formOctroi, setFormOctroi] = useState({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
@@ -237,6 +253,13 @@ export default function DeleguesLocalitesPage() {
     queryKey: ["commissions-membres-delegues-taux"],
     queryFn: () => apiFetch(`/api/delegues-localites/commissions/taux`),
     enabled: onglet === "taux",
+    staleTime: 30_000,
+  });
+
+  const { data: livraisonsDelegues = [], isLoading: loadLivraisonsDelegues } = useQuery<LivraisonDelegue[]>({
+    queryKey: ["livraisons-membres-delegues"],
+    queryFn: () => apiFetch(`/api/livraisons?categorie_membre_delegue=true`),
+    enabled: onglet === "livraisons" && !isMagasinier,
     staleTime: 30_000,
   });
 
@@ -360,6 +383,7 @@ export default function DeleguesLocalitesPage() {
       <div className="flex gap-1 border-b border-gray-200">
         {([
           { id: "membres" as Onglet,     label: "Membres",     icon: Users,      hidden: false },
+          { id: "livraisons" as Onglet,  label: "Livraisons",  icon: Truck,      hidden: isMagasinier },
           { id: "commissions" as Onglet, label: "Commissions", icon: TrendingUp, hidden: isMagasinier },
           { id: "taux" as Onglet,        label: "Taux",        icon: Settings,   hidden: isMagasinier },
         ] as const).filter(t => !t.hidden).map(({ id, label, icon: Icon }) => (
@@ -467,6 +491,157 @@ export default function DeleguesLocalitesPage() {
           )}
         </>
       )}
+
+      {/* ── Onglet Livraisons ─────────────────────────────────────────────── */}
+      {onglet === "livraisons" && (() => {
+        // Schema default is PAYÉ — null means the payment was immediate (paid).
+        // Only explicit EN_ATTENTE or DIFFÉRÉ values mean unpaid.
+        const STATUTS_NON_PAYES = new Set(["EN_ATTENTE", "EN ATTENTE", "DIFFERE", "DIFFÉRÉ"]);
+        const isPaye = (s: string | null) =>
+          s === null || !STATUTS_NON_PAYES.has((s).toUpperCase().trim());
+
+        const filtrées = livraisonsDelegues.filter(l => {
+          const matchStatut =
+            filtreLivraisons === "tous" ? true :
+            filtreLivraisons === "PAYÉ" ? isPaye(l.statutPaiement) :
+            /* EN_ATTENTE */ !isPaye(l.statutPaiement);
+          const nom = `${l.membrePrenoms ?? ""} ${l.membreNom ?? ""}`.toLowerCase();
+          const matchSearch = !searchLivraisons || nom.includes(searchLivraisons.toLowerCase());
+          return matchStatut && matchSearch;
+        });
+
+        const totalEnAttenteLiv = livraisonsDelegues
+          .filter(l => !isPaye(l.statutPaiement))
+          .reduce((s, l) => s + l.montantNetFcfa, 0);
+
+        return (
+          <>
+            {/* Bannière total en attente */}
+            {totalEnAttenteLiv > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+                <Clock size={18} className="text-amber-600 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">
+                    {formaterMontant(totalEnAttenteLiv)} en attente de paiement
+                  </p>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    Livraisons issues des sessions membres-délégués non encore payées
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Filtres */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Rechercher un membre…"
+                  value={searchLivraisons}
+                  onChange={e => setSearchLivraisons(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1a4731] focus:border-[#1a4731]"
+                />
+              </div>
+              <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                {(["tous", "EN_ATTENTE", "PAYÉ"] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFiltreLivraisons(f)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      filtreLivraisons === f
+                        ? "bg-white text-[#1a4731] shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {f === "tous" ? "Tous" : f === "EN_ATTENTE" ? "En attente" : "Payé"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tableau */}
+            {loadLivraisonsDelegues ? (
+              <TableSkeleton colonnes={5} />
+            ) : filtrées.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200">
+                <EmptyState
+                  icone={Truck}
+                  titre="Aucune livraison"
+                  description="Les livraisons des membres-délégués apparaîtront ici une fois enregistrées."
+                />
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Membre</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Poids (kg)</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Montant net</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {filtrées.map(l => {
+                      const paye = isPaye(l.statutPaiement);
+                      return (
+                        <tr key={l.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-900">
+                              {l.membrePrenoms} {l.membreNom}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+                            {formaterDate(l.dateLivraison)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-700">
+                            {Number(l.poidsKg).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-[#1a4731]">
+                            {formaterMontant(l.montantNetFcfa)}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              paye
+                                ? "bg-green-100 text-green-700"
+                                : "bg-amber-100 text-amber-700"
+                            }`}>
+                              {paye ? "Payé" : "En attente"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              title="Télécharger le bordereau"
+                              onClick={() => void downloadBordereau(l.id)}
+                              className="p-1.5 text-gray-400 hover:text-[#1a4731] transition-colors"
+                            >
+                              <Download size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-gray-200 bg-gray-50">
+                      <td colSpan={3} className="px-4 py-3 text-xs text-gray-500 font-medium">
+                        {filtrées.length} livraison{filtrées.length !== 1 ? "s" : ""}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900">
+                        {formaterMontant(filtrées.reduce((s, l) => s + l.montantNetFcfa, 0))}
+                      </td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* ── Onglet Commissions ────────────────────────────────────────────── */}
       {onglet === "commissions" && (

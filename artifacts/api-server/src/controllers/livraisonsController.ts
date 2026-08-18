@@ -27,7 +27,11 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
 
   try {
     const membreId = req.query["membre_id"] ? parseInt(String(req.query["membre_id"])) : undefined;
-    const limit = Math.min(100, parseInt(String(req.query["limit"] ?? "20")));
+    const categorieMembreDelegue = req.query["categorie_membre_delegue"] === "true";
+    // When fetching all delegue livraisons for the aggregated view, we don't cap at 200.
+    const defaultLimit = categorieMembreDelegue ? 10000 : 20;
+    const limit = Math.min(10000, parseInt(String(req.query["limit"] ?? String(defaultLimit))));
+    const statutPaiementFilter = req.query["statut_paiement"] ? String(req.query["statut_paiement"]) : undefined;
 
     const coopCondition = or(
       eq(membresTable.cooperativeId, cooperativeId),
@@ -35,6 +39,12 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
     );
     const extraConditions = [];
     if (membreId) extraConditions.push(eq(livraisonsTable.membreId, membreId));
+    if (categorieMembreDelegue) {
+      extraConditions.push(eq(membresTable.categorieMembre, "délégué de localités"));
+    }
+    if (statutPaiementFilter) {
+      extraConditions.push(eq(livraisonsTable.statutPaiement, statutPaiementFilter));
+    }
     if (req.user?.role === "delegue" && req.user?.id) {
       // Membres rattachés AU délégué OU fournisseurs externes créés PAR ce délégué
       extraConditions.push(
@@ -60,6 +70,7 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
         intrantsDeduitsFcfa: livraisonsTable.intrantsDeduitsFcfa,
         montantNetFcfa: livraisonsTable.montantNetFcfa,
         dateLivraison: livraisonsTable.dateLivraison,
+        statutPaiement: livraisonsTable.statutPaiement,
         agentId: livraisonsTable.agentId,
         createdAt: livraisonsTable.createdAt,
         membreNom: membresTable.nom,
