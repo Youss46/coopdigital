@@ -3927,6 +3927,7 @@ export async function generateBordereauAchatSession(
       nbSacsTotal:        sessionsPeseeTable.nbSacsTotal,
       dateFin:            sessionsPeseeTable.dateFin,
       transfertId:        sessionsPeseeTable.transfertId,
+      membreId:           sessionsPeseeTable.membreId,
       certificationCacao: sessionsPeseeTable.certificationCacao,
       createdAt:          sessionsPeseeTable.createdAt,
     })
@@ -3957,6 +3958,9 @@ export async function generateBordereauAchatSession(
   let modeFinancement    = "fonds_propres";
   let delegueIdSession: number | null = null;
   let transfertCharges: { carburantPar: string; carburantFcfa: number; autresFcfa: number; autresPar: string } | null = null;
+  // Vrai quand la session appartient à un membre catégorisé "délégué de localités"
+  // → même format bordereau que les délégués terrain, sans camion/chauffeur
+  let estDelegueMembre = false;
 
   if (session.transfertId) {
     const [t] = await db
@@ -4009,6 +4013,27 @@ export async function generateBordereauAchatSession(
         }
         if (entrepot) delegueZone = entrepot.zoneNom ?? "—";
       }
+    }
+  } else if (session.membreId) {
+    // Chemin membre : vérifier si catégorie "délégué de localités"
+    const [membreDelegue] = await db
+      .select({
+        nom:             membresTable.nom,
+        prenoms:         membresTable.prenoms,
+        telephone:       membresTable.telephone,
+        section:         membresTable.section,
+        categorieMembre: membresTable.categorieMembre,
+      })
+      .from(membresTable)
+      .where(eq(membresTable.id, session.membreId))
+      .limit(1);
+
+    if (membreDelegue?.categorieMembre === "délégué de localités") {
+      estDelegueMembre = true;
+      delegueNom       = membreDelegue.nom       ?? "—";
+      deleguePrenoms   = membreDelegue.prenoms   ?? "";
+      delegueTel       = membreDelegue.telephone ?? "—";
+      delegueZone      = membreDelegue.section   ?? "—";
     }
   }
 
@@ -4197,8 +4222,11 @@ export async function generateBordereauAchatSession(
   fieldRow("Délégué",       `${deleguePrenoms} ${delegueNom}`.trim());
   fieldRow("Téléphone",     delegueTel);
   fieldRow("Section",       delegueZone);
-  fieldRow("N° Camion",     immatriculation);
-  fieldRow("Nom Chauffeur", nomChauffeur);
+  // Camion & chauffeur : uniquement pour les sessions avec transfert (délégués terrain)
+  if (!estDelegueMembre) {
+    fieldRow("N° Camion",     immatriculation);
+    fieldRow("Nom Chauffeur", nomChauffeur);
+  }
   fieldRow("Produit",       session.produit
     ? session.produit.charAt(0).toUpperCase() + session.produit.slice(1)
     : "Cacao");

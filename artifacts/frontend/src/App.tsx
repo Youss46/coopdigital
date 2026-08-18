@@ -64,6 +64,7 @@ import FiscalitePage from "@/pages/FiscalitePage";
 import ReconciliationPage from "@/pages/ReconciliationPage";
 import InvestissementsPage from "@/pages/InvestissementsPage";
 import DeleguesPage from "@/pages/DeleguesPage";
+import DeleguesLocalitesPage from "@/pages/DeleguesLocalitesPage";
 import ChangerMotDePassePage from "@/pages/ChangerMotDePassePage";
 import FinancesTableauBordPage from "@/pages/FinancesTableauBordPage";
 import CartesMembres from "@/pages/CartesMembres";
@@ -287,6 +288,9 @@ function AppRoutes() {
       </Route>
       <Route path="/delegues">
         <ProtectedRoute component={DeleguesPage} />
+      </Route>
+      <Route path="/delegues-localites">
+        <ProtectedRoute component={DeleguesLocalitesPage} />
       </Route>
       <Route path="/cartes-membres">
         <ProtectedRoute component={CartesMembres} />

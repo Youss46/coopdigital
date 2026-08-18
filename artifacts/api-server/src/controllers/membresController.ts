@@ -125,6 +125,7 @@ export async function listMembres(req: Request, res: Response): Promise<void> {
     const rattachementType = req.query["rattachementType"] as string | undefined;
     const vue = req.query["vue"] as string | undefined;
     const sansGps = req.query["sans_gps"] === "1";
+    const categorieMembre = req.query["categorie_membre"] as string | undefined;
     const offset = (page - 1) * limit;
 
     const userRole = req.user?.role;
@@ -163,6 +164,9 @@ export async function listMembres(req: Request, res: Response): Promise<void> {
       }
       if (sansGps) {
         conditions.push(sql`${membresTable.gpsParcelles} IS NULL`);
+      }
+      if (categorieMembre) {
+        conditions.push(eq(membresTable.categorieMembre, categorieMembre));
       }
     }
 
