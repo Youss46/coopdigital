@@ -231,6 +231,17 @@ export default function Membres() {
     enabled: estDelegue && !!utilisateur,
   });
 
+  const fournisseursExternesFiltres = recherche.trim()
+    ? fournisseursExternes.filter((f) => {
+        const q = recherche.toLowerCase();
+        return (
+          `${f.nom} ${f.prenoms}`.toLowerCase().includes(q) ||
+          (f.telephone ?? "").includes(q) ||
+          (f.code ?? "").toLowerCase().includes(q)
+        );
+      })
+    : fournisseursExternes;
+
   const membres: MembreRow[] = (onglet === "demandes" ? demandesData?.membres : data?.membres) ?? [];
   const delegueCourant = estDelegue ? delegues.find((d) => d.id === utilisateur?.id) : null;
 
@@ -574,7 +585,7 @@ export default function Membres() {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-purple-800">🏪 Fournisseurs externes occasionnels</span>
-            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">{fournisseursExternes.length}</span>
+            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">{fournisseursExternesFiltres.length}</span>
           </div>
           <div className="bg-white rounded-xl border border-purple-100 overflow-x-auto overflow-y-auto max-h-48">
             <table className="w-full text-sm">
@@ -586,13 +597,13 @@ export default function Membres() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {fournisseursExternes.length === 0 ? (
+                {fournisseursExternesFiltres.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">
-                      Aucun fournisseur externe enregistré pour l'instant.
+                      {recherche.trim() ? "Aucun résultat pour cette recherche." : "Aucun fournisseur externe enregistré pour l'instant."}
                     </td>
                   </tr>
-                ) : fournisseursExternes.map((f) => (
+                ) : fournisseursExternesFiltres.map((f) => (
                   <tr key={f.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {f.nom} {f.prenoms}
