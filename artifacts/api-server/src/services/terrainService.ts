@@ -679,6 +679,22 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       eq(livraisonsTable.dateLivraison, todayStr),
     ));
 
+  // Sessions de pesée fournisseur externe terminées aujourd'hui et non encore converties en livraison
+  const [fournisseurSessionStats] = await db
+    .select({
+      nb:      sql<number>`COUNT(*)`,
+      tonnage: sql<string>`COALESCE(SUM(${sessionsPeseeTable.poidsTotalKg}), 0)`,
+    })
+    .from(sessionsPeseeTable)
+    .where(and(
+      eq(sessionsPeseeTable.peseurId, agentId),
+      eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+      sql`${sessionsPeseeTable.fournisseurId} IS NOT NULL`,
+      sql`${sessionsPeseeTable.statut} = 'terminee'`,
+      isNull(sessionsPeseeTable.livraisonId),
+      sql`DATE(${sessionsPeseeTable.dateFin}) = ${todayStr}::date`,
+    ));
+
   // Sessions de réception de transfert terminées aujourd'hui par ce peseur
   const [transfertReceptionStats] = await db
     .select({
@@ -745,16 +761,20 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
     .select({
       id: livraisonsTable.id,
       membreId: livraisonsTable.membreId,
+      fournisseurId: livraisonsTable.fournisseurId,
       agentId: livraisonsTable.agentId,
       poidsKg: livraisonsTable.poidsKg,
       createdAt: livraisonsTable.createdAt,
       fromSession: sessionsPeseeTable.id,
       delegueNom: delegueUserAlias.nom,
       deleguePrenoms: delegueUserAlias.prenoms,
+      fournisseurNom: fournisseursTable.nom,
+      fournisseurPrenoms: fournisseursTable.prenoms,
     })
     .from(livraisonsTable)
     .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
     .leftJoin(delegueUserAlias, eq(delegueUserAlias.id, livraisonsTable.agentId))
+    .leftJoin(fournisseursTable, eq(fournisseursTable.id, livraisonsTable.fournisseurId))
     .where(and(
       or(
         eq(livraisonsTable.agentId, agentId),
@@ -789,7 +809,8 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
   const membresIds = [
     ...recentesLivraisons.map((l) => l.membreId),
     ...recentesPaiements.map((p) => p.membreId),
-  ].filter((id, i, arr) => arr.indexOf(id) === i);
+  ].filter((id): id is number => id !== null && id !== undefined)
+   .filter((id, i, arr) => arr.indexOf(id) === i);
 
   let noms: Array<{ id: number; nom: string; prenoms: string }> = [];
   if (membresIds.length > 0) {
@@ -802,15 +823,20 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
   const nomMap = new Map(noms.map((n) => [n.id, `${n.nom} ${n.prenoms}`]));
 
   const dernieresOps = [
-    ...recentesLivraisons.map((l) => ({
-      heure: new Date(l.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
-      type: l.fromSession !== null ? "session_collecte" : "collecte",
-      label: `${l.fromSession !== null ? "Session groupée" : "Collecte"} ${(l.membreId ? nomMap.get(l.membreId) : null) ?? ""} — ${toNum(l.poidsKg)} kg`,
-      montant: 0,
-      saisiePour: (l.agentId !== null && l.agentId !== agentId && l.delegueNom)
-        ? `${l.delegueNom} ${l.deleguePrenoms ?? ""}`.trim()
-        : null as string | null,
-    })),
+    ...recentesLivraisons.map((l) => {
+      const nomDisplay = l.membreId
+        ? (nomMap.get(l.membreId) ?? "")
+        : (l.fournisseurNom ? `${l.fournisseurNom} ${l.fournisseurPrenoms ?? ""}`.trim() : "");
+      return {
+        heure: new Date(l.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+        type: l.fromSession !== null ? "session_collecte" : "collecte",
+        label: `${l.fromSession !== null ? "Session groupée" : "Collecte"} ${nomDisplay} — ${toNum(l.poidsKg)} kg`,
+        montant: 0,
+        saisiePour: (l.agentId !== null && l.agentId !== agentId && l.delegueNom)
+          ? `${l.delegueNom} ${l.deleguePrenoms ?? ""}`.trim()
+          : null as string | null,
+      };
+    }),
     ...recentesPaiements.map((p) => ({
       heure: new Date(p.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
       type: "paiement",
@@ -831,8 +857,8 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
 
   return {
     collectes: {
-      nb:      Number(collectesStats?.nb ?? 0)      + Number(transfertReceptionStats?.nb ?? 0),
-      tonnage: toNum(collectesStats?.tonnage)        + toNum(transfertReceptionStats?.tonnage),
+      nb:      Number(collectesStats?.nb ?? 0) + Number(transfertReceptionStats?.nb ?? 0) + Number(fournisseurSessionStats?.nb ?? 0),
+      tonnage: toNum(collectesStats?.tonnage)  + toNum(transfertReceptionStats?.tonnage)  + toNum(fournisseurSessionStats?.tonnage),
       valeur:  toNum(collectesStats?.valeur),
     },
     paiements: {
@@ -929,11 +955,14 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
       membreCode: membresTable.carteNumero,
+      fournisseurNom: fournisseursTable.nom,
+      fournisseurPrenoms: fournisseursTable.prenoms,
       sessionId: sessionsPeseeTable.id,
       planAvanceType: livraisonsTable.planAvanceType,
     })
     .from(livraisonsTable)
     .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+    .leftJoin(fournisseursTable, eq(fournisseursTable.id, livraisonsTable.fournisseurId))
     .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
     .where(
       and(
@@ -943,7 +972,11 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
           eq(livraisonsTable.peseurId, agentId),
           eq(sessionsPeseeTable.peseurId, agentId),
         ),
-        eq(membresTable.cooperativeId, cooperativeId),
+        // Filtre coopérative : via membre OU via fournisseur externe
+        or(
+          eq(membresTable.cooperativeId, cooperativeId),
+          eq(fournisseursTable.cooperativeId, cooperativeId),
+        ),
       ),
     )
     .orderBy(desc(livraisonsTable.dateLivraison), desc(livraisonsTable.id))
@@ -955,8 +988,8 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
     poidsKg: toNum(r.poidsKg),
     montantNetFcfa: r.montantNetFcfa,
     statutPaiement: r.statutPaiement ?? "PAYÉ",
-    membreNom: r.membreNom ?? "—",
-    membrePrenoms: r.membrePrenoms ?? "",
+    membreNom: r.membreNom ?? r.fournisseurNom ?? "—",
+    membrePrenoms: r.membrePrenoms ?? r.fournisseurPrenoms ?? "",
     membreCode: r.membreCode ?? "",
     fromSession: r.sessionId !== null,
     planAvanceType: r.planAvanceType ?? null,
@@ -1001,8 +1034,44 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
     sessionId: t.id,
   }));
 
+  // Sessions de pesée fournisseur externe terminées par ce peseur (non encore converties en livraison)
+  const fournisseurSessionRows = await db
+    .select({
+      id:           sessionsPeseeTable.id,
+      dateFin:      sessionsPeseeTable.dateFin,
+      poidsTotalKg: sessionsPeseeTable.poidsTotalKg,
+      fournisseurNom:     fournisseursTable.nom,
+      fournisseurPrenoms: fournisseursTable.prenoms,
+    })
+    .from(sessionsPeseeTable)
+    .leftJoin(fournisseursTable, eq(fournisseursTable.id, sessionsPeseeTable.fournisseurId))
+    .where(and(
+      eq(sessionsPeseeTable.peseurId, agentId),
+      eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+      sql`${sessionsPeseeTable.fournisseurId} IS NOT NULL`,
+      sql`${sessionsPeseeTable.statut} = 'terminee'`,
+      isNull(sessionsPeseeTable.livraisonId),
+    ))
+    .orderBy(desc(sessionsPeseeTable.dateFin))
+    .limit(100);
+
+  const fournisseurSessionEntries = fournisseurSessionRows.map((s) => ({
+    id: s.id,
+    dateLivraison: s.dateFin ? (s.dateFin as Date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+    poidsKg: toNum(s.poidsTotalKg),
+    montantNetFcfa: 0,
+    statutPaiement: "—",
+    membreNom: s.fournisseurNom ?? "Ext.",
+    membrePrenoms: s.fournisseurPrenoms ?? "",
+    membreCode: "",
+    fromSession: true,
+    planAvanceType: null as string | null,
+    type: "livraison" as const,
+    sessionId: s.id,
+  }));
+
   // Merge et trier par date décroissante
-  return [...livraisonEntries, ...transfertEntries].sort(
+  return [...livraisonEntries, ...transfertEntries, ...fournisseurSessionEntries].sort(
     (a, b) => b.dateLivraison.localeCompare(a.dateLivraison) || b.id - a.id,
   );
 }
