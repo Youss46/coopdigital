@@ -418,7 +418,13 @@ export async function handleGetMissions(req: Request, res: Response): Promise<vo
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
     const statut = typeof req.query["statut"] === "string" ? req.query["statut"] : undefined;
     const list = await getMissions(cooperativeId, statut);
-    res.json({ missions: list.map((row) => mapMission(row.mission)) });
+    res.json({
+      missions: list.map((row) => ({
+        mission: mapMission(row.mission),
+        vehicule: row.vehicule?.id ? row.vehicule : null,
+        chauffeur: row.chauffeur?.id ? row.chauffeur : null,
+      })),
+    });
   } catch (err) {
     req.log.error({ err }, "Erreur getMissions");
     res.status(500).json({ erreur: "Erreur interne" });
