@@ -4036,11 +4036,31 @@ export async function generateBordereauAchatSession(
 
       if (caisse) {
         const cutoff = session.createdAt ?? new Date();
+
+        // Isoler le cycle en cours : alimentations depuis la dernière clôture de session
+        // du même délégué (dernière session terminée avant la session courante).
+        // Sans dernière clôture (1ère session) → on somme toutes les alimentations avant cutoff.
+        const [derniereSessionTerminee] = await db
+          .select({ dateFin: sessionsPeseeTable.dateFin })
+          .from(sessionsPeseeTable)
+          .innerJoin(transfertsStockTable, eq(transfertsStockTable.id, sessionsPeseeTable.transfertId))
+          .where(and(
+            eq(transfertsStockTable.delegueId, delegueIdSession!),
+            eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+            sql`${sessionsPeseeTable.statut}::text = 'terminee'`,
+            lt(sessionsPeseeTable.dateFin, cutoff),
+          ))
+          .orderBy(desc(sessionsPeseeTable.dateFin))
+          .limit(1);
+
+        const cycleDebut: Date | null = derniereSessionTerminee?.dateFin ?? null;
+
         const alims = await db
           .select({ montantFcfa: alimentationsCaisseDelegueTable.montantFcfa })
           .from(alimentationsCaisseDelegueTable)
           .where(and(
             eq(alimentationsCaisseDelegueTable.caisseDelegueId, caisse.id),
+            cycleDebut ? gte(alimentationsCaisseDelegueTable.dateEnvoi, cycleDebut) : undefined,
             lt(alimentationsCaisseDelegueTable.dateEnvoi, cutoff),
           ));
         montantCoopFcfa = alims.reduce((s, a) => s + Math.round(parseFloat(a.montantFcfa ?? "0")), 0);
