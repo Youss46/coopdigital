@@ -1,4 +1,5 @@
 import { db, avancesTable, avancesDeleguesTable, cooperativesTable, membresTable, intrantsTable, usersTable } from "@workspace/db";
+import { detecterAnomaliesComptables } from "../services/anomaliesIAService.js";
 import { eq, and, lt, lte, between, gt, sql, inArray, isNotNull, isNull, or, ne } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { notifierParRole } from "../services/notificationService";

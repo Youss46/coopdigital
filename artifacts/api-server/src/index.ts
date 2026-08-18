@@ -49,12 +49,27 @@ app.listen(port, (err) => {
 // CRON budget : sync réalisé toutes les nuits à 02h00
 import { syncTousLesBudgets } from "./services/budgetService";
 import { initLicenceCrons } from "./services/licenceService";
+import { detecterAnomaliesComptables } from "./services/anomaliesIAService";
+import { db as dbCron, cooperativesTable as coopTable } from "@workspace/db";
+import { sql as sqlCron } from "drizzle-orm";
 
 initLicenceCrons();
 
 cron.schedule("0 2 * * *", () => {
   syncTousLesBudgets().catch((err) => logger.error({ err }, "Erreur cron syncBudget"));
 });
+
+// CRON veille IA comptable : analyse anomalies toutes les nuits à 02h30
+cron.schedule("30 2 * * *", async () => {
+  logger.info("CRON veille IA comptable démarré");
+  try {
+    const rows = await dbCron.select({ id: coopTable.id }).from(coopTable);
+    await Promise.allSettled(rows.map(r => detecterAnomaliesComptables(r.id)));
+    logger.info({ nb: rows.length }, "CRON veille IA comptable terminé");
+  } catch (err) {
+    logger.error({ err }, "Erreur CRON veille IA comptable");
+  }
+}, { timezone: "Africa/Abidjan" });
 
 cron.schedule("0 6 * * *", () => {
   checkEcheancesEnRetard().catch((err) => {

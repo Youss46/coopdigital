@@ -26,7 +26,7 @@ import {
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, RefreshCw, DollarSign, List, Sliders, RotateCcw, Plus, Pencil, Ban, ChevronDown, ChevronUp, Search, RotateCw, FileText, Scale, Droplets, Lock, Download, Filter, Users } from "lucide-react";
+import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, RefreshCw, DollarSign, List, Sliders, RotateCcw, Plus, Pencil, Ban, ChevronDown, ChevronUp, Search, RotateCw, FileText, Scale, Droplets, Lock, Download, Filter, Users, Sparkles, ShieldAlert, Eye } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { type TauxChange } from "@workspace/api-client-react";
 
@@ -3835,8 +3835,169 @@ function ClotureSection() {
   );
 }
 
+// ─── Onglet Veille IA ─────────────────────────────────────────────────────────
+
+interface AnomalieIA {
+  id: number; type_anomalie: string; niveau_gravite: string; description: string;
+  entite_id: number | null; statut: string; created_at: string;
+  ecriture_libelle: string | null; ecriture_date: string | null;
+  compte_debit: string | null; compte_credit: string | null; ecriture_montant: string | null;
+}
+
+function OngletAnomaliesIA() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["anomalies-ia"],
+    queryFn: () => apiFetch<{ anomalies: AnomalieIA[]; nbNouvelles: number }>("/api/comptabilite/anomalies-ia"),
+  });
+
+  const anomalies = data?.anomalies ?? [];
+
+  const graviteConfig: Record<string, { cls: string; label: string }> = {
+    critique:  { cls: "bg-red-50 border-red-200 text-red-700",    label: "🔴 Haute" },
+    attention: { cls: "bg-amber-50 border-amber-200 text-amber-700", label: "🟡 Moyenne" },
+    info:      { cls: "bg-blue-50 border-blue-200 text-blue-700",  label: "🔵 Basse" },
+  };
+
+  const typeLabel: Record<string, string> = {
+    doublon:               "Doublon suspect",
+    montant_anormal:       "Montant anormal",
+    comptes_incoherents:   "Comptes incohérents",
+    manuelle_suspecte:     "Écriture manuelle suspecte",
+    extourne_irreguliere:  "Extourne irrégulière",
+  };
+
+  const marquerLue = async (id: number) => {
+    await apiPost(`/api/comptabilite/anomalies-ia/${id}/lire`, {});
+    void refetch();
+  };
+
+  const marquerToutesLues = async () => {
+    try {
+      await apiPost("/api/comptabilite/anomalies-ia/tout-lire", {});
+      toast({ title: "Toutes les anomalies marquées comme lues" });
+      void qc.invalidateQueries({ queryKey: ["anomalies-ia"] });
+    } catch { /* */ }
+  };
+
+  const nbNouvelles = data?.nbNouvelles ?? 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+            <ShieldAlert size={18} className="text-purple-600" />
+            Veille comptable IA
+            {nbNouvelles > 0 && (
+              <span className="ml-1 text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                {nbNouvelles} nouvelle{nbNouvelles > 1 ? "s" : ""}
+              </span>
+            )}
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Claude Sonnet analyse chaque nuit les écritures de la veille et signale les anomalies au comptable.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {nbNouvelles > 0 && (
+            <button
+              onClick={() => void marquerToutesLues()}
+              className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 flex items-center gap-1.5"
+            >
+              <Eye size={12} /> Tout marquer lu
+            </button>
+          )}
+          <button onClick={() => void refetch()} className="text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg p-1.5 hover:bg-gray-50">
+            <RefreshCw size={14} />
+          </button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-500 border-t-transparent" />
+        </div>
+      ) : anomalies.length === 0 ? (
+        <div className="text-center py-16 bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl border border-purple-100">
+          <Sparkles size={40} className="mx-auto text-purple-300 mb-3" />
+          <p className="font-medium text-purple-700">Aucune anomalie détectée</p>
+          <p className="text-sm text-purple-400 mt-1">Claude n'a signalé aucune anomalie pour les écritures analysées.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {anomalies.map((a) => {
+            const cfg = graviteConfig[a.niveau_gravite] ?? graviteConfig["info"]!;
+            const isNew = a.statut === "nouvelle";
+            return (
+              <div
+                key={a.id}
+                className={`border rounded-xl p-4 transition-all ${cfg.cls} ${isNew ? "shadow-sm" : "opacity-70"}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="text-xs font-bold">{cfg.label}</span>
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">
+                        {typeLabel[a.type_anomalie] ?? a.type_anomalie}
+                      </span>
+                      {isNew && (
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-white/80 text-red-600">NOUVEAU</span>
+                      )}
+                    </div>
+                    <p className="text-sm font-medium">{a.description}</p>
+                    {a.ecriture_libelle && (
+                      <div className="mt-2 text-xs bg-white/50 rounded-lg px-3 py-1.5 space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Écriture :</span>
+                          <span>{a.ecriture_libelle}</span>
+                          {a.ecriture_date && <span className="text-gray-400">— {a.ecriture_date}</span>}
+                        </div>
+                        {a.ecriture_montant && (
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-semibold">
+                              {Number(a.ecriture_montant).toLocaleString("fr-FR")} FCFA
+                            </span>
+                            {a.compte_debit && a.compte_credit && (
+                              <span className="text-gray-400">| {a.compte_debit} / {a.compte_credit}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-xs opacity-60 mt-1.5">
+                      Détectée le {new Date(a.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  {isNew && (
+                    <button
+                      onClick={() => void marquerLue(a.id)}
+                      className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-lg bg-white/60 hover:bg-white/90 flex items-center gap-1"
+                    >
+                      <Eye size={11} /> Lu
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-100 text-xs text-gray-400 flex items-start gap-2">
+        <Sparkles size={14} className="shrink-0 mt-0.5 text-purple-400" />
+        <span>
+          Claude Sonnet analyse les écritures chaque nuit à 02h30. Les anomalies sont classées par sévérité et croisées avec le plan comptable SYSCOHADA de votre coopérative. Seul le comptable reçoit ces alertes.
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page principale ──────────────────────────────────────────────────────────
-type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable" | "grand_livre" | "balance" | "balance_aux" | "flux" | "cloture";
+type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable" | "grand_livre" | "balance" | "balance_aux" | "flux" | "cloture" | "anomalies_ia";
 
 export default function ComptabilitePage() {
   const [onglet, setOnglet] = useState<Onglet>("en_attente");
@@ -3853,7 +4014,15 @@ export default function ComptabilitePage() {
   const { data: countData } = useCountEcrituresEnAttente({ query: { queryKey: getCountEcrituresEnAttenteQueryKey(), enabled: peutVoirAttente } });
   const nbEnAttente = countData?.count ?? 0;
 
-  const peutVoirTaux = usePermission("devises", "voir_taux");
+  const peutVoirTaux      = usePermission("devises", "voir_taux");
+  const peutVoirAnomIA    = usePermission("comptabilite", "voir_anomalies_ia");
+
+  const { data: anomIaData } = useQuery({
+    queryKey: ["anomalies-ia"],
+    queryFn: () => apiFetch<{ anomalies: unknown[]; nbNouvelles: number }>("/api/comptabilite/anomalies-ia"),
+    enabled: peutVoirAnomIA,
+  });
+  const nbAnomaliesIA = anomIaData?.nbNouvelles ?? 0;
 
   const tabs: { id: Onglet; label: string; icon: React.ElementType; badge?: number }[] = [
     { id: "en_attente",  label: "En attente",      icon: Clock,     badge: nbEnAttente > 0 ? nbEnAttente : undefined },
@@ -3866,6 +4035,7 @@ export default function ComptabilitePage() {
     ...(peutVoirTaux   ? [{ id: "devises"         as Onglet, label: "Devises",        icon: DollarSign }] : []),
     ...(peutVoirPlan   ? [{ id: "plan_comptable"  as Onglet, label: "Plan comptable", icon: List }] : []),
     ...(peutVoirConfig ? [{ id: "config"          as Onglet, label: "Configuration",  icon: Settings }] : []),
+    ...(peutVoirAnomIA ? [{ id: "anomalies_ia"   as Onglet, label: "Alertes IA",     icon: ShieldAlert, badge: nbAnomaliesIA > 0 ? nbAnomaliesIA : undefined }] : []),
   ];
 
   return (
@@ -3927,6 +4097,7 @@ export default function ComptabilitePage() {
       {onglet === "devises"       && peutVoirTaux   && <OngletDevises />}
       {onglet === "plan_comptable"&& peutVoirPlan   && <OngletPlanComptableContainer />}
       {onglet === "config"        && peutVoirConfig && <OngletConfiguration />}
+      {onglet === "anomalies_ia"  && peutVoirAnomIA && <OngletAnomaliesIA />}
 
       {showSaisie && (
         <ModalSaisieManuelle

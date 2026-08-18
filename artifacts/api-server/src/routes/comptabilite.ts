@@ -31,6 +31,11 @@ import {
   declencherRistournes,
 } from "../controllers/comptabiliteController";
 import {
+  getAnomaliesIA,
+  marquerLue,
+  marquerToutesLues,
+} from "../controllers/anomaliesIAController.js";
+import {
   listPlanComptableHandler,
   createCompteHandler,
   updateCompteHandler,
@@ -105,5 +110,10 @@ router.post("/comptabilite/params/reset/:module",   checkPermission("comptabilit
 router.get("/comptabilite/ecritures/search",        checkPermission("comptabilite", "lire"),          searchEcrituresHandler);
 router.put("/comptabilite/ecritures/:id/corriger",  checkPermission("comptabilite", "corriger"),      corrigerEcritureHandler);
 router.get("/comptabilite/ecritures/:id/historique",checkPermission("comptabilite", "voir_historique_corrections"), getHistoriqueEcritureHandler);
+
+// ─── Veille IA — anomalies comptables ─────────────────────────────────────────
+router.get("/comptabilite/anomalies-ia",            checkPermission("comptabilite", "voir_anomalies_ia"), getAnomaliesIA);
+router.put("/comptabilite/anomalies-ia/tout-lire",  checkPermission("comptabilite", "voir_anomalies_ia"), marquerToutesLues);
+router.put("/comptabilite/anomalies-ia/:id/lire",   checkPermission("comptabilite", "voir_anomalies_ia"), marquerLue);
 
 export default router;

@@ -123,6 +123,8 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     // Corrections d'écritures
     corriger:                         ["pca", "directeur", "comptable"],
     voir_historique_corrections:      ["pca", "directeur", "comptable", "auditeur"],
+    // Veille IA anomalies comptables
+    voir_anomalies_ia:                ["comptable"],
   },
 
   // MODULE M06 — REPORTING
