@@ -2751,11 +2751,16 @@ interface ApercuCloture {
 }
 
 // ─── Types régularisations ────────────────────────────────────────────────────
+// SYSCOHADA OHADA : comptes régularisation
+// 408 = Fournisseurs, factures non parvenues (charges à payer)
+// 4487 = Clients, produits à recevoir  (souvent 418 en PCG français mais 4487 en SYSCOHADA)
+// 486 = Charges constatées d'avance
+// 487 = Produits constatés d'avance
 const TYPES_REGUL = [
-  { code: "408", label: "408 — Charges à payer",            exemple: "Facture énergie déc. non reçue",    compteHint: "6xx (charge, ex: 624)",  debitSide: "contrepartie" },
-  { code: "418", label: "418 — Produits à recevoir",         exemple: "Intérêts courus sur placement",     compteHint: "7xx (produit, ex: 771)", debitSide: "fixe" },
-  { code: "486", label: "486 — Produits constatés d'avance", exemple: "Acompte reçu pour livraison N+1",   compteHint: "7xx (produit, ex: 701)", debitSide: "contrepartie" },
-  { code: "487", label: "487 — Charges constatées d'avance", exemple: "Prime d'assurance payée pour N+1",  compteHint: "6xx (charge, ex: 616)",  debitSide: "fixe" },
+  { code: "408", label: "Charges à payer",             defaultRegul: "408",  exemple: "Facture énergie déc. non reçue",   compteHint: "6xx (charge)",  debitSide: "contrepartie" },
+  { code: "418", label: "Produits à recevoir",          defaultRegul: "4487", exemple: "Intérêts courus sur placement",    compteHint: "7xx (produit)", debitSide: "fixe" },
+  { code: "486", label: "Charges constatées d'avance",  defaultRegul: "486",  exemple: "Prime d'assurance payée pour N+1", compteHint: "6xx (charge)",  debitSide: "fixe" },
+  { code: "487", label: "Produits constatés d'avance",  defaultRegul: "487",  exemple: "Acompte reçu pour livraison N+1",  compteHint: "7xx (produit)", debitSide: "contrepartie" },
 ] as const;
 
 type TypeRegul = typeof TYPES_REGUL[number]["code"];
@@ -2777,12 +2782,18 @@ function OngletCloture() {
   const [resultat, setResultat]     = useState<{ message: string; ecrituresGenerees: number; soldes: ApercuCloture["soldes"] } | null>(null);
 
   // ── Régularisations ────────────────────────────────────────────────────────
-  const [rType,    setRType]    = useState<TypeRegul>("408");
-  const [rCompte,  setRCompte]  = useState("");
-  const [rLibelle, setRLibelle] = useState("");
-  const [rMontant, setRMontant] = useState(0);
-  const [rLoading, setRLoading] = useState(false);
+  const [rType,      setRType]      = useState<TypeRegul>("408");
+  const [rCompteRegul, setRCompteRegul] = useState(TYPES_REGUL[0].defaultRegul);
+  const [rCompte,    setRCompte]    = useState("");
+  const [rLibelle,   setRLibelle]   = useState("");
+  const [rMontant,   setRMontant]   = useState(0);
+  const [rLoading,   setRLoading]   = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const handleSetRType = (code: TypeRegul) => {
+    setRType(code);
+    setRCompteRegul(TYPES_REGUL.find((t) => t.code === code)?.defaultRegul ?? code);
+  };
 
   const regulQuery = useQuery({
     queryKey: ["regularisations", annee],
@@ -2798,6 +2809,7 @@ function OngletCloture() {
     try {
       await apiPost("/api/comptabilite/regularisations", {
         type: rType, compteContrepartie: rCompte.trim(),
+        compteRegul: rCompteRegul.trim(),
         libelle: rLibelle.trim(), montantFcfa: rMontant,
         date: `${annee}-12-31`, exercice: annee,
       });
@@ -2957,14 +2969,20 @@ function OngletCloture() {
               <div className="grid grid-cols-2 gap-2">
                 {TYPES_REGUL.map((t) => (
                   <button key={t.code} type="button"
-                    onClick={() => setRType(t.code)}
+                    onClick={() => handleSetRType(t.code)}
                     className={`text-left px-3 py-2 rounded-lg border text-xs transition-colors ${rType === t.code ? "border-green-600 bg-green-50 text-green-800 font-semibold" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
-                    <span className="block font-mono font-bold">{t.code}</span>
-                    <span className="block text-gray-500 mt-0.5">{t.label.split("—")[1]?.trim()}</span>
+                    <span className="block text-gray-500 font-medium">{t.label}</span>
                     <span className="block text-gray-400 mt-0.5 text-[10px]">{t.exemple}</span>
                   </button>
                 ))}
               </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Compte de régularisation <span className="text-gray-400">— modifiable si votre plan diffère</span>
+              </label>
+              <input value={rCompteRegul} onChange={(e) => setRCompteRegul(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-700" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -2973,11 +2991,11 @@ function OngletCloture() {
               <input value={rCompte} onChange={(e) => setRCompte(e.target.value)}
                 placeholder={TYPES_REGUL.find((t) => t.code === rType)?.compteHint}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
-              {rCompte && (
+              {rCompte && rCompteRegul && (
                 <p className="text-xs text-gray-400 mt-1 font-mono">
                   {TYPES_REGUL.find((t) => t.code === rType)?.debitSide === "contrepartie"
-                    ? `Débit ${rCompte} / Crédit ${rType}`
-                    : `Débit ${rType} / Crédit ${rCompte}`}
+                    ? `Débit ${rCompte} / Crédit ${rCompteRegul}`
+                    : `Débit ${rCompteRegul} / Crédit ${rCompte}`}
                 </p>
               )}
             </div>

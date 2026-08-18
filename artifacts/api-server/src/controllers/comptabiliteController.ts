@@ -675,9 +675,10 @@ export async function listRegularisations(req: Request, res: Response): Promise<
 export async function createRegularisation(req: Request, res: Response): Promise<void> {
   try {
     const coop = coopId(req);
-    const { type, compteContrepartie, libelle, montantFcfa, date, exercice } = req.body as {
+    const { type, compteContrepartie, compteRegul, libelle, montantFcfa, date, exercice } = req.body as {
       type: "408" | "418" | "486" | "487";
       compteContrepartie: string;
+      compteRegul?: string;           // compte fixe (côté régularisation), éditable par l'utilisateur
       libelle: string;
       montantFcfa: number;
       date: string;
@@ -691,9 +692,10 @@ export async function createRegularisation(req: Request, res: Response): Promise
       res.status(400).json({ erreur: "Champs manquants ou montant invalide" }); return;
     }
 
+    const compteFixe = (compteRegul ?? type).trim();
     const cfg = REGULARISATION_TYPES[type];
-    const compteDebit  = cfg.debitSide  === "fixe" ? type : compteContrepartie;
-    const compteCredit = cfg.creditSide === "fixe" ? type : compteContrepartie;
+    const compteDebit  = cfg.debitSide  === "fixe" ? compteFixe : compteContrepartie;
+    const compteCredit = cfg.creditSide === "fixe" ? compteFixe : compteContrepartie;
 
     const [inserted] = await db.insert(ecrituresComptablesTable).values({
       cooperativeId: coop,
