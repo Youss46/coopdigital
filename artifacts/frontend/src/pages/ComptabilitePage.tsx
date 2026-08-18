@@ -3678,6 +3678,11 @@ function ClotureSection() {
     queryFn: () => apiFetch<ExerciceStatut[]>("/api/comptabilite/exercices"),
   });
 
+  const historiqueAff = useQuery({
+    queryKey: ["historique-affectations"],
+    queryFn: () => apiFetch<HistoriqueAffectationRow[]>("/api/comptabilite/historique-affectations"),
+  });
+
   const statutAnnee = exercices?.find((e) => e.annee === annee)?.statut;
   const annees = Array.from({ length: 5 }, (_, i) => anneeActuelle - 1 - i);
 
