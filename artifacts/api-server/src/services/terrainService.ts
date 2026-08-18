@@ -462,6 +462,7 @@ export async function enregistrerCollecte(
     statutPaiement,
     montantRestant: String(montantNet),
     numeroLivraison,
+    planAvanceType: avance ? (data.avancePlanType ?? "integral") : null,
   }).returning();
 
   if (!livraison) throw new Error("Erreur lors de l'enregistrement de la collecte");

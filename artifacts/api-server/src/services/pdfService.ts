@@ -788,6 +788,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     montantNetFcfa: livraisonsTable.montantNetFcfa,
     statutPaiement: livraisonsTable.statutPaiement,
     sectionLivraison: livraisonsTable.sectionLivraison,
+    planAvanceType: livraisonsTable.planAvanceType,
     membreNom: membresTable.nom,
     membrePrenoms: membresTable.prenoms,
     membreCni: membresTable.numeroCni,
@@ -850,10 +851,24 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     y += 16;
   }
   y += 8;
+  // Libellé et couleur de la ligne avance selon le plan choisi
+  const planAvance = row.planAvanceType ?? "integral";
+  let avanceLabel: string;
+  let avanceBg: string;
+  if (planAvance === "reporte") {
+    avanceLabel = "Avance reportée (non déduite)";
+    avanceBg = "#fef9c3"; // jaune pâle
+  } else if (planAvance === "partiel") {
+    avanceLabel = "Avance déduite (partiel)";
+    avanceBg = "#fef3c7";
+  } else {
+    avanceLabel = "Avance déduite";
+    avanceBg = "#fffbeb";
+  }
   const recuLivTotaux: Array<[string, string, string]> = [
-    ["Montant brut",      formaterFCFA(row.montantBrutFcfa),             "#f9fafb"],
-    ["Avance déduite",   `- ${formaterFCFA(row.avanceDeduiteFcfa)}`,     "#fffbeb"],
-    ["Intrants déduits", `- ${formaterFCFA(row.intrantsDeduitsFcfa)}`,   "#fff7ed"],
+    ["Montant brut",      formaterFCFA(row.montantBrutFcfa),                                                     "#f9fafb"],
+    [avanceLabel,         planAvance === "reporte" ? "—" : `- ${formaterFCFA(row.avanceDeduiteFcfa)}`,           avanceBg],
+    ["Intrants déduits",  `- ${formaterFCFA(row.intrantsDeduitsFcfa)}`,                                          "#fff7ed"],
   ];
   for (const [label, val, bg] of recuLivTotaux) {
     doc.rect(MARGIN, y, 370, 18).fill(bg);

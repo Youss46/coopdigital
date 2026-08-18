@@ -55,6 +55,10 @@ export const livraisonsTable = pgTable("livraisons", {
   statutPaiement:       text("statut_paiement").default("PAYÉ"),
   montantRestant:       numeric("montant_restant", { precision: 12, scale: 2 }).default("0"),
   datePaiementPrevue:   date("date_paiement_prevue", { mode: "string" }),
+
+  // Plan de déduction d'avance choisi au moment de la livraison
+  // "integral" (défaut) | "partiel" | "reporte"
+  planAvanceType:       text("plan_avance_type"),
 });
 
 export const insertLivraisonSchema = createInsertSchema(livraisonsTable).omit({
