@@ -642,7 +642,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
           <div><div className="t-header__title">Pesée groupée</div></div>
         </header>
         <main className="t-main" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
-          <div style={{ textAlign: "center", color: "#94a3b8" }}>
+          <div style={{ textAlign: "center", color: "var(--t-muted)" }}>
             <div style={{ fontSize: "2rem", marginBottom: 12 }}>⏳</div>
             <div style={{ fontSize: ".9rem" }}>Chargement de la session…</div>
           </div>
@@ -675,18 +675,18 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
         {step === "membre" && (
           <>
             {!isOnline && (
-              <div className="t-card" style={{ margin: "16px 16px 0", borderLeft: "4px solid #3b82f6", background: "#1a2d3a" }}>
-                <div style={{ color: "#93c5fd", fontWeight: 700, fontSize: ".9rem" }}>
+              <div className="t-card" style={{ margin: "16px 16px 0", borderLeft: "4px solid var(--t-info)", background: "var(--t-info-bg)" }}>
+                <div style={{ color: "var(--t-info)", fontWeight: 700, fontSize: ".9rem" }}>
                   📴 Mode hors ligne
                 </div>
-                <div style={{ color: "#94a3b8", fontSize: ".8rem", marginTop: 4 }}>
+                <div style={{ color: "var(--t-muted)", fontSize: ".8rem", marginTop: 4 }}>
                   Sélectionnez un planteur pour démarrer une pesée. Elle sera synchronisée à la reconnexion.
                 </div>
               </div>
             )}
             {erreur && (
-              <div className="t-card" style={{ margin: "12px 16px 0", borderLeft: "4px solid #ef4444", background: "#1a2020" }}>
-                <span style={{ color: "#ef4444", fontSize: ".85rem" }}>⚠️ {erreur}</span>
+              <div className="t-card" style={{ margin: "12px 16px 0", borderLeft: "4px solid var(--t-danger)", background: "var(--t-danger-bg)" }}>
+                <span style={{ color: "var(--t-danger)", fontSize: ".85rem" }}>⚠️ {erreur}</span>
               </div>
             )}
             <FournisseurSearch
@@ -703,22 +703,22 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
           <>
             {/* Info membre OU info transfert */}
             {session.operation === "reception_transfert" ? (
-              <div className="t-card" style={{ margin: "16px 16px 8px", borderLeft: "4px solid #3b82f6", background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)", padding: 0, overflow: "hidden" }}>
+              <div className="t-card" style={{ margin: "16px 16px 8px", borderLeft: "4px solid var(--t-info)", background: "var(--t-card)", padding: 0, overflow: "hidden" }}>
                 {/* Titre */}
-                <div style={{ background: "rgba(59,130,246,.12)", padding: "10px 14px", borderBottom: "1px solid rgba(59,130,246,.2)", display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ background: "var(--t-info-bg)", padding: "10px 14px", borderBottom: "1px solid var(--t-border)", display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: "1.2rem" }}>🚛</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: ".68rem", color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>Réception de transfert</div>
-                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: "#e2e8f0" }}>
+                    <div style={{ fontSize: ".68rem", color: "var(--t-info)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>Réception de transfert</div>
+                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: "var(--t-text)" }}>
                       {session.transfertNumero ?? `Session ${session.numeroSession}`}
                     </div>
                   </div>
                 </div>
                 {/* Métriques */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, borderBottom: "1px solid rgba(255,255,255,.05)" }}>
-                  <div style={{ padding: "10px 14px", borderRight: "1px solid rgba(255,255,255,.05)" }}>
-                    <div style={{ fontSize: ".68rem", color: "#64748b", marginBottom: 2 }}>Poids déclaré</div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#22c55e" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, borderBottom: "1px solid var(--t-border)" }}>
+                  <div style={{ padding: "10px 14px", borderRight: "1px solid var(--t-border)" }}>
+                    <div style={{ fontSize: ".68rem", color: "var(--t-muted)", marginBottom: 2 }}>Poids déclaré</div>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--t-success)" }}>
                       {session.transfertPoidsDeclaréKg
                         ? (parseFloat(session.transfertPoidsDeclaréKg) >= 1000
                             ? (parseFloat(session.transfertPoidsDeclaréKg) / 1000).toFixed(2) + " T"
@@ -727,30 +727,30 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                     </div>
                   </div>
                   <div style={{ padding: "10px 14px" }}>
-                    <div style={{ fontSize: ".68rem", color: "#64748b", marginBottom: 2 }}>Sacs déclarés</div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f59e0b" }}>
+                    <div style={{ fontSize: ".68rem", color: "var(--t-muted)", marginBottom: 2 }}>Sacs déclarés</div>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--t-warning)" }}>
                       {session.transfertNombreSacs ?? "—"}
                     </div>
                   </div>
                 </div>
                 {/* Source */}
                 <div style={{ padding: "8px 14px" }}>
-                  <div style={{ fontSize: ".7rem", color: "#64748b" }}>
+                  <div style={{ fontSize: ".7rem", color: "var(--t-muted)" }}>
                     <span>Source : </span>
-                    <span style={{ color: "#93c5fd", fontWeight: 600 }}>
+                    <span style={{ color: "var(--t-info)", fontWeight: 600 }}>
                       {session.transfertEntrepotNom ?? "Entrepôt délégué"}
                       {session.transfertZoneNom ? ` · ${session.transfertZoneNom}` : ""}
                     </span>
                   </div>
                   {(session.transfertDelegueNom ?? session.transfertDeleguePrenoms) && (
-                    <div style={{ fontSize: ".7rem", color: "#64748b", marginTop: 2 }}>
+                    <div style={{ fontSize: ".7rem", color: "var(--t-muted)", marginTop: 2 }}>
                       <span>Délégué : </span>
-                      <span style={{ color: "#94a3b8", fontWeight: 600 }}>
+                      <span style={{ color: "var(--t-text)", fontWeight: 600 }}>
                         {session.transfertDelegueNom ?? ""} {session.transfertDeleguePrenoms ?? ""}
                       </span>
                     </div>
                   )}
-                  <div style={{ fontSize: ".65rem", color: "#475569", marginTop: 4 }}>Session · {session.numeroSession}</div>
+                  <div style={{ fontSize: ".65rem", color: "var(--t-muted)", marginTop: 4 }}>Session · {session.numeroSession}</div>
                 </div>
               </div>
             ) : fournisseur && (
@@ -764,36 +764,36 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
             {/* Bannière hors ligne */}
             {brouillon && (
-              <div style={{ margin: "0 16px 8px", background: "#1a2d1a", borderLeft: "3px solid #f59e0b", borderRadius: 8, padding: "8px 12px" }}>
-                <span style={{ color: "#f59e0b", fontSize: ".82rem", fontWeight: 600 }}>
+              <div style={{ margin: "0 16px 8px", background: "var(--t-warning-bg)", borderLeft: "3px solid var(--t-warning)", borderRadius: 8, padding: "8px 12px" }}>
+                <span style={{ color: "var(--t-warning)", fontSize: ".82rem", fontWeight: 600 }}>
                   📴 Pesée hors ligne — sera synchronisée à la reconnexion
                 </span>
               </div>
             )}
 
             {/* Cumul session */}
-            <div className="t-card" style={{ margin: "0 16px 8px", background: "linear-gradient(135deg, #0f2417 0%, #1a3a28 100%)" }}>
-              <div style={{ fontSize: ".72rem", color: "#4ade80", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
+            <div className="t-card" style={{ margin: "0 16px 8px", background: "var(--t-primary-light)", border: "1px solid var(--t-border)" }}>
+              <div style={{ fontSize: ".72rem", color: "var(--t-primary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
                 Cumul session
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, textAlign: "center" }}>
                 <div>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#fff" }}>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--t-primary)" }}>
                     {session.lignes.length}
                   </div>
-                  <div style={{ fontSize: ".68rem", color: "#86efac" }}>Pesée{session.lignes.length > 1 ? "s" : ""}</div>
+                  <div style={{ fontSize: ".68rem", color: "var(--t-muted)" }}>Pesée{session.lignes.length > 1 ? "s" : ""}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#fff" }}>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--t-primary)" }}>
                     {session.nbSacsTotal}
                   </div>
-                  <div style={{ fontSize: ".68rem", color: "#86efac" }}>Sacs</div>
+                  <div style={{ fontSize: ".68rem", color: "var(--t-muted)" }}>Sacs</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#22c55e" }}>
+                  <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--t-success)" }}>
                     {fmtPoids(poidsTotalNum)}
                   </div>
-                  <div style={{ fontSize: ".68rem", color: "#86efac" }}>Total net</div>
+                  <div style={{ fontSize: ".68rem", color: "var(--t-muted)" }}>Total net</div>
                 </div>
               </div>
             </div>
@@ -801,7 +801,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             {/* Lignes existantes */}
             {session.lignes.length > 0 && (
               <div style={{ margin: "0 16px 8px" }}>
-                <div style={{ fontSize: ".72rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
+                <div style={{ fontSize: ".72rem", color: "var(--t-muted)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
                   Pesées enregistrées
                 </div>
                 {session.lignes.map((l) => {
@@ -809,29 +809,29 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                   return (
                     <div key={l.id} style={{
                       display: "flex", alignItems: "center", gap: 10,
-                      background: "#1e2d3a", borderRadius: 10, padding: "10px 12px", marginBottom: 6,
+                      background: "var(--t-bg)", border: "1px solid var(--t-border)", borderRadius: 10, padding: "10px 12px", marginBottom: 6,
                     }}>
                       <div style={{
-                        width: 28, height: 28, borderRadius: "50%", background: "#1a4731",
+                        width: 28, height: 28, borderRadius: "50%", background: "var(--t-primary-light)",
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: ".75rem", fontWeight: 800, color: "#4ade80", flexShrink: 0,
+                        fontSize: ".75rem", fontWeight: 800, color: "var(--t-primary)", flexShrink: 0,
                       }}>
                         {l.numeroPassage}
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: ".88rem", fontWeight: 700, color: "#fff" }}>
+                        <div style={{ fontSize: ".88rem", fontWeight: 700, color: "var(--t-text)" }}>
                           {fmtPoids(net)}
-                          {l.nbSacs > 0 && <span style={{ color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>· {l.nbSacs} sac{l.nbSacs > 1 ? "s" : ""}</span>}
+                          {l.nbSacs > 0 && <span style={{ color: "var(--t-muted)", fontWeight: 400, marginLeft: 6 }}>· {l.nbSacs} sac{l.nbSacs > 1 ? "s" : ""}</span>}
                         </div>
                         {parseFloat(l.tareKg ?? "0") > 0 && (
-                          <div style={{ fontSize: ".72rem", color: "#64748b" }}>
+                          <div style={{ fontSize: ".72rem", color: "var(--t-muted)" }}>
                             Brut {parseFloat(l.poidsBrutKg).toFixed(3)} kg − tare {parseFloat(l.tareKg ?? "0").toFixed(3)} kg
                           </div>
                         )}
                       </div>
                       <button
                         onClick={() => handleSupprimerLigne(l.id)}
-                        style={{ background: "none", border: "none", color: "#ef4444", fontSize: "1rem", cursor: "pointer", padding: 4 }}
+                        style={{ background: "none", border: "none", color: "var(--t-danger)", fontSize: "1rem", cursor: "pointer", padding: 4 }}
                         title="Supprimer cette pesée"
                       >
                         ✕
@@ -844,7 +844,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
             {/* Formulaire nouvelle pesée */}
             <div className="t-form" style={{ margin: "0 16px" }}>
-              <div style={{ fontSize: ".75rem", color: "#4ade80", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>
+              <div style={{ fontSize: ".75rem", color: "var(--t-primary)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>
                 ⊕ Nouveau passage
               </div>
 
@@ -961,23 +961,23 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             <div style={{ fontSize: "3rem", marginBottom: 12 }}>
               {isTransfertReception ? "⚖️" : livraisonResult ? "🎉" : "✅"}
             </div>
-            <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "#22c55e", marginBottom: 4 }}>
+            <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--t-success)", marginBottom: 4 }}>
               {isTransfertReception ? "Pesée de réception clôturée" : livraisonResult ? "Livraison créée" : "Pesée terminée"}
             </div>
-            <div style={{ fontSize: ".82rem", color: "#94a3b8", fontFamily: "monospace", marginBottom: 20 }}>
+            <div style={{ fontSize: ".82rem", color: "var(--t-muted)", fontFamily: "monospace", marginBottom: 20 }}>
               {sessionTerminee.numeroSession}
             </div>
 
             {/* Message spécifique réception de transfert */}
             {isTransfertReception && (
               <div style={{
-                background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.3)",
-                borderRadius: 10, padding: 14, marginBottom: 20, fontSize: ".85rem", color: "#86efac", textAlign: "left",
+                background: "var(--t-success-bg)", border: "1px solid var(--t-success)",
+                borderRadius: 10, padding: 14, marginBottom: 20, fontSize: ".85rem", color: "var(--t-success)", textAlign: "left",
               }}>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>
                   ✅ Poids officiel enregistré : {fmtPoids(parseFloat(String(sessionTerminee.poidsTotalKg)))}
                 </div>
-                <div style={{ fontSize: ".78rem", color: "#64748b" }}>
+                <div style={{ fontSize: ".78rem", color: "var(--t-muted)" }}>
                   Le transfert a été mis à jour avec le poids pesé. Le stock central a été crédité automatiquement (ou un litige a été ouvert si l'écart dépasse 0,5 %).
                 </div>
               </div>
@@ -1036,7 +1036,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             {/* ── Détail de la livraison (après conversion) ─────────────── */}
             {livraisonResult && (
               <div className="t-recap" style={{ textAlign: "left", marginBottom: 20, borderLeft: "4px solid #22c55e" }}>
-                <div style={{ fontSize: ".7rem", color: "#4ade80", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>
+                <div style={{ fontSize: ".7rem", color: "var(--t-success)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>
                   Décompte livraison
                 </div>
                 <div className="t-recap-row">
@@ -1081,7 +1081,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                   La pesée sera envoyée au serveur dès le retour du réseau. La conversion en livraison sera possible une fois synchronisée.
                 </div>
                 {brouillon.syncStatus === "error" && brouillon.errorMsg && (
-                  <div style={{ fontSize: ".76rem", color: "#fca5a5", background: "#2d1a1a", borderRadius: 6, padding: "6px 10px" }}>
+                  <div style={{ fontSize: ".76rem", color: "var(--t-danger)", background: "var(--t-danger-bg)", borderRadius: 6, padding: "6px 10px" }}>
                     ⚠️ Erreur lors de la synchronisation : {brouillon.errorMsg}
                   </div>
                 )}
@@ -1096,15 +1096,15 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             {/* Détail lignes */}
             {!livraisonResult && (sessionTerminee.lignes?.length ?? 0) > 0 && (
               <div style={{ textAlign: "left", marginBottom: 20 }}>
-                <div style={{ fontSize: ".7rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
+                <div style={{ fontSize: ".7rem", color: "var(--t-muted)", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
                   Détail des passages
                 </div>
                 {sessionTerminee.lignes.map((l) => {
                   const net = parseFloat(l.poidsBrutKg) - parseFloat(l.tareKg ?? "0");
                   return (
-                    <div key={l.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1e2d3a", fontSize: ".85rem" }}>
-                      <span style={{ color: "#94a3b8" }}>Passage {l.numeroPassage} · {l.nbSacs} sac{l.nbSacs !== 1 ? "s" : ""}</span>
-                      <span style={{ color: "#fff", fontWeight: 600 }}>{net.toFixed(3)} kg</span>
+                    <div key={l.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--t-border)", fontSize: ".85rem" }}>
+                      <span style={{ color: "var(--t-muted)" }}>Passage {l.numeroPassage} · {l.nbSacs} sac{l.nbSacs !== 1 ? "s" : ""}</span>
+                      <span style={{ color: "var(--t-text)", fontWeight: 600 }}>{net.toFixed(3)} kg</span>
                     </div>
                   );
                 })}
@@ -1217,7 +1217,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             {!brouillon && !isTransfertReception && !livraisonResult && !sessionTerminee?.livraisonId && isOnline && (
               <button
                 className="t-btn t-btn--primary"
-                style={{ width: "100%", marginBottom: 10, background: "linear-gradient(135deg, #16a34a, #15803d)" }}
+                style={{ width: "100%", marginBottom: 10 }}
                 onClick={ouvrirConvertirModal}
               >
                 📦 Convertir en livraison
@@ -1250,12 +1250,12 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
       {/* Modal confirmation terminer */}
       {confirmTerminer && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
-          <div style={{ background: "#1e2d3a", width: "100%", borderRadius: "18px 18px 0 0", padding: 24 }}>
-            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#fff", marginBottom: 8, textAlign: "center" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: "var(--t-card)", width: "100%", borderRadius: "18px 18px 0 0", padding: 24, boxShadow: "0 -4px 20px rgba(0,0,0,.15)" }}>
+            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--t-text)", marginBottom: 8, textAlign: "center" }}>
               Terminer la pesée ?
             </div>
-            <div style={{ fontSize: ".85rem", color: "#94a3b8", textAlign: "center", marginBottom: 20 }}>
+            <div style={{ fontSize: ".85rem", color: "var(--t-muted)", textAlign: "center", marginBottom: 20 }}>
               {session?.nbSacsTotal} sacs · {fmtPoids(poidsTotalNum)} total net
               <br />Cette action est irréversible.
             </div>
@@ -1272,12 +1272,12 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
       {/* Modal confirmation convertir en livraison */}
       {confirmConvertir && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
-          <div style={{ background: "#1e2d3a", width: "100%", borderRadius: "18px 18px 0 0", padding: 24 }}>
-            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#22c55e", marginBottom: 8, textAlign: "center" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: "var(--t-card)", width: "100%", borderRadius: "18px 18px 0 0", padding: 24, boxShadow: "0 -4px 20px rgba(0,0,0,.15)" }}>
+            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--t-success)", marginBottom: 8, textAlign: "center" }}>
               📦 Convertir en livraison
             </div>
-            <div style={{ fontSize: ".85rem", color: "#94a3b8", textAlign: "center", marginBottom: 16 }}>
+            <div style={{ fontSize: ".85rem", color: "var(--t-muted)", textAlign: "center", marginBottom: 16 }}>
               {sessionTerminee?.membreNom} {sessionTerminee?.membrePrenoms}<br />
               {fmtPoids(parseFloat(String(sessionTerminee?.poidsTotalKg ?? 0)))} · {sessionTerminee?.nbSacsTotal} sacs
             </div>
@@ -1295,7 +1295,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               const net = Math.max(0, brut - avance - intrants);
               return (
                 <div className="t-recap" style={{ marginBottom: 16, borderLeft: "4px solid #22c55e" }}>
-                  <div style={{ fontSize: ".68rem", color: "#4ade80", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>
+                  <div style={{ fontSize: ".68rem", color: "var(--t-success)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>
                     Estimation (prix actuel : {estimePrixUnitaire.toLocaleString("fr-FR")} FCFA/kg)
                   </div>
                   <div className="t-recap-row">
@@ -1346,12 +1346,12 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
       {/* Modal confirmation annuler */}
       {confirmAnnuler && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
-          <div style={{ background: "#1e2d3a", width: "100%", borderRadius: "18px 18px 0 0", padding: 24 }}>
-            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#ef4444", marginBottom: 8, textAlign: "center" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: "var(--t-card)", width: "100%", borderRadius: "18px 18px 0 0", padding: 24, boxShadow: "0 -4px 20px rgba(0,0,0,.15)" }}>
+            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--t-danger)", marginBottom: 8, textAlign: "center" }}>
               Annuler la session ?
             </div>
-            <div style={{ fontSize: ".85rem", color: "#94a3b8", textAlign: "center", marginBottom: 20 }}>
+            <div style={{ fontSize: ".85rem", color: "var(--t-muted)", textAlign: "center", marginBottom: 20 }}>
               Toutes les pesées enregistrées seront perdues.
             </div>
             <button className="t-btn t-btn--ghost" style={{ width: "100%", color: "#ef4444", borderColor: "#ef4444", marginBottom: 10 }}

@@ -19,7 +19,7 @@ function formatMontant(n: number) {
 function statutStyle(s: string): { color: string; bg: string; label: string } {
   if (s === "PAYÉ") return { color: "#16a34a", bg: "rgba(22,163,74,.12)", label: "Payé" };
   if (s === "DIFFÉRÉ") return { color: "#f59e0b", bg: "rgba(245,158,11,.12)", label: "Différé" };
-  return { color: "#94a3b8", bg: "rgba(148,163,184,.1)", label: s };
+  return { color: "var(--t-muted)", bg: "rgba(148,163,184,.1)", label: s };
 }
 
 export default function HistoriquePeseur() {
@@ -96,7 +96,7 @@ export default function HistoriquePeseur() {
       <main className="t-main" style={{ paddingBottom: 24 }}>
         {/* Bannière hors-ligne/cache */}
         {(fromCache || !isOnline) && (
-          <div style={{ margin: "0 0 12px", padding: "8px 14px", background: "#1e2d45", borderLeft: "3px solid #f59e0b", borderRadius: 8, fontSize: ".8rem", color: "#f59e0b" }}>
+          <div style={{ margin: "0 0 12px", padding: "8px 14px", background: "var(--t-warning-bg)", borderLeft: "3px solid var(--t-warning)", borderRadius: 8, fontSize: ".8rem", color: "var(--t-warning)" }}>
             📡 {isOnline ? "Données en cache — actualisation en cours…" : "Hors ligne — données en cache"}
           </div>
         )}
@@ -121,7 +121,7 @@ export default function HistoriquePeseur() {
 
         {/* Erreur chargement */}
         {erreur && (
-          <div style={{ margin: "0 0 12px", padding: "10px 14px", background: "rgba(220,38,38,.12)", border: "1px solid rgba(220,38,38,.3)", borderRadius: 8, fontSize: ".85rem", color: "#f87171" }}>
+          <div style={{ margin: "0 0 12px", padding: "10px 14px", background: "var(--t-danger-bg)", border: "1px solid var(--t-danger)", borderRadius: 8, fontSize: ".85rem", color: "var(--t-danger)" }}>
             ⚠️ {erreur}
           </div>
         )}
@@ -129,7 +129,7 @@ export default function HistoriquePeseur() {
         {/* Erreur téléchargement reçu */}
         {downloadErreur && (
           <div
-            style={{ margin: "0 0 12px", padding: "10px 14px", background: "rgba(220,38,38,.12)", border: "1px solid rgba(220,38,38,.3)", borderRadius: 8, fontSize: ".85rem", color: "#f87171", cursor: "pointer" }}
+            style={{ margin: "0 0 12px", padding: "10px 14px", background: "var(--t-danger-bg)", border: "1px solid var(--t-danger)", borderRadius: 8, fontSize: ".85rem", color: "var(--t-danger)", cursor: "pointer" }}
             onClick={() => setDownloadErreur(null)}
           >
             ⚠️ {downloadErreur} — appuyez pour fermer
@@ -181,11 +181,11 @@ export default function HistoriquePeseur() {
                       </>
                     )}
                     <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: ".82rem", color: "#e2e8f0" }}>
+                      <span style={{ fontSize: ".82rem", color: "var(--t-text)" }}>
                         🌿 {c.poidsKg.toLocaleString("fr-FR")} kg
                       </span>
                       {!isTransfert && (
-                        <span style={{ fontSize: ".82rem", color: "#e2e8f0" }}>
+                        <span style={{ fontSize: ".82rem", color: "var(--t-text)" }}>
                           💵 {formatMontant(c.montantNetFcfa)}
                         </span>
                       )}
@@ -204,8 +204,8 @@ export default function HistoriquePeseur() {
                         {c.planAvanceType === "reporte" && (
                           <span style={{
                             fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
-                            color: "#fbbf24", background: "rgba(251,191,36,.12)",
-                            border: "1px solid rgba(251,191,36,.35)",
+                            color: "var(--t-warning)", background: "var(--t-warning-bg)",
+                            border: "1px solid var(--t-warning)",
                           }}>
                             ⏸ Avance reportée
                           </span>
@@ -249,10 +249,10 @@ export default function HistoriquePeseur() {
                         }}
                         style={{
                           marginTop: 2,
-                          background: downloadingId === c.id ? "rgba(255,255,255,.08)" : "rgba(99,210,132,.18)",
-                          border: "1px solid rgba(99,210,132,.35)",
+                          background: downloadingId === c.id ? "var(--t-bg)" : "var(--t-success-bg)",
+                          border: "1px solid var(--t-success)",
                           borderRadius: 8,
-                          color: downloadingId === c.id ? "var(--t-muted)" : "#63d284",
+                          color: downloadingId === c.id ? "var(--t-muted)" : "var(--t-success)",
                           fontSize: ".7rem",
                           fontWeight: 700,
                           padding: "4px 10px",
@@ -278,10 +278,10 @@ export default function HistoriquePeseur() {
                         }}
                         style={{
                           marginTop: 2,
-                          background: downloadingId === c.id ? "rgba(255,255,255,.08)" : "rgba(26,71,49,.4)",
-                          border: "1px solid rgba(99,210,132,.35)",
+                          background: downloadingId === c.id ? "var(--t-bg)" : "var(--t-primary-light)",
+                          border: "1px solid var(--t-success)",
                           borderRadius: 8,
-                          color: downloadingId === c.id ? "var(--t-muted)" : "#63d284",
+                          color: downloadingId === c.id ? "var(--t-muted)" : "var(--t-primary)",
                           fontSize: ".7rem",
                           fontWeight: 700,
                           padding: "4px 10px",

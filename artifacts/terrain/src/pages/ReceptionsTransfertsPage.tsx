@@ -33,9 +33,9 @@ function fmtDate(d: string | null): string {
   });
 }
 
-const STATUT_LABEL: Record<string, { label: string; color: string }> = {
-  arrive:   { label: "Arrivé — à peser", color: "#f59e0b" },
-  en_pesee: { label: "Pesée en cours",   color: "#3b82f6" },
+const STATUT_LABEL: Record<string, { label: string; color: string; bg: string }> = {
+  arrive:   { label: "Arrivé — à peser", color: "var(--t-warning)", bg: "var(--t-warning-bg)" },
+  en_pesee: { label: "Pesée en cours",   color: "var(--t-info)",    bg: "var(--t-info-bg)"    },
 };
 
 export default function ReceptionsTransfertsPage() {
@@ -121,58 +121,58 @@ export default function ReceptionsTransfertsPage() {
         {/* Bannière rôle */}
         {user && (
           <div style={{
-            background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+            background: "var(--t-card)",
             borderRadius: 12, padding: 12, marginBottom: 12,
-            border: "1px solid #1e3a5f", display: "flex", alignItems: "center", gap: 10,
+            border: "1px solid var(--t-border)", display: "flex", alignItems: "center", gap: 10,
           }}>
             <span style={{ fontSize: "1.4rem" }}>⚖️</span>
             <div>
-              <div style={{ fontWeight: 700, fontSize: ".88rem", color: "#e2e8f0" }}>{user.nom} {user.prenoms}</div>
-              <div style={{ fontSize: ".72rem", color: "#64748b" }}>Peseur — Base centrale · {user.cooperativeId ? `Coop #${user.cooperativeId}` : ""}</div>
+              <div style={{ fontWeight: 700, fontSize: ".88rem", color: "var(--t-text)" }}>{user.nom} {user.prenoms}</div>
+              <div style={{ fontSize: ".72rem", color: "var(--t-muted)" }}>Peseur — Base centrale · {user.cooperativeId ? `Coop #${user.cooperativeId}` : ""}</div>
             </div>
           </div>
         )}
 
         {/* Infobannière */}
         <div style={{
-          background: "rgba(59,130,246,.08)", border: "1px solid rgba(59,130,246,.3)",
-          borderRadius: 10, padding: 12, marginBottom: 16, fontSize: ".78rem", color: "#93c5fd",
+          background: "var(--t-info-bg)", border: "1px solid var(--t-info)",
+          borderRadius: 10, padding: 12, marginBottom: 16, fontSize: ".78rem", color: "var(--t-info)",
         }}>
           Les transferts expédiés par les délégués sont pesés sac par sac à la réception.
           Le poids pesé est le poids officiel enregistré en stock central.
         </div>
 
         {loading && (
-          <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>
+          <div style={{ textAlign: "center", color: "var(--t-muted)", padding: 40 }}>
             Chargement…
           </div>
         )}
 
         {error && (
-          <div style={{ background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.3)", borderRadius: 10, padding: 12, color: "#fca5a5", marginBottom: 12 }}>
+          <div style={{ background: "var(--t-danger-bg)", border: "1px solid var(--t-danger)", borderRadius: 10, padding: 12, color: "var(--t-danger)", marginBottom: 12 }}>
             {error}
-            <button onClick={reload} style={{ marginLeft: 8, background: "none", border: "none", color: "#93c5fd", cursor: "pointer", fontSize: ".85rem" }}>Réessayer</button>
+            <button onClick={reload} style={{ marginLeft: 8, background: "none", border: "none", color: "var(--t-info)", cursor: "pointer", fontSize: ".85rem" }}>Réessayer</button>
           </div>
         )}
 
         {!loading && !error && transferts.length === 0 && (
           <div style={{
-            background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+            background: "var(--t-card)",
             borderRadius: 14, padding: 32, textAlign: "center",
-            border: "1px solid #1e293b",
+            border: "1px solid var(--t-border)",
           }}>
             <div style={{ fontSize: "2.5rem", marginBottom: 12 }}>✅</div>
-            <div style={{ fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
+            <div style={{ fontWeight: 700, color: "var(--t-text)", marginBottom: 4 }}>
               Aucun transfert en attente
             </div>
-            <div style={{ fontSize: ".78rem", color: "#64748b" }}>
+            <div style={{ fontSize: ".78rem", color: "var(--t-muted)" }}>
               Les transferts arrivés apparaîtront ici dès qu'un délégué les a signalés.
             </div>
           </div>
         )}
 
         {transferts.map((t) => {
-          const statutInfo = STATUT_LABEL[t.statut] ?? { label: t.statut, color: "#94a3b8" };
+          const statutInfo = STATUT_LABEL[t.statut] ?? { label: t.statut, color: "var(--t-muted)", bg: "var(--t-bg)" };
           const isBusy = busy === t.id;
           const poidsKg = parseFloat(String(t.poidsDepart_kg ?? 0));
 
@@ -180,24 +180,24 @@ export default function ReceptionsTransfertsPage() {
             <div key={t.id} className="t-card" style={{ marginBottom: 12, padding: 0, overflow: "hidden" }}>
               {/* Header carte */}
               <div style={{
-                background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+                background: "var(--t-bg)",
                 padding: "12px 16px",
-                borderBottom: "1px solid rgba(255,255,255,.05)",
+                borderBottom: "1px solid var(--t-border)",
                 display: "flex", alignItems: "center", gap: 10,
               }}>
                 <span style={{ fontSize: "1.4rem" }}>🚛</span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800, fontSize: ".92rem", color: "#e2e8f0" }}>
+                  <div style={{ fontWeight: 800, fontSize: ".92rem", color: "var(--t-text)" }}>
                     {t.numeroTransfert}
                   </div>
-                  <div style={{ fontSize: ".72rem", color: "#64748b", marginTop: 2 }}>
+                  <div style={{ fontSize: ".72rem", color: "var(--t-muted)", marginTop: 2 }}>
                     {t.entrepotNom ?? "Entrepôt délégué"} · {t.zoneNom ?? ""}
                   </div>
                 </div>
                 <span style={{
-                  background: "rgba(0,0,0,.4)", borderRadius: 6, padding: "3px 8px",
+                  background: statutInfo.bg, borderRadius: 6, padding: "3px 8px",
                   fontSize: ".7rem", fontWeight: 700, color: statutInfo.color,
-                  border: `1px solid ${statutInfo.color}40`,
+                  border: `1px solid ${statutInfo.color}`,
                 }}>
                   {statutInfo.label}
                 </span>
@@ -208,35 +208,35 @@ export default function ReceptionsTransfertsPage() {
                 {/* Poids + sacs */}
                 <div style={{ display: "flex", gap: 16, marginBottom: 10 }}>
                   <div style={{ flex: 1, textAlign: "center" }}>
-                    <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#22c55e" }}>
+                    <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--t-success)" }}>
                       {fmtPoids(poidsKg)}
                     </div>
-                    <div style={{ fontSize: ".68rem", color: "#94a3b8" }}>Poids déclaré</div>
+                    <div style={{ fontSize: ".68rem", color: "var(--t-muted)" }}>Poids déclaré</div>
                   </div>
                   {t.nombreSacs != null && (
                     <div style={{ flex: 1, textAlign: "center" }}>
-                      <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#f59e0b" }}>
+                      <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--t-warning)" }}>
                         {t.nombreSacs}
                       </div>
-                      <div style={{ fontSize: ".68rem", color: "#94a3b8" }}>Sacs</div>
+                      <div style={{ fontSize: ".68rem", color: "var(--t-muted)" }}>Sacs</div>
                     </div>
                   )}
                 </div>
 
                 {/* Méta */}
-                <div style={{ fontSize: ".73rem", color: "#64748b", marginBottom: 4 }}>
+                <div style={{ fontSize: ".73rem", color: "var(--t-muted)", marginBottom: 4 }}>
                   <span>Délégué : </span>
-                  <span style={{ color: "#94a3b8", fontWeight: 600 }}>
+                  <span style={{ color: "var(--t-text)", fontWeight: 600 }}>
                     {t.delegueNom ?? "—"} {t.deleguePrenoms ?? ""}
                   </span>
                 </div>
                 {t.dateArrivee && (
-                  <div style={{ fontSize: ".73rem", color: "#64748b", marginBottom: 4 }}>
-                    Arrivée signalée : <span style={{ color: "#94a3b8" }}>{fmtDate(t.dateArrivee)}</span>
+                  <div style={{ fontSize: ".73rem", color: "var(--t-muted)", marginBottom: 4 }}>
+                    Arrivée signalée : <span style={{ color: "var(--t-text)" }}>{fmtDate(t.dateArrivee)}</span>
                   </div>
                 )}
                 {t.notes && (
-                  <div style={{ fontSize: ".73rem", color: "#64748b", fontStyle: "italic", marginBottom: 8 }}>
+                  <div style={{ fontSize: ".73rem", color: "var(--t-muted)", fontStyle: "italic", marginBottom: 8 }}>
                     « {t.notes} »
                   </div>
                 )}
@@ -270,8 +270,8 @@ export default function ReceptionsTransfertsPage() {
         <button
           onClick={reload}
           style={{
-            width: "100%", background: "transparent", border: "1px dashed #334155",
-            borderRadius: 10, color: "#64748b", padding: 10, fontSize: ".78rem", cursor: "pointer",
+            width: "100%", background: "transparent", border: "1px dashed var(--t-border)",
+            borderRadius: 10, color: "var(--t-muted)", padding: 10, fontSize: ".78rem", cursor: "pointer",
             marginTop: 8,
           }}
         >

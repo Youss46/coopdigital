@@ -82,32 +82,32 @@ export default function AccueilPeseur() {
             <div className="t-card__title" style={{ marginBottom: 10 }}>📊 Aujourd'hui</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#22c55e" }}>
+                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--t-success)" }}>
                   {bilan.collectes.nb}
                 </div>
-                <div style={{ fontSize: ".68rem", color: "#94a3b8", marginTop: 2 }}>
+                <div style={{ fontSize: ".68rem", color: "var(--t-muted)", marginTop: 2 }}>
                   Collecte{bilan.collectes.nb !== 1 ? "s" : ""}
                 </div>
               </div>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#3b82f6" }}>
+                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--t-info)" }}>
                   {fmtPoids(bilan.collectes.tonnage)}
                 </div>
-                <div style={{ fontSize: ".68rem", color: "#94a3b8", marginTop: 2 }}>
+                <div style={{ fontSize: ".68rem", color: "var(--t-muted)", marginTop: 2 }}>
                   Tonnage
                 </div>
               </div>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: ".95rem", fontWeight: 800, color: "#f59e0b", lineHeight: 1.3 }}>
+                <div style={{ fontSize: ".95rem", fontWeight: 800, color: "var(--t-warning)", lineHeight: 1.3 }}>
                   {bilan.collectes.valeur.toLocaleString("fr-FR")}
                 </div>
-                <div style={{ fontSize: ".68rem", color: "#94a3b8", marginTop: 2 }}>
+                <div style={{ fontSize: ".68rem", color: "var(--t-muted)", marginTop: 2 }}>
                   FCFA brut
                 </div>
               </div>
             </div>
             {bilan.collectes.nb === 0 && (
-              <div style={{ textAlign: "center", color: "#64748b", fontSize: ".8rem", marginTop: 8 }}>
+              <div style={{ textAlign: "center", color: "var(--t-muted)", fontSize: ".8rem", marginTop: 8 }}>
                 Aucune collecte enregistrée pour l'instant
               </div>
             )}
@@ -121,10 +121,8 @@ export default function AccueilPeseur() {
               <Link key={b.localId} href={`/pesee-session/b-${b.localId}`}>
                 <div className="t-card" style={{
                   marginBottom: 8,
-                  background: b.syncStatus === "error"
-                    ? "linear-gradient(135deg, #2d1a1a 0%, #3a1e1e 100%)"
-                    : "linear-gradient(135deg, #1a2a1a 0%, #1e3a20 100%)",
-                  borderLeft: `4px solid ${b.syncStatus === "error" ? "#ef4444" : "#f59e0b"}`,
+                  background: b.syncStatus === "error" ? "var(--t-danger-bg)" : "var(--t-warning-bg)",
+                  borderLeft: `4px solid ${b.syncStatus === "error" ? "var(--t-danger)" : "var(--t-warning)"}`,
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -132,20 +130,20 @@ export default function AccueilPeseur() {
                 }}>
                   <span style={{ fontSize: "1.6rem" }}>{b.syncStatus === "error" ? "⚠️" : "📴"}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: b.syncStatus === "error" ? "#fca5a5" : "#fcd34d" }}>
+                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: b.syncStatus === "error" ? "var(--t-danger)" : "var(--t-warning)" }}>
                       {b.statut === "terminee" ? "Pesée clôturée hors ligne" : "Pesée en cours hors ligne"}
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "#e2e8f0", marginTop: 2 }}>
+                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "var(--t-text)", marginTop: 2 }}>
                       {b.membreNom} {b.membrePrenoms}
                     </div>
-                    <div style={{ fontSize: ".72rem", color: "#64748b", marginTop: 2 }}>
+                    <div style={{ fontSize: ".72rem", color: "var(--t-muted)", marginTop: 2 }}>
                       {b.lignes.length} pesée{b.lignes.length !== 1 ? "s" : ""} · {b.poidsTotalKg.toFixed(1)} kg
                       {b.syncStatus === "error" && b.errorMsg && (
-                        <span style={{ color: "#ef4444", marginLeft: 6 }}>— {b.errorMsg}</span>
+                        <span style={{ color: "var(--t-danger)", marginLeft: 6 }}>— {b.errorMsg}</span>
                       )}
                     </div>
                   </div>
-                  <span style={{ fontSize: "1.1rem", color: b.syncStatus === "error" ? "#ef4444" : "#f59e0b" }}>›</span>
+                  <span style={{ fontSize: "1.1rem", color: b.syncStatus === "error" ? "var(--t-danger)" : "var(--t-warning)" }}>›</span>
                 </div>
               </Link>
             ))}
@@ -159,8 +157,8 @@ export default function AccueilPeseur() {
               <Link key={s.id} href={`/pesee-session/${s.id}`}>
                 <div className="t-card" style={{
                   marginBottom: 8,
-                  background: "linear-gradient(135deg, #1a2d4a 0%, #1e3a5f 100%)",
-                  borderLeft: "4px solid #3b82f6",
+                  background: "var(--t-info-bg)",
+                  borderLeft: "4px solid var(--t-info)",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -168,21 +166,21 @@ export default function AccueilPeseur() {
                 }}>
                   <span style={{ fontSize: "1.6rem" }}>▶</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: "#93c5fd" }}>
+                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: "var(--t-info)" }}>
                       Session en cours
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "#e2e8f0", marginTop: 2 }}>
+                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "var(--t-text)", marginTop: 2 }}>
                       {s.membreNom} {s.membrePrenoms}
                     </div>
-                    <div style={{ fontSize: ".72rem", color: "#64748b", marginTop: 2, fontFamily: "monospace" }}>
+                    <div style={{ fontSize: ".72rem", color: "var(--t-muted)", marginTop: 2, fontFamily: "monospace" }}>
                       {s.numeroSession} · {s.nbLignes ?? 0} pesée{(s.nbLignes ?? 0) !== 1 ? "s" : ""}
                     </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: ".85rem", fontWeight: 700, color: "#22c55e" }}>
+                    <div style={{ fontSize: ".85rem", fontWeight: 700, color: "var(--t-success)" }}>
                       Reprendre
                     </div>
-                    <span style={{ fontSize: "1.1rem", color: "#3b82f6" }}>›</span>
+                    <span style={{ fontSize: "1.1rem", color: "var(--t-info)" }}>›</span>
                   </div>
                 </div>
               </Link>
@@ -197,8 +195,8 @@ export default function AccueilPeseur() {
               <Link key={s.id} href={`/pesee-session/${s.id}`}>
                 <div className="t-card" style={{
                   marginBottom: 8,
-                  background: "linear-gradient(135deg, #1a2d14 0%, #1e3a1e 100%)",
-                  borderLeft: "4px solid #22c55e",
+                  background: "var(--t-success-bg)",
+                  borderLeft: "4px solid var(--t-success)",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -206,21 +204,21 @@ export default function AccueilPeseur() {
                 }}>
                   <span style={{ fontSize: "1.6rem" }}>📦</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: "#86efac" }}>
+                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: "var(--t-success)" }}>
                       Pesée clôturée · à convertir
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "#e2e8f0", marginTop: 2 }}>
+                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "var(--t-text)", marginTop: 2 }}>
                       {s.membreNom} {s.membrePrenoms}
                     </div>
-                    <div style={{ fontSize: ".72rem", color: "#64748b", marginTop: 2, fontFamily: "monospace" }}>
+                    <div style={{ fontSize: ".72rem", color: "var(--t-muted)", marginTop: 2, fontFamily: "monospace" }}>
                       {s.numeroSession} · {fmtPoids(parseFloat(s.poidsTotalKg))}
                     </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: ".85rem", fontWeight: 700, color: "#22c55e" }}>
+                    <div style={{ fontSize: ".85rem", fontWeight: 700, color: "var(--t-success)" }}>
                       Convertir
                     </div>
-                    <span style={{ fontSize: "1.1rem", color: "#22c55e" }}>›</span>
+                    <span style={{ fontSize: "1.1rem", color: "var(--t-success)" }}>›</span>
                   </div>
                 </div>
               </Link>
@@ -233,8 +231,8 @@ export default function AccueilPeseur() {
           <Link href="/receptions">
             <div className="t-card" style={{
               marginBottom: 12,
-              background: "linear-gradient(135deg, #172554 0%, #1e3a6e 100%)",
-              borderLeft: "4px solid #3b82f6",
+              background: "var(--t-info-bg)",
+              borderLeft: "4px solid var(--t-info)",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
@@ -242,14 +240,14 @@ export default function AccueilPeseur() {
             }}>
               <span style={{ fontSize: "1.8rem" }}>🚛</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 800, fontSize: ".95rem", color: "#93c5fd" }}>
+                <div style={{ fontWeight: 800, fontSize: ".95rem", color: "var(--t-info)" }}>
                   Réceptions de transferts
                 </div>
-                <div style={{ fontSize: ".75rem", color: "#64748b", marginTop: 2 }}>
+                <div style={{ fontSize: ".75rem", color: "var(--t-muted)", marginTop: 2 }}>
                   Peser les arrivages des délégués
                 </div>
               </div>
-              <span style={{ fontSize: "1.2rem", color: "#3b82f6" }}>›</span>
+              <span style={{ fontSize: "1.2rem", color: "var(--t-info)" }}>›</span>
             </div>
           </Link>
         )}
@@ -258,7 +256,7 @@ export default function AccueilPeseur() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <Link href="/collecte">
             <div className="t-card" style={{
-              background: "linear-gradient(135deg, #16a34a 0%, #15803d 100%)",
+              background: "var(--t-primary)",
               cursor: "pointer", textAlign: "center", padding: "18px 12px",
             }}>
               <span style={{ fontSize: "2rem" }}>⚖️</span>
@@ -272,7 +270,7 @@ export default function AccueilPeseur() {
           </Link>
           <Link href="/pesee-session">
             <div className="t-card" style={{
-              background: "linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)",
+              background: "var(--t-info)",
               cursor: "pointer", textAlign: "center", padding: "18px 12px",
             }}>
               <span style={{ fontSize: "2rem" }}>📦</span>
@@ -288,20 +286,20 @@ export default function AccueilPeseur() {
 
         {/* ── Opérations en attente de sync ────────────────────────────── */}
         {pendingCount > 0 && (
-          <div className="t-card" style={{ marginBottom: 12, borderLeft: "3px solid #f59e0b", background: "#1e2d45" }}>
+          <div className="t-card" style={{ marginBottom: 12, borderLeft: "3px solid var(--t-warning)", background: "var(--t-warning-bg)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: "1.4rem" }}>📴</span>
               <div>
-                <div style={{ fontWeight: 700, fontSize: ".9rem", color: "#f59e0b" }}>
+                <div style={{ fontWeight: 700, fontSize: ".9rem", color: "var(--t-warning)" }}>
                   {pendingCount} opération{pendingCount > 1 ? "s" : ""} en attente
                 </div>
-                <div style={{ fontSize: ".78rem", color: "#94a3b8", marginTop: 2 }}>
+                <div style={{ fontSize: ".78rem", color: "var(--t-muted)", marginTop: 2 }}>
                   {isOnline
                     ? "Synchronisation en cours…"
                     : "Hors ligne — sera synchronisé à la reconnexion"}
                 </div>
               </div>
-              <Link href="/historique" style={{ marginLeft: "auto", fontSize: ".78rem", color: "#3b82f6", fontWeight: 600 }}>
+              <Link href="/historique" style={{ marginLeft: "auto", fontSize: ".78rem", color: "var(--t-info)", fontWeight: 600 }}>
                 Voir →
               </Link>
             </div>
@@ -310,8 +308,8 @@ export default function AccueilPeseur() {
 
         {/* ── Hors ligne sans opérations en attente ────────────────────── */}
         {!isOnline && pendingCount === 0 && (
-          <div className="t-card" style={{ background: "#1e293b", borderLeft: "3px solid #f59e0b" }}>
-            <div style={{ fontSize: ".85rem", color: "#f59e0b" }}>
+          <div className="t-card" style={{ background: "var(--t-warning-bg)", borderLeft: "3px solid var(--t-warning)" }}>
+            <div style={{ fontSize: ".85rem", color: "var(--t-warning)" }}>
               📡 Hors ligne — les collectes saisies seront synchronisées à la reconnexion.
             </div>
           </div>
@@ -321,7 +319,6 @@ export default function AccueilPeseur() {
         <Link href="/historique">
           <div className="t-card" style={{
             marginBottom: 12,
-            background: "#1e2d45",
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
@@ -329,14 +326,14 @@ export default function AccueilPeseur() {
           }}>
             <span style={{ fontSize: "1.6rem" }}>📋</span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: ".9rem", color: "#e2e8f0" }}>
+              <div style={{ fontWeight: 700, fontSize: ".9rem", color: "var(--t-text)" }}>
                 Mes collectes
               </div>
-              <div style={{ fontSize: ".78rem", color: "#94a3b8", marginTop: 2 }}>
+              <div style={{ fontSize: ".78rem", color: "var(--t-muted)", marginTop: 2 }}>
                 Consulter l'historique de vos livraisons
               </div>
             </div>
-            <span style={{ fontSize: "1.2rem", color: "#64748b" }}>›</span>
+            <span style={{ fontSize: "1.2rem", color: "var(--t-muted)" }}>›</span>
           </div>
         </Link>
       </main>
@@ -357,7 +354,7 @@ export default function AccueilPeseur() {
             <div style={{ padding: "16px 24px" }}>
               <div style={{ fontSize: ".9rem", color: "#555" }}>Voulez-vous vraiment vous déconnecter ?</div>
               {pendingCount > 0 && (
-                <div style={{ marginTop: 8, fontSize: ".85rem", color: "#f59e0b" }}>
+                <div style={{ marginTop: 8, fontSize: ".85rem", color: "var(--t-warning)" }}>
                   ⚠️ {pendingCount} opération(s) en attente de synchronisation.
                 </div>
               )}
