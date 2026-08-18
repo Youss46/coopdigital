@@ -635,7 +635,7 @@ async function deduireAvancesMembreDelegue(
   membreId: number,
   plafondFcfa: number,
   sessionId: number,
-): Promise<void> {
+): Promise<number> {
   try {
     const avances = await db
       .select()
@@ -649,6 +649,7 @@ async function deduireAvancesMembreDelegue(
       .orderBy(avancesTable.dateOctroi); // plus ancienne en premier
 
     let restant = plafondFcfa;
+    let totalDeduit = 0;
     for (const avance of avances) {
       if (restant <= 0) break;
 
@@ -679,11 +680,14 @@ async function deduireAvancesMembreDelegue(
         note:        `Retenue automatique — pesée #${sessionId}`,
       });
 
-      restant -= retenue;
+      restant      -= retenue;
+      totalDeduit  += retenue;
     }
+    return totalDeduit;
   } catch (err) {
     // Non-fatal : log mais ne bloque pas la clôture de session
     logger.error({ err, membreId, sessionId }, "Erreur déduction avances membre délégué");
+    return 0;
   }
 }
 
@@ -747,14 +751,17 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
     if (membre?.categorieMembre === "délégué de localités") {
       const poidsKg = parseFloat(String(detail.poidsTotalKg ?? 0));
       if (poidsKg > 0) {
-        // Récupérer la campagne active pour rattacher la commission
+        // Récupérer la campagne active + prix bord-champ pour la livraison
         let campagneId: number | null = null;
+        let prixBordChampFcfa = 0;
         try {
           const prix = await getPrixActuel(cooperativeId);
-          campagneId = prix.campagneId ?? null;
+          campagneId       = prix.campagneId ?? null;
+          prixBordChampFcfa = prix.prixBordChampFcfa;
         } catch {
-          // Pas de campagne active — commission sans campagne
+          // Pas de campagne active — commission sans campagne, livraison sans prix
         }
+
         // await (pas void) : la commission doit être en DB avant que le bordereau soit téléchargé
         const commission = await creerCommissionMembreSiTaux(
           sessionId,
@@ -764,8 +771,9 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
           cooperativeId,
         );
 
-        // ── Déduction automatique des avances (même pattern que délégués terrain) ──
-        // Plafond = commission nette = commission brut − frais transport avancés par la coop
+        // ── Déduction automatique des avances ──────────────────────────────────
+        // Plafond = commission nette = commission brut − frais transport
+        let avanceDeduiteFcfa = 0;
         if (commission && commission.montantFcfa > 0) {
           let fraisTransportFcfa = 0;
           if (detail.bonReceptionId) {
@@ -781,7 +789,84 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
           }
           const commissionNette = Math.max(0, commission.montantFcfa - fraisTransportFcfa);
           if (commissionNette > 0) {
-            await deduireAvancesMembreDelegue(detail.membreId, commissionNette, sessionId);
+            avanceDeduiteFcfa = await deduireAvancesMembreDelegue(detail.membreId, commissionNette, sessionId);
+          }
+        }
+
+        // ── Livraison officielle + paiement + écritures OHADA ─────────────────
+        if (prixBordChampFcfa > 0) {
+          try {
+            const montantBrut = Math.round(poidsKg * prixBordChampFcfa);
+            const montantNet  = Math.max(0, montantBrut - avanceDeduiteFcfa);
+            const dateStr = updated?.dateFin
+              ? (updated.dateFin instanceof Date
+                  ? updated.dateFin.toISOString().split("T")[0]!
+                  : String(updated.dateFin).split("T")[0]!)
+              : new Date().toISOString().split("T")[0]!;
+
+            const [livraison] = await db
+              .insert(livraisonsTable)
+              .values({
+                membreId:            detail.membreId,
+                campagneId,
+                poidsKg:             String(poidsKg),
+                prixUnitaireFcfa:    prixBordChampFcfa,
+                montantBrutFcfa:     montantBrut,
+                avanceDeduiteFcfa:   avanceDeduiteFcfa,
+                intrantsDeduitsFcfa: 0,
+                montantNetFcfa:      montantNet,
+                retenueKg:           "0",
+                nombreSacs:          detail.nbSacsTotal ?? null,
+                produit:             "cacao",
+                dateLivraison:       dateStr,
+                statutPaiement:      "EN ATTENTE",
+              })
+              .returning();
+
+            if (livraison) {
+              // Lier la session à la livraison
+              await db
+                .update(sessionsPeseeTable)
+                .set({ livraisonId: livraison.id })
+                .where(eq(sessionsPeseeTable.id, sessionId));
+
+              // Paiement en attente
+              const numeroRecu = await genererNumeroRecu(cooperativeId);
+              await db.insert(paiementsTable).values({
+                livraisonId: livraison.id,
+                membreId:    detail.membreId,
+                montantFcfa: montantNet,
+                numeroRecu,
+                statut:      "en_attente",
+              });
+
+              // Écritures OHADA — fire-and-forget (601/401 + 401/4091)
+              void (async () => {
+                try {
+                  const [membreRow] = await db
+                    .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
+                    .from(membresTable)
+                    .where(eq(membresTable.id, detail.membreId!))
+                    .limit(1);
+                  await generateEcrituresLivraison(cooperativeId, {
+                    livraisonId:       livraison.id,
+                    membreId:          detail.membreId ?? undefined,
+                    membreNom:         membreRow
+                      ? `${membreRow.nom} ${membreRow.prenoms ?? ""}`.trim()
+                      : "—",
+                    montantBrutFcfa:   montantBrut,
+                    avanceDeduiteFcfa: avanceDeduiteFcfa,
+                    montantNetFcfa:    montantNet,
+                    dateLivraison:     dateStr,
+                  });
+                } catch (err) {
+                  logger.error({ err, sessionId }, "[membreDelegue] generateEcrituresLivraison failed");
+                }
+              })();
+            }
+          } catch (err) {
+            // Non-fatal : la commission existe déjà, la livraison sera créée manuellement
+            logger.error({ err, sessionId }, "Erreur création livraison automatique membre délégué");
           }
         }
       }
