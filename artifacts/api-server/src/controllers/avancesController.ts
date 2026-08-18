@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 import { checkAvance, creerAnomalies } from "../services/anomalieService";
 import { db, avancesTable, membresTable, campagnesTable, remboursementsAvancesMembresTable, usersTable } from "@workspace/db";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, ne, isNull, or, lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 const saisiseurAlias = alias(usersTable, "saisiseur_user");
@@ -313,6 +313,54 @@ export async function updatePlanAvanceMembre(req: Request, res: Response): Promi
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "updatePlanAvanceMembre");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── Avances membres avec plan "reporté" et date dépassée ou nulle ───────────
+
+export async function getAvancesReportees(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+
+  try {
+    const today = new Date().toISOString().split("T")[0]!;
+
+    const conditions: ReturnType<typeof eq>[] = [
+      eq(membresTable.cooperativeId, cooperativeId),
+      eq(avancesTable.planType, "reporte"),
+      ne(avancesTable.statut, "rembourse"),
+      or(isNull(avancesTable.reportDate), lt(avancesTable.reportDate, today))!,
+    ];
+
+    // Un délégué ne voit que les avances des membres qui lui sont rattachés
+    if (req.user?.role === "delegue" && req.user?.id) {
+      conditions.push(eq(membresTable.delegueId, req.user.id));
+    }
+
+    const avances = await db
+      .select({
+        id:                 avancesTable.id,
+        membreId:           avancesTable.membreId,
+        montantOctroyeFcfa: avancesTable.montantOctroyeFcfa,
+        soldeRestantFcfa:   avancesTable.soldeRestantFcfa,
+        dateOctroi:         avancesTable.dateOctroi,
+        dateEcheance:       avancesTable.dateEcheance,
+        statut:             avancesTable.statut,
+        planType:           avancesTable.planType,
+        reportDate:         avancesTable.reportDate,
+        membreNom:          membresTable.nom,
+        membrePrenoms:      membresTable.prenoms,
+      })
+      .from(avancesTable)
+      .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+      .where(and(...conditions))
+      .orderBy(desc(avancesTable.dateOctroi));
+
+    const soldeTotal = avances.reduce((s: number, a) => s + (a.soldeRestantFcfa ?? 0), 0);
+    res.json({ avances, total: avances.length, soldeTotal });
+  } catch (err) {
+    req.log.error({ err }, "getAvancesReportees");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

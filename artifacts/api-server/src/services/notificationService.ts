@@ -53,7 +53,9 @@ export type NotifType =
   | "peremption_intrant"
   // ── Transport ─────────────────────────────────────────
   | "bon_soumis_carburant"
-  | "demande_carburant";
+  | "demande_carburant"
+  // ── Avances reportées ────────────────────────────────────────────
+  | "avance_reportee";
 
 export type NotifGravite = "info" | "attention" | "critique";
 
@@ -110,6 +112,8 @@ const PREF_COL: Record<NotifType, keyof typeof preferencesNotificationsTable.$in
   // Transport
   bon_soumis_carburant:     "notifAnomalieCritique",
   demande_carburant:        "notifAnomalieCritique",
+  // Avances reportées
+  avance_reportee:          "notifAvanceRetard",
 };
 
 // ─── Créer des notifications pour une liste de users ──────────────────────────

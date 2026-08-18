@@ -13,7 +13,7 @@ import {
   Avance,
 } from "@workspace/api-client-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PlusCircle, TrendingDown, Banknote, Clock, FileDown, CloudOff, HandCoins, Loader2, Check, Settings2, History, User, X } from "lucide-react";
+import { PlusCircle, TrendingDown, Banknote, Clock, FileDown, CloudOff, HandCoins, Loader2, Check, Settings2, History, User, X, AlertTriangle } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
@@ -55,13 +55,28 @@ export default function Avances() {
   const [montantRemboursement, setMontantRemboursement] = useState("");
   const [planTarget, setPlanTarget] = useState<Avance | null>(null);
   const [notifHorsLigne, setNotifHorsLigne] = useState<string | null>(null);
+  const [filtreReportees, setFiltreReportees] = useState(false);
 
   const { data: encours } = useGetAvancesEncours();
   const { data: avancesData, isLoading } = useGetAvances({ statut: filtreStatut || undefined });
   const { data: membresData } = useGetMembres({ limit: 200 });
 
-  const avancesRaw = avancesData?.avances ?? [];
-  const avances = filtreProxy ? avancesRaw.filter((a) => !!a.agentSaisiseurId) : avancesRaw;
+  const { data: reporteesData } = useQuery<{ avances: unknown[]; total: number; soldeTotal: number }>({
+    queryKey: ["avances-reportees"],
+    queryFn: async () => {
+      const token = localStorage.getItem("coop_token") ?? "";
+      const res = await fetch(`${BASE}/api/avances/reportees`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return { avances: [], total: 0, soldeTotal: 0 };
+      return res.json() as Promise<{ avances: unknown[]; total: number; soldeTotal: number }>;
+    },
+  });
+
+  const avancesRaw: Avance[] = avancesData?.avances ?? [];
+  const avancesFiltrees = filtreProxy ? avancesRaw.filter((a: Avance) => !!a.agentSaisiseurId) : avancesRaw;
+  // When the "Reportées" filter is active, show only the IDs flagged by the API
+  // (reportDate dépassée ou nulle) — not all planType=reporte regardless of date
+  const reporteeIds = new Set((reporteesData?.avances ?? []).map((a) => (a as { id: number }).id));
+  const avances = filtreReportees ? avancesFiltrees.filter((a: Avance) => reporteeIds.has(a.id)) : avancesFiltrees;
   const membres = membresData?.membres ?? [];
 
   const [form, setForm] = useState({
@@ -181,6 +196,19 @@ export default function Avances() {
           {notifHorsLigne}
         </div>
       )}
+      {/* Alerte avances reportées en dépassement */}
+      {reporteesData && reporteesData.total > 0 && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle size={16} className="shrink-0 text-amber-500 mt-0.5" />
+          <span>
+            <strong>{reporteesData.total} avance{reporteesData.total > 1 ? "s" : ""} reportée{reporteesData.total > 1 ? "s" : ""}</strong>
+            {" "}avec date de report dépassée ou non définie —{" "}
+            solde non recouvré : <strong>{formaterFCFA(reporteesData.soldeTotal)}</strong>.{" "}
+            Utilisez le filtre <em>Reportées</em> ci-dessous pour les identifier.
+          </span>
+        </div>
+      )}
+
       {/* En-tête */}
       <div className="flex items-center justify-between">
         <div>
@@ -237,17 +265,34 @@ export default function Avances() {
         {(["", "en_cours", "rembourse", "en_retard"] as const).map((s) => (
           <button
             key={s}
-            onClick={() => setFiltreStatut(s)}
+            onClick={() => { setFiltreStatut(s); setFiltreReportees(false); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              filtreStatut === s
+              filtreStatut === s && !filtreReportees
                 ? "text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
-            style={filtreStatut === s ? { backgroundColor: "#1a4731" } : {}}
+            style={filtreStatut === s && !filtreReportees ? { backgroundColor: "#1a4731" } : {}}
           >
             {s === "" ? "Tous" : s === "en_cours" ? "En cours" : s === "rembourse" ? "Remboursé" : "En retard"}
           </button>
         ))}
+        <button
+          onClick={() => { setFiltreReportees((v) => !v); setFiltreStatut(""); }}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap ${
+            filtreReportees
+              ? "bg-amber-100 border-amber-300 text-amber-800"
+              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          <AlertTriangle size={12} />
+          Reportées
+          {reporteesData && reporteesData.total > 0 && (
+            <span className="ml-0.5 bg-amber-500 text-white rounded-full px-1.5 py-px text-[10px] font-bold leading-none">
+              {reporteesData.total}
+            </span>
+          )}
+          {filtreReportees && <X size={11} className="ml-0.5 opacity-60" />}
+        </button>
         <button
           onClick={() => setFiltreProxy((v) => !v)}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap ${

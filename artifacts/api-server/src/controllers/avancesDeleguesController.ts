@@ -5,7 +5,7 @@ import {
   remboursementsAvancesDeleguesTable,
   usersTable,
 } from "@workspace/db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, ne, isNull, or, lt } from "drizzle-orm";
 
 // ─── Liste des avances d'un délégué ──────────────────────────────────────────
 export async function listAvancesDelegueHandler(req: Request, res: Response): Promise<void> {
@@ -185,6 +185,54 @@ export async function patchPlanAvanceDelegueHandler(req: Request, res: Response)
   } catch (err) {
     req.log.error(err, "patchPlanAvanceDelegueHandler");
     res.status(500).json({ erreur: "Erreur lors de la modification du plan" });
+  }
+}
+
+// ─── Avances délégués reportées avec date dépassée ou nulle ──────────────────
+export async function getAvancesDeleguesReporteesHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
+
+  try {
+    const today = new Date().toISOString().split("T")[0]!;
+
+    const conditions: ReturnType<typeof eq>[] = [
+      eq(avancesDeleguesTable.cooperativeId, cooperativeId),
+      eq(avancesDeleguesTable.planType, "reporte"),
+      ne(avancesDeleguesTable.statut, "rembourse"),
+      or(isNull(avancesDeleguesTable.reportDate), lt(avancesDeleguesTable.reportDate, today))!,
+    ];
+
+    // Un délégué ne voit que ses propres avances
+    if (req.user?.role === "delegue" && req.user?.id) {
+      conditions.push(eq(avancesDeleguesTable.delegueId, req.user.id));
+    }
+
+    const avances = await db
+      .select({
+        id:                 avancesDeleguesTable.id,
+        delegueId:          avancesDeleguesTable.delegueId,
+        montantOctroyeFcfa: avancesDeleguesTable.montantOctroyeFcfa,
+        montantRembourse:   avancesDeleguesTable.montantRembourse,
+        soldeRestantFcfa:   avancesDeleguesTable.soldeRestantFcfa,
+        dateOctroi:         avancesDeleguesTable.dateOctroi,
+        dateEcheance:       avancesDeleguesTable.dateEcheance,
+        statut:             avancesDeleguesTable.statut,
+        planType:           avancesDeleguesTable.planType,
+        reportDate:         avancesDeleguesTable.reportDate,
+        delegueNom:         usersTable.nom,
+        deleguePrenoms:     usersTable.prenoms,
+      })
+      .from(avancesDeleguesTable)
+      .innerJoin(usersTable, eq(usersTable.id, avancesDeleguesTable.delegueId))
+      .where(and(...conditions))
+      .orderBy(desc(avancesDeleguesTable.dateOctroi));
+
+    const soldeTotal = avances.reduce((s: number, a) => s + a.soldeRestantFcfa, 0);
+    res.json({ avances, total: avances.length, soldeTotal });
+  } catch (err) {
+    req.log.error(err, "getAvancesDeleguesReporteesHandler");
+    res.status(500).json({ erreur: "Erreur lors de la récupération" });
   }
 }
 

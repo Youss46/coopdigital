@@ -12,7 +12,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import cron from "node-cron";
 import { checkEcheancesEnRetard } from "./services/empruntService";
-import { runNotificationsCron } from "./jobs/notificationsCron";
+import { runNotificationsCron, runAvancesReporteesCron } from "./jobs/notificationsCron";
 import { runMigrations } from "@workspace/db";
 import { bootstrapReferenceData } from "./services/bootstrapService";
 import path from "path";
@@ -66,6 +66,14 @@ cron.schedule("0 6 * * *", () => {
 cron.schedule("0 8 * * *", () => {
   runNotificationsCron().catch((err) => {
     logger.error({ err }, "Erreur cron notifications");
+  });
+});
+
+// CRON avances reportées : alerte hebdomadaire le lundi à 8h00
+// (cadence réduite pour éviter le spam de notifications sur des situations stables)
+cron.schedule("0 8 * * 1", () => {
+  runAvancesReporteesCron().catch((err) => {
+    logger.error({ err }, "Erreur cron avances reportées");
   });
 });
 

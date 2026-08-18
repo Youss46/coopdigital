@@ -299,6 +299,12 @@ export default function DeleguesPage() {
     enabled: tab === "avances" && avDelegueId !== null,
   });
 
+  const { data: avancesDeleguesReportees } = useQuery<{ avances: AvanceDelegue[]; total: number; soldeTotal: number }>({
+    queryKey: ["avances-delegues-reportees"],
+    queryFn: () => apiFetch("/delegues/avances-reportees"),
+    enabled: tab === "avances",
+  });
+
   const octroiMut = useMutation({
     mutationFn: (data: { montantOctroyeFcfa: number; dateOctroi: string; dateEcheance?: string; motif?: string; planType: string; montantPartielFcfa?: number; reportDate?: string }) =>
       apiFetch(`/delegues/${avDelegueId}/avances`, { method: "POST", body: JSON.stringify(data) }),
@@ -364,7 +370,7 @@ export default function DeleguesPage() {
             { key: "liste", label: "Liste des délégués" },
             { key: "differes", label: `Paiements différés${totalDifferes > 0 ? ` (${totalDifferes})` : ""}` },
             { key: "commissions", label: "Commissions" },
-            { key: "avances", label: "Avances" },
+            { key: "avances", label: `Avances${avancesDeleguesReportees && avancesDeleguesReportees.total > 0 ? ` ⚠ ${avancesDeleguesReportees.total}` : ""}` },
           ] as { key: "liste" | "differes" | "commissions" | "avances"; label: string }[]).map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)} style={{ padding: "6px 18px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: ".85rem", cursor: "pointer", background: tab === key ? "#fff" : "transparent", color: tab === key ? "#111" : "#6b7280", boxShadow: tab === key ? "0 1px 3px rgba(0,0,0,.1)" : "none", whiteSpace: "nowrap" }}>
               {label}
@@ -819,6 +825,20 @@ export default function DeleguesPage() {
         {/* Tab: avances délégués */}
         {tab === "avances" && (
           <div>
+            {/* Alerte avances reportées dépassées */}
+            {avancesDeleguesReportees && avancesDeleguesReportees.total > 0 && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 16px", marginBottom: 16 }}>
+                <span style={{ fontSize: "1rem", marginTop: 1 }}>⚠️</span>
+                <div style={{ fontSize: ".88rem", color: "#92400e" }}>
+                  <strong>{avancesDeleguesReportees.total} avance{avancesDeleguesReportees.total > 1 ? "s" : ""} délégué{avancesDeleguesReportees.total > 1 ? "s" : ""} reportée{avancesDeleguesReportees.total > 1 ? "s" : ""}</strong>
+                  {" "}avec date de report dépassée ou non définie —{" "}
+                  solde non recouvré :{" "}
+                  <strong>{avancesDeleguesReportees.soldeTotal.toLocaleString("fr-FR")} FCFA</strong>.{" "}
+                  Sélectionnez le délégué concerné pour agir.
+                </div>
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
               <select
                 value={avDelegueId ?? ""}

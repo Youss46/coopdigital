@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { terrainAuthMiddleware } from "../middlewares/terrainAuth.js";
 import { authMiddleware } from "../middlewares/auth.js";
+import { checkPermission } from "../middlewares/permissions.js";
 import {
   getCaisseHandler,
   getPaiementsDifferesHandler,
@@ -29,6 +30,7 @@ import {
   getRemboursementsAvanceDelegueHandler,
   getAvancesDelegueResumeHandler,
   patchPlanAvanceDelegueHandler,
+  getAvancesDeleguesReporteesHandler,
 } from "../controllers/avancesDeleguesController.js";
 
 const router = Router();
@@ -44,6 +46,7 @@ router.post("/terrain/regulariser/:livraisonId", terrainAuthMiddleware, regulari
 
 router.get("/delegues/alertes",            authMiddleware, getAlertesCaissesDeleguesHandler);
 router.get("/delegues/paiements-differes", authMiddleware, getPaiementsDifferesAdminHandler);
+router.get("/delegues/avances-reportees",  authMiddleware, checkPermission("avances", "lire"), getAvancesDeleguesReporteesHandler);
 router.get("/delegues",                    authMiddleware, listDeleguesHandler);
 
 // ─── Taux de commission (admin) ───────────────────────────────────────────────

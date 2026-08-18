@@ -1,5 +1,5 @@
-import { db, avancesTable, cooperativesTable, membresTable, intrantsTable } from "@workspace/db";
-import { eq, and, lt, lte, between, gt, sql, inArray, isNotNull } from "drizzle-orm";
+import { db, avancesTable, avancesDeleguesTable, cooperativesTable, membresTable, intrantsTable, usersTable } from "@workspace/db";
+import { eq, and, lt, lte, between, gt, sql, inArray, isNotNull, isNull, or, ne } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { notifierParRole } from "../services/notificationService";
 
@@ -238,6 +238,126 @@ async function checkPeremptionIntrants(cooperativeId: number): Promise<void> {
   } catch (err) {
     logger.error({ err, cooperativeId }, "Erreur checkPeremptionIntrants (notif)");
   }
+}
+
+// ─── Avances membres avec plan "reporté" et date dépassée ────────────────────
+
+async function checkAvancesReportees(cooperativeId: number): Promise<void> {
+  try {
+    const today = new Date().toISOString().split("T")[0]!;
+
+    const avances = await db
+      .select({
+        id: avancesTable.id,
+        solde: avancesTable.soldeRestantFcfa,
+        reportDate: avancesTable.reportDate,
+        membreNom: membresTable.nom,
+        membrePrenoms: membresTable.prenoms,
+      })
+      .from(avancesTable)
+      .innerJoin(membresTable, eq(membresTable.id, avancesTable.membreId))
+      .where(
+        and(
+          eq(membresTable.cooperativeId, cooperativeId),
+          eq(avancesTable.planType, "reporte"),
+          ne(avancesTable.statut, "rembourse"),
+          or(isNull(avancesTable.reportDate), lt(avancesTable.reportDate, today)),
+        ),
+      );
+
+    if (avances.length === 0) return;
+
+    const total = avances.reduce((s, a) => s + a.solde, 0);
+    const sansDate = avances.filter((a) => !a.reportDate).length;
+    const depasse  = avances.filter((a) => !!a.reportDate).length;
+
+    let detail = "";
+    if (sansDate > 0 && depasse > 0) detail = ` (${sansDate} sans date, ${depasse} date dépassée)`;
+    else if (sansDate > 0) detail = ` (sans date de report)`;
+    else detail = ` (date de report dépassée)`;
+
+    await notifierParRole(cooperativeId, ["pca", "directeur", "comptable"], {
+      type:         "avance_reportee",
+      gravite:      "attention",
+      titre:        `${avances.length} avance${avances.length > 1 ? "s" : ""} membre${avances.length > 1 ? "s" : ""} reportée${avances.length > 1 ? "s" : ""} sans retenue active`,
+      message:      `${avances.length} avance${avances.length > 1 ? "s sont" : " est"} en plan "reporté"${detail} — solde total non recouvré : ${total.toLocaleString("fr-FR")} FCFA. Action requise.`,
+      lien:         "/avances",
+      lienLibelle:  "Voir les avances",
+      sourceModule: "avances",
+    });
+
+    logger.info({ nb: avances.length, cooperativeId }, "Notifications avances membres reportées envoyées");
+  } catch (err) {
+    logger.error({ err, cooperativeId }, "Erreur checkAvancesReportees (notif)");
+  }
+}
+
+// ─── Avances délégués avec plan "reporté" et date dépassée ───────────────────
+
+async function checkAvancesDeleguesReportees(cooperativeId: number): Promise<void> {
+  try {
+    const today = new Date().toISOString().split("T")[0]!;
+
+    const avances = await db
+      .select({
+        id:         avancesDeleguesTable.id,
+        solde:      avancesDeleguesTable.soldeRestantFcfa,
+        reportDate: avancesDeleguesTable.reportDate,
+        delegueNom: usersTable.nom,
+      })
+      .from(avancesDeleguesTable)
+      .innerJoin(usersTable, eq(usersTable.id, avancesDeleguesTable.delegueId))
+      .where(
+        and(
+          eq(avancesDeleguesTable.cooperativeId, cooperativeId),
+          eq(avancesDeleguesTable.planType, "reporte"),
+          ne(avancesDeleguesTable.statut, "rembourse"),
+          or(isNull(avancesDeleguesTable.reportDate), lt(avancesDeleguesTable.reportDate, today)),
+        ),
+      );
+
+    if (avances.length === 0) return;
+
+    const total = avances.reduce((s, a) => s + a.solde, 0);
+
+    await notifierParRole(cooperativeId, ["pca", "directeur", "comptable"], {
+      type:         "avance_reportee",
+      gravite:      "attention",
+      titre:        `${avances.length} avance${avances.length > 1 ? "s" : ""} délégué${avances.length > 1 ? "s" : ""} reportée${avances.length > 1 ? "s" : ""} sans retenue active`,
+      message:      `${avances.length} avance${avances.length > 1 ? "s délégués sont" : " délégué est"} en plan "reporté" avec date dépassée ou indéfinie — solde total : ${total.toLocaleString("fr-FR")} FCFA.`,
+      lien:         "/delegues",
+      lienLibelle:  "Voir les délégués",
+      sourceModule: "avances",
+    });
+
+    logger.info({ nb: avances.length, cooperativeId }, "Notifications avances délégués reportées envoyées");
+  } catch (err) {
+    logger.error({ err, cooperativeId }, "Erreur checkAvancesDeleguesReportees (notif)");
+  }
+}
+
+// ─── Entrée hebdomadaire : avances reportées ──────────────────────────────────
+// Lancé le lundi à 08:00 pour éviter le spam quotidien (une seule alerte par semaine).
+
+export async function runAvancesReporteesCron(): Promise<void> {
+  logger.info("Démarrage du CRON avances reportées (hebdomadaire)");
+
+  let coopIds: number[];
+  try {
+    coopIds = await getAllCoopIds();
+  } catch (err) {
+    logger.error({ err }, "CRON avances reportées — impossible de récupérer les coopératives");
+    return;
+  }
+
+  await Promise.allSettled(
+    coopIds.flatMap((coopId) => [
+      checkAvancesReportees(coopId),
+      checkAvancesDeleguesReportees(coopId),
+    ]),
+  );
+
+  logger.info({ nb: coopIds.length }, "CRON avances reportées terminé");
 }
 
 // ─── Entrée principale du CRON ────────────────────────────────────────────────
