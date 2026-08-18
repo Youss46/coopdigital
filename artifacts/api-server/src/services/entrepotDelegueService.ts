@@ -60,14 +60,20 @@ export async function listEntrepots(cooperativeId: number) {
       delegueNom:    usersTable.nom,
       deleguePrenoms: usersTable.prenoms,
       capaciteSacs:  entrepotsDeleguesTable.capaciteSacs,
-      nombreSacsTotal: sql<number>`(
+      nombreSacsTotal: sql<number>`GREATEST(0, (
         SELECT COALESCE(SUM(l.nombre_sacs), 0)::integer
         FROM entrepot_mouvements em
         JOIN livraisons l ON l.id = em.livraison_id
         WHERE em.entrepot_id = entrepots_delegues.id
           AND em.type_mouvement = 'entree'
           AND em.livraison_id IS NOT NULL
-      )`,
+      ) - (
+        SELECT COALESCE(SUM(ts.nombre_sacs), 0)::integer
+        FROM transferts_stock ts
+        WHERE ts.entrepot_source_id = entrepots_delegues.id
+          AND ts.statut IN ('planifie', 'en_cours', 'en_pesee', 'arrive', 'confirme')
+          AND ts.nombre_sacs IS NOT NULL
+      ))`,
     })
     .from(entrepotsDeleguesTable)
     .leftJoin(usersTable, eq(usersTable.id, entrepotsDeleguesTable.delegueId))
