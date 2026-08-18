@@ -300,9 +300,14 @@ export type AvanceDeleagueTerrain = {
   statut: string;
 };
 
-/** Retourne les avances en cours du délégué lié au peseur connecté (ou du délégué lui-même). */
-export function getAvancesDeleguesTerrain(): Promise<AvanceDeleagueTerrain[]> {
-  return apiGet<AvanceDeleagueTerrain[]>("/avances-delegue");
+/**
+ * Retourne les avances en cours du délégué lié au peseur.
+ * Pour un peseur base centrale (non rattaché à un délégué), passer `membreId`
+ * pour que le backend remonte le délégué du membre en cours de pesée.
+ */
+export function getAvancesDeleguesTerrain(membreId?: number | null): Promise<AvanceDeleagueTerrain[]> {
+  const qs = membreId ? `?membreId=${membreId}` : "";
+  return apiGet<AvanceDeleagueTerrain[]>(`/avances-delegue${qs}`);
 }
 
 /** Met à jour le plan de remboursement d'une avance depuis le terrain (peseur ou délégué). */

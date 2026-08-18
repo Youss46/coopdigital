@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import * as terrainService from "../services/terrainService.js";
-import { db, avancesDeleguesTable } from "@workspace/db";
+import { db, avancesDeleguesTable, membresTable } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 
 function getAgent(req: Request) {
@@ -317,12 +317,31 @@ export async function postRapportHandler(req: Request, res: Response): Promise<v
 // ─── Avances du délégué — accessibles depuis le peseur ou le délégué lui-même ─
 export async function getAvancesDelegueTerrainHandler(req: Request, res: Response): Promise<void> {
   const role = req.agent?.role;
-  // Peseur → avances du délégué auquel il est rattaché; Délégué → ses propres avances
-  const delegueId = role === "delegue" ? req.agent?.id : req.agent?.delegueId;
   const cooperativeId = req.agent?.cooperativeId;
+  if (!cooperativeId) { res.json([]); return; }
 
-  if (!delegueId || !cooperativeId) {
-    res.json([]); // peseur non rattaché à un délégué → rien à afficher
+  let delegueId: number | null | undefined;
+
+  if (role === "delegue") {
+    // Délégué — ses propres avances
+    delegueId = req.agent?.id;
+  } else if (req.agent?.delegueId) {
+    // Peseur rattaché à un délégué spécifique
+    delegueId = req.agent.delegueId;
+  } else {
+    // Peseur base centrale (non rattaché) — on cherche le délégué du membre en cours de pesée
+    const membreId = req.query.membreId ? Number(req.query.membreId) : null;
+    if (!membreId) { res.json([]); return; }
+    const [membre] = await db
+      .select({ delegueId: membresTable.delegueId })
+      .from(membresTable)
+      .where(and(eq(membresTable.id, membreId), eq(membresTable.cooperativeId, cooperativeId)))
+      .limit(1);
+    delegueId = membre?.delegueId;
+  }
+
+  if (!delegueId) {
+    res.json([]); // membre sans délégué assigné → rien à afficher
     return;
   }
 

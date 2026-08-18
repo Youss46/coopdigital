@@ -401,7 +401,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   useEffect(() => {
     if (step !== "succes" || !sessionTerminee || sessionTerminee.operation === "reception_transfert" || !isOnline) return;
     setAvancesLoading(true);
-    getAvancesDeleguesTerrain()
+    // Passer membreId pour les peseurs base centrale (non rattachés à un délégué)
+    getAvancesDeleguesTerrain(sessionTerminee.membreId)
       .then((avances) => {
         setAvancesDelegue(avances);
         const edits: Record<number, { planType: string; montantPartiel: string; reportDate: string }> = {};
