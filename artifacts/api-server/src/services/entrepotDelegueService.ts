@@ -453,6 +453,7 @@ export async function creerTransfert(
     autresChargesFcfa?: number;
     autresChargesLibelle?: string;
     autresChargesPar?: string;
+    modeFinancement?: string;
   },
 ) {
   const entrepot = await getEntrepotDuDelegue(delegueId, cooperativeId);
@@ -489,6 +490,7 @@ export async function creerTransfert(
       autresChargesFcfa: data.autresChargesFcfa ?? null,
       autresChargesLibelle: data.autresChargesLibelle ?? null,
       autresChargesPar: data.autresChargesPar ?? null,
+      modeFinancement: data.modeFinancement ?? "fonds_propres",
     })
     .returning();
 
@@ -894,6 +896,7 @@ export async function creerTransfertAdmin(
     autresChargesFcfa?: number;
     autresChargesLibelle?: string;
     autresChargesPar?: string;
+    modeFinancement?: string;
   },
 ) {
   const [entrepot] = await db
@@ -940,6 +943,7 @@ export async function creerTransfertAdmin(
       autresChargesFcfa: data.autresChargesFcfa ?? null,
       autresChargesLibelle: data.autresChargesLibelle ?? null,
       autresChargesPar: data.autresChargesPar ?? null,
+      modeFinancement: data.modeFinancement ?? "fonds_propres",
     })
     .returning();
 

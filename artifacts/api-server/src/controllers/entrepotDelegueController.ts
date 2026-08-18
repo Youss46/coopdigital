@@ -186,7 +186,8 @@ export async function creerTransfertAdminHandler(req: Request, res: Response): P
   const id = Number(req.params["id"]);
   if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
   const { poidsKg, typeVehicule, immatriculation, nomChauffeur, telephoneChauffeur, transporteur, notes,
-    fraisCarburantFcfa, fraisCarburantPar, autresChargesFcfa, autresChargesLibelle, autresChargesPar } =
+    fraisCarburantFcfa, fraisCarburantPar, autresChargesFcfa, autresChargesLibelle, autresChargesPar,
+    modeFinancement } =
     req.body as Record<string, unknown>;
   if (!poidsKg || Number(poidsKg) <= 0) {
     res.status(400).json({ erreur: "poidsKg est requis et doit être positif" });
@@ -206,6 +207,7 @@ export async function creerTransfertAdminHandler(req: Request, res: Response): P
       autresChargesFcfa: autresChargesFcfa ? Number(autresChargesFcfa) : undefined,
       autresChargesLibelle: autresChargesLibelle ? String(autresChargesLibelle) : undefined,
       autresChargesPar: autresChargesPar ? String(autresChargesPar) : undefined,
+      modeFinancement: modeFinancement ? String(modeFinancement) : undefined,
     });
     res.status(201).json(t);
   } catch (err) {
@@ -309,6 +311,7 @@ export async function creerTransfertHandler(req: Request, res: Response): Promis
     entrepotId, poidsKg, nombreSacs, typeVehicule, immatriculation, nomChauffeur,
     telephoneChauffeur, transporteur, datePrevue, campagneId, notes,
     fraisCarburantFcfa, fraisCarburantPar, autresChargesFcfa, autresChargesLibelle, autresChargesPar,
+    modeFinancement,
   } = req.body as Record<string, unknown>;
   if (!entrepotId || !poidsKg) { res.status(400).json({ erreur: "entrepotId et poidsKg sont requis" }); return; }
   try {
@@ -329,6 +332,7 @@ export async function creerTransfertHandler(req: Request, res: Response): Promis
       autresChargesFcfa: autresChargesFcfa ? Number(autresChargesFcfa) : undefined,
       autresChargesLibelle: autresChargesLibelle ? String(autresChargesLibelle) : undefined,
       autresChargesPar: autresChargesPar ? String(autresChargesPar) : undefined,
+      modeFinancement: modeFinancement ? String(modeFinancement) : undefined,
     });
     res.status(201).json(t);
   } catch (err) {

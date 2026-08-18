@@ -80,6 +80,7 @@ export default function MonEntrepotPage() {
     nomChauffeur: "", telephoneChauffeur: "", datePrevue: "", notes: "",
     fraisCarburantFcfa: "", fraisCarburantPar: "cooperative",
     autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative",
+    modeFinancement: "fonds_propres",
   });
   const [formDepart, setFormDepart] = useState({ poidsDepart_kg: "", immatriculation: "", nomChauffeur: "" });
 
@@ -108,7 +109,7 @@ export default function MonEntrepotPage() {
       qc.invalidateQueries({ queryKey: ["mes-transferts"] });
       qc.invalidateQueries({ queryKey: ["mon-entrepot"] });
       setShowTransfert(false);
-      setForm({ poidsKg: "", nombreSacs: "", typeVehicule: "propre", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", datePrevue: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative" });
+      setForm({ poidsKg: "", nombreSacs: "", typeVehicule: "propre", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", datePrevue: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
       toast({ title: "Transfert soumis avec succès", description: "La direction a été notifiée." });
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -436,6 +437,27 @@ export default function MonEntrepotPage() {
                   onChange={(e) => setForm(f => ({ ...f, datePrevue: e.target.value }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
               </div>
+              {/* Mode de financement */}
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Mode de financement</p>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { value: "fonds_propres", label: "🟢 Fonds propres", desc: "Le délégué avance ses fonds pour acheter le cacao" },
+                    { value: "caisse_cooperative", label: "🔵 Caisse coopérative créditée", desc: "La caisse déléguée a été approvisionnée avant la collecte" },
+                  ].map(({ value, label, desc }) => (
+                    <label key={value} className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${form.modeFinancement === value ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
+                      <input type="radio" name="modeFinancement" value={value} checked={form.modeFinancement === value}
+                        onChange={(e) => setForm(f => ({ ...f, modeFinancement: e.target.value }))}
+                        className="mt-0.5 accent-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{label}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               {/* Charges de transport */}
               <div className="border-t border-gray-100 pt-3">
                 <p className="text-sm font-semibold text-gray-700 mb-2">Charges de transport</p>
@@ -521,6 +543,7 @@ export default function MonEntrepotPage() {
                   autresChargesFcfa: form.autresChargesFcfa ? parseInt(form.autresChargesFcfa) : undefined,
                   autresChargesLibelle: form.autresChargesLibelle || undefined,
                   autresChargesPar: form.autresChargesFcfa ? form.autresChargesPar : undefined,
+                  modeFinancement: form.modeFinancement,
                 })}
                 className="flex-1 bg-green-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50">
                 {mutTransfert.isPending ? "Envoi…" : "Soumettre le transfert"}

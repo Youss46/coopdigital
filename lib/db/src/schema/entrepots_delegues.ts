@@ -120,6 +120,12 @@ export const transfertsStockTable = pgTable("transferts_stock", {
   confirmePar:       integer("confirme_par").references(() => usersTable.id),
   confirme_le:       timestamp("confirme_le", { withTimezone: true }),
 
+  /** Mode de financement de la collecte :
+   *  - fonds_propres      : le délégué a avancé ses propres fonds (défaut)
+   *  - caisse_cooperative : la caisse déléguée a été approvisionnée par la coopérative
+   */
+  modeFinancement:   text("mode_financement").notNull().default("fonds_propres"),
+
   /** Session de pesée physique liée à la réception de ce transfert (nullable — optionnel) */
   sessionPeseeId:    integer("session_pesee_id"),
 

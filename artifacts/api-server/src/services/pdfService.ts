@@ -3932,6 +3932,8 @@ export async function generateBordereauAchatSession(
   let delegueZone     = "—";
   let carburantFcfa   = 0;
 
+  let modeFinancement = "fonds_propres";
+
   if (session.transfertId) {
     const [t] = await db
       .select({
@@ -3939,6 +3941,7 @@ export async function generateBordereauAchatSession(
         nomChauffeur:       transfertsStockTable.nomChauffeur,
         delegueId:          transfertsStockTable.delegueId,
         fraisCarburantFcfa: transfertsStockTable.fraisCarburantFcfa,
+        modeFinancement:    transfertsStockTable.modeFinancement,
       })
       .from(transfertsStockTable)
       .where(eq(transfertsStockTable.id, session.transfertId))
@@ -3948,6 +3951,7 @@ export async function generateBordereauAchatSession(
       immatriculation = t.immatriculation ?? "—";
       nomChauffeur    = t.nomChauffeur    ?? "—";
       carburantFcfa   = t.fraisCarburantFcfa ?? 0;
+      modeFinancement = t.modeFinancement ?? "fonds_propres";
 
       if (t.delegueId) {
         const [[delegue], [entrepot]] = await Promise.all([
@@ -4027,7 +4031,11 @@ export async function generateBordereauAchatSession(
   const poidsNetKg    = parseFloat(session.poidsTotalKg ?? "0");
   const poidsBrutKg   = lignes.reduce((s, l) => s + parseFloat(l.poidsBrutKg), 0);
   const valeurProduit = Math.round(poidsNetKg * prixUnitaire);
-  const montantNet    = valeurProduit + fraisCollecteFcfa;
+  // Mode de financement :
+  //   fonds_propres      → MONTANT NET = valeur produit + frais de collecte
+  //   caisse_cooperative → MONTANT NET = frais de collecte uniquement
+  const caisseCoop = modeFinancement === "caisse_cooperative";
+  const montantNet = caisseCoop ? fraisCollecteFcfa : valeurProduit + fraisCollecteFcfa;
 
   // 8. PDF
   const { doc, endPromise } = makePdfDoc();
@@ -4153,7 +4161,7 @@ export async function generateBordereauAchatSession(
     String(session.nbSacsTotal ?? lignes.reduce((s, l) => s + l.nbSacs, 0)),
     `${poidsNetKg.toFixed(1)} kg`,
     prixUnitaire > 0 ? `${formaterNombre(prixUnitaire)} F` : "—",
-    valeurProduit > 0 ? `${formaterNombre(valeurProduit)} F` : "—",
+    "",   // valeur produit — handled below (may be greyed out)
     "",
     `${formaterNombre(montantNet)} F`,
   ].forEach((v, i) => {
@@ -4163,6 +4171,22 @@ export async function generateBordereauAchatSession(
     }
     cx += colW[i]!;
   });
+
+  // Valeur produit — colonne 4 (index 4)
+  {
+    const vpX = MARGIN + colW.slice(0, 4).reduce((a, b) => a + b, 0);
+    const vpW = colW[4]!;
+    if (caisseCoop) {
+      // Afficher en gris avec mention "réglée via caisse"
+      doc.fontSize(7.5).fillColor(GRIS).font("Helvetica-Bold")
+        .text(valeurProduit > 0 ? `${formaterNombre(valeurProduit)} F` : "—", vpX + 3, cellMidY - 5, { width: vpW - 6, align: "center", lineBreak: false });
+      doc.fontSize(6).fillColor(GRIS).font("Helvetica")
+        .text("réglée via caisse", vpX + 2, cellMidY + 3, { width: vpW - 4, align: "center", lineBreak: false });
+    } else {
+      doc.fontSize(9).fillColor("black").font("Helvetica-Bold")
+        .text(valeurProduit > 0 ? `${formaterNombre(valeurProduit)} F` : "—", vpX + 3, cellMidY, { width: vpW - 6, align: "center", lineBreak: false });
+    }
+  }
 
   // Sous-lignes AUTRES FRAIS
   const autresX = MARGIN + colW.slice(0, 5).reduce((a, b) => a + b, 0);

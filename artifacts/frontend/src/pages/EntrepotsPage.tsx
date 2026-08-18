@@ -175,6 +175,7 @@ export default function EntrepotsPage() {
     notes: "",
     fraisCarburantFcfa: "", fraisCarburantPar: "cooperative",
     autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative",
+    modeFinancement: "fonds_propres",
   });
 
   const { data: deleguesListe = [], isLoading: loadDelegues } = useQuery<DelegueListe[]>({
@@ -278,7 +279,7 @@ export default function EntrepotsPage() {
       qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
       qc.invalidateQueries({ queryKey: ["transferts"] });
       setShowTransfert(null);
-      setFormTransfert({ poidsKg: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "" });
+      setFormTransfert({ poidsKg: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
       toast({ title: "Transfert lancé", description: "Le stock est en transit vers le magasin central." });
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -432,7 +433,7 @@ export default function EntrepotsPage() {
                       <button
                         onClick={() => {
                           setShowTransfert(e);
-                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative" });
+                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
                         }}
                         className="mt-3 w-full flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors">
                         <Truck className="w-3.5 h-3.5" />
@@ -799,6 +800,27 @@ export default function EntrepotsPage() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 resize-none" />
               </div>
 
+              {/* Mode de financement */}
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Mode de financement</p>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { value: "fonds_propres", label: "🟢 Fonds propres", desc: "Le délégué avance ses fonds pour acheter le cacao" },
+                    { value: "caisse_cooperative", label: "🔵 Caisse coopérative créditée", desc: "La caisse déléguée a été approvisionnée avant la collecte" },
+                  ].map(({ value, label, desc }) => (
+                    <label key={value} className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${formTransfert.modeFinancement === value ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
+                      <input type="radio" name="modeFinancement" value={value} checked={formTransfert.modeFinancement === value}
+                        onChange={(e) => setFormTransfert(f => ({ ...f, modeFinancement: e.target.value }))}
+                        className="mt-0.5 accent-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{label}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               {/* Charges de transport */}
               <div className="border-t border-gray-100 pt-3">
                 <p className="text-sm font-semibold text-gray-700 mb-2">Charges de transport</p>
@@ -896,6 +918,7 @@ export default function EntrepotsPage() {
                     autresChargesFcfa: formTransfert.autresChargesFcfa ? parseInt(formTransfert.autresChargesFcfa) : undefined,
                     autresChargesLibelle: formTransfert.autresChargesLibelle || undefined,
                     autresChargesPar: formTransfert.autresChargesFcfa ? formTransfert.autresChargesPar : undefined,
+                    modeFinancement: formTransfert.modeFinancement,
                   },
                 })}
                 className="flex-1 bg-green-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2">
