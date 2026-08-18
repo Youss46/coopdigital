@@ -153,16 +153,8 @@ export async function creerCommissionTransfert(
       .where(eq(transfertsStockTable.id, transfertId))
       .limit(1);
 
-    const carburantDeductible =
-      transfert?.fraisCarburantPar === "cooperative" ? (transfert.fraisCarburantFcfa ?? 0) : 0;
-    const autresDeductible =
-      transfert?.autresChargesPar === "cooperative" ? (transfert.autresChargesFcfa ?? 0) : 0;
-    const chargesDéduites = carburantDeductible + autresDeductible;
-
-    const montantNet = Math.max(0, montantBrut - chargesDéduites);
-
-    // Si les charges absorbent toute la commission, on enregistre quand même
-    // à 0 pour la traçabilité (le délégué a travaillé mais les charges couvrent tout)
+    // Les frais de transport du transfert sont gérés indépendamment —
+    // la commission est simplement poids × taux, sans déduction de charges.
     const [inserted] = await db.insert(commissionsDeleguesTable).values({
       delegueId,
       livraisonId: null,
@@ -171,13 +163,13 @@ export async function creerCommissionTransfert(
       tauxFcfaParKg: String(taux.tauxFcfaParKg),
       poidsKg: String(poidsKg),
       montantBrutFcfa: String(montantBrut),
-      chargesDeduitesFcfa: chargesDéduites > 0 ? chargesDéduites : null,
-      montantFcfa: String(montantNet),
+      chargesDeduitesFcfa: null,
+      montantFcfa: String(montantBrut),
       statut: "en_attente",
     }).returning({ id: commissionsDeleguesTable.id });
 
     logger.info(
-      { transfertId, delegueId, poidsKg, montantBrut, chargesDéduites, montantNet },
+      { transfertId, delegueId, poidsKg, montantBrut },
       "Commission transfert créée"
     );
     return inserted ? { id: inserted.id, montantFcfa: montantNet } : null;
