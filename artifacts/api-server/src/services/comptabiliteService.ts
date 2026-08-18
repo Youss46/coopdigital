@@ -307,6 +307,33 @@ export async function generateEcrituresAvance(cooperativeId: number, params: {
 }
 
 /**
+ * Avance octroyée à un délégué de localité.
+ *
+ *   Débit  4098 Avances et acomptes agents/délégués
+ *   Crédit  571 Caisse (décaissement espèces)
+ *
+ * Les comptes peuvent être configurés par la coopérative via
+ * parametres_comptes_modules (module: "avances_delegues", operation: "octroi_avance_delegue").
+ */
+export async function generateEcrituresAvanceDelegue(cooperativeId: number, params: {
+  avanceId: number;
+  delegueId?: number;
+  delegueNom: string;
+  montantFcfa: number;
+  dateOctroi: string;
+}) {
+  const c = await resolveComptes(cooperativeId, "avances_delegues", "octroi_avance_delegue", "4098", "571");
+  await proposerEcriture(cooperativeId, {
+    source: "avance", sourceId: params.avanceId,
+    libelle: `Avance délégué – ${params.delegueNom}`,
+    compteDebit: c.compteDebit, compteCredit: c.compteCredit,
+    montantFcfa: params.montantFcfa, date: params.dateOctroi,
+    numeroPiece: `AVD-${params.avanceId}`,
+    tiersId: params.delegueId, tiersType: "delegue",
+  });
+}
+
+/**
  * Vente exportateur
  */
 export async function generateEcrituresVente(cooperativeId: number, params: {

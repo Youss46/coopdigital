@@ -6,6 +6,7 @@ import {
   usersTable,
 } from "@workspace/db";
 import { eq, and, desc, inArray, ne, isNull, or, lt } from "drizzle-orm";
+import { generateEcrituresAvanceDelegue } from "../services/comptabiliteService";
 
 // ─── Liste des avances d'un délégué ──────────────────────────────────────────
 export async function listAvancesDelegueHandler(req: Request, res: Response): Promise<void> {
@@ -43,7 +44,7 @@ export async function createAvanceDelegueHandler(req: Request, res: Response): P
 
   // Vérifier que le délégué appartient à la coopérative
   const [delegue] = await db
-    .select({ id: usersTable.id })
+    .select({ id: usersTable.id, nom: usersTable.nom, prenoms: usersTable.prenoms })
     .from(usersTable)
     .where(and(eq(usersTable.id, delegueId), eq(usersTable.cooperativeId, cooperativeId)))
     .limit(1);
@@ -52,13 +53,14 @@ export async function createAvanceDelegueHandler(req: Request, res: Response): P
   try {
     const montant = Number(montantOctroyeFcfa);
     const plan = (planType as "integral" | "partiel" | "reporte") ?? "integral";
+    const dateOctroiStr = String(dateOctroi ?? new Date().toISOString().slice(0, 10));
     const [avance] = await db.insert(avancesDeleguesTable).values({
       delegueId,
       cooperativeId,
       montantOctroyeFcfa: montant,
       montantRembourse: 0,
       soldeRestantFcfa: montant,
-      dateOctroi: String(dateOctroi ?? new Date().toISOString().slice(0, 10)),
+      dateOctroi: dateOctroiStr,
       dateEcheance: dateEcheance ? String(dateEcheance) : null,
       motif: motif ? String(motif) : null,
       statut: "en_cours",
@@ -67,6 +69,16 @@ export async function createAvanceDelegueHandler(req: Request, res: Response): P
       montantPartielFcfa: plan === "partiel" && montantPartielFcfa ? Number(montantPartielFcfa) : null,
       reportDate: plan === "reporte" && reportDate ? String(reportDate) : null,
     }).returning();
+
+    // Écriture comptable : Débit 4098 (Avances délégués) / Crédit 571 (Caisse)
+    void generateEcrituresAvanceDelegue(cooperativeId, {
+      avanceId: avance!.id,
+      delegueId,
+      delegueNom: `${delegue.prenoms ?? ""} ${delegue.nom}`.trim(),
+      montantFcfa: montant,
+      dateOctroi: dateOctroiStr,
+    });
+
     res.status(201).json(avance);
   } catch (err) {
     req.log.error(err, "createAvanceDelegueHandler");
