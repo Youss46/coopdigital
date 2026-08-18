@@ -1086,6 +1086,38 @@ export async function cloturerExercice(req: Request, res: Response): Promise<voi
     if (aNouveaux.length > 0) await db.insert(ecrituresComptablesTable).values(aNouveaux);
 
     // ══════════════════════════════════════════════════════════════════════════
+    // PHASE 5B — Extournes des régularisations d'inventaire (01/01/N+1)
+    //   Chaque écriture type='regularisation' de l'exercice N est inversée
+    //   (débit ↔ crédit) au 01/01/N+1 avec type='extourne_regularisation'.
+    //   Cela neutralise automatiquement leur effet sur le nouvel exercice.
+    // ══════════════════════════════════════════════════════════════════════════
+    const regulsQ = await db.execute(sql`
+      SELECT id, libelle, compte_debit AS "compteDebit", compte_credit AS "compteCredit",
+             montant_fcfa AS "montantFcfa", numero_piece AS "numeroPiece"
+      FROM   ecritures_comptables
+      WHERE  cooperative_id = ${coop}
+        AND  exercice       = ${annee}
+        AND  type_ecriture  = 'regularisation'
+    `);
+    const extournes: EntreeClot[] = [];
+    for (const r of regulsQ.rows as { id: number; libelle: string; compteDebit: string; compteCredit: string; montantFcfa: number; numeroPiece: string | null }[]) {
+      extournes.push({
+        cooperativeId: coop,
+        dateEcriture:  dateOuv,
+        numeroPiece:   r.numeroPiece ? `EXT-${r.numeroPiece}` : `EXT-REG-${r.id}`,
+        libelle:       `Extourne: ${r.libelle}`,
+        compteDebit:   r.compteCredit,   // inversé
+        compteCredit:  r.compteDebit,    // inversé
+        montantFcfa:   Math.round(Number(r.montantFcfa)),
+        source:        "manuel",
+        sourceId:      null,
+        exercice:      annee + 1,
+        typeEcriture:  "extourne_regularisation",
+      });
+    }
+    if (extournes.length > 0) await db.insert(ecrituresComptablesTable).values(extournes);
+
+    // ══════════════════════════════════════════════════════════════════════════
     // PHASE 6 — Verrouillage exercice clôturé + ouverture exercice suivant
     // ══════════════════════════════════════════════════════════════════════════
     if (existing.length > 0) {
@@ -1115,12 +1147,13 @@ export async function cloturerExercice(req: Request, res: Response): Promise<voi
         net:          resultatNet,
       },
       compteResultat: cptRes,
-      ecrituresGenerees: phase2.length + phase3.length + entries.length + aNouveaux.length,
+      ecrituresGenerees: phase2.length + phase3.length + entries.length + aNouveaux.length + extournes.length,
       detailEcritures: {
-        amortissements:  phase2.length,
-        variationStocks: phase3.length,
-        cloture:         entries.length,
-        aNouveaux:       aNouveaux.length,
+        amortissements:          phase2.length,
+        variationStocks:         phase3.length,
+        cloture:                 entries.length,
+        aNouveaux:               aNouveaux.length,
+        extournesRegularisations: extournes.length,
       },
     });
   } catch (err) {

@@ -2839,7 +2839,7 @@ function OngletCloture() {
   const [stock, setStock]           = useState<string>("");
   const [confirm, setConfirm]       = useState(false);
   const [loading, setLoading]       = useState(false);
-  const [resultat, setResultat]     = useState<{ message: string; ecrituresGenerees: number; soldes: ApercuCloture["soldes"] } | null>(null);
+  const [resultat, setResultat]     = useState<{ message: string; ecrituresGenerees: number; soldes: ApercuCloture["soldes"]; detailEcritures?: { amortissements: number; variationStocks: number; cloture: number; aNouveaux: number; extournesRegularisations: number } } | null>(null);
 
   // ── Régularisations ────────────────────────────────────────────────────────
   const [rType,      setRType]      = useState<TypeRegul>("408");
@@ -2920,7 +2920,7 @@ function OngletCloture() {
     try {
       const body: Record<string, number> = { exercice: annee, impotResultat: impot };
       if (stockNum !== undefined) body["stockFinalCacao"] = stockNum;
-      const res = await apiPost<{ message: string; ecrituresGenerees: number; soldes: ApercuCloture["soldes"] }>(
+      const res = await apiPost<{ message: string; ecrituresGenerees: number; soldes: ApercuCloture["soldes"]; detailEcritures?: { amortissements: number; variationStocks: number; cloture: number; aNouveaux: number; extournesRegularisations: number } }>(
         "/api/comptabilite/cloture", body
       );
       setResultat(res);
@@ -3193,11 +3193,22 @@ function OngletCloture() {
           <h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
             <CheckCheck size={16} /> Exercice {annee} clôturé avec succès
           </h3>
-          <p className="text-sm text-green-700">{resultat.ecrituresGenerees} écritures générées (clôture + à-nouveaux N+1)</p>
-          <p className="text-sm text-green-700 mt-1">
-            Résultat net : <span className="font-bold">{resultat.soldes.net >= 0 ? "+" : "−"}{FCFA(Math.abs(resultat.soldes.net))}</span>
+          <p className="text-sm text-green-700">
+            {resultat.ecrituresGenerees} écritures générées — résultat net :{" "}
+            <span className="font-bold">{resultat.soldes.net >= 0 ? "+" : "−"}{FCFA(Math.abs(resultat.soldes.net))}</span>
             {" "}→ compte {resultat.soldes.net >= 0 ? "131" : "139"}
           </p>
+          {resultat.detailEcritures && (
+            <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-green-700">
+              {resultat.detailEcritures.amortissements > 0 && <span>• {resultat.detailEcritures.amortissements} écriture(s) amortissement</span>}
+              {resultat.detailEcritures.variationStocks > 0 && <span>• {resultat.detailEcritures.variationStocks} écriture(s) stock</span>}
+              {resultat.detailEcritures.cloture > 0 && <span>• {resultat.detailEcritures.cloture} écriture(s) clôture SIG</span>}
+              {resultat.detailEcritures.aNouveaux > 0 && <span>• {resultat.detailEcritures.aNouveaux} à-nouveaux {annee + 1}</span>}
+              {resultat.detailEcritures.extournesRegularisations > 0 && (
+                <span>• {resultat.detailEcritures.extournesRegularisations} extourne(s) régularisation au 01/01/{annee + 1}</span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
