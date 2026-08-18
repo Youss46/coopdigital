@@ -42,6 +42,12 @@ interface MembreRow {
   certificationsBadges?: string[] | null;
 }
 
+interface FournisseurExterneRow {
+  id: number; nom: string; prenoms: string;
+  telephone: string | null; code: string | null;
+  createdAt: string | null; creeParDelegueId: number | null;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const COOP_ID_PAR_DEFAUT = 1;
@@ -211,6 +217,18 @@ export default function Membres() {
       return r.json() as Promise<DelegueInfo[]>;
     },
     enabled: !!utilisateur,
+  });
+
+  const { data: fournisseursExternes = [] } = useQuery<FournisseurExterneRow[]>({
+    queryKey: ["fournisseurs", "externe", utilisateur?.id],
+    queryFn: async () => {
+      const r = await apiFetch("/api/fournisseurs?type=externe");
+      if (!r.ok) return [];
+      const rows = await r.json() as FournisseurExterneRow[];
+      // Garder uniquement ceux créés par ce délégué
+      return rows.filter((f) => f.creeParDelegueId === utilisateur?.id);
+    },
+    enabled: estDelegue && !!utilisateur,
   });
 
   const membres: MembreRow[] = (onglet === "demandes" ? demandesData?.membres : data?.membres) ?? [];
@@ -548,6 +566,47 @@ export default function Membres() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── SECTION — Fournisseurs externes (délégué uniquement) ───────────────── */}
+      {estDelegue && !afficheDemandes && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-purple-800">🏪 Fournisseurs externes occasionnels</span>
+            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">{fournisseursExternes.length}</span>
+          </div>
+          <div className="bg-white rounded-xl border border-purple-100 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-purple-50">
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Nom & Prénoms</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Téléphone</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Enregistré le</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {fournisseursExternes.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">
+                      Aucun fournisseur externe enregistré pour l'instant.
+                    </td>
+                  </tr>
+                ) : fournisseursExternes.map((f) => (
+                  <tr key={f.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {f.nom} {f.prenoms}
+                      {f.code && <div className="text-xs text-purple-700 font-mono font-semibold mt-0.5">{f.code}</div>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{f.telephone ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">
+                      {f.createdAt ? new Date(f.createdAt).toLocaleDateString("fr-FR") : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
