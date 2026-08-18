@@ -32,6 +32,9 @@ export const membresTable = pgTable("membres", {
   sexe:           text("sexe"),
   dateNaissance:  date("date_naissance", { mode: "string" }),
 
+  // Catégorie de membre (label organisationnel, sans impact sur les droits)
+  categorieMembre: text("categorie_membre"),
+
   // Parts sociales & enrichissement GESTCOOP
   typeFournisseur: text("type_fournisseur"),
   section: text("section"),

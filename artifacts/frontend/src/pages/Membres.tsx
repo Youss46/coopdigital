@@ -40,6 +40,7 @@ interface MembreRow {
   demandeParDelegueId?: number | null;
   motifRejet?: string | null; createdAt?: string | null;
   certificationsBadges?: string[] | null;
+  categorieMembre?: string | null;
 }
 
 interface FournisseurExterneRow {
@@ -352,6 +353,7 @@ export default function Membres() {
           typeFournisseur: (form as Record<string, unknown>)["typeFournisseur"],
           nbrePartsSouscrites: (form as Record<string, unknown>)["nbrePartsSouscrites"] ? Number((form as Record<string, unknown>)["nbrePartsSouscrites"]) : undefined,
           carteProducteur: (form as Record<string, unknown>)["carteProducteur"] || undefined,
+          categorieMembre: (form as Record<string, unknown>)["categorieMembre"] || undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any),
       },
@@ -897,6 +899,17 @@ export default function Membres() {
                   <option value="membre">Membre</option>
                   {!estDelegue && <option value="pisteur">Pisteur</option>}
                   <option value="externe">Externe</option>
+                </select>
+              </div>
+
+              {/* Catégorie de membre — label organisationnel sans impact sur les droits */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Catégorie de membre</label>
+                <select value={((form as Record<string, unknown>)["categorieMembre"] as string) ?? ""}
+                  onChange={(e) => setForm({ ...form, ...{ categorieMembre: e.target.value || undefined } } as typeof form)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1">
+                  <option value="">— Non renseignée —</option>
+                  <option value="délégué de localités">Délégué de localités</option>
                 </select>
               </div>
 

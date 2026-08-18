@@ -440,6 +440,7 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
         photoUrl: data.photoUrl ?? null,
         parcelleLat: data.parcelleLat ?? null,
         parcelleLng: data.parcelleLng ?? null,
+        categorieMembre: (body["categorieMembre"] ?? null) as string | null,
         typeFournisseur: (body["typeFournisseur"] ?? null) as string | null,
         section: (body["section"] ?? null) as string | null,
         nbrePartsSouscrites: Number(body["nbrePartsSouscrites"] ?? 0),
@@ -569,6 +570,7 @@ export async function updateMembre(req: Request, res: Response): Promise<void> {
     const extraFields: Record<string, unknown> = {};
     if (body["dateNaissance"] !== undefined)    extraFields["dateNaissance"]     = body["dateNaissance"] as string | null;
     if (body["dateAdhesion"] !== undefined)     extraFields["dateAdhesion"]      = body["dateAdhesion"] as string | null;
+    if (body["categorieMembre"] !== undefined)  extraFields["categorieMembre"]   = body["categorieMembre"] as string | null;
     if (body["typeFournisseur"] !== undefined)  extraFields["typeFournisseur"]   = body["typeFournisseur"] as string | null;
     if (body["nbrePartsSouscrites"] !== undefined) extraFields["nbrePartsSouscrites"] = Number(body["nbrePartsSouscrites"]);
     if (body["superficieTotale"] !== undefined) extraFields["superficieTotale"]  = String(body["superficieTotale"]);

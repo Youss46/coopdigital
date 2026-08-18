@@ -555,8 +555,8 @@ export default function MembreFiche() {
     groupement: string; superficieHa: string; sexe: string; numeroCni: string;
     carteProducteur: string;
     dateNaissance: string; dateAdhesion: string; typeFournisseur: string; nbrePartsSouscrites: string;
-    superficieTotale: string; nombreParcelles: string;
-  }>({ nom: "", prenoms: "", telephone: "", village: "", groupement: "", superficieHa: "", sexe: "", numeroCni: "", carteProducteur: "", dateNaissance: "", dateAdhesion: "", typeFournisseur: "", nbrePartsSouscrites: "", superficieTotale: "", nombreParcelles: "" });
+    superficieTotale: string; nombreParcelles: string; categorieMembre: string;
+  }>({ nom: "", prenoms: "", telephone: "", village: "", groupement: "", superficieHa: "", sexe: "", numeroCni: "", carteProducteur: "", dateNaissance: "", dateAdhesion: "", typeFournisseur: "", nbrePartsSouscrites: "", superficieTotale: "", nombreParcelles: "", categorieMembre: "" });
 
   function openEditModal() {
     if (!membre) return;
@@ -576,6 +576,7 @@ export default function MembreFiche() {
       nbrePartsSouscrites: mx?.nbrePartsSouscrites != null ? String(mx.nbrePartsSouscrites) : "",
       superficieTotale: (mx?.superficieTotale as string | null) ?? "",
       nombreParcelles: (mx?.nombreParcelles as number | null) != null ? String(mx.nombreParcelles) : "",
+      categorieMembre: (mx?.categorieMembre as string | null) ?? "",
     });
     setShowEditModal(true);
   }
@@ -597,6 +598,7 @@ export default function MembreFiche() {
       if (editForm.dateNaissance.trim())    body["dateNaissance"]     = editForm.dateNaissance.trim();
       if (editForm.dateAdhesion.trim())     body["dateAdhesion"]      = editForm.dateAdhesion.trim();
       if (editForm.typeFournisseur)         body["typeFournisseur"]   = editForm.typeFournisseur;
+      body["categorieMembre"] = editForm.categorieMembre || null as unknown as string;
       if (editForm.nbrePartsSouscrites.trim()) body["nbrePartsSouscrites"] = parseFloat(editForm.nbrePartsSouscrites);
       if (editForm.superficieTotale.trim()) body["superficieTotale"] = editForm.superficieTotale.trim();
       if (editForm.nombreParcelles.trim())  body["nombreParcelles"]  = parseInt(editForm.nombreParcelles);
@@ -760,6 +762,11 @@ export default function MembreFiche() {
             <span className="flex items-center gap-1"><Phone size={13} />{membre.telephone}</span>
             {membre.village && <span className="flex items-center gap-1"><MapPin size={13} />{membre.village}</span>}
             {membre.groupement && <span className="flex items-center gap-1"><Users size={13} />{membre.groupement}</span>}
+            {(mx?.categorieMembre as string | null) && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs font-medium">
+                {mx?.categorieMembre as string}
+              </span>
+            )}
             <span className="flex items-center gap-1"><Leaf size={13} />{parseFloat(membre.superficieHa).toFixed(2)} ha déclarée</span>
             {parcellesAvecGps.length > 0 && (
               <span className={`flex items-center gap-1 font-medium ${alerteSuperficieGps ? "text-amber-600" : "text-green-600"}`}>
@@ -1859,6 +1866,17 @@ export default function MembreFiche() {
                     <option value="membre">Membre</option>
                     <option value="pisteur">Pisteur</option>
                     <option value="externe">Externe</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Catégorie de membre</label>
+                  <select
+                    value={editForm.categorieMembre}
+                    onChange={e => setEditForm(f => ({ ...f, categorieMembre: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                  >
+                    <option value="">— Non renseignée —</option>
+                    <option value="délégué de localités">Délégué de localités</option>
                   </select>
                 </div>
                 <div>

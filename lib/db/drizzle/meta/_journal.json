@@ -757,6 +757,13 @@
       "when": 1788480400000,
       "tag": "0107_sessions_pesee_fournisseur",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1788480500000,
+      "tag": "0108_membre_categorie",
+      "breakpoints": true
     }
   ]
 }
