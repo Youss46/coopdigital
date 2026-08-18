@@ -3924,14 +3924,13 @@ export async function generateBordereauAchatSession(
     .orderBy(lignesPeseeTable.numeroPassage);
 
   // 3. Transfert + délégué
-  let immatriculation  = "—";
-  let nomChauffeur     = "—";
-  let delegueNom       = "—";
-  let deleguePrenoms   = "";
-  let delegueTel       = "—";
-  let delegueZone      = "—";
-  let carburantFcfa    = 0;
-  let delegModeGestion: "autonome" | "central" = "autonome";
+  let immatriculation = "—";
+  let nomChauffeur    = "—";
+  let delegueNom      = "—";
+  let deleguePrenoms  = "";
+  let delegueTel      = "—";
+  let delegueZone     = "—";
+  let carburantFcfa   = 0;
 
   if (session.transfertId) {
     const [t] = await db
@@ -3952,7 +3951,7 @@ export async function generateBordereauAchatSession(
 
       if (t.delegueId) {
         const [[delegue], [entrepot]] = await Promise.all([
-          db.select({ nom: usersTable.nom, prenoms: usersTable.prenoms, telephone: usersTable.telephone, modeGestion: usersTable.modeGestion })
+          db.select({ nom: usersTable.nom, prenoms: usersTable.prenoms, telephone: usersTable.telephone })
             .from(usersTable)
             .where(eq(usersTable.id, t.delegueId))
             .limit(1),
@@ -3965,10 +3964,9 @@ export async function generateBordereauAchatSession(
             .limit(1),
         ]);
         if (delegue) {
-          delegueNom       = delegue.nom      ?? "—";
-          deleguePrenoms   = delegue.prenoms  ?? "";
-          delegueTel       = delegue.telephone ?? "—";
-          delegModeGestion = (delegue.modeGestion ?? "autonome") as "autonome" | "central";
+          delegueNom     = delegue.nom      ?? "—";
+          deleguePrenoms = delegue.prenoms  ?? "";
+          delegueTel     = delegue.telephone ?? "—";
         }
         if (entrepot) delegueZone = entrepot.zoneNom ?? "—";
       }
@@ -4029,11 +4027,7 @@ export async function generateBordereauAchatSession(
   const poidsNetKg    = parseFloat(session.poidsTotalKg ?? "0");
   const poidsBrutKg   = lignes.reduce((s, l) => s + parseFloat(l.poidsBrutKg), 0);
   const valeurProduit = Math.round(poidsNetKg * prixUnitaire);
-  // Mode central : la valeur produit a déjà été payée via la caisse déléguée.
-  // La coopérative ne doit plus que les frais de collecte (commission).
-  const montantNet = delegModeGestion === "central"
-    ? fraisCollecteFcfa
-    : valeurProduit + fraisCollecteFcfa;
+  const montantNet    = valeurProduit + fraisCollecteFcfa;
 
   // 8. PDF
   const { doc, endPromise } = makePdfDoc();
@@ -4164,16 +4158,8 @@ export async function generateBordereauAchatSession(
     `${formaterNombre(montantNet)} F`,
   ].forEach((v, i) => {
     if (v) {
-      // Colonne VALEUR PRODUIT (index 4) : grisée + mention "(réglée)" si mode central
-      if (i === 4 && delegModeGestion === "central") {
-        doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-          .text(v, cx + 3, cellMidY - 4, { width: colW[i]! - 6, align: "center", lineBreak: false });
-        doc.fontSize(6).fillColor(GRIS).font("Helvetica")
-          .text("(réglée via caisse)", cx + 3, cellMidY + 6, { width: colW[i]! - 6, align: "center", lineBreak: false });
-      } else {
-        doc.fontSize(9).fillColor("black").font("Helvetica-Bold")
-          .text(v, cx + 3, cellMidY, { width: colW[i]! - 6, align: "center", lineBreak: false });
-      }
+      doc.fontSize(9).fillColor("black").font("Helvetica-Bold")
+        .text(v, cx + 3, cellMidY, { width: colW[i]! - 6, align: "center", lineBreak: false });
     }
     cx += colW[i]!;
   });
