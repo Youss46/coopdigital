@@ -40,7 +40,7 @@ import {
 } from "../lib/idb";
 import type { AvanceDeleagueTerrain } from "../lib/api";
 
-type Step = "membre" | "session" | "succes";
+type Step = "membre" | "certif" | "session" | "succes";
 
 function RecuLivraisonButton({ livraisonId }: { livraisonId: number }) {
   const [loading, setLoading] = useState(false);
@@ -131,6 +131,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const [poidsBrut, setPoidsBrut] = useState("");
   const [tare, setTare] = useState("0");
   const [notesLigne, setNotesLigne] = useState("");
+  const [certificationCacao, setCertificationCacao] = useState<string>("");
   const [ajoutLoading, setAjoutLoading] = useState(false);
   const [terminerLoading, setTerminerLoading] = useState(false);
   const [annulerLoading, setAnnulerLoading] = useState(false);
@@ -318,29 +319,21 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   }
 
   // ── Sélection du membre (chemin standard) ─────────────────────────────────
+  // Si une session active existe déjà → reprendre directement.
+  // Sinon → passer par l'étape "certif" pour déclarer le type de cacao avant création.
   async function handleSelectMembre(f: Fournisseur) {
     setFournisseur(f);
     setErreur("");
+    setCertificationCacao("");
 
     if (!isOnline) {
-      // Mode hors ligne : créer un brouillon local
-      try {
-        const newBrouillon = await createBrouillon({
-          membreId: f.id, membreNom: f.nom, membrePrenoms: f.prenoms,
-          membreCode: f.code, produit: "cacao", operation: "reception",
-        });
-        setBrouillon(newBrouillon);
-        setSession(brouillonToSyntheticSession(newBrouillon));
-        setStep("session");
-      } catch (err) {
-        setErreur((err as Error).message);
-      }
+      // Mode hors ligne → aller à l'étape certif avant de créer le brouillon
+      setStep("certif");
       return;
     }
 
     try {
       // Chemin rapide : sessionId déjà connu dans le cache local
-      // Fournisseurs externes utilisent une clé négative pour éviter collision avec IDs membres
       const cacheKey = f.typeMembre === "externe" ? -f.id : f.id;
       const knownId = activeSessions.get(cacheKey);
       if (knownId !== undefined) {
@@ -360,30 +353,56 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
         ? await getSessionsEnCours(undefined, f.id)
         : await getSessionsEnCours(f.id);
       if (sessions.length > 0) {
+        // Session existante → reprendre sans passer par certif
         const detail = await getSessionDetail(sessions[0]!.id);
         setSession(detail);
+        setStep("session");
       } else {
-        // Créer une nouvelle session
-        try {
-          const sessionPayload = isExterne
-            ? { fournisseurId: f.id, produit: "cacao", operation: "reception" }
-            : { membreId: f.id, produit: "cacao", operation: "reception" };
-          const s = await createSessionPesee(sessionPayload);
-          const detail = await getSessionDetail(s.id);
-          setSession(detail);
-        } catch (createErr) {
-          // Race condition : un autre peseur a créé une session entre le check et le create
-          if (createErr instanceof SessionEnCoursError) {
-            const detail = await getSessionDetail(createErr.sessionId);
-            setSession(detail);
-          } else {
-            throw createErr;
-          }
-        }
+        // Nouvelle session → déclarer le type de cacao d'abord
+        setStep("certif");
       }
-      setStep("session");
     } catch (err) {
       setErreur((err as Error).message);
+    }
+  }
+
+  // ── Confirmation de la certification + création de session ─────────────────
+  async function handleConfirmerCertif() {
+    if (!fournisseur) return;
+    setErreur("");
+
+    if (!isOnline) {
+      try {
+        const newBrouillon = await createBrouillon({
+          membreId: fournisseur.id, membreNom: fournisseur.nom, membrePrenoms: fournisseur.prenoms,
+          membreCode: fournisseur.code, produit: "cacao", operation: "reception",
+        });
+        setBrouillon(newBrouillon);
+        setSession(brouillonToSyntheticSession(newBrouillon));
+        setStep("session");
+      } catch (err) {
+        setErreur((err as Error).message);
+      }
+      return;
+    }
+
+    try {
+      const isExterne = fournisseur.typeMembre === "externe";
+      const sessionPayload = isExterne
+        ? { fournisseurId: fournisseur.id, produit: "cacao", operation: "reception", certificationCacao: certificationCacao || undefined }
+        : { membreId: fournisseur.id, produit: "cacao", operation: "reception", certificationCacao: certificationCacao || undefined };
+      const s = await createSessionPesee(sessionPayload);
+      const detail = await getSessionDetail(s.id);
+      setSession(detail);
+      setStep("session");
+    } catch (createErr) {
+      if (createErr instanceof SessionEnCoursError) {
+        const detail = await getSessionDetail(createErr.sessionId);
+        setSession(detail);
+        setStep("session");
+      } else {
+        setErreur((createErr as Error).message);
+      }
     }
   }
 
@@ -725,6 +744,73 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               onSelectActiveSession={handleSelectActiveSession}
             />
           </>
+        )}
+
+        {/* ─── STEP : Certification cacao ──────────────────────────────── */}
+        {step === "certif" && fournisseur && (
+          <div style={{ padding: "16px" }}>
+            {/* Membre sélectionné */}
+            <div style={{
+              background: "var(--t-peseur-bg)", border: "1.5px solid var(--t-peseur)",
+              borderRadius: 12, padding: "12px 14px", marginBottom: 20,
+            }}>
+              <div style={{ fontSize: ".7rem", color: "var(--t-peseur)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 2 }}>Producteur</div>
+              <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--t-text)" }}>{fournisseur.prenoms} {fournisseur.nom}</div>
+              {fournisseur.code && <div style={{ fontSize: ".78rem", color: "var(--t-muted)", marginTop: 2 }}>Code : {fournisseur.code}</div>}
+            </div>
+
+            {/* Sélection du type de cacao */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: ".72rem", color: "var(--t-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>
+                Type de cacao
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {(["RA", "FAIRTRADE", "ASR_1000", "ORDINAIRE"] as const).map(cert => (
+                  <button
+                    key={cert}
+                    onClick={() => setCertificationCacao(certificationCacao === cert ? "" : cert)}
+                    style={{
+                      padding: "16px 8px",
+                      borderRadius: 12,
+                      border: `2px solid ${certificationCacao === cert ? "var(--t-peseur)" : "var(--t-border)"}`,
+                      background: certificationCacao === cert ? "var(--t-peseur-bg)" : "var(--t-card)",
+                      color: certificationCacao === cert ? "var(--t-peseur-dark)" : "var(--t-text)",
+                      fontWeight: 700, fontSize: ".95rem",
+                      cursor: "pointer", transition: "all .15s",
+                    }}
+                  >
+                    {cert}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {erreur && (
+              <div style={{
+                marginBottom: 12, padding: "10px 14px", borderRadius: 10,
+                borderLeft: "4px solid var(--t-danger)", background: "var(--t-danger-bg)",
+                display: "flex", gap: 8, alignItems: "center",
+              }}>
+                <AlertTriangle size={15} color="var(--t-danger)" style={{ flexShrink: 0 }} />
+                <span style={{ color: "var(--t-danger)", fontSize: ".85rem" }}>{erreur}</span>
+              </div>
+            )}
+
+            <button
+              onClick={handleConfirmerCertif}
+              className="t-btn t-btn--primary"
+              style={{ width: "100%", marginBottom: 10 }}
+            >
+              {certificationCacao ? `Commencer — ${certificationCacao}` : "Commencer la pesée"}
+            </button>
+            <button
+              onClick={() => { setStep("membre"); setFournisseur(null); setErreur(""); }}
+              className="t-btn t-btn--ghost"
+              style={{ width: "100%" }}
+            >
+              ← Retour
+            </button>
+          </div>
         )}
 
         {/* ─── STEP : Session active ────────────────────────────────────── */}
@@ -1106,6 +1192,14 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                 <span className="t-recap-row__label">Produit</span>
                 <span className="t-recap-row__value">{sessionTerminee.produit}</span>
               </div>
+              {sessionTerminee.certificationCacao && (
+                <div className="t-recap-row">
+                  <span className="t-recap-row__label">Certification</span>
+                  <span className="t-recap-row__value" style={{ fontWeight: 700, color: "var(--t-peseur-dark)" }}>
+                    {sessionTerminee.certificationCacao}
+                  </span>
+                </div>
+              )}
               <div className="t-recap-row">
                 <span className="t-recap-row__label">Nombre de pesées</span>
                 <span className="t-recap-row__value">{sessionTerminee.lignes?.length ?? 0} passages</span>

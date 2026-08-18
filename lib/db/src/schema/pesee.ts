@@ -28,6 +28,8 @@ export const sessionsPeseeTable = pgTable("sessions_pesee", {
   livraisonId:    integer("livraison_id"),
   /** Pour les sessions de type 'reception_transfert' : ID du transfert concerné */
   transfertId:    integer("transfert_id"),
+  /** Certification du cacao déclarée par le peseur : 'RA' | 'FAIRTRADE' | 'ASR_1000' | 'ORDINAIRE' */
+  certificationCacao: varchar("certification_cacao", { length: 20 }),
   dateDebut:      timestamp("date_debut", { withTimezone: true }).defaultNow().notNull(),
   dateFin:        timestamp("date_fin", { withTimezone: true }),
   createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

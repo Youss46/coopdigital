@@ -407,6 +407,8 @@ export async function createSessionPesee(data: {
   produit?: string; operation?: string; notes?: string;
   /** Pour les sessions de réception de transfert */
   transfertId?: number;
+  /** Certification du cacao : 'RA' | 'FAIRTRADE' | 'ASR_1000' | 'ORDINAIRE' */
+  certificationCacao?: string;
 }): Promise<import("./types").SessionPesee> {
   const token = getToken();
   const headers: Record<string, string> = {

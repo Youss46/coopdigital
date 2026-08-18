@@ -412,6 +412,8 @@ export interface SessionPesee {
   livraisonId: number | null;
   /** Pour les sessions de type 'reception_transfert' */
   transfertId?: number | null;
+  /** Certification du cacao déclarée par le peseur */
+  certificationCacao?: string | null;
   createdAt: string;
 }
 

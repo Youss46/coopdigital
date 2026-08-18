@@ -3920,14 +3920,15 @@ export async function generateBordereauAchatSession(
   // 1. Session
   const [session] = await db
     .select({
-      id:            sessionsPeseeTable.id,
-      numeroSession: sessionsPeseeTable.numeroSession,
-      produit:       sessionsPeseeTable.produit,
-      poidsTotalKg:  sessionsPeseeTable.poidsTotalKg,
-      nbSacsTotal:   sessionsPeseeTable.nbSacsTotal,
-      dateFin:       sessionsPeseeTable.dateFin,
-      transfertId:   sessionsPeseeTable.transfertId,
-      createdAt:     sessionsPeseeTable.createdAt,
+      id:                 sessionsPeseeTable.id,
+      numeroSession:      sessionsPeseeTable.numeroSession,
+      produit:            sessionsPeseeTable.produit,
+      poidsTotalKg:       sessionsPeseeTable.poidsTotalKg,
+      nbSacsTotal:        sessionsPeseeTable.nbSacsTotal,
+      dateFin:            sessionsPeseeTable.dateFin,
+      transfertId:        sessionsPeseeTable.transfertId,
+      certificationCacao: sessionsPeseeTable.certificationCacao,
+      createdAt:          sessionsPeseeTable.createdAt,
     })
     .from(sessionsPeseeTable)
     .where(and(
@@ -4156,6 +4157,24 @@ export async function generateBordereauAchatSession(
     doc.font("Helvetica-Bold").fillColor("black").text(dateStr, PAGE_W - M - 94, y + 3, { width: 94, lineBreak: false });
     y += 18;
   }
+
+  // Bandeau Certification cacao (si renseignée)
+  if (session.certificationCacao) {
+    const CERT_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+      RA:        { bg: "#f0fdf4", border: "#16a34a", text: "#15803d" },
+      FAIRTRADE: { bg: "#fffbeb", border: "#d97706", text: "#b45309" },
+      ASR_1000:  { bg: "#eff6ff", border: "#2563eb", text: "#1d4ed8" },
+      ORDINAIRE: { bg: "#f9fafb", border: "#6b7280", text: "#374151" },
+    };
+    const cc = CERT_COLORS[session.certificationCacao] ?? CERT_COLORS["ORDINAIRE"]!;
+    const certW = 140;
+    const certX = M + BW - certW;
+    doc.rect(certX, y, certW, 16).fillAndStroke(cc.bg, cc.border);
+    doc.fontSize(8).fillColor(cc.text).font("Helvetica-Bold")
+      .text(`Cacao ${session.certificationCacao}`, certX, y + 4, { width: certW, align: "center", lineBreak: false });
+    y += 20;
+  }
+
   y += 6;
 
   // ── IDENTIFICATION (gauche) + DÉTAILS PESÉE (droite) ───────────────────────

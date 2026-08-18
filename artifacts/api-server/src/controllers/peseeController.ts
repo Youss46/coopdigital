@@ -335,8 +335,8 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const actorId = req.agent?.id ?? req.user?.id;
-  const { membreId, fournisseurId, produit, operation, balanceId, notes, transfertId } = req.body as {
-    membreId?: number; fournisseurId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string; transfertId?: number;
+  const { membreId, fournisseurId, produit, operation, balanceId, notes, transfertId, certificationCacao } = req.body as {
+    membreId?: number; fournisseurId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string; transfertId?: number; certificationCacao?: string;
   };
 
   // ── Guard : seul le peseur central (delegueId === null) peut démarrer une session de réception de transfert
@@ -355,6 +355,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       produit, operation, balanceId, notes,
       peseurId: actorId,
       transfertId: transfertId ? Number(transfertId) : undefined,
+      certificationCacao: certificationCacao || undefined,
     });
     res.status(201).json(session);
   } catch (err) {

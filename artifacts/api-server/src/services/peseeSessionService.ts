@@ -182,6 +182,8 @@ export async function createSession(
     notes?: string;
     /** ID du transfert pour une session de type 'reception_transfert' */
     transfertId?: number;
+    /** Certification du cacao : 'RA' | 'FAIRTRADE' | 'ASR_1000' | 'ORDINAIRE' */
+    certificationCacao?: string;
   },
 ) {
   // ── Cas 1 : session de réception de transfert (atomique) ─────────────────
@@ -310,6 +312,7 @@ export async function createSession(
         balanceId: data.balanceId,
         notes:     data.notes,
         transfertId: null,
+        certificationCacao: data.certificationCacao ?? null,
       })
       .returning();
 
