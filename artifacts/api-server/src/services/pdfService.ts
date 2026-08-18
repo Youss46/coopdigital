@@ -801,6 +801,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     peseurId: livraisonsTable.peseurId,
     peseurNom: peseurUserAlias.nom,
     peseurPrenoms: peseurUserAlias.prenoms,
+    createdAt: livraisonsTable.createdAt,
   }).from(livraisonsTable)
     .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
     .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
