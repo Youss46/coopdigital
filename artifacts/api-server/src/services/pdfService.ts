@@ -38,8 +38,10 @@ import {
   sessionsPeseeTable,
   lignesPeseeTable,
   historiquePrixTable,
+  caissesDeleguesTable,
+  alimentationsCaisseDelegueTable,
 } from "@workspace/db";
-import { eq, desc, gte, lte, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, gte, lte, lt, and, sql, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
 import { computeCodeMembre } from "./portailService";
@@ -3907,6 +3909,7 @@ export async function generateBordereauAchatSession(
       nbSacsTotal:   sessionsPeseeTable.nbSacsTotal,
       dateFin:       sessionsPeseeTable.dateFin,
       transfertId:   sessionsPeseeTable.transfertId,
+      createdAt:     sessionsPeseeTable.createdAt,
     })
     .from(sessionsPeseeTable)
     .where(and(
@@ -3924,15 +3927,15 @@ export async function generateBordereauAchatSession(
     .orderBy(lignesPeseeTable.numeroPassage);
 
   // 3. Transfert + délégué
-  let immatriculation = "—";
-  let nomChauffeur    = "—";
-  let delegueNom      = "—";
-  let deleguePrenoms  = "";
-  let delegueTel      = "—";
-  let delegueZone     = "—";
-  let carburantFcfa   = 0;
-
-  let modeFinancement = "fonds_propres";
+  let immatriculation  = "—";
+  let nomChauffeur     = "—";
+  let delegueNom       = "—";
+  let deleguePrenoms   = "";
+  let delegueTel       = "—";
+  let delegueZone      = "—";
+  let carburantFcfa    = 0;
+  let modeFinancement  = "fonds_propres";
+  let delegueIdSession: number | null = null;
 
   if (session.transfertId) {
     const [t] = await db
@@ -3954,6 +3957,7 @@ export async function generateBordereauAchatSession(
       modeFinancement = t.modeFinancement ?? "fonds_propres";
 
       if (t.delegueId) {
+        delegueIdSession = t.delegueId;
         const [[delegue], [entrepot]] = await Promise.all([
           db.select({ nom: usersTable.nom, prenoms: usersTable.prenoms, telephone: usersTable.telephone })
             .from(usersTable)
@@ -3998,28 +4002,48 @@ export async function generateBordereauAchatSession(
     if (comm) fraisCollecteFcfa = Math.round(parseFloat(comm.montantFcfa ?? "0"));
   }
 
-  // 6. Avances du délégué (pour bordereau informatif)
-  let soldeAvancesFcfa  = 0;
+  // 6. Avances du délégué + montant caisse coopérative crédité avant la session
+  let soldeAvancesFcfa   = 0;
   let retenueEstimeeFcfa = 0;
-  if (session.transfertId) {
-    const [t2] = await db
-      .select({ delegueId: transfertsStockTable.delegueId })
-      .from(transfertsStockTable)
-      .where(eq(transfertsStockTable.id, session.transfertId))
-      .limit(1);
-    if (t2?.delegueId) {
-      const avances = await db
-        .select({ soldeRestantFcfa: avancesDeleguesTable.soldeRestantFcfa, planType: avancesDeleguesTable.planType, montantPartielFcfa: avancesDeleguesTable.montantPartielFcfa })
-        .from(avancesDeleguesTable)
+  let montantCoopFcfa    = 0;   // total alimentations caisse avant session (mode caisse_cooperative)
+
+  if (delegueIdSession) {
+    // 6a. Avances en cours (informatif)
+    const avances = await db
+      .select({ soldeRestantFcfa: avancesDeleguesTable.soldeRestantFcfa, planType: avancesDeleguesTable.planType, montantPartielFcfa: avancesDeleguesTable.montantPartielFcfa })
+      .from(avancesDeleguesTable)
+      .where(and(
+        eq(avancesDeleguesTable.delegueId, delegueIdSession),
+        eq(avancesDeleguesTable.cooperativeId, cooperativeId),
+        inArray(avancesDeleguesTable.statut, ["en_cours", "en_retard"] as const),
+      ));
+    soldeAvancesFcfa = avances.reduce((s, a) => s + a.soldeRestantFcfa, 0);
+    for (const a of avances) {
+      if (a.planType === "integral") retenueEstimeeFcfa += a.soldeRestantFcfa;
+      else if (a.planType === "partiel" && a.montantPartielFcfa) retenueEstimeeFcfa += Math.min(a.montantPartielFcfa, a.soldeRestantFcfa);
+    }
+
+    // 6b. Si mode caisse_cooperative : somme des alimentations avant le début de session
+    if (modeFinancement === "caisse_cooperative") {
+      const [caisse] = await db
+        .select({ id: caissesDeleguesTable.id })
+        .from(caissesDeleguesTable)
         .where(and(
-          eq(avancesDeleguesTable.delegueId, t2.delegueId),
-          eq(avancesDeleguesTable.cooperativeId, cooperativeId),
-          inArray(avancesDeleguesTable.statut, ["en_cours", "en_retard"] as const),
-        ));
-      soldeAvancesFcfa = avances.reduce((s, a) => s + a.soldeRestantFcfa, 0);
-      for (const a of avances) {
-        if (a.planType === "integral") retenueEstimeeFcfa += a.soldeRestantFcfa;
-        else if (a.planType === "partiel" && a.montantPartielFcfa) retenueEstimeeFcfa += Math.min(a.montantPartielFcfa, a.soldeRestantFcfa);
+          eq(caissesDeleguesTable.userId, delegueIdSession),
+          eq(caissesDeleguesTable.cooperativeId, cooperativeId),
+        ))
+        .limit(1);
+
+      if (caisse) {
+        const cutoff = session.createdAt ?? new Date();
+        const alims = await db
+          .select({ montantFcfa: alimentationsCaisseDelegueTable.montantFcfa })
+          .from(alimentationsCaisseDelegueTable)
+          .where(and(
+            eq(alimentationsCaisseDelegueTable.caisseDelegueId, caisse.id),
+            lt(alimentationsCaisseDelegueTable.dateEnvoi, cutoff),
+          ));
+        montantCoopFcfa = alims.reduce((s, a) => s + Math.round(parseFloat(a.montantFcfa ?? "0")), 0);
       }
     }
   }
@@ -4031,11 +4055,15 @@ export async function generateBordereauAchatSession(
   const poidsNetKg    = parseFloat(session.poidsTotalKg ?? "0");
   const poidsBrutKg   = lignes.reduce((s, l) => s + parseFloat(l.poidsBrutKg), 0);
   const valeurProduit = Math.round(poidsNetKg * prixUnitaire);
-  // Mode de financement :
-  //   fonds_propres      → MONTANT NET = valeur produit + frais de collecte
-  //   caisse_cooperative → MONTANT NET = frais de collecte uniquement
-  const caisseCoop = modeFinancement === "caisse_cooperative";
-  const montantNet = caisseCoop ? fraisCollecteFcfa : valeurProduit + fraisCollecteFcfa;
+  const caisseCoop    = modeFinancement === "caisse_cooperative";
+
+  // Formule nuancée :
+  //   fonds_propres      → délégué a tout financé → NET = valeur + frais collecte
+  //   caisse_cooperative → NET = MAX(valeur - alimentations caisse, 0) + frais collecte
+  //     Si alimentations >= valeur : la coop a tout couvert → NET = frais collecte seulement
+  //     Si alimentations < valeur  : le délégué a complété  → NET = (valeur - alims) + frais
+  const resteValeurFcfa = caisseCoop ? Math.max(valeurProduit - montantCoopFcfa, 0) : valeurProduit;
+  const montantNet      = resteValeurFcfa + fraisCollecteFcfa;
 
   // 8. PDF
   const { doc, endPromise } = makePdfDoc();
@@ -4176,12 +4204,18 @@ export async function generateBordereauAchatSession(
   {
     const vpX = MARGIN + colW.slice(0, 4).reduce((a, b) => a + b, 0);
     const vpW = colW[4]!;
-    if (caisseCoop) {
-      // Afficher en gris avec mention "réglée via caisse"
+    if (caisseCoop && montantCoopFcfa >= valeurProduit) {
+      // Coop a tout couvert → grisé "réglée via caisse"
       doc.fontSize(7.5).fillColor(GRIS).font("Helvetica-Bold")
         .text(valeurProduit > 0 ? `${formaterNombre(valeurProduit)} F` : "—", vpX + 3, cellMidY - 5, { width: vpW - 6, align: "center", lineBreak: false });
       doc.fontSize(6).fillColor(GRIS).font("Helvetica")
         .text("réglée via caisse", vpX + 2, cellMidY + 3, { width: vpW - 4, align: "center", lineBreak: false });
+    } else if (caisseCoop && montantCoopFcfa > 0) {
+      // Financement partiel → valeur totale + note "dont X F via caisse"
+      doc.fontSize(8).fillColor("black").font("Helvetica-Bold")
+        .text(`${formaterNombre(valeurProduit)} F`, vpX + 3, cellMidY - 5, { width: vpW - 6, align: "center", lineBreak: false });
+      doc.fontSize(5.5).fillColor(GRIS).font("Helvetica")
+        .text(`dont ${formaterNombre(montantCoopFcfa)} F caisse`, vpX + 2, cellMidY + 4, { width: vpW - 4, align: "center", lineBreak: false });
     } else {
       doc.fontSize(9).fillColor("black").font("Helvetica-Bold")
         .text(valeurProduit > 0 ? `${formaterNombre(valeurProduit)} F` : "—", vpX + 3, cellMidY, { width: vpW - 6, align: "center", lineBreak: false });
