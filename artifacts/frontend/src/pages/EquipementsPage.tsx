@@ -467,7 +467,6 @@ function OngletAmortissements() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [mois, setMois] = useState(new Date().getMonth() + 1);
   const [annee, setAnnee] = useState(new Date().getFullYear());
   const [showTableau, setShowTableau] = useState(false);
 
@@ -486,7 +485,7 @@ function OngletAmortissements() {
         const d = data as { nb_dotations?: number };
         qc.invalidateQueries({ queryKey: getGetEquipementsQueryKey() });
         qc.invalidateQueries({ queryKey: getGetRapportInventaireEquipementsQueryKey() });
-        toast({ title: `${d.nb_dotations ?? 0} dotation(s) générée(s) pour ${String(mois).padStart(2, "0")}/${annee}` });
+        toast({ title: `${d.nb_dotations ?? 0} dotation(s) générée(s) pour l'exercice ${annee}` });
       },
     },
   });
@@ -529,35 +528,25 @@ function OngletAmortissements() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <RefreshCw className="w-4 h-4" />
-            Générer les dotations mensuelles
+            Générer les dotations annuelles
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3 items-end">
             <div>
-              <Label>Mois</Label>
-              <Select value={String(mois)} onValueChange={(v) => setMois(Number(v))}>
-                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {moisOptions.map((m, i) => (
-                    <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Année</Label>
+              <Label>Exercice</Label>
               <Input type="number" value={annee} onChange={(e) => setAnnee(Number(e.target.value))} className="w-28" />
             </div>
             <Button
               className="bg-green-700 hover:bg-green-800 text-white"
               disabled={dotMut.isPending}
-              onClick={() => dotMut.mutate({ data: { mois, annee } })}
+              onClick={() => dotMut.mutate({ data: { annee } })}
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${dotMut.isPending ? "animate-spin" : ""}`} />
-              Générer
+              Générer les dotations {annee}
             </Button>
           </div>
+          <p className="text-xs text-gray-400 mt-2">La dotation est calculée en une fois par exercice et comptabilisée au 31/12.</p>
         </CardContent>
       </Card>
 

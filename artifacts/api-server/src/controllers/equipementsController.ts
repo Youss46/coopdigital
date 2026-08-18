@@ -155,8 +155,8 @@ export async function getTableauAmortissement(req: Request, res: Response, next:
 export async function postGenererDotations(req: Request, res: Response, next: NextFunction) {
   try {
     const coopId = getCoopId(req, res); if (!coopId) return;
-    const { mois, annee } = req.body as { mois: number; annee: number };
-    const data = await svc.genererDotationsMensuelles(coopId, mois, annee);
+    const { annee } = req.body as { annee: number };
+    const data = await svc.genererDotationsAnnuelles(coopId, annee);
     res.json(data);
   } catch (e) { next(e); }
 }

@@ -16,7 +16,7 @@ function toNum(v: unknown): number {
 
 // ─── Amortissement ────────────────────────────────────────────────────────────
 
-export function calculerDotationMensuelle(equipement: {
+export function calculerDotationAnnuelle(equipement: {
   valeur_acquisition_fcfa: string | null;
   valeur_residuelle_fcfa: string | null;
   valeur_nette_comptable_fcfa: string | null;
@@ -31,13 +31,15 @@ export function calculerDotationMensuelle(equipement: {
   if (equipement.methode_amortissement === "degressif") {
     const tauxDegressif = (1 / duree) * 2;
     const vnc = toNum(equipement.valeur_nette_comptable_fcfa);
-    const dotAnnuelle = vnc * tauxDegressif;
-    return Math.round(dotAnnuelle / 12);
+    return Math.round(vnc * tauxDegressif);
   }
 
   // linéaire (défaut)
-  return Math.round(base / duree / 12);
+  return Math.round(base / duree);
 }
+
+/** @deprecated Alias for backward compatibility — use calculerDotationAnnuelle */
+export const calculerDotationMensuelle = calculerDotationAnnuelle;
 
 export function genererTableauAmortissement(equipement: {
   id: number;
@@ -57,8 +59,7 @@ export function genererTableauAmortissement(equipement: {
   const valRes = toNum(equipement.valeur_residuelle_fcfa);
   const base = valBrute - valRes;
   const duree = equipement.duree_amortissement_ans || 1;
-  const start = new Date(equipement.date_mise_service ?? equipement.date_acquisition);
-  const totalMois = duree * 12;
+  const startYear = new Date(equipement.date_mise_service ?? equipement.date_acquisition).getFullYear();
 
   const lignes: Array<{
     periode: string; exercice: number; mois: number;
@@ -68,18 +69,15 @@ export function genererTableauAmortissement(equipement: {
   let cumul = 0;
   let vnc = base;
 
-  for (let i = 0; i < totalMois; i++) {
-    const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
-    const mois = d.getMonth() + 1;
-    const exercice = d.getFullYear();
-    const periode = `${String(mois).padStart(2, "0")}/${exercice}`;
+  for (let i = 0; i < duree; i++) {
+    const exercice = startYear + i;
 
     let dotation: number;
     if (equipement.methode_amortissement === "degressif") {
       const taux = (1 / duree) * 2;
-      dotation = Math.round(vnc * taux / 12);
+      dotation = Math.round(vnc * taux);
     } else {
-      dotation = Math.round(base / duree / 12);
+      dotation = Math.round(base / duree);
     }
 
     // Ne pas dépasser la valeur résiduelle
@@ -90,7 +88,14 @@ export function genererTableauAmortissement(equipement: {
     cumul += dotation;
     vnc -= dotation;
 
-    lignes.push({ periode, exercice, mois, dotation_fcfa: dotation, cumul_fcfa: cumul, vnc_fcfa: Math.max(0, vnc) });
+    lignes.push({
+      periode: String(exercice),
+      exercice,
+      mois: 12,  // Dotation annuelle — comptabilisée au 31/12
+      dotation_fcfa: dotation,
+      cumul_fcfa: cumul,
+      vnc_fcfa: Math.max(0, vnc),
+    });
 
     if (vnc <= valRes) break;
   }
@@ -363,6 +368,11 @@ export async function getEquipementsAmortis(cooperativeId: number) {
 
 // ─── Dotations ────────────────────────────────────────────────────────────────
 
+export async function genererDotationsAnnuelles(cooperativeId: number, annee: number) {
+  return genererDotationsMensuelles(cooperativeId, 12, annee);
+}
+
+/** @deprecated Use genererDotationsAnnuelles */
 export async function genererDotationsMensuelles(cooperativeId: number, mois: number, annee: number) {
   const equips = await db
     .select({
@@ -415,7 +425,7 @@ export async function genererDotationsMensuelles(cooperativeId: number, mois: nu
       methode_amortissement: eq_.methodeAmortissement,
     };
 
-    let dotation = calculerDotationMensuelle(equip);
+    let dotation = calculerDotationAnnuelle(equip);
     if (vnc - dotation < valRes) dotation = Math.max(0, vnc - valRes);
     if (dotation <= 0) continue;
 
@@ -428,7 +438,7 @@ export async function genererDotationsMensuelles(cooperativeId: number, mois: nu
         equipementId: eq_.id,
         cooperativeId,
         exercice: annee,
-        mois,
+        mois,            // 12 = dotation annuelle au 31/12
         dotationFcfa: String(dotation),
         cumulFcfa: String(nouveauCumul),
         vncFcfa: String(Math.max(0, nouvelleVnc)),
@@ -444,22 +454,22 @@ export async function genererDotationsMensuelles(cooperativeId: number, mois: nu
         .where(eq(equipementsTable.id, eq_.id));
     });
 
-    // Écriture comptable — 681 / compte amortissement de la catégorie
+    // Écriture comptable — 681 / compte amortissement de la catégorie (31/12 exercice)
     await proposerEcriture(cooperativeId, {
       source: "amortissement",
       sourceId: eq_.id,
-      libelle: `Dotation amortissement ${String(mois).padStart(2, "0")}/${annee} – ${eq_.designation}`,
+      libelle: `Dotation amortissement ${annee} – ${eq_.designation}`,
       compteDebit: "681",
       compteCredit: eq_.compteAmortissement ?? "284",
       montantFcfa: dotation,
-      date: `${annee}-${String(mois).padStart(2, "0")}-01`,
+      date: `${annee}-12-31`,
     });
 
     nb++;
   }
 
-  logger.info({ cooperativeId, mois, annee, nb }, "Dotations amortissement générées");
-  return { nb_dotations: nb, mois, annee };
+  logger.info({ cooperativeId, annee, nb }, "Dotations amortissement annuelles générées");
+  return { nb_dotations: nb, annee };
 }
 
 // ─── Rapport inventaire ───────────────────────────────────────────────────────
