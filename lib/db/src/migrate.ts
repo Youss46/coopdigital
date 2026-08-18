@@ -76,6 +76,28 @@ async function ensureBaseline(client: pg.Client): Promise<void> {
     )
   `);
 
+  // Détecter si la DB est vierge (table cooperatives absente).
+  // Sur une DB fraîche (Replit dev), il ne faut PAS insérer la baseline :
+  // toutes les migrations 0000-0103 doivent s'appliquer depuis le début.
+  // Sur Railway/production, les tables 0000-0023 existent déjà via push →
+  // on insère la baseline pour éviter de les ré-exécuter.
+  const { rows: tableCheck } = await client.query<{ exists: boolean }>(`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'cooperatives'
+    ) AS exists
+  `);
+  const dbIsFresh = !tableCheck[0]?.exists;
+
+  if (dbIsFresh) {
+    // Supprimer toute entrée parasite dans le journal Drizzle (baseline insérée
+    // lors d'une tentative précédente ayant échoué) pour que le migrator puisse
+    // appliquer toutes les migrations depuis 0000.
+    await client.query("DELETE FROM drizzle.__drizzle_migrations");
+    console.log("[migrate] DB vierge détectée — journal réinitialisé, toutes les migrations seront appliquées depuis 0000");
+    return;
+  }
+
   // Lire le curseur actuel
   const { rows } = await client.query<{ last_ts: string | null }>(
     `SELECT MAX(created_at)::text AS last_ts FROM drizzle.__drizzle_migrations`
