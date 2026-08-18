@@ -105,6 +105,7 @@ interface AvanceDelegue {
   statut: "en_cours" | "rembourse" | "en_retard";
   planType: "integral" | "partiel" | "reporte";
   montantPartielFcfa: number | null;
+  reportDate: string | null;
   createdAt: string;
 }
 
@@ -134,10 +135,12 @@ export default function DeleguesPage() {
   // ── État onglet Avances ──────────────────────────────────────────────────
   const [avDelegueId, setAvDelegueId] = useState<number | null>(null);
   const [showOctroiForm, setShowOctroiForm] = useState(false);
-  const [formOctroi, setFormOctroi] = useState({ montant: "", dateOctroi: new Date().toISOString().slice(0, 10), dateEcheance: "", motif: "", planType: "integral", montantPartiel: "" });
+  const [formOctroi, setFormOctroi] = useState({ montant: "", dateOctroi: new Date().toISOString().slice(0, 10), dateEcheance: "", motif: "", planType: "integral", montantPartiel: "", reportDate: "" });
   const [showRembModal, setShowRembModal] = useState<{ avanceId: number; solde: number } | null>(null);
   const [rembMontant, setRembMontant] = useState("");
   const [rembNote, setRembNote] = useState("");
+  const [showPlanModal, setShowPlanModal] = useState<{ avanceId: number } | null>(null);
+  const [editPlan, setEditPlan] = useState<{ planType: string; montantPartiel: string; reportDate: string }>({ planType: "integral", montantPartiel: "", reportDate: "" });
 
   // ── Modal paiement commission ────────────────────────────────────────────
   const [showPayerModal, setShowPayerModal] = useState<{
@@ -297,12 +300,23 @@ export default function DeleguesPage() {
   });
 
   const octroiMut = useMutation({
-    mutationFn: (data: { montantOctroyeFcfa: number; dateOctroi: string; dateEcheance?: string; motif?: string; planType: string; montantPartielFcfa?: number }) =>
+    mutationFn: (data: { montantOctroyeFcfa: number; dateOctroi: string; dateEcheance?: string; motif?: string; planType: string; montantPartielFcfa?: number; reportDate?: string }) =>
       apiFetch(`/delegues/${avDelegueId}/avances`, { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
       toast({ title: "Avance octroyée avec succès" });
       setShowOctroiForm(false);
-      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().slice(0, 10), dateEcheance: "", motif: "", planType: "integral", montantPartiel: "" });
+      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().slice(0, 10), dateEcheance: "", motif: "", planType: "integral", montantPartiel: "", reportDate: "" });
+      qc.invalidateQueries({ queryKey: ["avances-delegue", avDelegueId] });
+    },
+    onError: (e) => toast({ title: (e as Error).message, variant: "destructive" }),
+  });
+
+  const patchPlanMut = useMutation({
+    mutationFn: ({ avanceId, plan_type, montant_partiel_fcfa, report_date }: { avanceId: number; plan_type: string; montant_partiel_fcfa?: number | null; report_date?: string | null }) =>
+      apiFetch(`/delegues/${avDelegueId}/avances/${avanceId}/plan`, { method: "PATCH", body: JSON.stringify({ plan_type, montant_partiel_fcfa, report_date }) }),
+    onSuccess: () => {
+      toast({ title: "Plan de remboursement mis à jour" });
+      setShowPlanModal(null);
       qc.invalidateQueries({ queryKey: ["avances-delegue", avDelegueId] });
     },
     onError: (e) => toast({ title: (e as Error).message, variant: "destructive" }),
@@ -873,7 +887,13 @@ export default function DeleguesPage() {
                               {a.soldeRestantFcfa.toLocaleString("fr-FR")} FCFA
                             </td>
                             <td style={{ padding: "10px 14px", fontSize: ".8rem" }}>
-                              {a.planType === "integral" ? "Intégral" : a.planType === "partiel" ? `Partiel (${(a.montantPartielFcfa ?? 0).toLocaleString("fr-FR")} FCFA)` : "Reporté"}
+                              {a.planType === "integral"
+                                ? "Intégral"
+                                : a.planType === "partiel"
+                                ? `Partiel (${(a.montantPartielFcfa ?? 0).toLocaleString("fr-FR")} FCFA)`
+                                : a.reportDate
+                                ? `Reporté au ${new Date(a.reportDate).toLocaleDateString("fr-FR")}`
+                                : "Reporté (indéfini)"}
                             </td>
                             <td style={{ padding: "10px 14px", fontSize: ".85rem", color: "#6b7280" }}>
                               {a.dateEcheance ? new Date(a.dateEcheance).toLocaleDateString("fr-FR") : "—"}
@@ -889,12 +909,23 @@ export default function DeleguesPage() {
                             </td>
                             <td style={{ padding: "10px 14px" }}>
                               {a.statut !== "rembourse" && (
-                                <button
-                                  onClick={() => { setShowRembModal({ avanceId: a.id, solde: a.soldeRestantFcfa }); setRembMontant(String(a.soldeRestantFcfa)); }}
-                                  style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontWeight: 600, cursor: "pointer", fontSize: ".8rem" }}
-                                >
-                                  Rembourser
-                                </button>
+                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                  <button
+                                    onClick={() => { setShowRembModal({ avanceId: a.id, solde: a.soldeRestantFcfa }); setRembMontant(String(a.soldeRestantFcfa)); }}
+                                    style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontWeight: 600, cursor: "pointer", fontSize: ".8rem" }}
+                                  >
+                                    Rembourser
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setShowPlanModal({ avanceId: a.id });
+                                      setEditPlan({ planType: a.planType, montantPartiel: a.montantPartielFcfa ? String(a.montantPartielFcfa) : "", reportDate: a.reportDate ?? "" });
+                                    }}
+                                    style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#f9fafb", fontWeight: 600, cursor: "pointer", fontSize: ".8rem" }}
+                                  >
+                                    Plan
+                                  </button>
+                                </div>
                               )}
                             </td>
                           </tr>
@@ -949,6 +980,13 @@ export default function DeleguesPage() {
                   <MoneyInput value={formOctroi.montantPartiel} onChange={(v) => setFormOctroi(f => ({ ...f, montantPartiel: v }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".95rem" }} placeholder="Ex: 50 000" />
                 </div>
               )}
+              {formOctroi.planType === "reporte" && (
+                <div>
+                  <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Reprendre la retenue à partir du (optionnel)</label>
+                  <input type="date" value={formOctroi.reportDate} onChange={(e) => setFormOctroi(f => ({ ...f, reportDate: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }} />
+                  <p style={{ fontSize: ".78rem", color: "#6b7280", marginTop: 4 }}>Sans date : aucune retenue automatique. Avec date : la retenue intégrale reprend dès cette date.</p>
+                </div>
+              )}
               <div>
                 <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Motif (optionnel)</label>
                 <input type="text" value={formOctroi.motif} onChange={(e) => setFormOctroi(f => ({ ...f, motif: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }} placeholder="Ex: Achat groupé intrants" />
@@ -965,10 +1003,58 @@ export default function DeleguesPage() {
                   motif: formOctroi.motif || undefined,
                   planType: formOctroi.planType,
                   montantPartielFcfa: formOctroi.planType === "partiel" && formOctroi.montantPartiel ? Number(formOctroi.montantPartiel) : undefined,
+                  reportDate: formOctroi.planType === "reporte" && formOctroi.reportDate ? formOctroi.reportDate : undefined,
                 })}
                 style={{ flex: 2, padding: "10px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: (!formOctroi.montant || octroiMut.isPending) ? .5 : 1 }}
               >
                 {octroiMut.isPending ? "Enregistrement…" : "Octroyer l'avance"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal modifier plan avance délégué */}
+      {showPlanModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 420, boxShadow: "0 8px 32px rgba(0,0,0,.18)" }}>
+            <div style={{ fontWeight: 800, fontSize: "1.05rem", marginBottom: 20 }}>Modifier le plan de remboursement</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Plan</label>
+                <select value={editPlan.planType} onChange={(e) => setEditPlan(p => ({ ...p, planType: e.target.value, montantPartiel: "", reportDate: "" }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }}>
+                  <option value="integral">Intégral — déduit en totalité à chaque paiement commission</option>
+                  <option value="partiel">Partiel — montant fixe par paiement</option>
+                  <option value="reporte">Reporté — pas de retenue automatique</option>
+                </select>
+              </div>
+              {editPlan.planType === "partiel" && (
+                <div>
+                  <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Montant par retenue (FCFA) *</label>
+                  <MoneyInput value={editPlan.montantPartiel} onChange={(v) => setEditPlan(p => ({ ...p, montantPartiel: v }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".95rem" }} placeholder="Ex: 50 000" />
+                </div>
+              )}
+              {editPlan.planType === "reporte" && (
+                <div>
+                  <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Reprendre la retenue à partir du (optionnel)</label>
+                  <input type="date" value={editPlan.reportDate} onChange={(e) => setEditPlan(p => ({ ...p, reportDate: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }} />
+                  <p style={{ fontSize: ".78rem", color: "#6b7280", marginTop: 4 }}>Sans date : aucune retenue automatique. Avec date : la retenue intégrale reprend dès cette date.</p>
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={() => setShowPlanModal(null)} style={{ flex: 1, padding: "10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", fontWeight: 600, cursor: "pointer" }}>Annuler</button>
+              <button
+                disabled={patchPlanMut.isPending || (editPlan.planType === "partiel" && !editPlan.montantPartiel)}
+                onClick={() => patchPlanMut.mutate({
+                  avanceId: showPlanModal.avanceId,
+                  plan_type: editPlan.planType,
+                  montant_partiel_fcfa: editPlan.planType === "partiel" && editPlan.montantPartiel ? Number(editPlan.montantPartiel) : null,
+                  report_date: editPlan.planType === "reporte" && editPlan.reportDate ? editPlan.reportDate : null,
+                })}
+                style={{ flex: 2, padding: "10px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: patchPlanMut.isPending ? .5 : 1 }}
+              >
+                {patchPlanMut.isPending ? "Enregistrement…" : "Enregistrer"}
               </button>
             </div>
           </div>

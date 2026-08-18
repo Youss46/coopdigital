@@ -33,7 +33,7 @@ export async function createAvanceDelegueHandler(req: Request, res: Response): P
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
   const delegueId = Number(req.params.agentId);
-  const { montantOctroyeFcfa, dateOctroi, dateEcheance, motif, planType, montantPartielFcfa } =
+  const { montantOctroyeFcfa, dateOctroi, dateEcheance, motif, planType, montantPartielFcfa, reportDate } =
     req.body as Record<string, unknown>;
 
   if (!montantOctroyeFcfa || Number(montantOctroyeFcfa) <= 0) {
@@ -51,6 +51,7 @@ export async function createAvanceDelegueHandler(req: Request, res: Response): P
 
   try {
     const montant = Number(montantOctroyeFcfa);
+    const plan = (planType as "integral" | "partiel" | "reporte") ?? "integral";
     const [avance] = await db.insert(avancesDeleguesTable).values({
       delegueId,
       cooperativeId,
@@ -62,8 +63,9 @@ export async function createAvanceDelegueHandler(req: Request, res: Response): P
       motif: motif ? String(motif) : null,
       statut: "en_cours",
       agentId: req.user!.id,
-      planType: (planType as "integral" | "partiel" | "reporte") ?? "integral",
-      montantPartielFcfa: montantPartielFcfa ? Number(montantPartielFcfa) : null,
+      planType: plan,
+      montantPartielFcfa: plan === "partiel" && montantPartielFcfa ? Number(montantPartielFcfa) : null,
+      reportDate: plan === "reporte" && reportDate ? String(reportDate) : null,
     }).returning();
     res.status(201).json(avance);
   } catch (err) {
@@ -141,6 +143,48 @@ export async function getRemboursementsAvanceDelegueHandler(req: Request, res: R
   } catch (err) {
     req.log.error(err, "getRemboursementsAvanceDelegueHandler");
     res.status(500).json({ erreur: "Erreur" });
+  }
+}
+
+// ─── Modifier le plan d'une avance (integral / partiel / reporte + date) ──────
+export async function patchPlanAvanceDelegueHandler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
+  const avanceId = Number(req.params.avanceId);
+  const { plan_type, montant_partiel_fcfa, report_date } = req.body as {
+    plan_type?: "integral" | "partiel" | "reporte";
+    montant_partiel_fcfa?: number | null;
+    report_date?: string | null;
+  };
+
+  if (!plan_type || !["integral", "partiel", "reporte"].includes(plan_type)) {
+    res.status(400).json({ erreur: "plan_type invalide (integral | partiel | reporte)" });
+    return;
+  }
+
+  try {
+    const [avance] = await db
+      .select({ id: avancesDeleguesTable.id, statut: avancesDeleguesTable.statut })
+      .from(avancesDeleguesTable)
+      .where(and(eq(avancesDeleguesTable.id, avanceId), eq(avancesDeleguesTable.cooperativeId, cooperativeId)))
+      .limit(1);
+
+    if (!avance) { res.status(404).json({ erreur: "Avance introuvable" }); return; }
+    if (avance.statut === "rembourse") {
+      res.status(400).json({ erreur: "Impossible de modifier le plan d'une avance déjà remboursée" });
+      return;
+    }
+
+    const [updated] = await db.update(avancesDeleguesTable).set({
+      planType: plan_type,
+      montantPartielFcfa: plan_type === "partiel" && montant_partiel_fcfa ? montant_partiel_fcfa : null,
+      reportDate: plan_type === "reporte" && report_date ? report_date : null,
+    }).where(eq(avancesDeleguesTable.id, avanceId)).returning();
+
+    res.json(updated);
+  } catch (err) {
+    req.log.error(err, "patchPlanAvanceDelegueHandler");
+    res.status(500).json({ erreur: "Erreur lors de la modification du plan" });
   }
 }
 

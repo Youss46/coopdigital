@@ -22,6 +22,7 @@ export const avancesDeleguesTable = pgTable("avances_delegues", {
   // Plan de retenue sur commission
   planType:             avanceDeleaguePlanTypeEnum("plan_type").notNull().default("integral"),
   montantPartielFcfa:   integer("montant_partiel_fcfa"),  // si planType = "partiel"
+  reportDate:           date("report_date"),               // si planType = "reporte" — reprend la retenue à partir de cette date
   cooperativeId:        integer("cooperative_id").notNull(),
   createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -428,8 +428,13 @@ export async function payerCommissions(
         retenueFcfa = avance.soldeRestantFcfa;
       } else if (avance.planType === "partiel" && avance.montantPartielFcfa) {
         retenueFcfa = Math.min(avance.montantPartielFcfa, avance.soldeRestantFcfa);
+      } else if (avance.planType === "reporte") {
+        // Reporté sans date → jamais de retenue automatique
+        // Reporté avec date → reprend la retenue intégrale dès que la date est atteinte
+        if (!avance.reportDate || today < String(avance.reportDate)) continue;
+        retenueFcfa = avance.soldeRestantFcfa;
       } else {
-        continue; // "reporte" → pas de retenue ce cycle
+        continue;
       }
       if (retenueFcfa <= 0) continue;
 

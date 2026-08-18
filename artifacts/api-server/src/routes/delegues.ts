@@ -28,6 +28,7 @@ import {
   rembourserAvanceDelegueHandler,
   getRemboursementsAvanceDelegueHandler,
   getAvancesDelegueResumeHandler,
+  patchPlanAvanceDelegueHandler,
 } from "../controllers/avancesDeleguesController.js";
 
 const router = Router();
@@ -61,6 +62,7 @@ router.get("/delegues/:agentId/avances",                    authMiddleware, list
 router.get("/delegues/:agentId/avances/resume",             authMiddleware, getAvancesDelegueResumeHandler);
 router.post("/delegues/:agentId/avances",                   authMiddleware, createAvanceDelegueHandler);
 router.post("/delegues/:agentId/avances/:avanceId/rembourser", authMiddleware, rembourserAvanceDelegueHandler);
+router.patch("/delegues/:agentId/avances/:avanceId/plan",      authMiddleware, patchPlanAvanceDelegueHandler);
 router.get("/delegues/:agentId/avances/:avanceId/remboursements", authMiddleware, getRemboursementsAvanceDelegueHandler);
 
 router.post("/delegues/:agentId/approvisionner",    authMiddleware, approvisionnerHandler);
