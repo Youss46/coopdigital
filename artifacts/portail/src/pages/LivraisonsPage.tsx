@@ -161,11 +161,19 @@ export default function LivraisonsPage() {
                   </div>
                 </div>
 
-                {(l.avanceDeduiteFcfa > 0 || l.intrantsDeduitsFcfa > 0) && (
+                {(l.avanceDeduiteFcfa > 0 || l.intrantsDeduitsFcfa > 0 || l.planAvanceType === "reporte") && (
                   <div className="mt-3 space-y-1">
+                    {l.planAvanceType === "reporte" && (
+                      <div className="flex justify-between text-sm items-center">
+                        <span className="text-yellow-600 font-medium">⏸ Avance reportée</span>
+                        <span className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-full px-2 py-0.5">non déduite</span>
+                      </div>
+                    )}
                     {l.avanceDeduiteFcfa > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-orange-600">— Avance déduite</span>
+                        <span className="text-orange-600">
+                          {l.planAvanceType === "partiel" ? "⚡ Avance déduite (partiel)" : "— Avance déduite"}
+                        </span>
                         <span className="font-medium text-orange-700">-{fmt(l.avanceDeduiteFcfa)} FCFA</span>
                       </div>
                     )}

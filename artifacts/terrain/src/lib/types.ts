@@ -258,6 +258,8 @@ export interface PeseurCollecte {
   membreCode: string;
   /** Vrai si la livraison est issue d'une session de pesée groupée */
   fromSession?: boolean;
+  /** Plan de déduction d'avance : null = pas d'avance, "integral" = déduit, "partiel" = partiel, "reporte" = reporté */
+  planAvanceType?: string | null;
 }
 
 export interface StatsAgent {

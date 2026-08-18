@@ -887,6 +887,7 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
       membrePrenoms: membresTable.prenoms,
       membreCode: membresTable.carteNumero,
       sessionId: sessionsPeseeTable.id,
+      planAvanceType: livraisonsTable.planAvanceType,
     })
     .from(livraisonsTable)
     .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
@@ -915,6 +916,7 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
     membrePrenoms: r.membrePrenoms ?? "",
     membreCode: r.membreCode ?? "",
     fromSession: r.sessionId !== null,
+    planAvanceType: r.planAvanceType ?? null,
   }));
 }
 

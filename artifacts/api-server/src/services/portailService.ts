@@ -183,6 +183,7 @@ export async function getLivraisonsMembre(membreId: number) {
       agentNom: agentUserPortail.nom,
       agentPrenoms: agentUserPortail.prenoms,
       agentRole: agentUserPortail.role,
+      planAvanceType: livraisonsTable.planAvanceType,
     })
     .from(livraisonsTable)
     .leftJoin(campagnesTable, eq(livraisonsTable.campagneId, campagnesTable.id))

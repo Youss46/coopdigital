@@ -55,6 +55,8 @@ export type Livraison = {
   intrantsDeduitsFcfa: number; montantNetFcfa: number;
   campagneId: number | null; campagneLibelle: string | null;
   agentNom: string | null; agentPrenoms: string | null; agentRole: string | null;
+  /** Plan de déduction d'avance : null = aucune avance, "integral", "partiel", "reporte" */
+  planAvanceType?: string | null;
 };
 
 export type Avance = {

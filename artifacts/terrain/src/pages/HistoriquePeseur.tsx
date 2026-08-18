@@ -174,8 +174,8 @@ export default function HistoriquePeseur() {
                         💵 {formatMontant(c.montantNetFcfa)}
                       </span>
                     </div>
-                    {c.fromSession && (
-                      <div style={{ marginTop: 4 }}>
+                    <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {c.fromSession && (
                         <span style={{
                           fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
                           color: "#818cf8", background: "rgba(129,140,248,.15)",
@@ -183,8 +183,26 @@ export default function HistoriquePeseur() {
                         }}>
                           ⚖️ Session groupée
                         </span>
-                      </div>
-                    )}
+                      )}
+                      {c.planAvanceType === "reporte" && (
+                        <span style={{
+                          fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                          color: "#fbbf24", background: "rgba(251,191,36,.12)",
+                          border: "1px solid rgba(251,191,36,.35)",
+                        }}>
+                          ⏸ Avance reportée
+                        </span>
+                      )}
+                      {c.planAvanceType === "partiel" && (
+                        <span style={{
+                          fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                          color: "#fb923c", background: "rgba(251,146,60,.12)",
+                          border: "1px solid rgba(251,146,60,.35)",
+                        }}>
+                          ⚡ Avance partielle
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
                     <span style={{ fontSize: ".7rem", color: "var(--t-muted)" }}>
