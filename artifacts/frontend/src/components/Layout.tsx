@@ -142,6 +142,7 @@ const NAV_ICON_LIST: React.ElementType[] = [
   Gavel,          // /gouvernance
   MessageSquare,  // /communication
   Users2,         // /delegues
+  Users2,         // /delegues-localites
   ShieldCheck,    // /administration/comptes
   Settings,       // /parametres
   WifiOff,        // /ops-en-attente
