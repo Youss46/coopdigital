@@ -7,8 +7,9 @@ import {
   markOpSyncedWithTs, markOpError, incrementTentatives,
   getPendingGpsOps, markGpsOpSynced, markGpsOpError, incrementGpsTentatives,
   getPendingEnqueteOps, markEnqueteOpSynced, markEnqueteOpError, incrementEnqueteTentatives,
+  getPendingBrouillons, markBrouillonSynced, markBrouillonError,
 } from "../lib/idb";
-import { syncOps, syncGpsOps, syncEnqueteOps } from "../lib/api";
+import { syncOps, syncGpsOps, syncEnqueteOps, batchSyncBrouillon } from "../lib/api";
 
 export interface SyncResult {
   succes: number;
@@ -47,10 +48,10 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
   const triggerSync = useCallback(async () => {
     if (syncingRef.current || !navigator.onLine) return;
-    const [ops, gpsOps, enqOps] = await Promise.all([
-      getPendingOps(), getPendingGpsOps(), getPendingEnqueteOps(),
+    const [ops, gpsOps, enqOps, pendingBrouillons] = await Promise.all([
+      getPendingOps(), getPendingGpsOps(), getPendingEnqueteOps(), getPendingBrouillons(),
     ]);
-    if (ops.length === 0 && gpsOps.length === 0 && enqOps.length === 0) return;
+    if (ops.length === 0 && gpsOps.length === 0 && enqOps.length === 0 && pendingBrouillons.length === 0) return;
 
     syncingRef.current = true;
     setSyncStatus("syncing");
@@ -90,6 +91,20 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
           const t = await incrementEnqueteTentatives(localId);
           if (t >= 3) await markEnqueteOpError(localId, `Échec définitif (${t} tentatives) : ${erreur}`);
           nbEchecs++;
+        }
+      }
+
+      // ── Sync brouillons de pesée hors-ligne ───────────────────────────────
+      if (pendingBrouillons.length > 0) {
+        for (const brouillon of pendingBrouillons) {
+          try {
+            const result = await batchSyncBrouillon(brouillon);
+            await markBrouillonSynced(brouillon.localId, result.sessionId, result.numeroSession);
+            nbSucces++;
+          } catch (err) {
+            await markBrouillonError(brouillon.localId, (err as Error).message);
+            nbEchecs++;
+          }
         }
       }
 

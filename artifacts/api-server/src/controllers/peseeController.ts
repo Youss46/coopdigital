@@ -10,6 +10,7 @@ import {
   annulerSession,
   creerLivraisonDepuisSession,
   expirerSessionsStales,
+  creerSessionBatch,
   SessionEnCoursError,
   SessionTransfertExistanteError,
 } from "../services/peseeSessionService";
@@ -293,6 +294,42 @@ export async function handleUpdateConfig(req: Request, res: Response) {
 }
 
 // ─── Sessions de pesée ────────────────────────────────────────────────────────
+
+/** Endpoint de synchronisation hors-ligne : crée une session complète depuis un brouillon local. */
+export async function handleBatchCreateSession(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.agent?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  const peseurId = req.agent!.id;
+
+  const { localId, membreId, produit, operation, lignes, statut } = req.body as {
+    localId?: string;
+    membreId?: number;
+    produit?: string;
+    operation?: string;
+    lignes?: Array<{ localId: string; nbSacs: number; poidsBrutKg: number; tareKg: number; notes?: string }>;
+    statut?: "terminee" | "en_cours";
+  };
+
+  if (!localId || !membreId || !Array.isArray(lignes) || lignes.length === 0) {
+    res.status(400).json({ erreur: "localId, membreId et au moins une ligne sont requis" });
+    return;
+  }
+
+  try {
+    const result = await creerSessionBatch(cooperativeId, peseurId, {
+      localId,
+      membreId: Number(membreId),
+      produit: produit ?? "cacao",
+      operation: operation ?? "reception",
+      lignes,
+      statut: statut ?? "terminee",
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    req.log.error({ err }, "handleBatchCreateSession");
+    res.status(400).json({ erreur: (err as Error).message });
+  }
+}
 
 export async function handleCreateSession(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;

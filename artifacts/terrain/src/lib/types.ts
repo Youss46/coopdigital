@@ -298,6 +298,38 @@ export interface EnqueteOp {
   syncedAt?: number;
 }
 
+// ─── Brouillons pesée hors-ligne ─────────────────────────────────────────────
+
+export interface BrouillonLigne {
+  localId: string;
+  nbSacs: number;
+  poidsBrutKg: number;
+  tareKg: number;
+  notes?: string;
+  numeroPassage: number;
+  timestamp: number;
+}
+
+export interface BrouillonPesee {
+  localId: string;
+  membreId: number;
+  membreNom: string;
+  membrePrenoms: string;
+  membreCode: string;
+  produit: string;
+  operation: string;
+  statut: "en_cours" | "terminee" | "annulee";
+  syncStatus: "pending" | "syncing" | "synced" | "error";
+  lignes: BrouillonLigne[];
+  poidsTotalKg: number;
+  nbSacsTotal: number;
+  createdAt: number;
+  updatedAt: number;
+  serverId?: number;
+  numeroSession?: string;
+  errorMsg?: string;
+}
+
 // ─── Missions d'enquête ────────────────────────────────────────────────────────
 
 export interface MissionEnquete {

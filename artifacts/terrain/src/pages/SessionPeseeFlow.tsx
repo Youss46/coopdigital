@@ -23,7 +23,15 @@ import {
   patchPlanAvanceDeleague,
   patchPlanAvanceMembre,
 } from "../lib/api";
-import type { Fournisseur, SessionDetail, ConversionLivraisonResult } from "../lib/types";
+import type { Fournisseur, SessionDetail, ConversionLivraisonResult, BrouillonPesee } from "../lib/types";
+import {
+  createBrouillon,
+  getBrouillon,
+  addLigneToBrouillon,
+  deleteLigneFromBrouillon,
+  terminerBrouillon as terminerBrouillonIDB,
+  annulerBrouillon,
+} from "../lib/idb";
 import type { AvanceDeleagueTerrain } from "../lib/api";
 
 type Step = "membre" | "session" | "succes";
@@ -81,6 +89,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const [fournisseur, setFournisseur] = useState<Fournisseur | null>(null);
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [sessionTerminee, setSessionTerminee] = useState<SessionDetail | null>(null);
+  const [brouillon, setBrouillon] = useState<BrouillonPesee | null>(null);
   const [resumeLoading, setResumeLoading] = useState(false);
 
   // Formulaire nouvelle pesée
@@ -135,10 +144,35 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     return () => clearInterval(timer);
   }, [isOnline, step]);
 
-  // Reprise directe depuis l'accueil via /pesee-session/:sessionId
+  // Reprise directe depuis l'accueil via /pesee-session/:sessionId (ou /pesee-session/b-<localId> pour brouillon)
   useEffect(() => {
     const rawId = params?.sessionId;
-    if (!rawId || !isOnline) return;
+    if (!rawId) return;
+
+    // Reprise d'un brouillon hors-ligne : URL /pesee-session/b-<localId>
+    if (rawId.startsWith("b-")) {
+      const localId = rawId.slice(2);
+      setResumeLoading(true);
+      (async () => {
+        try {
+          const b = await getBrouillon(localId);
+          if (b) {
+            setFournisseur({
+              id: b.membreId, code: b.membreCode, nom: b.membreNom, prenoms: b.membrePrenoms,
+              telephone: "", section: null, village: null, typeMembre: "membre",
+              avanceEnCours: 0, intrantsDus: 0, derniereLivraison: null,
+            });
+            setBrouillon(b);
+            const synth = brouillonToSyntheticSession(b);
+            if (b.statut === "terminee") { setSessionTerminee(synth); setStep("succes"); }
+            else { setSession(synth); setStep("session"); }
+          }
+        } catch { /* silencieux */ } finally { setResumeLoading(false); }
+      })();
+      return;
+    }
+
+    if (!isOnline) return;
     const sessionId = parseInt(rawId, 10);
     if (isNaN(sessionId)) return;
     setResumeLoading(true);
@@ -214,13 +248,57 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     }
   }
 
+  // ── Brouillon → SessionDetail synthétique ─────────────────────────────────
+  function brouillonToSyntheticSession(b: BrouillonPesee): SessionDetail {
+    return {
+      id: -1,
+      cooperativeId: 0,
+      numeroSession: "📴 Hors ligne",
+      membreId: b.membreId,
+      membreNom: b.membreNom,
+      membrePrenoms: b.membrePrenoms,
+      produit: b.produit,
+      operation: b.operation,
+      statut: b.statut === "annulee" ? "annulee" : b.statut === "terminee" ? "terminee" : "en_cours",
+      poidsTotalKg: String(b.poidsTotalKg.toFixed(3)),
+      nbSacsTotal: b.nbSacsTotal,
+      dateDebut: new Date(b.createdAt).toISOString(),
+      dateFin: b.statut === "terminee" ? new Date(b.updatedAt).toISOString() : null,
+      notes: null,
+      livraisonId: null,
+      transfertId: null,
+      createdAt: new Date(b.createdAt).toISOString(),
+      lignes: b.lignes.map((l, idx) => ({
+        id: idx + 1,
+        sessionId: -1,
+        numeroPassage: l.numeroPassage,
+        nbSacs: l.nbSacs,
+        poidsBrutKg: String(l.poidsBrutKg),
+        tareKg: String(l.tareKg),
+        notes: l.notes ?? null,
+        createdAt: new Date(l.timestamp).toISOString(),
+      })),
+    };
+  }
+
   // ── Sélection du membre (chemin standard) ─────────────────────────────────
   async function handleSelectMembre(f: Fournisseur) {
     setFournisseur(f);
     setErreur("");
 
     if (!isOnline) {
-      setErreur("La pesée groupée requiert une connexion internet");
+      // Mode hors ligne : créer un brouillon local
+      try {
+        const newBrouillon = await createBrouillon({
+          membreId: f.id, membreNom: f.nom, membrePrenoms: f.prenoms,
+          membreCode: f.code, produit: "cacao", operation: "reception",
+        });
+        setBrouillon(newBrouillon);
+        setSession(brouillonToSyntheticSession(newBrouillon));
+        setStep("session");
+      } catch (err) {
+        setErreur((err as Error).message);
+      }
       return;
     }
 
@@ -273,13 +351,25 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     setAjoutLoading(true);
     setErreur("");
     try {
-      const updated = await addLignePesee(session.id, {
-        nbSacs: parseInt(nbSacs) || 0,
-        poidsBrutKg: poidsNum,
-        tareKg: parseFloat(tare) || 0,
-        notes: notesLigne || undefined,
-      });
-      setSession(updated);
+      if (brouillon) {
+        // Mode hors ligne : ajouter la ligne dans le brouillon local
+        const updated = await addLigneToBrouillon(brouillon.localId, {
+          nbSacs: parseInt(nbSacs) || 0,
+          poidsBrutKg: poidsNum,
+          tareKg: parseFloat(tare) || 0,
+          notes: notesLigne || undefined,
+        });
+        setBrouillon(updated);
+        setSession(brouillonToSyntheticSession(updated));
+      } else {
+        const updated = await addLignePesee(session.id, {
+          nbSacs: parseInt(nbSacs) || 0,
+          poidsBrutKg: poidsNum,
+          tareKg: parseFloat(tare) || 0,
+          notes: notesLigne || undefined,
+        });
+        setSession(updated);
+      }
       // Reset form
       setNbSacs("");
       setPoidsBrut("");
@@ -294,6 +384,19 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
   // ── Supprimer une ligne ────────────────────────────────────────────────────
   async function handleSupprimerLigne(ligneId: number) {
+    if (brouillon) {
+      // ligneId est l'index 1-based de la ligne dans le brouillon
+      const ligne = brouillon.lignes[ligneId - 1];
+      if (!ligne) return;
+      try {
+        const updated = await deleteLigneFromBrouillon(brouillon.localId, ligne.localId);
+        setBrouillon(updated);
+        setSession(brouillonToSyntheticSession(updated));
+      } catch (err) {
+        setErreur((err as Error).message);
+      }
+      return;
+    }
     if (!session) return;
     try {
       const updated = await deleteLignePesee(session.id, ligneId);
@@ -305,9 +408,24 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
   // ── Terminer la session ────────────────────────────────────────────────────
   async function handleTerminer() {
-    if (!session) return;
     setTerminerLoading(true);
     setErreur("");
+    if (brouillon) {
+      try {
+        const updated = await terminerBrouillonIDB(brouillon.localId);
+        setBrouillon(updated);
+        const synth = brouillonToSyntheticSession(updated);
+        setSessionTerminee(synth);
+        setStep("succes");
+      } catch (err) {
+        setErreur((err as Error).message);
+      } finally {
+        setTerminerLoading(false);
+        setConfirmTerminer(false);
+      }
+      return;
+    }
+    if (!session) { setTerminerLoading(false); return; }
     try {
       const closed = await terminerSessionPesee(session.id);
       setSessionTerminee(closed);
@@ -322,6 +440,11 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
   // ── Annuler la session ─────────────────────────────────────────────────────
   async function handleAnnuler() {
+    if (brouillon) {
+      try { await annulerBrouillon(brouillon.localId); } catch { /* silencieux */ }
+      setLocation("/");
+      return;
+    }
     if (!session) return;
     setAnnulerLoading(true);
     try {
@@ -400,7 +523,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
   // ── Charger les avances du délégué dès la clôture d'une session membre ───────
   useEffect(() => {
-    if (step !== "succes" || !sessionTerminee || sessionTerminee.operation === "reception_transfert" || !isOnline) return;
+    if (step !== "succes" || !sessionTerminee || sessionTerminee.operation === "reception_transfert" || !isOnline || brouillon) return;
     setAvancesLoading(true);
     // Passer membreId pour les peseurs base centrale (non rattachés à un délégué)
     getAvancesDeleguesTerrain(sessionTerminee.membreId)
@@ -456,6 +579,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     setFournisseur(null);
     setSession(null);
     setSessionTerminee(null);
+    setBrouillon(null);
     setLivraisonResult(null);
     setErreur("");
     setNbSacs("");
@@ -512,12 +636,12 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
         {step === "membre" && (
           <>
             {!isOnline && (
-              <div className="t-card" style={{ margin: "16px 16px 0", borderLeft: "4px solid #f59e0b", background: "#1a2d3a" }}>
-                <div style={{ color: "#f59e0b", fontWeight: 700, fontSize: ".9rem" }}>
-                  📴 Connexion requise
+              <div className="t-card" style={{ margin: "16px 16px 0", borderLeft: "4px solid #3b82f6", background: "#1a2d3a" }}>
+                <div style={{ color: "#93c5fd", fontWeight: 700, fontSize: ".9rem" }}>
+                  📴 Mode hors ligne
                 </div>
                 <div style={{ color: "#94a3b8", fontSize: ".8rem", marginTop: 4 }}>
-                  La pesée groupée nécessite une connexion internet active.
+                  Sélectionnez un planteur pour démarrer une pesée. Elle sera synchronisée à la reconnexion.
                 </div>
               </div>
             )}
@@ -596,6 +720,15 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                   {fournisseur.nom} {fournisseur.prenoms}
                 </div>
                 <div className="t-text-muted">{fournisseur.code}</div>
+              </div>
+            )}
+
+            {/* Bannière hors ligne */}
+            {brouillon && (
+              <div style={{ margin: "0 16px 8px", background: "#1a2d1a", borderLeft: "3px solid #f59e0b", borderRadius: 8, padding: "8px 12px" }}>
+                <span style={{ color: "#f59e0b", fontSize: ".82rem", fontWeight: 600 }}>
+                  📴 Pesée hors ligne — sera synchronisée à la reconnexion
+                </span>
               </div>
             )}
 
@@ -899,6 +1032,23 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               </div>
             )}
 
+            {/* Pesée enregistrée hors ligne — en attente de sync */}
+            {brouillon && (
+              <div style={{ background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.3)", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                <div style={{ fontWeight: 700, fontSize: ".88rem", color: "#f59e0b", marginBottom: 4 }}>
+                  📴 Pesée enregistrée hors ligne
+                </div>
+                <div style={{ fontSize: ".78rem", color: "#64748b", marginBottom: brouillon.syncStatus === "error" ? 8 : 0 }}>
+                  La pesée sera envoyée au serveur dès le retour du réseau. La conversion en livraison sera possible une fois synchronisée.
+                </div>
+                {brouillon.syncStatus === "error" && brouillon.errorMsg && (
+                  <div style={{ fontSize: ".76rem", color: "#fca5a5", background: "#2d1a1a", borderRadius: 6, padding: "6px 10px" }}>
+                    ⚠️ Erreur lors de la synchronisation : {brouillon.errorMsg}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Erreur conversion */}
             {erreur && !livraisonResult && (
               <div style={{ color: "#ef4444", fontSize: ".82rem", marginBottom: 12, textAlign: "left" }}>⚠️ {erreur}</div>
@@ -933,7 +1083,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             )}
 
             {/* ── Avances du délégué — notification avant génération du reçu ── */}
-            {!isTransfertReception && !livraisonResult && !sessionTerminee?.livraisonId && (avancesLoading || avancesDelegue.length > 0) && (
+            {!brouillon && !isTransfertReception && !livraisonResult && !sessionTerminee?.livraisonId && (avancesLoading || avancesDelegue.length > 0) && (
               <div style={{ marginBottom: 16, border: "2px solid #f59e0b", borderRadius: 12, overflow: "hidden" }}>
                 {/* En-tête alerte */}
                 <div style={{ background: "#f59e0b", padding: "10px 14px", display: "flex", alignItems: "center", gap: 8 }}>
@@ -1024,8 +1174,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               </div>
             )}
 
-            {/* Bouton conversion (si pas encore convertie, sessions membres uniquement) */}
-            {!isTransfertReception && !livraisonResult && !sessionTerminee?.livraisonId && isOnline && (
+            {/* Bouton conversion (si pas encore convertie, sessions membres uniquement, et session en ligne) */}
+            {!brouillon && !isTransfertReception && !livraisonResult && !sessionTerminee?.livraisonId && isOnline && (
               <button
                 className="t-btn t-btn--primary"
                 style={{ width: "100%", marginBottom: 10, background: "linear-gradient(135deg, #16a34a, #15803d)" }}

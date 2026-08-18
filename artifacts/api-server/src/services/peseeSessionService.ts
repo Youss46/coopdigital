@@ -23,6 +23,111 @@ import { genererNumeroRecu } from "./recuService.js";
 import { creerCommissionTransfert } from "./commissionService.js";
 import { logger } from "../lib/logger.js";
 
+// ─── Création batch (sync hors-ligne) ────────────────────────────────────────
+
+/**
+ * Crée une session de pesée complète depuis un brouillon hors-ligne.
+ * Idempotent : si une session portant notes='offline:<localId>' existe déjà,
+ * elle est réutilisée — la requête peut être rejouée sans créer de doublon.
+ */
+export async function creerSessionBatch(
+  cooperativeId: number,
+  peseurId: number,
+  data: {
+    localId: string;
+    membreId: number;
+    produit: string;
+    operation: string;
+    lignes: Array<{ localId: string; nbSacs: number; poidsBrutKg: number; tareKg: number; notes?: string }>;
+    statut: "terminee" | "en_cours";
+  },
+) {
+  const offlineTag = `offline:${data.localId}`;
+
+  // ── Idempotency : session déjà créée lors d'un précédent essai ? ──────────
+  const [existing] = await db
+    .select({ id: sessionsPeseeTable.id, numeroSession: sessionsPeseeTable.numeroSession, statut: sessionsPeseeTable.statut })
+    .from(sessionsPeseeTable)
+    .where(
+      and(
+        eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+        sql`${sessionsPeseeTable.notes} = ${offlineTag}`,
+      ),
+    )
+    .limit(1);
+
+  let sessionId: number;
+  let numeroSession: string;
+
+  if (existing) {
+    sessionId = existing.id;
+    numeroSession = existing.numeroSession;
+  } else {
+    // ── Créer la session ──────────────────────────────────────────────────
+    let created: { id: number; numeroSession: string };
+    try {
+      created = await createSession(cooperativeId, {
+        membreId: data.membreId,
+        produit: data.produit,
+        operation: data.operation,
+        peseurId,
+        notes: offlineTag,
+      });
+    } catch (err) {
+      // Race condition : une session en cours existe déjà pour ce membre
+      if (err instanceof SessionEnCoursError) {
+        // Réutiliser la session en cours (même si elle n'est pas la nôtre)
+        sessionId = err.sessionId;
+        numeroSession = err.numeroSession;
+        // Ajouter les lignes à cette session et terminer
+        const detail = await getSessionDetail(cooperativeId, sessionId);
+        if (detail && (detail.lignes?.length ?? 0) === 0) {
+          for (const l of data.lignes) {
+            await addLigne(cooperativeId, sessionId, {
+              nbSacs: l.nbSacs, poidsBrutKg: l.poidsBrutKg, tareKg: l.tareKg, notes: l.notes,
+            });
+          }
+        }
+        if (data.statut === "terminee") {
+          const s = await getSessionDetail(cooperativeId, sessionId);
+          if (s?.statut === "en_cours") await terminerSession(cooperativeId, sessionId);
+        }
+        const finalDetail = await getSessionDetail(cooperativeId, sessionId);
+        return { sessionId, numeroSession, poidsTotalKg: finalDetail?.poidsTotalKg ?? "0", nbSacsTotal: finalDetail?.nbSacsTotal ?? 0 };
+      }
+      throw err;
+    }
+    sessionId = created.id;
+    numeroSession = created.numeroSession;
+  }
+
+  // ── Ajouter les lignes si pas déjà présentes ─────────────────────────────
+  const detail = await getSessionDetail(cooperativeId, sessionId);
+  if ((detail?.lignes?.length ?? 0) === 0 && data.lignes.length > 0) {
+    for (const l of data.lignes) {
+      await addLigne(cooperativeId, sessionId, {
+        nbSacs: l.nbSacs, poidsBrutKg: l.poidsBrutKg, tareKg: l.tareKg, notes: l.notes,
+      });
+    }
+  }
+
+  // ── Terminer si demandé ───────────────────────────────────────────────────
+  if (data.statut === "terminee") {
+    const current = await getSessionDetail(cooperativeId, sessionId);
+    if (current?.statut === "en_cours" && (current.lignes?.length ?? 0) > 0) {
+      await terminerSession(cooperativeId, sessionId);
+    }
+  }
+
+  const finalDetail = await getSessionDetail(cooperativeId, sessionId);
+  return {
+    sessionId,
+    numeroSession,
+    poidsTotalKg: finalDetail?.poidsTotalKg ?? "0",
+    nbSacsTotal: finalDetail?.nbSacsTotal ?? 0,
+  };
+}
+
 // ─── Génération numéro de session ─────────────────────────────────────────────
 async function generateNumeroSession(cooperativeId: number): Promise<string> {
   const year = new Date().getFullYear();

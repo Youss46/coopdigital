@@ -3,8 +3,9 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "../contexts/AuthContext";
 import { useOffline } from "../contexts/OfflineContext";
 import { getBilan, getSessionsEnCours, getSessionsAConvertir } from "../lib/api";
+import { getBrouillons } from "../lib/idb";
 import BottomNavPeseur from "../components/BottomNavPeseur";
-import type { BilanJour, SessionPesee } from "../lib/types";
+import type { BilanJour, SessionPesee, BrouillonPesee } from "../lib/types";
 
 function fmtPoids(kg: number): string {
   if (kg >= 1000) return (kg / 1000).toFixed(2) + " T";
@@ -23,6 +24,7 @@ export default function AccueilPeseur() {
   const [bilan, setBilan] = useState<BilanJour | null>(null);
   const [sessionsEnCours, setSessionsEnCours] = useState<SessionPesee[]>([]);
   const [sessionsAConvertir, setSessionsAConvertir] = useState<SessionPesee[]>([]);
+  const [brouillons, setBrouillons] = useState<BrouillonPesee[]>([]);
 
   // Rafraîchit le bilan à chaque fois que la route revient sur "/" (retour depuis collecte, historique…)
   // et à chaque changement de connectivité
@@ -45,6 +47,13 @@ export default function AccueilPeseur() {
     getSessionsEnCours().then(setSessionsEnCours).catch(() => setSessionsEnCours([]));
     getSessionsAConvertir().then(setSessionsAConvertir).catch(() => setSessionsAConvertir([]));
   }, [location, isOnline]);
+
+  // Charge les brouillons hors-ligne depuis IndexedDB (toujours, connecté ou non)
+  useEffect(() => {
+    getBrouillons()
+      .then((all) => setBrouillons(all.filter((b) => b.statut !== "annulee" && b.syncStatus !== "synced")))
+      .catch(() => {});
+  }, [location, syncStatus]);
 
   return (
     <div className="t-app">
@@ -102,6 +111,44 @@ export default function AccueilPeseur() {
                 Aucune collecte enregistrée pour l'instant
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Brouillons hors-ligne (pesées non encore synchronisées) ─────── */}
+        {brouillons.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            {brouillons.map((b) => (
+              <Link key={b.localId} href={`/pesee-session/b-${b.localId}`}>
+                <div className="t-card" style={{
+                  marginBottom: 8,
+                  background: b.syncStatus === "error"
+                    ? "linear-gradient(135deg, #2d1a1a 0%, #3a1e1e 100%)"
+                    : "linear-gradient(135deg, #1a2a1a 0%, #1e3a20 100%)",
+                  borderLeft: `4px solid ${b.syncStatus === "error" ? "#ef4444" : "#f59e0b"}`,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}>
+                  <span style={{ fontSize: "1.6rem" }}>{b.syncStatus === "error" ? "⚠️" : "📴"}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 800, fontSize: ".92rem", color: b.syncStatus === "error" ? "#fca5a5" : "#fcd34d" }}>
+                      {b.statut === "terminee" ? "Pesée clôturée hors ligne" : "Pesée en cours hors ligne"}
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: ".9rem", color: "#e2e8f0", marginTop: 2 }}>
+                      {b.membreNom} {b.membrePrenoms}
+                    </div>
+                    <div style={{ fontSize: ".72rem", color: "#64748b", marginTop: 2 }}>
+                      {b.lignes.length} pesée{b.lignes.length !== 1 ? "s" : ""} · {b.poidsTotalKg.toFixed(1)} kg
+                      {b.syncStatus === "error" && b.errorMsg && (
+                        <span style={{ color: "#ef4444", marginLeft: 6 }}>— {b.errorMsg}</span>
+                      )}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: "1.1rem", color: b.syncStatus === "error" ? "#ef4444" : "#f59e0b" }}>›</span>
+                </div>
+              </Link>
+            ))}
           </div>
         )}
 

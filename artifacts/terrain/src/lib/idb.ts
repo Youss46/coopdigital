@@ -1,4 +1,4 @@
-import type { PendingOp, CollecteInput, PaiementInput, AvanceInput, GpsCollecteInput, PrixActuel, Fournisseur, MissionTerrain, MissionDetail, EnqueteOp } from "./types";
+import type { PendingOp, CollecteInput, PaiementInput, AvanceInput, GpsCollecteInput, PrixActuel, Fournisseur, MissionTerrain, MissionDetail, EnqueteOp, BrouillonLigne, BrouillonPesee } from "./types";
 
 export interface GpsOp {
   localId: string;
@@ -13,7 +13,7 @@ export interface GpsOp {
 export type PendingOpType = "collecte" | "paiement" | "avance" | "gps_collecte";
 
 const DB_NAME = "coopdigital-terrain";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 let _db: IDBDatabase | null = null;
 
@@ -44,6 +44,11 @@ function openDb(): Promise<IDBDatabase> {
         const enqStore = db.createObjectStore("pending_enquetes", { keyPath: "localId" });
         enqStore.createIndex("status", "status");
         enqStore.createIndex("timestamp", "timestamp");
+      }
+      if (!db.objectStoreNames.contains("pesee_brouillons")) {
+        const brouStore = db.createObjectStore("pesee_brouillons", { keyPath: "localId" });
+        brouStore.createIndex("syncStatus", "syncStatus");
+        brouStore.createIndex("statut", "statut");
       }
     };
 
@@ -94,8 +99,10 @@ export async function getPendingOps(): Promise<PendingOp[]> {
 }
 
 export async function getPendingCount(): Promise<number> {
-  const [regularOps, gpsOps, enqOps] = await Promise.all([getPendingOps(), getPendingGpsOps(), getPendingEnqueteOps()]);
-  return regularOps.length + gpsOps.length + enqOps.length;
+  const [regularOps, gpsOps, enqOps, brouillons] = await Promise.all([
+    getPendingOps(), getPendingGpsOps(), getPendingEnqueteOps(), getPendingBrouillons(),
+  ]);
+  return regularOps.length + gpsOps.length + enqOps.length + brouillons.length;
 }
 
 export async function markOpSynced(localId: string): Promise<void> {
@@ -407,6 +414,138 @@ export async function incrementEnqueteTentatives(localId: string): Promise<numbe
     };
     getReq.onerror = () => reject(getReq.error);
   });
+}
+
+// ─── Brouillons de pesée hors-ligne ──────────────────────────────────────────
+
+export async function createBrouillon(data: {
+  membreId: number;
+  membreNom: string;
+  membrePrenoms: string;
+  membreCode: string;
+  produit: string;
+  operation: string;
+}): Promise<BrouillonPesee> {
+  const db = await openDb();
+  const now = Date.now();
+  const brouillon: BrouillonPesee = {
+    localId: crypto.randomUUID(),
+    ...data,
+    statut: "en_cours",
+    syncStatus: "pending",
+    lignes: [],
+    poidsTotalKg: 0,
+    nbSacsTotal: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  return new Promise((resolve, reject) => {
+    const store = tx("pesee_brouillons", "readwrite", db);
+    const req = store.put(brouillon);
+    req.onsuccess = () => resolve(brouillon);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getBrouillons(): Promise<BrouillonPesee[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pesee_brouillons", "readonly", db);
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const results = (req.result as BrouillonPesee[]).sort((a, b) => b.createdAt - a.createdAt);
+      resolve(results);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getBrouillon(localId: string): Promise<BrouillonPesee | null> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pesee_brouillons", "readonly", db);
+    const req = store.get(localId);
+    req.onsuccess = () => resolve((req.result as BrouillonPesee | undefined) ?? null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveBrouillon(brouillon: BrouillonPesee): Promise<BrouillonPesee> {
+  const db = await openDb();
+  const updated = { ...brouillon, updatedAt: Date.now() };
+  return new Promise((resolve, reject) => {
+    const store = tx("pesee_brouillons", "readwrite", db);
+    const req = store.put(updated);
+    req.onsuccess = () => resolve(updated);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function addLigneToBrouillon(
+  localId: string,
+  ligne: { nbSacs: number; poidsBrutKg: number; tareKg: number; notes?: string },
+): Promise<BrouillonPesee> {
+  const brouillon = await getBrouillon(localId);
+  if (!brouillon) throw new Error("Brouillon introuvable");
+  const newLigne: BrouillonLigne = {
+    localId: crypto.randomUUID(),
+    nbSacs: ligne.nbSacs,
+    poidsBrutKg: ligne.poidsBrutKg,
+    tareKg: ligne.tareKg,
+    notes: ligne.notes,
+    numeroPassage: brouillon.lignes.length + 1,
+    timestamp: Date.now(),
+  };
+  const lignes = [...brouillon.lignes, newLigne];
+  const poidsTotalKg = lignes.reduce((acc, l) => acc + Math.max(0, l.poidsBrutKg - l.tareKg), 0);
+  const nbSacsTotal = lignes.reduce((acc, l) => acc + l.nbSacs, 0);
+  return saveBrouillon({ ...brouillon, lignes, poidsTotalKg, nbSacsTotal });
+}
+
+export async function deleteLigneFromBrouillon(localId: string, ligneLocalId: string): Promise<BrouillonPesee> {
+  const brouillon = await getBrouillon(localId);
+  if (!brouillon) throw new Error("Brouillon introuvable");
+  const lignes = brouillon.lignes
+    .filter((l) => l.localId !== ligneLocalId)
+    .map((l, idx) => ({ ...l, numeroPassage: idx + 1 }));
+  const poidsTotalKg = lignes.reduce((acc, l) => acc + Math.max(0, l.poidsBrutKg - l.tareKg), 0);
+  const nbSacsTotal = lignes.reduce((acc, l) => acc + l.nbSacs, 0);
+  return saveBrouillon({ ...brouillon, lignes, poidsTotalKg, nbSacsTotal });
+}
+
+export async function terminerBrouillon(localId: string): Promise<BrouillonPesee> {
+  const brouillon = await getBrouillon(localId);
+  if (!brouillon) throw new Error("Brouillon introuvable");
+  if (brouillon.lignes.length === 0) throw new Error("Aucune pesée enregistrée dans ce brouillon");
+  return saveBrouillon({ ...brouillon, statut: "terminee" });
+}
+
+export async function annulerBrouillon(localId: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx("pesee_brouillons", "readwrite", db);
+    const req = store.delete(localId);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function markBrouillonSynced(localId: string, serverId: number, numeroSession: string): Promise<void> {
+  const brouillon = await getBrouillon(localId);
+  if (!brouillon) return;
+  await saveBrouillon({ ...brouillon, syncStatus: "synced", serverId, numeroSession });
+}
+
+export async function markBrouillonError(localId: string, errorMsg: string): Promise<void> {
+  const brouillon = await getBrouillon(localId);
+  if (!brouillon) return;
+  await saveBrouillon({ ...brouillon, syncStatus: "error", errorMsg });
+}
+
+/** Retourne les brouillons terminés et non encore synchronisés. */
+export async function getPendingBrouillons(): Promise<BrouillonPesee[]> {
+  const all = await getBrouillons();
+  return all.filter((b) => b.statut === "terminee" && b.syncStatus === "pending");
 }
 
 // ─── Cache missions d'enquête ──────────────────────────────────────────────────

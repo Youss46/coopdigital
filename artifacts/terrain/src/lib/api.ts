@@ -490,6 +490,32 @@ export async function convertirSessionEnLivraison(
   };
 }
 
+/** Synchronise un brouillon de pesée hors-ligne vers le serveur (batch atomique). */
+export async function batchSyncBrouillon(brouillon: import("./types").BrouillonPesee): Promise<{
+  sessionId: number;
+  numeroSession: string;
+  poidsTotalKg: string;
+  nbSacsTotal: number;
+}> {
+  return apiPeseeFetch("/pesee/sessions/batch", {
+    method: "POST",
+    body: JSON.stringify({
+      localId: brouillon.localId,
+      membreId: brouillon.membreId,
+      produit: brouillon.produit,
+      operation: brouillon.operation,
+      lignes: brouillon.lignes.map((l) => ({
+        localId: l.localId,
+        nbSacs: l.nbSacs,
+        poidsBrutKg: l.poidsBrutKg,
+        tareKg: l.tareKg,
+        notes: l.notes,
+      })),
+      statut: brouillon.statut,
+    }),
+  });
+}
+
 export async function getEnquetes(): Promise<import("./types").MissionEnquete[]> {
   return apiGet<import("./types").MissionEnquete[]>("/enquetes");
 }

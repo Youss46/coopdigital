@@ -25,6 +25,7 @@ import {
   handleConvertirSessionEnLivraison,
   handleExpirerSessionsStales,
   handleGetBordereauSession,
+  handleBatchCreateSession,
 } from "../controllers/peseeController";
 
 const router = Router();
@@ -53,6 +54,7 @@ router.put("/pesee/config",                  authMiddleware, handleUpdateConfig)
 // terrainAuthMiddleware pour ne pas passer par le tenantGuard de licence.
 // Route fixe avant les routes paramétrées /:id
 router.post("/pesee/sessions/expirer",                terrainAuthMiddleware, peseurOrDelegueOnly, handleExpirerSessionsStales);
+router.post("/pesee/sessions/batch",                  terrainAuthMiddleware, peseurOrDelegueOnly, handleBatchCreateSession);
 router.post("/pesee/sessions",                        terrainAuthMiddleware, peseurOrDelegueOnly, handleCreateSession);
 router.get("/pesee/sessions",                         flexAuthMiddleware, handleGetSessions);
 router.get("/pesee/sessions/:id",                     flexAuthMiddleware, handleGetSession);
