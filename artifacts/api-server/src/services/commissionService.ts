@@ -163,7 +163,7 @@ export async function creerCommissionTransfert(
 
     // Si les charges absorbent toute la commission, on enregistre quand même
     // à 0 pour la traçabilité (le délégué a travaillé mais les charges couvrent tout)
-    await db.insert(commissionsDeleguesTable).values({
+    const [inserted] = await db.insert(commissionsDeleguesTable).values({
       delegueId,
       livraisonId: null,
       transfertId,
@@ -174,17 +174,85 @@ export async function creerCommissionTransfert(
       chargesDeduitesFcfa: chargesDéduites > 0 ? chargesDéduites : null,
       montantFcfa: String(montantNet),
       statut: "en_attente",
-    });
+    }).returning({ id: commissionsDeleguesTable.id });
 
     logger.info(
       { transfertId, delegueId, poidsKg, montantBrut, chargesDéduites, montantNet },
       "Commission transfert créée"
     );
-    return montantNet;
+    return inserted ? { id: inserted.id, montantFcfa: montantNet } : null;
   } catch (err) {
     logger.error({ err, transfertId, delegueId }, "Erreur création commission transfert");
     return null;
   }
+}
+
+// ─── Déduction immédiate des avances sur une commission de réception ──────────
+/**
+ * Appelé juste après creerCommissionTransfert lors de la clôture d'une session
+ * reception_transfert. Applique les retenues selon le plan de chaque avance
+ * en cours du délégué et lie le remboursement à la commission créée.
+ * payerCommissions ignorera automatiquement les avances déjà remboursées.
+ */
+export async function deduireAvancesApresCommission(
+  commissionId: number,
+  delegueId: number,
+  cooperativeId: number,
+): Promise<number> {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const avancesEnCours = await db
+    .select()
+    .from(avancesDeleguesTable)
+    .where(and(
+      eq(avancesDeleguesTable.delegueId, delegueId),
+      eq(avancesDeleguesTable.cooperativeId, cooperativeId),
+      inArray(avancesDeleguesTable.statut, ["en_cours", "en_retard"] as const),
+    ))
+    .orderBy(avancesDeleguesTable.createdAt);
+
+  let totalRetenu = 0;
+
+  for (const avance of avancesEnCours) {
+    if (avance.statut === "rembourse") continue;
+
+    let retenueFcfa: number;
+    if (avance.planType === "integral") {
+      retenueFcfa = avance.soldeRestantFcfa;
+    } else if (avance.planType === "partiel" && avance.montantPartielFcfa) {
+      retenueFcfa = Math.min(avance.montantPartielFcfa, avance.soldeRestantFcfa);
+    } else if (avance.planType === "reporte") {
+      if (!avance.reportDate || today < String(avance.reportDate)) continue;
+      retenueFcfa = avance.soldeRestantFcfa;
+    } else {
+      continue;
+    }
+    if (retenueFcfa <= 0) continue;
+
+    const nouveauSolde     = avance.soldeRestantFcfa - retenueFcfa;
+    const nouveauRembourse = avance.montantRembourse + retenueFcfa;
+    const nouveauStatut    = nouveauSolde === 0 ? "rembourse" : "en_cours";
+
+    await db.update(avancesDeleguesTable).set({
+      montantRembourse: nouveauRembourse,
+      soldeRestantFcfa: nouveauSolde,
+      statut:           nouveauStatut as "en_cours" | "rembourse" | "en_retard",
+    }).where(eq(avancesDeleguesTable.id, avance.id));
+
+    await db.insert(remboursementsAvancesDeleguesTable).values({
+      avanceId:     avance.id,
+      commissionId,
+      montantFcfa:  retenueFcfa,
+      note:         `Retenue à la réception — session du ${today}`,
+    });
+
+    totalRetenu += retenueFcfa;
+  }
+
+  if (totalRetenu > 0) {
+    logger.info({ commissionId, delegueId, totalRetenu }, "Avances déduites à la réception");
+  }
+  return totalRetenu;
 }
 
 // ─── Moyens de paiement acceptés ─────────────────────────────────────────

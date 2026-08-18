@@ -33,6 +33,7 @@ import {
   traitementsRefusTable,
   campagnesTable,
   commissionsDeleguesTable,
+  remboursementsAvancesDeleguesTable,
   certificationsTable,
   certificationsMembresTable,
   sessionsPeseeTable,
@@ -4046,13 +4047,30 @@ export async function generateBordereauAchatSession(
 
   // 6. Avances du délégué + montant caisse coopérative crédité avant la session
   let soldeAvancesFcfa   = 0;
-  let retenueEstimeeFcfa = 0;
+  let retenueAvancesFcfa = 0;   // retenue réelle déjà opérée sur cette commission
   let montantCoopFcfa    = 0;   // total alimentations caisse avant session (mode caisse_cooperative)
 
   if (delegueIdSession) {
-    // 6a. Avances en cours (informatif)
+    // 6a. Retenues réelles déjà enregistrées sur la commission de cette session
+    if (session.transfertId) {
+      const [commPourRetenues] = await db
+        .select({ id: commissionsDeleguesTable.id })
+        .from(commissionsDeleguesTable)
+        .where(eq(commissionsDeleguesTable.transfertId, session.transfertId))
+        .orderBy(desc(commissionsDeleguesTable.id))
+        .limit(1);
+      if (commPourRetenues) {
+        const retenues = await db
+          .select({ montantFcfa: remboursementsAvancesDeleguesTable.montantFcfa })
+          .from(remboursementsAvancesDeleguesTable)
+          .where(eq(remboursementsAvancesDeleguesTable.commissionId, commPourRetenues.id));
+        retenueAvancesFcfa = retenues.reduce((s, r) => s + r.montantFcfa, 0);
+      }
+    }
+
+    // 6b. Solde total avances encore en cours (informatif)
     const avances = await db
-      .select({ soldeRestantFcfa: avancesDeleguesTable.soldeRestantFcfa, planType: avancesDeleguesTable.planType, montantPartielFcfa: avancesDeleguesTable.montantPartielFcfa })
+      .select({ soldeRestantFcfa: avancesDeleguesTable.soldeRestantFcfa })
       .from(avancesDeleguesTable)
       .where(and(
         eq(avancesDeleguesTable.delegueId, delegueIdSession),
@@ -4060,10 +4078,6 @@ export async function generateBordereauAchatSession(
         inArray(avancesDeleguesTable.statut, ["en_cours", "en_retard"] as const),
       ));
     soldeAvancesFcfa = avances.reduce((s, a) => s + a.soldeRestantFcfa, 0);
-    for (const a of avances) {
-      if (a.planType === "integral") retenueEstimeeFcfa += a.soldeRestantFcfa;
-      else if (a.planType === "partiel" && a.montantPartielFcfa) retenueEstimeeFcfa += Math.min(a.montantPartielFcfa, a.soldeRestantFcfa);
-    }
 
     // 6b. Si mode caisse_cooperative : montant pré-financé sur le cycle courant
     if (modeFinancement === "caisse_cooperative" && delegueIdSession) {
@@ -4102,13 +4116,11 @@ export async function generateBordereauAchatSession(
   const valeurProduit = Math.round(poidsNetKg * prixUnitaire);
   const caisseCoop    = modeFinancement === "caisse_cooperative";
 
-  // Formule nuancée :
-  //   fonds_propres      → délégué a tout financé → NET = valeur + frais collecte
-  //   caisse_cooperative → NET = MAX(valeur - alimentations caisse, 0) + frais collecte
-  //     Si alimentations >= valeur : la coop a tout couvert → NET = frais collecte seulement
-  //     Si alimentations < valeur  : le délégué a complété  → NET = (valeur - alims) + frais
+  // Formule :
+  //   fonds_propres      → NET = valeur + commission − retenues avances
+  //   caisse_cooperative → NET = MAX(valeur − alims coop, 0) + commission − retenues avances
   const resteValeurFcfa = caisseCoop ? Math.max(valeurProduit - montantCoopFcfa, 0) : valeurProduit;
-  const montantNet      = resteValeurFcfa + fraisCollecteFcfa;
+  const montantNet      = Math.max(0, resteValeurFcfa + fraisCollecteFcfa - retenueAvancesFcfa);
 
   // 8. PDF
   const { doc, endPromise } = makePdfDoc();
@@ -4218,7 +4230,7 @@ export async function generateBordereauAchatSession(
   const autresLignes: { label: string; valeur: number }[] = [
     { label: "FRAIS DE\nCOLLECTE", valeur: fraisCollecteFcfa },
     { label: "CARBURANT",          valeur: carburantFcfa },
-    { label: "RETENUE\nAVANCE",    valeur: retenueEstimeeFcfa },
+    { label: "RETENUE\nAVANCE",    valeur: retenueAvancesFcfa },
     { label: "SOLDE SUR\nAVANCES", valeur: soldeAvancesFcfa },
   ];
   // SUB_H doit loger : label sur 2 lignes à 7 pt (≈18 pt) + valeur à 8.5 pt + marges

@@ -20,7 +20,7 @@ import { getMontantAlimentationsCaisseDelegue } from "./delegueService.js";
 import { getEncoursMembreTx, enregistrerRemboursementParLivraison } from "./intrantsService.js";
 import { creerNotification, notifierParRole } from "./notificationService.js";
 import { genererNumeroRecu } from "./recuService.js";
-import { creerCommissionTransfert } from "./commissionService.js";
+import { creerCommissionTransfert, deduireAvancesApresCommission } from "./commissionService.js";
 import { logger } from "../lib/logger.js";
 
 // ─── Création batch (sync hors-ligne) ────────────────────────────────────────
@@ -554,13 +554,21 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
     // Commission délégué sur poids net pesé — uniquement si réception confirmée (pas de litige)
     // Awaited pour garantir que la commission est en DB avant que le PDF soit généré.
     if (result.statutFinal === "confirme" && result.transfert.delegueId) {
-      await creerCommissionTransfert(
+      const commission = await creerCommissionTransfert(
         detail.transfertId!,
         result.transfert.delegueId,
         result.transfert.campagneId ?? null,
         result.poidsPeseKg,
         cooperativeId,
       );
+      // Déduire immédiatement les avances du délégué sur cette commission
+      if (commission) {
+        await deduireAvancesApresCommission(
+          commission.id,
+          result.transfert.delegueId,
+          cooperativeId,
+        );
+      }
     }
 
     return { ...detail, statut: "terminee" as const, dateFin: result.dateFin, receptionConfirmee: true as const, statutTransfert: result.statutFinal };
