@@ -260,6 +260,11 @@ export interface PeseurCollecte {
   fromSession?: boolean;
   /** Plan de déduction d'avance : null = pas d'avance, "integral" = déduit, "partiel" = partiel, "reporte" = reporté */
   planAvanceType?: string | null;
+  /** Présent uniquement pour les entrées de type réception de transfert */
+  type?: "livraison" | "reception_transfert";
+  transfertNumero?: string | null;
+  entrepotNom?: string | null;
+  sessionId?: number | null;
 }
 
 export interface StatsAgent {

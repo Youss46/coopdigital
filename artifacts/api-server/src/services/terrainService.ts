@@ -3,7 +3,7 @@ import {
   usersTable, membresTable, fournisseursTable, avancesTable, livraisonsTable, paiementsTable,
   distributionsIntrantsTable, historiquePrixTable, campagnesTable,
   caissesTable, mouvementsCaisseTable, sessionsPeseeTable,
-  cooperativesTable,
+  cooperativesTable, transfertsStockTable, entrepotsDeleguesTable,
 } from "@workspace/db";
 import { and, eq, sql, desc, or, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -679,6 +679,42 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
       eq(livraisonsTable.dateLivraison, todayStr),
     ));
 
+  // Sessions de réception de transfert terminées aujourd'hui par ce peseur
+  const [transfertReceptionStats] = await db
+    .select({
+      nb:      sql<number>`COUNT(*)`,
+      tonnage: sql<string>`COALESCE(SUM(${sessionsPeseeTable.poidsTotalKg}), 0)`,
+    })
+    .from(sessionsPeseeTable)
+    .where(and(
+      eq(sessionsPeseeTable.peseurId, agentId),
+      eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+      sql`${sessionsPeseeTable.operation} = 'reception_transfert'`,
+      sql`${sessionsPeseeTable.statut} = 'terminee'`,
+      sql`DATE(${sessionsPeseeTable.dateFin}) = ${todayStr}::date`,
+    ));
+
+  // Récentes sessions de réception de transfert (pour dernieresOps)
+  const recentesTransferts = await db
+    .select({
+      id:          sessionsPeseeTable.id,
+      dateFin:     sessionsPeseeTable.dateFin,
+      poidsTotalKg: sessionsPeseeTable.poidsTotalKg,
+      entrepotNom: entrepotsDeleguesTable.nom,
+    })
+    .from(sessionsPeseeTable)
+    .leftJoin(transfertsStockTable, eq(transfertsStockTable.id, sessionsPeseeTable.transfertId))
+    .leftJoin(entrepotsDeleguesTable, eq(entrepotsDeleguesTable.id, transfertsStockTable.entrepotSourceId))
+    .where(and(
+      eq(sessionsPeseeTable.peseurId, agentId),
+      eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+      sql`${sessionsPeseeTable.operation} = 'reception_transfert'`,
+      sql`${sessionsPeseeTable.statut} = 'terminee'`,
+      sql`DATE(${sessionsPeseeTable.dateFin}) = ${todayStr}::date`,
+    ))
+    .orderBy(desc(sessionsPeseeTable.dateFin))
+    .limit(4);
+
   const [paiementsStats] = await db
     .select({
       nb: sql<number>`COUNT(*)`,
@@ -784,13 +820,20 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
         ? `${p.delegueNom} ${p.deleguePrenoms ?? ""}`.trim()
         : null,
     })),
+    ...recentesTransferts.map((t) => ({
+      heure: t.dateFin ? new Date(t.dateFin).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "--:--",
+      type: "reception_transfert",
+      label: `Réception transfert ${t.entrepotNom ?? "—"} — ${toNum(t.poidsTotalKg)} kg`,
+      montant: 0,
+      saisiePour: null as string | null,
+    })),
   ].sort((a, b) => b.heure.localeCompare(a.heure)).slice(0, 8);
 
   return {
     collectes: {
-      nb: Number(collectesStats?.nb ?? 0),
-      tonnage: toNum(collectesStats?.tonnage),
-      valeur: toNum(collectesStats?.valeur),
+      nb:      Number(collectesStats?.nb ?? 0)      + Number(transfertReceptionStats?.nb ?? 0),
+      tonnage: toNum(collectesStats?.tonnage)        + toNum(transfertReceptionStats?.tonnage),
+      valeur:  toNum(collectesStats?.valeur),
     },
     paiements: {
       nb: Number(paiementsStats?.nb ?? 0),
@@ -906,7 +949,7 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
     .orderBy(desc(livraisonsTable.dateLivraison), desc(livraisonsTable.id))
     .limit(200);
 
-  return rows.map((r) => ({
+  const livraisonEntries = rows.map((r) => ({
     id: r.id,
     dateLivraison: r.dateLivraison,
     poidsKg: toNum(r.poidsKg),
@@ -917,7 +960,51 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
     membreCode: r.membreCode ?? "",
     fromSession: r.sessionId !== null,
     planAvanceType: r.planAvanceType ?? null,
+    type: "livraison" as const,
   }));
+
+  // Sessions de réception de transfert terminées par ce peseur
+  const transfertRows = await db
+    .select({
+      id:               sessionsPeseeTable.id,
+      dateFin:          sessionsPeseeTable.dateFin,
+      poidsTotalKg:     sessionsPeseeTable.poidsTotalKg,
+      transfertNumero:  transfertsStockTable.numeroTransfert,
+      entrepotNom:      entrepotsDeleguesTable.nom,
+    })
+    .from(sessionsPeseeTable)
+    .leftJoin(transfertsStockTable, eq(transfertsStockTable.id, sessionsPeseeTable.transfertId))
+    .leftJoin(entrepotsDeleguesTable, eq(entrepotsDeleguesTable.id, transfertsStockTable.entrepotSourceId))
+    .where(and(
+      eq(sessionsPeseeTable.peseurId, agentId),
+      eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+      sql`${sessionsPeseeTable.operation} = 'reception_transfert'`,
+      sql`${sessionsPeseeTable.statut} = 'terminee'`,
+    ))
+    .orderBy(desc(sessionsPeseeTable.dateFin))
+    .limit(100);
+
+  const transfertEntries = transfertRows.map((t) => ({
+    id: t.id,                                                   // session id
+    dateLivraison: t.dateFin ? t.dateFin.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+    poidsKg: toNum(t.poidsTotalKg),
+    montantNetFcfa: 0,
+    statutPaiement: "—",
+    membreNom: "",
+    membrePrenoms: "",
+    membreCode: "",
+    fromSession: true,
+    planAvanceType: null as string | null,
+    type: "reception_transfert" as const,
+    transfertNumero: t.transfertNumero ?? null,
+    entrepotNom: t.entrepotNom ?? null,
+    sessionId: t.id,
+  }));
+
+  // Merge et trier par date décroissante
+  return [...livraisonEntries, ...transfertEntries].sort(
+    (a, b) => b.dateLivraison.localeCompare(a.dateLivraison) || b.id - a.id,
+  );
 }
 
 // ─── Rapport journalier ──────────────────────────────────────────────────

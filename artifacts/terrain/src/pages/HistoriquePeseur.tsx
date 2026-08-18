@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { getPeseurCollectes, telechargerRecuLivraison } from "../lib/api";
+import { getPeseurCollectes, telechargerRecuLivraison, telechargerBordereauSession } from "../lib/api";
 import { useOffline } from "../contexts/OfflineContext";
 import type { PeseurCollecte } from "../lib/types";
 import BottomNavPeseur from "../components/BottomNavPeseur";
@@ -71,7 +71,7 @@ export default function HistoriquePeseur() {
   }, [charger]);
 
   const totalPoids = collectes.reduce((s, c) => s + c.poidsKg, 0);
-  const totalMontant = collectes.reduce((s, c) => s + c.montantNetFcfa, 0);
+  const totalMontant = collectes.filter((c) => c.type !== "reception_transfert").reduce((s, c) => s + c.montantNetFcfa, 0);
 
   return (
     <div className="t-app">
@@ -152,69 +152,89 @@ export default function HistoriquePeseur() {
         {/* Liste des collectes */}
         <div>
           {collectes.map((c) => {
+            const isTransfert = c.type === "reception_transfert";
             const st = statutStyle(c.statutPaiement);
             return (
-              <div key={c.id} className="t-card" style={{ marginBottom: 10 }}>
+              <div key={`${isTransfert ? "tr" : "lv"}-${c.id}`} className="t-card" style={{ marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                  <span style={{ fontSize: "1.4rem", lineHeight: 1 }}>⚖️</span>
+                  <span style={{ fontSize: "1.4rem", lineHeight: 1 }}>{isTransfert ? "🚛" : "⚖️"}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: ".9rem", marginBottom: 2 }}>
-                      {c.membreNom} {c.membrePrenoms}
-                    </div>
-                    {c.membreCode && (
-                      <div style={{ fontSize: ".75rem", color: "var(--t-muted)", marginBottom: 4 }}>
-                        {c.membreCode}
-                      </div>
+                    {isTransfert ? (
+                      <>
+                        <div style={{ fontWeight: 700, fontSize: ".9rem", marginBottom: 2 }}>
+                          Réception transfert
+                        </div>
+                        <div style={{ fontSize: ".78rem", color: "var(--t-muted)", marginBottom: 4 }}>
+                          {c.entrepotNom ?? "—"}{c.transfertNumero ? ` · ${c.transfertNumero}` : ""}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 700, fontSize: ".9rem", marginBottom: 2 }}>
+                          {c.membreNom} {c.membrePrenoms}
+                        </div>
+                        {c.membreCode && (
+                          <div style={{ fontSize: ".75rem", color: "var(--t-muted)", marginBottom: 4 }}>
+                            {c.membreCode}
+                          </div>
+                        )}
+                      </>
                     )}
                     <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                       <span style={{ fontSize: ".82rem", color: "#e2e8f0" }}>
                         🌿 {c.poidsKg.toLocaleString("fr-FR")} kg
                       </span>
-                      <span style={{ fontSize: ".82rem", color: "#e2e8f0" }}>
-                        💵 {formatMontant(c.montantNetFcfa)}
-                      </span>
-                    </div>
-                    <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {c.fromSession && (
-                        <span style={{
-                          fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
-                          color: "#818cf8", background: "rgba(129,140,248,.15)",
-                          border: "1px solid rgba(129,140,248,.3)",
-                        }}>
-                          ⚖️ Session groupée
-                        </span>
-                      )}
-                      {c.planAvanceType === "reporte" && (
-                        <span style={{
-                          fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
-                          color: "#fbbf24", background: "rgba(251,191,36,.12)",
-                          border: "1px solid rgba(251,191,36,.35)",
-                        }}>
-                          ⏸ Avance reportée
-                        </span>
-                      )}
-                      {c.planAvanceType === "partiel" && (
-                        <span style={{
-                          fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
-                          color: "#fb923c", background: "rgba(251,146,60,.12)",
-                          border: "1px solid rgba(251,146,60,.35)",
-                        }}>
-                          ⚡ Avance partielle
+                      {!isTransfert && (
+                        <span style={{ fontSize: ".82rem", color: "#e2e8f0" }}>
+                          💵 {formatMontant(c.montantNetFcfa)}
                         </span>
                       )}
                     </div>
+                    {!isTransfert && (
+                      <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {c.fromSession && (
+                          <span style={{
+                            fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                            color: "#818cf8", background: "rgba(129,140,248,.15)",
+                            border: "1px solid rgba(129,140,248,.3)",
+                          }}>
+                            ⚖️ Session groupée
+                          </span>
+                        )}
+                        {c.planAvanceType === "reporte" && (
+                          <span style={{
+                            fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                            color: "#fbbf24", background: "rgba(251,191,36,.12)",
+                            border: "1px solid rgba(251,191,36,.35)",
+                          }}>
+                            ⏸ Avance reportée
+                          </span>
+                        )}
+                        {c.planAvanceType === "partiel" && (
+                          <span style={{
+                            fontSize: ".7rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                            color: "#fb923c", background: "rgba(251,146,60,.12)",
+                            border: "1px solid rgba(251,146,60,.35)",
+                          }}>
+                            ⚡ Avance partielle
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
                     <span style={{ fontSize: ".7rem", color: "var(--t-muted)" }}>
                       {formatDate(c.dateLivraison)}
                     </span>
-                    <span style={{
-                      fontSize: ".72rem", fontWeight: 700, padding: "3px 8px", borderRadius: 12,
-                      color: st.color, background: st.bg,
-                    }}>
-                      {st.label}
-                    </span>
-                    {isOnline && (
+                    {!isTransfert && (
+                      <span style={{
+                        fontSize: ".72rem", fontWeight: 700, padding: "3px 8px", borderRadius: 12,
+                        color: st.color, background: st.bg,
+                      }}>
+                        {st.label}
+                      </span>
+                    )}
+                    {isOnline && !isTransfert && (
                       <button
                         disabled={downloadingId === c.id}
                         onClick={async () => {
@@ -241,6 +261,35 @@ export default function HistoriquePeseur() {
                         }}
                       >
                         {downloadingId === c.id ? "…" : "📄 Reçu"}
+                      </button>
+                    )}
+                    {isOnline && isTransfert && c.sessionId && (
+                      <button
+                        disabled={downloadingId === c.id}
+                        onClick={async () => {
+                          setDownloadingId(c.id);
+                          setDownloadErreur(null);
+                          try {
+                            await telechargerBordereauSession(c.sessionId!);
+                          } catch (e) {
+                            setDownloadErreur((e as Error).message || "Erreur téléchargement");
+                          }
+                          setDownloadingId(null);
+                        }}
+                        style={{
+                          marginTop: 2,
+                          background: downloadingId === c.id ? "rgba(255,255,255,.08)" : "rgba(26,71,49,.4)",
+                          border: "1px solid rgba(99,210,132,.35)",
+                          borderRadius: 8,
+                          color: downloadingId === c.id ? "var(--t-muted)" : "#63d284",
+                          fontSize: ".7rem",
+                          fontWeight: 700,
+                          padding: "4px 10px",
+                          cursor: downloadingId === c.id ? "default" : "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {downloadingId === c.id ? "…" : "📋 Bordereau"}
                       </button>
                     )}
                   </div>
