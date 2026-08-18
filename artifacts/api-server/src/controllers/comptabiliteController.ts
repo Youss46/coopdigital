@@ -824,6 +824,17 @@ export async function apercuCloture(req: Request, res: Response): Promise<void> 
     const avImpot  = rao       + rhao;
     const net      = avImpot   - impotResultat;
 
+    // Régularisations existantes (seront extournées au 01/01/N+1 lors de la clôture)
+    const regulRows = await db.execute(sql`
+      SELECT libelle, compte_debit AS "compteDebit", compte_credit AS "compteCredit",
+             montant_fcfa AS "montantFcfa"
+      FROM   ecritures_comptables
+      WHERE  cooperative_id = ${coop}
+        AND  exercice       = ${annee}
+        AND  type_ecriture  = 'regularisation'
+      ORDER  BY id
+    `);
+
     res.json({
       exercice:        annee,
       statut:          exercice?.statut ?? "ouvert",
@@ -846,6 +857,7 @@ export async function apercuCloture(req: Request, res: Response): Promise<void> 
       tresorerie:      Number(p1?.soldeTresorerie    ?? 0),
       fournisseurs:    Number(p1?.soldeFournisseurs   ?? 0),
       stockCacao:      Number(p1?.soldeStock311       ?? 0),
+      regularisations: regulRows.rows as { libelle: string; compteDebit: string; compteCredit: string; montantFcfa: number }[],
     });
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
