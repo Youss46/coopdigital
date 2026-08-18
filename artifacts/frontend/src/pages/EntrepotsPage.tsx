@@ -8,6 +8,7 @@ import {
   RefreshCw, Eye, Pencil, Power, PowerOff, SlidersHorizontal, ChevronDown, ChevronUp, FileDown,
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
+import { useGetVehicules, useGetChauffeurs } from "@workspace/api-client-react";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -169,9 +170,13 @@ export default function EntrepotsPage() {
   const [showTransfert, setShowTransfert] = useState<Entrepot | null>(null);
   const [formTransfert, setFormTransfert] = useState({
     poidsKg: "",
+    typeTransport: "cooperatif" as "cooperatif" | "location",
+    vehiculeId: "",
+    chauffeurId: "",
     typeVehicule: "",
     immatriculation: "",
     nomChauffeur: "",
+    telephoneChauffeur: "",
     notes: "",
     fraisCarburantFcfa: "", fraisCarburantPar: "cooperative",
     autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative",
@@ -195,6 +200,11 @@ export default function EntrepotsPage() {
     queryFn: () => apiFetch("/transferts"),
     enabled: onglet === "transferts" || !!showDetail,
   });
+
+  const { data: vehiculesData } = useGetVehicules({ query: { enabled: !!showTransfert } });
+  const { data: chauffeursData } = useGetChauffeurs({ query: { enabled: !!showTransfert } });
+  const vehiculesCoop = (vehiculesData?.vehicules ?? []).filter((v: { statut?: string }) => v.statut === "disponible" || v.statut === "en_mission");
+  const chauffeursCoop = (chauffeursData?.chauffeurs ?? []).filter((c: { statut?: string }) => c.statut === "actif");
 
   const mutArriveePhysique = useMutation({
     mutationFn: (id: number) =>
@@ -279,7 +289,7 @@ export default function EntrepotsPage() {
       qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
       qc.invalidateQueries({ queryKey: ["transferts"] });
       setShowTransfert(null);
-      setFormTransfert({ poidsKg: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
+      setFormTransfert({ poidsKg: "", typeTransport: "cooperatif", vehiculeId: "", chauffeurId: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
       toast({ title: "Transfert lancé", description: "Le stock est en transit vers le magasin central." });
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -433,7 +443,7 @@ export default function EntrepotsPage() {
                       <button
                         onClick={() => {
                           setShowTransfert(e);
-                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", typeVehicule: "", immatriculation: "", nomChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
+                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", typeTransport: "cooperatif", vehiculeId: "", chauffeurId: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
                         }}
                         className="mt-3 w-full flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors">
                         <Truck className="w-3.5 h-3.5" />
@@ -761,35 +771,89 @@ export default function EntrepotsPage() {
                 })()}
               </div>
 
-              {/* Infos véhicule */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Immatriculation</label>
-                  <input type="text" placeholder="ex: AA 1234 CI"
-                    value={formTransfert.immatriculation}
-                    onChange={(e) => setFormTransfert(f => ({ ...f, immatriculation: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+              {/* Mode de transport */}
+              <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-gray-700">🚛 Moyen de transport</p>
+                <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+                  {(["cooperatif", "location"] as const).map((mode) => (
+                    <button key={mode} type="button"
+                      onClick={() => setFormTransfert(f => ({ ...f, typeTransport: mode, vehiculeId: "", chauffeurId: "", immatriculation: "", typeVehicule: "", nomChauffeur: "", telephoneChauffeur: "" }))}
+                      className={`flex-1 py-2 transition-colors ${mode !== "cooperatif" ? "border-l border-gray-200" : ""} ${formTransfert.typeTransport === mode ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
+                      style={formTransfert.typeTransport === mode ? { backgroundColor: "#1a4731" } : {}}>
+                      {mode === "cooperatif" ? "🏢 Camion coopérative" : "🔑 Camion de location"}
+                    </button>
+                  ))}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type de véhicule</label>
-                  <select value={formTransfert.typeVehicule}
-                    onChange={(e) => setFormTransfert(f => ({ ...f, typeVehicule: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                    <option value="">— Non précisé —</option>
-                    <option value="camion">Camion</option>
-                    <option value="pickup">Pick-up</option>
-                    <option value="moto">Moto</option>
-                    <option value="autre">Autre</option>
-                  </select>
-                </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom du chauffeur</label>
-                <input type="text" placeholder="ex: Kouadio Paul"
-                  value={formTransfert.nomChauffeur}
-                  onChange={(e) => setFormTransfert(f => ({ ...f, nomChauffeur: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" />
+                {formTransfert.typeTransport === "cooperatif" ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Sélectionner le camion *</label>
+                      <select value={formTransfert.vehiculeId}
+                        onChange={(e) => setFormTransfert(f => ({ ...f, vehiculeId: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500">
+                        <option value="">— Choisir un véhicule —</option>
+                        {vehiculesCoop.map((v: { id: number; immatriculation: string; marque?: string | null; modele?: string | null; type: string }) => (
+                          <option key={v.id} value={String(v.id)}>
+                            {v.immatriculation}{v.marque ? ` · ${v.marque}` : ""}{v.modele ? ` ${v.modele}` : ""} ({v.type})
+                          </option>
+                        ))}
+                      </select>
+                      {vehiculesCoop.length === 0 && <p className="text-xs text-amber-600 mt-1">Aucun véhicule disponible enregistré dans Transport.</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Sélectionner le chauffeur *</label>
+                      <select value={formTransfert.chauffeurId}
+                        onChange={(e) => setFormTransfert(f => ({ ...f, chauffeurId: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500">
+                        <option value="">— Choisir un chauffeur —</option>
+                        {chauffeursCoop.map((c: { id: number; nom: string; prenoms?: string | null }) => (
+                          <option key={c.id} value={String(c.id)}>{c.nom} {c.prenoms ?? ""}</option>
+                        ))}
+                      </select>
+                      {chauffeursCoop.length === 0 && <p className="text-xs text-amber-600 mt-1">Aucun chauffeur actif enregistré dans Transport.</p>}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Immatriculation</label>
+                        <input type="text" placeholder="ex: AA 1234 CI"
+                          value={formTransfert.immatriculation}
+                          onChange={(e) => setFormTransfert(f => ({ ...f, immatriculation: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Type de véhicule</label>
+                        <select value={formTransfert.typeVehicule}
+                          onChange={(e) => setFormTransfert(f => ({ ...f, typeVehicule: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500">
+                          <option value="">— Non précisé —</option>
+                          <option value="camion">Camion</option>
+                          <option value="camionnette">Camionnette</option>
+                          <option value="pickup">Pick-up</option>
+                          <option value="moto">Moto</option>
+                          <option value="autre">Autre</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nom du chauffeur</label>
+                      <input type="text" placeholder="ex: Kouadio Paul"
+                        value={formTransfert.nomChauffeur}
+                        onChange={(e) => setFormTransfert(f => ({ ...f, nomChauffeur: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone chauffeur</label>
+                      <input type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" placeholder="07 XX XX XX XX"
+                        value={formTransfert.telephoneChauffeur}
+                        onChange={(e) => setFormTransfert(f => ({ ...f, telephoneChauffeur: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500" />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -903,24 +967,39 @@ export default function EntrepotsPage() {
                   !formTransfert.poidsKg ||
                   parseFloat(formTransfert.poidsKg) <= 0 ||
                   parseFloat(formTransfert.poidsKg) > parseFloat(showTransfert.stockActuelKg) ||
+                  (formTransfert.typeTransport === "cooperatif" && (!formTransfert.vehiculeId || !formTransfert.chauffeurId)) ||
                   mutTransfert.isPending
                 }
-                onClick={() => mutTransfert.mutate({
-                  id: showTransfert.id,
-                  body: {
-                    poidsKg: parseFloat(formTransfert.poidsKg),
-                    typeVehicule: formTransfert.typeVehicule || undefined,
-                    immatriculation: formTransfert.immatriculation || undefined,
-                    nomChauffeur: formTransfert.nomChauffeur || undefined,
-                    notes: formTransfert.notes || undefined,
-                    fraisCarburantFcfa: formTransfert.fraisCarburantFcfa ? parseInt(formTransfert.fraisCarburantFcfa) : undefined,
-                    fraisCarburantPar: formTransfert.fraisCarburantFcfa ? formTransfert.fraisCarburantPar : undefined,
-                    autresChargesFcfa: formTransfert.autresChargesFcfa ? parseInt(formTransfert.autresChargesFcfa) : undefined,
-                    autresChargesLibelle: formTransfert.autresChargesLibelle || undefined,
-                    autresChargesPar: formTransfert.autresChargesFcfa ? formTransfert.autresChargesPar : undefined,
-                    modeFinancement: formTransfert.modeFinancement,
-                  },
-                })}
+                onClick={() => {
+                  const transportBody = formTransfert.typeTransport === "cooperatif"
+                    ? {
+                        vehiculeId: parseInt(formTransfert.vehiculeId),
+                        chauffeurId: parseInt(formTransfert.chauffeurId),
+                        immatriculation: vehiculesCoop.find((v: { id: number }) => v.id === parseInt(formTransfert.vehiculeId))?.immatriculation,
+                        nomChauffeur: chauffeursCoop.find((c: { id: number; nom: string; prenoms?: string | null }) => c.id === parseInt(formTransfert.chauffeurId))?.nom,
+                      }
+                    : {
+                        immatriculation: formTransfert.immatriculation || undefined,
+                        typeVehicule: formTransfert.typeVehicule || undefined,
+                        nomChauffeur: formTransfert.nomChauffeur || undefined,
+                        telephoneChauffeur: formTransfert.telephoneChauffeur || undefined,
+                      };
+                  mutTransfert.mutate({
+                    id: showTransfert.id,
+                    body: {
+                      poidsKg: parseFloat(formTransfert.poidsKg),
+                      typeTransport: formTransfert.typeTransport,
+                      ...transportBody,
+                      notes: formTransfert.notes || undefined,
+                      fraisCarburantFcfa: formTransfert.fraisCarburantFcfa ? parseInt(formTransfert.fraisCarburantFcfa) : undefined,
+                      fraisCarburantPar: formTransfert.fraisCarburantFcfa ? formTransfert.fraisCarburantPar : undefined,
+                      autresChargesFcfa: formTransfert.autresChargesFcfa ? parseInt(formTransfert.autresChargesFcfa) : undefined,
+                      autresChargesLibelle: formTransfert.autresChargesLibelle || undefined,
+                      autresChargesPar: formTransfert.autresChargesFcfa ? formTransfert.autresChargesPar : undefined,
+                      modeFinancement: formTransfert.modeFinancement,
+                    },
+                  });
+                }}
                 className="flex-1 bg-green-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2">
                 {mutTransfert.isPending
                   ? "Lancement…"
