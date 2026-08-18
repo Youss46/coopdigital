@@ -93,6 +93,7 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
     const entrepotId = req.query["entrepot_id"] ? parseInt(String(req.query["entrepot_id"])) : undefined;
     const dateDebut = req.query["date_debut"] as string | undefined;
     const dateFin = req.query["date_fin"] as string | undefined;
+    const certification = req.query["certification"] as string | undefined;
 
     const entrepotCondition = entrepotId
       ? sql`e.cooperative_id = ${cooperativeId} AND ms.entrepot_id = ${entrepotId}`
@@ -103,6 +104,16 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
       : sql``;
     const dateFinCondition = dateFin
       ? sql`AND ms.created_at <= ${new Date(dateFin + "T23:59:59Z")}`
+      : sql``;
+
+    // Filtre certification : JOIN sessions_pesee via l'ID extrait du motif "Livraison #N"
+    const certCondition = certification
+      ? sql`AND ms.motif ~ '^Livraison #[0-9]+$'
+            AND EXISTS (
+              SELECT 1 FROM sessions_pesee sp
+              WHERE sp.livraison_id = CAST(REGEXP_REPLACE(ms.motif, '^Livraison #', '') AS INTEGER)
+                AND sp.certification_cacao = ${certification}
+            )`
       : sql``;
 
     const rows = await db.execute<{
@@ -116,6 +127,7 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
       agentId: number | null;
       createdAt: Date;
       nombreSacs: number | null;
+      certificationCacao: string | null;
     }>(sql`
       SELECT
         ms.id,
@@ -138,12 +150,23 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
             )
             ELSE NULL
           END
-        ) AS "nombreSacs"
+        ) AS "nombreSacs",
+        CASE
+          WHEN ms.motif ~ '^Livraison #[0-9]+$'
+          THEN (
+            SELECT sp.certification_cacao
+            FROM sessions_pesee sp
+            WHERE sp.livraison_id = CAST(REGEXP_REPLACE(ms.motif, '^Livraison #', '') AS INTEGER)
+            LIMIT 1
+          )
+          ELSE NULL
+        END AS "certificationCacao"
       FROM mouvements_stock ms
       LEFT JOIN entrepots e ON e.id = ms.entrepot_id
       WHERE ${entrepotCondition}
       ${dateDebutCondition}
       ${dateFinCondition}
+      ${certCondition}
       ORDER BY ms.created_at DESC
       LIMIT 200
     `);
@@ -151,6 +174,46 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
     res.json(rows.rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getMouvements");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function getTonnageCertification(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  try {
+    // Répartition des livraisons (converties en stock) par certification cacao.
+    // Chemin : livraisons → sessions_pesee (via sp.livraison_id = l.id) → certification_cacao.
+    // On filtre par la coopérative du membre (livraisons.cooperative_id via membres).
+    const rows = await db.execute<{
+      certification: string | null;
+      totalKg: string;
+      totalSacs: string;
+      totalLivraisons: string;
+    }>(sql`
+      SELECT
+        sp.certification_cacao                 AS "certification",
+        SUM(l.poids_brut_kg)::text             AS "totalKg",
+        SUM(COALESCE(l.nombre_sacs, 0))::text  AS "totalSacs",
+        COUNT(l.id)::text                      AS "totalLivraisons"
+      FROM livraisons l
+      LEFT JOIN sessions_pesee sp ON sp.livraison_id = l.id
+      LEFT JOIN membres m ON m.id = l.membre_id
+      LEFT JOIN fournisseurs_externes fe ON fe.id = l.fournisseur_id
+      WHERE
+        (m.cooperative_id = ${cooperativeId} OR fe.cooperative_id = ${cooperativeId})
+        AND l.statut != 'annulee'
+      GROUP BY sp.certification_cacao
+      ORDER BY SUM(l.poids_brut_kg) DESC NULLS LAST
+    `);
+
+    res.json(rows.rows);
+  } catch (err) {
+    req.log.error({ err }, "Erreur getTonnageCertification");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

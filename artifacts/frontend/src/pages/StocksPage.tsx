@@ -93,6 +93,7 @@ export default function StocksPage() {
   const peutSortie = usePermission("stocks", "sortie");
   const [onglet, setOnglet] = useState<"entrepots" | "journal">("entrepots");
   const [filtreTransfert, setFiltreTransfert] = useState<string>("");
+  const [filtreCertification, setFiltreCertification] = useState<string>("");
   const [periode, setPeriode] = useState<PeriodeFilter>("all");
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
@@ -182,19 +183,31 @@ export default function StocksPage() {
   const { data: entrepots = [], isLoading } = useGetEntrepots();
   const { data: alertes = [] } = useGetStockAlertes();
 
-  // Fetch mouvements avec filtre de période (bypass hook Orval pour supporter date_debut/date_fin)
+  // Fetch mouvements avec filtre de période + certification
   const periodeDates = getPeriodeDates(periode, dateDebut, dateFin);
   const { data: mouvements = [], isLoading: isLoadingMouvements } = useQuery({
-    queryKey: ["stocks-mouvements", periode, dateDebut, dateFin],
+    queryKey: ["stocks-mouvements", periode, dateDebut, dateFin, filtreCertification],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (periodeDates.date_debut) params.set("date_debut", periodeDates.date_debut);
       if (periodeDates.date_fin) params.set("date_fin", periodeDates.date_fin);
+      if (filtreCertification) params.set("certification", filtreCertification);
       const qs = params.toString() ? `?${params.toString()}` : "";
       const r = await fetch(`${BASE}/api/stocks/mouvements${qs}`, { headers: { Authorization: `Bearer ${tok()}` } });
       if (!r.ok) throw new Error("Erreur chargement mouvements");
-      return r.json() as Promise<Array<{ id: number; entrepotNom: string | null; type: string; poidsKg: string; motif: string | null; createdAt: string; nombreSacs?: number | null }>>;
+      return r.json() as Promise<Array<{ id: number; entrepotNom: string | null; type: string; poidsKg: string; motif: string | null; createdAt: string; nombreSacs?: number | null; certificationCacao?: string | null }>>;
     },
+  });
+
+  // Répartition tonnage par certification
+  const { data: tonnageCertifications = [] } = useQuery<Array<{ certification: string | null; totalKg: string; totalSacs: string; totalLivraisons: string }>>({
+    queryKey: ["stocks-tonnage-certification"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/stocks/tonnage-certification`, { headers: { Authorization: `Bearer ${tok()}` } });
+      if (!r.ok) return [];
+      return r.json();
+    },
+    staleTime: 60_000,
   });
   const { data: lotStats } = useQuery<LotissementStats>({
     queryKey: ["stocks-lotissement-stats"],
@@ -357,6 +370,80 @@ export default function StocksPage() {
           </div>
         ))}
       </div>
+
+      {/* Répartition du tonnage par certification */}
+      {tonnageCertifications.length > 0 && (
+        (() => {
+          const CERT_CONFIG: Record<string, { label: string; bg: string; border: string; text: string; dot: string }> = {
+            RA:        { label: "RA",        bg: "#f0fdf4", border: "#bbf7d0", text: "#15803d", dot: "#22c55e" },
+            FAIRTRADE: { label: "Fairtrade", bg: "#fffbeb", border: "#fde68a", text: "#b45309", dot: "#f59e0b" },
+            ASR_1000:  { label: "ASR 1000",  bg: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8", dot: "#3b82f6" },
+            ORDINAIRE: { label: "Ordinaire", bg: "#f9fafb", border: "#e5e7eb", text: "#374151", dot: "#9ca3af" },
+          };
+          const totalKg = tonnageCertifications.reduce((s, r) => s + parseFloat(r.totalKg || "0"), 0);
+          return (
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-semibold text-gray-700">Tonnage par certification</p>
+                {filtreCertification && (
+                  <button
+                    onClick={() => setFiltreCertification("")}
+                    className="text-xs text-gray-400 hover:text-gray-700 flex items-center gap-1"
+                  >
+                    <X size={11} /> Effacer filtre
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {tonnageCertifications.map((row) => {
+                  const key = row.certification ?? "ORDINAIRE";
+                  const cfg = CERT_CONFIG[key] ?? CERT_CONFIG["ORDINAIRE"]!;
+                  const kg = parseFloat(row.totalKg || "0");
+                  const pct = totalKg > 0 ? Math.round((kg / totalKg) * 100) : 0;
+                  const isActive = filtreCertification === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setFiltreCertification(isActive ? "" : key);
+                        setOnglet("journal");
+                      }}
+                      style={{
+                        background: isActive ? cfg.bg : "#fafafa",
+                        border: `1.5px solid ${isActive ? cfg.border : "#e5e7eb"}`,
+                        borderRadius: 12,
+                        padding: "12px",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        transition: "all .15s",
+                        outline: isActive ? `2px solid ${cfg.dot}` : "none",
+                        outlineOffset: 1,
+                      }}
+                    >
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: cfg.dot, display: "inline-block", flexShrink: 0 }} />
+                        <span style={{ fontSize: ".7rem", fontWeight: 700, color: cfg.text, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                          {cfg.label}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", margin: 0 }}>{formaterPoids(kg)}</p>
+                      <p style={{ fontSize: ".7rem", color: "#6b7280", margin: "2px 0 0" }}>
+                        {pct}% · {row.totalLivraisons} livr.
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+              {filtreCertification && (
+                <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ background: CERT_CONFIG[filtreCertification]?.dot ?? "#9ca3af" }} />
+                  Journal filtré sur la certification <span className="font-semibold text-gray-700">{CERT_CONFIG[filtreCertification]?.label ?? filtreCertification}</span>
+                </p>
+              )}
+            </div>
+          );
+        })()
+      )}
 
       {/* Encart stock chez les délégués */}
       {statsDelegues && statsDelegues.stockTotalEntrepotsKg > 0 && (
@@ -618,6 +705,17 @@ export default function StocksPage() {
             </div>
           </div>
 
+          {/* Filtre certification actif */}
+          {filtreCertification && (
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700">
+              <span className="shrink-0 font-medium">Certification :</span>
+              <span className="font-semibold">{filtreCertification}</span>
+              <button onClick={() => setFiltreCertification("")} className="ml-auto text-gray-400 hover:text-gray-700 font-medium text-xs flex items-center gap-1">
+                <X size={11} /> Effacer
+              </button>
+            </div>
+          )}
+
           {filtreTransfert && (
             <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-800">
               <TrendingUp size={14} className="shrink-0" />
@@ -692,11 +790,28 @@ export default function StocksPage() {
                             )}
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">
-                            {estSurbrillance ? (
-                              <span className="text-green-700 font-medium">{m.motif ?? "—"}</span>
-                            ) : (
-                              <span className="text-gray-500">{m.motif ?? "—"}</span>
-                            )}
+                            <div className="flex flex-col gap-1">
+                              {estSurbrillance ? (
+                                <span className="text-green-700 font-medium">{m.motif ?? "—"}</span>
+                              ) : (
+                                <span className="text-gray-500">{m.motif ?? "—"}</span>
+                              )}
+                              {(m as typeof m & { certificationCacao?: string | null }).certificationCacao && (() => {
+                                const CERT_DOT: Record<string, string> = { RA: "#22c55e", FAIRTRADE: "#f59e0b", ASR_1000: "#3b82f6", ORDINAIRE: "#9ca3af" };
+                                const cert = (m as typeof m & { certificationCacao?: string | null }).certificationCacao!;
+                                return (
+                                  <span style={{
+                                    display: "inline-flex", alignItems: "center", gap: 4,
+                                    fontSize: ".65rem", fontWeight: 700, color: "#374151",
+                                    background: "#f3f4f6", borderRadius: 4, padding: "1px 5px",
+                                    width: "fit-content",
+                                  }}>
+                                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: CERT_DOT[cert] ?? "#9ca3af", display: "inline-block" }} />
+                                    {cert}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">
                             {formaterDate(m.createdAt)}
