@@ -16,6 +16,7 @@ import {
   annulerSessionPesee,
   convertirSessionEnLivraison,
   telechargerRecuLivraison,
+  telechargerBordereauSession,
   SessionEnCoursError,
   getPrix,
   getFournisseurRecap,
@@ -71,6 +72,34 @@ function RecuButton({ livraisonId }: { livraisonId: number }) {
     >
       {loading ? "Génération…" : "🧾 Télécharger le reçu PDF"}
     </button>
+  );
+}
+
+function BordereauSessionButton({ sessionId }: { sessionId: number }) {
+  const [loading, setLoading] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  return (
+    <>
+      <button
+        className="t-btn t-btn--ghost"
+        style={{ width: "100%", marginBottom: 10, borderColor: "#1a4731", color: "#1a4731" }}
+        disabled={loading}
+        onClick={async () => {
+          setLoading(true);
+          setErreur(null);
+          try { await telechargerBordereauSession(sessionId); }
+          catch (e) { setErreur((e as Error).message); }
+          finally { setLoading(false); }
+        }}
+      >
+        {loading ? "Génération…" : "📋 Bordereau de réception"}
+      </button>
+      {erreur && (
+        <div style={{ fontSize: ".75rem", color: "#ef4444", marginTop: -6, marginBottom: 10, textAlign: "center" }}>
+          {erreur}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1183,6 +1212,11 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               >
                 📦 Convertir en livraison
               </button>
+            )}
+
+            {/* Bordereau de réception de transfert */}
+            {isTransfertReception && sessionTerminee && isOnline && (
+              <BordereauSessionButton sessionId={sessionTerminee.id} />
             )}
 
             {isTransfertReception ? (

@@ -275,6 +275,38 @@ export async function telechargerRecuLivraison(livraisonId: number): Promise<voi
   return imprimerRecuLivraison(livraisonId);
 }
 
+export async function telechargerBordereauSession(sessionId: number): Promise<void> {
+  const token = getToken();
+  const res = await fetch(`${PESEE_BASE}/pesee/sessions/${sessionId}/bordereau`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  if (isMobile) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 5_000);
+  } else {
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;";
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    iframe.onload = () => {
+      try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); }
+      finally { setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 60_000); }
+    };
+  }
+}
+
 export async function getHistoriqueAgent(): Promise<MissionTerrain[]> {
   return apiGet<MissionTerrain[]>("/agent/historique");
 }
