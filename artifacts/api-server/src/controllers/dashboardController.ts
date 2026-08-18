@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable } from "@workspace/db";
+import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable, fournisseursTable } from "@workspace/db";
 import { eq, sql, desc, gte, lte, and, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -295,10 +295,23 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
 
     const campagneId = campagneActive?.id ?? null;
 
+    // Condition membres uniquement (pour avances, nb membres actifs)
     const membresCond = and(
       eq(membresTable.cooperativeId, cooperativeId),
       eq(membresTable.delegueId, delegueId),
     );
+
+    // Condition livraisons : membres rattachés au délégué OU fournisseurs externes créés par ce délégué
+    const livraisonDelegueFilter = and(
+      or(
+        eq(membresTable.cooperativeId, cooperativeId),
+        eq(fournisseursTable.cooperativeId, cooperativeId),
+      ),
+      or(
+        eq(membresTable.delegueId, delegueId),
+        eq(fournisseursTable.creeParDelegueId, delegueId),
+      ),
+    )!;
 
     const [
       [membresRow],
@@ -341,14 +354,16 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
         ? db.select({ tonnage: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
             .from(livraisonsTable)
             .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-            .where(and(membresCond, eq(livraisonsTable.campagneId, campagneId)))
+            .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+            .where(and(livraisonDelegueFilter, eq(livraisonsTable.campagneId, campagneId)))
         : Promise.resolve([{ tonnage: 0 }]),
 
       db.select({ tonnage: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
         .from(livraisonsTable)
         .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
         .where(and(
-          membresCond,
+          livraisonDelegueFilter,
           gte(livraisonsTable.dateLivraison, dateDebut),
           ...(dateFin ? [lte(livraisonsTable.dateLivraison, dateFin)] : []),
         )),
@@ -357,7 +372,8 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
         ? db.select({ count: sql<number>`count(*)::int` })
             .from(livraisonsTable)
             .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-            .where(and(membresCond, eq(livraisonsTable.campagneId, campagneId)))
+            .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+            .where(and(livraisonDelegueFilter, eq(livraisonsTable.campagneId, campagneId)))
         : Promise.resolve([{ count: 0 }]),
 
       db.select({
@@ -368,18 +384,22 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
           nombreSacs: livraisonsTable.nombreSacs,
           membreNom: membresTable.nom,
           membrePrenoms: membresTable.prenoms,
+          fournisseurNom: fournisseursTable.nom,
+          fournisseurPrenoms: fournisseursTable.prenoms,
         })
         .from(livraisonsTable)
         .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-        .where(membresCond)
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+        .where(livraisonDelegueFilter)
         .orderBy(desc(livraisonsTable.createdAt))
         .limit(5),
 
       db.select({ sacs: sql<number>`coalesce(sum(nombre_sacs),0)::int` })
         .from(livraisonsTable)
         .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
         .where(and(
-          membresCond,
+          livraisonDelegueFilter,
           gte(livraisonsTable.dateLivraison, dateDebut),
           ...(dateFin ? [lte(livraisonsTable.dateLivraison, dateFin)] : []),
         )),
@@ -388,7 +408,8 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
         ? db.select({ sacs: sql<number>`coalesce(sum(nombre_sacs),0)::int` })
             .from(livraisonsTable)
             .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-            .where(and(membresCond, eq(livraisonsTable.campagneId, campagneId)))
+            .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+            .where(and(livraisonDelegueFilter, eq(livraisonsTable.campagneId, campagneId)))
         : Promise.resolve([{ sacs: 0 }]),
     ]);
 

@@ -85,6 +85,8 @@ interface DashboardData {
     nombreSacs: number | null;
     membreNom: string | null;
     membrePrenoms: string | null;
+    fournisseurNom: string | null;
+    fournisseurPrenoms: string | null;
   }[];
 }
 
@@ -471,7 +473,7 @@ export default function DashboardDelegue() {
           </div>
         ) : !data?.dernieresLivraisons?.length ? (
           <div className="px-5 py-10 text-center text-gray-400 text-sm">
-            Aucune livraison enregistrée pour vos membres.
+            Aucune livraison enregistrée pour vos membres ou fournisseurs.
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
@@ -479,7 +481,7 @@ export default function DashboardDelegue() {
               <div key={l.id} className="px-5 py-3 flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-900">
-                    {l.membreNom ?? "—"} {l.membrePrenoms ?? ""}
+                    {l.membreNom ?? l.fournisseurNom ?? "—"} {l.membreNom ? (l.membrePrenoms ?? "") : (l.fournisseurPrenoms ?? "")}
                   </p>
                   <p className="text-xs text-gray-400">{formaterDate(l.dateLivraison)}</p>
                 </div>
