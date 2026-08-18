@@ -4155,9 +4155,12 @@ export async function generateBordereauAchatSession(
     }
   }
 
-  // 6. Avances du délégué + montant caisse coopérative crédité avant la session
-  soldeAvancesFcfa   = 0;
-  retenueAvancesFcfa = 0;       // retenue réelle déjà opérée sur cette commission
+  // 6. Avances du délégué terrain + montant caisse coopérative crédité avant la session
+  // (pas pour estDelegueMembre — ses valeurs sont déjà calculées dans le bloc membre ci-dessus)
+  if (!estDelegueMembre) {
+    soldeAvancesFcfa   = 0;
+    retenueAvancesFcfa = 0;
+  }
   let montantCoopFcfa    = 0;   // total alimentations caisse avant session (mode caisse_cooperative)
 
   if (delegueIdSession) {
