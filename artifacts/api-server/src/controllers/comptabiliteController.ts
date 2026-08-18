@@ -166,7 +166,7 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
     return;
   }
 
-  const { dateEcriture, numeroPiece, libelle, compteDebit, compteCredit, montantFcfa } = parse.data;
+  const { dateEcriture, numeroPiece, libelle, compteDebit, compteCredit, montantFcfa, typeEcriture } = parse.data;
   const exercice = new Date(dateEcriture).getFullYear();
 
   try {
@@ -195,6 +195,7 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
       source: "manuel",
       sourceId: null,
       exercice,
+      typeEcriture: typeEcriture ?? "normale",
     }).returning();
 
     if (ecriture && !numeroPiece) {

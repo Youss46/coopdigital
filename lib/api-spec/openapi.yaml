@@ -8259,6 +8259,9 @@ components:
           type: string
         montantFcfa:
           type: integer
+        typeEcriture:
+          type: string
+          enum: [normale, regularisation]
 
     UtilisateurCompte:
       type: object

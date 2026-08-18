@@ -2683,6 +2683,7 @@ function ModalSaisieManuelle({ onClose, onSuccess }: { onClose: () => void; onSu
     compteDebit: "",
     compteCredit: "",
     montantFcfa: "",
+    typeEcriture: "normale" as "normale" | "regularisation",
   });
   const [loading, setLoading] = useState(false);
 
@@ -2702,6 +2703,7 @@ function ModalSaisieManuelle({ onClose, onSuccess }: { onClose: () => void; onSu
         compteDebit: form.compteDebit.trim(),
         compteCredit: form.compteCredit.trim(),
         montantFcfa: montant,
+        typeEcriture: form.typeEcriture,
       });
       toast({ title: "Écriture enregistrée" });
       void qc.invalidateQueries({ queryKey: ["grand-livre"] });
@@ -2735,6 +2737,17 @@ function ModalSaisieManuelle({ onClose, onSuccess }: { onClose: () => void; onSu
                 onChange={(e) => setForm((f) => ({ ...f, numeroPiece: e.target.value }))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
             </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Type d'écriture</label>
+            <select
+              value={form.typeEcriture}
+              onChange={(e) => setForm((f) => ({ ...f, typeEcriture: e.target.value as "normale" | "regularisation" }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+            >
+              <option value="normale">Normale</option>
+              <option value="regularisation">Régularisation</option>
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Libellé *</label>

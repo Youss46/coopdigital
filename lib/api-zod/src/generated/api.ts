@@ -1169,7 +1169,8 @@ export const CreateEcritureManuelleBody = zod.object({
   "libelle": zod.string(),
   "compteDebit": zod.string(),
   "compteCredit": zod.string(),
-  "montantFcfa": zod.number()
+  "montantFcfa": zod.number(),
+  "typeEcriture": zod.enum(["normale", "regularisation"]).optional()
 })
 
 
