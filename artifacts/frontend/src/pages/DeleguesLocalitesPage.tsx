@@ -5,6 +5,7 @@ import {
   Users, Search, Phone, MapPin, Wallet, PlusCircle, X,
   ChevronRight, AlertCircle, CalendarDays, TrendingUp, Settings,
   CheckCircle2, Clock, Banknote, Trash2, ArrowDownCircle, Package,
+  Download, ShoppingCart,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
@@ -96,6 +97,30 @@ interface TauxCommission {
   actif: boolean;
   membreNom: string | null;
   membrePrenoms: string | null;
+}
+
+interface LivraisonMembre {
+  id: number;
+  poidsKg: string;
+  prixUnitaireFcfa: number;
+  montantBrutFcfa: number;
+  avanceDeduiteFcfa: number;
+  montantNetFcfa: number;
+  dateLivraison: string;
+  statutPaiement: string | null;
+}
+
+async function downloadBordereau(livraisonId: number) {
+  const url = `${BASE}/api/rapports/recu/livraison/${livraisonId}`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
+  if (!r.ok) return;
+  const blob = await r.blob();
+  if (!blob.size) return;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `bordereau-livraison-${livraisonId}.pdf`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function formaterMontant(n: number) {
@@ -191,6 +216,13 @@ export default function DeleguesLocalitesPage() {
     queryKey: ["avances-membre", modalMembre?.id],
     queryFn: () => apiFetch(`/api/avances?membre_id=${modalMembre!.id}`),
     enabled: !!modalMembre && !isMagasinier,
+    staleTime: 0,
+  });
+
+  const { data: livraisonsModal = [], isLoading: loadLivraisons } = useQuery<LivraisonMembre[]>({
+    queryKey: ["livraisons-membre-delegue", modalMembre?.id],
+    queryFn: () => apiFetch(`/api/livraisons?membre_id=${modalMembre!.id}&limit=20`),
+    enabled: !!modalMembre,
     staleTime: 0,
   });
 
@@ -901,6 +933,59 @@ export default function DeleguesLocalitesPage() {
               )}
               </>
               )}
+
+              {/* ── Livraisons du membre délégué ────────────────────────────── */}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                  <ShoppingCart size={13} className="text-[#1a4731]" />
+                  Livraisons
+                </p>
+                {loadLivraisons ? (
+                  <p className="text-xs text-gray-400 py-3 text-center">Chargement…</p>
+                ) : livraisonsModal.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-3 text-center">Aucune livraison enregistrée</p>
+                ) : (
+                  <div className="space-y-2">
+                    {livraisonsModal.map(liv => {
+                      const statutPaye = (liv.statutPaiement ?? "").toLowerCase().replace(/[_ ]/g, "") === "paye";
+                      return (
+                        <div key={liv.id} className="rounded-xl border border-gray-100 bg-gray-50 p-3 flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {formaterMontant(liv.montantNetFcfa)}
+                              <span className="text-xs font-normal text-gray-400 ml-1">net</span>
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {formaterDate(liv.dateLivraison)} · {Number(liv.poidsKg).toFixed(1)} kg
+                            </p>
+                            {liv.avanceDeduiteFcfa > 0 && (
+                              <p className="text-xs text-amber-600 mt-0.5">
+                                Avance déduite : {formaterMontant(liv.avanceDeduiteFcfa)}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {liv.statutPaiement && (
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                statutPaye ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                              }`}>
+                                {statutPaye ? "Payé" : "En attente"}
+                              </span>
+                            )}
+                            <button
+                              title="Télécharger le bordereau"
+                              onClick={() => void downloadBordereau(liv.id)}
+                              className="p-1.5 text-gray-400 hover:text-[#1a4731] transition-colors"
+                            >
+                              <Download size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -1110,36 +1110,53 @@ export default function MembreFiche() {
                   <th className="text-right px-4 py-3 font-medium text-gray-500">Montant brut</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-500">Avance déduite</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-500">Net payé</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-500">Statut</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {!historique?.livraisons || historique.livraisons.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center text-gray-400 py-8">Aucune livraison</td>
+                    <td colSpan={8} className="text-center text-gray-400 py-8">Aucune livraison</td>
                   </tr>
                 ) : (
-                  historique.livraisons.map((l) => (
-                    <tr key={l.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-600">{formaterDate(l.dateLivraison)}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{Number(l.poidsKg).toFixed(1)}</td>
-                      <td className="px-4 py-3 text-right text-gray-600">{l.prixUnitaireFcfa}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{formaterFCFA(l.montantBrutFcfa)}</td>
-                      <td className="px-4 py-3 text-right text-amber-600">
-                        {l.avanceDeduiteFcfa > 0 ? `-${formaterFCFA(l.avanceDeduiteFcfa)}` : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-green-700">{formaterFCFA(l.montantNetFcfa)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          title="Reçu livraison"
-                          onClick={() => void downloadPdf(`/api/rapports/recu/livraison/${l.id}`, `recu_livraison_${l.id}.pdf`)}
-                          className="p-1 text-gray-400 hover:text-green-700 transition-colors"
-                        >
-                          <Download size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  historique.livraisons.map((l) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const statut = (l as any).statutPaiement as string | null | undefined;
+                    const statutPaye = statut && statut.toLowerCase().replace(/[_ ]/g, "") === "paye";
+                    return (
+                      <tr key={l.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-600">{formaterDate(l.dateLivraison)}</td>
+                        <td className="px-4 py-3 text-right text-gray-700">{Number(l.poidsKg).toFixed(1)}</td>
+                        <td className="px-4 py-3 text-right text-gray-600">{l.prixUnitaireFcfa}</td>
+                        <td className="px-4 py-3 text-right text-gray-700">{formaterFCFA(l.montantBrutFcfa)}</td>
+                        <td className="px-4 py-3 text-right text-amber-600">
+                          {l.avanceDeduiteFcfa > 0 ? `-${formaterFCFA(l.avanceDeduiteFcfa)}` : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-green-700">{formaterFCFA(l.montantNetFcfa)}</td>
+                        <td className="px-4 py-3 text-center">
+                          {statut ? (
+                            <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
+                              statutPaye
+                                ? "bg-green-100 text-green-700"
+                                : "bg-amber-100 text-amber-700"
+                            }`}>
+                              {statutPaye ? "Payé" : "En attente"}
+                            </span>
+                          ) : <span className="text-gray-300 text-xs">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            title="Reçu livraison"
+                            onClick={() => void downloadPdf(`/api/rapports/recu/livraison/${l.id}`, `recu_livraison_${l.id}.pdf`)}
+                            className="p-1 text-gray-400 hover:text-green-700 transition-colors"
+                          >
+                            <Download size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
