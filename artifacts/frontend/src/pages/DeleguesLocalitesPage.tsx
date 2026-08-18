@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import {
   Users, Search, Phone, MapPin, Wallet, PlusCircle, X,
   ChevronRight, AlertCircle, CalendarDays, TrendingUp, Settings,
-  CheckCircle2, Clock, Banknote, Trash2,
+  CheckCircle2, Clock, Banknote, Trash2, ArrowDownCircle,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
@@ -21,6 +21,11 @@ async function apiFetch<T>(path: string): Promise<T> {
 }
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { method: "POST", headers: hdr(), body: JSON.stringify(body) });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erreur ?? r.statusText);
+  return r.json();
+}
+async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  const r = await fetch(`${BASE}${path}`, { method: "PUT", headers: hdr(), body: JSON.stringify(body) });
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erreur ?? r.statusText);
   return r.json();
 }
@@ -104,8 +109,9 @@ type Onglet = "membres" | "commissions" | "taux";
 export default function DeleguesLocalitesPage() {
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
-  const peutOctroyer = usePermission("avances", "octroyer");
-  const peutModifier = usePermission("delegues", "modifier");
+  const peutOctroyer   = usePermission("avances", "octroyer");
+  const peutRembourser = usePermission("avances", "rembourser");
+  const peutModifier   = usePermission("delegues", "modifier");
 
   const [onglet, setOnglet] = useState<Onglet>("membres");
   const [search, setSearch] = useState("");
@@ -113,6 +119,11 @@ export default function DeleguesLocalitesPage() {
   const [showOctroi, setShowOctroi] = useState(false);
   const [formOctroi, setFormOctroi] = useState({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
   const [errOctroi, setErrOctroi] = useState("");
+
+  // Remboursement manuel d'une avance
+  const [rembourserAvanceId, setRembourserAvanceId] = useState<number | null>(null);
+  const [formRembours, setFormRembours] = useState({ montant: "" });
+  const [errRembours, setErrRembours] = useState("");
 
   // ── Commission : modal paiement ───────────────────────────────────────────
   const [modalCommission, setModalCommission] = useState<CommissionRecap | null>(null);
@@ -197,6 +208,19 @@ export default function DeleguesLocalitesPage() {
       setErrOctroi("");
     },
     onError: (e: Error) => setErrOctroi(e.message),
+  });
+
+  const mutRembourser = useMutation({
+    mutationFn: (avanceId: number) =>
+      apiPut(`/api/avances/${avanceId}/rembourser`, { montantFcfa: parseInt(formRembours.montant) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["avances-membre", modalMembre?.id] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
+      setRembourserAvanceId(null);
+      setFormRembours({ montant: "" });
+      setErrRembours("");
+    },
+    onError: (e: Error) => setErrRembours(e.message),
   });
 
   const mutPayer = useMutation({
@@ -637,7 +661,14 @@ export default function DeleguesLocalitesPage() {
                   Fiche complète
                 </button>
                 <button
-                  onClick={() => { setModalMembre(null); setShowOctroi(false); setErrOctroi(""); }}
+                  onClick={() => {
+                    setModalMembre(null);
+                    setShowOctroi(false);
+                    setErrOctroi("");
+                    setRembourserAvanceId(null);
+                    setFormRembours({ montant: "" });
+                    setErrRembours("");
+                  }}
                   className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
                 >
                   <X size={15} />
@@ -732,6 +763,7 @@ export default function DeleguesLocalitesPage() {
                 <div className="space-y-2">
                   {avancesModal.map(a => {
                     const enCours = a.statut !== "rembourse";
+                    const isRembForm = rembourserAvanceId === a.id;
                     return (
                       <div
                         key={a.id}
@@ -766,8 +798,61 @@ export default function DeleguesLocalitesPage() {
                             }`}>
                               {a.statut === "en_cours" ? "En cours" : a.statut === "rembourse" ? "Remboursé" : "En retard"}
                             </span>
+                            {enCours && peutRembourser && !isRembForm && (
+                              <button
+                                onClick={() => {
+                                  setRembourserAvanceId(a.id);
+                                  setFormRembours({ montant: String(a.soldeRestantFcfa) });
+                                  setErrRembours("");
+                                }}
+                                className="mt-1 flex items-center gap-1 text-xs text-[#1a4731] font-medium hover:underline ml-auto"
+                              >
+                                <ArrowDownCircle size={11} /> Rembourser
+                              </button>
+                            )}
                           </div>
                         </div>
+
+                        {/* Formulaire de remboursement inline */}
+                        {isRembForm && (
+                          <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
+                            <p className="text-xs font-semibold text-gray-700">Remboursement manuel</p>
+                            <div className="flex gap-2 items-end">
+                              <div className="flex-1">
+                                <label className="block text-xs text-gray-500 mb-1">
+                                  Montant (FCFA) — solde : {formaterMontant(a.soldeRestantFcfa)}
+                                </label>
+                                <input
+                                  type="number"
+                                  value={formRembours.montant}
+                                  onChange={e => setFormRembours({ montant: e.target.value })}
+                                  className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                                  placeholder="Montant"
+                                  min="1"
+                                  max={a.soldeRestantFcfa}
+                                />
+                              </div>
+                              <button
+                                onClick={() => mutRembourser.mutate(a.id)}
+                                disabled={!formRembours.montant || mutRembourser.isPending}
+                                className="bg-[#1a4731] text-white text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-50 whitespace-nowrap"
+                              >
+                                {mutRembourser.isPending ? "…" : "Confirmer"}
+                              </button>
+                              <button
+                                onClick={() => { setRembourserAvanceId(null); setErrRembours(""); }}
+                                className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5"
+                              >
+                                Annuler
+                              </button>
+                            </div>
+                            {errRembours && (
+                              <p className="text-xs text-red-600 flex items-center gap-1">
+                                <AlertCircle size={11} /> {errRembours}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
