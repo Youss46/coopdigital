@@ -4,9 +4,11 @@ import {
   avancesDeleguesTable,
   remboursementsAvancesDeleguesTable,
   usersTable,
+  caissesTable,
 } from "@workspace/db";
 import { eq, and, desc, inArray, ne, isNull, or, lt } from "drizzle-orm";
-import { generateEcrituresAvanceDelegue } from "../services/comptabiliteService";
+import { enregistrerMouvement } from "../services/caisseService";
+import { logger } from "../lib/logger";
 
 // ─── Liste des avances d'un délégué ──────────────────────────────────────────
 export async function listAvancesDelegueHandler(req: Request, res: Response): Promise<void> {
@@ -26,6 +28,47 @@ export async function listAvancesDelegueHandler(req: Request, res: Response): Pr
   } catch (err) {
     req.log.error(err, "listAvancesDelegueHandler");
     res.status(500).json({ erreur: "Erreur lors de la récupération des avances" });
+  }
+}
+
+// ─── Débit caisse centrale lors de l'octroi d'une avance délégué ─────────────
+async function debiterCaisseCentraleAvanceDelegue(
+  cooperativeId: number,
+  montantFcfa: number,
+  avanceId: number,
+  delegueNom: string,
+  userId?: number,
+): Promise<void> {
+  try {
+    const [caisse] = await db
+      .select()
+      .from(caissesTable)
+      .where(
+        and(
+          eq(caissesTable.cooperativeId, cooperativeId),
+          eq(caissesTable.typeCaisse, "centrale"),
+          eq(caissesTable.actif, true),
+        ),
+      )
+      .limit(1);
+
+    if (!caisse) {
+      logger.warn({ cooperativeId, avanceId }, "Aucune caisse centrale active — avance délégué non débitée");
+      return;
+    }
+
+    await enregistrerMouvement(caisse.id, {
+      type: "sortie",
+      motif: "avance",
+      montantFcfa,
+      libelle: `Avance délégué – ${delegueNom} (AVD-${avanceId})`,
+      referenceOperation: `AVD-${avanceId}`,
+      userId,
+      // 4098 Avances et acomptes agents/délégués  (override du 4091 membres)
+      compteDebitOverride: "4098",
+    });
+  } catch (err) {
+    logger.warn({ err, avanceId }, "Débit caisse centrale avance délégué non effectué — session peut-être fermée");
   }
 }
 
@@ -70,14 +113,14 @@ export async function createAvanceDelegueHandler(req: Request, res: Response): P
       reportDate: plan === "reporte" && reportDate ? String(reportDate) : null,
     }).returning();
 
-    // Écriture comptable : Débit 4098 (Avances délégués) / Crédit 571 (Caisse)
-    void generateEcrituresAvanceDelegue(cooperativeId, {
-      avanceId: avance!.id,
-      delegueId,
-      delegueNom: `${delegue.prenoms ?? ""} ${delegue.nom}`.trim(),
-      montantFcfa: montant,
-      dateOctroi: dateOctroiStr,
-    });
+    // Débiter la caisse centrale + écriture comptable 4098/571
+    void debiterCaisseCentraleAvanceDelegue(
+      cooperativeId,
+      montant,
+      avance!.id,
+      `${delegue.prenoms ?? ""} ${delegue.nom}`.trim(),
+      req.user?.id,
+    );
 
     res.status(201).json(avance);
   } catch (err) {
