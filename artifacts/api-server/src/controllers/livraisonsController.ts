@@ -65,6 +65,7 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
         agentRole: agentUserAlias.role,
         peseurNom: peseurUserAlias.nom,
         peseurPrenoms: peseurUserAlias.prenoms,
+        planAvanceType: livraisonsTable.planAvanceType,
       })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))

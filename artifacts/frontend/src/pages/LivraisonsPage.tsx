@@ -81,6 +81,8 @@ interface Livraison {
   /** Personne qui a physiquement saisi (proxy délégué central) — présent seulement si différent de l'agent */
   peseurNom: string | null;
   peseurPrenoms: string | null;
+  /** Plan de déduction d'avance : null = aucune avance, "integral", "partiel", "reporte" */
+  planAvanceType?: string | null;
 }
 
 const ROLE_SAISIE_LABEL: Record<string, { label: string; color: string; bg: string }> = {
@@ -640,9 +642,20 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
       {ouvert && (
         <div className="px-4 pb-4 pt-1 bg-gray-50 border-t border-gray-100 space-y-1.5">
           <DetailLine label="Montant brut"   value={fmt(l.montantBrutFcfa)} />
+          {l.planAvanceType === "reporte" && (
+            <div className="flex items-center justify-between text-xs py-0.5">
+              <span className="flex items-center gap-1 text-yellow-700 font-medium">
+                <TrendingDown size={11} className="text-yellow-500" />
+                Avance reportée
+              </span>
+              <span className="bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                non déduite
+              </span>
+            </div>
+          )}
           {(l.avanceDeduiteFcfa ?? 0) > 0 && (
             <DetailLine
-              label="Avance déduite"
+              label={l.planAvanceType === "partiel" ? "Avance déduite (partiel)" : "Avance déduite"}
               value={`− ${fmt(l.avanceDeduiteFcfa)}`}
               icon={<TrendingDown size={11} className="text-orange-500" />}
               valueCls="text-orange-600"
