@@ -4086,38 +4086,41 @@ export async function generateBordereauAchatSession(
 
   // 8. PDF
   const { doc, endPromise } = makePdfDoc();
+  // Marges réduites pour que le bordereau occupe toute la feuille
+  const M  = 28;                          // marge gauche/droite réduite (vs MARGIN=50)
+  const BW = PAGE_W - M * 2;             // ≈ 539 pt utilisables en largeur
   await drawHeader(doc, cooperativeId, { titre_document: "BORDEREAU D'ACHAT", reference: session.numeroSession });
 
   // Bandeau Campagne / Date
   let y = doc.y + 4;
   if (campagne) {
-    doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 14).fill("#f0fdf4");
+    doc.rect(M, y, BW, 14).fill("#f0fdf4");
     const dateStr = session.dateFin
       ? formaterDateHeure(session.dateFin)
       : formaterDateHeure(new Date());
-    doc.fontSize(8).fillColor(GRIS).font("Helvetica").text("Campagne :", MARGIN + 6, y + 3, { width: 78, lineBreak: false });
-    doc.font("Helvetica-Bold").fillColor(VERT).text(campagne, MARGIN + 86, y + 3, { lineBreak: false });
-    doc.font("Helvetica").fillColor(GRIS).text("Date :", PAGE_W - MARGIN - 130, y + 3, { width: 36, lineBreak: false });
-    doc.font("Helvetica-Bold").fillColor("black").text(dateStr, PAGE_W - MARGIN - 94, y + 3, { width: 94, lineBreak: false });
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica").text("Campagne :", M + 6, y + 3, { width: 78, lineBreak: false });
+    doc.font("Helvetica-Bold").fillColor(VERT).text(campagne, M + 86, y + 3, { lineBreak: false });
+    doc.font("Helvetica").fillColor(GRIS).text("Date :", PAGE_W - M - 130, y + 3, { width: 36, lineBreak: false });
+    doc.font("Helvetica-Bold").fillColor("black").text(dateStr, PAGE_W - M - 94, y + 3, { width: 94, lineBreak: false });
     y += 18;
   }
   y += 6;
 
   // ── IDENTIFICATION (gauche) + DÉTAILS PESÉE (droite) ───────────────────────
-  const LEFT_W  = 242;
-  const RIGHT_X = MARGIN + LEFT_W + 8;
-  const RIGHT_W = PAGE_W - RIGHT_X - MARGIN;
+  const LEFT_W  = 278;
+  const RIGHT_X = M + LEFT_W + 10;
+  const RIGHT_W = PAGE_W - RIGHT_X - M;
   const topY    = y;
 
-  doc.fontSize(8).fillColor(VERT).font("Helvetica-Bold").text("IDENTIFICATION", MARGIN, y);
-  y += 13;
+  doc.fontSize(8.5).fillColor(VERT).font("Helvetica-Bold").text("IDENTIFICATION", M, y);
+  y += 14;
 
   const fieldRow = (label: string, value: string) => {
-    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
-      .text(`${label} :`, MARGIN, y, { width: 90, lineBreak: false });
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text(`${label} :`, M, y, { width: 96, lineBreak: false });
     doc.font("Helvetica-Bold").fillColor("black")
-      .text(value, MARGIN + 92, y, { width: LEFT_W - 92, lineBreak: false });
-    y += 12;
+      .text(value, M + 98, y, { width: LEFT_W - 98, lineBreak: false });
+    y += 13;
   };
 
   fieldRow("Délégué",       `${deleguePrenoms} ${delegueNom}`.trim());
@@ -4135,23 +4138,23 @@ export async function generateBordereauAchatSession(
 
   // Tableau DÉTAILS PESÉE
   let ry = topY;
-  doc.fontSize(8).fillColor(VERT).font("Helvetica-Bold").text("DÉTAILS PESÉE", RIGHT_X, ry);
-  ry += 13;
+  doc.fontSize(8.5).fillColor(VERT).font("Helvetica-Bold").text("DÉTAILS PESÉE", RIGHT_X, ry);
+  ry += 14;
 
-  const dCols = [24, 58, 30, RIGHT_W - 112];
+  const dCols = [26, 64, 32, RIGHT_W - 122];
   const dHdrs = ["N°", "POIDS BRUT", "SACS", "HORODATEUR"];
-  doc.rect(RIGHT_X, ry, RIGHT_W, 14).fill(VERT);
+  doc.rect(RIGHT_X, ry, RIGHT_W, 16).fill(VERT);
   let cx = RIGHT_X;
   dHdrs.forEach((h, i) => {
-    doc.fontSize(6.5).fillColor("white").font("Helvetica-Bold")
-      .text(h, cx + 2, ry + 4, { width: dCols[i]! - 4, lineBreak: false });
+    doc.fontSize(7).fillColor("white").font("Helvetica-Bold")
+      .text(h, cx + 2, ry + 5, { width: dCols[i]! - 4, lineBreak: false });
     cx += dCols[i]!;
   });
-  ry += 14;
+  ry += 16;
 
   for (let idx = 0; idx < lignes.length; idx++) {
     const l = lignes[idx]!;
-    if (idx % 2 === 0) doc.rect(RIGHT_X, ry, RIGHT_W, 13).fill("#f0fdf4");
+    if (idx % 2 === 0) doc.rect(RIGHT_X, ry, RIGHT_W, 14).fill("#f0fdf4");
     cx = RIGHT_X;
     [
       String(l.numeroPassage),
@@ -4159,28 +4162,28 @@ export async function generateBordereauAchatSession(
       String(l.nbSacs),
       formaterDateHeure(l.createdAt),
     ].forEach((v, i) => {
-      doc.fontSize(6.5).fillColor("black").font("Helvetica")
-        .text(v, cx + 2, ry + 3, { width: dCols[i]! - 4, lineBreak: false });
+      doc.fontSize(7).fillColor("black").font("Helvetica")
+        .text(v, cx + 2, ry + 4, { width: dCols[i]! - 4, lineBreak: false });
       cx += dCols[i]!;
     });
-    ry += 13;
+    ry += 14;
   }
 
-  y = Math.max(leftBottom, ry) + 14;
+  y = Math.max(leftBottom, ry) + 16;
 
   // ── Tableau de calcul ───────────────────────────────────────────────────────
-  const tW   = PAGE_W - MARGIN * 2;
-  const colW = [65, 48, 65, 68, 78, 82, tW - 65 - 48 - 65 - 68 - 78 - 82];
+  const tW   = BW;
+  const colW = [74, 54, 74, 76, 90, 90, tW - 74 - 54 - 74 - 76 - 90 - 90];
 
-  const HDR_H = 28;
-  doc.rect(MARGIN, y, tW, HDR_H).fill(VERT);
-  cx = MARGIN;
+  const HDR_H = 32;
+  doc.rect(M, y, tW, HDR_H).fill(VERT);
+  cx = M;
   [
     "POIDS BRUT\n(KG)", "NBRE\nSACS", "POIDS NET\n(KG)",
     "PRIX\nUNITAIRE", "VALEUR\nPRODUIT", "AUTRES FRAIS", "MONTANT NET\nA PAYER",
   ].forEach((h, i) => {
-    doc.fontSize(7).fillColor("white").font("Helvetica-Bold")
-      .text(h, cx + 2, y + 6, { width: colW[i]! - 4, align: "center", lineBreak: true });
+    doc.fontSize(7.5).fillColor("white").font("Helvetica-Bold")
+      .text(h, cx + 2, y + 7, { width: colW[i]! - 4, align: "center", lineBreak: true });
     cx += colW[i]!;
   });
   y += HDR_H;
@@ -4191,20 +4194,20 @@ export async function generateBordereauAchatSession(
     { label: "RETENUE\nAVANCE",    valeur: retenueEstimeeFcfa },
     { label: "SOLDE SUR\nAVANCES", valeur: soldeAvancesFcfa },
   ];
-  const SUB_H = 18;
+  const SUB_H = 20;
   const ROW_H = autresLignes.length * SUB_H;
 
-  doc.rect(MARGIN, y, tW, ROW_H).fill("#f9fafb");
-  doc.rect(MARGIN, y, tW, ROW_H).stroke("#d1d5db");
+  doc.rect(M, y, tW, ROW_H).fill("#f9fafb");
+  doc.rect(M, y, tW, ROW_H).stroke("#d1d5db");
 
-  cx = MARGIN;
+  cx = M;
   for (let i = 0; i < colW.length - 1; i++) {
     cx += colW[i]!;
     doc.moveTo(cx, y).lineTo(cx, y + ROW_H).stroke("#d1d5db");
   }
 
   const cellMidY = y + ROW_H / 2 - 6;
-  cx = MARGIN;
+  cx = M;
   [
     `${poidsBrutKg.toFixed(1)} kg`,
     String(session.nbSacsTotal ?? lignes.reduce((s, l) => s + l.nbSacs, 0)),
@@ -4215,7 +4218,7 @@ export async function generateBordereauAchatSession(
     `${formaterNombre(montantNet)} F`,
   ].forEach((v, i) => {
     if (v) {
-      doc.fontSize(9).fillColor("black").font("Helvetica-Bold")
+      doc.fontSize(10).fillColor("black").font("Helvetica-Bold")
         .text(v, cx + 3, cellMidY, { width: colW[i]! - 6, align: "center", lineBreak: false });
     }
     cx += colW[i]!;
@@ -4223,49 +4226,49 @@ export async function generateBordereauAchatSession(
 
   // Valeur produit — colonne 4 (index 4)
   {
-    const vpX = MARGIN + colW.slice(0, 4).reduce((a, b) => a + b, 0);
+    const vpX = M + colW.slice(0, 4).reduce((a, b) => a + b, 0);
     const vpW = colW[4]!;
     if (caisseCoop && montantCoopFcfa >= valeurProduit) {
-      // Coop a tout couvert → grisé "réglée via caisse"
-      doc.fontSize(7.5).fillColor(GRIS).font("Helvetica-Bold")
+      doc.fontSize(8).fillColor(GRIS).font("Helvetica-Bold")
         .text(valeurProduit > 0 ? `${formaterNombre(valeurProduit)} F` : "—", vpX + 3, cellMidY - 5, { width: vpW - 6, align: "center", lineBreak: false });
-      doc.fontSize(6).fillColor(GRIS).font("Helvetica")
-        .text("réglée via caisse", vpX + 2, cellMidY + 3, { width: vpW - 4, align: "center", lineBreak: false });
+      doc.fontSize(6.5).fillColor(GRIS).font("Helvetica")
+        .text("réglée via caisse", vpX + 2, cellMidY + 4, { width: vpW - 4, align: "center", lineBreak: false });
     } else if (caisseCoop && montantCoopFcfa > 0) {
-      // Financement partiel → valeur totale + note "dont X F via caisse"
-      doc.fontSize(8).fillColor("black").font("Helvetica-Bold")
-        .text(`${formaterNombre(valeurProduit)} F`, vpX + 3, cellMidY - 5, { width: vpW - 6, align: "center", lineBreak: false });
-      doc.fontSize(5.5).fillColor(GRIS).font("Helvetica")
-        .text(`dont ${formaterNombre(montantCoopFcfa)} F caisse`, vpX + 2, cellMidY + 4, { width: vpW - 4, align: "center", lineBreak: false });
-    } else {
       doc.fontSize(9).fillColor("black").font("Helvetica-Bold")
+        .text(`${formaterNombre(valeurProduit)} F`, vpX + 3, cellMidY - 5, { width: vpW - 6, align: "center", lineBreak: false });
+      doc.fontSize(6).fillColor(GRIS).font("Helvetica")
+        .text(`dont ${formaterNombre(montantCoopFcfa)} F caisse`, vpX + 2, cellMidY + 5, { width: vpW - 4, align: "center", lineBreak: false });
+    } else {
+      doc.fontSize(10).fillColor("black").font("Helvetica-Bold")
         .text(valeurProduit > 0 ? `${formaterNombre(valeurProduit)} F` : "—", vpX + 3, cellMidY, { width: vpW - 6, align: "center", lineBreak: false });
     }
   }
 
   // Sous-lignes AUTRES FRAIS
-  const autresX = MARGIN + colW.slice(0, 5).reduce((a, b) => a + b, 0);
+  const autresX = M + colW.slice(0, 5).reduce((a, b) => a + b, 0);
   const autresW = colW[5]!;
   let ay = y;
   autresLignes.forEach((al, idx) => {
     if (idx > 0) doc.moveTo(autresX, ay).lineTo(autresX + autresW, ay).stroke("#e5e7eb");
-    doc.fontSize(6.5).fillColor(GRIS).font("Helvetica-Bold")
-      .text(al.label, autresX + 2, ay + 2, { width: autresW - 4, align: "center", lineBreak: true });
-    doc.fontSize(8).fillColor(al.valeur > 0 ? VERT : "black").font("Helvetica-Bold")
-      .text(`${formaterNombre(al.valeur)} F`, autresX + 2, ay + SUB_H - 9, { width: autresW - 4, align: "center", lineBreak: false });
+    doc.fontSize(7).fillColor(GRIS).font("Helvetica-Bold")
+      .text(al.label, autresX + 2, ay + 3, { width: autresW - 4, align: "center", lineBreak: true });
+    doc.fontSize(8.5).fillColor(al.valeur > 0 ? VERT : "black").font("Helvetica-Bold")
+      .text(`${formaterNombre(al.valeur)} F`, autresX + 2, ay + SUB_H - 10, { width: autresW - 4, align: "center", lineBreak: false });
     ay += SUB_H;
   });
 
-  y += ROW_H + 18;
+  y += ROW_H + 22;
 
-  // ── Signatures ───────────────────────────────────────────────────────────────
-  const sigY = Math.min(y, 710);
-  const sigW = (tW - 16) / 3;
+  // ── Signatures : boîtes qui remplissent l'espace restant jusqu'au footer ────
+  const sigY  = y;
+  const sigW  = (BW - 16) / 3;
+  // Hauteur dynamique : occupe tout l'espace jusqu'au footer (footer à 32 pt du bas)
+  const sigH  = Math.max(72, doc.page.height - doc.page.margins.bottom - 36 - sigY - 16);
   ["PESEUR", "LIVREUR", "MAGASINIER"].forEach((lbl, i) => {
-    const sx = MARGIN + i * (sigW + 8);
-    doc.fontSize(8).fillColor(GRIS).font("Helvetica-Bold")
+    const sx = M + i * (sigW + 8);
+    doc.fontSize(9).fillColor(GRIS).font("Helvetica-Bold")
       .text(lbl, sx, sigY, { width: sigW, align: "center", lineBreak: false });
-    doc.rect(sx, sigY + 12, sigW, 46).stroke("#d1d5db");
+    doc.rect(sx, sigY + 14, sigW, sigH).stroke("#d1d5db");
   });
 
   await addFooters(doc, cooperativeId);
