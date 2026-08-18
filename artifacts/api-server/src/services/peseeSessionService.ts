@@ -22,6 +22,7 @@ import { getEncoursMembreTx, enregistrerRemboursementParLivraison } from "./intr
 import { creerNotification, notifierParRole } from "./notificationService.js";
 import { genererNumeroRecu } from "./recuService.js";
 import { creerCommissionTransfert, deduireAvancesApresCommission } from "./commissionService.js";
+import { creerCommissionMembreSiTaux } from "./commissionMembreDelegueService.js";
 import { logger } from "../lib/logger.js";
 
 // ─── Création batch (sync hors-ligne) ────────────────────────────────────────
@@ -601,6 +602,37 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
     .set({ statut: "terminee", dateFin: new Date() })
     .where(eq(sessionsPeseeTable.id, sessionId))
     .returning();
+
+  // Commission pour les membres délégués de localités
+  // Déclenchée si le membre a categorie_membre = 'délégué de localités'
+  if (detail.membreId) {
+    const [membre] = await db
+      .select({ categorieMembre: membresTable.categorieMembre })
+      .from(membresTable)
+      .where(eq(membresTable.id, detail.membreId))
+      .limit(1);
+
+    if (membre?.categorieMembre === "délégué de localités") {
+      const poidsKg = parseFloat(String(detail.poidsTotalKg ?? 0));
+      if (poidsKg > 0) {
+        // Récupérer la campagne active pour rattacher la commission
+        let campagneId: number | null = null;
+        try {
+          const prix = await getPrixActuel(cooperativeId);
+          campagneId = prix.campagneId ?? null;
+        } catch {
+          // Pas de campagne active — commission sans campagne
+        }
+        void creerCommissionMembreSiTaux(
+          sessionId,
+          detail.membreId,
+          campagneId,
+          poidsKg,
+          cooperativeId,
+        );
+      }
+    }
+  }
 
   return { ...detail, statut: "terminee" as const, dateFin: updated?.dateFin };
 }

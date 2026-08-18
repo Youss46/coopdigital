@@ -771,6 +771,13 @@
       "when": 1788480600000,
       "tag": "0109_pesee_certification_cacao",
       "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1788480700000,
+      "tag": "0110_commissions_membres_delegues",
+      "breakpoints": true
     }
   ]
 }
