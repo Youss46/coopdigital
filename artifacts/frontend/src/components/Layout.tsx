@@ -57,7 +57,7 @@ import {
 import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useOffline } from "@/contexts/OfflineContext";
-import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey } from "@workspace/api-client-react";
+import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey, useGetPaiementsStats, getGetPaiementsStatsQueryKey } from "@workspace/api-client-react";
 import { OfflineBanner } from "./OfflineIndicator";
 import NotificationPanel from "./NotificationPanel";
 import HelpPanel from "./HelpPanel";
@@ -204,6 +204,17 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
   });
   const nbMessagesNonLus = messagesNonLus?.count ?? 0;
 
+  const estDelegue = utilisateur?.role === "delegue";
+  const { data: paiementsStats } = useGetPaiementsStats({
+    query: {
+      queryKey: getGetPaiementsStatsQueryKey(),
+      enabled: estDelegue,
+      staleTime: 30_000,
+      refetchInterval: 60_000,
+    },
+  });
+  const nbReglementsEnAttente = estDelegue ? (paiementsStats?.en_attente?.count ?? 0) : 0;
+
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#1a4731" }}>
       {/* Logo + close button */}
@@ -232,13 +243,14 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {(navItems as NavItem[])
           .filter(({ roles }) => !roles || roles.includes(utilisateur?.role ?? ""))
-          .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge, showEudrAlerteBadge: hasEudrAlerteBadge, showMessagesBadge: hasMessagesBadge, showPendingOpsBadge: hasPendingOpsBadge }) => {
+          .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge, showEudrAlerteBadge: hasEudrAlerteBadge, showMessagesBadge: hasMessagesBadge, showPendingOpsBadge: hasPendingOpsBadge, showReglementsBadge: hasReglementsBadge }) => {
             const isActive = location === href || location.startsWith(href + "/");
             const badgeCount = hasAnomaliesBadge && showAnomaliesBadge ? nbCritiques
               : hasBadge && showBadge ? nbEnAttente
               : hasEudrAlerteBadge && showEudrAlerteBadge ? nbSectionsAlerte
               : hasMessagesBadge ? nbMessagesNonLus
               : hasPendingOpsBadge ? pendingCount
+              : hasReglementsBadge ? nbReglementsEnAttente
               : 0;
             return (
               <Link
