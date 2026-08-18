@@ -26,6 +26,7 @@ import {
   deleteRegularisation,
   getApercuAffectationResultat,
   affecterResultat,
+  getHistoriqueAffectations,
 } from "../controllers/comptabiliteController";
 import {
   listPlanComptableHandler,
@@ -66,6 +67,7 @@ router.post("/comptabilite/cloture",                   checkPermission("comptabi
 router.get("/comptabilite/regularisations",            checkPermission("comptabilite", "voir_config"),              listRegularisations);
 router.post("/comptabilite/regularisations",           checkPermission("comptabilite", "saisir_ecriture_manuelle"), createRegularisation);
 router.delete("/comptabilite/regularisations/:id",     checkPermission("comptabilite", "saisir_ecriture_manuelle"), deleteRegularisation);
+router.get("/comptabilite/historique-affectations",    checkPermission("comptabilite", "voir_config"),              getHistoriqueAffectations);
 router.get("/comptabilite/affectation-resultat",       checkPermission("comptabilite", "voir_config"),              getApercuAffectationResultat);
 router.post("/comptabilite/affectation-resultat",      checkPermission("comptabilite", "modifier_config"),           affecterResultat);
 

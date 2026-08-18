@@ -1466,6 +1466,44 @@ export async function getApercuAffectationResultat(req: Request, res: Response):
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
+// ─── Historique des affectations de résultat ──────────────────────────────────
+// Retourne, par exercice clôturé ayant fait l'objet d'une affectation, les
+// montants ventilés (réserve légale, report à nouveau, ristournes) ainsi que
+// le bénéfice net porté en compte 131 lors de la clôture.
+export async function getHistoriqueAffectations(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+
+    // Affectations groupées par exercice (stockées en N+1 → exercice-1 = exercice du résultat)
+    const rows = await db.execute(sql`
+      SELECT
+        (a.exercice - 1)                                                          AS "exerciceResultat",
+        COALESCE(SUM(CASE WHEN a.compte_credit = '1061' THEN a.montant_fcfa ELSE 0 END), 0)::int AS "reserveLegale",
+        COALESCE(SUM(CASE WHEN a.compte_credit = '110'  THEN a.montant_fcfa ELSE 0 END), 0)::int AS "reportANouveau",
+        COALESCE(SUM(CASE WHEN a.compte_credit = '4461' THEN a.montant_fcfa ELSE 0 END), 0)::int AS "ristournes",
+        MIN(a.date_ecriture)                                                      AS "dateAffectation",
+        COALESCE(
+          (SELECT (SUM(CASE WHEN compte_credit = '131' THEN montant_fcfa ELSE 0 END)
+                - SUM(CASE WHEN compte_debit  = '131' THEN montant_fcfa ELSE 0 END))::int
+           FROM ecritures_comptables
+           WHERE cooperative_id = ${coop}
+             AND exercice = (a.exercice - 1)
+             AND type_ecriture = 'cloture'), 0)                                   AS "beneficeNet"
+      FROM ecritures_comptables a
+      WHERE a.cooperative_id = ${coop}
+        AND a.type_ecriture  = 'affectation'
+      GROUP BY a.exercice
+      ORDER BY a.exercice DESC
+    `);
+
+    res.json(rows.rows);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur getHistoriqueAffectations");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 export async function getStatutsExercices(req: Request, res: Response): Promise<void> {
   try {
     const coop = coopId(req);

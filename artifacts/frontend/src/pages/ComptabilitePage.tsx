@@ -2751,6 +2751,15 @@ interface ApercuCloture {
   regularisations?: { libelle: string; compteDebit: string; compteCredit: string; montantFcfa: number }[];
 }
 
+interface HistoriqueAffectationRow {
+  exerciceResultat: number;
+  beneficeNet: number;
+  reserveLegale: number;
+  reportANouveau: number;
+  ristournes: number;
+  dateAffectation: string;
+}
+
 interface ApercuAffectation {
   exercice: number;
   solde131: number;
@@ -2935,6 +2944,11 @@ function OngletCloture() {
     queryFn: () => apiFetch<ApercuAffectation>(`/api/comptabilite/affectation-resultat?exercice=${annee}`),
     enabled: deja,
     retry: false,
+  });
+
+  const historiqueAff = useQuery({
+    queryKey: ["historique-affectations"],
+    queryFn: () => apiFetch<HistoriqueAffectationRow[]>("/api/comptabilite/historique-affectations"),
   });
 
   const handleAffectation = async () => {
@@ -3524,6 +3538,63 @@ function ClotureSection() {
           </div>
         )}
       </div>
+      {/* ── Historique des affectations de résultat ─────────────────────── */}
+      <div className="mt-8 pt-6 border-t border-gray-200">
+        <h3 className="text-base font-bold text-gray-900 mb-1 flex items-center gap-2">
+          <Users size={16} className="text-gray-500" /> Historique des affectations de résultat
+        </h3>
+        <p className="text-xs text-gray-400 mb-4">
+          Décisions d'AG enregistrées — réserves constituées, ristournes versées et reports à nouveau par exercice clôturé.
+        </p>
+        {historiqueAff.isLoading ? (
+          <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-5 w-5 border-2 border-green-600 border-t-transparent" /></div>
+        ) : historiqueAff.data && historiqueAff.data.length > 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Exercice</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Bénéfice net</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Réserve légale</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Report à nouveau</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Ristournes</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Date AG</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historiqueAff.data.map((row) => {
+                  const totalAffecte = row.reserveLegale + row.reportANouveau + row.ristournes;
+                  const nonAffecte = row.beneficeNet - totalAffecte;
+                  return (
+                    <tr key={row.exerciceResultat} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
+                      <td className="px-4 py-3 font-semibold text-gray-800">{row.exerciceResultat}</td>
+                      <td className="px-4 py-3 text-right font-medium text-gray-800">{FCFA(row.beneficeNet)}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{row.reserveLegale > 0 ? FCFA(row.reserveLegale) : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{row.reportANouveau > 0 ? FCFA(row.reportANouveau) : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3 text-right">
+                        {row.ristournes > 0 ? (
+                          <span className="font-medium" style={{ color: OR }}>{FCFA(row.ristournes)}</span>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-500 text-xs">
+                        {row.dateAffectation ? new Date(row.dateAffectation).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                        {nonAffecte !== 0 && (
+                          <div className="text-[10px] text-amber-600 mt-0.5">Δ {nonAffecte > 0 ? "+" : ""}{FCFA(nonAffecte)}</div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-sm text-gray-400">
+            Aucune affectation de résultat enregistrée — clôturez un exercice puis enregistrez la décision d'AG.
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
