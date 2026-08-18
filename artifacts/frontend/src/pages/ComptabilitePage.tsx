@@ -2750,6 +2750,68 @@ interface ApercuCloture {
   tresorerie: number; fournisseurs: number; stockCacao: number;
 }
 
+// ─── Autocomplete compte du plan comptable ───────────────────────────────────
+function CompteAutocomplete({ value, onChange, placeholder, filter }: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  filter?: (c: ComptePC) => boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState(value);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const { data: plan = [] } = useQuery<ComptePC[]>({
+    queryKey: ["plan-comptable"],
+    queryFn: () => apiFetch<ComptePC[]>("/api/comptabilite/plan"),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const lower = q.toLowerCase();
+  const suggestions = plan
+    .filter((c) => c.actif && (!filter || filter(c)))
+    .filter((c) => c.numeroCompte.startsWith(q) || c.libelle.toLowerCase().includes(lower))
+    .slice(0, 10);
+
+  // Sync external value → input quand le parent change (ex: changement de type)
+  useState(() => { setQ(value); });
+  const prevValue = useRef(value);
+  if (prevValue.current !== value) { prevValue.current = value; setQ(value); }
+
+  // Fermer si clic extérieur
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <input
+        value={q}
+        placeholder={placeholder}
+        onChange={(e) => { setQ(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-700"
+      />
+      {open && suggestions.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+          {suggestions.map((c) => (
+            <button key={c.id} type="button"
+              onMouseDown={(e) => { e.preventDefault(); onChange(c.numeroCompte); setQ(c.numeroCompte); setOpen(false); }}
+              className="w-full text-left px-3 py-2 hover:bg-green-50 flex items-center gap-3 border-b border-gray-50 last:border-0">
+              <span className="font-mono text-sm font-semibold text-blue-700 w-14 flex-shrink-0">{c.numeroCompte}</span>
+              <span className="text-sm text-gray-700 truncate">{c.libelle}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Types régularisations ────────────────────────────────────────────────────
 // SYSCOHADA OHADA : comptes régularisation
 // 408 = Fournisseurs, factures non parvenues (charges à payer)
@@ -2978,19 +3040,22 @@ function OngletCloture() {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">
-                Compte de régularisation <span className="text-gray-400">— modifiable si votre plan diffère</span>
-              </label>
-              <input value={rCompteRegul} onChange={(e) => setRCompteRegul(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-700" />
+              <label className="block text-xs font-medium text-gray-500 mb-1">Compte de régularisation</label>
+              <CompteAutocomplete
+                value={rCompteRegul}
+                onChange={setRCompteRegul}
+                placeholder="Ex: 4487, 408…"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">
                 Compte contrepartie <span className="text-gray-400">— {TYPES_REGUL.find((t) => t.code === rType)?.compteHint}</span>
               </label>
-              <input value={rCompte} onChange={(e) => setRCompte(e.target.value)}
+              <CompteAutocomplete
+                value={rCompte}
+                onChange={setRCompte}
                 placeholder={TYPES_REGUL.find((t) => t.code === rType)?.compteHint}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
+              />
               {rCompte && rCompteRegul && (
                 <p className="text-xs text-gray-400 mt-1 font-mono">
                   {TYPES_REGUL.find((t) => t.code === rType)?.debitSide === "contrepartie"
