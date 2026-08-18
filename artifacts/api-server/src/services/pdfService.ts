@@ -3951,8 +3951,9 @@ export async function generateBordereauAchatSession(
   let deleguePrenoms   = "";
   let delegueTel       = "—";
   let delegueZone      = "—";
-  let carburantFcfa    = 0;
-  let modeFinancement  = "fonds_propres";
+  let carburantFcfa      = 0;
+  let autresChargesFcfa  = 0;
+  let modeFinancement    = "fonds_propres";
   let delegueIdSession: number | null = null;
   let transfertCharges: { carburantPar: string; carburantFcfa: number; autresFcfa: number; autresPar: string } | null = null;
 
@@ -3975,8 +3976,9 @@ export async function generateBordereauAchatSession(
     if (t) {
       immatriculation = t.immatriculation ?? "—";
       nomChauffeur    = t.nomChauffeur    ?? "—";
-      carburantFcfa   = t.fraisCarburantFcfa ?? 0;
-      modeFinancement = t.modeFinancement ?? "fonds_propres";
+      carburantFcfa     = t.fraisCarburantFcfa ?? 0;
+      autresChargesFcfa = t.autresChargesFcfa  ?? 0;
+      modeFinancement   = t.modeFinancement ?? "fonds_propres";
       transfertCharges = {
         carburantPar:  t.fraisCarburantPar  ?? "cooperative",
         carburantFcfa: t.fraisCarburantFcfa ?? 0,
@@ -4121,11 +4123,14 @@ export async function generateBordereauAchatSession(
   const valeurProduit = Math.round(poidsNetKg * prixUnitaire);
   const caisseCoop    = modeFinancement === "caisse_cooperative";
 
+  // Frais de collecte net = commission brute − carburant − autres charges de transport
+  const fraisCollecteNet = Math.max(0, fraisCollecteFcfa - carburantFcfa - autresChargesFcfa);
+
   // Formule :
-  //   fonds_propres      → NET = valeur + commission − retenues avances
-  //   caisse_cooperative → NET = MAX(valeur − alims coop, 0) + commission − retenues avances
+  //   fonds_propres      → NET = valeur + frais collecte net − retenues avances
+  //   caisse_cooperative → NET = MAX(valeur − alims coop, 0) + frais collecte net − retenues avances
   const resteValeurFcfa = caisseCoop ? Math.max(valeurProduit - montantCoopFcfa, 0) : valeurProduit;
-  const montantNet      = Math.max(0, resteValeurFcfa + fraisCollecteFcfa - retenueAvancesFcfa);
+  const montantNet      = Math.max(0, resteValeurFcfa + fraisCollecteNet - retenueAvancesFcfa);
 
   // 8. PDF
   const { doc, endPromise } = makePdfDoc();
@@ -4232,11 +4237,15 @@ export async function generateBordereauAchatSession(
   });
   y += HDR_H;
 
-  const autresLignes: { label: string; valeur: number }[] = [
-    { label: "FRAIS DE\nCOLLECTE", valeur: fraisCollecteFcfa },
-    { label: "CARBURANT",          valeur: carburantFcfa },
-    { label: "RETENUE\nAVANCE",    valeur: retenueAvancesFcfa },
-    { label: "SOLDE SUR\nAVANCES", valeur: soldeAvancesFcfa },
+  const autresLignes: { label: string; valeur: number; net?: boolean }[] = [
+    { label: "FRAIS DE\nCOLLECTE",  valeur: fraisCollecteFcfa },
+    { label: "CARBURANT",            valeur: carburantFcfa },
+    ...(autresChargesFcfa > 0
+      ? [{ label: "AUTRES\nCHARGES", valeur: autresChargesFcfa }]
+      : []),
+    { label: "FRAIS COLLECTE\nNET", valeur: fraisCollecteNet, net: true },
+    { label: "RETENUE\nAVANCE",     valeur: retenueAvancesFcfa },
+    { label: "SOLDE SUR\nAVANCES",  valeur: soldeAvancesFcfa },
   ];
   // SUB_H doit loger : label sur 2 lignes à 7 pt (≈18 pt) + valeur à 8.5 pt + marges
   const SUB_H = 32;
@@ -4295,8 +4304,12 @@ export async function generateBordereauAchatSession(
   let ay = y;
   autresLignes.forEach((al, idx) => {
     if (idx > 0) doc.moveTo(autresX, ay).lineTo(autresX + autresW, ay).stroke("#e5e7eb");
+    // Fond distinctif pour la ligne "net"
+    if (al.net) {
+      doc.rect(autresX, ay, autresW, SUB_H).fill("#f0fdf4").stroke("#d1d5db");
+    }
     // Label sur 2 lignes, ancré en haut de la cellule
-    doc.fontSize(7).fillColor(GRIS).font("Helvetica-Bold")
+    doc.fontSize(7).fillColor(al.net ? VERT : GRIS).font("Helvetica-Bold")
       .text(al.label, autresX + 2, ay + 4, { width: autresW - 4, align: "center", lineBreak: true });
     // Valeur ancrée en bas de la cellule (SUB_H - 11 laisse 11 pt depuis le bas)
     doc.fontSize(9).fillColor(al.valeur > 0 ? VERT : "black").font("Helvetica-Bold")
