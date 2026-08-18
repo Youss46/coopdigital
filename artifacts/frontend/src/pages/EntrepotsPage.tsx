@@ -444,7 +444,7 @@ export default function EntrepotsPage() {
                       <button
                         onClick={() => {
                           setShowTransfert(e);
-                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", nombreSacs: "", typeTransport: "cooperatif", vehiculeId: "", chauffeurId: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
+                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", nombreSacs: e.nombreSacsTotal ? String(e.nombreSacsTotal) : "", typeTransport: "cooperatif", vehiculeId: "", chauffeurId: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
                         }}
                         className="mt-3 w-full flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors">
                         <Truck className="w-3.5 h-3.5" />
