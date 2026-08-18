@@ -2798,6 +2798,14 @@ interface ApercuCloture {
   regularisations?: { libelle: string; compteDebit: string; compteCredit: string; montantFcfa: number }[];
 }
 
+interface ApercuRistournes {
+  montantTotal: number;
+  dejaDeclenche: boolean;
+  membres: { membreId: number; nomComplet: string; tonnageKg: number; montantFcfa: number }[];
+  campagnes: { id: number; libelle: string; anneeDebut: number; anneeFin: number }[];
+  campagneId: number | null;
+}
+
 interface HistoriqueAffectationRow {
   exerciceResultat: number;
   beneficeNet: number;
@@ -2997,6 +3005,43 @@ function OngletCloture() {
     queryKey: ["historique-affectations"],
     queryFn: () => apiFetch<HistoriqueAffectationRow[]>("/api/comptabilite/historique-affectations"),
   });
+
+  // ── Ristournes — aperçu déclenchement ──────────────────────────────────────
+  const [campagneRistId, setCampagneRistId] = useState<number | null>(null);
+  const [modeRist,       setModeRist]       = useState("");
+  const [loadingRist,    setLoadingRist]    = useState(false);
+  const [showRistModal,  setShowRistModal]  = useState(false);
+
+  const apercuRist = useQuery({
+    queryKey: ["apercu-ristournes", annee, campagneRistId],
+    queryFn: () => {
+      const p = new URLSearchParams({ exercice: String(annee) });
+      if (campagneRistId) p.set("campagne_id", String(campagneRistId));
+      return apiFetch<ApercuRistournes>(`/api/comptabilite/ristournes/apercu?${p.toString()}`);
+    },
+    enabled: deja,
+    retry: false,
+  });
+
+  const handleDeclencherRistournes = async () => {
+    const ap = apercuRist.data;
+    if (!ap?.campagneId && !campagneRistId) {
+      toast({ title: "Sélectionnez une campagne", variant: "destructive" }); return;
+    }
+    setLoadingRist(true);
+    try {
+      const res = await apiPost<{ count: number; montantTotal: number; message: string }>(
+        "/api/comptabilite/ristournes/declencher",
+        { exercice: annee, campagneId: campagneRistId ?? ap?.campagneId, modePaiement: modeRist || undefined },
+      );
+      toast({ title: `✅ ${res.message}` });
+      setShowRistModal(false);
+      void apercuRist.refetch();
+      void qc.invalidateQueries({ queryKey: ["historique-affectations"] });
+    } catch (err) {
+      toast({ title: "Erreur", description: (err as Error).message, variant: "destructive" });
+    } finally { setLoadingRist(false); }
+  };
 
   const handleAffectation = async () => {
     setLoadingAff(true);
@@ -3391,22 +3436,153 @@ function OngletCloture() {
         const ok          = Math.abs(ecartFcfa) <= 1;
         const reserveMin  = Math.ceil(beneficeNet * 0.05);
 
-        if (aff.dejaAffecte) return (
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <CheckCheck size={15} className="text-green-600" /> Affectation du résultat {annee} — enregistrée
-            </h3>
-            <div className="divide-y divide-gray-50">
-              {aff.ecrituresAffectation.map((e, i) => (
-                <div key={i} className="flex items-center justify-between py-2 text-sm">
-                  <span className="text-gray-600">{e.libelle}</span>
-                  <span className="font-mono text-gray-800">{FCFA(e.montantFcfa)}</span>
+        if (aff.dejaAffecte) {
+          const ristRow = aff.ecrituresAffectation.find((e) => e.compteCredit === "4461");
+          const ristMontant = ristRow?.montantFcfa ?? 0;
+          const apRist = apercuRist.data;
+          const campId = campagneRistId ?? apRist?.campagneId ?? null;
+
+          return (
+            <div className="space-y-4">
+              {/* Affectation enregistrée */}
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <CheckCheck size={15} className="text-green-600" /> Affectation du résultat {annee} — enregistrée
+                </h3>
+                <div className="divide-y divide-gray-50">
+                  {aff.ecrituresAffectation.map((e, i) => (
+                    <div key={i} className="flex items-center justify-between py-2 text-sm">
+                      <span className="text-gray-600">{e.libelle}</span>
+                      <span className="font-mono text-gray-800">{FCFA(e.montantFcfa)}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+                <p className="text-xs text-gray-400 mt-3">Comptes 131 → 1061 / 110 / 4461 • exercice {annee + 1}</p>
+              </div>
+
+              {/* Ristournes — déclenchement paiements */}
+              {ristMontant > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <Users size={15} className="text-amber-600" /> Ristournes membres — {FCFA(ristMontant)}
+                    </h3>
+                    {apRist?.dejaDeclenche ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">
+                        <CheckCheck size={11} /> Paiements déclenchés
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setShowRistModal(true)}
+                        className="text-xs font-medium px-3 py-1.5 rounded-lg border text-amber-700 border-amber-200 hover:bg-amber-50 flex items-center gap-1.5"
+                      >
+                        <Users size={12} /> Déclencher les paiements
+                      </button>
+                    )}
+                  </div>
+                  {apRist?.dejaDeclenche ? (
+                    <p className="text-xs text-gray-400">
+                      Écriture 4461 → 521 générée en exercice {annee + 1}. Les paiements individuels sont visibles dans le module Paiements.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400">
+                      Distribue {FCFA(ristMontant)} aux membres proportionnellement à leurs livraisons de la campagne sélectionnée.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Modal déclenchement */}
+              {showRistModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowRistModal(false)}>
+                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                    <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                      <h3 className="font-bold text-gray-900">Déclencher les ristournes {annee}</h3>
+                      <button onClick={() => setShowRistModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                    </div>
+                    <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
+                      {/* Campagne */}
+                      {apRist?.campagnes && apRist.campagnes.length > 0 && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Campagne de référence</label>
+                          <select
+                            value={campId ?? ""}
+                            onChange={(e) => setCampagneRistId(Number(e.target.value))}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                          >
+                            {apRist.campagnes.map((c) => (
+                              <option key={c.id} value={c.id}>{c.libelle} ({c.anneeDebut}/{c.anneeFin})</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {/* Mode paiement */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Mode de paiement (optionnel)</label>
+                        <select
+                          value={modeRist}
+                          onChange={(e) => setModeRist(e.target.value)}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                        >
+                          <option value="">— Définir lors du paiement —</option>
+                          <option value="especes">Espèces</option>
+                          <option value="orange_money">Orange Money</option>
+                          <option value="wave">Wave</option>
+                          <option value="mtn_momo">MTN MoMo</option>
+                          <option value="virement">Virement</option>
+                        </select>
+                      </div>
+                      {/* Aperçu membres */}
+                      {apercuRist.isLoading ? (
+                        <div className="flex justify-center py-4"><div className="animate-spin rounded-full h-5 w-5 border-2 border-green-600 border-t-transparent" /></div>
+                      ) : apRist?.membres && apRist.membres.length > 0 ? (
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">
+                            Répartition — {apRist.membres.length} membres
+                          </p>
+                          <div className="rounded-lg border border-gray-100 overflow-hidden max-h-48 overflow-y-auto">
+                            {apRist.membres.map((m) => (
+                              <div key={m.membreId} className="flex items-center justify-between px-3 py-2 border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
+                                <div>
+                                  <span className="text-sm font-medium text-gray-800">{m.nomComplet}</span>
+                                  <span className="text-xs text-gray-400 ml-2">{m.tonnageKg.toLocaleString("fr-FR")} kg</span>
+                                </div>
+                                <span className="text-sm font-mono font-semibold text-gray-700">{FCFA(m.montantFcfa)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex justify-between px-3 py-2 bg-gray-50 border border-gray-100 rounded-lg mt-2 text-sm">
+                            <span className="font-medium text-gray-700">Total</span>
+                            <span className="font-bold font-mono text-gray-800">{FCFA(ristMontant)}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-4 text-sm text-amber-600 bg-amber-50 rounded-lg border border-amber-100">
+                          ⚠ Aucune livraison trouvée pour cette campagne — impossible de calculer les parts.
+                        </div>
+                      )}
+                    </div>
+                    <div className="px-6 pb-5 pt-3 border-t border-gray-100 flex gap-3">
+                      <button onClick={() => setShowRistModal(false)} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        Annuler
+                      </button>
+                      <button
+                        onClick={() => void handleDeclencherRistournes()}
+                        disabled={loadingRist || !apRist?.membres?.length}
+                        className="flex-1 py-2.5 rounded-lg text-white text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                        style={{ backgroundColor: OR }}
+                      >
+                        {loadingRist
+                          ? <><div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" /> Déclenchement…</>
+                          : `Déclencher — ${apRist?.membres?.length ?? 0} membres`}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <p className="text-xs text-gray-400 mt-3">Comptes 131 → 1061 / 110 / 4461 • exercice {annee + 1}</p>
-          </div>
-        );
+          );
+        }
 
         return (
           <div className="bg-white rounded-xl border border-gray-200 p-5">

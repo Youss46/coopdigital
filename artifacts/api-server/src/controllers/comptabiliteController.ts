@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { checkEcriture, creerAnomalies } from "../services/anomalieService";
-import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable, membresTable, usersTable, personnelTable, exportateursTable, fournisseursTable } from "@workspace/db";
+import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable, membresTable, usersTable, personnelTable, exportateursTable, fournisseursTable, campagnesTable, livraisonsTable, paiementsTable } from "@workspace/db";
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
 import { assignerNumeroPiece, assignerNumerosPieces } from "../lib/numeroPiece";
@@ -1468,6 +1468,155 @@ export async function getApercuAffectationResultat(req: Request, res: Response):
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
+// ─── Ristournes — aperçu et déclenchement ─────────────────────────────────────
+
+type RistMembre = { membreId: number; nomComplet: string; tonnageKg: number; montantFcfa: number };
+
+async function getRistournesAmount(coop: number, annee: number): Promise<number> {
+  const q = await db.execute(sql`
+    SELECT COALESCE(SUM(montant_fcfa), 0)::int AS "montant"
+    FROM   ecritures_comptables
+    WHERE  cooperative_id = ${coop} AND exercice = ${annee + 1}
+      AND  type_ecriture = 'affectation' AND compte_credit = '4461'
+  `);
+  return Number((q.rows[0] as { montant: number }).montant);
+}
+
+async function getMembresParts(coop: number, campagneId: number, montantTotal: number): Promise<RistMembre[]> {
+  const rows = (await db.execute(sql`
+    SELECT m.id AS "membreId",
+           TRIM(m.prenom || ' ' || m.nom) AS "nomComplet",
+           COALESCE(SUM(l.poids_kg), 0)::numeric AS "tonnageKg"
+    FROM   membres m
+    JOIN   livraisons l ON l.membre_id = m.id AND l.campagne_id = ${campagneId}
+    WHERE  m.cooperative_id = ${coop} AND l.poids_kg > 0
+    GROUP  BY m.id, m.prenom, m.nom
+    HAVING COALESCE(SUM(l.poids_kg), 0) > 0
+    ORDER  BY "tonnageKg" DESC
+  `)).rows as { membreId: number; nomComplet: string; tonnageKg: number }[];
+
+  const totalTonnage = rows.reduce((s, r) => s + Number(r.tonnageKg), 0);
+  if (totalTonnage === 0 || rows.length === 0) return [];
+
+  let reste = montantTotal;
+  return rows.map((r, i) => {
+    const share = i === rows.length - 1 ? reste : Math.round(montantTotal * Number(r.tonnageKg) / totalTonnage);
+    reste -= share;
+    return { membreId: r.membreId, nomComplet: r.nomComplet, tonnageKg: Number(r.tonnageKg), montantFcfa: share };
+  }).filter((p) => p.montantFcfa > 0);
+}
+
+export async function apercuRistournes(req: Request, res: Response): Promise<void> {
+  try {
+    const coop  = coopId(req);
+    const annee = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : exerciceCourant() - 1;
+    const campQId = req.query["campagne_id"] ? parseInt(String(req.query["campagne_id"])) : undefined;
+
+    const [exercice] = await db.select().from(exercicesTable)
+      .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, annee)));
+    if (!exercice || exercice.statut !== "cloture") {
+      res.status(400).json({ erreur: `L'exercice ${annee} n'est pas clôturé` }); return;
+    }
+
+    const montantTotal = await getRistournesAmount(coop, annee);
+    if (montantTotal === 0) {
+      res.json({ montantTotal: 0, dejaDeclenche: false, membres: [], campagnes: [], campagneId: null }); return;
+    }
+
+    const declQ = await db.execute(sql`
+      SELECT COUNT(*)::int AS count FROM ecritures_comptables
+      WHERE cooperative_id = ${coop} AND exercice = ${annee + 1} AND type_ecriture = 'paiement_ristournes'
+    `);
+    const dejaDeclenche = Number((declQ.rows[0] as { count: number }).count) > 0;
+
+    const campagnesRows = (await db.execute(sql`
+      SELECT id, libelle, annee_debut AS "anneeDebut", annee_fin AS "anneeFin"
+      FROM   campagnes
+      WHERE  cooperative_id = ${coop}
+        AND  (annee_debut = ${annee} OR annee_fin = ${annee})
+      ORDER  BY annee_debut DESC
+    `)).rows as { id: number; libelle: string; anneeDebut: number; anneeFin: number }[];
+
+    const campagneId = campQId ?? campagnesRows[0]?.id ?? null;
+    const membres: RistMembre[] = campagneId && !dejaDeclenche
+      ? await getMembresParts(coop, campagneId, montantTotal)
+      : [];
+
+    res.json({ montantTotal, dejaDeclenche, membres, campagnes: campagnesRows, campagneId });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur apercuRistournes");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function declencherRistournes(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+    const { exercice: annee, campagneId, modePaiement } = req.body as {
+      exercice: number; campagneId: number; modePaiement?: string;
+    };
+    if (!annee || !campagneId) {
+      res.status(400).json({ erreur: "exercice et campagneId sont requis" }); return;
+    }
+
+    const [exercice] = await db.select().from(exercicesTable)
+      .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, annee)));
+    if (!exercice || exercice.statut !== "cloture") {
+      res.status(400).json({ erreur: `L'exercice ${annee} n'est pas clôturé` }); return;
+    }
+
+    const montantTotal = await getRistournesAmount(coop, annee);
+    if (montantTotal === 0) {
+      res.status(400).json({ erreur: "Aucune ristourne affectée pour cet exercice" }); return;
+    }
+
+    const declQ = await db.execute(sql`
+      SELECT COUNT(*)::int AS count FROM ecritures_comptables
+      WHERE cooperative_id = ${coop} AND exercice = ${annee + 1} AND type_ecriture = 'paiement_ristournes'
+    `);
+    if (Number((declQ.rows[0] as { count: number }).count) > 0) {
+      res.status(409).json({ erreur: `Les ristournes de l'exercice ${annee} ont déjà été déclenchées` }); return;
+    }
+
+    const parts = await getMembresParts(coop, campagneId, montantTotal);
+    if (parts.length === 0) {
+      res.status(400).json({ erreur: "Aucune livraison trouvée pour cette campagne — impossible de calculer les parts" }); return;
+    }
+
+    const mode = (modePaiement as "especes" | "orange_money" | "mtn_momo" | "wave" | "cheque" | "virement" | undefined) ?? undefined;
+
+    await db.transaction(async (tx) => {
+      for (const p of parts) {
+        await tx.execute(sql`
+          INSERT INTO paiements (membre_id, campagne_id, libelle, montant_fcfa, mode_paiement, statut, initialise_par)
+          VALUES (${p.membreId}, ${campagneId}, ${`Ristournes exercice ${annee}`}, ${p.montantFcfa},
+                  ${mode ?? null}, 'en_attente', ${req.user?.id ?? null})
+        `);
+      }
+      await tx.insert(ecrituresComptablesTable).values({
+        cooperativeId: coop,
+        dateEcriture:  `${annee + 1}-01-01`,
+        numeroPiece:   `RIST-${annee + 1}`,
+        libelle:       `Paiement ristournes exercice ${annee} — ${parts.length} membres`,
+        compteDebit:   "4461",
+        compteCredit:  "521",
+        montantFcfa:   montantTotal,
+        source:        "manuel",
+        sourceId:      null,
+        exercice:      annee + 1,
+        typeEcriture:  "paiement_ristournes",
+      });
+    });
+
+    res.json({ count: parts.length, montantTotal, message: `Paiements déclenchés pour ${parts.length} membres` });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur declencherRistournes");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 // ─── Historique des affectations de résultat ──────────────────────────────────
 // Retourne, par exercice clôturé ayant fait l'objet d'une affectation, les
 // montants ventilés (réserve légale, report à nouveau, ristournes) ainsi que
