@@ -185,19 +185,23 @@ export async function createSession(
   if (data.transfertId) {
     const transfertId = data.transfertId;
 
-    // #16 — Vérifier que la config pesée est configurée avant de démarrer
+    // #16 — S'assurer qu'une config pesée existe ; créer les valeurs par défaut si absente
     const [peseeConfigCheck] = await db
-      .select({ id: configPeseeTable.id, ecartMaxAutorisePct: configPeseeTable.ecartMaxAutorisePct })
+      .select({ id: configPeseeTable.id })
       .from(configPeseeTable)
       .where(eq(configPeseeTable.cooperativeId, cooperativeId))
       .limit(1);
 
     if (!peseeConfigCheck) {
-      throw new Error(
-        "La configuration de pesée n'est pas encore définie pour cette coopérative. " +
-        "Veuillez configurer les paramètres de pesée (seuil d'écart autorisé, délai d'expiration) " +
-        "dans l'espace gestionnaire avant de démarrer une session de réception de transfert.",
-      );
+      await db.insert(configPeseeTable).values({
+        cooperativeId,
+        // valeurs par défaut raisonnables
+        ecartMaxAutorisePct: "2",      // 2 % d'écart toléré
+        seuilDoublePeseeKg: "500",     // double pesée si > 500 kg
+        toleranceBalanceG: "500",      // tolérance balance 500 g
+        frequenceVerificationJours: 90,
+      }).onConflictDoNothing();
+      logger.info({ cooperativeId }, "Config pesée par défaut créée automatiquement");
     }
 
     const numeroSession = await generateNumeroSession(cooperativeId);
