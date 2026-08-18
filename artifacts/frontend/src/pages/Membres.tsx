@@ -825,7 +825,7 @@ export default function Membres() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1">
                   <option value="">— Non renseigné —</option>
                   <option value="membre">Membre</option>
-                  <option value="pisteur">Pisteur</option>
+                  {!estDelegue && <option value="pisteur">Pisteur</option>}
                   <option value="externe">Externe</option>
                 </select>
               </div>
