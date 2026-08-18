@@ -4086,9 +4086,9 @@ export async function generateBordereauAchatSession(
 
   // 8. PDF
   const { doc, endPromise } = makePdfDoc();
-  // Marges réduites pour que le bordereau occupe toute la feuille
-  const M  = 28;                          // marge gauche/droite réduite (vs MARGIN=50)
-  const BW = PAGE_W - M * 2;             // ≈ 539 pt utilisables en largeur
+  // M=40 aligne avec les marges internes de drawHeader (marginLeft=40/marginRight=40)
+  const M  = 40;
+  const BW = PAGE_W - M * 2;             // 515.28 pt utilisables = toute la largeur utile
   await drawHeader(doc, cooperativeId, { titre_document: "BORDEREAU D'ACHAT", reference: session.numeroSession });
 
   // Bandeau Campagne / Date
@@ -4107,7 +4107,7 @@ export async function generateBordereauAchatSession(
   y += 6;
 
   // ── IDENTIFICATION (gauche) + DÉTAILS PESÉE (droite) ───────────────────────
-  const LEFT_W  = 278;
+  const LEFT_W  = 262;
   const RIGHT_X = M + LEFT_W + 10;
   const RIGHT_W = PAGE_W - RIGHT_X - M;
   const topY    = y;
@@ -4171,9 +4171,10 @@ export async function generateBordereauAchatSession(
 
   y = Math.max(leftBottom, ry) + 16;
 
-  // ── Tableau de calcul ───────────────────────────────────────────────────────
-  const tW   = BW;
-  const colW = [74, 54, 74, 76, 90, 90, tW - 74 - 54 - 74 - 76 - 90 - 90];
+  // ── Tableau de calcul ── colonnes calibrées pour BW ≈ 515 pt ──────────────
+  const tW   = BW;   // 515.28 pt
+  // Somme fixe des 6 premières colonnes = 70+48+70+70+80+85 = 423 → dernière = ~92
+  const colW = [70, 48, 70, 70, 80, 85, tW - 70 - 48 - 70 - 70 - 80 - 85];
 
   const HDR_H = 32;
   doc.rect(M, y, tW, HDR_H).fill(VERT);
@@ -4260,18 +4261,20 @@ export async function generateBordereauAchatSession(
     ay += SUB_H;
   });
 
-  y += ROW_H + 22;
+  y += ROW_H + 16;
 
-  // ── Signatures : boîtes qui remplissent l'espace restant jusqu'au footer ────
-  const sigY  = y;
-  const sigW  = (BW - 16) / 3;
-  // Hauteur dynamique : occupe tout l'espace jusqu'au footer (footer à 32 pt du bas)
-  const sigH  = Math.max(72, doc.page.height - doc.page.margins.bottom - 36 - sigY - 16);
+  // ── Signatures épinglées au pied de page ────────────────────────────────────
+  // addFooters dessine à pageHeight-32 ; le séparateur est à pageHeight-38.
+  // Les boîtes s'étendent depuis y (juste sous le tableau) jusqu'à 8 pt au-dessus du footer.
+  const footerSepY = doc.page.height - 38;        // ligne séparatrice du footer
+  const sigBoxH    = Math.max(72, footerSepY - 8 - 14 - y);  // 14 pt = label
+  const sigW       = (BW - 16) / 3;
+  const sigY       = y;                            // label commence juste sous le tableau
   ["PESEUR", "LIVREUR", "MAGASINIER"].forEach((lbl, i) => {
     const sx = M + i * (sigW + 8);
     doc.fontSize(9).fillColor(GRIS).font("Helvetica-Bold")
       .text(lbl, sx, sigY, { width: sigW, align: "center", lineBreak: false });
-    doc.rect(sx, sigY + 14, sigW, sigH).stroke("#d1d5db");
+    doc.rect(sx, sigY + 14, sigW, sigBoxH).stroke("#d1d5db");
   });
 
   await addFooters(doc, cooperativeId);
