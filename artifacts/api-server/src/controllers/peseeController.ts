@@ -374,7 +374,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       return;
     }
     req.log.error(err, "handleCreateSession");
-    res.status(500).json({ erreur: "Erreur création session" });
+    res.status(500).json({ erreur: (err as Error).message ?? "Erreur création session" });
   }
 }
 
