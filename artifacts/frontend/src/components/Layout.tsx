@@ -205,15 +205,17 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
   const nbMessagesNonLus = messagesNonLus?.count ?? 0;
 
   const estDelegue = utilisateur?.role === "delegue";
+  const REGLEMENTS_ROLES = ["pca", "directeur", "comptable", "caissier", "delegue"];
+  const peutVoirReglements = REGLEMENTS_ROLES.includes(utilisateur?.role ?? "");
   const { data: paiementsStats } = useGetPaiementsStats({
     query: {
       queryKey: getGetPaiementsStatsQueryKey(),
-      enabled: estDelegue,
+      enabled: peutVoirReglements,
       staleTime: 30_000,
       refetchInterval: 60_000,
     },
   });
-  const nbReglementsEnAttente = estDelegue ? (paiementsStats?.en_attente?.count ?? 0) : 0;
+  const nbReglementsEnAttente = peutVoirReglements ? (paiementsStats?.en_attente?.count ?? 0) : 0;
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#1a4731" }}>
