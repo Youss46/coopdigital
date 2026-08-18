@@ -2813,16 +2813,13 @@ function CompteAutocomplete({ value, onChange, placeholder, filter }: {
 }
 
 // ─── Types régularisations ────────────────────────────────────────────────────
-// SYSCOHADA OHADA : comptes régularisation
-// 408 = Fournisseurs, factures non parvenues (charges à payer)
-// 4487 = Clients, produits à recevoir  (souvent 418 en PCG français mais 4487 en SYSCOHADA)
-// 486 = Charges constatées d'avance
-// 487 = Produits constatés d'avance
+// Pas de défaut codé en dur — les numéros varient selon le plan de la coopérative.
+// L'utilisateur sélectionne depuis son plan via l'autocomplete.
 const TYPES_REGUL = [
-  { code: "408", label: "Charges à payer",             defaultRegul: "408",  exemple: "Facture énergie déc. non reçue",   compteHint: "6xx (charge)",  debitSide: "contrepartie" },
-  { code: "418", label: "Produits à recevoir",          defaultRegul: "4487", exemple: "Intérêts courus sur placement",    compteHint: "7xx (produit)", debitSide: "fixe" },
-  { code: "486", label: "Charges constatées d'avance",  defaultRegul: "486",  exemple: "Prime d'assurance payée pour N+1", compteHint: "6xx (charge)",  debitSide: "fixe" },
-  { code: "487", label: "Produits constatés d'avance",  defaultRegul: "487",  exemple: "Acompte reçu pour livraison N+1",  compteHint: "7xx (produit)", debitSide: "contrepartie" },
+  { code: "408", label: "Charges à payer",             defaultRegul: "", exemple: "Facture énergie déc. non reçue",   compteHint: "charge (ex: 6xx, 4486…)", debitSide: "contrepartie" },
+  { code: "418", label: "Produits à recevoir",          defaultRegul: "", exemple: "Intérêts courus sur placement",    compteHint: "produit (ex: 7xx, 4487…)",  debitSide: "fixe" },
+  { code: "486", label: "Charges constatées d'avance",  defaultRegul: "", exemple: "Prime d'assurance payée pour N+1", compteHint: "charge (ex: 6xx…)",         debitSide: "fixe" },
+  { code: "487", label: "Produits constatés d'avance",  defaultRegul: "", exemple: "Acompte reçu pour livraison N+1",  compteHint: "produit (ex: 7xx…)",        debitSide: "contrepartie" },
 ] as const;
 
 type TypeRegul = typeof TYPES_REGUL[number]["code"];
