@@ -697,6 +697,13 @@ export async function createRegularisation(req: Request, res: Response): Promise
       res.status(400).json({ erreur: "Champs manquants ou montant invalide" }); return;
     }
 
+    // Rejeter si l'exercice cible est clôturé
+    const [exCheck] = await db.select({ statut: exercicesTable.statut }).from(exercicesTable)
+      .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, Number(exercice))));
+    if (exCheck?.statut === "cloture") {
+      res.status(409).json({ erreur: `L'exercice ${exercice} est clôturé — saisie impossible` }); return;
+    }
+
     const compteFixe = (compteRegul ?? type).trim();
     const cfg = REGULARISATION_TYPES[type];
     const compteDebit  = cfg.debitSide  === "fixe" ? compteFixe : compteContrepartie;
@@ -1406,7 +1413,59 @@ export async function getGrandLivreTiers(req: Request, res: Response): Promise<v
   }
 }
 
-// ─── Statut des exercices ─────────────────────────────────────────────────────
+export async function getApercuAffectationResultat(req: Request, res: Response): Promise<void> {
+  try {
+    const coop  = coopId(req);
+    const annee = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : exerciceCourant() - 1;
+
+    // L'exercice doit être clôturé
+    const [exercice] = await db.select().from(exercicesTable)
+      .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, annee)));
+    if (!exercice || exercice.statut !== "cloture") {
+      res.status(400).json({ erreur: `L'exercice ${annee} n'est pas clôturé` }); return;
+    }
+
+    // Solde compte 131 (bénéfice net porté en clôture)
+    const soldeQ = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN compte_credit = '131' THEN montant_fcfa ELSE 0 END), 0)::bigint AS "credit131",
+        COALESCE(SUM(CASE WHEN compte_debit  = '131' THEN montant_fcfa ELSE 0 END), 0)::bigint AS "debit131",
+        COALESCE(SUM(CASE WHEN compte_credit = '139' THEN montant_fcfa ELSE 0 END), 0)::bigint AS "credit139",
+        COALESCE(SUM(CASE WHEN compte_debit  = '139' THEN montant_fcfa ELSE 0 END), 0)::bigint AS "debit139"
+      FROM ecritures_comptables
+      WHERE cooperative_id = ${coop} AND exercice = ${annee}
+        AND type_ecriture = 'cloture'
+    `);
+    const r = soldeQ.rows[0] as { credit131: number; debit131: number; credit139: number; debit139: number };
+    const solde131 = Number(r.credit131) - Number(r.debit131);
+    const solde139 = Number(r.credit139) - Number(r.debit139);
+
+    // Vérifier si une affectation a déjà été enregistrée en N+1
+    const affQ = await db.execute(sql`
+      SELECT id, date_ecriture AS "dateEcriture", libelle, compte_debit AS "compteDebit",
+             compte_credit AS "compteCredit", montant_fcfa AS "montantFcfa"
+      FROM   ecritures_comptables
+      WHERE  cooperative_id = ${coop}
+        AND  exercice = ${annee + 1}
+        AND  type_ecriture = 'affectation'
+      ORDER  BY id
+    `);
+    const dejaAffecte = affQ.rows.length > 0;
+
+    res.json({
+      exercice: annee,
+      solde131,
+      solde139,
+      compteResultat: solde131 >= solde139 ? "131" : "139",
+      dejaAffecte,
+      ecrituresAffectation: affQ.rows,
+    });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur getApercuAffectationResultat");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
 export async function getStatutsExercices(req: Request, res: Response): Promise<void> {
   try {
     const coop = coopId(req);
@@ -1417,6 +1476,127 @@ export async function getStatutsExercices(req: Request, res: Response): Promise<
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getStatutsExercices");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function affecterResultat(req: Request, res: Response): Promise<void> {
+  try {
+    const coop           = coopId(req);
+    const annee          = req.body.exercice        ? parseInt(String(req.body.exercice))        : null;
+    const dateAG         = String(req.body.dateAG   ?? "").trim();
+    const reserveLegale  = Math.round(Number(req.body.reserveLegale  ?? 0));
+    const reportANouveau = Math.round(Number(req.body.reportANouveau ?? 0));
+    const ristournes     = Math.round(Number(req.body.ristournes     ?? 0));
+
+    if (!annee || isNaN(annee)) { res.status(400).json({ erreur: "Exercice manquant" }); return; }
+    if (!dateAG || !/^\d{4}-\d{2}-\d{2}$/.test(dateAG)) {
+      res.status(400).json({ erreur: "Date de l'AG invalide (format YYYY-MM-DD requis)" }); return;
+    }
+    if (reserveLegale < 0 || reportANouveau < 0 || ristournes < 0) {
+      res.status(400).json({ erreur: "Les montants ne peuvent pas être négatifs" }); return;
+    }
+    const totalAffecte = reserveLegale + reportANouveau + ristournes;
+    if (totalAffecte === 0) { res.status(400).json({ erreur: "Au moins un poste d'affectation doit être renseigné" }); return; }
+
+    // L'exercice N doit être clôturé
+    const [exercice] = await db.select().from(exercicesTable)
+      .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, annee)));
+    if (!exercice || exercice.statut !== "cloture") {
+      res.status(400).json({ erreur: `L'exercice ${annee} doit être clôturé avant l'affectation` }); return;
+    }
+
+    // L'exercice N+1 ne doit pas être clôturé (on ne peut pas écrire dans un exercice verrouillé)
+    const [exerciceNPlus1] = await db.select({ statut: exercicesTable.statut }).from(exercicesTable)
+      .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, annee + 1)));
+    if (exerciceNPlus1?.statut === "cloture") {
+      res.status(409).json({ erreur: `L'exercice ${annee + 1} est déjà clôturé — impossible d'y écrire des écritures d'affectation` }); return;
+    }
+
+    // Solde 131 (calculé avant la transaction — lecture seule)
+    const soldeQ = await db.execute(sql`
+      SELECT
+        (COALESCE(SUM(CASE WHEN compte_credit = '131' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN compte_debit = '131'  THEN montant_fcfa ELSE 0 END), 0))::bigint AS "solde131"
+      FROM ecritures_comptables
+      WHERE cooperative_id = ${coop} AND exercice = ${annee} AND type_ecriture = 'cloture'
+    `);
+    const solde131 = Number((soldeQ.rows[0] as { solde131: number }).solde131);
+
+    if (solde131 <= 0) {
+      res.status(400).json({ erreur: `L'exercice ${annee} présente un déficit (compte 139) — l'affectation de bénéfice n'est pas applicable` }); return;
+    }
+    // Tolérance d'arrondi de 1 FCFA
+    if (Math.abs(totalAffecte - solde131) > 1) {
+      res.status(400).json({
+        erreur: `Le total affecté (${totalAffecte.toLocaleString("fr-FR")} FCFA) ne correspond pas au bénéfice net (${solde131.toLocaleString("fr-FR")} FCFA)`,
+      }); return;
+    }
+
+    const exoAffect = annee + 1;
+
+    type EntreeAff = {
+      cooperativeId: number; dateEcriture: string; numeroPiece: string | null;
+      libelle: string; compteDebit: string; compteCredit: string;
+      montantFcfa: number; source: "manuel"; sourceId: null;
+      exercice: number; typeEcriture: string;
+    };
+    const mk = (debit: string, credit: string, montant: number, libelle: string): EntreeAff[] => {
+      const m = Math.round(montant);
+      if (m <= 0) return [];
+      return [{ cooperativeId: coop, dateEcriture: dateAG, numeroPiece: `AFF-${annee}-AG`, libelle,
+                compteDebit: debit, compteCredit: credit, montantFcfa: m,
+                source: "manuel", sourceId: null, exercice: exoAffect, typeEcriture: "affectation" }];
+    };
+
+    const entries: EntreeAff[] = [
+      ...mk("131", "1061", reserveLegale,  `Réserve légale — affectation résultat ${annee}`),
+      ...mk("131", "110",  reportANouveau, `Report à nouveau — affectation résultat ${annee}`),
+      ...mk("131", "4461", ristournes,     `Ristournes membres — affectation résultat ${annee}`),
+    ];
+
+    if (entries.length === 0) { res.status(400).json({ erreur: "Aucune écriture à générer" }); return; }
+
+    // Insertion atomique : advisory lock par (coop, annee) pour éviter les doublons concurrents
+    let ecrituresGenerees = 0;
+    await db.transaction(async (tx) => {
+      // Lock exclusif pour cette coopérative + exercice source (libéré à la fin de la transaction)
+      const lockKey = (BigInt(coop) << 20n) | BigInt(annee % (1 << 20));
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${lockKey})`);
+
+      // Double-check à l'intérieur du verrou
+      const dup = await tx.execute(sql`
+        SELECT 1 FROM ecritures_comptables
+        WHERE cooperative_id = ${coop} AND exercice = ${exoAffect} AND type_ecriture = 'affectation'
+        LIMIT 1
+      `);
+      if (dup.rows.length > 0) {
+        throw Object.assign(new Error("DUPLICATE_AFFECTATION"), { status: 409 });
+      }
+
+      await tx.insert(ecrituresComptablesTable).values(entries);
+      ecrituresGenerees = entries.length;
+
+      // Créer exercice N+1 s'il n'existe pas encore
+      if (!exerciceNPlus1) {
+        await tx.insert(exercicesTable).values({ cooperativeId: coop, annee: exoAffect, statut: "ouvert" });
+      }
+    });
+
+    res.json({
+      message: `Affectation du résultat ${annee} enregistrée avec succès`,
+      exercice: annee,
+      dateAG,
+      solde131,
+      affectation: { reserveLegale, reportANouveau, ristournes, total: totalAffecte },
+      ecrituresGenerees,
+    });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    if ((err as Error & { status?: number }).status === 409) {
+      res.status(409).json({ erreur: `Une affectation du résultat ${req.body.exercice} existe déjà` }); return;
+    }
+    req.log.error({ err }, "Erreur affecterResultat");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

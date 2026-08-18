@@ -2751,7 +2751,14 @@ interface ApercuCloture {
   regularisations?: { libelle: string; compteDebit: string; compteCredit: string; montantFcfa: number }[];
 }
 
-// ─── Autocomplete compte du plan comptable ───────────────────────────────────
+interface ApercuAffectation {
+  exercice: number;
+  solde131: number;
+  solde139: number;
+  compteResultat: string;
+  dejaAffecte: boolean;
+  ecrituresAffectation: { dateEcriture: string; libelle: string; compteDebit: string; compteCredit: string; montantFcfa: number }[];
+}
 function CompteAutocomplete({ value, onChange, placeholder, filter }: {
   value: string;
   onChange: (val: string) => void;
@@ -2851,6 +2858,13 @@ function OngletCloture() {
   const [rLoading,   setRLoading]   = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  // ── Affectation du résultat ────────────────────────────────────────────────
+  const [dateAG, setDateAG]                 = useState(() => `${anneeActuelle}-03-31`);
+  const [reserveLegale, setReserveLegale]   = useState(0);
+  const [reportANouveau, setReportANouveau] = useState(0);
+  const [ristournes, setRistournes]         = useState(0);
+  const [loadingAff, setLoadingAff]         = useState(false);
+
   const handleSetRType = (code: TypeRegul) => {
     setRType(code);
     setRCompteRegul(TYPES_REGUL.find((t) => t.code === code)?.defaultRegul ?? code);
@@ -2915,6 +2929,31 @@ function OngletCloture() {
   const ap = apercu.data;
   const statutAnnee = ap?.statut ?? exercices?.find((e) => e.annee === annee)?.statut;
   const deja = statutAnnee === "cloture";
+
+  const apercuAff = useQuery({
+    queryKey: ["affectation-resultat-apercu", annee],
+    queryFn: () => apiFetch<ApercuAffectation>(`/api/comptabilite/affectation-resultat?exercice=${annee}`),
+    enabled: deja,
+    retry: false,
+  });
+
+  const handleAffectation = async () => {
+    setLoadingAff(true);
+    try {
+      const res = await apiPost<{ message: string; ecrituresGenerees: number; affectation: { reserveLegale: number; reportANouveau: number; ristournes: number; total: number } }>(
+        "/api/comptabilite/affectation-resultat",
+        { exercice: annee, dateAG, reserveLegale, reportANouveau, ristournes },
+      );
+      toast({ title: `✅ Affectation enregistrée`, description: `${res.ecrituresGenerees} écriture${res.ecrituresGenerees > 1 ? "s" : ""} générée${res.ecrituresGenerees > 1 ? "s" : ""}` });
+      void apercuAff.refetch();
+      void qc.invalidateQueries({ queryKey: ["grand-livre"] });
+      void qc.invalidateQueries({ queryKey: ["balance"] });
+    } catch (err) {
+      toast({ title: "Erreur lors de l'affectation", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setLoadingAff(false);
+    }
+  };
 
   const handleCloture = async () => {
     setLoading(true);
@@ -3276,6 +3315,100 @@ function OngletCloture() {
           <Lock size={16} /> L'exercice {annee} est déjà clôturé — journal verrouillé.
         </div>
       )}
+
+      {/* Affectation du résultat après AG */}
+      {deja && (() => {
+        const aff = apercuAff.data;
+        if (apercuAff.isLoading) return (
+          <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-5 w-5 border-2 border-green-600 border-t-transparent" /></div>
+        );
+        if (!aff || aff.solde131 <= 0) return null;
+
+        const beneficeNet = aff.solde131;
+        const totalSaisi  = reserveLegale + reportANouveau + ristournes;
+        const ecartFcfa   = totalSaisi - beneficeNet;
+        const ok          = Math.abs(ecartFcfa) <= 1;
+        const reserveMin  = Math.ceil(beneficeNet * 0.05);
+
+        if (aff.dejaAffecte) return (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              <CheckCheck size={15} className="text-green-600" /> Affectation du résultat {annee} — enregistrée
+            </h3>
+            <div className="divide-y divide-gray-50">
+              {aff.ecrituresAffectation.map((e, i) => (
+                <div key={i} className="flex items-center justify-between py-2 text-sm">
+                  <span className="text-gray-600">{e.libelle}</span>
+                  <span className="font-mono text-gray-800">{FCFA(e.montantFcfa)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-3">Comptes 131 → 1061 / 110 / 4461 • exercice {annee + 1}</p>
+          </div>
+        );
+
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
+              <Scale size={15} className="text-green-700" /> Affectation du résultat {annee} — après AG
+            </h3>
+            <p className="text-sm text-gray-500 mb-5">
+              Enregistre les décisions de l'assemblée générale : mise en réserve, report à nouveau et ristournes aux membres.
+              Les écritures (131 → 1061 / 110 / 4461) seront datées à la date de l'AG et imputées à l'exercice {annee + 1}.
+            </p>
+
+            <div className="flex items-center justify-between px-4 py-3 bg-green-50 border border-green-200 rounded-lg mb-5">
+              <span className="text-sm font-medium text-green-800">Bénéfice net {annee} (compte 131)</span>
+              <span className="text-sm font-bold text-green-700 font-mono">+{FCFA(beneficeNet)}</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Date de l'AG</label>
+                <input type="date" value={dateAG} onChange={(e) => setDateAG(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-green-700" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Réserve légale (1061) <span className="text-gray-400">— min. 5&nbsp;% recommandé</span>
+                </label>
+                <MoneyInput value={reserveLegale} onChange={setReserveLegale} className="w-full" placeholder="0" />
+                {reserveLegale > 0 && reserveLegale < reserveMin && (
+                  <p className="text-xs text-amber-600 mt-1">⚠ Minimum OHADA recommandé : {FCFA(reserveMin)}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Report à nouveau (110)</label>
+                <MoneyInput value={reportANouveau} onChange={setReportANouveau} className="w-full" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Ristournes membres (4461)</label>
+                <MoneyInput value={ristournes} onChange={setRistournes} className="w-full" placeholder="0" />
+              </div>
+            </div>
+
+            <div className={`flex items-center justify-between px-4 py-3 rounded-lg mb-5 border ${ok ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}`}>
+              <span className="text-sm font-medium text-gray-700">Total affecté</span>
+              <span className={`text-sm font-bold font-mono ${ok ? "text-green-700" : "text-amber-700"}`}>
+                {FCFA(totalSaisi)}
+                {!ok && <span className="ml-2 text-xs font-normal">({ecartFcfa > 0 ? "+" : ""}{FCFA(ecartFcfa)} vs bénéfice)</span>}
+              </span>
+            </div>
+
+            <button
+              onClick={() => void handleAffectation()}
+              disabled={loadingAff || !ok || !dateAG}
+              className="flex items-center gap-2 px-5 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
+              {loadingAff
+                ? <><div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" /> Enregistrement…</>
+                : <><CheckCheck size={14} /> Enregistrer l'affectation</>}
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
