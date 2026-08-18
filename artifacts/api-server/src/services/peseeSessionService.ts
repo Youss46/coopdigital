@@ -552,8 +552,9 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
     void envoyerNotificationsReception(cooperativeId, result.transfert, result.poidsPeseKg, result.ecartKg, result.pctEcart, sessionId);
 
     // Commission délégué sur poids net pesé — uniquement si réception confirmée (pas de litige)
+    // Awaited pour garantir que la commission est en DB avant que le PDF soit généré.
     if (result.statutFinal === "confirme" && result.transfert.delegueId) {
-      void creerCommissionTransfert(
+      await creerCommissionTransfert(
         detail.transfertId!,
         result.transfert.delegueId,
         result.transfert.campagneId ?? null,

@@ -44,6 +44,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
 import { computeCodeMembre } from "./portailService";
 import { getMontantAlimentationsCaisseDelegue } from "./delegueService";
+import { getTauxActif } from "./commissionService";
 
 const VERT = "#1a4731";
 const OR   = "#c4962a";
@@ -3952,6 +3953,7 @@ export async function generateBordereauAchatSession(
   let carburantFcfa    = 0;
   let modeFinancement  = "fonds_propres";
   let delegueIdSession: number | null = null;
+  let transfertCharges: { carburantPar: string; carburantFcfa: number; autresFcfa: number; autresPar: string } | null = null;
 
   if (session.transfertId) {
     const [t] = await db
@@ -3960,6 +3962,9 @@ export async function generateBordereauAchatSession(
         nomChauffeur:       transfertsStockTable.nomChauffeur,
         delegueId:          transfertsStockTable.delegueId,
         fraisCarburantFcfa: transfertsStockTable.fraisCarburantFcfa,
+        fraisCarburantPar:  transfertsStockTable.fraisCarburantPar,
+        autresChargesFcfa:  transfertsStockTable.autresChargesFcfa,
+        autresChargesPar:   transfertsStockTable.autresChargesPar,
         modeFinancement:    transfertsStockTable.modeFinancement,
       })
       .from(transfertsStockTable)
@@ -3971,6 +3976,12 @@ export async function generateBordereauAchatSession(
       nomChauffeur    = t.nomChauffeur    ?? "—";
       carburantFcfa   = t.fraisCarburantFcfa ?? 0;
       modeFinancement = t.modeFinancement ?? "fonds_propres";
+      transfertCharges = {
+        carburantPar:  t.fraisCarburantPar  ?? "cooperative",
+        carburantFcfa: t.fraisCarburantFcfa ?? 0,
+        autresFcfa:    t.autresChargesFcfa  ?? 0,
+        autresPar:     t.autresChargesPar   ?? "cooperative",
+      };
 
       if (t.delegueId) {
         delegueIdSession = t.delegueId;
@@ -4007,6 +4018,8 @@ export async function generateBordereauAchatSession(
   const prixUnitaire = dernierPrix ? parseFloat(dernierPrix.prix) : 0;
 
   // 5. Commission = frais de collecte
+  // Cherche d'abord le record en DB (créé juste après terminerSession).
+  // Fallback : calcule directement depuis le taux actif si le record n'existe pas encore.
   let fraisCollecteFcfa = 0;
   if (session.transfertId) {
     const [comm] = await db
@@ -4015,7 +4028,20 @@ export async function generateBordereauAchatSession(
       .where(eq(commissionsDeleguesTable.transfertId, session.transfertId))
       .orderBy(desc(commissionsDeleguesTable.id))
       .limit(1);
-    if (comm) fraisCollecteFcfa = Math.round(parseFloat(comm.montantFcfa ?? "0"));
+    if (comm) {
+      fraisCollecteFcfa = Math.round(parseFloat(comm.montantFcfa ?? "0"));
+    } else if (delegueIdSession) {
+      // Fallback : taux × poids net − charges coopérative (même logique que creerCommissionTransfert)
+      const campagneActuelle = await getCampagneEnCours(cooperativeId);
+      const taux = await getTauxActif(cooperativeId, campagneActuelle?.id ?? null, delegueIdSession);
+      if (taux) {
+        const poidsNetPourCommission = parseFloat(session.poidsTotalKg ?? "0");
+        const brut = Math.round(poidsNetPourCommission * taux.tauxFcfaParKg);
+        const chargesCoopCarb  = transfertCharges?.carburantPar  === "cooperative" ? (transfertCharges.carburantFcfa ?? 0) : 0;
+        const chargesCoopAutre = transfertCharges?.autresPar     === "cooperative" ? (transfertCharges.autresFcfa   ?? 0) : 0;
+        fraisCollecteFcfa = Math.max(0, brut - chargesCoopCarb - chargesCoopAutre);
+      }
+    }
   }
 
   // 6. Avances du délégué + montant caisse coopérative crédité avant la session
