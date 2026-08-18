@@ -576,7 +576,7 @@ export default function Membres() {
             <span className="text-sm font-semibold text-purple-800">🏪 Fournisseurs externes occasionnels</span>
             <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">{fournisseursExternes.length}</span>
           </div>
-          <div className="bg-white rounded-xl border border-purple-100 overflow-x-auto">
+          <div className="bg-white rounded-xl border border-purple-100 overflow-x-auto overflow-y-auto max-h-48">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-purple-50">
