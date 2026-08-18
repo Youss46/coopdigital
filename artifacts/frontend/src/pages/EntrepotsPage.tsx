@@ -170,6 +170,7 @@ export default function EntrepotsPage() {
   const [showTransfert, setShowTransfert] = useState<Entrepot | null>(null);
   const [formTransfert, setFormTransfert] = useState({
     poidsKg: "",
+    nombreSacs: "",
     typeTransport: "cooperatif" as "cooperatif" | "location",
     vehiculeId: "",
     chauffeurId: "",
@@ -289,7 +290,7 @@ export default function EntrepotsPage() {
       qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
       qc.invalidateQueries({ queryKey: ["transferts"] });
       setShowTransfert(null);
-      setFormTransfert({ poidsKg: "", typeTransport: "cooperatif", vehiculeId: "", chauffeurId: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
+      setFormTransfert({ poidsKg: "", nombreSacs: "", typeTransport: "cooperatif", vehiculeId: "", chauffeurId: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
       toast({ title: "Transfert lancé", description: "Le stock est en transit vers le magasin central." });
     },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -443,7 +444,7 @@ export default function EntrepotsPage() {
                       <button
                         onClick={() => {
                           setShowTransfert(e);
-                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", typeTransport: "cooperatif", vehiculeId: "", chauffeurId: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
+                          setFormTransfert({ poidsKg: e.stockActuelKg ? String(Math.floor(parseFloat(e.stockActuelKg))) : "", nombreSacs: "", typeTransport: "cooperatif", vehiculeId: "", chauffeurId: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "", notes: "", fraisCarburantFcfa: "", fraisCarburantPar: "cooperative", autresChargesFcfa: "", autresChargesLibelle: "", autresChargesPar: "cooperative", modeFinancement: "fonds_propres" });
                         }}
                         className="mt-3 w-full flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors">
                         <Truck className="w-3.5 h-3.5" />
@@ -748,20 +749,35 @@ export default function EntrepotsPage() {
             </div>
 
             <div className="space-y-3">
-              {/* Poids */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Poids à transférer (kg) *
-                </label>
-                <input
-                  type="number" min="1" step="1"
-                  max={parseFloat(showTransfert.stockActuelKg)}
-                  placeholder={`max ${Math.floor(parseFloat(showTransfert.stockActuelKg))} kg`}
-                  value={formTransfert.poidsKg}
-                  onChange={(e) => setFormTransfert(f => ({ ...f, poidsKg: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                />
-                {formTransfert.poidsKg && (() => {
+              {/* Poids + Sacs */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Poids à transférer (kg) *
+                  </label>
+                  <input
+                    type="number" min="1" step="1"
+                    max={parseFloat(showTransfert.stockActuelKg)}
+                    placeholder={`max ${Math.floor(parseFloat(showTransfert.stockActuelKg))} kg`}
+                    value={formTransfert.poidsKg}
+                    onChange={(e) => setFormTransfert(f => ({ ...f, poidsKg: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nombre de sacs *
+                  </label>
+                  <input
+                    type="number" min="1" step="1"
+                    placeholder="ex. 120"
+                    value={formTransfert.nombreSacs}
+                    onChange={(e) => setFormTransfert(f => ({ ...f, nombreSacs: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+              </div>
+              {formTransfert.poidsKg && (() => {
                   const max = parseFloat(showTransfert.stockActuelKg);
                   const v = parseFloat(formTransfert.poidsKg);
                   if (v > max) return <p className="text-xs text-red-600 mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Dépasse le stock disponible ({kg(max)})</p>;
@@ -769,7 +785,6 @@ export default function EntrepotsPage() {
                   const reste = max - v;
                   return <p className="text-xs text-gray-500 mt-1">Stock restant après transfert : <span className="font-medium text-gray-700">{kg(reste)}</span></p>;
                 })()}
-              </div>
 
               {/* Mode de transport */}
               <div className="border border-gray-200 rounded-xl p-4 space-y-3">
@@ -967,6 +982,8 @@ export default function EntrepotsPage() {
                   !formTransfert.poidsKg ||
                   parseFloat(formTransfert.poidsKg) <= 0 ||
                   parseFloat(formTransfert.poidsKg) > parseFloat(showTransfert.stockActuelKg) ||
+                  !formTransfert.nombreSacs ||
+                  parseInt(formTransfert.nombreSacs) <= 0 ||
                   (formTransfert.typeTransport === "cooperatif" && (!formTransfert.vehiculeId || !formTransfert.chauffeurId)) ||
                   mutTransfert.isPending
                 }
@@ -988,6 +1005,7 @@ export default function EntrepotsPage() {
                     id: showTransfert.id,
                     body: {
                       poidsKg: parseFloat(formTransfert.poidsKg),
+                      nombreSacs: parseInt(formTransfert.nombreSacs),
                       typeTransport: formTransfert.typeTransport,
                       ...transportBody,
                       notes: formTransfert.notes || undefined,

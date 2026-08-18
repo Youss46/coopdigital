@@ -884,6 +884,7 @@ export async function creerTransfertAdmin(
   adminId: number,
   data: {
     poidsKg: number;
+    nombreSacs?: number;
     typeTransport?: string;
     vehiculeId?: number;
     chauffeurId?: number;
@@ -934,6 +935,7 @@ export async function creerTransfertAdmin(
       cooperativeId,
       campagneId: data.campagneId ?? null,
       poidsDepart_kg: String(data.poidsKg),
+      nombreSacs: data.nombreSacs ?? null,
       typeVehicule: data.typeVehicule ?? null,
       immatriculation: data.immatriculation ?? null,
       nomChauffeur: data.nomChauffeur ?? null,
