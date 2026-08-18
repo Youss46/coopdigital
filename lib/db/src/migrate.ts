@@ -69,6 +69,34 @@ async function applyHotfixes(client: pg.Client): Promise<void> {
     )`,
     // Colonne ajoutée après la création initiale de la table
     `ALTER TABLE commissions_membres_delegues ADD COLUMN IF NOT EXISTS retenue_avances_fcfa integer NOT NULL DEFAULT 0`,
+
+    // ── Bons de réception membres délégués ──────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS bons_reception_membres_delegues (
+      id                      serial PRIMARY KEY,
+      cooperative_id          integer NOT NULL REFERENCES cooperatives(id),
+      membre_delegue_id       integer NOT NULL REFERENCES membres(id),
+      magasinier_id           integer REFERENCES users(id),
+      statut                  text NOT NULL DEFAULT 'en_attente_pesee',
+      poids_declare_kg        numeric(10,2),
+      nombre_sacs_declares    integer,
+      type_transport          text NOT NULL DEFAULT 'externe',
+      vehicule_id             integer REFERENCES vehicules(id),
+      chauffeur_id            integer REFERENCES chauffeurs(id),
+      type_vehicule           text,
+      immatriculation         text,
+      nom_chauffeur           text,
+      telephone_chauffeur     text,
+      frais_carburant_fcfa    integer NOT NULL DEFAULT 0,
+      autres_charges_fcfa     integer NOT NULL DEFAULT 0,
+      autres_charges_libelle  text,
+      notes                   text,
+      session_pesee_id        integer,
+      created_at              timestamptz NOT NULL DEFAULT now(),
+      updated_at              timestamptz NOT NULL DEFAULT now()
+    )`,
+
+    // Colonne sur sessions_pesee pour lier à un bon de réception
+    `ALTER TABLE sessions_pesee ADD COLUMN IF NOT EXISTS bon_reception_id integer`,
   ];
 
   for (const sql of hotfixes) {

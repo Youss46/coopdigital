@@ -68,6 +68,7 @@ import primesRouter from "./primes";
 import stationRouter from "./station";
 import chargesDiversesRouter from "./charges_diverses";
 import commissionsMembresDelaguesRouter from "./commissions_membres_delegues";
+import bonsReceptionRouter from "./bons_reception";
 
 const router: IRouter = Router();
 
@@ -145,5 +146,6 @@ router.use(certificationsRouter);
 router.use(primesRouter);
 router.use(chargesDiversesRouter);
 router.use(commissionsMembresDelaguesRouter);
+router.use(bonsReceptionRouter);
 
 export default router;

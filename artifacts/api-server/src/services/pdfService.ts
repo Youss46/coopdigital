@@ -34,6 +34,7 @@ import {
   campagnesTable,
   commissionsDeleguesTable,
   commissionsMembresDelaguesTable,
+  bonsReceptionMembresDeleguesTable,
   remboursementsAvancesDeleguesTable,
   certificationsTable,
   certificationsMembresTable,
@@ -3928,6 +3929,7 @@ export async function generateBordereauAchatSession(
       nbSacsTotal:        sessionsPeseeTable.nbSacsTotal,
       dateFin:            sessionsPeseeTable.dateFin,
       transfertId:        sessionsPeseeTable.transfertId,
+      bonReceptionId:     sessionsPeseeTable.bonReceptionId,
       membreId:           sessionsPeseeTable.membreId,
       certificationCacao: sessionsPeseeTable.certificationCacao,
       createdAt:          sessionsPeseeTable.createdAt,
@@ -3962,6 +3964,11 @@ export async function generateBordereauAchatSession(
   // Vrai quand la session appartient à un membre catégorisé "délégué de localités"
   // → même format bordereau que les délégués terrain, sans camion/chauffeur
   let estDelegueMembre = false;
+  // Déclarées tôt car utilisées dans le bloc estDelegueMembre AVANT d'être (ré)initialisées
+  // dans la section "5. Commission" / "6. Avances" plus bas.
+  let fraisCollecteFcfa  = 0;
+  let soldeAvancesFcfa   = 0;
+  let retenueAvancesFcfa = 0;
 
   if (session.transfertId) {
     const [t] = await db
@@ -4036,6 +4043,26 @@ export async function generateBordereauAchatSession(
       delegueTel       = membreDelegue.telephone ?? "—";
       delegueZone      = membreDelegue.section   ?? "—";
 
+      // Frais de transport depuis le bon de réception (si créé par le magasinier)
+      if (session.bonReceptionId) {
+        const [bon] = await db
+          .select({
+            immatriculation:      bonsReceptionMembresDeleguesTable.immatriculation,
+            nomChauffeur:         bonsReceptionMembresDeleguesTable.nomChauffeur,
+            fraisCarburantFcfa:   bonsReceptionMembresDeleguesTable.fraisCarburantFcfa,
+            autresChargesFcfa:    bonsReceptionMembresDeleguesTable.autresChargesFcfa,
+          })
+          .from(bonsReceptionMembresDeleguesTable)
+          .where(eq(bonsReceptionMembresDeleguesTable.id, session.bonReceptionId))
+          .limit(1);
+        if (bon) {
+          immatriculation   = bon.immatriculation ?? "—";
+          nomChauffeur      = bon.nomChauffeur    ?? "—";
+          carburantFcfa     = Number(bon.fraisCarburantFcfa ?? 0);
+          autresChargesFcfa = Number(bon.autresChargesFcfa  ?? 0);
+        }
+      }
+
       // Commission pour ce membre délégué (créée à terminerSession)
       const [commMembre] = await db
         .select({
@@ -4095,7 +4122,7 @@ export async function generateBordereauAchatSession(
   // On lit montantBrutFcfa pour afficher la commission brute, indépendamment des
   // éventuelles charges de transport qui sont déduites séparément sur le bordereau.
   // Fallback : taux × poids net si le record n'existe pas encore.
-  let fraisCollecteFcfa = 0;
+  fraisCollecteFcfa = 0;
   if (session.transfertId) {
     const [comm] = await db
       .select({
@@ -4123,8 +4150,8 @@ export async function generateBordereauAchatSession(
   }
 
   // 6. Avances du délégué + montant caisse coopérative crédité avant la session
-  let soldeAvancesFcfa   = 0;
-  let retenueAvancesFcfa = 0;   // retenue réelle déjà opérée sur cette commission
+  soldeAvancesFcfa   = 0;
+  retenueAvancesFcfa = 0;       // retenue réelle déjà opérée sur cette commission
   let montantCoopFcfa    = 0;   // total alimentations caisse avant session (mode caisse_cooperative)
 
   if (delegueIdSession) {

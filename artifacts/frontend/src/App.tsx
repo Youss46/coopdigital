@@ -18,6 +18,7 @@ import PrimesPage from "@/pages/PrimesPage";
 import NouvelleLivraison from "@/pages/NouvelleLivraison";
 import LivraisonsPage from "@/pages/LivraisonsPage";
 import SessionsPeseePage from "@/pages/SessionsPeseePage";
+import BonsReceptionMembresDeleguesPage from "@/pages/BonsReceptionMembresDeleguesPage";
 import MesPeseursPage from "@/pages/MesPeseursPage";
 import PeseursPage from "@/pages/PeseursPage";
 import TracabilitePage from "@/pages/TracabilitePage";
@@ -153,6 +154,9 @@ function AppRoutes() {
       </Route>
       <Route path="/sessions-pesee">
         <ProtectedRoute component={SessionsPeseePage} />
+      </Route>
+      <Route path="/bons-reception-membres">
+        <ProtectedRoute component={BonsReceptionMembresDeleguesPage} />
       </Route>
       <Route path="/tracabilite">
         <ProtectedRoute component={TracabilitePage} />

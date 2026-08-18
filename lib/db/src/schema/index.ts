@@ -64,3 +64,4 @@ export * from "./primes";
 export * from "./rapports_ia";
 export * from "./charges_diverses";
 export * from "./avances_delegues";
+export * from "./bons_reception_membres_delegues";

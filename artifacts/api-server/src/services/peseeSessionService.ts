@@ -13,6 +13,7 @@ import {
   entrepotsTable,
   entrepotsDeleguesTable,
   usersTable,
+  bonsReceptionMembresDeleguesTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, gte, lte, isNull, inArray } from "drizzle-orm";
 import { getPrixActuel } from "./terrainService.js";
@@ -161,6 +162,15 @@ export class SessionEnCoursError extends Error {
   }
 }
 
+/** Thrown when a weighing session already exists for the given bon de réception. */
+export class SessionBonExistanteError extends Error {
+  readonly code = "SESSION_BON_EXISTANTE";
+  constructor(public readonly sessionId: number) {
+    super(`Une session de pesée est déjà associée à ce bon de réception (session #${sessionId})`);
+    this.name = "SessionBonExistanteError";
+  }
+}
+
 /** Thrown when a weighing session already exists for the given transfer. */
 export class SessionTransfertExistanteError extends Error {
   readonly code = "SESSION_TRANSFERT_EXISTANTE";
@@ -183,10 +193,67 @@ export async function createSession(
     notes?: string;
     /** ID du transfert pour une session de type 'reception_transfert' */
     transfertId?: number;
+    /** ID du bon de réception membre délégué */
+    bonReceptionId?: number;
     /** Certification du cacao : 'RA' | 'FAIRTRADE' | 'ASR_1000' | 'ORDINAIRE' */
     certificationCacao?: string;
   },
 ) {
+  // ── Cas 0 : session liée à un bon de réception membre délégué ────────────
+  if (data.bonReceptionId) {
+    const bonId = data.bonReceptionId;
+
+    const [bon] = await db
+      .select({
+        id:               bonsReceptionMembresDeleguesTable.id,
+        statut:           bonsReceptionMembresDeleguesTable.statut,
+        membreDelegueId:  bonsReceptionMembresDeleguesTable.membreDelegueId,
+        sessionPeseeId:   bonsReceptionMembresDeleguesTable.sessionPeseeId,
+        cooperativeId:    bonsReceptionMembresDeleguesTable.cooperativeId,
+      })
+      .from(bonsReceptionMembresDeleguesTable)
+      .where(and(
+        eq(bonsReceptionMembresDeleguesTable.id, bonId),
+        eq(bonsReceptionMembresDeleguesTable.cooperativeId, cooperativeId),
+      ))
+      .limit(1);
+
+    if (!bon) throw new Error("Bon de réception introuvable");
+    if (bon.statut !== "en_attente_pesee") {
+      if (bon.sessionPeseeId) throw new SessionBonExistanteError(bon.sessionPeseeId);
+      throw new Error(`Le bon doit être en statut 'en_attente_pesee' pour démarrer une pesée (statut actuel : ${bon.statut})`);
+    }
+
+    const numeroSession = await generateNumeroSession(cooperativeId);
+    const [session] = await db
+      .insert(sessionsPeseeTable)
+      .values({
+        cooperativeId,
+        numeroSession,
+        membreId:       bon.membreDelegueId,
+        fournisseurId:  null,
+        produit:        data.produit ?? "cacao",
+        operation:      "reception_membre_delegue",
+        peseurId:       data.peseurId,
+        balanceId:      data.balanceId,
+        notes:          data.notes,
+        bonReceptionId: bonId,
+      })
+      .returning();
+
+    // Lier le bon à la session (optimiste — si une race condition survient, le peseur verra l'erreur)
+    await db
+      .update(bonsReceptionMembresDeleguesTable)
+      .set({ statut: "en_pesee", sessionPeseeId: session!.id, updatedAt: new Date() })
+      .where(and(
+        eq(bonsReceptionMembresDeleguesTable.id, bonId),
+        eq(bonsReceptionMembresDeleguesTable.statut, "en_attente_pesee"),
+      ));
+
+    logger.info({ bonId, sessionId: session!.id }, "Session pesée créée depuis bon réception membre délégué");
+    return session!;
+  }
+
   // ── Cas 1 : session de réception de transfert (atomique) ─────────────────
   if (data.transfertId) {
     const transfertId = data.transfertId;
@@ -428,8 +495,9 @@ export async function getSessionDetail(cooperativeId: number, sessionId: number)
       dateDebut: sessionsPeseeTable.dateDebut,
       dateFin: sessionsPeseeTable.dateFin,
       notes: sessionsPeseeTable.notes,
-      livraisonId: sessionsPeseeTable.livraisonId,
-      transfertId: sessionsPeseeTable.transfertId,
+      livraisonId:    sessionsPeseeTable.livraisonId,
+      transfertId:    sessionsPeseeTable.transfertId,
+      bonReceptionId: sessionsPeseeTable.bonReceptionId,
       createdAt: sessionsPeseeTable.createdAt,
       // ── Contexte transfert (#15) ──────────────────────────────────────
       transfertNumero:           transfertsStockTable.numeroTransfert,
@@ -633,6 +701,14 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
         );
       }
     }
+  }
+
+  // Clôturer le bon de réception s'il y en a un
+  if (detail.bonReceptionId) {
+    await db
+      .update(bonsReceptionMembresDeleguesTable)
+      .set({ statut: "terminee", updatedAt: new Date() })
+      .where(eq(bonsReceptionMembresDeleguesTable.id, detail.bonReceptionId));
   }
 
   return { ...detail, statut: "terminee" as const, dateFin: updated?.dateFin };

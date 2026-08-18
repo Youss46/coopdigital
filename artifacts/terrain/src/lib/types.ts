@@ -376,6 +376,34 @@ export interface EnqueteDetail {
   membres: EnqueteMembre[];
 }
 
+// ─── Bons de réception membres délégués de localités ─────────────────────────
+
+export interface BonReceptionMembre {
+  id: number;
+  cooperativeId: number;
+  membreDelegueId: number;
+  membreNom: string | null;
+  membrePrenoms: string | null;
+  membreTel: string | null;
+  membreSection: string | null;
+  statut: "en_attente_pesee" | "en_pesee" | "terminee" | "annulee";
+  poidsDeclaraKg: number | null;
+  nombreSacsDeclares: number | null;
+  typeTransport: "cooperatif" | "externe";
+  vehiculeId: number | null;
+  chauffeurId: number | null;
+  typeVehicule: string | null;
+  immatriculation: string | null;
+  nomChauffeur: string | null;
+  telephoneChauffeur: string | null;
+  fraisCarburantFcfa: number;
+  autresChargesFcfa: number;
+  autresChargesLibelle: string | null;
+  notes: string | null;
+  sessionPeseeId: number | null;
+  createdAt: string;
+}
+
 // ─── Sessions de pesée ────────────────────────────────────────────────────────
 
 export interface LignePesee {
@@ -412,6 +440,8 @@ export interface SessionPesee {
   livraisonId: number | null;
   /** Pour les sessions de type 'reception_transfert' */
   transfertId?: number | null;
+  /** Pour les sessions de type 'reception_membre_delegue' */
+  bonReceptionId?: number | null;
   /** Certification du cacao déclarée par le peseur */
   certificationCacao?: string | null;
   createdAt: string;

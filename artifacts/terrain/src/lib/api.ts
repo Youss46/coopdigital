@@ -407,6 +407,8 @@ export async function createSessionPesee(data: {
   produit?: string; operation?: string; notes?: string;
   /** Pour les sessions de réception de transfert */
   transfertId?: number;
+  /** Pour les sessions de réception membre délégué */
+  bonReceptionId?: number;
   /** Certification du cacao : 'RA' | 'FAIRTRADE' | 'ASR_1000' | 'ORDINAIRE' */
   certificationCacao?: string;
 }): Promise<import("./types").SessionPesee> {
@@ -444,6 +446,12 @@ export async function createSessionPesee(data: {
 }
 
 // ─── Transferts en attente de pesée (peseur central) ─────────────────────────
+
+// ─── Bons de réception membres délégués (peseur central) ─────────────────────
+
+export async function getBonsReceptionEnAttente(): Promise<import("./types").BonReceptionMembre[]> {
+  return apiPeseeFetch<import("./types").BonReceptionMembre[]>("/terrain/bons-reception/en-attente");
+}
 
 export async function getTransfertsEnAttentePesee(): Promise<import("./types").TransfertEnAttente[]> {
   return apiPeseeFetch<import("./types").TransfertEnAttente[]>("/terrain/transferts/en_attente_pesee");
