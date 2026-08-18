@@ -185,7 +185,8 @@ export async function creerTransfertAdminHandler(req: Request, res: Response): P
   if (!coop) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
   const id = Number(req.params["id"]);
   if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
-  const { poidsKg, typeVehicule, immatriculation, nomChauffeur, telephoneChauffeur, transporteur, notes,
+  const { poidsKg, typeTransport, vehiculeId, chauffeurId,
+    typeVehicule, immatriculation, nomChauffeur, telephoneChauffeur, transporteur, notes,
     fraisCarburantFcfa, fraisCarburantPar, autresChargesFcfa, autresChargesLibelle, autresChargesPar,
     modeFinancement } =
     req.body as Record<string, unknown>;
@@ -196,6 +197,9 @@ export async function creerTransfertAdminHandler(req: Request, res: Response): P
   try {
     const t = await svc.creerTransfertAdmin(id, coop, req.user!.id, {
       poidsKg: Number(poidsKg),
+      typeTransport: typeTransport ? String(typeTransport) : undefined,
+      vehiculeId: vehiculeId ? Number(vehiculeId) : undefined,
+      chauffeurId: chauffeurId ? Number(chauffeurId) : undefined,
       typeVehicule: typeVehicule ? String(typeVehicule) : undefined,
       immatriculation: immatriculation ? String(immatriculation) : undefined,
       nomChauffeur: nomChauffeur ? String(nomChauffeur) : undefined,

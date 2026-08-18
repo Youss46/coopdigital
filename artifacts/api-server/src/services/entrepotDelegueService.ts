@@ -8,6 +8,7 @@ import {
   entrepotsTable,
   mouvementsStockTable,
   sessionsPeseeTable,
+  missionsTransportTable,
 } from "@workspace/db";
 import { and, eq, desc, sql, count, sum } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
@@ -883,6 +884,9 @@ export async function creerTransfertAdmin(
   adminId: number,
   data: {
     poidsKg: number;
+    typeTransport?: string;
+    vehiculeId?: number;
+    chauffeurId?: number;
     typeVehicule?: string;
     immatriculation?: string;
     nomChauffeur?: string;
@@ -966,6 +970,36 @@ export async function creerTransfertAdmin(
     })
     .where(eq(transfertsStockTable.id, transfert!.id))
     .returning();
+
+  // 3. Créer automatiquement une mission transport si mode coopératif
+  if (data.typeTransport === "cooperatif" && data.vehiculeId && data.chauffeurId) {
+    try {
+      const lieuArrivee = "Magasin central";
+      const [mission] = await db
+        .insert(missionsTransportTable)
+        .values({
+          cooperativeId,
+          vehiculeId: data.vehiculeId,
+          chauffeurId: data.chauffeurId,
+          campagneId: data.campagneId ?? null,
+          typeMission: "transfert",
+          lieuDepart: entrepot.nom,
+          lieuArrivee,
+          dateDepart: new Date(),
+          poidsChargeKg: String(data.poidsKg),
+          coutCarburantFcfa: String(data.fraisCarburantFcfa ?? 0),
+          coutDiversFcfa: String(data.autresChargesFcfa ?? 0),
+          coutTotalFcfa: String((data.fraisCarburantFcfa ?? 0) + (data.autresChargesFcfa ?? 0)),
+          statut: "en_cours",
+          observations: `Transfert automatique ${numero}${data.notes ? ` — ${data.notes}` : ""}`,
+        })
+        .returning();
+      logger.info({ missionId: mission!.id, transfertId: transfert!.id, numero }, "Mission transport auto-créée pour transfert");
+    } catch (missionErr) {
+      // La mission est secondaire : on ne fait pas échouer le transfert si elle rate
+      logger.warn({ missionErr, transfertId: transfert!.id }, "Échec création mission automatique (non bloquant)");
+    }
+  }
 
   await notifierParRole(cooperativeId, ["directeur", "pca"], {
     type: "transfert_planifie",
