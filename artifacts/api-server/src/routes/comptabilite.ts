@@ -17,6 +17,7 @@ import {
   rejeterEcritureEnAttente,
   validerToutEcrituresEnAttente,
   cloturerExercice,
+  apercuCloture,
   getStatutsExercices,
   getGrandLivreTiers,
   getBalanceAuxiliaire,
@@ -55,6 +56,7 @@ router.get("/comptabilite/tresorerie",    checkPermission("comptabilite", "lire"
 
 // ─── Clôture d'exercice ───────────────────────────────────────────────────────
 router.get("/comptabilite/exercices",        checkPermission("comptabilite", "voir_config"),    getStatutsExercices);
+router.get("/comptabilite/cloture/apercu",   checkPermission("comptabilite", "voir_config"),    apercuCloture);
 router.post("/comptabilite/cloture",         checkPermission("comptabilite", "modifier_config"), cloturerExercice);
 
 // ─── Config comptable ─────────────────────────────────────────────────────────

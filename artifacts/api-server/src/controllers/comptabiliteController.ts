@@ -641,6 +641,107 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
   }
 }
 
+// ─── Aperçu clôture (simulation lecture seule) ───────────────────────────────
+export async function apercuCloture(req: Request, res: Response): Promise<void> {
+  try {
+    const coop          = coopId(req);
+    const annee         = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : exerciceCourant() - 1;
+    const impotResultat = req.query["impot"]    ? Math.round(Number(req.query["impot"]))  : 0;
+    const stockFinal    = req.query["stock"]    != null && req.query["stock"] !== "" ? Math.round(Number(req.query["stock"])) : null;
+
+    // Statut exercice
+    const [exercice] = await db.select().from(exercicesTable)
+      .where(and(eq(exercicesTable.cooperativeId, coop), eq(exercicesTable.annee, annee)));
+
+    // ── Phase 1 : vérifications ────────────────────────────────────────────────
+    const v1 = await db.execute(sql`
+      SELECT
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('52','57') THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('52','57') THEN montant_fcfa ELSE 0 END), 0))::bigint AS "soldeTresorerie",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '40' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '40' THEN montant_fcfa ELSE 0 END), 0))::bigint AS "soldeFournisseurs",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '48' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '48' THEN montant_fcfa ELSE 0 END), 0))::bigint AS "soldeRegularisation",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '31' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '31' THEN montant_fcfa ELSE 0 END), 0))::bigint AS "soldeStock311"
+      FROM ecritures_comptables
+      WHERE cooperative_id = ${coop} AND exercice = ${annee}
+        AND type_ecriture NOT IN ('cloture','a_nouveau')
+    `);
+    const p1 = v1.rows[0] as { soldeTresorerie: number; soldeFournisseurs: number; soldeRegularisation: number; soldeStock311: number; };
+    const alertes: string[] = [];
+    if (Number(p1?.soldeTresorerie    ?? 0) < 0)  alertes.push("⚠ Solde trésorerie négatif — vérifier comptes 52x/57x");
+    if (Number(p1?.soldeRegularisation?? 0) !== 0) alertes.push("⚠ Comptes 48x non soldés — régulariser avant clôture");
+
+    // ── Phase 4 (simulation) : calcul des soldes ───────────────────────────────
+    const soldesQ = await db.execute(sql`
+      SELECT
+        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('70','71','75') THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('70','71','75') THEN montant_fcfa ELSE 0 END), 0))::bigint AS "prodExpl",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('60','61','62','63','64','65','66','68','69') THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('60','61','62','63','64','65','66','68','69') THEN montant_fcfa ELSE 0 END), 0))::bigint AS "chgExpl",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '77' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '77' THEN montant_fcfa ELSE 0 END), 0))::bigint AS "prodFin",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) = '67' THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) = '67' THEN montant_fcfa ELSE 0 END), 0))::bigint AS "chgFin",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('82','84','86') THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('82','84','86') THEN montant_fcfa ELSE 0 END), 0))::bigint AS "prodHAO",
+        (COALESCE(SUM(CASE WHEN LEFT(compte_debit, 2) IN ('81','83','85') THEN montant_fcfa ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN LEFT(compte_credit, 2) IN ('81','83','85') THEN montant_fcfa ELSE 0 END), 0))::bigint AS "chgHAO"
+      FROM ecritures_comptables
+      WHERE cooperative_id = ${coop} AND exercice = ${annee}
+        AND type_ecriture NOT IN ('cloture','a_nouveau')
+    `);
+    const g = soldesQ.rows[0] as { prodExpl: number; chgExpl: number; prodFin: number; chgFin: number; prodHAO: number; chgHAO: number; };
+    const prodExpl = Number(g?.prodExpl ?? 0);
+    const chgExpl  = Number(g?.chgExpl  ?? 0);
+    const prodFin  = Number(g?.prodFin  ?? 0);
+    const chgFin   = Number(g?.chgFin   ?? 0);
+    const prodHAO  = Number(g?.prodHAO  ?? 0);
+    const chgHAO   = Number(g?.chgHAO   ?? 0);
+
+    // Variation stocks simulée
+    const stockInitial     = stockFinal !== null ? Math.max(0, Number(p1?.soldeStock311 ?? 0)) : 0;
+    const variationStock   = stockFinal !== null ? (stockFinal - stockInitial) : 0;
+    const chgExplAjustee   = chgExpl - variationStock; // variation positive réduit les charges nettes
+
+    const resExpl  = prodExpl  - chgExplAjustee;
+    const resFin   = prodFin   - chgFin;
+    const rao      = resExpl   + resFin;
+    const rhao     = prodHAO   - chgHAO;
+    const avImpot  = rao       + rhao;
+    const net      = avImpot   - impotResultat;
+
+    res.json({
+      exercice:        annee,
+      statut:          exercice?.statut ?? "ouvert",
+      alertes,
+      soldes: {
+        produitsExploitation:  prodExpl,
+        chargesExploitation:   chgExplAjustee,
+        resultatExploitation:  resExpl,
+        produitsFinanciers:    prodFin,
+        chargesFinancieres:    chgFin,
+        resultatFinancier:     resFin,
+        rao,
+        produitsHAO:           prodHAO,
+        chargesHAO:            chgHAO,
+        resultatHAO:           rhao,
+        avantImpot:            avImpot,
+        impot:                 impotResultat,
+        net,
+      },
+      tresorerie:      Number(p1?.soldeTresorerie    ?? 0),
+      fournisseurs:    Number(p1?.soldeFournisseurs   ?? 0),
+      stockCacao:      Number(p1?.soldeStock311       ?? 0),
+    });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur apercuCloture");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 // ─── Clôture d'exercice — SYSCOHADA 6 phases complètes ───────────────────────
 export async function cloturerExercice(req: Request, res: Response): Promise<void> {
   try {

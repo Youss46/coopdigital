@@ -2735,8 +2735,280 @@ function ModalSaisieManuelle({ onClose, onSuccess }: { onClose: () => void; onSu
   );
 }
 
-// ─── Section Clôture (dans OngletConfiguration) ───────────────────────────────
+// ─── Onglet Clôture d'exercice ────────────────────────────────────────────────
 interface ExerciceStatut { id: number; annee: number; statut: string; }
+
+interface ApercuCloture {
+  exercice: number; statut: string; alertes: string[];
+  soldes: {
+    produitsExploitation: number; chargesExploitation: number; resultatExploitation: number;
+    produitsFinanciers: number;   chargesFinancieres: number;  resultatFinancier: number;
+    rao: number;
+    produitsHAO: number;          chargesHAO: number;          resultatHAO: number;
+    avantImpot: number;           impot: number;               net: number;
+  };
+  tresorerie: number; fournisseurs: number; stockCacao: number;
+}
+
+function OngletCloture() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const anneeActuelle = new Date().getFullYear();
+  const [annee, setAnnee]           = useState(anneeActuelle - 1);
+  const [impot, setImpot]           = useState(0);
+  const [stock, setStock]           = useState<string>("");
+  const [confirm, setConfirm]       = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [resultat, setResultat]     = useState<{ message: string; ecrituresGenerees: number; soldes: ApercuCloture["soldes"] } | null>(null);
+
+  const annees = Array.from({ length: 6 }, (_, i) => anneeActuelle - 1 - i);
+
+  const { data: exercices, refetch: refetchEx } = useQuery({
+    queryKey: ["exercices-statuts"],
+    queryFn: () => apiFetch<ExerciceStatut[]>("/api/comptabilite/exercices"),
+  });
+
+  const stockNum  = stock !== "" ? Math.round(Number(stock)) : undefined;
+  const apercu = useQuery({
+    queryKey: ["cloture-apercu", annee, impot, stockNum],
+    queryFn:  () => {
+      const params = new URLSearchParams({ exercice: String(annee), impot: String(impot) });
+      if (stockNum !== undefined) params.set("stock", String(stockNum));
+      return apiFetch<ApercuCloture>(`/api/comptabilite/cloture/apercu?${params.toString()}`);
+    },
+  });
+
+  const ap = apercu.data;
+  const statutAnnee = ap?.statut ?? exercices?.find((e) => e.annee === annee)?.statut;
+  const deja = statutAnnee === "cloture";
+
+  const handleCloture = async () => {
+    setLoading(true);
+    try {
+      const body: Record<string, number> = { exercice: annee, impotResultat: impot };
+      if (stockNum !== undefined) body["stockFinalCacao"] = stockNum;
+      const res = await apiPost<{ message: string; ecrituresGenerees: number; soldes: ApercuCloture["soldes"] }>(
+        "/api/comptabilite/cloture", body
+      );
+      setResultat(res);
+      toast({ title: `✅ Exercice ${annee} clôturé`, description: `${res.ecrituresGenerees} écritures générées` });
+      void refetchEx();
+      void apercu.refetch();
+      void qc.invalidateQueries({ queryKey: ["grand-livre"] });
+      void qc.invalidateQueries({ queryKey: ["balance"] });
+      setConfirm(false);
+    } catch (err) {
+      toast({ title: "Erreur lors de la clôture", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const SIG = ({ label, montant, indent = false, bold = false, positif }: {
+    label: string; montant: number; indent?: boolean; bold?: boolean; positif?: boolean;
+  }) => {
+    const color = positif !== undefined ? (positif || montant >= 0 ? "text-green-700" : "text-red-600") : "text-gray-800";
+    return (
+      <div className={`flex items-center justify-between py-1.5 ${indent ? "pl-4" : ""} ${bold ? "border-t border-gray-200 mt-1 pt-2.5" : ""}`}>
+        <span className={`text-sm ${bold ? "font-semibold text-gray-900" : "text-gray-600"}`}>{label}</span>
+        <span className={`text-sm font-mono ${bold ? "font-bold" : ""} ${color}`}>
+          {montant >= 0 ? "" : "−"}{FCFA(Math.abs(montant))}
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-5">
+
+      {/* En-tête + paramètres */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <h2 className="text-base font-bold text-gray-900 mb-1 flex items-center gap-2">
+          <Lock size={16} className="text-gray-500" /> Clôture d'exercice OHADA
+        </h2>
+        <p className="text-sm text-gray-500 mb-5">
+          Simule le résultat net avant de verrouiller définitivement l'exercice.
+          L'opération est irréversible.
+        </p>
+
+        <div className="flex flex-wrap gap-4 items-end">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Exercice</label>
+            <select value={annee}
+              onChange={(e) => { setAnnee(Number(e.target.value)); setConfirm(false); setResultat(null); }}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
+              {annees.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">IS / Impôt résultat (FCFA)</label>
+            <MoneyInput value={impot} onChange={setImpot} className="w-44" placeholder="0" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Stock final cacao (FCFA) <span className="text-gray-400">— optionnel</span></label>
+            <input
+              type="number" value={stock} min={0}
+              onChange={(e) => setStock(e.target.value)}
+              placeholder="Laisser vide si non applicable"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 w-52"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Statuts exercices */}
+      {exercices && exercices.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Exercices</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {exercices.map((e) => (
+              <div key={e.id} className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-sm font-medium text-gray-800">{e.annee}</span>
+                {e.statut === "cloture" ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                    <Lock size={11} /> Clôturé
+                  </span>
+                ) : (
+                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-green-50 text-green-700">Ouvert</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Aperçu simulation */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-gray-700">Simulation — Résultat {annee}</h3>
+          {apercu.isFetching && <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-600 border-t-transparent" />}
+        </div>
+
+        {ap ? (
+          <>
+            {/* Alertes */}
+            {ap.alertes.length > 0 && (
+              <div className="mb-4 space-y-1.5">
+                {ap.alertes.map((a, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                    {a}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* SIG */}
+            <div className="space-y-0 divide-y divide-gray-50">
+              <div className="pb-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Exploitation</p>
+                <SIG label="Produits d'exploitation (70x–75x)" montant={ap.soldes.produitsExploitation}  indent />
+                <SIG label="Charges d'exploitation (60x–69x)"  montant={-ap.soldes.chargesExploitation} indent />
+                <SIG label="Résultat d'exploitation"           montant={ap.soldes.resultatExploitation}  bold positif />
+              </div>
+              <div className="py-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Financier</p>
+                <SIG label="Produits financiers (77x)"   montant={ap.soldes.produitsFinanciers}  indent />
+                <SIG label="Charges financières (67x)"   montant={-ap.soldes.chargesFinancieres} indent />
+                <SIG label="Résultat financier"          montant={ap.soldes.resultatFinancier}   bold positif />
+              </div>
+              <div className="py-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">HAO</p>
+                <SIG label="Produits HAO (82x–86x)" montant={ap.soldes.produitsHAO}  indent />
+                <SIG label="Charges HAO (81x–85x)"  montant={-ap.soldes.chargesHAO}  indent />
+                <SIG label="Résultat HAO"            montant={ap.soldes.resultatHAO}  bold positif />
+              </div>
+              <div className="pt-3 space-y-1">
+                <SIG label="Résultat avant impôt" montant={ap.soldes.avantImpot}  bold positif />
+                {ap.soldes.impot > 0 && <SIG label="Impôt sur le résultat (891)" montant={-ap.soldes.impot} indent />}
+                <div className={`flex items-center justify-between py-2 px-3 rounded-lg mt-1 ${ap.soldes.net >= 0 ? "bg-green-50" : "bg-red-50"}`}>
+                  <span className="text-sm font-bold text-gray-900">Résultat net {annee}</span>
+                  <span className={`text-lg font-bold ${ap.soldes.net >= 0 ? "text-green-700" : "text-red-600"}`}>
+                    {ap.soldes.net >= 0 ? "+" : "−"}{FCFA(Math.abs(ap.soldes.net))}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Compte {ap.soldes.net >= 0 ? "131 — Bénéfice net" : "139 — Déficit net"}
+                </p>
+              </div>
+            </div>
+
+            {/* KPIs tréso/fournisseurs */}
+            <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-gray-100">
+              {[
+                { label: "Trésorerie nette", v: ap.tresorerie,    warn: ap.tresorerie < 0 },
+                { label: "Dû aux membres/fourn.", v: -ap.fournisseurs, warn: false },
+                { label: "Stock cacao (comptable)", v: ap.stockCacao, warn: false },
+              ].map(({ label, v, warn }) => (
+                <div key={label} className={`rounded-lg p-3 border ${warn ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100"}`}>
+                  <p className="text-xs text-gray-500 mb-0.5">{label}</p>
+                  <p className={`text-sm font-bold ${warn ? "text-amber-700" : v >= 0 ? "text-gray-800" : "text-red-600"}`}>{FCFA(v)}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : apercu.isLoading ? (
+          <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-2 border-green-600 border-t-transparent" /></div>
+        ) : null}
+      </div>
+
+      {/* Résultat après clôture */}
+      {resultat && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-5">
+          <h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
+            <CheckCheck size={16} /> Exercice {annee} clôturé avec succès
+          </h3>
+          <p className="text-sm text-green-700">{resultat.ecrituresGenerees} écritures générées (clôture + à-nouveaux N+1)</p>
+          <p className="text-sm text-green-700 mt-1">
+            Résultat net : <span className="font-bold">{resultat.soldes.net >= 0 ? "+" : "−"}{FCFA(Math.abs(resultat.soldes.net))}</span>
+            {" "}→ compte {resultat.soldes.net >= 0 ? "131" : "139"}
+          </p>
+        </div>
+      )}
+
+      {/* Bouton clôture */}
+      {!deja && !resultat && (
+        <div className="bg-white rounded-xl border border-red-100 p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Clôturer l'exercice {annee}</h3>
+          <p className="text-sm text-gray-500 mb-4">
+            Cette opération est <strong>irréversible</strong>. Elle génère les écritures de clôture OHADA
+            (solde des 6xx/7xx, calcul du résultat, balance d'ouverture N+1) et verrouille le journal de l'exercice {annee}.
+          </p>
+          {!confirm ? (
+            <button onClick={() => setConfirm(true)}
+              className="flex items-center gap-2 px-4 py-2.5 border border-red-300 text-red-700 rounded-lg text-sm font-medium hover:bg-red-50">
+              <Lock size={14} /> Initier la clôture de l'exercice {annee}
+            </button>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium">
+                ⚠ Irréversible. Confirmer la clôture de l'exercice {annee} ?
+              </div>
+              <button onClick={() => void handleCloture()} disabled={loading}
+                className="px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
+                {loading ? <><div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" /> Clôture en cours…</> : "Oui, clôturer"}
+              </button>
+              <button onClick={() => setConfirm(false)}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+                Annuler
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {deja && !resultat && (
+        <div className="flex items-center gap-3 px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500">
+          <Lock size={16} /> L'exercice {annee} est déjà clôturé — journal verrouillé.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Section Clôture (dans OngletConfiguration) — conservée pour rétrocompat ──
 
 function ClotureSection() {
   const { toast } = useToast();
@@ -2852,7 +3124,7 @@ function ClotureSection() {
 }
 
 // ─── Page principale ──────────────────────────────────────────────────────────
-type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable" | "grand_livre" | "balance" | "balance_aux" | "flux";
+type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable" | "grand_livre" | "balance" | "balance_aux" | "flux" | "cloture";
 
 export default function ComptabilitePage() {
   const [onglet, setOnglet] = useState<Onglet>("en_attente");
@@ -2878,6 +3150,7 @@ export default function ComptabilitePage() {
     ...(peutBalance    ? [{ id: "balance"     as Onglet, label: "Balance",         icon: Scale }] : []),
     ...(peutBalance    ? [{ id: "balance_aux" as Onglet, label: "Balance tiers",   icon: Users }] : []),
     { id: "flux",        label: "Flux trésorerie",  icon: Droplets },
+    ...(peutVoirConfig ? [{ id: "cloture"         as Onglet, label: "Clôture",        icon: Lock }] : []),
     ...(peutVoirTaux   ? [{ id: "devises"         as Onglet, label: "Devises",        icon: DollarSign }] : []),
     ...(peutVoirPlan   ? [{ id: "plan_comptable"  as Onglet, label: "Plan comptable", icon: List }] : []),
     ...(peutVoirConfig ? [{ id: "config"          as Onglet, label: "Configuration",  icon: Settings }] : []),
@@ -2938,6 +3211,7 @@ export default function ComptabilitePage() {
       {onglet === "balance"       && peutBalance    && <OngletBalance />}
       {onglet === "balance_aux"   && peutBalance    && <OngletBalanceAuxiliaire />}
       {onglet === "flux"          && <OngletFluxTresorerie />}
+      {onglet === "cloture"       && peutVoirConfig && <OngletCloture />}
       {onglet === "devises"       && peutVoirTaux   && <OngletDevises />}
       {onglet === "plan_comptable"&& peutVoirPlan   && <OngletPlanComptableContainer />}
       {onglet === "config"        && peutVoirConfig && <OngletConfiguration />}
