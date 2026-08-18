@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { checkEcriture, creerAnomalies } from "../services/anomalieService";
-import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable, membresTable, usersTable, personnelTable } from "@workspace/db";
+import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable, membresTable, usersTable, personnelTable, exportateursTable, fournisseursTable } from "@workspace/db";
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
 import { assignerNumeroPiece, assignerNumerosPieces } from "../lib/numeroPiece";
@@ -983,6 +983,57 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           ABS(SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
               - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)) DESC,
           u.nom
+      `);
+    } else if (tiersType === "exportateur") {
+      // Compte 4111 — Clients exportateurs (créances sur ventes cacao)
+      result = await db.execute<Row>(sql`
+        SELECT
+          e.tiers_id                                                             AS "tiersId",
+          COALESCE(ex.nom, '—')                                                  AS nom,
+          ''                                                                     AS prenoms,
+          COALESCE(ex.pays, '')                                                  AS code,
+          SUM(CASE WHEN e.compte_debit  IN ('411','4111') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
+          SUM(CASE WHEN e.compte_credit IN ('411','4111') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalPaye",
+          0::integer                                                             AS "totalIntrantsDus",
+          0::integer                                                             AS "totalIntrantsRemb",
+          (SUM(CASE WHEN e.compte_debit  IN ('411','4111') THEN e.montant_fcfa ELSE 0 END)
+           - SUM(CASE WHEN e.compte_credit IN ('411','4111') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
+        FROM ecritures_comptables e
+        LEFT JOIN exportateurs ex ON ex.id = e.tiers_id
+        WHERE e.cooperative_id = ${coop}
+          AND e.tiers_type = 'exportateur'
+          ${exerciceCond}
+        GROUP BY e.tiers_id, ex.nom, ex.pays
+        ORDER BY
+          ABS(SUM(CASE WHEN e.compte_debit  IN ('411','4111') THEN e.montant_fcfa ELSE 0 END)
+              - SUM(CASE WHEN e.compte_credit IN ('411','4111') THEN e.montant_fcfa ELSE 0 END)) DESC,
+          ex.nom
+      `);
+    } else if (tiersType === "fournisseur_ext") {
+      // Compte 401 — Fournisseurs externes (pisteurs, apporteurs tiers)
+      result = await db.execute<Row>(sql`
+        SELECT
+          e.tiers_id                                                             AS "tiersId",
+          COALESCE(f.nom, '—')                                                   AS nom,
+          COALESCE(f.prenoms, '')                                                AS prenoms,
+          COALESCE(f.code, '')                                                   AS code,
+          SUM(CASE WHEN e.compte_credit = '401' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
+          SUM(CASE WHEN e.compte_debit  = '401' AND e.source = 'paiement'
+                   THEN e.montant_fcfa ELSE 0 END)::integer                     AS "totalPaye",
+          0::integer                                                             AS "totalIntrantsDus",
+          0::integer                                                             AS "totalIntrantsRemb",
+          (SUM(CASE WHEN e.compte_credit = '401' THEN e.montant_fcfa ELSE 0 END)
+           - SUM(CASE WHEN e.compte_debit  = '401' THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
+        FROM ecritures_comptables e
+        LEFT JOIN fournisseurs f ON f.id = e.tiers_id
+        WHERE e.cooperative_id = ${coop}
+          AND e.tiers_type = 'fournisseur_ext'
+          ${exerciceCond}
+        GROUP BY e.tiers_id, f.nom, f.prenoms, f.code
+        ORDER BY
+          ABS(SUM(CASE WHEN e.compte_credit = '401' THEN e.montant_fcfa ELSE 0 END)
+              - SUM(CASE WHEN e.compte_debit  = '401' THEN e.montant_fcfa ELSE 0 END)) DESC,
+          f.nom
       `);
     } else {
       // membre (défaut) — Comptes 401/4091/4092

@@ -221,6 +221,8 @@ async function resolveCompteDebit(
 export async function generateEcrituresLivraison(cooperativeId: number, params: {
   livraisonId: number;
   membreId?: number;
+  /** Fournisseur externe (pisteur) — exclusif avec membreId */
+  fournisseurId?: number;
   membreNom: string;
   montantBrutFcfa: number;
   avanceDeduiteFcfa: number;
@@ -233,7 +235,10 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
    */
   montantCoopFcfa?: number;
 }) {
-  const { livraisonId, membreId, membreNom, montantBrutFcfa, avanceDeduiteFcfa, dateLivraison } = params;
+  const { livraisonId, membreId, fournisseurId, membreNom, montantBrutFcfa, avanceDeduiteFcfa, dateLivraison } = params;
+  // tiersId/tiersType : membre prioritaire, sinon fournisseur externe
+  const tiersId   = membreId ?? fournisseurId;
+  const tiersType = membreId ? "membre" : fournisseurId ? "fournisseur_ext" : undefined;
   const montantCoopCouvert = Math.min(params.montantCoopFcfa ?? 0, montantBrutFcfa);
   const restePayable = montantBrutFcfa - montantCoopCouvert;
   const piece = `LIV-${livraisonId}`;
@@ -249,7 +254,7 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
       libelle: `Achat cacao (caisse coopérative) – ${membreNom}`,
       compteDebit: c.compteDebit, compteCredit: c.compteCredit,
       montantFcfa: montantCoopCouvert, date: dateLivraison, numeroPiece: piece,
-      tiersId: membreId, tiersType: "membre",
+      tiersId, tiersType,
     }));
   }
 
@@ -261,12 +266,12 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
       libelle: `Achat cacao – ${membreNom}`,
       compteDebit: c.compteDebit, compteCredit: c.compteCredit,
       montantFcfa: restePayable, date: dateLivraison, numeroPiece: piece,
-      tiersId: membreId, tiersType: "membre",
+      tiersId, tiersType,
     }));
   }
 
-  // ── Déduction avance (401 / 4091) — identique dans les deux modes ───────────
-  if (avanceDeduiteFcfa > 0) {
+  // ── Déduction avance (401 / 4091) — membres seulement ───────────────────────
+  if (avanceDeduiteFcfa > 0 && membreId) {
     const c = await resolveComptes(cooperativeId, "avances", "remboursement_avance", "401", "4091");
     promises.push(proposerEcriture(cooperativeId, {
       source: "livraison", sourceId: livraisonId,
@@ -306,6 +311,7 @@ export async function generateEcrituresAvance(cooperativeId: number, params: {
  */
 export async function generateEcrituresVente(cooperativeId: number, params: {
   venteId: number;
+  exportateurId?: number;
   exportateurNom: string;
   montantFcfa: number;
   dateVente: string;
@@ -317,6 +323,7 @@ export async function generateEcrituresVente(cooperativeId: number, params: {
     compteDebit: c.compteDebit, compteCredit: c.compteCredit,
     montantFcfa: params.montantFcfa, date: params.dateVente,
     numeroPiece: `VTE-${params.venteId}`,
+    tiersId: params.exportateurId, tiersType: params.exportateurId ? "exportateur" : undefined,
   });
 }
 
@@ -325,6 +332,7 @@ export async function generateEcrituresVente(cooperativeId: number, params: {
  */
 export async function generateEcrituresEncaissement(cooperativeId: number, params: {
   venteId: number;
+  exportateurId?: number;
   exportateurNom: string;
   montantFcfa: number;
   date: string;
@@ -336,6 +344,7 @@ export async function generateEcrituresEncaissement(cooperativeId: number, param
     compteDebit: c.compteDebit, compteCredit: c.compteCredit,
     montantFcfa: params.montantFcfa, date: params.date,
     numeroPiece: `ENC-${params.venteId}`,
+    tiersId: params.exportateurId, tiersType: params.exportateurId ? "exportateur" : undefined,
   });
 }
 

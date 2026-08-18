@@ -229,6 +229,7 @@ export async function createVente(req: Request, res: Response): Promise<void> {
 
     void generateEcrituresVente(cooperativeId, {
       venteId: vente!.id,
+      exportateurId,
       exportateurNom: detail?.exportateurNom ?? `exp-${exportateurId}`,
       montantFcfa: montantTotalFcfa,
       dateVente,
@@ -300,6 +301,7 @@ export async function encaisserVente(req: Request, res: Response): Promise<void>
 
     void generateEcrituresEncaissement(cooperativeId, {
       venteId: id,
+      exportateurId: current.ventes_exportateurs.exportateurId ?? undefined,
       exportateurNom: detail?.exportateurNom ?? `exp-${id}`,
       montantFcfa: parse.data.montantFcfa,
       date: new Date().toISOString().split("T")[0]!,
