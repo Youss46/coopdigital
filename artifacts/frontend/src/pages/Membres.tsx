@@ -811,11 +811,17 @@ export default function Membres() {
                 </div>
               </div>
 
-              {/* Type fournisseur */}
+              {/* Type fournisseur — pour les délégués, "Externe" bascule directement vers le flux dédié */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Type fournisseur</label>
                 <select value={((form as Record<string, unknown>)["typeFournisseur"] as string) ?? ""}
-                  onChange={(e) => setForm({ ...form, ...{ typeFournisseur: e.target.value || undefined } } as typeof form)}
+                  onChange={(e) => {
+                    if (estDelegue && e.target.value === "externe") {
+                      setTypeCreation("fournisseur_externe");
+                    } else {
+                      setForm({ ...form, ...{ typeFournisseur: e.target.value || undefined } } as typeof form);
+                    }
+                  }}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1">
                   <option value="">— Non renseigné —</option>
                   <option value="membre">Membre</option>
