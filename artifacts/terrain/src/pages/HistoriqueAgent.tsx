@@ -5,12 +5,12 @@ import OfflineBanner from "../components/OfflineBanner";
 import BottomNavAgent from "../components/BottomNavAgent";
 import type { MissionTerrain } from "../lib/types";
 
-const STATUT_LABEL: Record<string, { label: string; color: string; icon: string }> = {
-  planifiee: { label: "Planifiée", color: "#6366f1", icon: "🕒" },
-  en_cours:  { label: "En cours",  color: "#f59e0b", icon: "⚡" },
-  soumise:   { label: "Soumise",   color: "#3b82f6", icon: "📤" },
-  validee:   { label: "Validée",   color: "#22c55e", icon: "✅" },
-  rejetee:   { label: "Rejetée",   color: "#ef4444", icon: "❌" },
+const STATUT_LABEL: Record<string, { label: string; color: string; bg: string; icon: string }> = {
+  planifiee: { label: "Planifiée", color: "#6366f1", bg: "#eef2ff", icon: "🕒" },
+  en_cours:  { label: "En cours",  color: "#d97706", bg: "#fef3c7", icon: "⚡" },
+  soumise:   { label: "Soumise",   color: "#2563eb", bg: "#dbeafe", icon: "📤" },
+  validee:   { label: "Validée",   color: "#16a34a", bg: "#dcfce7", icon: "✅" },
+  rejetee:   { label: "Rejetée",   color: "#dc2626", bg: "#fee2e2", icon: "❌" },
 };
 
 type FiltreKey = "toutes" | "en_cours" | "validee" | "rejetee";
@@ -45,7 +45,7 @@ export default function HistoriqueAgent() {
 
       <OfflineBanner />
 
-      <div style={{ display: "flex", gap: 6, padding: "12px 16px 0", background: "#0f172a", overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 6, padding: "12px 16px", background: "var(--t-card)", borderBottom: "1px solid var(--t-border)", overflowX: "auto" }}>
         {FILTRES.map(({ key, label }) => (
           <button
             key={key}
@@ -58,8 +58,8 @@ export default function HistoriqueAgent() {
               fontSize: ".78rem",
               fontWeight: 600,
               cursor: "pointer",
-              background: filtre === key ? "#3b82f6" : "#1e2d45",
-              color: filtre === key ? "#fff" : "#94a3b8",
+              background: filtre === key ? "var(--t-primary)" : "var(--t-border)",
+              color: filtre === key ? "#fff" : "var(--t-muted)",
               whiteSpace: "nowrap",
             }}
           >
@@ -72,50 +72,50 @@ export default function HistoriqueAgent() {
         {loading ? (
           <div className="t-spinner" />
         ) : !isOnline ? (
-          <div className="t-card" style={{ textAlign: "center", color: "#f59e0b" }}>
+          <div className="t-card" style={{ textAlign: "center", color: "var(--t-warning)" }}>
             📡 Hors ligne — données non disponibles
           </div>
         ) : displayed.length === 0 ? (
-          <div className="t-card" style={{ textAlign: "center", color: "#64748b", padding: 24 }}>
+          <div className="t-card" style={{ textAlign: "center", color: "var(--t-muted)", padding: 24 }}>
             Aucune mission trouvée
           </div>
         ) : (
           displayed.map((m) => {
-            const s = STATUT_LABEL[m.statut] ?? { label: m.statut, color: "#94a3b8", icon: "❓" };
+            const s = STATUT_LABEL[m.statut] ?? { label: m.statut, color: "var(--t-muted)", bg: "var(--t-border)", icon: "❓" };
             const tauxValid = m.tauxValidation ?? (m.membresCollectes > 0 && m.membresValides !== undefined
               ? Math.round((m.membresValides / m.membresCollectes) * 100)
               : 0);
             return (
-              <div key={m.id} style={{ background: "#1e2d45", borderRadius: 12, padding: "14px 16px", marginBottom: 10, borderLeft: `3px solid ${s.color}` }}>
+              <div key={m.id} style={{ background: "var(--t-card)", border: "1px solid var(--t-border)", borderLeft: `3px solid ${s.color}`, borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ fontWeight: 700, fontSize: ".95rem" }}>{m.titre}</div>
-                  <span style={{ fontSize: ".7rem", background: s.color + "33", color: s.color, borderRadius: 4, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>
+                  <span style={{ fontSize: ".7rem", background: s.bg, color: s.color, borderRadius: 4, padding: "2px 7px", flexShrink: 0, marginLeft: 6 }}>
                     {s.icon} {s.label}
                   </span>
                 </div>
-                <div style={{ color: "#94a3b8", fontSize: ".78rem", marginTop: 4 }}>
+                <div style={{ color: "var(--t-muted)", fontSize: ".78rem", marginTop: 4 }}>
                   {m.zoneType} · {m.zoneNom}
                 </div>
                 <div style={{ display: "flex", gap: 16, marginTop: 10 }}>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#22c55e" }}>{m.membresCollectes}</div>
-                    <div style={{ fontSize: ".65rem", color: "#64748b" }}>Collectées</div>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--t-success)" }}>{m.membresCollectes}</div>
+                    <div style={{ fontSize: ".65rem", color: "var(--t-muted)" }}>Collectées</div>
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#3b82f6" }}>{m.membresValides ?? "—"}</div>
-                    <div style={{ fontSize: ".65rem", color: "#64748b" }}>Validées</div>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--t-info)" }}>{m.membresValides ?? "—"}</div>
+                    <div style={{ fontSize: ".65rem", color: "var(--t-muted)" }}>Validées</div>
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#f59e0b" }}>{tauxValid}%</div>
-                    <div style={{ fontSize: ".65rem", color: "#64748b" }}>Taux valid.</div>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--t-warning)" }}>{tauxValid}%</div>
+                    <div style={{ fontSize: ".65rem", color: "var(--t-muted)" }}>Taux valid.</div>
                   </div>
                 </div>
                 {m.statut === "rejetee" && m.motifRejet && (
-                  <div style={{ marginTop: 8, fontSize: ".78rem", color: "#ef4444", background: "#ef444422", padding: "6px 8px", borderRadius: 6 }}>
+                  <div style={{ marginTop: 8, fontSize: ".78rem", color: "var(--t-danger)", background: "var(--t-danger-bg)", padding: "6px 8px", borderRadius: 6 }}>
                     Motif : {m.motifRejet}
                   </div>
                 )}
-                <div style={{ marginTop: 8, fontSize: ".72rem", color: "#475569" }}>
+                <div style={{ marginTop: 8, fontSize: ".72rem", color: "var(--t-muted)" }}>
                   Mis à jour : {new Date(m.updatedAt).toLocaleDateString("fr-FR")}
                 </div>
               </div>

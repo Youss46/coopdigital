@@ -9,12 +9,12 @@ import type { MissionTerrain } from "../lib/types";
 
 type TabKey = "planifiees" | "en_cours" | "a_corriger";
 
-const STATUT_LABEL: Record<string, { label: string; color: string }> = {
-  planifiee: { label: "Planifiée", color: "#6366f1" },
-  en_cours:  { label: "En cours",  color: "#f59e0b" },
-  soumise:   { label: "Soumise",   color: "#3b82f6" },
-  validee:   { label: "Validée",   color: "#22c55e" },
-  rejetee:   { label: "À corriger", color: "#ef4444" },
+const STATUT_LABEL: Record<string, { label: string; color: string; bg: string }> = {
+  planifiee: { label: "Planifiée",  color: "#6366f1", bg: "#eef2ff" },
+  en_cours:  { label: "En cours",   color: "#d97706", bg: "#fef3c7" },
+  soumise:   { label: "Soumise",    color: "#2563eb", bg: "#dbeafe" },
+  validee:   { label: "Validée",    color: "#16a34a", bg: "#dcfce7" },
+  rejetee:   { label: "À corriger", color: "#dc2626", bg: "#fee2e2" },
 };
 
 function filterByTab(missions: MissionTerrain[], tab: TabKey): MissionTerrain[] {
@@ -67,7 +67,7 @@ export default function MissionsAgent() {
       <header className="t-header">
         <div className="t-header__title">📍 Mes missions</div>
         {fromCache && (
-          <span style={{ fontSize: ".7rem", background: "#f59e0b22", color: "#f59e0b", borderRadius: 4, padding: "2px 6px" }}>
+          <span style={{ fontSize: ".7rem", background: "var(--t-warning-bg)", color: "var(--t-warning)", borderRadius: 4, padding: "2px 6px" }}>
             📦 cache
           </span>
         )}
@@ -75,7 +75,7 @@ export default function MissionsAgent() {
 
       <OfflineBanner />
 
-      <div style={{ display: "flex", gap: 8, padding: "12px 16px 0", background: "#0f172a" }}>
+      <div style={{ display: "flex", gap: 8, padding: "12px 16px", background: "var(--t-card)", borderBottom: "1px solid var(--t-border)" }}>
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -88,8 +88,8 @@ export default function MissionsAgent() {
               fontSize: ".78rem",
               fontWeight: 600,
               cursor: "pointer",
-              background: tab === t.key ? "#3b82f6" : "#1e2d45",
-              color: tab === t.key ? "#fff" : "#94a3b8",
+              background: tab === t.key ? "var(--t-primary)" : "var(--t-border)",
+              color: tab === t.key ? "#fff" : "var(--t-muted)",
               position: "relative",
             }}
           >
@@ -99,7 +99,7 @@ export default function MissionsAgent() {
                 position: "absolute",
                 top: -6,
                 right: -4,
-                background: t.key === "a_corriger" ? "#ef4444" : "#3b82f6",
+                background: t.key === "a_corriger" ? "var(--t-danger)" : "var(--t-info)",
                 color: "#fff",
                 borderRadius: "50%",
                 width: 16,
@@ -123,43 +123,43 @@ export default function MissionsAgent() {
         ) : erreur ? (
           <div className="t-error">{erreur}</div>
         ) : displayed.length === 0 ? (
-          <div className="t-card" style={{ textAlign: "center", color: "#64748b", padding: "24px" }}>
+          <div className="t-card" style={{ textAlign: "center", color: "var(--t-muted)", padding: "24px" }}>
             {fromCache && missions.length === 0
               ? "📡 Hors ligne — aucune donnée en cache"
               : `Aucune mission ${tabLabel}`}
           </div>
         ) : (
           displayed.map((m) => {
-            const s = STATUT_LABEL[m.statut] ?? { label: m.statut, color: "#94a3b8" };
+            const s = STATUT_LABEL[m.statut] ?? { label: m.statut, color: "var(--t-muted)", bg: "var(--t-border)" };
             const pct = m.membresTotal > 0 ? Math.round((m.membresCollectes / m.membresTotal) * 100) : 0;
             return (
               <Link key={m.id} href={`/missions/${m.id}`}>
-                <div style={{ background: "#1e2d45", borderRadius: 12, padding: "14px 16px", marginBottom: 10, cursor: "pointer", borderLeft: `3px solid ${s.color}` }}>
+                <div style={{ background: "var(--t-card)", border: "1px solid var(--t-border)", borderLeft: `3px solid ${s.color}`, borderRadius: 12, padding: "14px 16px", marginBottom: 10, cursor: "pointer" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div style={{ fontWeight: 700, fontSize: ".95rem" }}>{m.titre}</div>
-                    <span style={{ fontSize: ".7rem", background: s.color + "33", color: s.color, borderRadius: 4, padding: "2px 7px", flexShrink: 0, marginLeft: 8 }}>
+                    <span style={{ fontSize: ".7rem", background: s.bg, color: s.color, borderRadius: 4, padding: "2px 7px", flexShrink: 0, marginLeft: 8 }}>
                       {s.label}
                     </span>
                   </div>
-                  <div style={{ color: "#94a3b8", fontSize: ".78rem", marginTop: 4 }}>
+                  <div style={{ color: "var(--t-muted)", fontSize: ".78rem", marginTop: 4 }}>
                     {m.zoneType} · {m.zoneNom}
                   </div>
-                  <div style={{ color: "#94a3b8", fontSize: ".78rem" }}>
+                  <div style={{ color: "var(--t-muted)", fontSize: ".78rem" }}>
                     📅 {new Date(m.datePrevue).toLocaleDateString("fr-FR")}
                   </div>
                   {m.statut !== "planifiee" && (
                     <div style={{ marginTop: 8 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: ".75rem", color: "#94a3b8", marginBottom: 3 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: ".75rem", color: "var(--t-muted)", marginBottom: 3 }}>
                         <span>{m.membresCollectes}/{m.membresTotal} parcelles</span>
                         <span>{pct}%</span>
                       </div>
-                      <div style={{ height: 5, background: "#1a2035", borderRadius: 3 }}>
-                        <div style={{ width: `${pct}%`, height: "100%", background: "#22c55e", borderRadius: 3 }} />
+                      <div style={{ height: 5, background: "var(--t-border)", borderRadius: 3 }}>
+                        <div style={{ width: `${pct}%`, height: "100%", background: "var(--t-success)", borderRadius: 3 }} />
                       </div>
                     </div>
                   )}
                   {m.statut === "rejetee" && m.motifRejet && (
-                    <div style={{ marginTop: 6, fontSize: ".78rem", color: "#ef4444" }}>
+                    <div style={{ marginTop: 6, fontSize: ".78rem", color: "var(--t-danger)" }}>
                       ❌ Motif : {m.motifRejet}
                     </div>
                   )}
