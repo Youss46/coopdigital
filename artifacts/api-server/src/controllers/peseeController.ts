@@ -335,8 +335,8 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const actorId = req.agent?.id ?? req.user?.id;
-  const { membreId, produit, operation, balanceId, notes, transfertId } = req.body as {
-    membreId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string; transfertId?: number;
+  const { membreId, fournisseurId, produit, operation, balanceId, notes, transfertId } = req.body as {
+    membreId?: number; fournisseurId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string; transfertId?: number;
   };
 
   // ── Guard : seul le peseur central (delegueId === null) peut démarrer une session de réception de transfert
@@ -350,7 +350,9 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
 
   try {
     const session = await createSession(cooperativeId, {
-      membreId, produit, operation, balanceId, notes,
+      membreId,
+      fournisseurId: fournisseurId ? Number(fournisseurId) : undefined,
+      produit, operation, balanceId, notes,
       peseurId: actorId,
       transfertId: transfertId ? Number(transfertId) : undefined,
     });
@@ -381,13 +383,14 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
 export async function handleGetSessions(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
-  const { statut, membreId, limit, date_debut, date_fin } = req.query as { statut?: string; membreId?: string; limit?: string; date_debut?: string; date_fin?: string };
+  const { statut, membreId, fournisseurId, limit, date_debut, date_fin } = req.query as { statut?: string; membreId?: string; fournisseurId?: string; limit?: string; date_debut?: string; date_fin?: string };
   // Peseur : ne voit que ses propres sessions (filtre par peseurId)
   const peseurId = req.agent?.role === "peseur" ? req.agent.id : undefined;
   try {
     const sessions = await getSessions(cooperativeId, {
       statut,
       membreId: membreId ? parseInt(membreId) : undefined,
+      fournisseurId: fournisseurId ? parseInt(fournisseurId) : undefined,
       limit: limit ? parseInt(limit) : undefined,
       peseurId,
       dateDebut: date_debut,

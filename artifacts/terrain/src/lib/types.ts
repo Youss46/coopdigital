@@ -396,6 +396,10 @@ export interface SessionPesee {
   membreId: number | null;
   membreNom: string | null;
   membrePrenoms: string | null;
+  /** ID du fournisseur externe (pisteur) — mutuellement exclusif avec membreId */
+  fournisseurId?: number | null;
+  fournisseurNom?: string | null;
+  fournisseurPrenoms?: string | null;
   produit: string;
   operation: string;
   statut: "en_cours" | "terminee" | "annulee";

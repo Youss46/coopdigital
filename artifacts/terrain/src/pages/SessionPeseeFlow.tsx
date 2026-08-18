@@ -163,6 +163,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
         const map = new Map<number, number>();
         for (const s of sessions) {
           if (s.membreId !== null && s.id !== undefined) map.set(s.membreId, s.id);
+          // Les fournisseurs externes utilisent un namespace décalé pour éviter les collisions d'ID
+          if (s.fournisseurId && s.id !== undefined) map.set(-s.fournisseurId, s.id);
         }
         setActiveSessions(map);
       }).catch(() => { /* silencieux */ });
@@ -333,7 +335,9 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
     try {
       // Chemin rapide : sessionId déjà connu dans le cache local
-      const knownId = activeSessions.get(f.id);
+      // Fournisseurs externes utilisent une clé négative pour éviter collision avec IDs membres
+      const cacheKey = f.typeMembre === "externe" ? -f.id : f.id;
+      const knownId = activeSessions.get(cacheKey);
       if (knownId !== undefined) {
         try {
           const detail = await getSessionDetail(knownId);
@@ -346,14 +350,20 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
       }
 
       // Chemin complet : vérification API
-      const sessions = await getSessionsEnCours(f.id);
+      const isExterne = f.typeMembre === "externe";
+      const sessions = isExterne
+        ? await getSessionsEnCours(undefined, f.id)
+        : await getSessionsEnCours(f.id);
       if (sessions.length > 0) {
         const detail = await getSessionDetail(sessions[0]!.id);
         setSession(detail);
       } else {
         // Créer une nouvelle session
         try {
-          const s = await createSessionPesee({ membreId: f.id, produit: "cacao", operation: "reception" });
+          const sessionPayload = isExterne
+            ? { fournisseurId: f.id, produit: "cacao", operation: "reception" }
+            : { membreId: f.id, produit: "cacao", operation: "reception" };
+          const s = await createSessionPesee(sessionPayload);
           const detail = await getSessionDetail(s.id);
           setSession(detail);
         } catch (createErr) {

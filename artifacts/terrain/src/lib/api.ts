@@ -401,7 +401,10 @@ export class SessionTransfertExistanteError extends Error {
 }
 
 export async function createSessionPesee(data: {
-  membreId?: number; produit?: string; operation?: string; notes?: string;
+  membreId?: number;
+  /** ID du fournisseur externe (pisteur) */
+  fournisseurId?: number;
+  produit?: string; operation?: string; notes?: string;
   /** Pour les sessions de réception de transfert */
   transfertId?: number;
 }): Promise<import("./types").SessionPesee> {
@@ -451,8 +454,10 @@ export async function signalerArriveePhysique(transfertId: number, data?: { note
   );
 }
 
-export async function getSessionsEnCours(membreId?: number): Promise<import("./types").SessionPesee[]> {
-  const q = membreId ? `?statut=en_cours&membreId=${membreId}` : "?statut=en_cours";
+export async function getSessionsEnCours(membreId?: number, fournisseurId?: number): Promise<import("./types").SessionPesee[]> {
+  let q = "?statut=en_cours";
+  if (membreId) q += `&membreId=${membreId}`;
+  if (fournisseurId) q += `&fournisseurId=${fournisseurId}`;
   return apiPeseeFetch(`/pesee/sessions${q}`);
 }
 

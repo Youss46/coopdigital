@@ -5,6 +5,7 @@ import {
 import { cooperativesTable } from "./cooperatives";
 import { usersTable } from "./users";
 import { membresTable } from "./membres";
+import { fournisseursTable } from "./fournisseurs";
 
 // ─── Sessions de pesée ────────────────────────────────────────────────────────
 
@@ -15,6 +16,7 @@ export const sessionsPeseeTable = pgTable("sessions_pesee", {
   cooperativeId:  integer("cooperative_id").notNull().references(() => cooperativesTable.id),
   numeroSession:  varchar("numero_session", { length: 30 }).notNull(),
   membreId:       integer("membre_id").references(() => membresTable.id),
+  fournisseurId:  integer("fournisseur_id").references(() => fournisseursTable.id),
   produit:        varchar("produit", { length: 100 }).notNull().default("cacao"),
   operation:      varchar("operation", { length: 50 }).notNull().default("reception"),
   peseurId:       integer("peseur_id").references(() => usersTable.id),

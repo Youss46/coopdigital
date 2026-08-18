@@ -3,6 +3,7 @@ import {
   sessionsPeseeTable,
   lignesPeseeTable,
   membresTable,
+  fournisseursTable,
   livraisonsTable,
   paiementsTable,
   avancesTable,
@@ -172,6 +173,8 @@ export async function createSession(
   cooperativeId: number,
   data: {
     membreId?: number;
+    /** ID du fournisseur externe (pisteur) — mutuellement exclusif avec membreId */
+    fournisseurId?: number;
     produit?: string;
     operation?: string;
     peseurId?: number;
@@ -264,8 +267,14 @@ export async function createSession(
     return session;
   }
 
-  // ── Cas 2 : session membre — vérifier l'unicité en cours ────────────────
-  if (data.membreId) {
+  // ── Cas 2 : session membre ou fournisseur — vérifier l'unicité en cours ──
+  const entityCondition = data.fournisseurId
+    ? eq(sessionsPeseeTable.fournisseurId, data.fournisseurId)
+    : data.membreId
+      ? eq(sessionsPeseeTable.membreId, data.membreId)
+      : null;
+
+  if (entityCondition) {
     const [existing] = await db
       .select({
         id: sessionsPeseeTable.id,
@@ -275,7 +284,7 @@ export async function createSession(
       .where(
         and(
           eq(sessionsPeseeTable.cooperativeId, cooperativeId),
-          eq(sessionsPeseeTable.membreId, data.membreId),
+          entityCondition,
           sql`${sessionsPeseeTable.statut}::text = 'en_cours'`,
         ),
       )
@@ -293,12 +302,13 @@ export async function createSession(
       .values({
         cooperativeId,
         numeroSession,
-        membreId: data.membreId ?? null,
-        produit: data.produit ?? "cacao",
+        membreId:      data.membreId      ?? null,
+        fournisseurId: data.fournisseurId ?? null,
+        produit:   data.produit   ?? "cacao",
         operation: data.operation ?? "reception",
-        peseurId: data.peseurId,
+        peseurId:  data.peseurId,
         balanceId: data.balanceId,
-        notes: data.notes,
+        notes:     data.notes,
         transfertId: null,
       })
       .returning();
@@ -306,11 +316,10 @@ export async function createSession(
     return session!;
   } catch (err) {
     // PostgreSQL unique-constraint violation (23505) means a concurrent request
-    // won the race and already inserted an en_cours session for the same member.
+    // won the race and already inserted an en_cours session for the same entity.
     if (
-      data.membreId &&
-      typeof err === "object" &&
-      err !== null &&
+      entityCondition &&
+      typeof err === "object" && err !== null &&
       (err as Record<string, unknown>)["code"] === "23505"
     ) {
       const [existing] = await db
@@ -319,7 +328,7 @@ export async function createSession(
         .where(
           and(
             eq(sessionsPeseeTable.cooperativeId, cooperativeId),
-            eq(sessionsPeseeTable.membreId, data.membreId),
+            entityCondition,
             sql`${sessionsPeseeTable.statut}::text = 'en_cours'`,
           ),
         )
@@ -335,7 +344,7 @@ export async function createSession(
 // ─── Lister sessions (avec lignes count) ──────────────────────────────────────
 export async function getSessions(
   cooperativeId: number,
-  opts: { statut?: string; membreId?: number; limit?: number; peseurId?: number; dateDebut?: string; dateFin?: string } = {},
+  opts: { statut?: string; membreId?: number; fournisseurId?: number; limit?: number; peseurId?: number; dateDebut?: string; dateFin?: string } = {},
 ) {
   const conditions = [eq(sessionsPeseeTable.cooperativeId, cooperativeId)];
   if (opts.statut) {
@@ -345,6 +354,9 @@ export async function getSessions(
   }
   if (opts.membreId) {
     conditions.push(eq(sessionsPeseeTable.membreId, opts.membreId));
+  }
+  if (opts.fournisseurId) {
+    conditions.push(eq(sessionsPeseeTable.fournisseurId, opts.fournisseurId));
   }
   // Peseur : ne voit que ses propres sessions
   if (opts.peseurId !== undefined) {
@@ -365,6 +377,9 @@ export async function getSessions(
       membreId: sessionsPeseeTable.membreId,
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
+      fournisseurId: sessionsPeseeTable.fournisseurId,
+      fournisseurNom: sql<string | null>`(select nom from fournisseurs where id = ${sessionsPeseeTable.fournisseurId})`,
+      fournisseurPrenoms: sql<string | null>`(select prenoms from fournisseurs where id = ${sessionsPeseeTable.fournisseurId})`,
       produit: sessionsPeseeTable.produit,
       operation: sessionsPeseeTable.operation,
       statut: sessionsPeseeTable.statut,
@@ -398,6 +413,9 @@ export async function getSessionDetail(cooperativeId: number, sessionId: number)
       membreId: sessionsPeseeTable.membreId,
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
+      fournisseurId: sessionsPeseeTable.fournisseurId,
+      fournisseurNom: sql<string | null>`(select nom from fournisseurs where id = ${sessionsPeseeTable.fournisseurId})`,
+      fournisseurPrenoms: sql<string | null>`(select prenoms from fournisseurs where id = ${sessionsPeseeTable.fournisseurId})`,
       produit: sessionsPeseeTable.produit,
       operation: sessionsPeseeTable.operation,
       statut: sessionsPeseeTable.statut,
@@ -773,6 +791,7 @@ export async function creerLivraisonDepuisSession(
         cooperativeId: sessionsPeseeTable.cooperativeId,
         statut: sessionsPeseeTable.statut,
         membreId: sessionsPeseeTable.membreId,
+        fournisseurId: sessionsPeseeTable.fournisseurId,
         poidsTotalKg: sessionsPeseeTable.poidsTotalKg,
         nbSacsTotal: sessionsPeseeTable.nbSacsTotal,
         produit: sessionsPeseeTable.produit,
@@ -787,7 +806,9 @@ export async function creerLivraisonDepuisSession(
     if (!session) throw new Error("Session introuvable");
     if (session.statut !== "terminee") throw new Error("La session doit être terminée avant d'être convertie en livraison");
     if (session.livraisonId) throw new Error("Une livraison a déjà été créée pour cette session");
-    if (!session.membreId) throw new Error("La session ne comporte pas de membre — impossible de créer une livraison");
+    if (!session.membreId && !session.fournisseurId) throw new Error("La session ne comporte pas de membre ou fournisseur — impossible de créer une livraison");
+
+    const isFournisseur = !session.membreId && !!session.fournisseurId;
 
     const poidsKg = parseFloat(String(session.poidsTotalKg ?? 0));
     if (poidsKg <= 0) throw new Error("Le poids total de la session est invalide (0 kg)");
@@ -797,31 +818,39 @@ export async function creerLivraisonDepuisSession(
       ? (typeof session.dateFin === "string" ? session.dateFin : (session.dateFin as Date).toISOString().split("T")[0]!)
       : new Date().toISOString().split("T")[0]!;
 
-    // ── Avances & intrants deductions (same logic as createLivraison) ─────
-    // Both reads run inside the transaction with FOR UPDATE so concurrent
-    // deliveries for the same member cannot see the same stale balance.
-    const avanceRows = await tx
-      .select()
-      .from(avancesTable)
-      .where(and(eq(avancesTable.membreId, session.membreId), eq(avancesTable.statut, "en_cours")))
-      .orderBy(desc(avancesTable.dateOctroi))
-      .for("update")
-      .limit(1);
-    const avanceEnCours = avanceRows[0];
+    // ── Avances & intrants deductions — membres seulement (pas de déductions pour fournisseurs) ──
+    let avanceEnCours: typeof avancesTable.$inferSelect | undefined;
+    let avanceDeduite = 0;
+    let intrantsDeduits = 0;
 
-    const encoursIntrants = await getEncoursMembreTx(tx, cooperativeId, session.membreId);
+    if (!isFournisseur && session.membreId) {
+      // Both reads run inside the transaction with FOR UPDATE so concurrent
+      // deliveries for the same member cannot see the same stale balance.
+      const avanceRows = await tx
+        .select()
+        .from(avancesTable)
+        .where(and(eq(avancesTable.membreId, session.membreId), eq(avancesTable.statut, "en_cours")))
+        .orderBy(desc(avancesTable.dateOctroi))
+        .for("update")
+        .limit(1);
+      avanceEnCours = avanceRows[0];
 
-    const avanceDeduite = avanceEnCours
-      ? Math.min(avanceEnCours.soldeRestantFcfa, montantBrut)
-      : 0;
-    const apresAvance = montantBrut - avanceDeduite;
-    const intrantsDeduits = Math.min(encoursIntrants, Math.max(0, apresAvance));
+      const encoursIntrants = await getEncoursMembreTx(tx, cooperativeId, session.membreId);
+
+      avanceDeduite = avanceEnCours
+        ? Math.min(avanceEnCours.soldeRestantFcfa, montantBrut)
+        : 0;
+      const apresAvance = montantBrut - avanceDeduite;
+      intrantsDeduits = Math.min(encoursIntrants, Math.max(0, apresAvance));
+    }
+
     const montantNet = montantBrut - avanceDeduite - intrantsDeduits;
 
     const [livraison] = await tx
       .insert(livraisonsTable)
       .values({
-        membreId: session.membreId,
+        membreId:      isFournisseur ? null : session.membreId,
+        fournisseurId: isFournisseur ? session.fournisseurId : null,
         campagneId,
         poidsKg: String(poidsKg),
         prixUnitaireFcfa: prixBordChampFcfa,
@@ -844,7 +873,7 @@ export async function creerLivraisonDepuisSession(
       .insert(paiementsTable)
       .values({
         livraisonId: livraison!.id,
-        membreId: session.membreId,
+        membreId: isFournisseur ? null : session.membreId,
         montantFcfa: montantNet,
         numeroRecu,
         // modePaiement intentionally null — chosen by the gestionnaire at settlement time
@@ -852,8 +881,8 @@ export async function creerLivraisonDepuisSession(
       })
       .returning();
 
-    // ── Mise à jour de l'avance ───────────────────────────────────────────
-    if (avanceEnCours && avanceDeduite > 0) {
+    // ── Mise à jour de l'avance (membres seulement) ───────────────────────
+    if (!isFournisseur && avanceEnCours && avanceDeduite > 0) {
       const nouveauRembourse = avanceEnCours.montantRembourse_fcfa + avanceDeduite;
       const nouveauSolde = avanceEnCours.soldeRestantFcfa - avanceDeduite;
       await tx
@@ -866,8 +895,8 @@ export async function creerLivraisonDepuisSession(
         .where(eq(avancesTable.id, avanceEnCours.id));
     }
 
-    // ── Remboursement intrants ────────────────────────────────────────────
-    if (intrantsDeduits > 0) {
+    // ── Remboursement intrants (membres seulement) ────────────────────────
+    if (!isFournisseur && intrantsDeduits > 0 && session.membreId) {
       await enregistrerRemboursementParLivraison(tx, cooperativeId, session.membreId, intrantsDeduits, dateStr);
     }
 
@@ -877,46 +906,49 @@ export async function creerLivraisonDepuisSession(
       .set({ livraisonId: livraison!.id })
       .where(eq(sessionsPeseeTable.id, sessionId));
 
-    return { livraison: livraison!, paiement: paiement! };
+    return { livraison: livraison!, paiement: paiement!, isFournisseur };
   });
 
   // Écritures OHADA — fire-and-forget, hors transaction
-  void (async () => {
-    try {
-      const [membre] = await db
-        .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
-        .from(membresTable)
-        .where(eq(membresTable.id, result.livraison.membreId!))
-        .limit(1);
+  // Pour les fournisseurs externes : pas d'écritures OHADA sur le compte membre (4010)
+  if (!result.isFournisseur) {
+    void (async () => {
+      try {
+        const [membre] = await db
+          .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
+          .from(membresTable)
+          .where(eq(membresTable.id, result.livraison.membreId!))
+          .limit(1);
 
-      // Déterminer si le délégué (agentId) a reçu des alimentations de caisse
-      // coopérative avant la session → montantCoopFcfa pour la ventilation 601/521 vs 601/401.
-      let montantCoopFcfa = 0;
-      const delegueId = result.livraison.agentId;
-      if (delegueId) {
-        const cutoff = result.livraison.dateLivraison
-          ? new Date(result.livraison.dateLivraison)
-          : new Date();
-        montantCoopFcfa = await getMontantAlimentationsCaisseDelegue(
-          delegueId, cooperativeId, cutoff,
-        );
+        // Déterminer si le délégué (agentId) a reçu des alimentations de caisse
+        // coopérative avant la session → montantCoopFcfa pour la ventilation 601/521 vs 601/401.
+        let montantCoopFcfa = 0;
+        const delegueId = result.livraison.agentId;
+        if (delegueId) {
+          const cutoff = result.livraison.dateLivraison
+            ? new Date(result.livraison.dateLivraison)
+            : new Date();
+          montantCoopFcfa = await getMontantAlimentationsCaisseDelegue(
+            delegueId, cooperativeId, cutoff,
+          );
+        }
+
+        await generateEcrituresLivraison(cooperativeId, {
+          livraisonId:       result.livraison.id,
+          membreId:          result.livraison.membreId ?? undefined,
+          membreNom:         membre ? `${membre.nom} ${membre.prenoms}` : "—",
+          montantBrutFcfa:   result.livraison.montantBrutFcfa,
+          avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
+          montantNetFcfa:    result.livraison.montantNetFcfa,
+          dateLivraison:     result.livraison.dateLivraison,
+          montantCoopFcfa:   montantCoopFcfa > 0 ? montantCoopFcfa : undefined,
+        });
+      } catch (err) {
+        // Ne pas bloquer la réponse — l'écriture sera visible dans les anomalies comptables
+        console.error("[peseeSession] generateEcrituresLivraison failed", err);
       }
-
-      await generateEcrituresLivraison(cooperativeId, {
-        livraisonId:       result.livraison.id,
-        membreId:          result.livraison.membreId ?? undefined,
-        membreNom:         membre ? `${membre.nom} ${membre.prenoms}` : "—",
-        montantBrutFcfa:   result.livraison.montantBrutFcfa,
-        avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
-        montantNetFcfa:    result.livraison.montantNetFcfa,
-        dateLivraison:     result.livraison.dateLivraison,
-        montantCoopFcfa:   montantCoopFcfa > 0 ? montantCoopFcfa : undefined,
-      });
-    } catch (err) {
-      // Ne pas bloquer la réponse — l'écriture sera visible dans les anomalies comptables
-      console.error("[peseeSession] generateEcrituresLivraison failed", err);
-    }
-  })();
+    })();
+  }
 
   return result;
 }

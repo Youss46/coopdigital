@@ -37,6 +37,8 @@ async function applyHotfixes(client: pg.Client): Promise<void> {
     `ALTER TABLE paiements ALTER COLUMN livraison_id DROP NOT NULL`,
     // paiements : membre_id rendu nullable (migration 0057)
     `ALTER TABLE paiements ALTER COLUMN membre_id DROP NOT NULL`,
+    // sessions_pesee : fournisseur_id pour les pesées de fournisseurs externes
+    `ALTER TABLE sessions_pesee ADD COLUMN IF NOT EXISTS fournisseur_id integer REFERENCES fournisseurs(id)`,
   ];
 
   for (const sql of hotfixes) {
