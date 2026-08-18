@@ -53,6 +53,7 @@ import {
   WifiOff,
   AlertTriangle,
   Scale,
+  PackageCheck,
 } from "lucide-react";
 import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -110,6 +111,7 @@ const NAV_ICON_LIST: React.ElementType[] = [
   Warehouse,      // /entrepots
   Warehouse,      // /mon-entrepot
   PackageX,       // /refus
+  PackageCheck,   // /bons-reception-membres
   CreditCard,     // /avances
   Leaf,           // /intrants
   CheckCircle2,   // /reglements

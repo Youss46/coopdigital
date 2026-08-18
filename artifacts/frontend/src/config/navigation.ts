@@ -51,6 +51,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/entrepots",              label: "Entrepôts délégués",        roles: ["pca","directeur","comptable","auditeur"],                                    category: "Stocks" },
   { href: "/mon-entrepot",           label: "Mon entrepôt",              roles: ["delegue"],                                                                   category: "Stocks" },
   { href: "/refus",                  label: "Stocks refoulés",           roles: ["pca","directeur","magasinier","comptable","auditeur"],                       category: "Stocks" },
+  { href: "/bons-reception-membres", label: "Bons de réception",         roles: ["pca","directeur","magasinier","comptable","auditeur"],                       category: "Stocks" },
 
   // ── Finance membre ───────────────────────────────────────────────────────────
   { href: "/avances",                label: "Avances",                   roles: ["pca","directeur","comptable","caissier","delegue","auditeur"],                          category: "Finance membre" },
