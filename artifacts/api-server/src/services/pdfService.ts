@@ -68,8 +68,9 @@ function formaterDate(d: string | Date): string {
 
 function formaterDateHeure(d: string | Date): string {
   const dt = new Date(d);
-  const date = dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const heure = dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const tz = "Africa/Abidjan";
+  const date = dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: tz });
+  const heure = dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: tz });
   return `${date} à ${heure}`;
 }
 
