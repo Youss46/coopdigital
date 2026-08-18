@@ -715,6 +715,13 @@
       "when": 1788480053000,
       "tag": "0101_transfert_charges_par",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1788480054000,
+      "tag": "0102_avances_delegues",
+      "breakpoints": true
     }
   ]
 }

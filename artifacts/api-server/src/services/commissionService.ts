@@ -24,6 +24,8 @@ import {
   usersTable,
   campagnesTable,
   transfertsStockTable,
+  avancesDeleguesTable,
+  remboursementsAvancesDeleguesTable,
 } from "@workspace/db";
 import { and, eq, isNull, or, desc, inArray, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
@@ -246,6 +248,17 @@ export async function payerCommissions(
   const today = new Date().toISOString().slice(0, 10);
   const libelleMvt = `Paiement commissions délégué (${commissions.length} livraison${commissions.length > 1 ? "s" : ""})`;
 
+  // ── Avances en cours du délégué (pour retenue automatique) ───────────────
+  const avancesEnCours = await db
+    .select()
+    .from(avancesDeleguesTable)
+    .where(and(
+      eq(avancesDeleguesTable.delegueId, delegueId),
+      eq(avancesDeleguesTable.cooperativeId, cooperativeId),
+      inArray(avancesDeleguesTable.statut, ["en_cours", "en_retard"] as const),
+    ))
+    .orderBy(avancesDeleguesTable.createdAt);
+
   // ── Transaction atomique : marquer payé + débiter le compte ──────────────
   // Si le débit échoue (solde insuffisant, compte manquant…), le statut des
   // commissions est automatiquement rollbacké à "en_attente".
@@ -405,6 +418,37 @@ export async function payerCommissions(
           mouvementBanqueId: mvt?.id ?? null,
         });
       }
+    }
+
+    // 3. Retenue automatique sur avances du délégué ─────────────────────────
+    for (const avance of avancesEnCours) {
+      if (avance.statut === "rembourse") continue;
+      let retenueFcfa: number;
+      if (avance.planType === "integral") {
+        retenueFcfa = avance.soldeRestantFcfa;
+      } else if (avance.planType === "partiel" && avance.montantPartielFcfa) {
+        retenueFcfa = Math.min(avance.montantPartielFcfa, avance.soldeRestantFcfa);
+      } else {
+        continue; // "reporte" → pas de retenue ce cycle
+      }
+      if (retenueFcfa <= 0) continue;
+
+      const nouveauSolde     = avance.soldeRestantFcfa - retenueFcfa;
+      const nouveauRembourse = avance.montantRembourse + retenueFcfa;
+      const nouveauStatut    = nouveauSolde === 0 ? "rembourse" : "en_cours";
+
+      await tx.update(avancesDeleguesTable).set({
+        montantRembourse: nouveauRembourse,
+        soldeRestantFcfa: nouveauSolde,
+        statut:           nouveauStatut as "en_cours" | "rembourse" | "en_retard",
+      }).where(eq(avancesDeleguesTable.id, avance.id));
+
+      await tx.insert(remboursementsAvancesDeleguesTable).values({
+        avanceId:     avance.id,
+        commissionId: commissions[0]?.id ?? null,
+        montantFcfa:  retenueFcfa,
+        note:         `Retenue automatique — paiement commissions du ${today}`,
+      });
     }
   }); // fin transaction
 

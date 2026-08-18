@@ -62,3 +62,4 @@ export * from "./missionsEnquete";
 export * from "./primes";
 export * from "./rapports_ia";
 export * from "./charges_diverses";
+export * from "./avances_delegues";

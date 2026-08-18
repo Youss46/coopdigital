@@ -93,6 +93,21 @@ interface DetailCaisse {
   paiementsDifferes: Array<{ livraisonId: number; membreNom: string; dateLivraison: string; montantRestant: number }>;
 }
 
+interface AvanceDelegue {
+  id: number;
+  delegueId: number;
+  montantOctroyeFcfa: number;
+  montantRembourse: number;
+  soldeRestantFcfa: number;
+  dateOctroi: string;
+  dateEcheance: string | null;
+  motif: string | null;
+  statut: "en_cours" | "rembourse" | "en_retard";
+  planType: "integral" | "partiel" | "reporte";
+  montantPartielFcfa: number | null;
+  createdAt: string;
+}
+
 function BadgePaiement({ nb }: { nb: number }) {
   if (nb === 0) return <span style={{ color: "#6b7280", fontSize: ".8rem" }}>—</span>;
   return <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 12, padding: "2px 8px", fontSize: ".78rem", fontWeight: 700 }}>{nb} en attente</span>;
@@ -105,7 +120,7 @@ export default function DeleguesPage() {
   const [showAppro, setShowAppro] = useState<number | null>(null);
   const [montant, setMontant] = useState("");
   const [note, setNote] = useState("");
-  const [tab, setTab] = useState<"liste" | "differes" | "commissions">("liste");
+  const [tab, setTab] = useState<"liste" | "differes" | "commissions" | "avances">("liste");
 
   // ── État onglet Commissions ──────────────────────────────────────────────
   const [commTab, setCommTab] = useState<"taux" | "recap" | "pardelegue">("taux");
@@ -115,6 +130,14 @@ export default function DeleguesPage() {
   const [commCampagneId, setCommCampagneId] = useState<number | null>(null);
   const [dlReleve, setDlReleve] = useState(false);
   const [dlReleveErr, setDlReleveErr] = useState<string | null>(null);
+
+  // ── État onglet Avances ──────────────────────────────────────────────────
+  const [avDelegueId, setAvDelegueId] = useState<number | null>(null);
+  const [showOctroiForm, setShowOctroiForm] = useState(false);
+  const [formOctroi, setFormOctroi] = useState({ montant: "", dateOctroi: new Date().toISOString().slice(0, 10), dateEcheance: "", motif: "", planType: "integral", montantPartiel: "" });
+  const [showRembModal, setShowRembModal] = useState<{ avanceId: number; solde: number } | null>(null);
+  const [rembMontant, setRembMontant] = useState("");
+  const [rembNote, setRembNote] = useState("");
 
   // ── Modal paiement commission ────────────────────────────────────────────
   const [showPayerModal, setShowPayerModal] = useState<{
@@ -266,6 +289,36 @@ export default function DeleguesPage() {
     onError: (e) => toast({ title: (e as Error).message, variant: "destructive" }),
   });
 
+  // ── Queries & mutations avances délégués ─────────────────────────────────
+  const { data: avancesDelegue = [], isLoading: avLoading } = useQuery<AvanceDelegue[]>({
+    queryKey: ["avances-delegue", avDelegueId],
+    queryFn: () => apiFetch(`/delegues/${avDelegueId}/avances`),
+    enabled: tab === "avances" && avDelegueId !== null,
+  });
+
+  const octroiMut = useMutation({
+    mutationFn: (data: { montantOctroyeFcfa: number; dateOctroi: string; dateEcheance?: string; motif?: string; planType: string; montantPartielFcfa?: number }) =>
+      apiFetch(`/delegues/${avDelegueId}/avances`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      toast({ title: "Avance octroyée avec succès" });
+      setShowOctroiForm(false);
+      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().slice(0, 10), dateEcheance: "", motif: "", planType: "integral", montantPartiel: "" });
+      qc.invalidateQueries({ queryKey: ["avances-delegue", avDelegueId] });
+    },
+    onError: (e) => toast({ title: (e as Error).message, variant: "destructive" }),
+  });
+
+  const rembMut = useMutation({
+    mutationFn: ({ avanceId, montantFcfa, note }: { avanceId: number; montantFcfa: number; note?: string }) =>
+      apiFetch(`/delegues/${avDelegueId}/avances/${avanceId}/rembourser`, { method: "POST", body: JSON.stringify({ montantFcfa, note }) }),
+    onSuccess: () => {
+      toast({ title: "Remboursement enregistré" });
+      setShowRembModal(null); setRembMontant(""); setRembNote("");
+      qc.invalidateQueries({ queryKey: ["avances-delegue", avDelegueId] });
+    },
+    onError: (e) => toast({ title: (e as Error).message, variant: "destructive" }),
+  });
+
   const totalSoldes = delegues.reduce((s, d) => s + d.caisse.solde, 0);
   const totalDifferes = delegues.reduce((s, d) => s + d.paiementsDifferes.nb, 0);
   const totalDu = delegues.reduce((s, d) => s + d.paiementsDifferes.montantTotal, 0);
@@ -297,7 +350,8 @@ export default function DeleguesPage() {
             { key: "liste", label: "Liste des délégués" },
             { key: "differes", label: `Paiements différés${totalDifferes > 0 ? ` (${totalDifferes})` : ""}` },
             { key: "commissions", label: "Commissions" },
-          ] as { key: "liste" | "differes" | "commissions"; label: string }[]).map(({ key, label }) => (
+            { key: "avances", label: "Avances" },
+          ] as { key: "liste" | "differes" | "commissions" | "avances"; label: string }[]).map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)} style={{ padding: "6px 18px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: ".85rem", cursor: "pointer", background: tab === key ? "#fff" : "transparent", color: tab === key ? "#111" : "#6b7280", boxShadow: tab === key ? "0 1px 3px rgba(0,0,0,.1)" : "none", whiteSpace: "nowrap" }}>
               {label}
             </button>
@@ -747,6 +801,207 @@ export default function DeleguesPage() {
             )}
           </div>
         )}
+
+        {/* Tab: avances délégués */}
+        {tab === "avances" && (
+          <div>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
+              <select
+                value={avDelegueId ?? ""}
+                onChange={(e) => setAvDelegueId(e.target.value ? Number(e.target.value) : null)}
+                style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem", minWidth: 220 }}
+              >
+                <option value="">— Sélectionner un délégué —</option>
+                {delegues.map((d) => <option key={d.id} value={d.id}>{d.nom} {d.prenoms}{d.section ? ` — ${d.section}` : ""}</option>)}
+              </select>
+              {avDelegueId && (
+                <button
+                  onClick={() => setShowOctroiForm(true)}
+                  style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#2563eb", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: ".88rem" }}
+                >
+                  + Octroyer une avance
+                </button>
+              )}
+            </div>
+
+            {!avDelegueId && (
+              <div style={{ padding: 32, textAlign: "center", color: "#9ca3af", background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb" }}>
+                Sélectionnez un délégué pour voir ses avances
+              </div>
+            )}
+
+            {avDelegueId && (
+              <div>
+                {/* Résumé */}
+                {avancesDelegue.filter(a => a.statut !== "rembourse").length > 0 && (
+                  <div style={{ background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 16px", marginBottom: 16, display: "flex", gap: 20, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: ".88rem", fontWeight: 600, color: "#92400e" }}>
+                      Solde total dû :{" "}
+                      <strong>
+                        {avancesDelegue.filter(a => a.statut !== "rembourse").reduce((s, a) => s + a.soldeRestantFcfa, 0).toLocaleString("fr-FR")} FCFA
+                      </strong>
+                    </span>
+                    <span style={{ fontSize: ".88rem", color: "#92400e" }}>
+                      {avancesDelegue.filter(a => a.statut !== "rembourse").length} avance(s) en cours
+                    </span>
+                  </div>
+                )}
+
+                {avLoading ? (
+                  <div style={{ padding: 32, textAlign: "center", color: "#9ca3af" }}>Chargement…</div>
+                ) : avancesDelegue.length === 0 ? (
+                  <div style={{ padding: 32, textAlign: "center", color: "#9ca3af", background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb" }}>
+                    Aucune avance enregistrée pour ce délégué
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
+                      <thead>
+                        <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                          {["Date octroi", "Montant octroyé", "Remboursé", "Solde restant", "Plan", "Échéance", "Statut", "Action"].map((h) => (
+                            <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: ".78rem", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".05em" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {avancesDelegue.map((a) => (
+                          <tr key={a.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                            <td style={{ padding: "10px 14px", fontSize: ".88rem" }}>{new Date(a.dateOctroi).toLocaleDateString("fr-FR")}</td>
+                            <td style={{ padding: "10px 14px", fontSize: ".88rem", fontWeight: 600 }}>{a.montantOctroyeFcfa.toLocaleString("fr-FR")} FCFA</td>
+                            <td style={{ padding: "10px 14px", fontSize: ".88rem", color: "#16a34a" }}>{a.montantRembourse.toLocaleString("fr-FR")} FCFA</td>
+                            <td style={{ padding: "10px 14px", fontSize: ".9rem", fontWeight: 700, color: a.soldeRestantFcfa > 0 ? "#dc2626" : "#16a34a" }}>
+                              {a.soldeRestantFcfa.toLocaleString("fr-FR")} FCFA
+                            </td>
+                            <td style={{ padding: "10px 14px", fontSize: ".8rem" }}>
+                              {a.planType === "integral" ? "Intégral" : a.planType === "partiel" ? `Partiel (${(a.montantPartielFcfa ?? 0).toLocaleString("fr-FR")} FCFA)` : "Reporté"}
+                            </td>
+                            <td style={{ padding: "10px 14px", fontSize: ".85rem", color: "#6b7280" }}>
+                              {a.dateEcheance ? new Date(a.dateEcheance).toLocaleDateString("fr-FR") : "—"}
+                            </td>
+                            <td style={{ padding: "10px 14px" }}>
+                              <span style={{
+                                padding: "3px 9px", borderRadius: 10, fontSize: ".75rem", fontWeight: 700,
+                                background: a.statut === "rembourse" ? "#dcfce7" : a.statut === "en_retard" ? "#fee2e2" : "#fef3c7",
+                                color: a.statut === "rembourse" ? "#16a34a" : a.statut === "en_retard" ? "#dc2626" : "#92400e",
+                              }}>
+                                {a.statut === "rembourse" ? "Remboursé" : a.statut === "en_retard" ? "En retard" : "En cours"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "10px 14px" }}>
+                              {a.statut !== "rembourse" && (
+                                <button
+                                  onClick={() => { setShowRembModal({ avanceId: a.id, solde: a.soldeRestantFcfa }); setRembMontant(String(a.soldeRestantFcfa)); }}
+                                  style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontWeight: 600, cursor: "pointer", fontSize: ".8rem" }}
+                                >
+                                  Rembourser
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ background: "#f9fafb", fontWeight: 700 }}>
+                          <td style={{ padding: "10px 14px", fontSize: ".85rem" }}>Total</td>
+                          <td style={{ padding: "10px 14px", fontSize: ".85rem" }}>{avancesDelegue.reduce((s, a) => s + a.montantOctroyeFcfa, 0).toLocaleString("fr-FR")} FCFA</td>
+                          <td style={{ padding: "10px 14px", fontSize: ".85rem", color: "#16a34a" }}>{avancesDelegue.reduce((s, a) => s + a.montantRembourse, 0).toLocaleString("fr-FR")} FCFA</td>
+                          <td style={{ padding: "10px 14px", fontSize: ".85rem", color: "#dc2626" }}>{avancesDelegue.filter(a => a.statut !== "rembourse").reduce((s, a) => s + a.soldeRestantFcfa, 0).toLocaleString("fr-FR")} FCFA</td>
+                          <td colSpan={4} />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+      {/* Modal octroi avance */}
+      {showOctroiForm && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 440, boxShadow: "0 8px 32px rgba(0,0,0,.18)" }}>
+            <div style={{ fontWeight: 800, fontSize: "1.05rem", marginBottom: 20 }}>Octroyer une avance</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Montant (FCFA) *</label>
+                <MoneyInput value={formOctroi.montant} onChange={(v) => setFormOctroi(f => ({ ...f, montant: v }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".95rem" }} placeholder="Ex: 150 000" />
+              </div>
+              <div>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Date d'octroi *</label>
+                <input type="date" value={formOctroi.dateOctroi} onChange={(e) => setFormOctroi(f => ({ ...f, dateOctroi: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Date d'échéance (optionnel)</label>
+                <input type="date" value={formOctroi.dateEcheance} onChange={(e) => setFormOctroi(f => ({ ...f, dateEcheance: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Plan de remboursement</label>
+                <select value={formOctroi.planType} onChange={(e) => setFormOctroi(f => ({ ...f, planType: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }}>
+                  <option value="integral">Intégral — déduit en totalité à chaque paiement commission</option>
+                  <option value="partiel">Partiel — montant fixe par paiement</option>
+                  <option value="reporte">Reporté — pas de retenue automatique</option>
+                </select>
+              </div>
+              {formOctroi.planType === "partiel" && (
+                <div>
+                  <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Montant par retenue (FCFA) *</label>
+                  <MoneyInput value={formOctroi.montantPartiel} onChange={(v) => setFormOctroi(f => ({ ...f, montantPartiel: v }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".95rem" }} placeholder="Ex: 50 000" />
+                </div>
+              )}
+              <div>
+                <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Motif (optionnel)</label>
+                <input type="text" value={formOctroi.motif} onChange={(e) => setFormOctroi(f => ({ ...f, motif: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }} placeholder="Ex: Achat groupé intrants" />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={() => setShowOctroiForm(false)} style={{ flex: 1, padding: "10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", fontWeight: 600, cursor: "pointer" }}>Annuler</button>
+              <button
+                disabled={!formOctroi.montant || Number(formOctroi.montant) <= 0 || octroiMut.isPending}
+                onClick={() => octroiMut.mutate({
+                  montantOctroyeFcfa: Number(formOctroi.montant),
+                  dateOctroi: formOctroi.dateOctroi,
+                  dateEcheance: formOctroi.dateEcheance || undefined,
+                  motif: formOctroi.motif || undefined,
+                  planType: formOctroi.planType,
+                  montantPartielFcfa: formOctroi.planType === "partiel" && formOctroi.montantPartiel ? Number(formOctroi.montantPartiel) : undefined,
+                })}
+                style={{ flex: 2, padding: "10px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: (!formOctroi.montant || octroiMut.isPending) ? .5 : 1 }}
+              >
+                {octroiMut.isPending ? "Enregistrement…" : "Octroyer l'avance"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal remboursement manuel */}
+      {showRembModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 400, boxShadow: "0 8px 32px rgba(0,0,0,.18)" }}>
+            <div style={{ fontWeight: 800, fontSize: "1.05rem", marginBottom: 4 }}>Remboursement manuel</div>
+            <div style={{ fontSize: ".85rem", color: "#6b7280", marginBottom: 20 }}>Solde restant : <strong style={{ color: "#dc2626" }}>{showRembModal.solde.toLocaleString("fr-FR")} FCFA</strong></div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Montant à rembourser (FCFA) *</label>
+              <MoneyInput value={rembMontant} onChange={setRembMontant} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".95rem" }} placeholder="Ex: 50 000" />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontWeight: 600, fontSize: ".85rem", marginBottom: 6 }}>Note (optionnel)</label>
+              <input type="text" value={rembNote} onChange={(e) => setRembNote(e.target.value)} style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: ".9rem" }} placeholder="Ex: Remboursement espèces" />
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => { setShowRembModal(null); setRembMontant(""); setRembNote(""); }} style={{ flex: 1, padding: "10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", fontWeight: 600, cursor: "pointer" }}>Annuler</button>
+              <button
+                disabled={!rembMontant || Number(rembMontant) <= 0 || rembMut.isPending}
+                onClick={() => rembMut.mutate({ avanceId: showRembModal.avanceId, montantFcfa: Number(rembMontant), note: rembNote || undefined })}
+                style={{ flex: 2, padding: "10px", border: "none", borderRadius: 8, background: "#16a34a", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: (!rembMontant || rembMut.isPending) ? .5 : 1 }}
+              >
+                {rembMut.isPending ? "Enregistrement…" : "Confirmer le remboursement"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal formulaire taux */}
       {showTauxForm && editTaux !== null && (

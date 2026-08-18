@@ -8,6 +8,7 @@ import {
   membresTable,
   livraisonsTable,
   avancesTable,
+  avancesDeleguesTable,
   ventesExportateursTable,
   exportateursTable,
   ecrituresComptablesTable,
@@ -3993,10 +3994,36 @@ export async function generateBordereauAchatSession(
     if (comm) fraisCollecteFcfa = Math.round(parseFloat(comm.montantFcfa ?? "0"));
   }
 
-  // 6. Campagne
+  // 6. Avances du délégué (pour bordereau informatif)
+  let soldeAvancesFcfa  = 0;
+  let retenueEstimeeFcfa = 0;
+  if (session.transfertId) {
+    const [t2] = await db
+      .select({ delegueId: transfertsStockTable.delegueId })
+      .from(transfertsStockTable)
+      .where(eq(transfertsStockTable.id, session.transfertId))
+      .limit(1);
+    if (t2?.delegueId) {
+      const avances = await db
+        .select({ soldeRestantFcfa: avancesDeleguesTable.soldeRestantFcfa, planType: avancesDeleguesTable.planType, montantPartielFcfa: avancesDeleguesTable.montantPartielFcfa })
+        .from(avancesDeleguesTable)
+        .where(and(
+          eq(avancesDeleguesTable.delegueId, t2.delegueId),
+          eq(avancesDeleguesTable.cooperativeId, cooperativeId),
+          inArray(avancesDeleguesTable.statut, ["en_cours", "en_retard"] as const),
+        ));
+      soldeAvancesFcfa = avances.reduce((s, a) => s + a.soldeRestantFcfa, 0);
+      for (const a of avances) {
+        if (a.planType === "integral") retenueEstimeeFcfa += a.soldeRestantFcfa;
+        else if (a.planType === "partiel" && a.montantPartielFcfa) retenueEstimeeFcfa += Math.min(a.montantPartielFcfa, a.soldeRestantFcfa);
+      }
+    }
+  }
+
+  // 7. Campagne
   const campagne = await getCampagneEnCours(cooperativeId);
 
-  // 7. Totaux
+  // 8. Totaux
   const poidsNetKg    = parseFloat(session.poidsTotalKg ?? "0");
   const poidsBrutKg   = lignes.reduce((s, l) => s + parseFloat(l.poidsBrutKg), 0);
   const valeurProduit = Math.round(poidsNetKg * prixUnitaire);
@@ -4104,8 +4131,8 @@ export async function generateBordereauAchatSession(
   const autresLignes: { label: string; valeur: number }[] = [
     { label: "FRAIS DE\nCOLLECTE", valeur: fraisCollecteFcfa },
     { label: "CARBURANT",          valeur: carburantFcfa },
-    { label: "RETENUE\nAVANCE",    valeur: 0 },
-    { label: "SOLDE SUR\nAVANCES", valeur: 0 },
+    { label: "RETENUE\nAVANCE",    valeur: retenueEstimeeFcfa },
+    { label: "SOLDE SUR\nAVANCES", valeur: soldeAvancesFcfa },
   ];
   const SUB_H = 18;
   const ROW_H = autresLignes.length * SUB_H;

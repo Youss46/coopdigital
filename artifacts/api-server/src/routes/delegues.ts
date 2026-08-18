@@ -22,6 +22,13 @@ import {
   getRecapCommissionsHandler,
 } from "../controllers/commissionController.js";
 import { getAdminReleveCommissions } from "../controllers/rapportsController.js";
+import {
+  listAvancesDelegueHandler,
+  createAvanceDelegueHandler,
+  rembourserAvanceDelegueHandler,
+  getRemboursementsAvanceDelegueHandler,
+  getAvancesDelegueResumeHandler,
+} from "../controllers/avancesDeleguesController.js";
 
 const router = Router();
 
@@ -49,6 +56,13 @@ router.get("/delegues/:agentId/caisse",             authMiddleware, getDetailCai
 router.get("/delegues/:agentId/commissions",                authMiddleware, getCommissionsDelegueHandler);
 router.get("/delegues/:agentId/commissions/releve",         authMiddleware, getAdminReleveCommissions);
 router.post("/delegues/:agentId/commissions/payer",         authMiddleware, payerCommissionsHandler);
+// ─── Avances délégués ─────────────────────────────────────────────────────────
+router.get("/delegues/:agentId/avances",                    authMiddleware, listAvancesDelegueHandler);
+router.get("/delegues/:agentId/avances/resume",             authMiddleware, getAvancesDelegueResumeHandler);
+router.post("/delegues/:agentId/avances",                   authMiddleware, createAvanceDelegueHandler);
+router.post("/delegues/:agentId/avances/:avanceId/rembourser", authMiddleware, rembourserAvanceDelegueHandler);
+router.get("/delegues/:agentId/avances/:avanceId/remboursements", authMiddleware, getRemboursementsAvanceDelegueHandler);
+
 router.post("/delegues/:agentId/approvisionner",    authMiddleware, approvisionnerHandler);
 router.post("/delegues/:agentId/alimenter",         authMiddleware, alimenterCaisseHandler);
 router.put("/delegues/:agentId/cloturer",           authMiddleware, cloturerJourneeHandler);
