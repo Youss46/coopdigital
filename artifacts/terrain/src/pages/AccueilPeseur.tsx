@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useOffline } from "../contexts/OfflineContext";
-import { getBilan, getSessionsEnCours, getSessionsAConvertir, getTransfertsEnAttentePesee } from "../lib/api";
+import { getBilan, getSessionsEnCours, getSessionsAConvertir, getTransfertsEnAttentePesee, getBonsReceptionEnAttente } from "../lib/api";
 import { getBrouillons } from "../lib/idb";
 import BottomNavPeseur from "../components/BottomNavPeseur";
 import type { BilanJour, SessionPesee, BrouillonPesee } from "../lib/types";
@@ -34,6 +34,7 @@ export default function AccueilPeseur() {
   const [sessionsAConvertir, setSessionsAConvertir] = useState<SessionPesee[]>([]);
   const [brouillons, setBrouillons] = useState<BrouillonPesee[]>([]);
   const [nbTransferts, setNbTransferts] = useState(0);
+  const [nbBons, setNbBons]             = useState(0);
 
   useEffect(() => {
     if (isOnline) {
@@ -59,20 +60,27 @@ export default function AccueilPeseur() {
       .catch(() => {});
   }, [location, syncStatus]);
 
-  // Fetch transferts en attente for central peseur (delegueId == null)
+  // Fetch réceptions en attente for central peseur (delegueId == null)
+  // Compte les deux types : transferts délégués + bons membres délégués
   useEffect(() => {
     if (user?.delegueId != null || !isOnline) return;
     let cancelled = false;
-    async function fetchCount() {
+    async function fetchCounts() {
       try {
-        const list = await getTransfertsEnAttentePesee();
-        if (!cancelled) setNbTransferts(list.length);
+        const [transferts, bons] = await Promise.all([
+          getTransfertsEnAttentePesee(),
+          getBonsReceptionEnAttente(),
+        ]);
+        if (!cancelled) {
+          setNbTransferts(transferts.length);
+          setNbBons(bons.length);
+        }
       } catch {
         // silencieux — pas de badge si hors-ligne
       }
     }
-    void fetchCount();
-    const interval = setInterval(() => void fetchCount(), 60_000);
+    void fetchCounts();
+    const interval = setInterval(() => void fetchCounts(), 60_000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [user?.delegueId, isOnline]);
 
@@ -307,49 +315,55 @@ export default function AccueilPeseur() {
           </section>
         )}
 
-        {/* ── Réceptions de transferts (peseur central) ─────────── */}
-        {user?.delegueId == null && (
-          <Link href="/receptions">
-            <div className="t-session-card" style={{ marginBottom: 14 }}>
-              <div className="t-session-card__stripe" style={{ background: "var(--t-peseur)" }} />
-              <div className="t-session-card__body">
-                <div style={{ position: "relative", flexShrink: 0 }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 10,
-                    background: "var(--t-peseur-bg)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    <Truck size={18} color="var(--t-peseur)" />
-                  </div>
-                  {nbTransferts > 0 && (
-                    <span style={{
-                      position: "absolute", top: -4, right: -6,
-                      minWidth: 16, height: 16, borderRadius: 999,
-                      background: "#dc2626", color: "#fff",
-                      fontSize: ".6rem", fontWeight: 700,
+        {/* ── Réceptions de cacao (peseur central) ──────────────── */}
+        {user?.delegueId == null && (() => {
+          const nbTotal = nbTransferts + nbBons;
+          const parties: string[] = [];
+          if (nbTransferts > 0) parties.push(`${nbTransferts} transfert${nbTransferts > 1 ? "s" : ""}`);
+          if (nbBons > 0)       parties.push(`${nbBons} membre${nbBons > 1 ? "s" : ""} délégué${nbBons > 1 ? "s" : ""}`);
+          return (
+            <Link href="/receptions">
+              <div className="t-session-card" style={{ marginBottom: 14 }}>
+                <div className="t-session-card__stripe" style={{ background: "var(--t-peseur)" }} />
+                <div className="t-session-card__body">
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10,
+                      background: "var(--t-peseur-bg)",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      paddingInline: 3, lineHeight: 1,
-                      boxShadow: "0 0 0 2px var(--t-card-bg, #fff)",
                     }}>
-                      {nbTransferts > 99 ? "99+" : nbTransferts}
-                    </span>
-                  )}
-                </div>
-                <div className="t-session-card__text">
-                  <div className="t-session-card__title" style={{ color: "var(--t-peseur)" }}>
-                    Réceptions de transferts
+                      <Truck size={18} color="var(--t-peseur)" />
+                    </div>
+                    {nbTotal > 0 && (
+                      <span style={{
+                        position: "absolute", top: -4, right: -6,
+                        minWidth: 16, height: 16, borderRadius: 999,
+                        background: "#dc2626", color: "#fff",
+                        fontSize: ".6rem", fontWeight: 700,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        paddingInline: 3, lineHeight: 1,
+                        boxShadow: "0 0 0 2px var(--t-card-bg, #fff)",
+                      }}>
+                        {nbTotal > 99 ? "99+" : nbTotal}
+                      </span>
+                    )}
                   </div>
-                  <div className="t-session-card__meta">
-                    {nbTransferts > 0
-                      ? `${nbTransferts} transfert${nbTransferts > 1 ? "s" : ""} en attente`
-                      : "Peser les arrivages des délégués"}
+                  <div className="t-session-card__text">
+                    <div className="t-session-card__title" style={{ color: "var(--t-peseur)" }}>
+                      Réceptions de cacao
+                    </div>
+                    <div className="t-session-card__meta">
+                      {nbTotal > 0
+                        ? parties.join(" · ") + " en attente"
+                        : "Peser les arrivages — délégués et membres"}
+                    </div>
                   </div>
+                  <ChevronRight size={18} color="var(--t-peseur)" style={{ flexShrink: 0 }} />
                 </div>
-                <ChevronRight size={18} color="var(--t-peseur)" style={{ flexShrink: 0 }} />
               </div>
-            </div>
-          </Link>
-        )}
+            </Link>
+          );
+        })()}
 
         {/* ── Actions pesée ─────────────────────────────────────── */}
         <section style={{ marginBottom: 14 }}>
