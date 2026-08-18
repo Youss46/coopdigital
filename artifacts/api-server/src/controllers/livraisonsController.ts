@@ -12,6 +12,7 @@ import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard
 import { checkLivraison, creerAnomalies } from "../services/anomalieService";
 import { CreateLivraisonBody } from "@workspace/api-zod";
 import { generateEcrituresLivraison } from "../services/comptabiliteService";
+import { getMontantAlimentationsCaisseDelegue } from "../services/delegueService";
 import { getEncoursMembre, enregistrerRemboursementParLivraison } from "../services/intrantsService";
 import { envoyerPushGroupePortail } from "../services/pushService";
 import { entrerStockSiDelegue, entrerStockLivraison } from "../services/entrepotDelegueService";
@@ -330,15 +331,34 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       });
     }
 
-    void generateEcrituresLivraison(cooperativeId, {
-      livraisonId: result.livraison.id,
-      membreId: membreId ?? undefined,
-      membreNom: nomProducteur,
-      montantBrutFcfa: result.livraison.montantBrutFcfa,
-      avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
-      montantNetFcfa: result.livraison.montantNetFcfa,
-      dateLivraison: result.livraison.dateLivraison,
-    });
+    // Déterminer si le délégué collecteur a été pré-financé par la caisse coop
+    // → ventilation OHADA 601/521 (caisse) vs 601/401 (dette fournisseur).
+    void (async () => {
+      let montantCoopFcfa = 0;
+      const delegueId = result.livraison.agentId;
+      if (delegueId) {
+        const cutoff = result.livraison.dateLivraison
+          ? new Date(result.livraison.dateLivraison)
+          : new Date();
+        try {
+          montantCoopFcfa = await getMontantAlimentationsCaisseDelegue(
+            delegueId, cooperativeId, cutoff,
+          );
+        } catch {
+          // non-bloquant — on continue sans la ventilation caisse
+        }
+      }
+      await generateEcrituresLivraison(cooperativeId, {
+        livraisonId: result.livraison.id,
+        membreId: membreId ?? undefined,
+        membreNom: nomProducteur,
+        montantBrutFcfa: result.livraison.montantBrutFcfa,
+        avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
+        montantNetFcfa: result.livraison.montantNetFcfa,
+        dateLivraison: result.livraison.dateLivraison,
+        montantCoopFcfa: montantCoopFcfa > 0 ? montantCoopFcfa : undefined,
+      });
+    })();
 
     if (membreId) {
       void envoyerPushGroupePortail([membreId], {

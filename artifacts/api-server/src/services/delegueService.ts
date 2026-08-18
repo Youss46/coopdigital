@@ -8,7 +8,7 @@ import {
   mouvementsCaisseTable,
   campagnesTable,
 } from "@workspace/db";
-import { and, eq, sql, desc } from "drizzle-orm";
+import { and, eq, sql, desc, lt, gte } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { creerNotification, notifierParRole } from "./notificationService.js";
 
@@ -601,6 +601,51 @@ export async function cloturerJournee(
     montantRecu,
     montantPaye,
   };
+}
+
+// ─── Montant alimentations caisse déléguée (pour écritures OHADA) ─────────────
+
+/**
+ * Retourne le total des alimentations reçues par la caisse d'un délégué avant
+ * une date de référence (cutoff). Utilisé pour déterminer la portion de la
+ * valeur produit déjà couverte par la caisse coopérative pré-alimentée, afin
+ * de générer les bonnes écritures OHADA (601/521 vs 601/401).
+ *
+ * @param agentId       - userId du délégué
+ * @param cooperativeId
+ * @param cutoff        - date de référence (date de la livraison / session)
+ * @param depuis        - borne inférieure optionnelle (début du cycle courant)
+ */
+export async function getMontantAlimentationsCaisseDelegue(
+  agentId: number,
+  cooperativeId: number,
+  cutoff: Date,
+  depuis?: Date,
+): Promise<number> {
+  const [caisse] = await db
+    .select({ id: caissesTable.id })
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.responsableId, agentId),
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+    ))
+    .limit(1);
+
+  if (!caisse) return 0;
+
+  const [result] = await db
+    .select({ total: sql<number>`coalesce(sum(${mouvementsCaisseTable.montantFcfa}::numeric), 0)::float` })
+    .from(mouvementsCaisseTable)
+    .where(and(
+      eq(mouvementsCaisseTable.caisseId, caisse.id),
+      eq(mouvementsCaisseTable.type, "entree"),
+      eq(mouvementsCaisseTable.motif, "alimentation_delegue"),
+      depuis ? gte(mouvementsCaisseTable.createdAt, depuis) : undefined,
+      lt(mouvementsCaisseTable.createdAt, cutoff),
+    ));
+
+  return Math.round(result?.total ?? 0);
 }
 
 // ─── Alertes caisses déléguées ────────────────────────────────────────────────

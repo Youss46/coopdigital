@@ -16,6 +16,7 @@ import {
 import { eq, and, desc, sql, gte, lte, isNull, inArray } from "drizzle-orm";
 import { getPrixActuel } from "./terrainService.js";
 import { generateEcrituresLivraison } from "./comptabiliteService.js";
+import { getMontantAlimentationsCaisseDelegue } from "./delegueService.js";
 import { getEncoursMembreTx, enregistrerRemboursementParLivraison } from "./intrantsService.js";
 import { creerNotification, notifierParRole } from "./notificationService.js";
 import { genererNumeroRecu } from "./recuService.js";
@@ -770,6 +771,19 @@ export async function creerLivraisonDepuisSession(
         .where(eq(membresTable.id, result.livraison.membreId!))
         .limit(1);
 
+      // Déterminer si le délégué (agentId) a reçu des alimentations de caisse
+      // coopérative avant la session → montantCoopFcfa pour la ventilation 601/521 vs 601/401.
+      let montantCoopFcfa = 0;
+      const delegueId = result.livraison.agentId;
+      if (delegueId) {
+        const cutoff = result.livraison.dateLivraison
+          ? new Date(result.livraison.dateLivraison)
+          : new Date();
+        montantCoopFcfa = await getMontantAlimentationsCaisseDelegue(
+          delegueId, cooperativeId, cutoff,
+        );
+      }
+
       await generateEcrituresLivraison(cooperativeId, {
         livraisonId:       result.livraison.id,
         membreId:          result.livraison.membreId ?? undefined,
@@ -778,6 +792,7 @@ export async function creerLivraisonDepuisSession(
         avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
         montantNetFcfa:    result.livraison.montantNetFcfa,
         dateLivraison:     result.livraison.dateLivraison,
+        montantCoopFcfa:   montantCoopFcfa > 0 ? montantCoopFcfa : undefined,
       });
     } catch (err) {
       // Ne pas bloquer la réponse — l'écriture sera visible dans les anomalies comptables

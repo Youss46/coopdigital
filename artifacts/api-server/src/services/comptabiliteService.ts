@@ -201,8 +201,18 @@ async function resolveCompteDebit(
 
 /**
  * Livraison enregistrée :
- * 1) 601 / 401 = montant brut (achat cacao — dette envers le producteur)
- * 2) 401 / 4091 = avance déduite (imputation créance)
+ *
+ * Mode fonds_propres (défaut) :
+ *   1) 601 / 401 = montantBrut  (achat cacao — dette envers le producteur)
+ *   2) 401 / 4091 = avanceDéduite (imputation créance avance)
+ *
+ * Mode caisse_cooperative (caisse coopérative pré-alimentée) :
+ *   La partie couverte par la caisse a DÉJÀ été décaissée lors de l'alimentation.
+ *   On enregistre donc deux lignes distinctes pour éviter le double comptage :
+ *   1a) 601 / 521 = montantCoopFcfa    (achat soldé via caisse pré-alimentée — pas de nouvelle dette 401)
+ *   1b) 601 / 401 = resteValeurFcfa    (achat financé par le délégué — nouvelle dette)
+ *        → si resteValeurFcfa = 0 l'écriture 1b est omise
+ *   2) 401 / 4091 = avanceDéduite (identique aux deux modes)
  *
  * NB : l'écriture de décaissement (401/521 ou 401/571) est générée
  * au moment de la VALIDATION du règlement dans validerPaiement(),
@@ -216,21 +226,46 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
   avanceDeduiteFcfa: number;
   montantNetFcfa: number;
   dateLivraison: string;
+  /**
+   * Montant déjà couvert par la caisse coopérative pré-alimentée.
+   * Positif uniquement si mode_financement = 'caisse_cooperative'.
+   * Quand fourni, évite de créer une nouvelle dette 401 pour cette portion.
+   */
+  montantCoopFcfa?: number;
 }) {
   const { livraisonId, membreId, membreNom, montantBrutFcfa, avanceDeduiteFcfa, dateLivraison } = params;
+  const montantCoopCouvert = Math.min(params.montantCoopFcfa ?? 0, montantBrutFcfa);
+  const restePayable = montantBrutFcfa - montantCoopCouvert;
   const piece = `LIV-${livraisonId}`;
   const promises: Promise<unknown>[] = [];
 
-  if (montantBrutFcfa > 0) {
+  // ── Part couverte par la caisse coopérative pré-alimentée (601 / 521) ──────
+  // Pas de nouvelle dette fournisseur 401 : la caisse avait déjà été débitée
+  // lors de l'alimentation du délégué.
+  if (montantCoopCouvert > 0) {
+    const c = await resolveComptes(cooperativeId, "livraisons", "achat_cacao_caisse_coop", "601", "521");
+    promises.push(proposerEcriture(cooperativeId, {
+      source: "livraison", sourceId: livraisonId,
+      libelle: `Achat cacao (caisse coopérative) – ${membreNom}`,
+      compteDebit: c.compteDebit, compteCredit: c.compteCredit,
+      montantFcfa: montantCoopCouvert, date: dateLivraison, numeroPiece: piece,
+      tiersId: membreId, tiersType: "membre",
+    }));
+  }
+
+  // ── Part nouvelle (601 / 401) — financée par le délégué ou mode fonds propres ─
+  if (restePayable > 0) {
     const c = await resolveComptes(cooperativeId, "livraisons", "achat_cacao_producteur", "601", "401");
     promises.push(proposerEcriture(cooperativeId, {
       source: "livraison", sourceId: livraisonId,
       libelle: `Achat cacao – ${membreNom}`,
       compteDebit: c.compteDebit, compteCredit: c.compteCredit,
-      montantFcfa: montantBrutFcfa, date: dateLivraison, numeroPiece: piece,
+      montantFcfa: restePayable, date: dateLivraison, numeroPiece: piece,
       tiersId: membreId, tiersType: "membre",
     }));
   }
+
+  // ── Déduction avance (401 / 4091) — identique dans les deux modes ───────────
   if (avanceDeduiteFcfa > 0) {
     const c = await resolveComptes(cooperativeId, "avances", "remboursement_avance", "401", "4091");
     promises.push(proposerEcriture(cooperativeId, {

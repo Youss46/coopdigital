@@ -38,13 +38,12 @@ import {
   sessionsPeseeTable,
   lignesPeseeTable,
   historiquePrixTable,
-  caissesDeleguesTable,
-  alimentationsCaisseDelegueTable,
 } from "@workspace/db";
 import { eq, desc, gte, lte, lt, and, sql, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
 import { computeCodeMembre } from "./portailService";
+import { getMontantAlimentationsCaisseDelegue } from "./delegueService";
 
 const VERT = "#1a4731";
 const OR   = "#c4962a";
@@ -4023,23 +4022,13 @@ export async function generateBordereauAchatSession(
       else if (a.planType === "partiel" && a.montantPartielFcfa) retenueEstimeeFcfa += Math.min(a.montantPartielFcfa, a.soldeRestantFcfa);
     }
 
-    // 6b. Si mode caisse_cooperative : somme des alimentations avant le début de session
-    if (modeFinancement === "caisse_cooperative") {
-      const [caisse] = await db
-        .select({ id: caissesDeleguesTable.id })
-        .from(caissesDeleguesTable)
-        .where(and(
-          eq(caissesDeleguesTable.userId, delegueIdSession),
-          eq(caissesDeleguesTable.cooperativeId, cooperativeId),
-        ))
-        .limit(1);
-
-      if (caisse) {
+    // 6b. Si mode caisse_cooperative : montant pré-financé sur le cycle courant
+    if (modeFinancement === "caisse_cooperative" && delegueIdSession) {
+      {
         const cutoff = session.createdAt ?? new Date();
 
-        // Isoler le cycle en cours : alimentations depuis la dernière clôture de session
-        // du même délégué (dernière session terminée avant la session courante).
-        // Sans dernière clôture (1ère session) → on somme toutes les alimentations avant cutoff.
+        // Cycle start = dateFin de la dernière session terminée pour ce délégué
+        // (pour ne compter que les alimentations du cycle de collecte en cours).
         const [derniereSessionTerminee] = await db
           .select({ dateFin: sessionsPeseeTable.dateFin })
           .from(sessionsPeseeTable)
@@ -4053,17 +4042,10 @@ export async function generateBordereauAchatSession(
           .orderBy(desc(sessionsPeseeTable.dateFin))
           .limit(1);
 
-        const cycleDebut: Date | null = derniereSessionTerminee?.dateFin ?? null;
-
-        const alims = await db
-          .select({ montantFcfa: alimentationsCaisseDelegueTable.montantFcfa })
-          .from(alimentationsCaisseDelegueTable)
-          .where(and(
-            eq(alimentationsCaisseDelegueTable.caisseDelegueId, caisse.id),
-            cycleDebut ? gte(alimentationsCaisseDelegueTable.dateEnvoi, cycleDebut) : undefined,
-            lt(alimentationsCaisseDelegueTable.dateEnvoi, cutoff),
-          ));
-        montantCoopFcfa = alims.reduce((s, a) => s + Math.round(parseFloat(a.montantFcfa ?? "0")), 0);
+        const cycleDebut = derniereSessionTerminee?.dateFin ?? undefined;
+        montantCoopFcfa = await getMontantAlimentationsCaisseDelegue(
+          delegueIdSession!, cooperativeId, cutoff, cycleDebut,
+        );
       }
     }
   }
