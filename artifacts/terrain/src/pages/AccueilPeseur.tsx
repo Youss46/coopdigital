@@ -132,13 +132,9 @@ export default function AccueilPeseur() {
                 <div className="t-kpi__icon" style={{ background: "rgba(22,163,74,.1)" }}>
                   <Banknote size={18} color="var(--t-success)" />
                 </div>
-                <div className="t-kpi__value" style={{ fontSize: ".9rem", color: "var(--t-success)" }}>
+                <div className="t-kpi__value" style={{ fontSize: ".82rem", color: "var(--t-success)", wordBreak: "break-all" }}>
                   {bilan.collectes.valeur > 0
-                    ? (bilan.collectes.valeur >= 1_000_000
-                      ? (bilan.collectes.valeur / 1_000_000).toFixed(1) + "M"
-                      : (bilan.collectes.valeur >= 1000
-                        ? (bilan.collectes.valeur / 1000).toFixed(0) + "k"
-                        : bilan.collectes.valeur.toLocaleString("fr-FR")))
+                    ? bilan.collectes.valeur.toLocaleString("fr-FR")
                     : "—"}
                 </div>
                 <div className="t-kpi__label">FCFA brut</div>

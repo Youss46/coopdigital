@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
-import { db, campagnesTable, usersTable, livraisonsTable, membresTable, rapportsIaTable } from "@workspace/db";
-import { and, eq, desc } from "drizzle-orm";
+import { db, campagnesTable, usersTable, livraisonsTable, membresTable, rapportsIaTable, fournisseursTable } from "@workspace/db";
+import { and, eq, desc, or } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
 import PDFDocument from "pdfkit";
 import {
@@ -132,10 +132,14 @@ export async function getTerrainRecuLivraison(req: Request, res: Response): Prom
       .select({ agentId: livraisonsTable.agentId })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+      .leftJoin(fournisseursTable, eq(fournisseursTable.id, livraisonsTable.fournisseurId))
       .where(
         and(
           eq(livraisonsTable.id, id),
-          eq(membresTable.cooperativeId, cooperativeId),
+          or(
+            eq(membresTable.cooperativeId, cooperativeId),
+            eq(fournisseursTable.cooperativeId, cooperativeId),
+          ),
         ),
       )
       .limit(1);

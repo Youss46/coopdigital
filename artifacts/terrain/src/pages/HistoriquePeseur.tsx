@@ -145,12 +145,8 @@ export default function HistoriquePeseur() {
               <div className="t-kpi__icon" style={{ background: "rgba(22,163,74,.08)" }}>
                 <Package size={16} color="var(--t-success)" />
               </div>
-              <div className="t-kpi__value" style={{ fontSize: ".85rem", color: "var(--t-success)" }}>
-                {totalMontant >= 1_000_000
-                  ? (totalMontant / 1_000_000).toFixed(1) + "M"
-                  : totalMontant >= 1000
-                    ? (totalMontant / 1000).toFixed(0) + "k"
-                    : totalMontant.toLocaleString("fr-FR")}
+              <div className="t-kpi__value" style={{ fontSize: ".82rem", color: "var(--t-success)", wordBreak: "break-all" }}>
+                {totalMontant.toLocaleString("fr-FR")}
               </div>
               <div className="t-kpi__label">FCFA net</div>
             </div>

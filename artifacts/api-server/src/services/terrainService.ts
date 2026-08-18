@@ -259,7 +259,12 @@ export async function getFournisseurs(
     })
   );
 
-  // ── Fournisseurs externes créés par ce délégué ──────────────────────────
+  // ── Fournisseurs externes ────────────────────────────────────────────────
+  // null = peseur sans délégué rattaché → aucun external à retourner
+  if (delegueId === null) {
+    return membresResult;
+  }
+
   const extConditions = [
     eq(fournisseursTable.cooperativeId, cooperativeId),
     eq(fournisseursTable.typeFournisseur, "externe"),

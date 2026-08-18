@@ -70,6 +70,8 @@ export async function getFournisseursHandler(req: Request, res: Response): Promi
   const delegueIdForExternals =
     agent.role === "delegue" ? agent.id :
     agent.role === "peseur" && agent.delegueId ? agent.delegueId :
+    // peseur sans délégué rattaché → aucun fournisseur externe (null = signal "skip")
+    agent.role === "peseur" ? null :
     undefined;
   try {
     const fournisseurs = await terrainService.getFournisseurs(cooperativeId, section, search, peseurScopeDelegueId, delegueIdForExternals);
