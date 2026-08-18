@@ -60,4 +60,16 @@ router.get(
   ctrl.getRapportPdf,
 );
 
+router.post(
+  "/reconciliation/lignes/:id/suggestions-ia",
+  checkPermission("reconciliation", "voir"),
+  ctrl.postSuggestionsIA,
+);
+
+router.post(
+  "/reconciliation/:id/analyse-ia",
+  checkPermission("reconciliation", "voir"),
+  ctrl.postAnalyseIA,
+);
+
 export default router;

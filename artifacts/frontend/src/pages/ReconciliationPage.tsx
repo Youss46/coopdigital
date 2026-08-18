@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
-import { GitMerge, Upload, CheckCircle2, AlertTriangle, HelpCircle, X, Download, RefreshCw, Search, Eye } from "lucide-react";
+import { GitMerge, Upload, CheckCircle2, AlertTriangle, HelpCircle, X, Download, RefreshCw, Search, Eye, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ReactMarkdown from "react-markdown";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok  = () => localStorage.getItem("coop_token") ?? "";
@@ -69,6 +70,26 @@ function ModalReconcilier({
   const [selected, setSelected]   = useState<Ecriture | null>(null);
   const [loading, setLoading]     = useState(false);
 
+  // Suggestions IA
+  interface Suggestion { ecritureId: number; score: number; raison: string; ecriture: Ecriture }
+  const [suggestions, setSuggestions]   = useState<Suggestion[]>([]);
+  const [loadingIa,   setLoadingIa]     = useState(true);
+  const [showIa,      setShowIa]        = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`${BASE}/api/reconciliation/lignes/${ligne.id}/suggestions-ia`, {
+          method: "POST", headers: { Authorization: `Bearer ${tok()}` },
+        });
+        if (r.ok) {
+          const data = await r.json() as { suggestions: Suggestion[] };
+          setSuggestions(data.suggestions ?? []);
+        }
+      } finally { setLoadingIa(false); }
+    })();
+  }, [ligne.id]);
+
   const rechercher = useCallback(async () => {
     const montant = Math.round(parseFloat(ligne.montant_fcfa));
     const url = `${BASE}/api/reconciliation/ecritures?q=${encodeURIComponent(q)}&montant=${montant}`;
@@ -95,48 +116,109 @@ function ModalReconcilier({
     } finally { setLoading(false); }
   };
 
+  const scoreBadge = (score: number) => {
+    if (score >= 80) return <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">{score}%</span>;
+    if (score >= 50) return <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">{score}%</span>;
+    return <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">{score}%</span>;
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl">
-        <div className="flex items-center justify-between p-5 border-b">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b shrink-0">
           <h2 className="text-lg font-semibold text-gray-800">Réconcilier manuellement</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto flex-1">
+          {/* Ligne bancaire */}
           <div className="bg-gray-50 rounded-lg p-3 text-sm">
             <p className="font-medium text-gray-800">{ligne.libelle_banque}</p>
             <p className="text-gray-500">{ligne.date_operation} — {ligne.type === "debit" ? "Débit" : "Crédit"} {FCFA(ligne.montant_fcfa)}</p>
           </div>
-          <div className="flex gap-2">
-            <input type="text" value={q} onChange={e => setQ(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && rechercher()}
-              placeholder="Rechercher dans les écritures comptables…"
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            <button onClick={rechercher}
-              className="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
-              <Search size={14} />
+
+          {/* Suggestions Claude IA */}
+          <div className="border border-purple-100 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setShowIa(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 transition-colors"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-purple-800">
+                <Sparkles size={14} className="text-purple-600" />
+                Suggestions Claude IA
+                {loadingIa && <span className="text-xs font-normal text-purple-500 ml-1">Analyse en cours…</span>}
+                {!loadingIa && suggestions.length === 0 && <span className="text-xs font-normal text-purple-400 ml-1">Aucune suggestion</span>}
+                {!loadingIa && suggestions.length > 0 && <span className="text-xs font-normal text-purple-500 ml-1">{suggestions.length} correspondance{suggestions.length > 1 ? "s" : ""}</span>}
+              </span>
+              {showIa ? <ChevronUp size={14} className="text-purple-500" /> : <ChevronDown size={14} className="text-purple-500" />}
             </button>
+            {showIa && (
+              <div className="divide-y divide-purple-50">
+                {loadingIa ? (
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-400 border-t-transparent" />
+                    <span className="text-sm text-purple-500">Claude analyse les écritures candidates…</span>
+                  </div>
+                ) : suggestions.length === 0 ? (
+                  <p className="text-sm text-gray-400 px-4 py-3">Aucune écriture candidate trouvée dans la plage montant/date.</p>
+                ) : suggestions.map((s) => (
+                  <button
+                    key={s.ecritureId}
+                    onClick={() => setSelected(s.ecriture)}
+                    className={`w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors ${selected?.id === s.ecritureId ? "bg-purple-50 border-l-2 border-purple-600" : ""}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {scoreBadge(s.score)}
+                          <span className="text-sm font-medium text-gray-800 truncate">{s.ecriture.libelle}</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">{s.ecriture.date_ecriture} | {s.ecriture.compte_debit}/{s.ecriture.compte_credit}</p>
+                        <p className="text-xs text-purple-600 mt-1 italic">{s.raison}</p>
+                      </div>
+                      <span className={`text-sm font-bold shrink-0 ${Math.abs(s.ecriture.montant_fcfa) === Math.round(parseFloat(ligne.montant_fcfa)) ? "text-green-600" : "text-gray-700"}`}>
+                        {FCFA(Math.abs(s.ecriture.montant_fcfa))}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="max-h-64 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
-            {ecritures.length === 0 ? (
-              <p className="text-sm text-gray-400 p-4 text-center">Aucune écriture trouvée</p>
-            ) : ecritures.map(e => (
-              <button key={e.id} onClick={() => setSelected(e)}
-                className={`w-full text-left p-3 hover:bg-blue-50 transition-colors ${selected?.id === e.id ? "bg-blue-50 border-l-2 border-blue-600" : ""}`}>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-gray-800">{e.libelle}</p>
-                  <p className={`text-sm font-bold ${Math.abs(e.montant_fcfa) === Math.round(parseFloat(ligne.montant_fcfa)) ? "text-green-600" : "text-gray-700"}`}>
-                    {FCFA(Math.abs(e.montant_fcfa))}
-                  </p>
-                </div>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {e.date_ecriture} | Débit : {e.compte_debit} / Crédit : {e.compte_credit}
-                </p>
+
+          {/* Recherche manuelle */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Recherche manuelle</p>
+            <div className="flex gap-2 mb-2">
+              <input type="text" value={q} onChange={e => setQ(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && rechercher()}
+                placeholder="Rechercher dans les écritures comptables…"
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <button onClick={rechercher} className="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
+                <Search size={14} />
               </button>
-            ))}
+            </div>
+            <div className="max-h-48 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
+              {ecritures.length === 0 ? (
+                <p className="text-sm text-gray-400 p-4 text-center">Aucune écriture trouvée</p>
+              ) : ecritures.map(e => (
+                <button key={e.id} onClick={() => setSelected(e)}
+                  className={`w-full text-left p-3 hover:bg-blue-50 transition-colors ${selected?.id === e.id ? "bg-blue-50 border-l-2 border-blue-600" : ""}`}>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-800">{e.libelle}</p>
+                    <p className={`text-sm font-bold ${Math.abs(e.montant_fcfa) === Math.round(parseFloat(ligne.montant_fcfa)) ? "text-green-600" : "text-gray-700"}`}>
+                      {FCFA(Math.abs(e.montant_fcfa))}
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {e.date_ecriture} | Débit : {e.compte_debit} / Crédit : {e.compte_credit}
+                  </p>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-        <div className="flex gap-3 p-5 pt-0">
+
+        <div className="flex gap-3 p-5 border-t shrink-0">
           <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Annuler</button>
           <button onClick={confirmer} disabled={!selected || loading}
             className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
@@ -422,6 +504,46 @@ function Reconciliation() {
   const [modalReconc, setModalReconc] = useState<LigneReleve | null>(null);
   const [modalIgnorer, setModalIgnorer] = useState<LigneReleve | null>(null);
 
+  // Analyse IA streaming
+  const [analyseIa,      setAnalyseIa]      = useState("");
+  const [loadingAnalyse, setLoadingAnalyse] = useState(false);
+  const [showAnalyse,    setShowAnalyse]    = useState(false);
+  const analyseRef = useRef<HTMLDivElement>(null);
+
+  const lancerAnalyseIA = async () => {
+    if (!selectedId) return;
+    setAnalyseIa("");
+    setShowAnalyse(true);
+    setLoadingAnalyse(true);
+    setTimeout(() => analyseRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    try {
+      const r = await fetch(`${BASE}/api/reconciliation/${selectedId}/analyse-ia`, {
+        method: "POST", headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (!r.ok || !r.body) throw new Error("Erreur serveur");
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+        for (const part of parts) {
+          const line = part.replace(/^data: /, "").trim();
+          if (line === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(line) as { text?: string; erreur?: string };
+            if (parsed.text) setAnalyseIa(prev => prev + parsed.text);
+          } catch { /* skip */ }
+        }
+      }
+    } catch (e) {
+      toast({ title: "Erreur analyse IA", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    } finally { setLoadingAnalyse(false); }
+  };
+
   const chargerReleves = useCallback(async () => {
     const r = await fetch(`${BASE}/api/reconciliation/releves`, { headers: { Authorization: `Bearer ${tok()}` } });
     if (r.ok) setReleves(await r.json());
@@ -498,6 +620,11 @@ function Reconciliation() {
                 <RefreshCw size={14} className={running ? "animate-spin" : ""} />
                 {running ? "Traitement…" : "Réconciliation automatique"}
               </button>
+              <button onClick={() => void lancerAnalyseIA()} disabled={loadingAnalyse}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 border border-purple-200 text-purple-700 hover:bg-purple-50">
+                <Sparkles size={14} className={loadingAnalyse ? "animate-pulse" : ""} />
+                {loadingAnalyse ? "Claude analyse…" : "Analyser avec IA"}
+              </button>
               <button onClick={telechargerPdf}
                 className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
                 <Download size={14} /> Rapport PDF
@@ -511,6 +638,32 @@ function Reconciliation() {
           </button>
         </div>
       </div>
+
+      {/* Panel analyse IA streaming */}
+      {showAnalyse && (
+        <div ref={analyseRef} className="bg-white rounded-xl border border-purple-100 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-purple-50 to-violet-50 border-b border-purple-100">
+            <h3 className="text-sm font-semibold text-purple-800 flex items-center gap-2">
+              <Sparkles size={14} className={loadingAnalyse ? "animate-pulse text-purple-500" : "text-purple-600"} />
+              Analyse IA — Claude Sonnet
+              {loadingAnalyse && <span className="text-xs font-normal text-purple-400">Rédaction en cours…</span>}
+            </h3>
+            <button onClick={() => setShowAnalyse(false)} className="text-purple-400 hover:text-purple-600"><X size={16} /></button>
+          </div>
+          <div className="p-5">
+            {analyseIa ? (
+              <div className="prose prose-sm max-w-none prose-headings:text-gray-800 prose-p:text-gray-600 prose-li:text-gray-600 prose-strong:text-gray-800">
+                <ReactMarkdown>{analyseIa}</ReactMarkdown>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 py-4">
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-purple-400 border-t-transparent" />
+                <span className="text-sm text-purple-500">Claude analyse le relevé…</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Résultat auto */}
       {autoResult && (
