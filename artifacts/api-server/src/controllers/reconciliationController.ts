@@ -164,6 +164,21 @@ export async function postSuggestionsIA(req: Request, res: Response): Promise<vo
 
     const montant = Math.round(parseFloat(ligne.montant_fcfa));
 
+    // ── Comptes de trésorerie du plan comptable de la coopérative (classe 5) ──
+    const planQ = await db.execute<{ numero_compte: string; libelle: string }>(sql`
+      SELECT numero_compte, libelle
+      FROM plan_comptable
+      WHERE cooperative_id = ${cooperativeId} AND classe = 5 AND actif = true
+      ORDER BY numero_compte
+    `);
+    const comptesTresorerie = planQ.rows;
+    // Fallback SYSCOHADA si plan vide (coopérative sans plan personnalisé)
+    const numerosTresorerie = comptesTresorerie.length > 0
+      ? comptesTresorerie.map(c => c.numero_compte)
+      : ["521", "522", "523", "514", "571", "572"];
+    const planLabel = (num: string) =>
+      comptesTresorerie.find(c => c.numero_compte === num)?.libelle ?? num;
+
     const candidatesQ = await db.execute<{
       id: number; date_ecriture: string; libelle: string;
       compte_debit: string; compte_credit: string; montant_fcfa: number; source: string;
@@ -172,7 +187,11 @@ export async function postSuggestionsIA(req: Request, res: Response): Promise<vo
              compte_debit, compte_credit, montant_fcfa::numeric AS montant_fcfa, source
       FROM ecritures_comptables
       WHERE cooperative_id = ${cooperativeId}
-        AND (compte_debit IN ('521','522','571') OR compte_credit IN ('521','522','571'))
+        AND (
+          compte_debit  IN (SELECT numero_compte FROM plan_comptable WHERE cooperative_id = ${cooperativeId} AND classe = 5 AND actif = true)
+          OR compte_credit IN (SELECT numero_compte FROM plan_comptable WHERE cooperative_id = ${cooperativeId} AND classe = 5 AND actif = true)
+          ${comptesTresorerie.length === 0 ? sql`OR compte_debit IN ('521','522','523','514','571','572') OR compte_credit IN ('521','522','523','514','571','572')` : sql``}
+        )
         AND montant_fcfa::numeric BETWEEN ${Math.round(montant * 0.6)} AND ${Math.round(montant * 1.4)}
         AND date_ecriture BETWEEN (${ligne.date_operation}::date - INTERVAL '30 days')
                                AND (${ligne.date_operation}::date + INTERVAL '30 days')
@@ -188,9 +207,23 @@ export async function postSuggestionsIA(req: Request, res: Response): Promise<vo
       return;
     }
 
+    // ── Récupérer les libellés de TOUS les comptes impliqués dans les écritures ──
+    const allNums = [...new Set(candidates.flatMap(c => [c.compte_debit, c.compte_credit]))];
+    const allLabelsQ = await db.execute<{ numero_compte: string; libelle: string }>(sql`
+      SELECT numero_compte, libelle FROM plan_comptable
+      WHERE cooperative_id = ${cooperativeId} AND numero_compte = ANY(${allNums})
+    `);
+    const allLabels = new Map(allLabelsQ.rows.map(r => [r.numero_compte, r.libelle]));
+    const label = (num: string) => allLabels.get(num) ? `${num} — ${allLabels.get(num)}` : num;
+
     const anthropic = new Anthropic({ apiKey: process.env["ANTHROPIC_API_KEY"] });
 
+    const planSection = comptesTresorerie.length > 0
+      ? `\nComptes de trésorerie de cette coopérative (classe 5 du plan comptable) :\n${comptesTresorerie.map(c => `  ${c.numero_compte} — ${c.libelle}`).join("\n")}\n`
+      : `\nComptes de trésorerie utilisés : SYSCOHADA standard (521 Banque, 571 Caisse…)\n`;
+
     const system = `Tu es expert-comptable spécialisé en rapprochement bancaire pour des coopératives agricoles en Côte d'Ivoire (SYSCOHADA).
+Tu connais parfaitement la nomenclature SYSCOHADA et tu utilises les libellés du plan comptable fourni pour raisonner.
 Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown, sans texte hors du JSON.`;
 
     const user = `Opération bancaire à rapprocher :
@@ -199,11 +232,12 @@ Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown, sans texte hors 
 - Montant : ${montant.toLocaleString("fr-FR")} FCFA (${ligne.type === "debit" ? "débit — sortie banque" : "crédit — entrée banque"})
 - Référence : ${ligne.reference_banque ?? "—"}
 - Banque : ${ligne.banque}${ligne.numero_compte ? ` (compte ${ligne.numero_compte})` : ""}
+${planSection}
+Écritures candidates issues du journal (filtrées sur les comptes de trésorerie de la coopérative, montant ±40 %, date ±30 jours) :
+${candidates.map((e, i) => `${i + 1}. ID=${e.id} | ${e.date_ecriture} | ${e.libelle} | ${Number(e.montant_fcfa).toLocaleString("fr-FR")} FCFA | Débit: ${label(e.compte_debit)} / Crédit: ${label(e.compte_credit)} | Source: ${e.source}`).join("\n")}
 
-Écritures candidates (filtrées par montant ±40 % et date ±30 jours) :
-${candidates.map((e, i) => `${i + 1}. ID=${e.id} | ${e.date_ecriture} | ${e.libelle} | ${Number(e.montant_fcfa).toLocaleString("fr-FR")} FCFA | Débit:${e.compte_debit} Crédit:${e.compte_credit} | Source:${e.source}`).join("\n")}
-
-Retourne les 3 meilleures correspondances (ou moins s'il n'y en a pas). Score de 0 à 100. Raison en 1-2 phrases en français.
+Utilise les libellés du plan comptable pour valider la cohérence sens débit/crédit avec le type d'opération bancaire.
+Retourne les 3 meilleures correspondances (ou moins). Score 0-100. Raison 1-2 phrases en français.
 Format JSON exact :
 [{"ecritureId":<id>,"score":<0-100>,"raison":"<explication>"}]`;
 
@@ -268,6 +302,17 @@ export async function postAnalyseIA(req: Request, res: Response): Promise<void> 
     const nonRec  = lignes.filter(l => ["non_reconciliee", "a_justifier"].includes(l.statut_reconciliation));
     const recAvecEcart = lignes.filter(l => l.statut_reconciliation === "reconciliee" && Math.abs(parseFloat(l.ecart_fcfa)) > 0);
 
+    // ── Plan comptable classe 5 de la coopérative ──────────────────────────────
+    const planQ2 = await db.execute<{ numero_compte: string; libelle: string }>(sql`
+      SELECT numero_compte, libelle FROM plan_comptable
+      WHERE cooperative_id = ${cooperativeId} AND classe = 5 AND actif = true
+      ORDER BY numero_compte
+    `);
+    const comptesTresorerie2 = planQ2.rows;
+    const planSection2 = comptesTresorerie2.length > 0
+      ? `\n## Plan comptable — comptes de trésorerie (classe 5)\n${comptesTresorerie2.map(c => `- ${c.numero_compte} — ${c.libelle}`).join("\n")}\n`
+      : "\n## Plan comptable\nSYSCOHADA standard (521 Banque, 571 Caisse…)\n";
+
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -275,6 +320,7 @@ export async function postAnalyseIA(req: Request, res: Response): Promise<void> 
     const anthropic = new Anthropic({ apiKey: process.env["ANTHROPIC_API_KEY"] });
 
     const system = `Tu es expert-comptable et auditeur spécialisé dans les coopératives agricoles SYSCOHADA en Côte d'Ivoire.
+Tu connais parfaitement la nomenclature SYSCOHADA et utilises le plan comptable fourni pour contextualiser les opérations.
 Tu produis des rapports de rapprochement bancaire clairs et actionnables en français professionnel.
 Utilise des titres Markdown (## et ###) et des listes à puces. Sois concis et précis.`;
 
@@ -285,7 +331,7 @@ Utilise des titres Markdown (## et ###) et des listes à puces. Sois concis et p
 - Période : ${releve.periode_debut ?? "?"} → ${releve.periode_fin ?? "?"}
 - Solde début : ${Number(releve.solde_debut_fcfa).toLocaleString("fr-FR")} FCFA | Solde fin : ${Number(releve.solde_fin_fcfa).toLocaleString("fr-FR")} FCFA
 - Total lignes : ${lignes.length} | Réconciliées : ${lignes.length - nonRec.length} | Non réconciliées : ${nonRec.length}
-
+${planSection2}
 ## Lignes réconciliées avec écart (${recAvecEcart.length})
 ${recAvecEcart.slice(0, 10).map(l => `- ${l.date_operation} | ${l.libelle_banque} | Banque: ${Number(l.montant_fcfa).toLocaleString("fr-FR")} FCFA | Écart: ${Number(l.ecart_fcfa).toLocaleString("fr-FR")} FCFA`).join("\n") || "Aucun écart."}
 
@@ -293,10 +339,11 @@ ${recAvecEcart.slice(0, 10).map(l => `- ${l.date_operation} | ${l.libelle_banque
 ${nonRec.slice(0, 40).map(l => `- ${l.date_operation} | ${l.type === "debit" ? "↓ Débit" : "↑ Crédit"} | ${Number(l.montant_fcfa).toLocaleString("fr-FR")} FCFA | ${l.libelle_banque}${l.statut_reconciliation === "a_justifier" ? " [À VÉRIFIER — écriture proposée : " + (l.ecriture_libelle ?? "?") + "]" : ""}`).join("\n") || "Aucune ligne non réconciliée."}
 
 ## Analyse demandée
+Utilise le plan comptable ci-dessus pour interpréter les comptes impliqués dans les écritures.
 1. **Synthèse** — taux de réconciliation, montant total non réconcilié, appréciation globale
 2. **Anomalies** — opérations suspectes, montants inhabituels, doublons potentiels, libellés atypiques
-3. **Patterns** — types d'opérations dominants, charges récurrentes identifiées
-4. **Actions prioritaires** — top 5 lignes à traiter en urgence avec suggestion de traitement
+3. **Patterns** — types d'opérations dominants, charges récurrentes identifiées (en nommant les comptes par leur libellé)
+4. **Actions prioritaires** — top 5 lignes à traiter en urgence avec suggestion de traitement et compte probable
 5. **Conclusion** — recommandations comptables et appréciation de la situation de trésorerie`;
 
     const stream = anthropic.messages.stream({
