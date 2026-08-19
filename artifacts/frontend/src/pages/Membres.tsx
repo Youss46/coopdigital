@@ -1,7 +1,7 @@
 import { useState, type ElementType } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import { useLocation } from "wouter";
-import { useCreateMembre, type MembreInput } from "@workspace/api-client-react";
+import { useCreateMembre, useCreateFournisseur, type MembreInput, type FournisseurInput } from "@workspace/api-client-react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   UserPlus, Search, Eye, FileDown, Loader2, Check,
@@ -48,6 +48,17 @@ interface FournisseurExterneRow {
   telephone: string | null; code: string | null;
   createdAt: string | null; creeParDelegueId: number | null;
 }
+
+type MembreForm = Partial<MembreInput> & {
+  rattachementType: "delegue" | "base_centrale";
+  delegueId?: number;
+  typeFournisseur?: "membre" | "pisteur" | "externe";
+  categorieMembre?: string;
+  carteProducteur?: string;
+  dateNaissance?: string;
+  nbrePartsSouscrites?: string;
+  dateAgrement?: string;
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -173,13 +184,19 @@ export default function Membres() {
   const [typeCreation, setTypeCreation] = useState<"membre" | "fournisseur_externe">("membre");
   const [formExt, setFormExt] = useState({ nom: "", prenoms: "", telephone: "" });
 
-  const [form, setForm] = useState<Partial<MembreInput> & { rattachementType: "delegue" | "base_centrale"; delegueId?: number }>({
+  const [form, setForm] = useState<MembreForm>({
     cooperativeId: COOP_ID_PAR_DEFAUT,
     statut: "actif",
     dateAdhesion: new Date().toISOString().split("T")[0],
     rattachementType: "delegue",
     delegueId: undefined,
+    typeFournisseur: "membre",
   });
+
+  const typeFournisseurSelectionne =
+    (((form as Record<string, unknown>)["typeFournisseur"] as string | undefined) || "membre");
+  const estProfilFournisseur =
+    typeCreation === "membre" && (typeFournisseurSelectionne === "pisteur" || typeFournisseurSelectionne === "externe");
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -258,6 +275,17 @@ export default function Membres() {
     },
   });
 
+  const fournisseurMembreMutation = useCreateFournisseur({
+    mutation: {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ["fournisseurs"] });
+        toast({ title: typeFournisseurSelectionne === "pisteur" ? "Pisteur créé avec succès" : "Fournisseur externe créé avec succès" });
+        setModalOuvert(false);
+        resetForm();
+      },
+    },
+  });
+
   const validerMutation = useMutation({
     mutationFn: async (id: number) => {
       const r = await apiFetch(`/api/membres/${id}/valider`, { method: "POST" });
@@ -310,7 +338,7 @@ export default function Membres() {
   const resetForm = () => {
     setTypeCreation("membre");
     setFormExt({ nom: "", prenoms: "", telephone: "" });
-    setForm({ cooperativeId: COOP_ID_PAR_DEFAUT, statut: "actif", dateAdhesion: new Date().toISOString().split("T")[0], rattachementType: "delegue", delegueId: undefined });
+    setForm({ cooperativeId: COOP_ID_PAR_DEFAUT, statut: "actif", dateAdhesion: new Date().toISOString().split("T")[0], rattachementType: "delegue", delegueId: undefined, typeFournisseur: "membre" });
   };
 
   async function handleExportPdf() {
@@ -332,6 +360,27 @@ export default function Membres() {
     if (typeCreation === "fournisseur_externe") {
       if (!formExt.nom.trim() || !formExt.prenoms.trim() || !formExt.telephone.trim()) return;
       fournisseurExtMutation.mutate(formExt);
+      return;
+    }
+
+    // ── Pisteur / fournisseur externe (même flux que la page Fournisseurs) ────
+    if (estProfilFournisseur) {
+      if (!form.nom?.trim() || !form.telephone?.trim()) return;
+      const fournisseurType = typeFournisseurSelectionne as "pisteur" | "externe";
+      const fournisseurData: FournisseurInput = {
+        typeFournisseur: fournisseurType,
+        nom: form.nom,
+        prenoms: form.prenoms,
+        telephone: form.telephone,
+        sexe: form.sexe,
+        numeroCni: form.numeroCni,
+        section: (form as Record<string, unknown>)["groupement"] as string | undefined,
+        origine: (form as Record<string, unknown>)["village"] as string | undefined,
+        dateAgrement: fournisseurType === "pisteur"
+          ? (form as Record<string, unknown>)["dateAgrement"] as string | undefined
+          : undefined,
+      };
+      fournisseurMembreMutation.mutate({ data: fournisseurData });
       return;
     }
 
@@ -721,11 +770,11 @@ export default function Membres() {
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-gray-900">
-                  {!estDelegue
-                    ? "Nouveau membre"
-                    : typeCreation === "fournisseur_externe"
-                      ? "Nouveau fournisseur externe"
-                      : "Soumettre une demande"}
+                  {typeCreation === "fournisseur_externe"
+                    ? "Nouveau fournisseur externe"
+                    : estProfilFournisseur
+                      ? typeFournisseurSelectionne === "pisteur" ? "Nouveau pisteur agréé" : "Nouveau fournisseur externe"
+                      : !estDelegue ? "Nouveau membre" : "Soumettre une demande"}
                 </h3>
                 {estDelegue && typeCreation === "membre" && (
                   <p className="text-xs text-yellow-700 mt-0.5">⏳ La demande sera examinée par le responsable traçabilité.</p>
@@ -763,7 +812,7 @@ export default function Membres() {
                   <div className="bg-purple-50 border border-purple-100 rounded-lg px-4 py-3 text-xs text-purple-800">
                     Cet individu sera enregistré directement en tant que <strong>fournisseur externe occasionnel</strong> dans la coopérative. Aucune validation requise.
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
                       <input required value={formExt.nom} onChange={(e) => setFormExt({ ...formExt, nom: e.target.value })}
@@ -783,8 +832,100 @@ export default function Membres() {
                 </>
               )}
 
-              {/* ── Formulaire complet — membre coopérant ──────────────────── */}
+              {/* ── Choix du profil et formulaire adapté ───────────────────── */}
               {typeCreation === "membre" && <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Profil à créer *</label>
+                  <select value={typeFournisseurSelectionne}
+                    onChange={(e) => {
+                      const type = e.target.value as "membre" | "pisteur" | "externe";
+                      if (estDelegue && type === "externe") {
+                        setTypeCreation("fournisseur_externe");
+                        return;
+                      }
+                      setForm({ ...form, typeFournisseur: type });
+                    }}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1">
+                    <option value="membre">Membre coopérateur</option>
+                    {!estDelegue && <option value="pisteur">Pisteur agréé</option>}
+                    <option value="externe">Fournisseur externe</option>
+                  </select>
+                </div>
+                {!estProfilFournisseur && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Catégorie de membre</label>
+                    <select value={form.categorieMembre ?? ""}
+                      onChange={(e) => setForm({ ...form, categorieMembre: e.target.value || undefined })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1">
+                      <option value="">— Standard —</option>
+                      <option value="délégué de localités">Délégué de localités</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {estProfilFournisseur ? (
+                <>
+                  <div className={`rounded-lg px-4 py-3 text-xs border ${
+                    typeFournisseurSelectionne === "pisteur"
+                      ? "bg-amber-50 border-amber-100 text-amber-800"
+                      : "bg-purple-50 border-purple-100 text-purple-800"
+                  }`}>
+                    {typeFournisseurSelectionne === "pisteur"
+                      ? <>Ce profil sera créé comme <strong>pisteur agréé</strong> et apparaîtra dans la page Fournisseurs.</>
+                      : <>Ce profil sera créé comme <strong>fournisseur externe occasionnel</strong> et apparaîtra dans la page Fournisseurs.</>}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
+                      <input required value={form.nom ?? ""} onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="TRAORE" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Prénoms</label>
+                      <input value={form.prenoms ?? ""} onChange={(e) => setForm({ ...form, prenoms: e.target.value })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="Lass" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone *</label>
+                      <input required type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" value={form.telephone ?? ""} onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="07 XX XX XX XX" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Section / Zone</label>
+                      <input value={form.groupement ?? ""} onChange={(e) => setForm({ ...form, groupement: e.target.value })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Village d'origine</label>
+                      <input value={form.village ?? ""} onChange={(e) => setForm({ ...form, village: e.target.value })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Sexe</label>
+                      <select value={form.sexe ?? ""} onChange={(e) => setForm({ ...form, sexe: e.target.value as "M" | "F" | undefined })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1">
+                        <option value="">—</option>
+                        <option value="M">Masculin</option>
+                        <option value="F">Féminin</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">N° CNI</label>
+                      <input value={form.numeroCni ?? ""} onChange={(e) => setForm({ ...form, numeroCni: e.target.value })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
+                    </div>
+                    {typeFournisseurSelectionne === "pisteur" && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Date d'agrément</label>
+                        <input type="date" value={form.dateAgrement ?? ""} onChange={(e) => setForm({ ...form, dateAgrement: e.target.value })}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : <>
 
               {/* Civilité */}
               <div>
@@ -801,7 +942,7 @@ export default function Membres() {
               </div>
 
               {/* Nom + Prénoms */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
                   <input required value={form.nom ?? ""} onChange={(e) => setForm({ ...form, nom: e.target.value })}
@@ -815,7 +956,7 @@ export default function Membres() {
               </div>
 
               {/* Téléphone + CNI */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone *</label>
                   <input required type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" value={form.telephone ?? ""} onChange={(e) => setForm({ ...form, telephone: e.target.value })}
@@ -838,7 +979,7 @@ export default function Membres() {
               </div>
 
               {/* Village + Groupement */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Village {estDelegue && "*"}</label>
                   <input required={estDelegue} value={form.village ?? ""} onChange={(e) => setForm({ ...form, village: e.target.value })}
@@ -852,7 +993,7 @@ export default function Membres() {
               </div>
 
               {/* Superficie + Date adhésion */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Superficie (ha) *</label>
                   <input required type="number" min="0.01" step="0.01" value={form.superficieHa ?? ""}
@@ -868,7 +1009,7 @@ export default function Membres() {
               </div>
 
               {/* Date de naissance + N° CNI */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Date de naissance</label>
                   <input type="date" value={((form as Record<string, unknown>)["dateNaissance"] as string) ?? ""}
@@ -881,36 +1022,6 @@ export default function Membres() {
                     onChange={(e) => setForm({ ...form, ...{ nbrePartsSouscrites: e.target.value } } as typeof form)}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
                 </div>
-              </div>
-
-              {/* Type fournisseur — pour les délégués, "Externe" bascule directement vers le flux dédié */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Type fournisseur</label>
-                <select value={((form as Record<string, unknown>)["typeFournisseur"] as string) ?? ""}
-                  onChange={(e) => {
-                    if (estDelegue && e.target.value === "externe") {
-                      setTypeCreation("fournisseur_externe");
-                    } else {
-                      setForm({ ...form, ...{ typeFournisseur: e.target.value || undefined } } as typeof form);
-                    }
-                  }}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1">
-                  <option value="">— Non renseigné —</option>
-                  <option value="membre">Membre</option>
-                  {!estDelegue && <option value="pisteur">Pisteur</option>}
-                  <option value="externe">Externe</option>
-                </select>
-              </div>
-
-              {/* Catégorie de membre — label organisationnel sans impact sur les droits */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Catégorie de membre</label>
-                <select value={((form as Record<string, unknown>)["categorieMembre"] as string) ?? ""}
-                  onChange={(e) => setForm({ ...form, ...{ categorieMembre: e.target.value || undefined } } as typeof form)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1">
-                  <option value="">— Non renseignée —</option>
-                  <option value="délégué de localités">Délégué de localités</option>
-                </select>
               </div>
 
               {/* Rattachement */}
@@ -958,10 +1069,16 @@ export default function Membres() {
                 )}
               </div>
               </>}
+              </>}
 
               {/* Erreurs */}
-              {typeCreation === "membre" && mutation.isError && (
+              {typeCreation === "membre" && !estProfilFournisseur && mutation.isError && (
                 <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">Erreur lors de la création</p>
+              )}
+              {estProfilFournisseur && fournisseurMembreMutation.isError && (
+                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                  {(fournisseurMembreMutation.error as Error)?.message ?? "Erreur lors de la création du fournisseur"}
+                </p>
               )}
               {typeCreation === "fournisseur_externe" && fournisseurExtMutation.isError && (
                 <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
@@ -975,12 +1092,16 @@ export default function Membres() {
                   Annuler
                 </button>
                 {typeCreation === "membre" ? (
-                  <button type="submit" disabled={mutation.isPending}
+                  <button type="submit" disabled={estProfilFournisseur ? fournisseurMembreMutation.isPending : mutation.isPending}
                     className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-90 flex items-center justify-center gap-2 transition-colors duration-200"
-                    style={{ backgroundColor: mutation.isError ? "#b91c1c" : "#1a4731" }}>
-                    {mutation.isPending && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />}
-                    {mutation.isSuccess && !mutation.isPending && <Check size={16} />}
-                    {mutation.isPending ? "Enregistrement…" : mutation.isError ? "Réessayer" : estDelegue ? "Soumettre la demande →" : "Créer le membre →"}
+                    style={{ backgroundColor: estProfilFournisseur
+                      ? fournisseurMembreMutation.isError ? "#b91c1c" : typeFournisseurSelectionne === "pisteur" ? "#b45309" : "#7c3aed"
+                      : mutation.isError ? "#b91c1c" : "#1a4731" }}>
+                    {(estProfilFournisseur ? fournisseurMembreMutation.isPending : mutation.isPending) && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />}
+                    {(estProfilFournisseur ? fournisseurMembreMutation.isSuccess : mutation.isSuccess) && !(estProfilFournisseur ? fournisseurMembreMutation.isPending : mutation.isPending) && <Check size={16} />}
+                    {estProfilFournisseur
+                      ? fournisseurMembreMutation.isPending ? "Enregistrement…" : fournisseurMembreMutation.isError ? "Réessayer" : typeFournisseurSelectionne === "pisteur" ? "Créer le pisteur →" : "Créer le fournisseur →"
+                      : mutation.isPending ? "Enregistrement…" : mutation.isError ? "Réessayer" : estDelegue ? "Soumettre la demande →" : "Créer le membre →"}
                   </button>
                 ) : (
                   <button type="submit" disabled={fournisseurExtMutation.isPending}
