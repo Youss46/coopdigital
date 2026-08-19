@@ -34,7 +34,14 @@ lib/
 
 ## Démarrage en développement
 
-Les workflows Replit démarrent automatiquement les services. Pour les relancer manuellement :
+Pour ouvrir l'application principale dans Replit, démarrer ces deux workflows gérés :
+
+- `artifacts/api-server: API Server` (API, port 8080)
+- `artifacts/frontend: web` (interface principale, avec proxy `/api`)
+
+Les autres interfaces (portail membre, M15 et terrain) ont chacune leur propre
+workflow et ne sont démarrées qu'en cas de besoin. Pour les lancer manuellement
+hors workflow :
 
 ```bash
 # Backend API (port 8080)
