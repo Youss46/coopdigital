@@ -724,7 +724,16 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
   if (!detail) throw new Error("Session introuvable");
   // Une répétition réseau sur un bon déjà finalisé est idempotente : elle rend
   // le même résultat sans relancer livraison, paiement ni stock.
-  if (detail.statut === "terminee" && detail.bonReceptionId) return detail;
+  if (detail.statut === "terminee" && detail.bonReceptionId) {
+    await db
+      .update(bonsReceptionMembresDeleguesTable)
+      .set({ statut: "terminee", updatedAt: new Date() })
+      .where(and(
+        eq(bonsReceptionMembresDeleguesTable.id, detail.bonReceptionId),
+        eq(bonsReceptionMembresDeleguesTable.sessionPeseeId, sessionId),
+      ));
+    return detail;
+  }
   if (detail.statut !== "en_cours") throw new Error("Session déjà terminée ou annulée");
   if ((detail.lignes?.length ?? 0) === 0) throw new Error("Aucune pesée enregistrée dans cette session");
   if (detail.bonReceptionId) {
@@ -789,6 +798,15 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
     const current = await getSessionDetail(cooperativeId, sessionId);
     if (current?.statut === "terminee" && current.bonReceptionId) return current;
     throw new Error("Session déjà terminée ou annulée");
+  }
+  if (detail.bonReceptionId) {
+    await db
+      .update(bonsReceptionMembresDeleguesTable)
+      .set({ statut: "terminee", updatedAt: new Date() })
+      .where(and(
+        eq(bonsReceptionMembresDeleguesTable.id, detail.bonReceptionId),
+        eq(bonsReceptionMembresDeleguesTable.sessionPeseeId, sessionId),
+      ));
   }
 
   // Commission + livraison + paiement pour les membres délégués de localités.
@@ -1448,6 +1466,7 @@ export async function expirerSessionsStales(cooperativeId: number): Promise<numb
       id: sessionsPeseeTable.id,
       operation: sessionsPeseeTable.operation,
       transfertId: sessionsPeseeTable.transfertId,
+      bonReceptionId: sessionsPeseeTable.bonReceptionId,
     })
     .from(sessionsPeseeTable)
     .where(
@@ -1595,5 +1614,14 @@ export async function annulerSession(cooperativeId: number, sessionId: number) {
 
   if (cancelled.length === 0) {
     throw new Error("Session déjà terminée ou annulée");
+  }
+  if (session.bonReceptionId) {
+    await db
+      .update(bonsReceptionMembresDeleguesTable)
+      .set({ statut: "en_attente_pesee", sessionPeseeId: null, updatedAt: new Date() })
+      .where(and(
+        eq(bonsReceptionMembresDeleguesTable.id, session.bonReceptionId),
+        eq(bonsReceptionMembresDeleguesTable.sessionPeseeId, sessionId),
+      ));
   }
 }

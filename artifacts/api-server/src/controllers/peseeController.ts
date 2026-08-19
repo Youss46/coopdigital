@@ -437,6 +437,8 @@ export async function handleGetSessions(req: Request, res: Response): Promise<vo
 export async function handleGetSession(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  res.setHeader("Cache-Control", "private, no-store");
+  res.setHeader("Vary", "Authorization");
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
   try {
     const session = await getSessionDetail(cooperativeId, sessionId);

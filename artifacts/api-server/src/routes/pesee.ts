@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth";
 import { terrainAuthMiddleware, peseurOrDelegueOnly, peseurOnly, flexAuthMiddleware } from "../middlewares/terrainAuth.js";
 import type { Request, Response } from "express";
-import { listerBonsReception } from "../services/bonReceptionService.js";
+import { listerBonsReception, synchroniserBonsReceptionEnPesee } from "../services/bonReceptionService.js";
 import {
   creerBonTerrainHandler,
   getBonReceptionOptionsTerrainHandler,
@@ -79,7 +79,10 @@ router.get("/terrain/bons-reception/en-attente", terrainAuthMiddleware, peseurOn
     const cooperativeId = req.agent?.cooperativeId;
     if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
     try {
+      await synchroniserBonsReceptionEnPesee(cooperativeId);
       const bons = await listerBonsReception(cooperativeId, { statuts: ["en_attente_pesee", "en_pesee"] });
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("Vary", "Authorization");
       res.json(bons);
     } catch (err) {
       req.log.error({ err }, "getBonsEnAttente terrain");

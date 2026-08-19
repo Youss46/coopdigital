@@ -126,3 +126,16 @@ sessions puis deux livraisons, paiements et écritures pour le même cacao.
 **How to apply:** lors de tout démarrage ou traitement d'une session liée à un
 bon, vérifier que la session est bien celle enregistrée sur le bon; conserver
 la contrainte d'unicité côté base en complément du contrôle applicatif.
+
+## Statut de reprise d'un bon
+
+Pour un bon en pesée, le statut réel de la session liée est la source de
+vérité. Une session annulée doit libérer le bon; une session terminée doit
+clôturer le bon avant qu'il soit listé de nouveau.
+
+**Why:** un bon resté « en pesée » alors que sa session ne l'est plus affiche
+un bouton « Reprendre » inutilisable et bloque le peseur lors de la saisie.
+
+**How to apply:** conserver les changements de statut du bon et de sa session
+ensemble; avant une liste de bons repris sur mobile, réconcilier les anciens
+liens incohérents avec le statut réel de leur session.

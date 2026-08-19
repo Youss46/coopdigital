@@ -15,6 +15,7 @@ import {
   usersTable,
   vehiculesTable,
   chauffeursTable,
+  sessionsPeseeTable,
 } from "@workspace/db";
 import { and, eq, inArray, desc } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -219,6 +220,43 @@ export async function listerBonsReception(
       createurPrenoms:    r.createurPrenoms ?? r.magasinierPrenoms,
       createurRole:       r.bon.creeParRole ?? (r.magasinierNom ? "magasinier" : null),
   }));
+}
+
+/**
+ * Répare les bons restés en_pesee après une annulation ou une finalisation
+ * interrompue. La session est la source de vérité : seul son statut en_cours
+ * autorise la reprise de la pesée.
+ */
+export async function synchroniserBonsReceptionEnPesee(cooperativeId: number): Promise<void> {
+  const candidats = await db
+    .select({
+      bonId: bonsReceptionMembresDeleguesTable.id,
+      sessionPeseeId: bonsReceptionMembresDeleguesTable.sessionPeseeId,
+      sessionStatut: sessionsPeseeTable.statut,
+    })
+    .from(bonsReceptionMembresDeleguesTable)
+    .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.id, bonsReceptionMembresDeleguesTable.sessionPeseeId))
+    .where(and(
+      eq(bonsReceptionMembresDeleguesTable.cooperativeId, cooperativeId),
+      eq(bonsReceptionMembresDeleguesTable.statut, "en_pesee"),
+    ));
+
+  for (const bon of candidats) {
+    if (bon.sessionStatut === "en_cours") continue;
+
+    const sessionEstTerminee = bon.sessionStatut === "terminee";
+    await db
+      .update(bonsReceptionMembresDeleguesTable)
+      .set({
+        statut: sessionEstTerminee ? "terminee" : "en_attente_pesee",
+        sessionPeseeId: sessionEstTerminee ? bon.sessionPeseeId : null,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(bonsReceptionMembresDeleguesTable.id, bon.bonId),
+        eq(bonsReceptionMembresDeleguesTable.statut, "en_pesee"),
+      ));
+  }
 }
 
 // ─── Détail ───────────────────────────────────────────────────────────────────

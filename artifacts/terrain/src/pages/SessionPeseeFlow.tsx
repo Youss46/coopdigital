@@ -436,7 +436,29 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
       setTare("0");
       setNotesLigne("");
     } catch (err) {
-      setErreur((err as Error).message);
+      const message = (err as Error).message;
+      // Une clôture peut avoir gagné une course réseau juste avant cet envoi.
+      // Recharger alors l'état réel plutôt que laisser le peseur sur un
+      // formulaire devenu inutilisable.
+      if (!brouillon && /session déjà terminée|session déjà annulée/i.test(message)) {
+        try {
+          const refreshed = await getSessionDetail(session.id);
+          if (refreshed.statut === "terminee") {
+            setSessionTerminee(refreshed);
+            setSession(null);
+            setStep("succes");
+            return;
+          }
+          if (refreshed.statut === "annulee") {
+            setSession(null);
+            setErreur("La session a été annulée. Retournez à la réception pour démarrer une nouvelle pesée.");
+            return;
+          }
+        } catch {
+          // Conserver le message du serveur s'il est impossible de recharger.
+        }
+      }
+      setErreur(message);
     } finally {
       setAjoutLoading(false);
     }
