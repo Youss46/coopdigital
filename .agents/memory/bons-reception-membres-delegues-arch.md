@@ -139,3 +139,16 @@ un bouton « Reprendre » inutilisable et bloque le peseur lors de la saisie.
 **How to apply:** conserver les changements de statut du bon et de sa session
 ensemble; avant une liste de bons repris sur mobile, réconcilier les anciens
 liens incohérents avec le statut réel de leur session.
+
+## Entrée des membres délégués depuis Terrain
+
+Au poste central, un membre délégué sélectionné depuis n'importe quel parcours
+de pesée Terrain doit d'abord créer son bon de réception, puis suivre la même
+certification et session de pesée que depuis l'onglet Réceptions.
+
+**Why:** laisser le parcours Simple ou Groupée créer directement une session
+contourne les frais avancés et la traçabilité du bon.
+
+**How to apply:** exposer le statut « membre délégué » dans la recherche
+Terrain et rediriger le peseur central vers le formulaire de bon prérempli;
+les membres ordinaires et les peseurs rattachés gardent leur parcours actuel.

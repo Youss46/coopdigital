@@ -122,6 +122,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const { isOnline } = useOffline();
   const { user } = useAuth();
   const machinePeseeObligatoire = user?.machinePeseeObligatoire === true;
+  const isPeseurCentral = user?.role === "peseur" && user.delegueId == null;
 
   const [step, setStep] = useState<Step>("membre");
   const [fournisseur, setFournisseur] = useState<Fournisseur | null>(null);
@@ -263,6 +264,10 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
   // ── Reprise directe depuis le badge "Session en cours" ────────────────────
   async function handleSelectActiveSession(f: Fournisseur, sessionId: number) {
+    if (isPeseurCentral && f.isMembreDelegue) {
+      setLocation(`/receptions?membreDelegueId=${f.id}`);
+      return;
+    }
     setFournisseur(f);
     setErreur("");
     if (!isOnline) { setErreur("La pesée groupée requiert une connexion internet"); return; }
@@ -315,6 +320,10 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   // Si une session active existe déjà → reprendre directement.
   // Sinon → passer par l'étape "certif" pour déclarer le type de cacao avant création.
   async function handleSelectMembre(f: Fournisseur) {
+    if (isPeseurCentral && f.isMembreDelegue) {
+      setLocation(`/receptions?membreDelegueId=${f.id}`);
+      return;
+    }
     setFournisseur(f);
     setErreur("");
     setCertificationCacao("");

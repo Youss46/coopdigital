@@ -67,6 +67,7 @@ export default function ReceptionsTransfertsPage() {
   const [location, navigate] = useLocation();
   const query = new URLSearchParams(window.location.search);
   const bonIdCible = Number(query.get("bonId")) || null;
+  const membreDelegueIdCible = Number(query.get("membreDelegueId")) || null;
 
   const [onglet, setOnglet] = useState<Onglet>("transferts");
 
@@ -88,6 +89,7 @@ export default function ReceptionsTransfertsPage() {
   const [loadingOptionsCreation, setLoadingOptionsCreation] = useState(false);
   const [errorCreation, setErrorCreation] = useState<string | null>(null);
   const [creationEnCours, setCreationEnCours] = useState(false);
+  const [creationAutoOuverte, setCreationAutoOuverte] = useState(false);
   const isPeseurCentral = user?.role === "peseur" && user.delegueId == null;
 
   // ── Loaders ────────────────────────────────────────────────────────────
@@ -145,6 +147,15 @@ export default function ReceptionsTransfertsPage() {
     void reloadTransferts();
     void reloadBons();
   }, [isPeseurCentral]);
+
+  // Depuis les parcours Simple ou Groupée, un membre délégué est transmis ici
+  // afin d'ouvrir le même bon de réception avec le membre déjà sélectionné.
+  useEffect(() => {
+    if (!isPeseurCentral || !membreDelegueIdCible || creationAutoOuverte) return;
+    setCreationAutoOuverte(true);
+    setCreationOuverte(true);
+    void chargerOptionsCreation();
+  }, [isPeseurCentral, membreDelegueIdCible, creationAutoOuverte]);
 
   useEffect(() => {
     if (user && !isPeseurCentral) navigate("/");
@@ -679,6 +690,7 @@ export default function ReceptionsTransfertsPage() {
         loadingOptions={loadingOptionsCreation}
         error={errorCreation}
         submitting={creationEnCours}
+        initialMembreDelegueId={membreDelegueIdCible}
         onClose={() => { if (!creationEnCours) setCreationOuverte(false); }}
         onRetry={() => { void chargerOptionsCreation(); }}
         onSubmit={(data) => { void creerBonDepuisTerrain(data); }}

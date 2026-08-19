@@ -27,6 +27,8 @@ export interface Fournisseur {
   section: string | null;
   village: string | null;
   typeMembre: "membre" | "externe";
+  /** Les membres délégués doivent passer par un bon de réception avant pesée. */
+  isMembreDelegue?: boolean;
   avanceEnCours: number;
   intrantsDus: number;
   derniereLivraison: string | null;

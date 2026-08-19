@@ -45,6 +45,8 @@ interface Props {
   loadingOptions: boolean;
   error: string | null;
   submitting: boolean;
+  /** Membre déjà sélectionné depuis les parcours Simple ou Groupée. */
+  initialMembreDelegueId?: number | null;
   onClose: () => void;
   onRetry: () => void;
   onSubmit: (data: CreateBonReceptionTerrainInput) => void;
@@ -56,6 +58,7 @@ export default function CreateBonReceptionSheet({
   loadingOptions,
   error,
   submitting,
+  initialMembreDelegueId,
   onClose,
   onRetry,
   onSubmit,
@@ -63,8 +66,13 @@ export default function CreateBonReceptionSheet({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
   useEffect(() => {
-    if (open) setForm(EMPTY_FORM);
-  }, [open]);
+    if (open) {
+      setForm({
+        ...EMPTY_FORM,
+        membreDelegueId: initialMembreDelegueId ? String(initialMembreDelegueId) : "",
+      });
+    }
+  }, [open, initialMembreDelegueId]);
 
   if (!open) return null;
 

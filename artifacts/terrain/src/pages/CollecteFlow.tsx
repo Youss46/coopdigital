@@ -43,6 +43,7 @@ export default function CollecteFlow() {
   const { user } = useAuth();
   const { proxy } = useProxy();
   const machinePeseeObligatoire = user?.machinePeseeObligatoire === true;
+  const isPeseurCentral = user?.role === "peseur" && user.delegueId == null;
   const [step, setStep] = useState<Step>(1);
   const [fournisseur, setFournisseur] = useState<Fournisseur | null>(null);
   const [prix, setPrix] = useState<PrixActuel | null>(null);
@@ -143,6 +144,17 @@ export default function CollecteFlow() {
     setAvanceMontantPartiel("");
   }
 
+  function handleSelectFournisseur(f: Fournisseur) {
+    // Les membres délégués sont réceptionnés au magasin central : la création
+    // du bon précède toujours la pesée et la livraison.
+    if (isPeseurCentral && f.isMembreDelegue) {
+      setLocation(`/receptions?membreDelegueId=${f.id}`);
+      return;
+    }
+    setFournisseur(f);
+    setStep(2);
+  }
+
   return (
     <div className="t-app">
       <header className="t-header">
@@ -178,7 +190,7 @@ export default function CollecteFlow() {
         {step === 1 && (
           <FournisseurSearch
             title="Choisir le planteur ou fournisseur"
-            onSelect={(f) => { setFournisseur(f); setStep(2); }}
+            onSelect={handleSelectFournisseur}
           />
         )}
 

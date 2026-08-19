@@ -127,6 +127,11 @@ export default function FournisseurSearch({
                       Fournisseur externe
                     </span>
                   )}
+                  {f.isMembreDelegue && (
+                    <span className="t-badge t-badge--peseur">
+                      Membre délégué — bon de réception
+                    </span>
+                  )}
                   {hasSession && (
                     <span className="t-badge t-badge--peseur">
                       <Play size={10} fill="currentColor" style={{ marginRight: 4 }} />

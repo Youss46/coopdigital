@@ -251,6 +251,7 @@ export async function getFournisseurs(
         section: m.section ?? null,
         village: m.village ?? null,
         typeMembre: (m.typeFournisseur ?? "membre") as string,
+        isMembreDelegue: m.categorieMembre === "délégué de localités",
         avanceEnCours: avance ? toNum(avance.solde) : 0,
         avanceId: null as number | null,
         intrantsDus: toNum(intrantsDus?.total),
