@@ -14,6 +14,7 @@ import jwt from "jsonwebtoken";
 import { logger } from "../lib/logger.js";
 import { envoyerPushGroupePortail } from "./pushService.js";
 import { entrerStockSiDelegue, getEntrepotDuDelegue } from "./entrepotDelegueService.js";
+import { computeCodeMembre } from "./portailService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -243,7 +244,7 @@ export async function getFournisseurs(
 
       return {
         id: m.id,
-        code: `M-${String(m.id).padStart(4, "0")}`,
+        code: computeCodeMembre(m.numeroMembre, m.dateAdhesion),
         nom: m.nom,
         prenoms: m.prenoms,
         telephone: m.telephone,
@@ -353,7 +354,7 @@ export async function getFournisseurRecap(membreId: number, cooperativeId: numbe
 
   return {
     id: membre.id,
-    code: `M-${String(membre.id).padStart(4, "0")}`,
+    code: computeCodeMembre(membre.numeroMembre, membre.dateAdhesion),
     nom: membre.nom,
     prenoms: membre.prenoms,
     telephone: membre.telephone,
