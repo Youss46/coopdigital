@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNav from "../components/BottomNav";
+import BottomNavPeseur from "../components/BottomNavPeseur";
 import ScaleWeightDisplay from "../components/ScaleWeightDisplay";
 import { useOffline } from "../contexts/OfflineContext";
 import { enregistrerCollecte, getPrix, imprimerRecuLivraison } from "../lib/api";
@@ -510,7 +511,9 @@ export default function CollecteFlow() {
         )}
       </main>
 
-      <BottomNav />
+      {user?.role === "peseur"
+        ? <BottomNavPeseur delegueId={user.delegueId} />
+        : <BottomNav />}
     </div>
   );
 }
