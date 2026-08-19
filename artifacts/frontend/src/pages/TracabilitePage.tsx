@@ -1433,6 +1433,7 @@ export default function TracabilitePage() {
                         {pourFournisseurs ? "Fournisseur" : "Membre"}
                       </th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500">Poids</th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-500">Sacs</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">
                         Montant net
                       </th>
@@ -1484,6 +1485,11 @@ export default function TracabilitePage() {
                                 <span className="text-gray-400 text-xs ml-1">(net {formaterPoids(l.poidsKg)})</span>
                               </span>
                             ) : formaterPoids(l.poidsKg)}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 text-sm">
+                            {(l as typeof l & { nombreSacs?: number | null }).nombreSacs != null
+                              ? `${(l as typeof l & { nombreSacs?: number | null }).nombreSacs} sac${((l as typeof l & { nombreSacs?: number | null }).nombreSacs ?? 0) > 1 ? "s" : ""}`
+                              : <span className="text-gray-300">—</span>}
                           </td>
                           <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">
                             {l.montantNetFcfa != null
