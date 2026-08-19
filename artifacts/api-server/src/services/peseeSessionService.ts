@@ -1280,16 +1280,45 @@ export async function creerLivraisonDepuisSession(
     })();
   }
 
-  // ── Entrée stock entrepôt du délégué — fire-and-forget ──────────────────
-  // Pour les sessions membres et fournisseurs converties manuellement via
-  // « Convertir en livraison » : le poids net entre dans l'entrepôt rattaché
-  // à l'agent (délégué ou peseur autonome).
-  void entrerStockSiDelegue(
-    result.livraison.agentId,
-    cooperativeId,
-    parseFloat(String(result.livraison.poidsKg)),
-    result.livraison.id,
-  );
+  // ── Entrée stock — fire-and-forget ──────────────────────────────────────
+  // Règle : peseur de la base centrale  → entrepôt central (mouvementsStockTable)
+  //         peseur rattaché à un délégué → entrepôt du délégué (entrerStockSiDelegue)
+  // Le discriminant est result.livraison.peseurId :
+  //   - null  → peseur autonome de la base centrale
+  //   - set   → peseur rattaché à un délégué (agentId = delegueId sur la livraison)
+  const poidsKgNum = parseFloat(String(result.livraison.poidsKg));
+  if (result.livraison.peseurId) {
+    // Peseur rattaché à un délégué → stock entrepôt délégué
+    void entrerStockSiDelegue(
+      result.livraison.agentId,
+      cooperativeId,
+      poidsKgNum,
+      result.livraison.id,
+    );
+  } else {
+    // Peseur de la base centrale → stock entrepôt central
+    void (async () => {
+      try {
+        const [entrepotCentral] = await db
+          .select({ id: entrepotsTable.id })
+          .from(entrepotsTable)
+          .where(eq(entrepotsTable.cooperativeId, cooperativeId))
+          .orderBy(entrepotsTable.id)
+          .limit(1);
+        if (entrepotCentral) {
+          await db.insert(mouvementsStockTable).values({
+            entrepotId: entrepotCentral.id,
+            type:       "entree",
+            poidsKg:    String(poidsKgNum),
+            motif:      `Session pesée #${sessionId}`,
+            agentId:    result.livraison.agentId ?? null,
+          });
+        }
+      } catch (err) {
+        logger.warn({ err, sessionId }, "[creerLivraison] Entrée stock central non créée (non bloquant)");
+      }
+    })();
+  }
 
   return result;
 }
