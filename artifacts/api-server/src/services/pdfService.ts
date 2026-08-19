@@ -42,6 +42,8 @@ import {
   sessionsPeseeTable,
   lignesPeseeTable,
   historiquePrixTable,
+  vehiculesTable,
+  chauffeursTable,
 } from "@workspace/db";
 import { eq, desc, gte, lte, lt, and, sql, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -4048,17 +4050,31 @@ export async function generateBordereauAchatSession(
       if (session.bonReceptionId) {
         const [bon] = await db
           .select({
-            immatriculation:      bonsReceptionMembresDeleguesTable.immatriculation,
-            nomChauffeur:         bonsReceptionMembresDeleguesTable.nomChauffeur,
+            immatriculationSaisie: bonsReceptionMembresDeleguesTable.immatriculation,
+            nomChauffeurSaisi:    bonsReceptionMembresDeleguesTable.nomChauffeur,
+            immatriculationFlotte: vehiculesTable.immatriculation,
+            chauffeurNomFlotte:    chauffeursTable.nom,
+            chauffeurPrenomsFlotte: chauffeursTable.prenoms,
             fraisCarburantFcfa:   bonsReceptionMembresDeleguesTable.fraisCarburantFcfa,
             autresChargesFcfa:    bonsReceptionMembresDeleguesTable.autresChargesFcfa,
           })
           .from(bonsReceptionMembresDeleguesTable)
+          .leftJoin(
+            vehiculesTable,
+            eq(vehiculesTable.id, bonsReceptionMembresDeleguesTable.vehiculeId),
+          )
+          .leftJoin(
+            chauffeursTable,
+            eq(chauffeursTable.id, bonsReceptionMembresDeleguesTable.chauffeurId),
+          )
           .where(eq(bonsReceptionMembresDeleguesTable.id, session.bonReceptionId))
           .limit(1);
         if (bon) {
-          immatriculation   = bon.immatriculation ?? "—";
-          nomChauffeur      = bon.nomChauffeur    ?? "—";
+          immatriculation = bon.immatriculationSaisie ?? bon.immatriculationFlotte ?? "—";
+          const nomChauffeurFlotte = [bon.chauffeurNomFlotte, bon.chauffeurPrenomsFlotte]
+            .filter(Boolean)
+            .join(" ");
+          nomChauffeur = bon.nomChauffeurSaisi ?? (nomChauffeurFlotte || "—");
           carburantFcfa     = Number(bon.fraisCarburantFcfa ?? 0);
           autresChargesFcfa = Number(bon.autresChargesFcfa  ?? 0);
         }

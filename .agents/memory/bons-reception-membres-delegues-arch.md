@@ -64,3 +64,15 @@ catégorie est « délégué de localités ».
 Depuis l'historique Terrain, le téléchargement d'une livraison liée à cette
 session doit sélectionner automatiquement le bordereau d'achat plutôt que le
 reçu de livraison générique.
+
+Les informations de transport peuvent être saisies à la main pour un camion
+externe, ou référencer un véhicule et un chauffeur de la flotte coopérative.
+Le bordereau doit résoudre les références de flotte comme repli si les champs
+manuels sont vides.
+
+**Why:** les bons créés avec le mode coopératif ne dupliquent pas
+l'immatriculation et le nom du chauffeur dans les champs de saisie externe.
+
+**How to apply:** tout générateur de document lié à un bon doit lire les
+valeurs manuelles en priorité, puis joindre véhicule et chauffeur par leurs
+identifiants lorsque nécessaire.
