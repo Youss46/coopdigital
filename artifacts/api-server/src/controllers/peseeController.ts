@@ -384,6 +384,10 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
 export async function handleGetSessions(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  // Une liste de sessions est liée au compte authentifié : ne jamais la laisser
+  // être réutilisée par le cache HTTP après un changement de compte sur mobile.
+  res.setHeader("Cache-Control", "private, no-store");
+  res.setHeader("Vary", "Authorization");
   const { statut, membreId, fournisseurId, limit, date_debut, date_fin } = req.query as { statut?: string; membreId?: string; fournisseurId?: string; limit?: string; date_debut?: string; date_fin?: string };
   // Peseur : ne voit que ses propres sessions (filtre par peseurId)
   const peseurId = req.agent?.role === "peseur" ? req.agent.id : undefined;

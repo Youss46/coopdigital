@@ -55,13 +55,23 @@ vi.mock("../controllers/avancesDeleguesController.js", () => ({
   getAvancesDeleguesReporteesHandler: okHandler,
 }));
 
+vi.mock("../controllers/commissionMembreDelegueController.js", () => ({
+  listTauxHandler: okHandler,
+  upsertTauxHandler: okHandler,
+  deleteTauxHandler: okHandler,
+  getRecapHandler: okHandler,
+  getCommissionsHandler: okHandler,
+  payerHandler: (_req: express.Request, res: express.Response) => res.status(201).json({ ok: true }),
+}));
+
 describe("tenantGuard sur les routes administratives des délégués", () => {
   let server: Server;
   let baseUrl: string;
 
   beforeAll(async () => {
-    const [{ default: deleguesRouter }, { tenantGuard }, { authMiddleware }] = await Promise.all([
+    const [{ default: deleguesRouter }, { default: commissionsMembresDeleguesRouter }, { tenantGuard }, { authMiddleware }] = await Promise.all([
       import("../routes/delegues.js"),
+      import("../routes/commissions_membres_delegues.js"),
       import("../middlewares/tenantGuard.js"),
       import("../middlewares/auth.js"),
     ]);
@@ -69,9 +79,10 @@ describe("tenantGuard sur les routes administratives des délégués", () => {
     const app = express();
     app.get("/standard", authMiddleware, tenantGuard, okHandler);
     app.use(deleguesRouter);
+    app.use(commissionsMembresDeleguesRouter);
 
-    await new Promise<void>((resolve) => {
-      server = app.listen(0, "127.0.0.1", resolve);
+    await new Promise<void>((resolve, reject) => {
+      server = app.listen(0, "127.0.0.1", (error?: Error) => error ? reject(error) : resolve());
     });
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Serveur de test indisponible");
@@ -112,5 +123,29 @@ describe("tenantGuard sur les routes administratives des délégués", () => {
 
   it("laisse le magasinier passer une route opérationnelle malgré une licence expirée", async () => {
     expect((await request("/standard", "magasinier")).status).toBe(200);
+  });
+
+  it("laisse un comptable autorisé payer une commission membre délégué", async () => {
+    const { verifierLicenceActive } = await import("../services/licenceService.js");
+    vi.mocked(verifierLicenceActive).mockResolvedValue({
+      valide: true,
+      statut: "active",
+      messageInvalide: "",
+      joursRestants: null,
+    } as never);
+
+    const response = await fetch(`${baseUrl}/delegues-localites/123/commissions/payer`, {
+      method: "POST",
+      headers: { "x-test-role": "comptable" },
+    });
+    expect(response.status).toBe(201);
+  });
+
+  it("refuse le paiement de commission à un rôle non autorisé", async () => {
+    const response = await fetch(`${baseUrl}/delegues-localites/123/commissions/payer`, {
+      method: "POST",
+      headers: { "x-test-role": "magasinier" },
+    });
+    expect(response.status).toBe(403);
   });
 });

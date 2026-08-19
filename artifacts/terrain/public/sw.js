@@ -1,4 +1,4 @@
-const CACHE_VERSION = "coopdigital-terrain-v2";
+const CACHE_VERSION = "coopdigital-terrain-v3";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DATA_CACHE   = `${CACHE_VERSION}-data`;
 
@@ -73,12 +73,20 @@ self.addEventListener("fetch", (e) => {
 async function networkFirstStrategy(request) {
   try {
     const response = await fetch(request.clone());
-    if (response.ok) {
+    // Les réponses authentifiées sont privées. Elles ne doivent jamais être
+    // partagées entre deux comptes qui utilisent le même téléphone.
+    if (response.ok && !request.headers.has("Authorization")) {
       const cache = await caches.open(DATA_CACHE);
       cache.put(request, response.clone());
     }
     return response;
   } catch {
+    if (request.headers.has("Authorization")) {
+      return new Response(
+        JSON.stringify({ erreur: "HORS_LIGNE", message: "Données non disponibles hors ligne" }),
+        { status: 503, headers: { "Content-Type": "application/json" } }
+      );
+    }
     const cached = await caches.match(request);
     if (cached) return cached;
     return new Response(

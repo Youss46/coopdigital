@@ -290,6 +290,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     return {
       id: -1,
       cooperativeId: 0,
+      peseurId: null,
       numeroSession: "📴 Hors ligne",
       membreId: b.membreId,
       membreNom: b.membreNom,

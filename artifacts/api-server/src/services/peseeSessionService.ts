@@ -445,6 +445,7 @@ export async function getSessions(
     .select({
       id: sessionsPeseeTable.id,
       cooperativeId: sessionsPeseeTable.cooperativeId,
+      peseurId: sessionsPeseeTable.peseurId,
       numeroSession: sessionsPeseeTable.numeroSession,
       membreId: sessionsPeseeTable.membreId,
       membreNom: membresTable.nom,
@@ -481,6 +482,7 @@ export async function getSessionDetail(cooperativeId: number, sessionId: number)
     .select({
       id: sessionsPeseeTable.id,
       cooperativeId: sessionsPeseeTable.cooperativeId,
+      peseurId: sessionsPeseeTable.peseurId,
       numeroSession: sessionsPeseeTable.numeroSession,
       membreId: sessionsPeseeTable.membreId,
       membreNom: membresTable.nom,

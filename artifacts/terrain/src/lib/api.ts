@@ -376,7 +376,7 @@ async function apiPeseeFetch<T>(path: string, options: RequestInit = {}): Promis
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string> || {}),
   };
-  const res = await fetch(`${PESEE_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${PESEE_BASE}${path}`, { ...options, headers, cache: "no-store" });
   if (!res.ok) {
     if (res.status === 401) { clearAuth(); window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`; throw new Error("Session expirée"); }
     const body = await res.json().catch(() => ({}));
@@ -472,9 +472,15 @@ export async function getSessionsEnCours(membreId?: number, fournisseurId?: numb
 }
 
 /** Sessions clôturées sans livraison (terminee + livraisonId null) — le peseur peut encore les convertir. */
-export async function getSessionsAConvertir(): Promise<import("./types").SessionPesee[]> {
+export async function getSessionsAConvertir(scope?: {
+  cooperativeId: number | null;
+  peseurId: number;
+}): Promise<import("./types").SessionPesee[]> {
   const sessions = await apiPeseeFetch<import("./types").SessionPesee[]>("/pesee/sessions?statut=terminee");
-  return sessions.filter((s) => s.livraisonId === null);
+  return sessions.filter((s) =>
+    s.livraisonId === null
+    && (!scope || (s.cooperativeId === scope.cooperativeId && s.peseurId === scope.peseurId)),
+  );
 }
 
 export async function getSessionDetail(sessionId: number): Promise<import("./types").SessionDetail> {

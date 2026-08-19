@@ -420,6 +420,8 @@ export interface LignePesee {
 export interface SessionPesee {
   id: number;
   cooperativeId: number;
+  /** Peseur ayant créé la session — utilisé pour rejeter toute réponse hors périmètre. */
+  peseurId: number | null;
   numeroSession: string;
   membreId: number | null;
   membreNom: string | null;

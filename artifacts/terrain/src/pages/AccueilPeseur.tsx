@@ -51,8 +51,10 @@ export default function AccueilPeseur() {
   useEffect(() => {
     if (!isOnline) { setSessionsEnCours([]); setSessionsAConvertir([]); return; }
     getSessionsEnCours().then(setSessionsEnCours).catch(() => setSessionsEnCours([]));
-    getSessionsAConvertir().then(setSessionsAConvertir).catch(() => setSessionsAConvertir([]));
-  }, [location, isOnline]);
+    getSessionsAConvertir(
+      user ? { cooperativeId: user.cooperativeId, peseurId: user.id } : undefined,
+    ).then(setSessionsAConvertir).catch(() => setSessionsAConvertir([]));
+  }, [location, isOnline, user?.id, user?.cooperativeId]);
 
   useEffect(() => {
     getBrouillons()

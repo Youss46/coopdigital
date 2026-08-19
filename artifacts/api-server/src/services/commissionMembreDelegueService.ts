@@ -373,15 +373,14 @@ export async function payerCommissionsMembreDelegue(
       resteAvance -= prise;
       if (dejaRetenu + prise >= montantComm) idxCommission++;
     }
-    if (resteAvance > 0) {
-      // Plus de commissions à couvrir — appliquer ce qui reste à la dernière commission
-      const derniere = aTraiter[aTraiter.length - 1]!;
-      retenueParCommission.set(derniere.id, Math.min(toNum(derniere.montantFcfa), (retenueParCommission.get(derniere.id) ?? 0) + resteAvance));
-    }
+    // Une avance ne peut être remboursée que dans la limite des commissions
+    // effectivement disponibles. Le reliquat reste dû pour un paiement futur.
+    const retenueAppliquee = retenueTotale - resteAvance;
+    if (retenueAppliquee <= 0) continue;
 
     // Mettre à jour le solde de l'avance
-    const nouveauSolde     = avance.soldeRestantFcfa - retenueTotale;
-    const nouveauRembourse = avance.montantRembourse_fcfa + retenueTotale;
+    const nouveauSolde     = avance.soldeRestantFcfa - retenueAppliquee;
+    const nouveauRembourse = avance.montantRembourse_fcfa + retenueAppliquee;
     const nouveauStatut    = nouveauSolde === 0 ? "rembourse" : "en_cours";
     await db.update(avancesTable).set({
       montantRembourse_fcfa: nouveauRembourse,

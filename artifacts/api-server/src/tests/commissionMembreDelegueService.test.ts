@@ -1,0 +1,166 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { db } from "@workspace/db";
+
+const proposerEcriture = vi.fn();
+const generateEcrituresCommission = vi.fn();
+
+vi.mock("../services/comptabiliteService.js", () => ({
+  proposerEcriture,
+  generateEcrituresCommission,
+}));
+
+vi.mock("../lib/logger.js", () => ({
+  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
+}));
+
+const { payerCommissionsMembreDelegue } = await import(
+  "../services/commissionMembreDelegueService.js"
+);
+
+function selectWithLimit(rows: unknown[]) {
+  return {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue(rows),
+  };
+}
+
+function selectWithOrder(rows: unknown[]) {
+  return {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockResolvedValue(rows),
+  };
+}
+
+function updateChain() {
+  return {
+    set: vi.fn().mockReturnThis(),
+    where: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+describe("payerCommissionsMembreDelegue", () => {
+  let updates: Array<ReturnType<typeof updateChain>>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    updates = [];
+    vi.mocked(db.update).mockImplementation(() => {
+      const chain = updateChain();
+      updates.push(chain);
+      return chain as never;
+    });
+  });
+
+  it("propose une seule écriture 401/4091 pour une retenue d'avance", async () => {
+    vi.mocked(db.select)
+      .mockImplementationOnce(() => selectWithLimit([
+        { id: 17, nom: "Konde", prenoms: "Kami" },
+      ]) as never)
+      .mockImplementationOnce(() => selectWithOrder([
+        {
+          id: 92,
+          membreDelegueId: 17,
+          montantFcfa: 300,
+          statut: "en_attente",
+          sessionPeseeId: null,
+        },
+      ]) as never)
+      .mockImplementationOnce(() => selectWithOrder([
+        {
+          id: 4,
+          membreId: 17,
+          planType: "integral",
+          soldeRestantFcfa: 300,
+          montantRembourse_fcfa: 0,
+          statut: "en_cours",
+        },
+      ]) as never);
+
+    const result = await payerCommissionsMembreDelegue(17, 3, {
+      modePaiement: "especes",
+    });
+
+    expect(result).toEqual({
+      montantTotal: 300,
+      totalRetenu: 300,
+      montantNet: 0,
+      nb: 1,
+    });
+
+    await vi.waitFor(() => expect(proposerEcriture).toHaveBeenCalledOnce());
+    expect(proposerEcriture).toHaveBeenCalledWith(3, expect.objectContaining({
+      source: "avance",
+      compteDebit: "401",
+      compteCredit: "4091",
+      montantFcfa: 300,
+      tiersId: 17,
+      tiersType: "membre",
+    }));
+    expect(generateEcrituresCommission).not.toHaveBeenCalled();
+  });
+
+  it("ne rembourse qu'une partie de l'avance quand la commission est insuffisante", async () => {
+    vi.mocked(db.select)
+      .mockImplementationOnce(() => selectWithLimit([
+        { id: 17, nom: "Konde", prenoms: "Kami" },
+      ]) as never)
+      .mockImplementationOnce(() => selectWithOrder([
+        { id: 92, membreDelegueId: 17, montantFcfa: 300, statut: "en_attente", sessionPeseeId: null },
+      ]) as never)
+      .mockImplementationOnce(() => selectWithOrder([
+        {
+          id: 4,
+          membreId: 17,
+          planType: "integral",
+          soldeRestantFcfa: 1_000,
+          montantRembourse_fcfa: 0,
+          statut: "en_cours",
+        },
+      ]) as never);
+
+    const result = await payerCommissionsMembreDelegue(17, 3, { modePaiement: "especes" });
+
+    expect(result).toMatchObject({ totalRetenu: 300, montantNet: 0, nb: 1 });
+    expect(updates[0]!.set).toHaveBeenCalledWith(expect.objectContaining({
+      soldeRestantFcfa: 700,
+      montantRembourse_fcfa: 300,
+      statut: "en_cours",
+    }));
+    expect(updates[1]!.set).toHaveBeenCalledWith(expect.objectContaining({
+      retenueAvancesFcfa: 300,
+    }));
+    await vi.waitFor(() => expect(proposerEcriture).toHaveBeenCalledOnce());
+    expect(proposerEcriture).toHaveBeenCalledWith(3, expect.objectContaining({ montantFcfa: 300 }));
+  });
+
+  it("laisse intactes les avances suivantes une fois les commissions épuisées", async () => {
+    vi.mocked(db.select)
+      .mockImplementationOnce(() => selectWithLimit([
+        { id: 17, nom: "Konde", prenoms: "Kami" },
+      ]) as never)
+      .mockImplementationOnce(() => selectWithOrder([
+        { id: 92, membreDelegueId: 17, montantFcfa: 300, statut: "en_attente", sessionPeseeId: null },
+      ]) as never)
+      .mockImplementationOnce(() => selectWithOrder([
+        { id: 4, membreId: 17, planType: "integral", soldeRestantFcfa: 300, montantRembourse_fcfa: 0, statut: "en_cours" },
+        { id: 5, membreId: 17, planType: "integral", soldeRestantFcfa: 1_000, montantRembourse_fcfa: 0, statut: "en_cours" },
+      ]) as never);
+
+    const result = await payerCommissionsMembreDelegue(17, 3, { modePaiement: "especes" });
+
+    expect(result).toMatchObject({ totalRetenu: 300, montantNet: 0, nb: 1 });
+    expect(updates[0]!.set).toHaveBeenCalledWith(expect.objectContaining({
+      soldeRestantFcfa: 0,
+      montantRembourse_fcfa: 300,
+      statut: "rembourse",
+    }));
+    expect(updates[1]!.set).toHaveBeenCalledWith(expect.objectContaining({
+      retenueAvancesFcfa: 300,
+    }));
+    expect(updates).toHaveLength(2);
+    await vi.waitFor(() => expect(proposerEcriture).toHaveBeenCalledOnce());
+    expect(proposerEcriture).toHaveBeenCalledWith(3, expect.objectContaining({ montantFcfa: 300 }));
+  });
+});
