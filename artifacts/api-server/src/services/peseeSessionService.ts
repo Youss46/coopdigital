@@ -599,14 +599,36 @@ export async function addLigne(
   return db.transaction(async (tx: any) => {
     // Verrouillage de la ligne session — bloque finalisation concurrente et vice-versa
     const [session] = await tx
-      .select({ id: sessionsPeseeTable.id, statut: sessionsPeseeTable.statut, nbSacsTotal: sessionsPeseeTable.nbSacsTotal, poidsTotalKg: sessionsPeseeTable.poidsTotalKg })
+      .select({
+        id: sessionsPeseeTable.id,
+        numeroSession: sessionsPeseeTable.numeroSession,
+        statut: sessionsPeseeTable.statut,
+        bonReceptionId: sessionsPeseeTable.bonReceptionId,
+        transfertId: sessionsPeseeTable.transfertId,
+        dateDebut: sessionsPeseeTable.dateDebut,
+        dateFin: sessionsPeseeTable.dateFin,
+        nbSacsTotal: sessionsPeseeTable.nbSacsTotal,
+        poidsTotalKg: sessionsPeseeTable.poidsTotalKg,
+      })
       .from(sessionsPeseeTable)
       .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.cooperativeId, cooperativeId)))
       .for("update")
       .limit(1);
 
     if (!session) throw new Error("Session introuvable");
-    if (session.statut !== "en_cours") throw new Error("Session déjà terminée ou annulée");
+    if (session.statut !== "en_cours") {
+      logger.warn({
+        cooperativeId,
+        sessionId,
+        numeroSession: session.numeroSession,
+        statutSousVerrou: session.statut,
+        bonReceptionId: session.bonReceptionId,
+        transfertId: session.transfertId,
+        dateDebut: session.dateDebut,
+        dateFin: session.dateFin,
+      }, "[pesee] Ajout de passage refusé : session inactive");
+      throw new Error("Session déjà terminée ou annulée");
+    }
 
     // Numéro de passage
     const [{ maxPassage }] = await tx
@@ -764,6 +786,13 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
   }
   if (detail.statut !== "en_cours") throw new Error("Session déjà terminée ou annulée");
   if ((detail.lignes?.length ?? 0) === 0) throw new Error("Aucune pesée enregistrée dans cette session");
+  logger.info({
+    cooperativeId,
+    sessionId,
+    numeroSession: detail.numeroSession,
+    bonReceptionId: detail.bonReceptionId,
+    transfertId: detail.transfertId,
+  }, "[pesee] Clôture de session demandée");
   if (detail.bonReceptionId) {
     const [bon] = await db
       .select({ sessionPeseeId: bonsReceptionMembresDeleguesTable.sessionPeseeId })
@@ -1497,9 +1526,12 @@ export async function expirerSessionsStales(cooperativeId: number): Promise<numb
   const staleSessions = await db
     .select({
       id: sessionsPeseeTable.id,
+      numeroSession: sessionsPeseeTable.numeroSession,
       operation: sessionsPeseeTable.operation,
       transfertId: sessionsPeseeTable.transfertId,
       bonReceptionId: sessionsPeseeTable.bonReceptionId,
+      dateDebut: sessionsPeseeTable.dateDebut,
+      createdAt: sessionsPeseeTable.createdAt,
     })
     .from(sessionsPeseeTable)
     .where(
@@ -1511,6 +1543,19 @@ export async function expirerSessionsStales(cooperativeId: number): Promise<numb
     );
 
   if (staleSessions.length === 0) return 0;
+  logger.warn({
+    cooperativeId,
+    delaiHeures: heures,
+    sessions: staleSessions.map((s) => ({
+      id: s.id,
+      numeroSession: s.numeroSession,
+      operation: s.operation,
+      bonReceptionId: s.bonReceptionId,
+      transfertId: s.transfertId,
+      dateDebut: s.dateDebut,
+      createdAt: s.createdAt,
+    })),
+  }, "[pesee] Expiration automatique des sessions inactives");
 
   type StaleRow = { id: number; operation: string; transfertId: number | null };
   const regularIds = (staleSessions as StaleRow[])
@@ -1602,6 +1647,13 @@ export async function annulerSession(cooperativeId: number, sessionId: number) {
     .limit(1);
 
   if (!session) throw new Error("Session introuvable");
+  logger.info({
+    cooperativeId,
+    sessionId,
+    statutAvantAnnulation: session.statut,
+    bonReceptionId: session.bonReceptionId,
+    transfertId: session.transfertId,
+  }, "[pesee] Annulation manuelle de session demandée");
 
   // Pour les sessions de réception de transfert : annulation atomique + restauration du transfert
   if (session.operation === "reception_transfert" && session.transfertId != null) {
