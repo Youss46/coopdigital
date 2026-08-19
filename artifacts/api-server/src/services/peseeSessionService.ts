@@ -200,6 +200,10 @@ export async function createSession(
     certificationCacao?: string;
   },
 ) {
+  if (data.operation === "reception_membre_delegue" && !data.bonReceptionId) {
+    throw new Error("Un bon de réception est obligatoire pour démarrer la pesée d'un membre délégué");
+  }
+
   // ── Cas 0 : session liée à un bon de réception membre délégué ────────────
   if (data.bonReceptionId) {
     const bonId = data.bonReceptionId;

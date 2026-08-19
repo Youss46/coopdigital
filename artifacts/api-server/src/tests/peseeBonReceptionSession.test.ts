@@ -1,0 +1,91 @@
+import type { Request, Response } from "express";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const createSession = vi.fn();
+
+vi.mock("../services/peseeSessionService", () => ({
+  createSession,
+  getSessions: vi.fn(),
+  getSessionDetail: vi.fn(),
+  addLigne: vi.fn(),
+  deleteLigne: vi.fn(),
+  terminerSession: vi.fn(),
+  annulerSession: vi.fn(),
+  creerLivraisonDepuisSession: vi.fn(),
+  expirerSessionsStales: vi.fn(),
+  creerSessionBatch: vi.fn(),
+  SessionEnCoursError: class SessionEnCoursError extends Error {},
+  SessionTransfertExistanteError: class SessionTransfertExistanteError extends Error {},
+}));
+
+vi.mock("../services/pdfService.js", () => ({
+  generateBordereauAchatSession: vi.fn(),
+}));
+
+vi.mock("../services/peseeService", () => ({
+  getBalances: vi.fn(),
+  createBalance: vi.fn(),
+  updateBalance: vi.fn(),
+  getBalancesAlertes: vi.fn(),
+  createVerification: vi.fn(),
+  validerDoublePeseeLivraison: vi.fn(),
+  getLitiges: vi.fn(),
+  createLitige: vi.fn(),
+  resoudreLitige: vi.fn(),
+  getStatistiques: vi.fn(),
+  getRapportAgent: vi.fn(),
+  getConfig: vi.fn(),
+  upsertConfig: vi.fn(),
+}));
+
+const { handleCreateSession } = await import("../controllers/peseeController.js");
+
+describe("création de session depuis un bon de réception", () => {
+  const response = {
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
+  } as unknown as Response;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createSession.mockResolvedValue({ id: 19, numeroSession: "PSE-2026-00019" });
+  });
+
+  it("transmet le bon et crée une session liée au membre délégué", async () => {
+    const request = {
+      agent: { id: 7, cooperativeId: 3, role: "peseur", delegueId: null },
+      body: {
+        bonReceptionId: 42,
+        produit: "cacao",
+        operation: "reception_membre_delegue",
+      },
+      log: { error: vi.fn() },
+    } as unknown as Request;
+
+    await handleCreateSession(request, response);
+
+    expect(createSession).toHaveBeenCalledWith(3, expect.objectContaining({
+      peseurId: 7,
+      bonReceptionId: 42,
+      produit: "cacao",
+      operation: "reception_membre_delegue",
+    }));
+    expect(response.status).toHaveBeenCalledWith(201);
+  });
+
+  it("refuse une réception de membre délégué sans bon de réception", async () => {
+    const request = {
+      agent: { id: 7, cooperativeId: 3, role: "peseur", delegueId: null },
+      body: { produit: "cacao", operation: "reception_membre_delegue" },
+      log: { error: vi.fn() },
+    } as unknown as Request;
+
+    await handleCreateSession(request, response);
+
+    expect(createSession).not.toHaveBeenCalled();
+    expect(response.status).toHaveBeenCalledWith(400);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      erreur: expect.stringContaining("bon de réception"),
+    }));
+  });
+});

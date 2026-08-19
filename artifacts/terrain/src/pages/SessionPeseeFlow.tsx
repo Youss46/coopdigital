@@ -39,6 +39,10 @@ import {
   annulerBrouillon,
 } from "../lib/idb";
 import type { AvanceDeleagueTerrain } from "../lib/api";
+import {
+  getFournisseurForSession,
+  isIncompleteMemberDelegateSession,
+} from "../lib/sessionPesee";
 
 type Step = "membre" | "certif" | "session" | "succes";
 
@@ -161,6 +165,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   // Map membreId → sessionId pour les sessions actives (badge + reprise directe)
   // Rafraîchie toutes les 30 s tant que l'écran de sélection du membre est visible.
   const [activeSessions, setActiveSessions] = useState<Map<number, number>>(new Map());
+  const sessionMembreDelegueIncomplete = isIncompleteMemberDelegateSession(session);
   useEffect(() => {
     if (!isOnline || step !== "membre") return;
 
@@ -216,24 +221,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     (async () => {
       try {
         const detail = await getSessionDetail(sessionId);
-        // Construire un fournisseur synthétique depuis les données de la session
-        if (detail.membreId != null) {
-          setFournisseur({
-            id: detail.membreId,
-            code: detail.numeroSession,
-            nom: detail.membreNom ?? "",
-            prenoms: detail.membrePrenoms ?? "",
-            telephone: "",
-            section: null,
-            village: null,
-            typeMembre: "membre",
-            avanceEnCours: 0,
-            intrantsDus: 0,
-            derniereLivraison: null,
-          });
-        }
-        // Pour les sessions de réception de transfert (membreId=null), fournisseur reste null
-        // La session s'affiche en mode "transfert" (sans membre)
+        // Remplace aussi le membre précédent par null pour les sessions sans membre.
+        setFournisseur(getFournisseurForSession(detail));
         if (detail.statut === "terminee") {
           // Session clôturée — aller directement à l'écran de succès pour permettre la conversion
           setSessionTerminee(detail);
@@ -815,7 +804,11 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
         )}
 
         {/* ─── STEP : Session active ────────────────────────────────────── */}
-        {step === "session" && session && (fournisseur != null || session.operation === "reception_transfert") && (
+        {step === "session" && session && (
+          fournisseur != null
+          || session.operation === "reception_transfert"
+          || session.operation === "reception_membre_delegue"
+        ) && (
           <>
             {/* Info membre OU info transfert */}
             {session.operation === "reception_transfert" ? (
@@ -875,6 +868,19 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                   {fournisseur.nom} {fournisseur.prenoms}
                 </div>
                 <div className="t-text-muted">{fournisseur.code}</div>
+              </div>
+            )}
+
+            {sessionMembreDelegueIncomplete && (
+              <div style={{
+                margin: "16px 16px 8px", padding: "12px 14px", borderRadius: 12,
+                borderLeft: "4px solid var(--t-warning)", background: "var(--t-warning-bg)",
+                color: "var(--t-text)", fontSize: ".84rem", lineHeight: 1.45,
+              }}>
+                <strong>Session incomplète</strong>
+                <div style={{ marginTop: 4 }}>
+                  Cette session n&apos;est associée à aucun membre délégué. Annulez-la, puis démarrez à nouveau la pesée depuis le bon de réception.
+                </div>
               </div>
             )}
 
@@ -1096,7 +1102,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                   background: "linear-gradient(135deg, var(--t-peseur-dark) 0%, var(--t-peseur) 100%)",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 }}
-                disabled={!poidsBrut || parseFloat(poidsBrut) <= 0 || ajoutLoading}
+                disabled={sessionMembreDelegueIncomplete || !poidsBrut || parseFloat(poidsBrut) <= 0 || ajoutLoading}
                 onClick={handleAjouterLigne}
               >
                 {ajoutLoading
@@ -1124,7 +1130,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                       : "linear-gradient(135deg, var(--t-primary) 0%, var(--t-success) 100%)",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                   }}
-                  disabled={session.lignes.length === 0 || terminerLoading}
+                  disabled={sessionMembreDelegueIncomplete || session.lignes.length === 0 || terminerLoading}
                   onClick={() => setConfirmTerminer(true)}
                 >
                   <CheckCheck size={16} />

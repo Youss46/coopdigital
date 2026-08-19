@@ -335,9 +335,14 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const actorId = req.agent?.id ?? req.user?.id;
-  const { membreId, fournisseurId, produit, operation, balanceId, notes, transfertId, certificationCacao } = req.body as {
-    membreId?: number; fournisseurId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string; transfertId?: number; certificationCacao?: string;
+  const { membreId, fournisseurId, produit, operation, balanceId, notes, transfertId, bonReceptionId, certificationCacao } = req.body as {
+    membreId?: number; fournisseurId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string; transfertId?: number; bonReceptionId?: number; certificationCacao?: string;
   };
+
+  if (operation === "reception_membre_delegue" && !bonReceptionId) {
+    res.status(400).json({ erreur: "Un bon de réception est obligatoire pour démarrer la pesée d'un membre délégué" });
+    return;
+  }
 
   // ── Guard : seul le peseur central (delegueId === null) peut démarrer une session de réception de transfert
   if (transfertId != null) {
@@ -355,6 +360,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       produit, operation, balanceId, notes,
       peseurId: actorId,
       transfertId: transfertId ? Number(transfertId) : undefined,
+      bonReceptionId: bonReceptionId ? Number(bonReceptionId) : undefined,
       certificationCacao: certificationCacao || undefined,
     });
     res.status(201).json(session);
