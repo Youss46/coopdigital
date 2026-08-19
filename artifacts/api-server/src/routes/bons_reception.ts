@@ -35,7 +35,7 @@ router.get(
           and(
             eq(membresTable.cooperativeId, cooperativeId),
             eq(membresTable.categorieMembre, "délégué de localités"),
-            eq(membresTable.statutMembre, "actif"),
+            eq(membresTable.statut, "actif"),
           ),
         )
         .orderBy(membresTable.nom);

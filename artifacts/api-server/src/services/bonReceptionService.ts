@@ -49,7 +49,13 @@ export async function creerBonReception(
 ) {
   // Vérifier que le membre appartient à la coop et est bien délégué de localités
   const [membre] = await db
-    .select({ id: membresTable.id, nom: membresTable.nom, prenoms: membresTable.prenoms, categorieMembre: membresTable.categorieMembre })
+    .select({
+      id: membresTable.id,
+      nom: membresTable.nom,
+      prenoms: membresTable.prenoms,
+      categorieMembre: membresTable.categorieMembre,
+      statut: membresTable.statut,
+    })
     .from(membresTable)
     .where(and(
       eq(membresTable.id, data.membreDelegueId),
@@ -60,6 +66,9 @@ export async function creerBonReception(
   if (!membre) throw new Error("Membre introuvable dans cette coopérative");
   if (membre.categorieMembre !== "délégué de localités") {
     throw new Error("Ce membre n'est pas catégorisé comme délégué de localités");
+  }
+  if (membre.statut !== "actif") {
+    throw new Error("Ce membre n'est pas actif");
   }
 
   const [bon] = await db

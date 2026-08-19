@@ -120,7 +120,13 @@ export default function BonsReceptionMembresDeleguesPage() {
   }, [search]);
 
   // ── Données ──────────────────────────────────────────────────────────────
-  const { data: membresData } = useQuery({
+  const {
+    data: membresData,
+    isLoading: isLoadingMembres,
+    isError: isMembresError,
+    error: membresError,
+    refetch: refetchMembres,
+  } = useQuery({
     queryKey: ["membres-delegues-localites"],
     queryFn: () => apiFetch<Membre[]>(`/api/pesee/membres-delegues`),
   });
@@ -446,14 +452,40 @@ export default function BonsReceptionMembresDeleguesPage() {
                   value={form.membreDelegueId}
                   onChange={e => setForm(f => ({ ...f, membreDelegueId: e.target.value }))}
                   style={selectStyle}
+                  disabled={isLoadingMembres}
                 >
-                  <option value="">— Sélectionner —</option>
+                  <option value="">
+                    {isLoadingMembres
+                      ? "Chargement des membres…"
+                      : isMembresError
+                        ? "Impossible de charger les membres"
+                        : membres.length === 0
+                          ? "Aucun membre délégué disponible"
+                          : "— Sélectionner —"}
+                  </option>
                   {membres.map(m => (
                     <option key={m.id} value={m.id}>
                       {m.prenoms} {m.nom}{m.section ? ` (${m.section})` : ""}
                     </option>
                   ))}
                 </select>
+                {isMembresError ? (
+                  <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, fontSize: ".75rem", color: "#b91c1c" }}>
+                    <AlertCircle size={13} />
+                    <span>{(membresError as Error).message}</span>
+                    <button
+                      type="button"
+                      onClick={() => void refetchMembres()}
+                      style={{ border: "none", background: "none", color: "#0891b2", fontWeight: 700, cursor: "pointer", padding: 0 }}
+                    >
+                      Réessayer
+                    </button>
+                  </div>
+                ) : !isLoadingMembres && membres.length === 0 ? (
+                  <div style={{ marginTop: 6, fontSize: ".75rem", color: "#92400e" }}>
+                    Aucun membre actif avec la catégorie « Délégué de localités » n’est disponible.
+                  </div>
+                ) : null}
               </div>
 
               {/* Poids + sacs */}
