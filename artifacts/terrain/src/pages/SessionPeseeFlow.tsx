@@ -161,6 +161,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const [estimePrixUnitaire, setEstimePrixUnitaire] = useState<number | null>(null);
   const [estimeAvance, setEstimeAvance] = useState<number>(0);
   const [estimeIntrants, setEstimeIntrants] = useState<number>(0);
+  const poidsSessionTerminee = parseFloat(String(sessionTerminee?.poidsTotalKg ?? 0));
+  const sessionConvertible = Number.isFinite(poidsSessionTerminee) && poidsSessionTerminee > 0;
 
   // Map membreId → sessionId pour les sessions actives (badge + reprise directe)
   // Rafraîchie toutes les 30 s tant que l'écran de sélection du membre est visible.
@@ -512,6 +514,10 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
   // ── Ouvrir le modal de conversion (et pré-charger l'estimation) ───────────
   async function ouvrirConvertirModal() {
+    if (!sessionConvertible) {
+      setErreur("Impossible de créer une livraison : cette session ne contient aucune pesée valide. Enregistrez au moins un passage avec un poids net supérieur à 0 kg.");
+      return;
+    }
     setConfirmConvertir(true);
     setEstimePrixUnitaire(null);
     setEstimeAvance(fournisseur?.avanceEnCours ?? 0);
@@ -538,6 +544,10 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   // ── Convertir la session terminée en livraison ─────────────────────────────
   async function handleConvertir() {
     if (!sessionTerminee) return;
+    if (!sessionConvertible) {
+      setErreur("Impossible de créer une livraison : le poids total de la session doit être supérieur à 0 kg.");
+      return;
+    }
     // Synchronous guard: block any second invocation until the first resolves.
     // State-based guards (convertirLoading) are insufficient on mobile because
     // React may not re-render between two rapid taps.
@@ -1427,7 +1437,21 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             )}
 
             {/* Bouton conversion (si pas encore convertie, sessions membres uniquement, et session en ligne) */}
-            {!brouillon && !isTransfertReception && !livraisonResult && !sessionTerminee?.livraisonId && isOnline && (
+            {!brouillon && !isTransfertReception && !livraisonResult && !sessionTerminee?.livraisonId && isOnline && !sessionConvertible && (
+              <div
+                role="alert"
+                style={{
+                  background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10,
+                  color: "#b91c1c", fontSize: ".84rem", lineHeight: 1.45,
+                  padding: "12px 14px", marginBottom: 10, textAlign: "left",
+                }}
+              >
+                <strong>Livraison impossible pour cette session.</strong>
+                <br />
+                Ajoutez au moins un passage avec un poids net supérieur à 0 kg, puis terminez de nouveau la pesée.
+              </div>
+            )}
+            {!brouillon && !isTransfertReception && !livraisonResult && !sessionTerminee?.livraisonId && isOnline && sessionConvertible && (
               <button
                 className="t-btn t-btn--primary"
                 style={{ width: "100%", marginBottom: 10 }}
