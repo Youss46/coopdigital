@@ -492,10 +492,13 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             setStep("succes");
             return;
           }
-          if (refreshed.statut !== "en_cours") {
-            quitterSessionAnnulee(refreshed);
-            return;
-          }
+          // Le serveur vient de refuser l'ajout comme session terminée ou
+          // annulée. Même si le GET concurrent retourne encore en_cours
+          // (réplica/cache ou course entre les deux lectures), son refus est
+          // l'information la plus récente : quitter ce formulaire et
+          // permettre une nouvelle reprise depuis la liste des réceptions.
+          quitterSessionAnnulee(refreshed);
+          return;
         } catch {
           // Le serveur a confirmé que la session est inactive. Ne pas laisser
           // le peseur sur un formulaire qui ne pourra plus être enregistré.
