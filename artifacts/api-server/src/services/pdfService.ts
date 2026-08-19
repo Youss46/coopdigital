@@ -4246,17 +4246,20 @@ export async function generateBordereauAchatSession(
   const caisseCoop    = modeFinancement === "caisse_cooperative";
 
   // Frais de collecte net = commission brute − carburant − autres charges de transport
+  // Utilisé uniquement pour l'affichage de la ligne "FRAIS DE COLLECTE" dans la colonne Autres frais.
   const fraisCollecteNet = Math.max(0, fraisCollecteFcfa - carburantFcfa - autresChargesFcfa);
 
-  // Formule :
-  //   fonds_propres      → NET = valeur + frais collecte net − retenues avances
-  //   caisse_cooperative → NET = frais collecte net − retenues avances
+  // Formule montant net à payer :
+  //   fonds_propres      → NET = valeur + commission − carburant − autres charges − retenues avances
+  //     Le délégué perçoit la valeur du produit, majorée de sa commission brute, moins TOUTES
+  //     les charges de transport (même si elles dépassent la commission) et les retenues avances.
+  //   caisse_cooperative → NET = commission nette − retenues avances
   //     (la valeur produit est déjà réglée par la coopérative via caisse ; le délégué
   //      ne perçoit que sa commission nette de transport et d'avances)
   const resteValeurFcfa = caisseCoop ? Math.max(valeurProduit - montantCoopFcfa, 0) : valeurProduit;
   const montantNet = caisseCoop
     ? Math.max(0, fraisCollecteNet - retenueAvancesFcfa)
-    : Math.max(0, resteValeurFcfa + fraisCollecteNet - retenueAvancesFcfa);
+    : Math.max(0, resteValeurFcfa + fraisCollecteFcfa - carburantFcfa - autresChargesFcfa - retenueAvancesFcfa);
 
   // 8. PDF
   const { doc, endPromise } = makePdfDoc();
