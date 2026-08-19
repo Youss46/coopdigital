@@ -1,3 +1,9 @@
+-- La colonne était utilisée par le schéma et les flux de réception, mais
+-- n'était pas créée par une migration antérieure.
+ALTER TABLE "sessions_pesee"
+  ADD COLUMN IF NOT EXISTS "bon_reception_id" integer
+  REFERENCES "bons_reception_membres_delegues"("id");
+
 -- Conserver la session autoritaire des rares doublons historiques : celle déjà
 -- liée au bon est prioritaire, sinon la plus ancienne. Les autres sessions
 -- encore ouvertes sont annulées et dissociées pour éviter toute seconde
