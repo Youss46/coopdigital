@@ -1,4 +1,4 @@
-const CACHE_VERSION = "coopdigital-terrain-v3";
+const CACHE_VERSION = "coopdigital-terrain-v4";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DATA_CACHE   = `${CACHE_VERSION}-data`;
 
@@ -35,8 +35,11 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
 
-  // API terrain GET → network first + cache fallback
-  if (url.pathname.startsWith("/api/terrain") || url.pathname.startsWith("/terrain/api")) {
+  // TOUS les appels API (terrain, pesee, etc.) → network first + cache fallback.
+  // Ne jamais laisser un appel API tomber dans la stratégie cache-first des
+  // assets : les données (sessions en cours, bons, bilans) deviendraient
+  // figées au premier chargement.
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/terrain/api")) {
     if (e.request.method === "GET") {
       e.respondWith(networkFirstStrategy(e.request));
     } else {
