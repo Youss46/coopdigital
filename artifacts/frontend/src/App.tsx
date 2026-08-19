@@ -147,7 +147,7 @@ function AppRoutes() {
         <ProtectedRoute component={Avances} />
       </Route>
       <Route path="/livraisons/nouvelle">
-        <ProtectedRoute component={NouvelleLivraison} />
+        <ProtectedRoute component={NouvelleLivraison} roles={["pca", "directeur", "delegue"]} />
       </Route>
       <Route path="/livraisons">
         <ProtectedRoute component={LivraisonsPage} />

@@ -11,7 +11,7 @@ import {
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 
-const ROLES_CREER = ["pca", "directeur", "delegue", "magasinier"];
+const ROLES_CREER = ["pca", "directeur", "delegue"];
 const ROLES_VOIR_DELEGUES = ["pca", "directeur", "magasinier", "comptable", "auditeur"];
 const ROLES_VOIR_SESSIONS = ["pca", "directeur", "magasinier", "comptable", "caissier", "auditeur"];
 
@@ -122,7 +122,7 @@ const MODE_LABELS: Record<string, string> = {
   cheque: "Chèque",
 };
 
-const ROLES_CONVERTIR_SESSION = ["pca", "directeur", "magasinier"];
+const ROLES_CONVERTIR_SESSION = ["pca", "directeur"];
 
 function SessionsPeseeSection() {
   const { utilisateur } = useAuth();
