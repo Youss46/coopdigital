@@ -1132,6 +1132,12 @@ export interface LotInput {
   livraisonIds: number[];
   entrepot?: string;
   nombreSacs?: number;
+  /** Poids cible du lot (utilisé pour le fractionnement) */
+  quantiteCibleKg?: number;
+  /** ID de la livraison source fractionnée */
+  fractionLivraisonId?: number;
+  /** Poids extrait de la livraison fractionnée */
+  fractionPoidsKg?: number;
 }
 
 export type LotStatutInputStatut = typeof LotStatutInputStatut[keyof typeof LotStatutInputStatut];
@@ -1560,6 +1566,14 @@ export interface MargeCampagne {
   tauxMarge?: number;
 }
 
+export type EcritureManuelleInputTypeEcriture = typeof EcritureManuelleInputTypeEcriture[keyof typeof EcritureManuelleInputTypeEcriture];
+
+
+export const EcritureManuelleInputTypeEcriture = {
+  normale: 'normale',
+  regularisation: 'regularisation',
+} as const;
+
 export interface EcritureManuelleInput {
   dateEcriture: string;
   numeroPiece?: string;
@@ -1567,6 +1581,7 @@ export interface EcritureManuelleInput {
   compteDebit: string;
   compteCredit: string;
   montantFcfa: number;
+  typeEcriture?: EcritureManuelleInputTypeEcriture;
 }
 
 export type UtilisateurCompteRole = typeof UtilisateurCompteRole[keyof typeof UtilisateurCompteRole];

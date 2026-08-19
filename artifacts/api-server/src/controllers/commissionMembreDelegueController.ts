@@ -11,7 +11,7 @@ export async function listTauxHandler(req: Request, res: Response): Promise<void
     res.json(taux);
   } catch (err) {
     req.log.error({ err }, "listTauxMembresDelegues");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -42,7 +42,7 @@ export async function upsertTauxHandler(req: Request, res: Response): Promise<vo
     res.status(id ? 200 : 201).json(row);
   } catch (err) {
     req.log.error({ err }, "upsertTauxMembreDelegue");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -56,7 +56,7 @@ export async function deleteTauxHandler(req: Request, res: Response): Promise<vo
     res.status(204).end();
   } catch (err) {
     req.log.error({ err }, "deleteTauxMembreDelegue");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -71,7 +71,7 @@ export async function getRecapHandler(req: Request, res: Response): Promise<void
     res.json(recap);
   } catch (err) {
     req.log.error({ err }, "getRecapCommissionsMembresDelegues");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -87,7 +87,7 @@ export async function getCommissionsHandler(req: Request, res: Response): Promis
     res.json(data);
   } catch (err) {
     req.log.error({ err }, "getCommissionsMembreDelegue");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -112,7 +112,7 @@ export async function payerHandler(req: Request, res: Response): Promise<void> {
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "payerCommissionsMembreDelegue");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne";
     res.status(500).json({ erreur: msg });
   }
 }

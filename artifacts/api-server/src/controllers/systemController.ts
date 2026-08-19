@@ -26,6 +26,6 @@ export async function updateSystemBannerHandler(req: Request, res: Response): Pr
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Erreur mise à jour bannière système");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }

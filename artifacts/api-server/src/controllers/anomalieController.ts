@@ -26,7 +26,7 @@ export async function getAnomalies(req: Request, res: Response): Promise<void> {
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur getAnomalies");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -38,7 +38,7 @@ export async function getStatsAnomalies(req: Request, res: Response): Promise<vo
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "Erreur getStatsAnomalies");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -67,7 +67,7 @@ export async function traiter(req: Request, res: Response): Promise<void> {
     res.json(anomalie);
   } catch (err) {
     req.log.error({ err }, "Erreur traiterAnomalie");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -80,7 +80,7 @@ export async function getConfig(req: Request, res: Response): Promise<void> {
     res.json(cfg);
   } catch (err) {
     req.log.error({ err }, "Erreur getConfig");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -104,6 +104,6 @@ export async function putConfig(req: Request, res: Response): Promise<void> {
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur putConfig");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }

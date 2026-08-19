@@ -42,7 +42,7 @@ router.get(
       res.json(membres);
     } catch (err) {
       req.log.error({ err }, "listMembresDelegues");
-      res.status(500).json({ erreur: apiError(err) });
+      res.status(500).json({ erreur: "Erreur interne" });
     }
   },
 );

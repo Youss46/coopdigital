@@ -22,7 +22,7 @@ export async function subscribePush(req: Request, res: Response): Promise<void> 
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Erreur subscribePush");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -38,6 +38,6 @@ export async function unsubscribePush(req: Request, res: Response): Promise<void
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Erreur unsubscribePush");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }

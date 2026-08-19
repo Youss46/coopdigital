@@ -486,7 +486,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getSynthesePca");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -616,7 +616,7 @@ export async function getAlertesPrioritairesPca(req: Request, res: Response): Pr
     res.json(alertes);
   } catch (err) {
     req.log.error({ err }, "Erreur getAlertesPrioritairesPca");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -723,6 +723,6 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getComparaisonCampagnesPca");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

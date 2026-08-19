@@ -590,7 +590,10 @@ export const CreateLotBody = zod.object({
   "cooperativeId": zod.number(),
   "livraisonIds": zod.array(zod.number()),
   "entrepot": zod.string().optional(),
-  "nombreSacs": zod.number().optional()
+  "nombreSacs": zod.number().optional(),
+  "quantiteCibleKg": zod.number().optional().describe('Poids cible du lot (utilisé pour le fractionnement)'),
+  "fractionLivraisonId": zod.number().optional().describe('ID de la livraison source fractionnée'),
+  "fractionPoidsKg": zod.number().optional().describe('Poids extrait de la livraison fractionnée')
 })
 
 
@@ -1170,7 +1173,7 @@ export const CreateEcritureManuelleBody = zod.object({
   "compteDebit": zod.string(),
   "compteCredit": zod.string(),
   "montantFcfa": zod.number(),
-  "typeEcriture": zod.enum(["normale", "regularisation"]).optional()
+  "typeEcriture": zod.enum(['normale', 'regularisation']).optional()
 })
 
 

@@ -77,7 +77,7 @@ export async function listLots(req: Request, res: Response): Promise<void> {
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Erreur listLots");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -197,7 +197,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
     });
   } catch (err) {
     req.log.error({ err }, "Erreur previewAutoLot");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -440,7 +440,7 @@ export async function createLot(req: Request, res: Response): Promise<void> {
     res.status(201).json(detail);
   } catch (err) {
     req.log.error({ err }, "Erreur createLot");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -482,7 +482,7 @@ export async function getLotByQr(req: Request, res: Response): Promise<void> {
     res.json(lot);
   } catch (err) {
     req.log.error({ err }, "Erreur getLotByQr");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -520,7 +520,7 @@ export async function updateLotStatut(req: Request, res: Response): Promise<void
     res.json({ ...lot, nbLivraisons: 0, nbProducteurs: 0 });
   } catch (err) {
     req.log.error({ err }, "Erreur updateLotStatut");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -632,7 +632,7 @@ export async function fusionnerLots(req: Request, res: Response): Promise<void> 
     });
   } catch (err) {
     req.log.error({ err }, "Erreur fusionnerLots");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -740,7 +740,7 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
     res.json({ lot, livraisons, membres, vente: vente ?? null, parcelles });
   } catch (err) {
     req.log.error({ err }, "Erreur getLotTracabilite");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -764,12 +764,12 @@ export async function getLotEudrPdf(req: Request, res: Response): Promise<void> 
     });
     res.send(buf);
   } catch (err: unknown) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne";
     if (msg === "Lot introuvable") {
       res.status(404).json({ erreur: msg });
     } else {
       req.log.error({ err }, "Erreur getLotEudrPdf");
-      res.status(500).json({ erreur: apiError(err) });
+      res.status(500).json({ erreur: "Erreur interne du serveur" });
     }
   }
 }

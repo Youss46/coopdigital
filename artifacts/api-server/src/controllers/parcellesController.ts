@@ -93,7 +93,7 @@ export async function listParcelles(req: Request, res: Response): Promise<void> 
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur listParcelles");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -142,7 +142,7 @@ export async function getParcellesCarte(req: Request, res: Response): Promise<vo
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getParcellesCarte");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -164,7 +164,7 @@ export async function getParcelleById(req: Request, res: Response): Promise<void
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getParcelleById");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -225,7 +225,7 @@ export async function createParcelle(req: Request, res: Response): Promise<void>
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur createParcelle");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -282,7 +282,7 @@ export async function updateParcelle(req: Request, res: Response): Promise<void>
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur updateParcelle");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -313,7 +313,7 @@ export async function getStatsGps(req: Request, res: Response): Promise<void> {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getStatsGps");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -332,7 +332,7 @@ export async function getParcellesMembre(req: Request, res: Response): Promise<v
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getParcellesMembre");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -355,7 +355,7 @@ export async function getHistoriqueRendements(req: Request, res: Response): Prom
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getHistoriqueRendements");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -374,7 +374,7 @@ export async function exportGeoJSONController(req: Request, res: Response): Prom
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur exportGeoJSON");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -390,7 +390,7 @@ export async function getConformite(req: Request, res: Response): Promise<void> 
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getConformite");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -427,7 +427,7 @@ export async function importZonesRisque(req: Request, res: Response): Promise<vo
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur importZonesRisque");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -446,7 +446,7 @@ export async function verifierEUDRController(req: Request, res: Response): Promi
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur verifierEUDR");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -494,7 +494,7 @@ export async function getMembresSansGps(req: Request, res: Response): Promise<vo
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getMembresSansGps");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -560,7 +560,7 @@ export async function getGpsTerrain(req: Request, res: Response): Promise<void> 
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getGpsTerrain");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -599,7 +599,7 @@ export async function getZonesFiltres(req: Request, res: Response): Promise<void
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getZonesFiltres");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -646,7 +646,7 @@ export async function exportEudrData(req: Request, res: Response): Promise<void>
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur exportEudrData");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -673,6 +673,6 @@ export async function verifierTout(req: Request, res: Response): Promise<void> {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur verifierTout");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }

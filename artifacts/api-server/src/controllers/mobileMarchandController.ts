@@ -35,7 +35,7 @@ export async function getComptes(req: Request, res: Response): Promise<void> {
     })));
   } catch (err) {
     req.log.error({ err }, "getComptesMobile");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -62,7 +62,7 @@ export async function postCompte(req: Request, res: Response): Promise<void> {
     res.status(201).json(compte);
   } catch (err) {
     req.log.error({ err }, "postCompteMobile");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -88,7 +88,7 @@ export async function putCompte(req: Request, res: Response): Promise<void> {
     res.json(row);
   } catch (err) {
     req.log.error({ err }, "putCompteMobile");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -146,7 +146,7 @@ export async function postMouvement(req: Request, res: Response): Promise<void> 
 
     res.status(201).json(mouvement);
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "postMouvementMobile");
     res.status(400).json({ erreur: msg });
   }
@@ -180,7 +180,7 @@ export async function getJournal(req: Request, res: Response): Promise<void> {
     })));
   } catch (err) {
     req.log.error({ err }, "getJournalMobile");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -203,7 +203,7 @@ export async function getComptesBancaires(req: Request, res: Response): Promise<
     })));
   } catch (err) {
     req.log.error({ err }, "getComptesBancairesMobile");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -338,7 +338,7 @@ export async function postVirementBanque(req: Request, res: Response): Promise<v
       reference:         ref,
     });
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "postVirementBanque");
     res.status(400).json({ erreur: msg });
   }
@@ -377,7 +377,7 @@ export async function getCaissesCentrales(req: Request, res: Response): Promise<
     })));
   } catch (err) {
     req.log.error({ err }, "getCaissesCentrales");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -520,7 +520,7 @@ export async function postVirementCaisse(req: Request, res: Response): Promise<v
       reference:        ref,
     });
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "postVirementCaisse");
     res.status(400).json({ erreur: msg });
   }

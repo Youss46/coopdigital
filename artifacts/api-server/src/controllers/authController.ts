@@ -24,7 +24,7 @@ export async function changerMotDePasse(req: Request, res: Response): Promise<vo
     res.json({ message: "Mot de passe modifié avec succès" });
   } catch (err) {
     req.log.error({ err }, "Erreur changement mot de passe");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -116,7 +116,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     });
   } catch (err) {
     req.log.error({ err }, "Erreur lors de la connexion");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 

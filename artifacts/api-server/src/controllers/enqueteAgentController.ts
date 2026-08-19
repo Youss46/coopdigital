@@ -17,7 +17,7 @@ export async function getEnquetesAgentHandler(req: Request, res: Response): Prom
     res.json(await svc.getEnquetesAgent(id, cooperativeId));
   } catch (err) {
     req.log.error({ err }, "getEnquetesAgent");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -32,7 +32,7 @@ export async function getEnqueteDetailHandler(req: Request, res: Response): Prom
     res.json(detail);
   } catch (err) {
     req.log.error({ err }, "getEnqueteDetail");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -55,7 +55,7 @@ export async function soumettreReponsesHandler(req: Request, res: Response): Pro
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "soumettreReponses");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: err instanceof Error ? err.message : "Erreur interne" });
   }
 }
 
@@ -80,7 +80,7 @@ export async function syncEnquetesHandler(req: Request, res: Response): Promise<
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "syncEnquetes");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -94,6 +94,6 @@ export async function soumettreEnqueteHandler(req: Request, res: Response): Prom
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "soumettreEnquete");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: err instanceof Error ? err.message : "Erreur interne" });
   }
 }

@@ -72,7 +72,7 @@ export async function handleGetConfig(req: Request, res: Response): Promise<void
     res.json(config ? toApiConfig(config) : {});
   } catch (err) {
     req.log.error({ err }, "Erreur getConfig");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -135,7 +135,7 @@ export async function handleUpdateConfig(req: Request, res: Response): Promise<v
     res.json(updated ? toApiConfig(updated) : {});
   } catch (err) {
     req.log.error({ err }, "Erreur updateConfig");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -182,7 +182,7 @@ export async function handleUploadLogo(req: Request, res: Response): Promise<voi
     res.json({ logo_url: data_url });
   } catch (err) {
     req.log.error({ err }, "Erreur uploadLogo");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -197,7 +197,7 @@ export async function handleGetDocuments(req: Request, res: Response): Promise<v
     res.json({ documents });
   } catch (err) {
     req.log.error({ err }, "Erreur getDocuments");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -227,7 +227,7 @@ export async function handleCreateDocument(req: Request, res: Response): Promise
     res.status(201).json(doc);
   } catch (err) {
     req.log.error({ err }, "Erreur createDocument");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -254,7 +254,7 @@ export async function handleDeleteDocument(req: Request, res: Response): Promise
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Erreur deleteDocument");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -393,6 +393,6 @@ export async function handleExportConfigPdf(req: Request, res: Response): Promis
     doc.end();
   } catch (err) {
     req.log.error({ err }, "Erreur exportConfigPdf");
-    if (!res.headersSent) res.status(500).json({ erreur: apiError(err) });
+    if (!res.headersSent) res.status(500).json({ erreur: "Erreur interne" });
   }
 }

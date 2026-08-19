@@ -61,3 +61,4 @@
 - [Accès aux taux des délégués de localités](local-delegates-rate-access.md) — l’administration des taux suit le modèle des délégués terrain, sans dépendre de la permission `delegues`.
 - [Bons de réception — créateurs autorisés](bon-reception-createurs.md) — création autorisée au magasinier ET au peseur central; ne jamais retirer le parcours terrain lors de refactors d’autorisation.
 - [Tables push sans migration CREATE](push-created-tables-missing-migrations.md) — tables créées via drizzle push n’ont pas de CREATE TABLE dans lib/db/drizzle; toute migration ALTER doit d’abord CREATE TABLE IF NOT EXISTS.
+- [Typecheck sans cast d'échappement](typecheck-no-cast-escapes.md) — jamais de `as unknown as` pour un champ manquant; corriger le select Drizzle, la vraie colonne ou le schéma OpenAPI+Orval — la revue rejette les casts masquants.

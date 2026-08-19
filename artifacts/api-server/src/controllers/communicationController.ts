@@ -48,7 +48,7 @@ export async function sendSmsGroupe(req: Request, res: Response): Promise<void> 
     res.json({ envoyes: membreIds.length, echecs: 0, total: membreIds.length });
   } catch (err) {
     req.log.error({ err }, "Erreur sendSmsGroupe");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -78,6 +78,6 @@ export async function getCommunicationHistorique(req: Request, res: Response): P
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getCommunicationHistorique");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

@@ -27,7 +27,7 @@ export async function handleListChargesDiverses(req: Request, res: Response): Pr
     res.json(rows.map(mapCharge));
   } catch (err) {
     req.log.error({ err }, "Erreur listChargesDiverses");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -62,7 +62,7 @@ export async function handleCreateChargeDiverses(req: Request, res: Response): P
     res.status(201).json(mapCharge(row));
   } catch (err) {
     req.log.error({ err }, "Erreur createChargeDiverses");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -77,7 +77,7 @@ export async function handleGetChargeDiverses(req: Request, res: Response): Prom
     res.json(mapCharge(row));
   } catch (err) {
     req.log.error({ err }, "Erreur getChargeDiverses");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -109,7 +109,7 @@ export async function handleUpdateChargeDiverses(req: Request, res: Response): P
     res.json(mapCharge(row));
   } catch (err) {
     req.log.error({ err }, "Erreur updateChargeDiverses");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -138,7 +138,7 @@ export async function handleValiderChargeDiverses(req: Request, res: Response): 
     res.json(mapCharge(row));
   } catch (err) {
     req.log.error({ err }, "Erreur validerChargeDiverses");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -153,7 +153,7 @@ export async function handleDeleteChargeDiverses(req: Request, res: Response): P
     res.json({ success: true });
   } catch (err) {
     req.log.error({ err }, "Erreur deleteChargeDiverses");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -167,7 +167,7 @@ export async function handleStatsChargesDiverses(req: Request, res: Response): P
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "Erreur statsChargesDiverses");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 

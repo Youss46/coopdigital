@@ -44,7 +44,7 @@ export async function connexionPortail(req: Request, res: Response): Promise<voi
   const secret = process.env["JWT_SECRET"] ?? process.env["SESSION_SECRET"];
   if (!secret) {
     req.log.error("JWT_SECRET non configuré");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
     return;
   }
 
@@ -330,7 +330,7 @@ export async function getNotificationsPortailHandler(req: Request, res: Response
     res.json(notifs);
   } catch (err) {
     req.log.error({ err }, "getNotificationsPortail");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -352,7 +352,7 @@ export async function marquerLuPortailHandler(req: Request, res: Response): Prom
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "marquerLuPortail");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -372,7 +372,7 @@ export async function marquerToutLuPortailHandler(req: Request, res: Response): 
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "marquerToutLuPortail");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -398,7 +398,7 @@ export async function subscribePushPortailHandler(req: Request, res: Response): 
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "subscribePushPortail");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -412,6 +412,6 @@ export async function unsubscribePushPortailHandler(req: Request, res: Response)
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "unsubscribePushPortail");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }

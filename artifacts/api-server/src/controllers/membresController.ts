@@ -1,5 +1,4 @@
 import { type Request, type Response } from "express";
-import { apiError } from "../lib/apiError.js";
 
 import { db, membresTable, livraisonsTable, campagnesTable, fournisseursTable, usersTable, certificationsMembresTable, certificationsTable } from "@workspace/db";
 import { eq, and, or, ilike, sql, desc, notInArray, asc, inArray } from "drizzle-orm";
@@ -75,7 +74,7 @@ export async function listDeleguesPourMembres(req: Request, res: Response): Prom
     res.json(delegues);
   } catch (err) {
     req.log.error({ err }, "Erreur listDeleguesPourMembres");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -214,7 +213,7 @@ export async function listMembres(req: Request, res: Response): Promise<void> {
     res.json({ membres: membres.map(m => ({ ...enrichMembre(m), certificationsBadges: certifsByMembre.get(m.id) ?? [] })), total: count, page, limit });
   } catch (err) {
     req.log.error({ err }, "Erreur listMembres");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -261,7 +260,7 @@ export async function getMembreCertifications(req: Request, res: Response): Prom
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getMembreCertifications");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -303,7 +302,7 @@ export async function getMembreById(req: Request, res: Response): Promise<void> 
     res.json({ ...enrichMembre(membre), delegueInfo });
   } catch (err) {
     req.log.error({ err }, "Erreur getMembreById");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -532,7 +531,7 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
     res.status(201).json(enrichMembre(membre));
   } catch (err) {
     req.log.error({ err }, "Erreur createMembre");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -624,7 +623,7 @@ export async function updateMembre(req: Request, res: Response): Promise<void> {
     res.json(enrichMembre(membre));
   } catch (err) {
     req.log.error({ err }, "Erreur updateMembre");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -732,7 +731,7 @@ export async function transfererRattachement(req: Request, res: Response): Promi
     res.json(enrichMembre(updated));
   } catch (err) {
     req.log.error({ err }, "Erreur transfererRattachement");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -761,7 +760,7 @@ export async function getMembreByQr(req: Request, res: Response): Promise<void> 
     res.json(enrichMembre(membre));
   } catch (err) {
     req.log.error({ err }, "Erreur getMembreByQr");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -787,7 +786,7 @@ export async function getMembreHistorique(req: Request, res: Response): Promise<
     res.json({ livraisons, avances, paiements });
   } catch (err) {
     req.log.error({ err }, "Erreur getMembreHistorique");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -818,7 +817,7 @@ export async function exportMembresPdf(req: Request, res: Response): Promise<voi
     res.end(buf);
   } catch (err) {
     req.log.error({ err }, "Erreur exportMembresPdf");
-    if (!res.headersSent) res.status(500).json({ erreur: apiError(err) });
+    if (!res.headersSent) res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -847,7 +846,7 @@ export async function modifierStatutMembre(req: Request, res: Response): Promise
     res.json(enrichMembre(membre));
   } catch (err) {
     req.log.error({ err }, "Erreur modifierStatutMembre");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -896,7 +895,7 @@ export async function desactiverMembresSansCampagne(req: Request, res: Response)
     res.json({ desactivesCount, campagneId });
   } catch (err) {
     req.log.error({ err }, "Erreur desactiverMembresSansCampagne");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -972,7 +971,7 @@ export async function validerMembre(req: Request, res: Response): Promise<void> 
     res.json(enrichMembre(membre));
   } catch (err) {
     req.log.error({ err }, "Erreur validerMembre");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1020,7 +1019,7 @@ export async function rejeterMembre(req: Request, res: Response): Promise<void> 
     res.json(enrichMembre(membre));
   } catch (err) {
     req.log.error({ err }, "Erreur rejeterMembre");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1063,7 +1062,7 @@ export async function getCartesMembres(req: Request, res: Response): Promise<voi
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getCartesMembres");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1093,7 +1092,7 @@ export async function getMembreCartePdf(req: Request, res: Response): Promise<vo
     res.send(pdf);
   } catch (err) {
     req.log.error({ err }, "Erreur getMembreCartePdf");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1134,7 +1133,7 @@ export async function updateCarteStatut(req: Request, res: Response): Promise<vo
     res.json({ ok: true, carteStatut: updates.carteStatut });
   } catch (err) {
     req.log.error({ err }, "Erreur updateCarteStatut");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1211,6 +1210,6 @@ export async function getRepartitionMembres(req: Request, res: Response): Promis
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getRepartitionMembres");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

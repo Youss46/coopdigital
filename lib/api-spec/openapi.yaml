@@ -7608,6 +7608,15 @@ components:
           type: string
         nombreSacs:
           type: integer
+        quantiteCibleKg:
+          type: number
+          description: Poids cible du lot (utilisé pour le fractionnement)
+        fractionLivraisonId:
+          type: integer
+          description: ID de la livraison source fractionnée
+        fractionPoidsKg:
+          type: number
+          description: Poids extrait de la livraison fractionnée
 
     LotStatutInput:
       type: object

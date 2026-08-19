@@ -15,7 +15,7 @@ export async function handleListMissionsEnquete(req: Request, res: Response): Pr
   const certifId = req.query["certificationId"] ? Number(req.query["certificationId"]) : undefined;
   try {
     res.json(await svc.listMissionsEnquete(cid, certifId));
-  } catch (err) { req.log.error({ err }, "listMissionsEnquete"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "listMissionsEnquete"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleCreateMissionEnquete(req: Request, res: Response): Promise<void> {
@@ -35,7 +35,7 @@ export async function handleCreateMissionEnquete(req: Request, res: Response): P
       membreIds: membreIds ?? [],
     });
     res.status(201).json(mission);
-  } catch (err) { req.log.error({ err }, "createMissionEnquete"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "createMissionEnquete"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleGetMissionEnquete(req: Request, res: Response): Promise<void> {
@@ -47,7 +47,7 @@ export async function handleGetMissionEnquete(req: Request, res: Response): Prom
     if (!mission) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
     const membres = await svc.getMembresEnquete(cid, id);
     res.json({ ...mission, membres: membres ?? [] });
-  } catch (err) { req.log.error({ err }, "getMissionEnquete"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "getMissionEnquete"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleUpdateMissionEnquete(req: Request, res: Response): Promise<void> {
@@ -61,7 +61,7 @@ export async function handleUpdateMissionEnquete(req: Request, res: Response): P
     const updated = await svc.updateMissionEnquete(cid, id, { titre, datePrevue, agentId, instructions });
     if (!updated) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
     res.json(updated);
-  } catch (err) { req.log.error({ err }, "updateMissionEnquete"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "updateMissionEnquete"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleUpdateStatut(req: Request, res: Response): Promise<void> {
@@ -75,7 +75,7 @@ export async function handleUpdateStatut(req: Request, res: Response): Promise<v
     const updated = await svc.updateMissionStatut(cid, id, statut);
     if (!updated) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
     res.json(updated);
-  } catch (err) { req.log.error({ err }, "updateStatutMission"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "updateStatutMission"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleValiderMembre(req: Request, res: Response): Promise<void> {
@@ -86,7 +86,7 @@ export async function handleValiderMembre(req: Request, res: Response): Promise<
     const result = await svc.validerEnqueteMembre(cid, id, membreId);
     if (!result.ok) { res.status(400).json({ erreur: result.message }); return; }
     res.json({ ok: true });
-  } catch (err) { req.log.error({ err }, "validerEnqueteMembre"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "validerEnqueteMembre"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleRejeterMembre(req: Request, res: Response): Promise<void> {
@@ -98,7 +98,7 @@ export async function handleRejeterMembre(req: Request, res: Response): Promise<
   try {
     const result = await svc.rejeterEnqueteMembre(cid, id, membreId, commentaireRt.trim());
     res.json(result);
-  } catch (err) { req.log.error({ err }, "rejeterMembre"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "rejeterMembre"); res.status(500).json({ erreur: err instanceof Error ? err.message : "Erreur interne" }); }
 }
 
 export async function handleDeleteMissionEnquete(req: Request, res: Response): Promise<void> {
@@ -109,7 +109,7 @@ export async function handleDeleteMissionEnquete(req: Request, res: Response): P
     const ok = await svc.deleteMissionEnquete(cid, id);
     if (!ok) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
     res.status(204).end();
-  } catch (err) { req.log.error({ err }, "deleteMissionEnquete"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "deleteMissionEnquete"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleRapportPdfEnquete(req: Request, res: Response): Promise<void> {
@@ -136,5 +136,5 @@ export async function handleGetAgentsDisponibles(req: Request, res: Response): P
   if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
   try {
     res.json(await svc.getAgentsDisponibles(cid));
-  } catch (err) { req.log.error({ err }, "getAgentsDisponibles"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "getAgentsDisponibles"); res.status(500).json({ erreur: "Erreur interne" }); }
 }

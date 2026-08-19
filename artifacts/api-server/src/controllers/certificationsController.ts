@@ -30,21 +30,21 @@ export async function handleListCertifications(req: Request, res: Response): Pro
   const cid = coopId(req);
   if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
   try { res.json(await listCertifications(cid)); }
-  catch (err) { req.log.error({ err }, "handleListCertifications"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "handleListCertifications"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleGetStatsCertifications(req: Request, res: Response): Promise<void> {
   const cid = coopId(req);
   if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
   try { res.json(await getStatsCertifications(cid)); }
-  catch (err) { req.log.error({ err }, "handleGetStatsCertifications"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "handleGetStatsCertifications"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleGetDashboardCertifications(req: Request, res: Response): Promise<void> {
   const cid = coopId(req);
   if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
   try { res.json(await getDashboardCertifications(cid)); }
-  catch (err) { req.log.error({ err }, "handleGetDashboardCertifications"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "handleGetDashboardCertifications"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleGetCertification(req: Request, res: Response): Promise<void> {
@@ -58,7 +58,7 @@ export async function handleGetCertification(req: Request, res: Response): Promi
     const statsM         = await getStatsMembresConformite(cid, id);
     const tonnageCampagne = await getTonnageCampagneCertification(cid, id);
     res.json({ ...cert, criteresType: criteres, statsMembres: statsM, tonnageCampagne: tonnageCampagne ?? null });
-  } catch (err) { req.log.error({ err }, "handleGetCertification"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "handleGetCertification"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleGetAuditsCertification(req: Request, res: Response): Promise<void> {
@@ -66,14 +66,14 @@ export async function handleGetAuditsCertification(req: Request, res: Response):
   if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
   if (!id) { res.status(400).json({ erreur: "ID invalide" }); return; }
   try { res.json(await getAuditsCertification(cid, id)); }
-  catch (err) { req.log.error({ err }, "handleGetAuditsCertification"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "handleGetAuditsCertification"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleCreateCertification(req: Request, res: Response): Promise<void> {
   const cid = coopId(req); const uid = userId(req);
   if (!cid || !uid) { res.status(403).json({ erreur: "Non autorisé" }); return; }
   try { res.status(201).json(await createCertification(cid, req.body, uid)); }
-  catch (err) { req.log.error({ err }, "handleCreateCertification"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "handleCreateCertification"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleUpdateCertification(req: Request, res: Response): Promise<void> {
@@ -83,7 +83,7 @@ export async function handleUpdateCertification(req: Request, res: Response): Pr
   try { res.json(await updateCertification(cid, id, req.body, uid)); }
   catch (err) {
     req.log.error({ err }, "handleUpdateCertification");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne";
     res.status(msg === "Certification introuvable" ? 404 : 500).json({ erreur: msg });
   }
 }
@@ -95,7 +95,7 @@ export async function handleDeleteCertification(req: Request, res: Response): Pr
   try { await deleteCertification(cid, id, uid); res.status(204).end(); }
   catch (err) {
     req.log.error({ err }, "handleDeleteCertification");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne";
     res.status(msg === "Certification introuvable" ? 404 : 500).json({ erreur: msg });
   }
 }
@@ -109,7 +109,7 @@ export async function handleCreateAudit(req: Request, res: Response): Promise<vo
   try { res.status(201).json(await createAudit(cid, id, req.body, uid)); }
   catch (err) {
     req.log.error({ err }, "handleCreateAudit");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne";
     res.status(msg === "Certification introuvable" ? 404 : 500).json({ erreur: msg });
   }
 }
@@ -121,7 +121,7 @@ export async function handleListMembresCertification(req: Request, res: Response
   if (!cid) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
   if (!id) { res.status(400).json({ erreur: "ID invalide" }); return; }
   try { res.json(await listMembresCertification(cid, id)); }
-  catch (err) { req.log.error({ err }, "handleListMembresCertification"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "handleListMembresCertification"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleGetMembreCertification(req: Request, res: Response): Promise<void> {
@@ -134,7 +134,7 @@ export async function handleGetMembreCertification(req: Request, res: Response):
     const membre  = await getMembreCertification(cid, id, membreId);
     const criteres = CRITERES_PAR_TYPE[certif.type] ?? [];
     res.json({ membre, criteresType: criteres, certif });
-  } catch (err) { req.log.error({ err }, "handleGetMembreCertification"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "handleGetMembreCertification"); res.status(500).json({ erreur: "Erreur interne" }); }
 }
 
 export async function handleEvaluerMembre(req: Request, res: Response): Promise<void> {
@@ -144,7 +144,7 @@ export async function handleEvaluerMembre(req: Request, res: Response): Promise<
   try { res.json(await evaluerMembre(cid, id, req.body, uid)); }
   catch (err) {
     req.log.error({ err }, "handleEvaluerMembre");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne";
     res.status(msg === "Certification introuvable" ? 404 : 500).json({ erreur: msg });
   }
 }
@@ -234,6 +234,6 @@ export async function handleRapportPdf(req: Request, res: Response): Promise<voi
     res.end(Buffer.concat(chunks));
   } catch (err) {
     req.log.error({ err }, "handleRapportPdf");
-    if (!res.headersSent) res.status(500).json({ erreur: apiError(err) });
+    if (!res.headersSent) res.status(500).json({ erreur: "Erreur interne" });
   }
 }

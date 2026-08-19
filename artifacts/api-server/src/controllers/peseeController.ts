@@ -60,7 +60,7 @@ export async function handleGetBalancesAlertes(req: Request, res: Response) {
     res.json({ alertes });
   } catch (err) {
     req.log.error(err, "handleGetBalancesAlertes");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -72,7 +72,7 @@ export async function handleGetBalances(req: Request, res: Response) {
     res.json({ balances });
   } catch (err) {
     req.log.error(err, "handleGetBalances");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -96,7 +96,7 @@ export async function handleCreateBalance(req: Request, res: Response) {
     res.status(201).json({ balance });
   } catch (err) {
     req.log.error(err, "handleCreateBalance");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -123,7 +123,7 @@ export async function handleUpdateBalance(req: Request, res: Response) {
     res.json({ balance });
   } catch (err) {
     req.log.error(err, "handleUpdateBalance");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -144,7 +144,7 @@ export async function handleCreateVerification(req: Request, res: Response) {
     res.status(201).json({ verification });
   } catch (err) {
     req.log.error(err, "handleCreateVerification");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -168,7 +168,7 @@ export async function handleValiderDoublePesee(req: Request, res: Response) {
     res.json(result);
   } catch (err) {
     req.log.error(err, "handleValiderDoublePesee");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -182,7 +182,7 @@ export async function handleGetLitiges(req: Request, res: Response) {
     res.json({ litiges });
   } catch (err) {
     req.log.error(err, "handleGetLitiges");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -204,7 +204,7 @@ export async function handleCreateLitige(req: Request, res: Response) {
     res.status(201).json({ litige });
   } catch (err) {
     req.log.error(err, "handleCreateLitige");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -223,7 +223,7 @@ export async function handleResoudreLitige(req: Request, res: Response) {
     res.json({ litige });
   } catch (err) {
     req.log.error(err, "handleResoudreLitige");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -237,7 +237,7 @@ export async function handleGetStatistiques(req: Request, res: Response) {
     res.json(stats);
   } catch (err) {
     req.log.error(err, "handleGetStatistiques");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -248,7 +248,7 @@ export async function handleGetRapportAgent(req: Request, res: Response) {
     res.json(rapport);
   } catch (err) {
     req.log.error(err, "handleGetRapportAgent");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -270,7 +270,7 @@ export async function handleGetConfig(req: Request, res: Response) {
     });
   } catch (err) {
     req.log.error(err, "handleGetConfig");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 
@@ -292,7 +292,7 @@ export async function handleUpdateConfig(req: Request, res: Response) {
     });
   } catch (err) {
     req.log.error(err, "handleUpdateConfig");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
 }
 

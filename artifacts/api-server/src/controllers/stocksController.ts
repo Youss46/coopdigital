@@ -78,7 +78,7 @@ export async function getEntrepots(req: Request, res: Response): Promise<void> {
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur getEntrepots");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -174,7 +174,7 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
     res.json(rows.rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getMouvements");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -214,7 +214,7 @@ export async function getTonnageCertification(req: Request, res: Response): Prom
     res.json(rows.rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getTonnageCertification");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -290,14 +290,14 @@ export async function entreeStock(req: Request, res: Response): Promise<void> {
     res.status(201).json(withNom);
   } catch (err) {
     req.log.error({ err }, "Erreur entreeStock");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
 export async function updateEntrepot(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(403).json({ erreur: "Non autorisé" }); return; }
-  const id = parseInt(req.params["id"] ?? "");
+  const id = parseInt(String(req.params["id"] ?? ""));
   if (!id) { res.status(400).json({ erreur: "ID invalide" }); return; }
   const { nom, ville, capaciteKg, capaciteSacs, seuilAlerteKg, pourFournisseursExt } = req.body as Record<string, unknown>;
   try {
@@ -315,14 +315,14 @@ export async function updateEntrepot(req: Request, res: Response): Promise<void>
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur updateEntrepot");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
 export async function deleteEntrepot(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(403).json({ erreur: "Non autorisé" }); return; }
-  const id = parseInt(req.params["id"] ?? "");
+  const id = parseInt(String(req.params["id"] ?? ""));
   if (!id) { res.status(400).json({ erreur: "ID invalide" }); return; }
   try {
     const [existing] = await db.select({ id: entrepotsTable.id })
@@ -335,7 +335,7 @@ export async function deleteEntrepot(req: Request, res: Response): Promise<void>
     res.status(204).end();
   } catch (err) {
     req.log.error({ err }, "Erreur deleteEntrepot");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -443,7 +443,7 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
     res.status(201).json(withNom);
   } catch (err) {
     req.log.error({ err }, "Erreur sortieStock");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -485,7 +485,7 @@ export async function createEntrepot(req: Request, res: Response): Promise<void>
     res.status(201).json(entrepot);
   } catch (err) {
     req.log.error({ err }, "Erreur createEntrepot");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -531,7 +531,7 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
     res.json(alertes);
   } catch (err) {
     req.log.error({ err }, "Erreur getAlertes");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -565,6 +565,6 @@ export async function getLotissementStats(req: Request, res: Response): Promise<
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getLotissementStats");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

@@ -11,7 +11,7 @@ export async function getCaisseHandler(req: Request, res: Response): Promise<voi
     res.json(caisse);
   } catch (err) {
     req.log.error({ err }, "Erreur getCaisse délégué");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -23,7 +23,7 @@ export async function getPaiementsDifferesHandler(req: Request, res: Response): 
     res.json(list);
   } catch (err) {
     req.log.error({ err }, "Erreur paiements différés terrain");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -53,7 +53,7 @@ export async function listDeleguesHandler(req: Request, res: Response): Promise<
     res.json(list);
   } catch (err) {
     req.log.error({ err }, "Erreur listDelegues");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -67,7 +67,7 @@ export async function getDetailCaisseHandler(req: Request, res: Response): Promi
     res.json(detail);
   } catch (err) {
     req.log.error({ err }, "Erreur detail caisse");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -95,7 +95,7 @@ export async function getPaiementsDifferesAdminHandler(req: Request, res: Respon
     res.json(list);
   } catch (err) {
     req.log.error({ err }, "Erreur paiements différés admin");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -168,6 +168,6 @@ export async function getAlertesCaissesDeleguesHandler(req: Request, res: Respon
     res.json(alertes);
   } catch (err) {
     req.log.error({ err }, "Erreur alertes caisses déléguées");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }

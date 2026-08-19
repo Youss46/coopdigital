@@ -69,7 +69,7 @@ export async function creerBonHandler(req: Request, res: Response): Promise<void
     );
     res.status(201).json(bon);
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne";
     req.log.error({ err }, "creerBonReception");
     res.status(400).json({ erreur: msg });
   }
@@ -98,7 +98,7 @@ export async function creerBonTerrainHandler(req: Request, res: Response): Promi
     );
     res.status(201).json(bon);
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne";
     req.log.error({ err }, "creerBonTerrain");
     res.status(400).json({ erreur: msg });
   }
@@ -120,7 +120,7 @@ export async function listerBonsHandler(req: Request, res: Response): Promise<vo
     res.json(bons);
   } catch (err) {
     req.log.error({ err }, "listerBonsReception");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -136,7 +136,7 @@ export async function detailBonHandler(req: Request, res: Response): Promise<voi
     res.json(bon);
   } catch (err) {
     req.log.error({ err }, "detailBon");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -150,7 +150,7 @@ export async function annulerBonHandler(req: Request, res: Response): Promise<vo
     await svc.annulerBonReception(id, cooperativeId);
     res.json({ ok: true });
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne";
     req.log.error({ err }, "annulerBon");
     res.status(400).json({ erreur: msg });
   }

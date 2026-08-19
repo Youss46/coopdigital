@@ -103,7 +103,7 @@ export async function listMissions(req: Request, res: Response): Promise<void> {
     res.json(missions);
   } catch (err) {
     req.log.error({ err }, "Erreur listMissions");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -157,7 +157,7 @@ export async function getMissionById(req: Request, res: Response): Promise<void>
     res.json({ ...mission, membres });
   } catch (err) {
     req.log.error({ err }, "Erreur getMissionById");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -258,7 +258,7 @@ export async function exportMissionGeoJSON(req: Request, res: Response): Promise
     res.json(geojson);
   } catch (err) {
     req.log.error({ err }, "Erreur exportMissionGeoJSON");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -331,7 +331,7 @@ export async function createMission(req: Request, res: Response): Promise<void> 
     res.status(201).json(mission);
   } catch (err) {
     req.log.error({ err }, "Erreur createMission");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -367,7 +367,7 @@ export async function demarrerMission(req: Request, res: Response): Promise<void
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur demarrerMission");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -424,7 +424,7 @@ export async function collecterGpsMembre(req: Request, res: Response): Promise<v
     res.json(mm);
   } catch (err) {
     req.log.error({ err }, "Erreur collecterGpsMembre");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -479,7 +479,7 @@ export async function soumettreMission(req: Request, res: Response): Promise<voi
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur soumettreMission");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -596,7 +596,7 @@ export async function validerParcelleMission(req: Request, res: Response): Promi
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Erreur validerParcelleMission");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -654,7 +654,7 @@ export async function rejeterParcelleMission(req: Request, res: Response): Promi
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Erreur rejeterParcelleMission");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -708,7 +708,7 @@ export async function getMessagesMission(req: Request, res: Response): Promise<v
     res.json(messages);
   } catch (err) {
     req.log.error({ err }, "Erreur getMessagesMission");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -752,7 +752,7 @@ export async function sendMessageMission(req: Request, res: Response): Promise<v
     res.status(201).json(msg);
   } catch (err) {
     req.log.error({ err }, "Erreur sendMessageMission");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -896,7 +896,7 @@ export async function validerToutCollectes(req: Request, res: Response): Promise
     res.json({ ok: true, valides: toValider.length });
   } catch (err) {
     req.log.error({ err }, "Erreur validerToutCollectes");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -972,7 +972,7 @@ export async function rejeterToutCollectes(req: Request, res: Response): Promise
     res.json({ ok: true, rejetes: toRejeter.length });
   } catch (err) {
     req.log.error({ err }, "Erreur rejeterToutCollectes");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1023,7 +1023,7 @@ export async function validerMissionComplete(req: Request, res: Response): Promi
     res.json({ ok: true, mission: updated });
   } catch (err) {
     req.log.error({ err }, "Erreur validerMissionComplete");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1085,7 +1085,7 @@ export async function rejeterMissionComplete(req: Request, res: Response): Promi
     res.json({ ok: true, mission: updated });
   } catch (err) {
     req.log.error({ err }, "Erreur rejeterMissionComplete");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1125,7 +1125,7 @@ export async function membresSansGps(req: Request, res: Response): Promise<void>
     res.json(membres);
   } catch (err) {
     req.log.error({ err }, "Erreur membresSansGps");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1153,7 +1153,7 @@ export async function listAgentsTerrain(req: Request, res: Response): Promise<vo
     res.json(agents);
   } catch (err) {
     req.log.error({ err }, "Erreur listAgentsTerrain");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1210,6 +1210,6 @@ export async function createAgentTerrain(req: Request, res: Response): Promise<v
       return;
     }
     req.log.error({ err }, "Erreur createAgentTerrain");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

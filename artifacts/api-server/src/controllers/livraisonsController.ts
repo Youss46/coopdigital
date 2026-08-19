@@ -97,7 +97,7 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
     res.json(livraisons);
   } catch (err) {
     req.log.error({ err }, "Erreur listLivraisons");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -409,7 +409,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
     res.status(201).json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur createLivraison");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -465,6 +465,6 @@ export async function getLivraisonsNonLotees(req: Request, res: Response): Promi
     res.json(livraisons);
   } catch (err) {
     req.log.error({ err }, "Erreur getLivraisonsNonLotees");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

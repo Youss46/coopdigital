@@ -86,7 +86,7 @@ router.get("/terrain/bons-reception/en-attente", terrainAuthMiddleware, peseurOn
       res.json(bons);
     } catch (err) {
       req.log.error({ err }, "getBonsEnAttente terrain");
-      res.status(500).json({ erreur: apiError(err) });
+      res.status(500).json({ erreur: "Erreur interne" });
     }
   },
 );

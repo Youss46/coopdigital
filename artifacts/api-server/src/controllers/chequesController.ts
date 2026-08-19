@@ -15,7 +15,7 @@ export async function getCheques(req: Request, res: Response): Promise<void> {
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getCheques");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -49,7 +49,7 @@ export async function postCheque(req: Request, res: Response): Promise<void> {
     res.status(201).json(cheque);
   } catch (err) {
     req.log.error({ err }, "Erreur postCheque");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -74,7 +74,7 @@ export async function putCheque(req: Request, res: Response): Promise<void> {
     if (msg === "Chèque introuvable") { res.status(404).json({ erreur: msg }); return; }
     if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
     req.log.error({ err }, "Erreur putCheque");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -102,7 +102,7 @@ export async function postEncaisser(req: Request, res: Response): Promise<void> 
     if (msg === "Chèque introuvable") { res.status(404).json({ erreur: msg }); return; }
     if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
     req.log.error({ err }, "Erreur postEncaisser");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -130,7 +130,7 @@ export async function postRejeter(req: Request, res: Response): Promise<void> {
     if (msg === "Chèque introuvable") { res.status(404).json({ erreur: msg }); return; }
     if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
     req.log.error({ err }, "Erreur postRejeter");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -154,6 +154,6 @@ export async function postAnnuler(req: Request, res: Response): Promise<void> {
     if (msg === "Chèque introuvable") { res.status(404).json({ erreur: msg }); return; }
     if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
     req.log.error({ err }, "Erreur postAnnuler");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }

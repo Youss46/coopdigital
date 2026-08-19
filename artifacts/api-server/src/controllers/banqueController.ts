@@ -11,7 +11,7 @@ export async function getComptes(req: Request, res: Response): Promise<void> {
   const cid = coopId(req);
   if (!cid) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   try { res.json(await svc.listComptes(cid)); }
-  catch (err) { req.log.error({ err }, "getComptesBancaires"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "getComptesBancaires"); res.status(500).json({ erreur: "Erreur serveur" }); }
 }
 
 export async function postCompte(req: Request, res: Response): Promise<void> {
@@ -25,7 +25,7 @@ export async function postCompte(req: Request, res: Response): Promise<void> {
   try {
     const compte = await svc.creerCompte(cid, { nom, banque, numeroCompte, iban, soldeInitial, soldeMiniAlerte });
     res.status(201).json(compte);
-  } catch (err) { req.log.error({ err }, "postCompteBancaire"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "postCompteBancaire"); res.status(500).json({ erreur: "Erreur serveur" }); }
 }
 
 export async function putCompte(req: Request, res: Response): Promise<void> {
@@ -36,7 +36,7 @@ export async function putCompte(req: Request, res: Response): Promise<void> {
     const row = await svc.updateCompte(id, cid, req.body);
     if (!row) { res.status(404).json({ erreur: "Compte introuvable" }); return; }
     res.json(row);
-  } catch (err) { req.log.error({ err }, "putCompteBancaire"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "putCompteBancaire"); res.status(500).json({ erreur: "Erreur serveur" }); }
 }
 
 // ─── Mouvements ───────────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ export async function postMouvement(req: Request, res: Response): Promise<void> 
     });
     res.status(201).json(result);
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "postMouvementBanque");
     res.status(400).json({ erreur: msg });
   }
@@ -83,7 +83,7 @@ export async function getJournal(req: Request, res: Response): Promise<void> {
       nonRapproché: nonRapproche === "1",
     });
     res.json(rows);
-  } catch (err) { req.log.error({ err }, "getJournalBanque"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "getJournalBanque"); res.status(500).json({ erreur: "Erreur serveur" }); }
 }
 
 // ─── Rapprochement ────────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ export async function postRapprocher(req: Request, res: Response): Promise<void>
   try {
     const result = await svc.rapprocherMouvements(compteId, cid, ids);
     res.json(result);
-  } catch (err) { req.log.error({ err }, "postRapprocherBanque"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "postRapprocherBanque"); res.status(500).json({ erreur: "Erreur serveur" }); }
 }
 
 // ─── Caisses disponibles ──────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ export async function getCaisses(req: Request, res: Response): Promise<void> {
   const cid = coopId(req);
   if (!cid) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
   try { res.json(await svc.getCaissesCentrales(cid)); }
-  catch (err) { req.log.error({ err }, "getCaissesBanque"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "getCaissesBanque"); res.status(500).json({ erreur: "Erreur serveur" }); }
 }
 
 // ─── Virement Banque → Caisse ─────────────────────────────────────────────────
@@ -131,7 +131,7 @@ export async function postVirementCaisse(req: Request, res: Response): Promise<v
     });
     res.status(201).json(result);
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "postVirementCaisseBanque");
     res.status(400).json({ erreur: msg });
   }
@@ -143,5 +143,5 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
   const cid = coopId(req);
   if (!cid) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   try { res.json(await svc.getAlertes(cid)); }
-  catch (err) { req.log.error({ err }, "getAlertesBanque"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "getAlertesBanque"); res.status(500).json({ erreur: "Erreur serveur" }); }
 }

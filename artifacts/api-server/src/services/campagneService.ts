@@ -470,10 +470,11 @@ export async function activerCampagnesProgrammees(): Promise<void> {
     logger.info({ campagneId: c.id, cooperativeId: c.cooperativeId }, "Campagne programmée activée automatiquement");
     const admins = await getUsersAdminCooperative(c.cooperativeId);
     if (admins.length > 0) {
-      await creerNotification(c.cooperativeId, admins.map(u => u.id), {
-        titre: "Campagne ouverte automatiquement",
+      await creerNotification(c.cooperativeId, admins, {
+        type:    "cloture_campagne",
+        gravite: "info",
+        titre:   "Campagne ouverte automatiquement",
         message: `La campagne "${c.libelle}" a été ouverte automatiquement à sa date programmée.`,
-        type: "info",
       });
     }
   }

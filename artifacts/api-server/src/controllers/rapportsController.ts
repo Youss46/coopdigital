@@ -129,13 +129,13 @@ export async function getRecuLivraison(req: Request, res: Response): Promise<voi
 
     const bordereauAchat = livraison.bonReceptionId != null && livraison.sessionId != null;
     const buffer = bordereauAchat
-      ? await generateBordereauAchatSession(livraison.sessionId, cooperativeId)
+      ? await generateBordereauAchatSession(livraison.sessionId!, cooperativeId)
       : await generateRecuLivraison(id, cooperativeId);
     sendPdf(
       res,
       buffer,
       bordereauAchat
-        ? `bordereau_achat_${livraison.sessionId}.pdf`
+        ? `bordereau_achat_${livraison.sessionId!}.pdf`
         : `recu_livraison_${id}.pdf`,
     );
   } catch (err) {
@@ -194,13 +194,13 @@ export async function getTerrainRecuLivraison(req: Request, res: Response): Prom
   try {
     const bordereauAchat = livraison.bonReceptionId != null && livraison.sessionId != null;
     const buffer = bordereauAchat
-      ? await generateBordereauAchatSession(livraison.sessionId, cooperativeId)
+      ? await generateBordereauAchatSession(livraison.sessionId!, cooperativeId)
       : await generateRecuLivraison(id, cooperativeId);
     sendPdf(
       res,
       buffer,
       bordereauAchat
-        ? `bordereau_achat_${livraison.sessionId}.pdf`
+        ? `bordereau_achat_${livraison.sessionId!}.pdf`
         : `recu_livraison_${id}.pdf`,
     );
   } catch (err) {

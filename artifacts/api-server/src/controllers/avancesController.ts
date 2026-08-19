@@ -58,7 +58,7 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
     res.json({ avances, total: avances.length });
   } catch (err) {
     req.log.error({ err }, "Erreur listAvances");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -150,7 +150,7 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     res.status(201).json(avance);
   } catch (err) {
     req.log.error({ err }, "Erreur createAvance");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -201,7 +201,7 @@ export async function getAvancesEncours(req: Request, res: Response): Promise<vo
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getAvancesEncours");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -263,7 +263,7 @@ export async function rembourserAvance(req: Request, res: Response): Promise<voi
     res.json(avanceMaj);
   } catch (err) {
     req.log.error({ err }, "Erreur rembourserAvance");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -313,7 +313,7 @@ export async function updatePlanAvanceMembre(req: Request, res: Response): Promi
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "updatePlanAvanceMembre");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -361,7 +361,7 @@ export async function getAvancesReportees(req: Request, res: Response): Promise<
     res.json({ avances, total: avances.length, soldeTotal });
   } catch (err) {
     req.log.error({ err }, "getAvancesReportees");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -391,6 +391,6 @@ export async function getRemboursementsAvanceMembre(req: Request, res: Response)
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "getRemboursementsAvanceMembre");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

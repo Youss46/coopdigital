@@ -70,13 +70,13 @@ export async function getChauffeurMissions(req: Request, res: Response): Promise
         zone_collecte:    m.mission.zoneCollecte ?? null,
         section:          m.mission.section ?? null,
         observations:     m.mission.observations ?? null,
-        cout_fcfa:        m.mission.coutFcfa != null ? parseFloat(m.mission.coutFcfa) : null,
+        cout_fcfa:        m.mission.coutTotalFcfa != null ? parseFloat(m.mission.coutTotalFcfa) : null,
         created_at:       m.mission.createdAt.toISOString(),
       })),
     });
   } catch (err) {
     req.log.error({ err }, "getChauffeurMissions");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -137,7 +137,7 @@ export async function getChauffeurBons(req: Request, res: Response): Promise<voi
     });
   } catch (err) {
     req.log.error({ err }, "getChauffeurBons");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -233,7 +233,7 @@ export async function utiliserBonChauffeur(req: Request, res: Response): Promise
     res.json({ ...updated, message: "Utilisation enregistrée avec succès" });
   } catch (err) {
     req.log.error({ err }, "utiliserBonChauffeur");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -328,7 +328,7 @@ export async function getChauffeurAccueil(req: Request, res: Response): Promise<
     });
   } catch (err) {
     req.log.error({ err }, "getChauffeurAccueil");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -399,7 +399,7 @@ export async function getChauffeurStations(req: Request, res: Response): Promise
     });
   } catch (err) {
     req.log.error({ err }, "getChauffeurStations");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -422,7 +422,7 @@ export async function getChauffeurVehicules(req: Request, res: Response): Promis
     });
   } catch (err) {
     req.log.error({ err }, "getChauffeurVehicules");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -468,6 +468,6 @@ export async function creerDemandeCarburant(req: Request, res: Response): Promis
     res.status(201).json({ id: bon.id, numero: bon.numero, statut: bon.statut });
   } catch (err) {
     req.log.error({ err }, "creerDemandeCarburant");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }

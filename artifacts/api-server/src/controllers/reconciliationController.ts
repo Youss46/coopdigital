@@ -72,7 +72,7 @@ export async function getReleves(req: Request, res: Response): Promise<void> {
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     res.json(await svc.listReleves(cooperativeId));
   }
-  catch (err) { req.log.error({ err }, "getReleves"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "getReleves"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 // ─── Détail d'un relevé ───────────────────────────────────────────────────────
@@ -85,7 +85,7 @@ export async function getReleve(req: Request, res: Response): Promise<void> {
     const data = await svc.getReleve(cooperativeId, id);
     if (!data) { res.status(404).json({ error: "Relevé introuvable" }); return; }
     res.json(data);
-  } catch (err) { req.log.error({ err }, "getReleve"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "getReleve"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 // ─── Réconciliation automatique ───────────────────────────────────────────────
@@ -97,7 +97,7 @@ export async function postAuto(req: Request, res: Response): Promise<void> {
     const id = parseInt(String(req.params["id"]), 10);
     res.json(await svc.reconcilierAutomatiquement(cooperativeId, id));
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "postAuto reconciliation");
     res.status(400).json({ error: msg });
   }
@@ -112,7 +112,7 @@ export async function putReconcilier(req: Request, res: Response): Promise<void>
     if (!ecriture_id) { res.status(400).json({ error: "ecriture_id requis" }); return; }
     res.json(await svc.reconcilierManuel(ligneId, ecriture_id));
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "putReconcilier");
     res.status(400).json({ error: msg });
   }
@@ -125,7 +125,7 @@ export async function putIgnorer(req: Request, res: Response): Promise<void> {
     const id   = parseInt(String(req.params["id"]), 10);
     const { motif } = req.body as { motif?: string };
     res.json(await svc.ignorerLigne(id, motif));
-  } catch (err) { req.log.error({ err }, "putIgnorer"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "putIgnorer"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 // ─── Recherche écritures (autocomplete) ───────────────────────────────────────
@@ -137,7 +137,7 @@ export async function getEcritures(req: Request, res: Response): Promise<void> {
     const q       = String(req.query["q"] ?? "");
     const montant = req.query["montant"] ? parseInt(String(req.query["montant"]), 10) : undefined;
     res.json(await svc.rechercherEcritures(cooperativeId, q, montant));
-  } catch (err) { req.log.error({ err }, "getEcritures reconciliation"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "getEcritures reconciliation"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 // ─── Suggestions IA pour une ligne ───────────────────────────────────────────

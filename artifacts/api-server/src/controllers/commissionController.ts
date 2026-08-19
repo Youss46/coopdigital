@@ -12,7 +12,7 @@ export async function getRecapCommissionsHandler(req: Request, res: Response): P
     res.json(recap);
   } catch (err) {
     req.log.error({ err }, "getRecapCommissions");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -26,7 +26,7 @@ export async function listTauxHandler(req: Request, res: Response): Promise<void
     res.json(taux);
   } catch (err) {
     req.log.error({ err }, "listTaux");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -57,7 +57,7 @@ export async function upsertTauxHandler(req: Request, res: Response): Promise<vo
     res.status(id ? 200 : 201).json(row);
   } catch (err) {
     req.log.error({ err }, "upsertTaux");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -71,7 +71,7 @@ export async function deleteTauxHandler(req: Request, res: Response): Promise<vo
     res.status(204).end();
   } catch (err) {
     req.log.error({ err }, "deleteTaux");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -87,7 +87,7 @@ export async function getCommissionsDelegueHandler(req: Request, res: Response):
     res.json(data);
   } catch (err) {
     req.log.error({ err }, "getCommissionsDelegue");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -121,7 +121,7 @@ export async function payerCommissionsHandler(req: Request, res: Response): Prom
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "payerCommissions");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -143,6 +143,6 @@ export async function getMesCommissionsHandler(req: Request, res: Response): Pro
     res.json(data);
   } catch (err) {
     req.log.error({ err }, "getMesCommissions");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }

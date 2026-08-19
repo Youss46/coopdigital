@@ -82,7 +82,7 @@ router.get("/saas/ma-licence", authMiddleware, async (req, res) => {
     });
   } catch (err) {
     req.log.error({ err }, "Erreur ma-licence");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 });
 

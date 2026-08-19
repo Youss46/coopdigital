@@ -51,7 +51,7 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
     res.json(users);
   } catch (err) {
     req.log.error({ err }, "Erreur lors de la récupération des utilisateurs");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -148,7 +148,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
       return;
     }
     req.log.error({ err }, "Erreur lors de la création du compte");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -207,7 +207,7 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur lors de la mise à jour du compte");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -264,7 +264,7 @@ export async function resetUserPassword(req: Request, res: Response): Promise<vo
     res.json({ message: "Mot de passe réinitialisé avec succès" });
   } catch (err) {
     req.log.error({ err }, "Erreur lors de la réinitialisation du mot de passe");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -302,7 +302,7 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
     res.status(204).end();
   } catch (err) {
     req.log.error({ err }, "Erreur lors de la suppression du compte");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -361,7 +361,7 @@ export async function toggleUserActif(req: Request, res: Response): Promise<void
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur lors de l'activation/désactivation du compte");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -404,7 +404,7 @@ export async function resetPeseurPasswordParDelegue(req: Request, res: Response)
     res.json({ message: "Mot de passe réinitialisé avec succès" });
   } catch (err) {
     req.log.error({ err }, "resetPeseurPasswordParDelegue");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -432,7 +432,7 @@ export async function getMesPeseurs(req: Request, res: Response): Promise<void> 
     res.json(peseurs);
   } catch (err) {
     req.log.error({ err }, "getMesPeseurs");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -510,7 +510,7 @@ export async function createPeseurParDelegue(req: Request, res: Response): Promi
       return;
     }
     req.log.error({ err }, "createPeseurParDelegue");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -573,7 +573,7 @@ export async function createChauffeurUser(req: Request, res: Response): Promise<
       res.status(409).json({ erreur: "Un compte avec ce numéro de téléphone existe déjà" }); return;
     }
     req.log.error({ err }, "createChauffeurUser");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -628,7 +628,7 @@ export async function togglePeseurActifParDelegue(req: Request, res: Response): 
     res.json({ ok: true, actif });
   } catch (err) {
     req.log.error({ err }, "togglePeseurActif");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -675,7 +675,7 @@ export async function listAllPeseurs(req: Request, res: Response): Promise<void>
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "listAllPeseurs");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -754,7 +754,7 @@ export async function createPeseurAdmin(req: Request, res: Response): Promise<vo
       return;
     }
     req.log.error({ err }, "createPeseurAdmin");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -787,6 +787,6 @@ export async function resetPeseurPassword(req: Request, res: Response): Promise<
     res.json({ message: "Mot de passe réinitialisé avec succès" });
   } catch (err) {
     req.log.error({ err }, "resetPeseurPassword");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }

@@ -535,6 +535,7 @@ export async function getSessions(
       dateFin: sessionsPeseeTable.dateFin,
       notes: sessionsPeseeTable.notes,
       livraisonId: sessionsPeseeTable.livraisonId,
+      bonReceptionId: sessionsPeseeTable.bonReceptionId,
       createdAt: sessionsPeseeTable.createdAt,
     })
     .from(sessionsPeseeTable)

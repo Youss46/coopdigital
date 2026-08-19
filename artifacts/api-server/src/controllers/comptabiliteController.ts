@@ -59,7 +59,7 @@ export async function getGrandLivre(req: Request, res: Response): Promise<void> 
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getGrandLivre");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -116,7 +116,7 @@ export async function getBalance(req: Request, res: Response): Promise<void> {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getBalance");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -155,7 +155,7 @@ export async function getJournalComptable(req: Request, res: Response): Promise<
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getJournalComptable");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -209,7 +209,7 @@ export async function createEcritureManuelle(req: Request, res: Response): Promi
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur createEcritureManuelle");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -309,7 +309,7 @@ export async function exportJournalCsv(req: Request, res: Response): Promise<voi
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur exportJournalExcel");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -337,7 +337,7 @@ export async function getMargeCollecte(req: Request, res: Response): Promise<voi
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getMargeCollecte");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -366,7 +366,7 @@ export async function getTresorerie(req: Request, res: Response): Promise<void> 
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getTresorerie");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -390,7 +390,7 @@ export async function getConfigComptable(req: Request, res: Response): Promise<v
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "getConfigComptable");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -432,7 +432,7 @@ export async function updateConfigComptable(req: Request, res: Response): Promis
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "updateConfigComptable");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -461,7 +461,7 @@ export async function listEcrituresEnAttente(req: Request, res: Response): Promi
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "listEcrituresEnAttente");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -478,7 +478,7 @@ export async function countEcrituresEnAttente(req: Request, res: Response): Prom
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "countEcrituresEnAttente");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -557,7 +557,7 @@ export async function validerEcritureEnAttente(req: Request, res: Response): Pro
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "validerEcritureEnAttente");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -593,7 +593,7 @@ export async function rejeterEcritureEnAttente(req: Request, res: Response): Pro
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "rejeterEcritureEnAttente");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -642,7 +642,7 @@ export async function validerToutEcrituresEnAttente(req: Request, res: Response)
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "validerToutEcrituresEnAttente");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -678,7 +678,7 @@ export async function listRegularisations(req: Request, res: Response): Promise<
     res.json(rows.rows);
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -686,7 +686,7 @@ export async function createRegularisation(req: Request, res: Response): Promise
   try {
     const coop = coopId(req);
     const { type, compteContrepartie, compteRegul, libelle, montantFcfa, date, exercice } = req.body as {
-      type: "408" | "418" | "486" | "487";
+      type: keyof typeof REGULARISATION_TYPES;
       compteContrepartie: string;
       compteRegul?: string;           // compte fixe (côté régularisation), éditable par l'utilisateur
       libelle: string;
@@ -710,7 +710,7 @@ export async function createRegularisation(req: Request, res: Response): Promise
     }
 
     const compteFixe = (compteRegul ?? type).trim();
-    const cfg = REGULARISATION_TYPES[type];
+    const cfg = REGULARISATION_TYPES[type as keyof typeof REGULARISATION_TYPES];
     const compteDebit  = cfg.debitSide  === "fixe" ? compteFixe : compteContrepartie;
     const compteCredit = cfg.creditSide === "fixe" ? compteFixe : compteContrepartie;
 
@@ -732,7 +732,7 @@ export async function createRegularisation(req: Request, res: Response): Promise
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur createRegularisation");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -761,7 +761,7 @@ export async function deleteRegularisation(req: Request, res: Response): Promise
     res.json({ supprime: id });
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne" });
   }
 }
 
@@ -874,7 +874,7 @@ export async function apercuCloture(req: Request, res: Response): Promise<void> 
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur apercuCloture");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1183,7 +1183,7 @@ export async function cloturerExercice(req: Request, res: Response): Promise<voi
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur cloturerExercice");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1337,7 +1337,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getBalanceAuxiliaire");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1414,7 +1414,7 @@ export async function getGrandLivreTiers(req: Request, res: Response): Promise<v
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getGrandLivreTiers");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1468,7 +1468,7 @@ export async function getApercuAffectationResultat(req: Request, res: Response):
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getApercuAffectationResultat");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 // ─── Ristournes — aperçu et déclenchement ─────────────────────────────────────
@@ -1549,7 +1549,7 @@ export async function apercuRistournes(req: Request, res: Response): Promise<voi
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur apercuRistournes");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1616,7 +1616,7 @@ export async function declencherRistournes(req: Request, res: Response): Promise
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur declencherRistournes");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1654,7 +1654,7 @@ export async function getHistoriqueAffectations(req: Request, res: Response): Pr
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getHistoriqueAffectations");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1668,7 +1668,7 @@ export async function getStatutsExercices(req: Request, res: Response): Promise<
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getStatutsExercices");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -1789,6 +1789,6 @@ export async function affecterResultat(req: Request, res: Response): Promise<voi
       res.status(409).json({ erreur: `Une affectation du résultat ${req.body.exercice} existe déjà` }); return;
     }
     req.log.error({ err }, "Erreur affecterResultat");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

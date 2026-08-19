@@ -107,6 +107,17 @@ async function getCampagneEnCours(cooperativeId: number): Promise<string | null>
   return `${c.libelle} (${years})`;
 }
 
+/** Retourne l'ID de la campagne ouverte de la coopérative, ou null si aucune. */
+async function getCampagneIdEnCours(cooperativeId: number): Promise<number | null> {
+  const [c] = await db
+    .select({ id: campagnesTable.id })
+    .from(campagnesTable)
+    .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
+    .orderBy(desc(campagnesTable.dateOuverture))
+    .limit(1);
+  return c?.id ?? null;
+}
+
 /** Retourne le libellé de certification du produit pour un membre.
  *  Ex : "Cacao certifié Rainforest Alliance · Fairtrade" ou "Cacao ordinaire". */
 async function getMentionCertification(membreId: number | null | undefined, cooperativeId: number): Promise<string> {
@@ -996,7 +1007,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     ["N° Reçu",              ref],
     ["Campagne",             campagne ?? "—"],
     ["Date",                 formaterDateHeure(row.createdAt)],
-    ["Mode de paiement",     payModeLabel[row.modeReglement ?? row.modePaiement] ?? row.modePaiement],
+    ["Mode de paiement",     payModeLabel[(row.modeReglement ?? row.modePaiement) ?? ""] ?? row.modePaiement ?? "—"],
     ["Référence transaction",row.referenceTransaction ?? "—"],
     ["Libellé",              row.libelle ?? "Paiement livraison cacao"],
     ["Livraison associée",   row.livraisonRef ?? (row.livraisonId ? `LIV-${String(row.livraisonId).padStart(5,"0")}` : "—")],
@@ -1081,6 +1092,22 @@ type BulletinData = {
   retenues:  (typeof lignesBulletinTable.$inferSelect)[];
 };
 
+/** Formate l'ancienneté d'un agent à partir de sa date d'embauche (ex: "2 ans 3 mois"). */
+function formatAnciennete(dateEmbauche: string | null | undefined): string {
+  if (!dateEmbauche) return "—";
+  const debut = new Date(dateEmbauche);
+  if (isNaN(debut.getTime())) return "—";
+  const now = new Date();
+  let mois = (now.getFullYear() - debut.getFullYear()) * 12 + (now.getMonth() - debut.getMonth());
+  if (now.getDate() < debut.getDate()) mois -= 1;
+  if (mois < 0) return "—";
+  const ans = Math.floor(mois / 12);
+  const restMois = mois % 12;
+  if (ans === 0) return `${restMois} mois`;
+  const ansLabel = `${ans} an${ans > 1 ? "s" : ""}`;
+  return restMois === 0 ? ansLabel : `${ansLabel} ${restMois} mois`;
+}
+
 async function fetchBulletinData(bulletinId: number, cooperativeId: number): Promise<BulletinData> {
   const [bulletin] = await db.select().from(bulletinsPaieTable)
     .where(and(eq(bulletinsPaieTable.id, bulletinId), eq(bulletinsPaieTable.cooperativeId, cooperativeId)));
@@ -1148,7 +1175,7 @@ async function drawBulletinOnDoc(
      .text(`Période : ${bulletin.periode}`, MID + 10, y + 19);
   doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
      .text(`Référence : ${REF}`, MID + 10, y + 31)
-     .text(`Ancienneté : ${agent?.anciennete ?? "—"}`, MID + 10, y + 42);
+     .text(`Ancienneté : ${formatAnciennete(agent?.dateEmbauche)}`, MID + 10, y + 42);
 
   // Badge statut
   const BADGE_W = 64, BADGE_H = 14;
@@ -4183,8 +4210,8 @@ export async function generateBordereauAchatSession(
       fraisCollecteFcfa = Math.round(brut);
     } else if (delegueIdSession) {
       // Fallback : taux × poids net (commission brute, sans déduction de charges)
-      const campagneActuelle = await getCampagneEnCours(cooperativeId);
-      const taux = await getTauxActif(cooperativeId, campagneActuelle?.id ?? null, delegueIdSession);
+      const campagneIdFallback = await getCampagneIdEnCours(cooperativeId);
+      const taux = await getTauxActif(cooperativeId, campagneIdFallback, delegueIdSession);
       if (taux) {
         const poidsNetPourCommission = parseFloat(session.poidsTotalKg ?? "0");
         fraisCollecteFcfa = Math.round(poidsNetPourCommission * taux.tauxFcfaParKg);

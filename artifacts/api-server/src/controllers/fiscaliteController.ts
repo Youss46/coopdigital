@@ -7,7 +7,7 @@ export async function getObligations(req: Request, res: Response): Promise<void>
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     res.json(await svc.listObligations(cooperativeId));
   }
-  catch (err) { req.log.error({ err }, "getObligations"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "getObligations"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function getAllObligations(req: Request, res: Response): Promise<void> {
@@ -16,7 +16,7 @@ export async function getAllObligations(req: Request, res: Response): Promise<vo
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     res.json(await svc.listObligationsAll(cooperativeId));
   }
-  catch (err) { req.log.error({ err }, "getAllObligations"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "getAllObligations"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 export async function postInitObligationsCI(req: Request, res: Response): Promise<void> {
   try {
@@ -24,7 +24,7 @@ export async function postInitObligationsCI(req: Request, res: Response): Promis
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const result = await svc.initObligationsCI(cooperativeId);
     res.status(201).json(result);
-  } catch (err) { req.log.error({ err }, "postInitObligationsCI"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "postInitObligationsCI"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function postGenererMensuel(req: Request, res: Response): Promise<void> {
@@ -35,7 +35,7 @@ export async function postGenererMensuel(req: Request, res: Response): Promise<v
     const annee = parseInt(String(req.params["annee"]), 10);
     if (mois < 1 || mois > 12 || annee < 2000) { res.status(400).json({ error: "mois (1-12) et annee valides requis" }); return; }
     res.status(201).json(await svc.genererDeclarationsMensuelles(cooperativeId, mois, annee));
-  } catch (err) { req.log.error({ err }, "postGenererMensuel"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "postGenererMensuel"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function postGenererAnnuel(req: Request, res: Response): Promise<void> {
@@ -45,7 +45,7 @@ export async function postGenererAnnuel(req: Request, res: Response): Promise<vo
     const annee = parseInt(String(req.params["annee"]), 10);
     if (annee < 2000) { res.status(400).json({ error: "annee valide requise" }); return; }
     res.status(201).json(await svc.genererDeclarationsAnnuelles(cooperativeId, annee));
-  } catch (err) { req.log.error({ err }, "postGenererAnnuel"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "postGenererAnnuel"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function getDeclarations(req: Request, res: Response): Promise<void> {
@@ -54,7 +54,7 @@ export async function getDeclarations(req: Request, res: Response): Promise<void
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const { statut, type_taxe, periode } = req.query as Record<string, string | undefined>;
     res.json(await svc.listDeclarations(cooperativeId, { statut, typeTaxe: type_taxe, periode }));
-  } catch (err) { req.log.error({ err }, "getDeclarations"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "getDeclarations"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function deleteDeclaration(req: Request, res: Response): Promise<void> {
@@ -66,12 +66,12 @@ export async function deleteDeclaration(req: Request, res: Response): Promise<vo
     await svc.supprimerDeclaration(cooperativeId, id);
     res.status(204).end();
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     if (msg.includes("introuvable") || msg.includes("impossible")) {
       res.status(400).json({ error: msg });
     } else {
       req.log.error({ err }, "deleteDeclaration");
-      res.status(500).json({ erreur: apiError(err) });
+      res.status(500).json({ error: "Erreur serveur" });
     }
   }
 }
@@ -85,12 +85,12 @@ export async function putRecalculer(req: Request, res: Response): Promise<void> 
     await svc.recalculerDeclaration(cooperativeId, id);
     res.json({ ok: true });
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     if (msg.includes("introuvable") || msg.includes("impossible") || msg.includes("parseable")) {
       res.status(400).json({ error: msg });
     } else {
       req.log.error({ err }, "putRecalculer");
-      res.status(500).json({ erreur: apiError(err) });
+      res.status(500).json({ error: "Erreur serveur" });
     }
   }
 }
@@ -106,7 +106,7 @@ export async function putPayer(req: Request, res: Response): Promise<void> {
     if (!montantPaye) { res.status(400).json({ error: "montantPaye requis" }); return; }
     res.json(await svc.enregistrerPaiement(cooperativeId, id, { montantPaye: Math.round(montantPaye), reference, datePaiement }));
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "putPayer");
     res.status(400).json({ error: msg });
   }
@@ -118,7 +118,7 @@ export async function getCalendrier(req: Request, res: Response): Promise<void> 
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     res.json(await svc.getCalendrier(cooperativeId));
   }
-  catch (err) { req.log.error({ err }, "getCalendrier"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "getCalendrier"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function getAlertes(req: Request, res: Response): Promise<void> {
@@ -127,7 +127,7 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     res.json(await svc.getAlertes(cooperativeId));
   }
-  catch (err) { req.log.error({ err }, "getAlertes fiscalite"); res.status(500).json({ erreur: apiError(err) }); }
+  catch (err) { req.log.error({ err }, "getAlertes fiscalite"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function getRapportAnnuel(req: Request, res: Response): Promise<void> {
@@ -136,7 +136,7 @@ export async function getRapportAnnuel(req: Request, res: Response): Promise<voi
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const annee = parseInt((req.query["annee"] as string) ?? String(new Date().getFullYear()), 10);
     res.json(await svc.getRapportAnnuel(cooperativeId, annee));
-  } catch (err) { req.log.error({ err }, "getRapportAnnuel"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "getRapportAnnuel"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function getRapportPdf(req: Request, res: Response): Promise<void> {
@@ -148,7 +148,7 @@ export async function getRapportPdf(req: Request, res: Response): Promise<void> 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="rapport-fiscal-${annee}.pdf"`);
     res.send(buf);
-  } catch (err) { req.log.error({ err }, "getRapportPdf fiscalite"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "getRapportPdf fiscalite"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function getBordereauCnpsPdf(req: Request, res: Response): Promise<void> {
@@ -165,7 +165,7 @@ export async function getBordereauCnpsPdf(req: Request, res: Response): Promise<
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="bordereau-cnps-${annee}-${moisStr}.pdf"`);
     res.send(buf);
-  } catch (err) { req.log.error({ err }, "getBordereauCnpsPdf"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "getBordereauCnpsPdf"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
 export async function patchObligationToggle(req: Request, res: Response): Promise<void> {
@@ -195,7 +195,7 @@ export async function patchObligationToggle(req: Request, res: Response): Promis
     const updated = await svc.toggleObligation(cooperativeId, id);
     res.json(updated);
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "patchObligationToggle");
     res.status(400).json({ error: msg });
   }
@@ -240,7 +240,7 @@ export async function putObligation(req: Request, res: Response): Promise<void> 
     const updated = await svc.updateObligation(cooperativeId, id, { libelle, typeTaxe, periodicite, jourEcheance, tauxPct, baseCalcul });
     res.json(updated);
   } catch (err) {
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "putObligation");
     res.status(400).json({ error: msg });
   }
@@ -261,5 +261,5 @@ export async function postObligation(req: Request, res: Response): Promise<void>
     if (validErr) { res.status(400).json({ error: validErr }); return; }
     const created = await svc.createObligation(cooperativeId, { libelle, typeTaxe, periodicite, jourEcheance, tauxPct, baseCalcul });
     res.status(201).json(created);
-  } catch (err) { req.log.error({ err }, "postObligation"); res.status(500).json({ erreur: apiError(err) }); }
+  } catch (err) { req.log.error({ err }, "postObligation"); res.status(500).json({ error: "Erreur serveur" }); }
 }

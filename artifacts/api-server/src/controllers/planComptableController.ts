@@ -16,7 +16,7 @@ export async function listPlanComptableHandler(req: Request, res: Response): Pro
     res.json(comptes);
   } catch (err) {
     req.log.error({ err }, "listPlanComptable");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -39,7 +39,7 @@ export async function createCompteHandler(req: Request, res: Response): Promise<
     res.status(201).json(compte);
   } catch (err: unknown) {
     req.log.error({ err }, "createCompte");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne du serveur";
     res.status(msg.includes("déjà") || msg.includes("unique") ? 409 : 500).json({ erreur: msg });
   }
 }
@@ -54,7 +54,7 @@ export async function updateCompteHandler(req: Request, res: Response): Promise<
     res.json(compte);
   } catch (err: unknown) {
     req.log.error({ err }, "updateCompte");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne du serveur";
     res.status(msg.includes("introuvable") ? 404 : 500).json({ erreur: msg });
   }
 }
@@ -71,7 +71,7 @@ export async function seedParamsOhadaHandler(req: Request, res: Response): Promi
     });
   } catch (err) {
     req.log.error({ err }, "seedParamsOhada");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -86,7 +86,7 @@ export async function seedPlanOhadaHandler(req: Request, res: Response): Promise
     });
   } catch (err) {
     req.log.error({ err }, "seedPlanOhada");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -99,7 +99,7 @@ export async function deleteCompteHandler(req: Request, res: Response): Promise<
     res.json(compte);
   } catch (err: unknown) {
     req.log.error({ err }, "deleteCompte");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne du serveur";
     const status = msg.includes("introuvable") ? 404 : msg.includes("Désactivation refusée") ? 409 : 500;
     res.status(status).json({ erreur: msg });
   }
@@ -113,7 +113,7 @@ export async function listParamsHandler(req: Request, res: Response): Promise<vo
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "listParams");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -124,7 +124,7 @@ export async function listParamsModuleHandler(req: Request, res: Response): Prom
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "listParamsModule");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -141,7 +141,7 @@ export async function updateParamsHandler(req: Request, res: Response): Promise<
     res.json(updated);
   } catch (err: unknown) {
     req.log.error({ err }, "updateParams");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne du serveur";
     res.status(msg.includes("introuvable") ? 404 : msg.includes("désactivé") ? 422 : 500).json({ erreur: msg });
   }
 }
@@ -156,7 +156,7 @@ export async function resetModuleHandler(req: Request, res: Response): Promise<v
     res.json(result);
   } catch (err: unknown) {
     req.log.error({ err }, "resetModule");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne du serveur";
     res.status(msg.includes("non reconnu") ? 400 : 500).json({ erreur: msg });
   }
 }
@@ -173,7 +173,7 @@ export async function searchEcrituresHandler(req: Request, res: Response): Promi
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "searchEcritures");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
 
@@ -200,7 +200,7 @@ export async function corrigerEcritureHandler(req: Request, res: Response): Prom
     res.status(201).json(result);
   } catch (err: unknown) {
     req.log.error({ err }, "corrigerEcriture");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne du serveur";
     const status = msg.includes("introuvable") ? 404 : msg.includes("Seules") ? 422 : 500;
     res.status(status).json({ erreur: msg });
   }
@@ -215,7 +215,7 @@ export async function getHistoriqueEcritureHandler(req: Request, res: Response):
     res.json(result);
   } catch (err: unknown) {
     req.log.error({ err }, "getHistoriqueEcriture");
-    const msg = apiError(err);
+    const msg = err instanceof Error ? err.message : "Erreur interne du serveur";
     res.status(msg.includes("introuvable") ? 404 : 500).json({ erreur: msg });
   }
 }
@@ -230,6 +230,6 @@ export async function validerNumeroCompteHandler(req: Request, res: Response): P
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "validerNumeroCompte");
-    res.status(500).json({ erreur: apiError(err) });
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
