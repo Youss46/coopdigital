@@ -262,6 +262,23 @@ export async function createSession(
           ));
       }
 
+      // Vérifier qu'il n'existe pas déjà une session en_cours pour ce membre
+      // (contrainte unique partielle sessions_pesee_unique_en_cours_idx).
+      // Cela peut arriver si une session de livraison simple est en cours pour
+      // le même membre alors qu'on tente de démarrer une réception bon délégué.
+      const [sessionEnCours] = await tx
+        .select({ id: sessionsPeseeTable.id, numeroSession: sessionsPeseeTable.numeroSession })
+        .from(sessionsPeseeTable)
+        .where(and(
+          eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+          eq(sessionsPeseeTable.membreId, bon.membreDelegueId),
+          eq(sessionsPeseeTable.statut, "en_cours"),
+        ))
+        .limit(1);
+      if (sessionEnCours) {
+        throw new SessionEnCoursError(sessionEnCours.id, sessionEnCours.numeroSession);
+      }
+
       const [created] = await tx
         .insert(sessionsPeseeTable)
         .values({
