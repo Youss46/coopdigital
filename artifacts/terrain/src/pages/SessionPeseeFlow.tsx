@@ -169,6 +169,24 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   // Rafraîchie toutes les 30 s tant que l'écran de sélection du membre est visible.
   const [activeSessions, setActiveSessions] = useState<Map<number, number>>(new Map());
   const sessionMembreDelegueIncomplete = isIncompleteMemberDelegateSession(session);
+  const sessionSaisissable = session?.statut === "en_cours";
+
+  // Une session peut changer de statut après son chargement (annulation depuis
+  // un autre appareil, cron d'expiration, etc.). Ne jamais laisser le
+  // formulaire de saisie affiché dans cet état devenu inactif.
+  useEffect(() => {
+    if (step !== "session" || !session || session.statut === "en_cours") return;
+
+    if (session.statut === "terminee") {
+      setSessionTerminee(session);
+      setSession(null);
+      setStep("succes");
+      return;
+    }
+
+    quitterSessionAnnulee(session);
+  }, [session?.id, session?.statut, step]);
+
   useEffect(() => {
     if (!isOnline || step !== "membre") return;
 
@@ -421,6 +439,16 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   // ── Ajouter une ligne ──────────────────────────────────────────────────────
   async function handleAjouterLigne() {
     if (!session || !poidsBrut) return;
+    if (session.statut !== "en_cours") {
+      if (session.statut === "terminee") {
+        setSessionTerminee(session);
+        setSession(null);
+        setStep("succes");
+      } else {
+        quitterSessionAnnulee(session);
+      }
+      return;
+    }
     const poidsNum = parseFloat(poidsBrut);
     if (isNaN(poidsNum) || poidsNum <= 0) { setErreur("Poids invalide"); return; }
     setAjoutLoading(true);
@@ -464,12 +492,15 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             setStep("succes");
             return;
           }
-          if (refreshed.statut === "annulee") {
+          if (refreshed.statut !== "en_cours") {
             quitterSessionAnnulee(refreshed);
             return;
           }
         } catch {
-          // Conserver le message du serveur s'il est impossible de recharger.
+          // Le serveur a confirmé que la session est inactive. Ne pas laisser
+          // le peseur sur un formulaire qui ne pourra plus être enregistré.
+          quitterSessionAnnulee(session);
+          return;
         }
       }
       setErreur(message);
@@ -1196,7 +1227,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                   background: "linear-gradient(135deg, var(--t-peseur-dark) 0%, var(--t-peseur) 100%)",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 }}
-                disabled={sessionMembreDelegueIncomplete || !poidsBrut || parseFloat(poidsBrut) <= 0 || ajoutLoading}
+                disabled={!sessionSaisissable || sessionMembreDelegueIncomplete || !poidsBrut || parseFloat(poidsBrut) <= 0 || ajoutLoading}
                 onClick={handleAjouterLigne}
               >
                 {ajoutLoading
@@ -1224,7 +1255,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                       : "linear-gradient(135deg, var(--t-primary) 0%, var(--t-success) 100%)",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                   }}
-                  disabled={sessionMembreDelegueIncomplete || session.lignes.length === 0 || terminerLoading}
+                  disabled={!sessionSaisissable || sessionMembreDelegueIncomplete || session.lignes.length === 0 || terminerLoading}
                   onClick={() => setConfirmTerminer(true)}
                 >
                   <CheckCheck size={16} />
