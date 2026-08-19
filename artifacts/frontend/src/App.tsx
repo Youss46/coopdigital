@@ -294,7 +294,7 @@ function AppRoutes() {
         <ProtectedRoute component={DeleguesPage} />
       </Route>
       <Route path="/delegues-localites">
-        <ProtectedRoute component={DeleguesLocalitesPage} />
+        <ProtectedRoute component={DeleguesLocalitesPage} roles={["pca", "directeur", "comptable", "auditeur"]} />
       </Route>
       <Route path="/cartes-membres">
         <ProtectedRoute component={CartesMembres} />
