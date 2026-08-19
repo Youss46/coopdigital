@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { terrainAuthMiddleware } from "../middlewares/terrainAuth.js";
 import { authMiddleware } from "../middlewares/auth.js";
+import { tenantGuard } from "../middlewares/tenantGuard.js";
 import { checkPermission } from "../middlewares/permissions.js";
 import {
   getCaisseHandler,
@@ -41,6 +42,10 @@ router.get("/terrain/paiements-differes",      terrainAuthMiddleware, getPaiemen
 router.post("/terrain/regulariser/:livraisonId", terrainAuthMiddleware, regulariserPaiementHandler);
 
 // ─── Routes admin (JWT coopérative) ──────────────────────────────────────────
+// Ce router est monté avant le guard global : protéger explicitement toutes les
+// routes /delegues tout en laissant les trois routes JWT terrain ci-dessus libres.
+router.use("/delegues", authMiddleware, tenantGuard);
+
 // IMPORTANT : les routes spécifiques (alertes, paiements-differes, commissions)
 // doivent être AVANT les routes paramétrées (/:agentId) pour éviter les collisions Express
 

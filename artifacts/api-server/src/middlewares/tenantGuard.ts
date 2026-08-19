@@ -1,17 +1,20 @@
 import { type Request, type Response, type NextFunction } from "express";
 import { verifierLicenceActive } from "../services/licenceService.js";
 
+// La licence est une restriction de gestion et de pilotage financier.
+// Les rôles opérationnels doivent pouvoir continuer à travailler lorsque
+// la coopérative doit régulariser sa licence.
+const ROLES_SOUMIS_A_LA_LICENCE = new Set(["pca", "directeur", "comptable"]);
+
 export async function tenantGuard(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!req.user || !req.user.cooperativeId) {
     next();
     return;
   }
 
-  // Le PCA et les délégués de localité sont exemptés :
-  // - PCA : doit pouvoir voir le dashboard pour décider de renouveler
-  // - Délégué : opérateur terrain (caisse, collecte) — ne doit pas être bloqué
-  //   par un problème de licence de la coopérative centrale
-  if (req.user.role === "pca" || req.user.role === "delegue") {
+  // Les rôles opérationnels (magasinier, auditeur, délégué, terrain, etc.)
+  // ne doivent pas être bloqués par l'état de la licence.
+  if (!ROLES_SOUMIS_A_LA_LICENCE.has(req.user.role)) {
     next();
     return;
   }

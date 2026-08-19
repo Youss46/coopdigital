@@ -48,7 +48,7 @@
 - [Vercel+Railway frontend BASE URL](vercel-railway-base-url.md) — MissionsEnquetePage et tout nouveau fichier fetch doivent utiliser `import.meta.env.VITE_API_URL ?? ""` comme BASE; hardcoder `""` casse les appels API en production Vercel+Railway si VITE_API_URL est défini.
 - [Commissions délégués — architecture](commissions-delegues-arch.md) — Option A (délégué du membre via membres.delegue_id); 2 tables; hook dans enregistrerCollecte; résolution taux par priorité.
 - [Rôle Peseur — pattern ajout terrain role](terrain-peseur-role.md) — peseur = 4e rôle terrain (phone auth); 6 fichiers à toucher; backend delegueOnly guard déjà protège avance/paiement.
-- [Contrôle de licence](licence-guard-dev-testing.md) — tenantGuard priorise une licence encore valable; les checks négatifs sont cachés en mémoire.
+- [Contrôle de licence](licence-guard-dev-testing.md) — seuls PCA, directeur et comptable sont soumis à tenantGuard; une licence valide prime sur l’historique expiré.
 - [Période campagne du tableau de bord](dashboard-campaign-filter.md) — « Toute la campagne » doit être un mode API explicite, pas une absence de dates.
 - [Avances membres — plan déduction flexible](avances-membres-plan.md) — planType/montantPartielFcfa/reportDate sur avancesTable; remboursementsAvancesMembresTable pour historique; livraisonsController itère TOUTES les avances en_cours par dateOctroi ASC (pas limit 1).
 - [Avances délégués — architecture](avances-delegues-arch.md) — table dédiée avances_delegues; retenue automatique dans payerCommissions (même transaction); planType integral/partiel/reporte; UI onglet 4 dans DeleguesPage.
