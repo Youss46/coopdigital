@@ -39,3 +39,12 @@ l'ancienne conserve ce lien.
 **How to apply:** à l'annulation, dissocier la session tout en conservant son
 historique; au démarrage et au chargement des réceptions, réparer aussi les
 anciennes sessions annulées qui auraient gardé leur lien.
+
+À la création d'une session, définir explicitement son statut à `en_cours`
+plutôt que de dépendre uniquement de la valeur par défaut de la base.
+
+**Why:** un environnement dont le schéma ou les valeurs par défaut ont dérivé
+peut autrement créer une session immédiatement inutilisable.
+
+**How to apply:** appliquer cette valeur à chaque chemin de création : bon de
+réception, transfert, parcours standard et synchronisation hors ligne.
