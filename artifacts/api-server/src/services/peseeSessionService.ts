@@ -1483,7 +1483,12 @@ export async function expirerSessionsStales(cooperativeId: number): Promise<numb
     .where(eq(configPeseeTable.cooperativeId, cooperativeId))
     .limit(1);
 
-  const heures = config?.delai ?? 8;
+  // Un délai nul ou négatif annulerait chaque session dès le prochain passage
+  // du cron. Une session de pesée doit rester disponible au minimum une heure.
+  const heuresConfigurees = Number(config?.delai ?? 8);
+  const heures = Number.isFinite(heuresConfigurees) && heuresConfigurees >= 1
+    ? Math.floor(heuresConfigurees)
+    : 8;
 
   const now = new Date();
   const cutoff = sql`NOW() - interval '1 hour' * ${heures}`;

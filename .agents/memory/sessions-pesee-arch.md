@@ -48,3 +48,12 @@ peut autrement créer une session immédiatement inutilisable.
 
 **How to apply:** appliquer cette valeur à chaque chemin de création : bon de
 réception, transfert, parcours standard et synchronisation hors ligne.
+
+Le délai d'expiration configuré pour les sessions doit être une durée positive;
+une valeur nulle ou invalide doit retomber sur le délai sûr par défaut.
+
+**Why:** un délai à zéro annule une session ouverte dès le passage du cron, ce
+qui laisse au peseur un bon affiché comme reprenable mais impossible à saisir.
+
+**How to apply:** valider ce paramètre dans toute interface d'administration
+et le normaliser côté service avant de calculer l'expiration.

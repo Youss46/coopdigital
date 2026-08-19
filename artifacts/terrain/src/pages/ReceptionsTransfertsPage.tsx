@@ -18,6 +18,7 @@ import {
   getTransfertsEnAttentePesee,
   signalerArriveePhysique,
   createSessionPesee,
+  getSessionDetail,
   getBonsReceptionEnAttente,
   getBonReceptionCreationOptions,
   createBonReceptionTerrain,
@@ -208,7 +209,10 @@ export default function ReceptionsTransfertsPage() {
 
   // ── Actions bons membres délégués ───────────────────────────────────────
   async function handleDemarrerPeseeBon(bon: BonReceptionMembre, certification: string) {
-    if (bon.sessionPeseeId) { navigate(`/pesee-session/${bon.sessionPeseeId}`); return; }
+    if (bon.sessionPeseeId) {
+      await handleReprendrePeseeBon(bon);
+      return;
+    }
     setBusyB(bon.id);
     try {
       const session = await createSessionPesee({
@@ -226,6 +230,31 @@ export default function ReceptionsTransfertsPage() {
       }
       alert("Erreur : " + err.message);
     } finally { setBusyB(null); }
+  }
+
+  /**
+   * La liste peut avoir été affichée avant qu'un autre appareil ou le cron ne
+   * termine la session. Vérifier l'état courant évite d'ouvrir un formulaire
+   * de saisie déjà devenu inutilisable.
+   */
+  async function handleReprendrePeseeBon(bon: BonReceptionMembre) {
+    if (!bon.sessionPeseeId) return;
+    setBusyB(bon.id);
+    setErrorB(null);
+    try {
+      const session = await getSessionDetail(bon.sessionPeseeId);
+      if (session.statut !== "en_cours") {
+        await reloadBons();
+        setErrorB("Cette session n'est plus active. La liste des bons a été actualisée.");
+        return;
+      }
+      navigate(`/pesee-session/${session.id}`);
+    } catch (e) {
+      await reloadBons();
+      setErrorB(`Impossible de reprendre cette session : ${(e as Error).message}`);
+    } finally {
+      setBusyB(null);
+    }
   }
 
   function demanderCertification(cible: DemarrageCible) {
@@ -590,12 +619,13 @@ export default function ReceptionsTransfertsPage() {
 
                     {bon.statut === "en_pesee" && bon.sessionPeseeId && (
                       <button
-                        onClick={() => navigate(`/pesee-session/${bon.sessionPeseeId}`)}
+                        disabled={busyB === bon.id}
+                        onClick={() => void handleReprendrePeseeBon(bon)}
                         className="t-btn t-btn--ghost"
                         style={{ width: "100%", marginTop: 8, height: 52, borderColor: "var(--t-peseur)", color: "var(--t-peseur)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                       >
                         <RotateCcw size={16} />
-                        Reprendre la session de pesée
+                        {busyB === bon.id ? "Vérification…" : "Reprendre la session de pesée"}
                       </button>
                     )}
                   </div>
