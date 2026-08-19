@@ -70,7 +70,7 @@ router.get("/pesee/sessions/:id/bordereau",           flexAuthMiddleware, handle
 // ── Bons de réception membres délégués (peseur terrain central) ───────────────
 router.get("/terrain/bons-reception/en-attente", terrainAuthMiddleware, peseurOrDelegueOnly,
   async (req: Request, res: Response) => {
-    const cooperativeId = req.user?.cooperativeId;
+    const cooperativeId = req.agent?.cooperativeId;
     if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
     try {
       const bons = await listerBonsReception(cooperativeId, { statuts: ["en_attente_pesee", "en_pesee"] });
