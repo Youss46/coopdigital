@@ -144,11 +144,12 @@ export default function ReceptionsTransfertsPage() {
     }
   }
 
+  // Charge au montage ET à chaque retour sur la page (ex. après annulation de pesée)
   useEffect(() => {
     if (!isPeseurCentral) return;
     void reloadTransferts();
     void reloadBons();
-  }, [isPeseurCentral]);
+  }, [isPeseurCentral, location]);
 
   // Depuis les parcours Simple ou Groupée, un membre délégué est transmis ici
   // afin d'ouvrir le même bon de réception avec le membre déjà sélectionné.
