@@ -37,7 +37,7 @@ interface ProposerEcriturePayload {
   /** Tiers individualisé : id du membre / fournisseur / exportateur / délégué */
   tiersId?: number;
   /** Type du tiers : "membre" | "fournisseur" | "exportateur" | "delegue" */
-  tiersType?: "membre" | "fournisseur" | "exportateur" | "delegue" | "personnel";
+  tiersType?: "membre" | "fournisseur" | "fournisseur_ext" | "exportateur" | "delegue" | "personnel";
 }
 
 const AUTO_KEY_MAP: Record<SourceEcriture, keyof typeof configComptableTable.$inferSelect> = {
@@ -204,7 +204,8 @@ async function resolveCompteDebit(
  *
  * Mode fonds_propres (défaut) :
  *   1) 601 / 401 = montantBrut  (achat cacao — dette envers le producteur)
- *   2) 401 / 4091 = avanceDéduite (imputation créance avance)
+ *   2) charge / trésorerie puis 401 / produit de récupération = charges avancées
+ *   3) 401 / 4091 = avanceDéduite (imputation créance avance)
  *
  * Mode caisse_cooperative (caisse coopérative pré-alimentée) :
  *   La partie couverte par la caisse a DÉJÀ été décaissée lors de l'alimentation.
@@ -228,6 +229,12 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
   avanceDeduiteFcfa: number;
   montantNetFcfa: number;
   dateLivraison: string;
+  /** Ventilation réservée aux livraisons depuis un bon de réception membre délégué. */
+  fraisCarburantAvancesFcfa?: number;
+  autresChargesAvanceesFcfa?: number;
+  fraisCarburantDeduitsFcfa?: number;
+  autresChargesDeduitesFcfa?: number;
+  autresChargesLibelle?: string | null;
   /**
    * Montant déjà couvert par la caisse coopérative pré-alimentée.
    * Positif uniquement si mode_financement = 'caisse_cooperative'.
@@ -235,12 +242,47 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
    */
   montantCoopFcfa?: number;
 }) {
-  const { livraisonId, membreId, fournisseurId, membreNom, montantBrutFcfa, avanceDeduiteFcfa, dateLivraison } = params;
+  const {
+    livraisonId,
+    membreId,
+    fournisseurId,
+    membreNom,
+    montantBrutFcfa,
+    avanceDeduiteFcfa,
+    dateLivraison,
+  } = params;
   // tiersId/tiersType : membre prioritaire, sinon fournisseur externe
   const tiersId   = membreId ?? fournisseurId;
   const tiersType = membreId ? "membre" : fournisseurId ? "fournisseur_ext" : undefined;
   const montantCoopCouvert = Math.min(params.montantCoopFcfa ?? 0, montantBrutFcfa);
   const restePayable = montantBrutFcfa - montantCoopCouvert;
+  const fraisCarburantAvanceFcfa = Math.max(0, Math.round(
+    params.fraisCarburantAvancesFcfa ?? params.fraisCarburantDeduitsFcfa ?? 0,
+  ));
+  const autresChargesAvanceFcfa = Math.max(0, Math.round(
+    params.autresChargesAvanceesFcfa ?? params.autresChargesDeduitesFcfa ?? 0,
+  ));
+  const fraisCarburantDemandeDeduitFcfa = Math.max(0, Math.round(params.fraisCarburantDeduitsFcfa ?? 0));
+  const autresChargesDemandeesDeduitesFcfa = Math.max(0, Math.round(params.autresChargesDeduitesFcfa ?? 0));
+  // Les retenues ne peuvent pas débiter le compte 401 au-delà de la dette
+  // produit effectivement créée. Carburant, autres charges, puis avance.
+  let disponiblePourRetenuesFcfa = Math.max(0, restePayable);
+  const fraisCarburantRetenusFcfa = Math.min(
+    fraisCarburantAvanceFcfa,
+    fraisCarburantDemandeDeduitFcfa,
+    disponiblePourRetenuesFcfa,
+  );
+  disponiblePourRetenuesFcfa -= fraisCarburantRetenusFcfa;
+  const autresChargesRetenuesFcfa = Math.min(
+    autresChargesAvanceFcfa,
+    autresChargesDemandeesDeduitesFcfa,
+    disponiblePourRetenuesFcfa,
+  );
+  disponiblePourRetenuesFcfa -= autresChargesRetenuesFcfa;
+  const avanceImputableFcfa = Math.min(
+    Math.max(0, Math.round(avanceDeduiteFcfa)),
+    disponiblePourRetenuesFcfa,
+  );
   const piece = `LIV-${livraisonId}`;
   const promises: Promise<unknown>[] = [];
 
@@ -270,14 +312,81 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
     }));
   }
 
+  // ── Charges avancées au titre du bon de réception ──────────────────────────
+  // Chaque charge est comptabilisée au compte configuré de la coopérative, puis
+  // récupérée explicitement sur le compte du membre. Cette seconde écriture
+  // explique pourquoi le solde 401 rejoint exactement le montant du paiement.
+  const ajouterChargeBon = async (
+    montantAvanceFcfa: number,
+    montantRetenuFcfa: number,
+    libelle: string,
+    operationCharge: string,
+    operationRetenue: string,
+    compteChargeDefaut: string,
+  ) => {
+    const montantAvance = Math.max(0, Math.round(montantAvanceFcfa));
+    const montantRetenu = Math.min(montantAvance, Math.max(0, Math.round(montantRetenuFcfa)));
+    if (montantAvance === 0 || !membreId) return;
+
+    const charge = await resolveComptes(
+      cooperativeId,
+      "receptions_membres_delegues",
+      operationCharge,
+      compteChargeDefaut,
+      "521",
+    );
+    const retenue = await resolveComptes(
+      cooperativeId,
+      "receptions_membres_delegues",
+      operationRetenue,
+      "401",
+      "758",
+    );
+    promises.push(
+      proposerEcriture(cooperativeId, {
+        source: "livraison", sourceId: livraisonId,
+        libelle: `${libelle} avancé – ${membreNom}`,
+        compteDebit: charge.compteDebit, compteCredit: charge.compteCredit,
+        montantFcfa: montantAvance, date: dateLivraison, numeroPiece: piece,
+        tiersId: membreId, tiersType: "membre",
+      }),
+    );
+    if (montantRetenu > 0) {
+      promises.push(proposerEcriture(cooperativeId, {
+        source: "livraison", sourceId: livraisonId,
+        libelle: `Retenue ${libelle.toLowerCase()} – ${membreNom}`,
+        compteDebit: retenue.compteDebit, compteCredit: retenue.compteCredit,
+        montantFcfa: montantRetenu, date: dateLivraison, numeroPiece: piece,
+        tiersId: membreId, tiersType: "membre",
+      }));
+    }
+  };
+
+  await ajouterChargeBon(
+    fraisCarburantAvanceFcfa,
+    fraisCarburantRetenusFcfa,
+    "Carburant",
+    "frais_carburant",
+    "retenue_carburant",
+    "6042",
+  );
+  await ajouterChargeBon(
+    autresChargesAvanceFcfa,
+    autresChargesRetenuesFcfa,
+    params.autresChargesLibelle?.trim() || "Autres charges",
+    "autres_charges",
+    "retenue_autres_charges",
+    "618",
+  );
+
   // ── Déduction avance (401 / 4091) — membres seulement ───────────────────────
-  if (avanceDeduiteFcfa > 0 && membreId) {
+  if (avanceImputableFcfa > 0 && membreId) {
     const c = await resolveComptes(cooperativeId, "avances", "remboursement_avance", "401", "4091");
     promises.push(proposerEcriture(cooperativeId, {
       source: "livraison", sourceId: livraisonId,
       libelle: `Déduction avance sur livraison – ${membreNom}`,
       compteDebit: c.compteDebit, compteCredit: c.compteCredit,
-      montantFcfa: avanceDeduiteFcfa, date: dateLivraison, numeroPiece: piece,
+      montantFcfa: avanceImputableFcfa, date: dateLivraison, numeroPiece: piece,
       tiersId: membreId, tiersType: "membre",
     }));
   }

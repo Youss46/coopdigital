@@ -7,4 +7,4 @@ Lors du paiement d’une commission, mettre à jour une avance avec la retenue r
 
 **Why:** Comptabiliser une retenue plafonnée tout en soldant l’avance entière crée un écart entre dette du membre et écritures comptables.
 
-**How to apply:** Toute boucle qui affecte des avances à un revenu doit calculer la somme réellement affectée après plafonnement par le revenu, mettre à jour le solde avec cette somme, et laisser les avances sans affectation inchangées.
+**How to apply:** Toute boucle qui affecte des avances à un revenu doit calculer la somme réellement affectée après plafonnement par le revenu, mettre à jour le solde avec cette somme, et laisser les avances sans affectation inchangées. Pour une livraison avec charges, imputer d'abord carburant puis autres charges, puis plafonner l'avance au solde payable : les débits du compte membre ne doivent jamais dépasser l'achat crédité. Conserver séparément les charges avancées (coût intégral) et les charges récupérées (retenue effective) pour l'audit comptable.

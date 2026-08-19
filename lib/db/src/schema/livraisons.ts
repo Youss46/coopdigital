@@ -32,6 +32,13 @@ export const livraisonsTable = pgTable("livraisons", {
   avanceDeduiteFcfa: integer("avance_deduite_fcfa").notNull().default(0),
   intrantsDeduitsFcfa: integer("intrants_deduits_fcfa").notNull().default(0),
   montantNetFcfa: integer("montant_net_fcfa").notNull(),
+  // Ventilation immuable des règlements issus d'un bon de réception membre délégué.
+  // Les montants avancés restent auditables, même lorsqu'une part ne peut pas
+  // être récupérée sur le paiement du producteur.
+  fraisCarburantAvancesFcfa:    integer("frais_carburant_avances_fcfa").notNull().default(0),
+  autresChargesAvanceesFcfa:    integer("autres_charges_avancees_fcfa").notNull().default(0),
+  fraisCarburantDeduitsFcfa:    integer("frais_carburant_deduits_fcfa").notNull().default(0),
+  autresChargesDeduitesFcfa:    integer("autres_charges_deduites_fcfa").notNull().default(0),
   dateLivraison: date("date_livraison", { mode: "string" }).notNull(),
   agentId: integer("agent_id").references(() => usersTable.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

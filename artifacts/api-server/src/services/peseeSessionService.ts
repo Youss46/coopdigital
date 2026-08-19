@@ -26,6 +26,7 @@ import { genererNumeroRecu } from "./recuService.js";
 import { creerCommissionTransfert, deduireAvancesApresCommission } from "./commissionService.js";
 import { creerCommissionMembreSiTaux } from "./commissionMembreDelegueService.js";
 import { entrerStockSiDelegue } from "./entrepotDelegueService.js";
+import { calculerReglementMembreDelegue } from "./membreDelegueReglement.js";
 import { logger } from "../lib/logger.js";
 import { isCertificationCacao, type CertificationCacao } from "../lib/certificationCacao.js";
 
@@ -791,25 +792,45 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
           cooperativeId,
         );
 
-        // ── Déduction automatique des avances ──────────────────────────────────
-        // Plafond = commission nette = commission brut − frais transport
+        // ── Charges du bon + déduction automatique des avances ─────────────────
+        // Les charges sont lues une seule fois puis persistées avec la livraison :
+        // elles ne dépendent plus d'une modification ultérieure du bon.
+        let fraisCarburantDeduitsFcfa = 0;
+        let autresChargesDeduitesFcfa = 0;
+        let autresChargesLibelle: string | null = null;
+        if (detail.bonReceptionId) {
+          const [bon] = await db
+            .select({
+              carburant: bonsReceptionMembresDeleguesTable.fraisCarburantFcfa,
+              autres: bonsReceptionMembresDeleguesTable.autresChargesFcfa,
+              autresChargesLibelle: bonsReceptionMembresDeleguesTable.autresChargesLibelle,
+            })
+            .from(bonsReceptionMembresDeleguesTable)
+            .where(eq(bonsReceptionMembresDeleguesTable.id, detail.bonReceptionId))
+            .limit(1);
+          fraisCarburantDeduitsFcfa = Math.max(0, Number(bon?.carburant ?? 0));
+          autresChargesDeduitesFcfa = Math.max(0, Number(bon?.autres ?? 0));
+          autresChargesLibelle = bon?.autresChargesLibelle ?? null;
+        }
+
+        // Plafond = minimum de la commission nette et du solde réellement
+        // payable après charges. On ne rembourse jamais une avance au-delà de
+        // la dette 401 créée par la livraison.
         let avanceDeduiteFcfa = 0;
         if (commission && commission.montantFcfa > 0) {
-          let fraisTransportFcfa = 0;
-          if (detail.bonReceptionId) {
-            const [bon] = await db
-              .select({
-                carburant: bonsReceptionMembresDeleguesTable.fraisCarburantFcfa,
-                autres:    bonsReceptionMembresDeleguesTable.autresChargesFcfa,
-              })
-              .from(bonsReceptionMembresDeleguesTable)
-              .where(eq(bonsReceptionMembresDeleguesTable.id, detail.bonReceptionId))
-              .limit(1);
-            fraisTransportFcfa = (bon?.carburant ?? 0) + (bon?.autres ?? 0);
-          }
-          const commissionNette = Math.max(0, commission.montantFcfa - fraisTransportFcfa);
-          if (commissionNette > 0) {
-            avanceDeduiteFcfa = await deduireAvancesMembreDelegue(detail.membreId, commissionNette, sessionId);
+          const commissionNette = Math.max(
+            0,
+            commission.montantFcfa - fraisCarburantDeduitsFcfa - autresChargesDeduitesFcfa,
+          );
+          const valeurProduitPrevue = prixBordChampFcfa > 0
+            ? Math.round(poidsKg * prixBordChampFcfa)
+            : 0;
+          const plafondAvance = Math.min(
+            commissionNette,
+            Math.max(0, valeurProduitPrevue - fraisCarburantDeduitsFcfa - autresChargesDeduitesFcfa),
+          );
+          if (plafondAvance > 0) {
+            avanceDeduiteFcfa = await deduireAvancesMembreDelegue(detail.membreId, plafondAvance, sessionId);
           }
         }
 
@@ -817,7 +838,12 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
         if (prixBordChampFcfa > 0) {
           try {
             const montantBrut = Math.round(poidsKg * prixBordChampFcfa);
-            const montantNet  = Math.max(0, montantBrut - avanceDeduiteFcfa);
+            const reglement = calculerReglementMembreDelegue({
+              valeurProduitFcfa: montantBrut,
+              fraisCarburantFcfa: fraisCarburantDeduitsFcfa,
+              autresChargesFcfa: autresChargesDeduitesFcfa,
+              avanceDeduiteFcfa,
+            });
             const dateStr = updated?.dateFin
               ? (updated.dateFin instanceof Date
                   ? updated.dateFin.toISOString().split("T")[0]!
@@ -840,9 +866,15 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
                 produitBrutKg:       poidsBrutKg != null ? String(poidsBrutKg) : undefined,
                 prixUnitaireFcfa:    prixBordChampFcfa,
                 montantBrutFcfa:     montantBrut,
-                avanceDeduiteFcfa:   avanceDeduiteFcfa,
+                avanceDeduiteFcfa:   reglement.avanceDeduiteFcfa,
                 intrantsDeduitsFcfa: 0,
-                montantNetFcfa:      montantNet,
+                montantNetFcfa:      reglement.montantNetFcfa,
+                // Les avances de charges sont conservées pour audit comptable;
+                // seules les retenues effectives déterminent le règlement.
+                fraisCarburantAvancesFcfa: fraisCarburantDeduitsFcfa,
+                autresChargesAvanceesFcfa: autresChargesDeduitesFcfa,
+                fraisCarburantDeduitsFcfa: reglement.fraisCarburantFcfa,
+                autresChargesDeduitesFcfa: reglement.autresChargesFcfa,
                 retenueKg:           "0",
                 nombreSacs:          detail.nbSacsTotal ?? null,
                 produit:             "cacao",
@@ -887,34 +919,34 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
               await db.insert(paiementsTable).values({
                 livraisonId: livraison.id,
                 membreId:    detail.membreId,
-                montantFcfa: montantNet,
+                montantFcfa: reglement.montantNetFcfa,
                 numeroRecu,
                 statut:      "en_attente",
               });
 
-              // Écritures OHADA — fire-and-forget (601/401 + 401/4091)
-              void (async () => {
-                try {
-                  const [membreRow] = await db
-                    .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
-                    .from(membresTable)
-                    .where(eq(membresTable.id, detail.membreId!))
-                    .limit(1);
-                  await generateEcrituresLivraison(cooperativeId, {
-                    livraisonId:       livraison.id,
-                    membreId:          detail.membreId ?? undefined,
-                    membreNom:         membreRow
-                      ? `${membreRow.nom} ${membreRow.prenoms ?? ""}`.trim()
-                      : "—",
-                    montantBrutFcfa:   montantBrut,
-                    avanceDeduiteFcfa: avanceDeduiteFcfa,
-                    montantNetFcfa:    montantNet,
-                    dateLivraison:     dateStr,
-                  });
-                } catch (err) {
-                  logger.error({ err, sessionId }, "[membreDelegue] generateEcrituresLivraison failed");
-                }
-              })();
+              // Attendre les propositions : le règlement validé ne doit pas
+              // repartir avant que sa ventilation comptable ait été proposée.
+              const [membreRow] = await db
+                .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
+                .from(membresTable)
+                .where(eq(membresTable.id, detail.membreId!))
+                .limit(1);
+              await generateEcrituresLivraison(cooperativeId, {
+                livraisonId:       livraison.id,
+                membreId:          detail.membreId ?? undefined,
+                membreNom:         membreRow
+                  ? `${membreRow.nom} ${membreRow.prenoms ?? ""}`.trim()
+                  : "—",
+                montantBrutFcfa:   montantBrut,
+                avanceDeduiteFcfa: reglement.avanceDeduiteFcfa,
+                montantNetFcfa:    reglement.montantNetFcfa,
+                dateLivraison:     dateStr,
+                fraisCarburantAvancesFcfa: fraisCarburantDeduitsFcfa,
+                autresChargesAvanceesFcfa: autresChargesDeduitesFcfa,
+                fraisCarburantDeduitsFcfa: reglement.fraisCarburantFcfa,
+                autresChargesDeduitesFcfa: reglement.autresChargesFcfa,
+                autresChargesLibelle,
+              });
             }
           } catch (err) {
             // Non-fatal : la commission existe déjà, la livraison sera créée manuellement

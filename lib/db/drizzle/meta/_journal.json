@@ -778,6 +778,13 @@
       "when": 1788480700000,
       "tag": "0110_commissions_membres_delegues",
       "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1788480800000,
+      "tag": "0111_reglement_bon_reception_charges",
+      "breakpoints": true
     }
   ]
 }

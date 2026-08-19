@@ -674,6 +674,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
           .update(livraisonsTable)
           .set({ statutPaiement: "PAYÉ" })
           .where(eq(livraisonsTable.id, row.paiement.livraisonId));
+
       }
     });
 

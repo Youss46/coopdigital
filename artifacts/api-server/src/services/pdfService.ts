@@ -51,6 +51,7 @@ import { drawHeader, drawFooter } from "./pdfHeaderService";
 import { computeCodeMembre } from "./portailService";
 import { getMontantAlimentationsCaisseDelegue } from "./delegueService";
 import { getTauxActif } from "./commissionService";
+import { calculerReglementMembreDelegue } from "./membreDelegueReglement";
 
 const VERT = "#1a4731";
 const OR   = "#c4962a";
@@ -3933,6 +3934,7 @@ export async function generateBordereauAchatSession(
       dateFin:            sessionsPeseeTable.dateFin,
       transfertId:        sessionsPeseeTable.transfertId,
       bonReceptionId:     sessionsPeseeTable.bonReceptionId,
+      livraisonId:        sessionsPeseeTable.livraisonId,
       membreId:           sessionsPeseeTable.membreId,
       certificationCacao: sessionsPeseeTable.certificationCacao,
       createdAt:          sessionsPeseeTable.createdAt,
@@ -3951,6 +3953,24 @@ export async function generateBordereauAchatSession(
     .from(lignesPeseeTable)
     .where(eq(lignesPeseeTable.sessionId, sessionId))
     .orderBy(lignesPeseeTable.numeroPassage);
+
+  // Une livraison créée à la clôture est la source immuable du règlement.
+  // On conserve le repli de calcul ci-dessous pour les anciens bordereaux et
+  // les sessions téléchargées avant la création de leur livraison.
+  const [livraisonReglement] = session.livraisonId
+    ? await db
+      .select({
+        montantBrutFcfa: livraisonsTable.montantBrutFcfa,
+        montantNetFcfa: livraisonsTable.montantNetFcfa,
+        fraisCarburantDeduitsFcfa: livraisonsTable.fraisCarburantDeduitsFcfa,
+        autresChargesDeduitesFcfa: livraisonsTable.autresChargesDeduitesFcfa,
+        avanceDeduiteFcfa: livraisonsTable.avanceDeduiteFcfa,
+        prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
+      })
+      .from(livraisonsTable)
+      .where(eq(livraisonsTable.id, session.livraisonId))
+      .limit(1)
+    : [undefined];
 
   // 3. Transfert + délégué
   let immatriculation  = "—";
@@ -4137,7 +4157,8 @@ export async function generateBordereauAchatSession(
     .where(eq(historiquePrixTable.cooperativeId, cooperativeId))
     .orderBy(desc(historiquePrixTable.datePrix))
     .limit(1);
-  const prixUnitaire = dernierPrix ? parseFloat(dernierPrix.prix) : 0;
+  const prixUnitaire = livraisonReglement?.prixUnitaireFcfa
+    ?? (dernierPrix ? parseFloat(dernierPrix.prix) : 0);
 
   // 5. Commission = frais de collecte (toujours affiché en montant BRUT = poids × taux)
   // Cherche d'abord le record en DB (créé juste après terminerSession).
@@ -4242,8 +4263,15 @@ export async function generateBordereauAchatSession(
   // 8. Totaux
   const poidsNetKg    = parseFloat(session.poidsTotalKg ?? "0");
   const poidsBrutKg   = lignes.reduce((s, l) => s + parseFloat(l.poidsBrutKg), 0);
-  const valeurProduit = Math.round(poidsNetKg * prixUnitaire);
+  const valeurProduit = livraisonReglement?.montantBrutFcfa
+    ?? Math.round(poidsNetKg * prixUnitaire);
   const caisseCoop    = modeFinancement === "caisse_cooperative";
+
+  if (livraisonReglement) {
+    carburantFcfa = livraisonReglement.fraisCarburantDeduitsFcfa;
+    autresChargesFcfa = livraisonReglement.autresChargesDeduitesFcfa;
+    retenueAvancesFcfa = livraisonReglement.avanceDeduiteFcfa;
+  }
 
   // Frais de collecte net = commission brute − carburant − autres charges de transport
   // Utilisé uniquement pour l'affichage de la ligne "FRAIS DE COLLECTE" dans la colonne Autres frais.
@@ -4257,9 +4285,18 @@ export async function generateBordereauAchatSession(
   //     (la valeur produit est déjà réglée par la coopérative via caisse ; le délégué
   //      ne perçoit que sa commission nette de transport et d'avances)
   const resteValeurFcfa = caisseCoop ? Math.max(valeurProduit - montantCoopFcfa, 0) : valeurProduit;
-  const montantNet = caisseCoop
+  const montantNetCalcule = caisseCoop
     ? Math.max(0, fraisCollecteNet - retenueAvancesFcfa)
     : Math.max(0, resteValeurFcfa + fraisCollecteFcfa - carburantFcfa - autresChargesFcfa - retenueAvancesFcfa);
+  const montantNet = livraisonReglement?.montantNetFcfa
+    ?? (estDelegueMembre
+      ? calculerReglementMembreDelegue({
+        valeurProduitFcfa: valeurProduit,
+        fraisCarburantFcfa: carburantFcfa,
+        autresChargesFcfa,
+        avanceDeduiteFcfa: retenueAvancesFcfa,
+      }).montantNetFcfa
+      : montantNetCalcule);
 
   // 8. PDF
   const { doc, endPromise } = makePdfDoc();

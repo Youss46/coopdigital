@@ -70,14 +70,27 @@ vi.mock("@workspace/db", async (importOriginal) => {
   const original = await importOriginal<typeof import("@workspace/db")>();
 
   const fakeTransaction = async (fn: (tx: unknown) => Promise<unknown>) => {
+    let selectCount = 0;
     const tx = {
-      select: vi.fn(() => ({
-        from:    vi.fn().mockReturnThis(),
-        where:   vi.fn().mockReturnThis(),
-        for:     vi.fn().mockReturnThis(),
-        limit:   vi.fn().mockResolvedValue([mockSession]),
-        orderBy: vi.fn().mockReturnThis(),
-      })),
+      select: vi.fn(() => {
+        selectCount += 1;
+        const query = {
+          from:    vi.fn(),
+          where:   vi.fn(),
+          for:     vi.fn(),
+          limit:   vi.fn(),
+          orderBy: vi.fn(),
+          then:    (resolve: (value: unknown) => unknown) => Promise.resolve(
+            selectCount === 2 ? [{ total: 0 }] : [],
+          ).then(resolve),
+        };
+        query.from.mockReturnValue(query);
+        query.where.mockReturnValue(query);
+        query.for.mockReturnValue(query);
+        query.orderBy.mockReturnValue(query);
+        query.limit.mockResolvedValue(selectCount === 1 ? [mockSession] : []);
+        return query;
+      }),
       insert: vi.fn(() => ({
         values: vi.fn((vals: unknown) => {
           if (vals && typeof vals === "object" && "numeroRecu" in (vals as object)) {
