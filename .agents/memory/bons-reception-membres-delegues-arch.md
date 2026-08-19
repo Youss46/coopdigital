@@ -61,9 +61,9 @@ bruts de façon directement vérifiable.
 préserver ces champs et ce libellé de synthèse pour les membres dont la
 catégorie est « délégué de localités ».
 
-Depuis l'historique Terrain, le téléchargement d'une livraison liée à cette
-session doit sélectionner automatiquement le bordereau d'achat plutôt que le
-reçu de livraison générique.
+Depuis tout écran de livraisons (Terrain ou tableau de bord principal), le
+téléchargement d'une livraison liée à cette session doit sélectionner
+automatiquement le bordereau d'achat plutôt que le reçu de livraison générique.
 
 Les informations de transport peuvent être saisies à la main pour un camion
 externe, ou référencer un véhicule et un chauffeur de la flotte coopérative.

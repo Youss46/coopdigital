@@ -106,8 +106,38 @@ export async function getRecuLivraison(req: Request, res: Response): Promise<voi
   if (!id) { res.status(400).json({ erreur: "ID livraison invalide" }); return; }
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
   try {
-    const buffer = await generateRecuLivraison(id, cooperativeId);
-    sendPdf(res, buffer, `recu_livraison_${id}.pdf`);
+    const [livraison] = await db
+      .select({
+        sessionId: sessionsPeseeTable.id,
+        bonReceptionId: sessionsPeseeTable.bonReceptionId,
+      })
+      .from(livraisonsTable)
+      .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+      .leftJoin(fournisseursTable, eq(fournisseursTable.id, livraisonsTable.fournisseurId))
+      .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
+      .where(
+        and(
+          eq(livraisonsTable.id, id),
+          or(
+            eq(membresTable.cooperativeId, cooperativeId),
+            eq(fournisseursTable.cooperativeId, cooperativeId),
+          ),
+        ),
+      )
+      .limit(1);
+    if (!livraison) { res.status(404).json({ erreur: "Livraison introuvable" }); return; }
+
+    const bordereauAchat = livraison.bonReceptionId != null && livraison.sessionId != null;
+    const buffer = bordereauAchat
+      ? await generateBordereauAchatSession(livraison.sessionId, cooperativeId)
+      : await generateRecuLivraison(id, cooperativeId);
+    sendPdf(
+      res,
+      buffer,
+      bordereauAchat
+        ? `bordereau_achat_${livraison.sessionId}.pdf`
+        : `recu_livraison_${id}.pdf`,
+    );
   } catch (err) {
     req.log.error({ err }, "Erreur getRecuLivraison");
     if (err instanceof Error && err.message.includes("introuvable")) {

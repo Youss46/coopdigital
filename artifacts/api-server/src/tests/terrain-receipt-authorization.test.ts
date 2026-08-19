@@ -38,7 +38,7 @@ vi.mock("../services/pdfService.js", () => ({
   generateReleveCommissions: vi.fn(),
 }));
 
-const { getTerrainRecuLivraison } = await import("../controllers/rapportsController.js");
+const { getRecuLivraison, getTerrainRecuLivraison } = await import("../controllers/rapportsController.js");
 
 function selectChain(rows: unknown[]) {
   const chain: Record<string, unknown> = {};
@@ -114,6 +114,33 @@ describe("terrain delivery receipt authorization", () => {
     };
 
     await getTerrainRecuLivraison(req as never, res as never);
+
+    expect(generateBordereauAchatSession).toHaveBeenCalledWith(88, 3);
+    expect(generateRecuLivraison).not.toHaveBeenCalled();
+    expect(res.setHeader).toHaveBeenCalledWith("Content-Disposition", 'attachment; filename="bordereau_achat_88.pdf"');
+    expect(res.end).toHaveBeenCalledWith(Buffer.from("bordereau"));
+  });
+});
+
+describe("main delivery receipt endpoint", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    generateRecuLivraison.mockResolvedValue(Buffer.from("pdf"));
+    generateBordereauAchatSession.mockResolvedValue(Buffer.from("bordereau"));
+  });
+
+  it("returns the purchase statement for a delivery created from a reception bon", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(selectChain([
+      { sessionId: 88, bonReceptionId: 12 },
+    ]) as never);
+    const res = makeResponse();
+    const req = {
+      params: { id: "123" },
+      user: { cooperativeId: 3 },
+      log: { error: vi.fn() },
+    };
+
+    await getRecuLivraison(req as never, res as never);
 
     expect(generateBordereauAchatSession).toHaveBeenCalledWith(88, 3);
     expect(generateRecuLivraison).not.toHaveBeenCalled();
