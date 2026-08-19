@@ -493,16 +493,27 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             return;
           }
           // Le serveur vient de refuser l'ajout comme session terminée ou
-          // annulée. Même si le GET concurrent retourne encore en_cours
-          // (réplica/cache ou course entre les deux lectures), son refus est
-          // l'information la plus récente : quitter ce formulaire et
-          // permettre une nouvelle reprise depuis la liste des réceptions.
-          quitterSessionAnnulee(refreshed);
+          // annulée. Ne pas rediriger silencieusement vers Réceptions :
+          // l'opérateur doit voir la raison du refus, y compris si le GET
+          // concurrent retourne encore en_cours.
+          if (refreshed.statut === "annulee") {
+            const isReception =
+              refreshed.operation === "reception_membre_delegue" ||
+              refreshed.operation === "reception_transfert";
+            quitterSessionSansNavigation(
+              isReception
+                ? "Cette session a été annulée. Retournez à l'écran Réceptions pour démarrer une nouvelle pesée."
+                : "Cette session a expiré ou a été annulée. Sélectionnez à nouveau le planteur pour démarrer une nouvelle pesée.",
+            );
+          } else {
+            quitterSessionSansNavigation(message);
+          }
           return;
         } catch {
-          // Le serveur a confirmé que la session est inactive. Ne pas laisser
-          // le peseur sur un formulaire qui ne pourra plus être enregistré.
-          quitterSessionAnnulee(session);
+          // La session est inactive d'après l'API, mais son état détaillé
+          // n'est momentanément pas lisible. Garder l'erreur visible au lieu
+          // de renvoyer l'opérateur à une autre page sans explication.
+          quitterSessionSansNavigation(message);
           return;
         }
       }
@@ -766,6 +777,22 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     setErreur("");
     setStep("membre");
     setLocation(retourReceptions ? "/receptions" : "/");
+  }
+
+  /**
+   * Même nettoyage qu'une session inactive, mais sans navigation automatique.
+   * Utilisé après un échec d'enregistrement afin de conserver le message
+   * d'erreur visible dans le parcours de pesée groupée.
+   */
+  function quitterSessionSansNavigation(message: string) {
+    setConfirmAnnuler(false);
+    setAnnulerLoading(false);
+    setSession(null);
+    setSessionTerminee(null);
+    setBrouillon(null);
+    setFournisseur(null);
+    setErreur(message);
+    setStep("membre");
   }
 
   const poidsNet = (parseFloat(poidsBrut) || 0) - (parseFloat(tare) || 0);
