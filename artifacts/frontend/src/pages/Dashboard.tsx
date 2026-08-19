@@ -542,6 +542,7 @@ const CERTIF_COLORS: Record<string, string> = {
   FAIRTRADE: "#00a8a6",
   ASR_1000:  "#a06be3",
   ORDINAIRE: "#9ca3af",
+  NON_CLASSEE: "#f59e0b",
 };
 
 interface TonnageCertifRow { type: string; label: string; tonnageKg: number; nombreSacs: number }
@@ -568,6 +569,7 @@ function ModalTonnageCertif({
 
   const rows = data?.parCertification ?? [];
   const maxKg = Math.max(...rows.map((r) => r.tonnageKg), 1);
+  const nonClasse = rows.find((r) => r.type === "NON_CLASSEE");
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-0 sm:px-4" onClick={onClose}>
@@ -633,9 +635,19 @@ function ModalTonnageCertif({
             })
           )}
           {rows.length > 0 && (
-            <p className="text-[10px] text-gray-400 pt-1">
-              Source : certification déclarée par le peseur lors de la pesée.
-            </p>
+            <>
+              {nonClasse && (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
+                  {nonClasse.tonnageKg >= 1000
+                    ? `${(nonClasse.tonnageKg / 1000).toFixed(2)} t`
+                    : `${nonClasse.tonnageKg.toFixed(1)} kg`} de livraisons n’ont pas de certification enregistrée.
+                  Elles sont incluses dans le tonnage total, mais ne peuvent pas être rattachées à RA, Fairtrade ou une autre certification sans information fiable.
+                </p>
+              )}
+              <p className="text-[10px] text-gray-400 pt-1">
+                Source : certification déclarée par le peseur lors de la pesée.
+              </p>
+            </>
           )}
         </div>
       </div>

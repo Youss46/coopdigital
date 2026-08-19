@@ -574,6 +574,7 @@ const CERTIF_LABELS: Record<string, string> = {
   FAIRTRADE: "Fairtrade",
   ASR_1000:  "ASR 1000",
   ORDINAIRE: "Cacao ordinaire",
+  NON_CLASSEE: "Certification non déclarée",
 };
 
 export async function getDashboardTonnageCertif(req: Request, res: Response): Promise<void> {
@@ -614,19 +615,25 @@ export async function getDashboardTonnageCertif(req: Request, res: Response): Pr
     // Ne pas joindre certifications_membres/certifications : ces tables
     // représentent la certification administrative du membre, qui peut
     // différer du lot réellement pesé.
+    //
+    // Une livraison historique peut ne pas avoir de certification exploitable.
+    // Elle doit rester visible dans la répartition, sous une catégorie explicite,
+    // plutôt que créer un écart trompeur avec le tonnage total du tableau de bord.
     const result = await db.execute(sql`
       WITH livraisons_periode AS (
         SELECT
           l.poids_kg,
           l.nombre_sacs,
-          COALESCE(l.certification_cacao, sp.certification_cacao) AS certification_cacao
+          COALESCE(
+            NULLIF(l.certification_cacao, ''),
+            NULLIF(sp.certification_cacao, ''),
+            'NON_CLASSEE'
+          ) AS certification_cacao
         FROM livraisons l
         LEFT JOIN sessions_pesee sp ON sp.livraison_id = l.id
         LEFT JOIN membres m ON m.id = l.membre_id
         WHERE m.cooperative_id = ${cooperativeId}
           AND ${filtreDate}
-          AND COALESCE(l.certification_cacao, sp.certification_cacao) IS NOT NULL
-          AND COALESCE(l.certification_cacao, sp.certification_cacao) <> ''
       )
       SELECT
         lp.certification_cacao                         AS type,
