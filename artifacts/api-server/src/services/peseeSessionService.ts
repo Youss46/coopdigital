@@ -865,6 +865,7 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
                     entrepotId: entrepotCentral.id,
                     type:       "entree",
                     poidsKg:    String(poidsKg),
+                    nombreSacs: detail.nbSacsTotal ?? null,
                     motif:      `Livraison membre-délégué — session #${sessionId}`,
                     agentId:    null,
                   });
@@ -1050,6 +1051,7 @@ async function finaliserReceptionTransfertTx(
       entrepotId: entrepotCentral.id,
       type: "entree",
       poidsKg: String(poidsPeseKg),
+      nombreSacs: updatedSession.nbSacsTotal ?? null,
       motif: `Transfert ${t.numeroTransfert} — pesée physique réception (session #${sessionId})`,
       agentId: null,
     });
@@ -1310,6 +1312,7 @@ export async function creerLivraisonDepuisSession(
             entrepotId: entrepotCentral.id,
             type:       "entree",
             poidsKg:    String(poidsKgNum),
+            nombreSacs: result.livraison.nombreSacs ?? null,
             motif:      `Session pesée #${sessionId}`,
             agentId:    result.livraison.agentId ?? null,
           });
