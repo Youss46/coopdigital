@@ -22,6 +22,7 @@ import {
   getBonReceptionCreationOptions,
   createBonReceptionTerrain,
   type CreateBonReceptionTerrainInput,
+  SessionBonExistanteError,
   SessionTransfertExistanteError,
 } from "../lib/api";
 import type { TransfertEnAttente, BonReceptionMembre, BonReceptionCreationOptions } from "../lib/types";
@@ -219,8 +220,8 @@ export default function ReceptionsTransfertsPage() {
       navigate(`/pesee-session/${session.id}`);
     } catch (e) {
       const err = e as Error & { code?: string; sessionId?: number };
-      if (err.code === "SESSION_BON_EXISTANTE" && err.sessionId) {
-        navigate(`/pesee-session/${err.sessionId}`);
+      if (e instanceof SessionBonExistanteError) {
+        navigate(`/pesee-session/${e.sessionId}`);
         return;
       }
       alert("Erreur : " + err.message);

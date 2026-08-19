@@ -245,6 +245,32 @@ export async function synchroniserBonsReceptionEnPesee(cooperativeId: number): P
     if (bon.sessionStatut === "en_cours") continue;
 
     const sessionEstTerminee = bon.sessionStatut === "terminee";
+    // Une session annulée doit abandonner son lien exclusif au bon. Cela
+    // répare aussi les annulations effectuées avant cette règle, sans effacer
+    // la session historique ni ses lignes de pesée.
+    if (bon.sessionStatut === "annulee" && bon.sessionPeseeId != null) {
+      await db.transaction(async (tx: any) => {
+        await tx
+          .update(sessionsPeseeTable)
+          .set({ bonReceptionId: null })
+          .where(and(
+            eq(sessionsPeseeTable.id, bon.sessionPeseeId!),
+            eq(sessionsPeseeTable.bonReceptionId, bon.bonId),
+            eq(sessionsPeseeTable.statut, "annulee"),
+          ));
+
+        await tx
+          .update(bonsReceptionMembresDeleguesTable)
+          .set({ statut: "en_attente_pesee", sessionPeseeId: null, updatedAt: new Date() })
+          .where(and(
+            eq(bonsReceptionMembresDeleguesTable.id, bon.bonId),
+            eq(bonsReceptionMembresDeleguesTable.statut, "en_pesee"),
+            eq(bonsReceptionMembresDeleguesTable.sessionPeseeId, bon.sessionPeseeId!),
+          ));
+      });
+      continue;
+    }
+
     await db
       .update(bonsReceptionMembresDeleguesTable)
       .set({

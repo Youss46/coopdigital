@@ -409,6 +409,14 @@ export class SessionTransfertExistanteError extends Error {
   }
 }
 
+export class SessionBonExistanteError extends Error {
+  readonly code = "SESSION_BON_EXISTANTE";
+  constructor(public readonly sessionId: number) {
+    super(`Une session de pesée est déjà associée à ce bon de réception (session #${sessionId})`);
+    this.name = "SessionBonExistanteError";
+  }
+}
+
 export async function createSessionPesee(data: {
   membreId?: number;
   /** ID du fournisseur externe (pisteur) */
@@ -439,6 +447,9 @@ export async function createSessionPesee(data: {
     };
     if (body.code === "SESSION_TRANSFERT_EXISTANTE") {
       throw new SessionTransfertExistanteError(body.sessionId!);
+    }
+    if (body.code === "SESSION_BON_EXISTANTE") {
+      throw new SessionBonExistanteError(body.sessionId!);
     }
     throw new SessionEnCoursError(body.sessionId!, body.numeroSession ?? "");
   }

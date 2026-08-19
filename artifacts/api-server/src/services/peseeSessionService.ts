@@ -237,6 +237,31 @@ export async function createSession(
         throw new Error(`Le bon doit être en statut 'en_attente_pesee' pour démarrer une pesée (statut actuel : ${bon.statut})`);
       }
 
+      // Les sessions annulées historiques peuvent encore retenir le lien unique
+      // du bon après une annulation interrompue. Elles sont conservées pour
+      // audit mais dissociées pour permettre une nouvelle pesée du même bon.
+      const [ancienneSession] = await tx
+        .select({ id: sessionsPeseeTable.id, statut: sessionsPeseeTable.statut })
+        .from(sessionsPeseeTable)
+        .where(eq(sessionsPeseeTable.bonReceptionId, bonId))
+        .limit(1);
+      if (ancienneSession) {
+        if (ancienneSession.statut !== "annulee") {
+          throw new SessionBonExistanteError(ancienneSession.id);
+        }
+        await tx
+          .update(sessionsPeseeTable)
+          .set({
+            bonReceptionId: null,
+            notes: sql`concat_ws(E'\n', ${sessionsPeseeTable.notes}, '[Bon de réception dissocié après annulation]')`,
+          })
+          .where(and(
+            eq(sessionsPeseeTable.id, ancienneSession.id),
+            eq(sessionsPeseeTable.bonReceptionId, bonId),
+            eq(sessionsPeseeTable.statut, "annulee"),
+          ));
+      }
+
       const [created] = await tx
         .insert(sessionsPeseeTable)
         .values({
@@ -1562,6 +1587,7 @@ export async function annulerSession(cooperativeId: number, sessionId: number) {
       statut: sessionsPeseeTable.statut,
       operation: sessionsPeseeTable.operation,
       transfertId: sessionsPeseeTable.transfertId,
+      bonReceptionId: sessionsPeseeTable.bonReceptionId,
     })
     .from(sessionsPeseeTable)
     .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.cooperativeId, cooperativeId)))
@@ -1602,6 +1628,41 @@ export async function annulerSession(cooperativeId: number, sessionId: number) {
     return;
   }
 
+  // Une session liée à un bon doit libérer ce bon dans la même transaction :
+  // l'index unique sur bon_reception_id autorise alors une nouvelle pesée.
+  if (session.bonReceptionId != null) {
+    await db.transaction(async (tx: any) => {
+      const cancelled = await tx
+        .update(sessionsPeseeTable)
+        .set({
+          statut: "annulee",
+          dateFin: new Date(),
+          bonReceptionId: null,
+          notes: sql`concat_ws(E'\n', ${sessionsPeseeTable.notes}, '[Bon de réception dissocié après annulation]')`,
+        })
+        .where(and(
+          eq(sessionsPeseeTable.id, sessionId),
+          eq(sessionsPeseeTable.bonReceptionId, session.bonReceptionId!),
+          eq(sessionsPeseeTable.statut, "en_cours"),
+        ))
+        .returning({ id: sessionsPeseeTable.id });
+
+      if (cancelled.length === 0) {
+        throw new Error("Session déjà terminée ou annulée");
+      }
+
+      await tx
+        .update(bonsReceptionMembresDeleguesTable)
+        .set({ statut: "en_attente_pesee", sessionPeseeId: null, updatedAt: new Date() })
+        .where(and(
+          eq(bonsReceptionMembresDeleguesTable.id, session.bonReceptionId!),
+          eq(bonsReceptionMembresDeleguesTable.sessionPeseeId, sessionId),
+          eq(bonsReceptionMembresDeleguesTable.statut, "en_pesee"),
+        ));
+    });
+    return;
+  }
+
   // Session membre classique : annulation conditionnelle
   const cancelled = await db
     .update(sessionsPeseeTable)
@@ -1614,14 +1675,5 @@ export async function annulerSession(cooperativeId: number, sessionId: number) {
 
   if (cancelled.length === 0) {
     throw new Error("Session déjà terminée ou annulée");
-  }
-  if (session.bonReceptionId) {
-    await db
-      .update(bonsReceptionMembresDeleguesTable)
-      .set({ statut: "en_attente_pesee", sessionPeseeId: null, updatedAt: new Date() })
-      .where(and(
-        eq(bonsReceptionMembresDeleguesTable.id, session.bonReceptionId),
-        eq(bonsReceptionMembresDeleguesTable.sessionPeseeId, sessionId),
-      ));
   }
 }

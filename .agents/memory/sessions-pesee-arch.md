@@ -28,3 +28,14 @@ perdus.
 **How to apply:** une session déjà liée à une livraison ne doit plus proposer
 de conversion et les interfaces de conversion doivent garder une copie locale
 du détail clôturé pendant l'appel réseau.
+
+Une session de pesée annulée liée à un bon de réception doit libérer le lien
+unique vers ce bon et remettre le bon en attente, dans la même transaction.
+
+**Why:** le bon doit pouvoir être repesé après une annulation, mais la
+contrainte d'unicité sur le lien session/bon bloque toute nouvelle session si
+l'ancienne conserve ce lien.
+
+**How to apply:** à l'annulation, dissocier la session tout en conservant son
+historique; au démarrage et au chargement des réceptions, réparer aussi les
+anciennes sessions annulées qui auraient gardé leur lien.

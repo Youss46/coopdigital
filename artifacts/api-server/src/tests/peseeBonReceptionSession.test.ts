@@ -15,6 +15,11 @@ vi.mock("../services/peseeSessionService", () => ({
   expirerSessionsStales: vi.fn(),
   creerSessionBatch: vi.fn(),
   SessionEnCoursError: class SessionEnCoursError extends Error {},
+  SessionBonExistanteError: class SessionBonExistanteError extends Error {
+    constructor(public readonly sessionId: number) {
+      super(`Une session est déjà associée au bon #${sessionId}`);
+    }
+  },
   SessionTransfertExistanteError: class SessionTransfertExistanteError extends Error {},
 }));
 
@@ -108,6 +113,29 @@ describe("création de session depuis un bon de réception", () => {
     expect(response.status).toHaveBeenCalledWith(400);
     expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
       erreur: expect.stringContaining("certification"),
+    }));
+  });
+
+  it("renvoie la session liée au bon au lieu d'une erreur serveur", async () => {
+    const { SessionBonExistanteError } = await import("../services/peseeSessionService.js");
+    createSession.mockRejectedValueOnce(new SessionBonExistanteError(19));
+    const request = {
+      agent: { id: 7, cooperativeId: 3, role: "peseur", delegueId: null },
+      body: {
+        bonReceptionId: 42,
+        produit: "cacao",
+        operation: "reception_membre_delegue",
+        certificationCacao: "RA",
+      },
+      log: { error: vi.fn() },
+    } as unknown as Request;
+
+    await handleCreateSession(request, response);
+
+    expect(response.status).toHaveBeenCalledWith(409);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: "SESSION_BON_EXISTANTE",
+      sessionId: 19,
     }));
   });
 });

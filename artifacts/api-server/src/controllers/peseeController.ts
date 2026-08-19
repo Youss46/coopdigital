@@ -12,6 +12,7 @@ import {
   expirerSessionsStales,
   creerSessionBatch,
   SessionEnCoursError,
+  SessionBonExistanteError,
   SessionTransfertExistanteError,
 } from "../services/peseeSessionService";
 import { isCertificationCacao } from "../lib/certificationCacao.js";
@@ -390,6 +391,14 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       res.status(409).json({
         erreur: err.message,
         code: "SESSION_TRANSFERT_EXISTANTE",
+        sessionId: err.sessionId,
+      });
+      return;
+    }
+    if (err instanceof SessionBonExistanteError) {
+      res.status(409).json({
+        erreur: err.message,
+        code: "SESSION_BON_EXISTANTE",
         sessionId: err.sessionId,
       });
       return;
