@@ -538,11 +538,10 @@ function getPeriodeParams(preset: Preset, persoDebut: string, persoFin: string):
 
 // ── Couleurs par type de certification ────────────────────────────────────────
 const CERTIF_COLORS: Record<string, string> = {
-  fairtrade:          "#00A8A6",
-  bio:                "#4caf50",
-  rainforest:         "#6dbf6d",
-  utz:                "#a06be3",
-  sans_certification: "#9ca3af",
+  RA:        "#2f9e44",
+  FAIRTRADE: "#00a8a6",
+  ASR_1000:  "#a06be3",
+  ORDINAIRE: "#9ca3af",
 };
 
 interface TonnageCertifRow { type: string; label: string; tonnageKg: number; nombreSacs: number }
@@ -631,7 +630,7 @@ function ModalTonnageCertif({
           )}
           {rows.length > 0 && (
             <p className="text-[10px] text-gray-400 pt-1">
-              Un membre certifié dans plusieurs types est comptabilisé dans chacun.
+              Source : certification déclarée par le peseur lors de la pesée.
             </p>
           )}
         </div>

@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable, fournisseursTable, certificationsTable, certificationsMembresTable } from "@workspace/db";
+import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable, fournisseursTable } from "@workspace/db";
 import { eq, sql, desc, gte, lte, and, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -570,11 +570,10 @@ export async function getDeleguesPeseursCollectes(req: Request, res: Response): 
 
 // ─── Tonnage par type de certification ────────────────────────────────────────
 const CERTIF_LABELS: Record<string, string> = {
-  fairtrade:          "Fairtrade",
-  bio:                "Agriculture biologique",
-  rainforest:         "Rainforest Alliance",
-  utz:                "UTZ",
-  sans_certification: "Non certifié",
+  RA:        "Rainforest Alliance",
+  FAIRTRADE: "Fairtrade",
+  ASR_1000:  "ASR 1000",
+  ORDINAIRE: "Cacao ordinaire",
 };
 
 export async function getDashboardTonnageCertif(req: Request, res: Response): Promise<void> {
@@ -610,32 +609,29 @@ export async function getDashboardTonnageCertif(req: Request, res: Response): Pr
       ? sql`l.campagne_id = ${campagneActive.id}`
       : sql`l.date_livraison >= ${periodeDebut} AND l.date_livraison <= ${periodeFin}`;
 
-    // Tonnage par type de certification
-    // Un membre peut avoir plusieurs certifications → sa livraison apparaît dans chaque type.
-    // Livraisons de membres sans certification → 'sans_certification'.
+    // La certification d'une livraison est exclusivement celle déclarée
+    // par le peseur au démarrage de la session de pesée.
+    // Ne pas joindre certifications_membres/certifications : ces tables
+    // représentent la certification administrative du membre, qui peut
+    // différer du lot réellement pesé.
     const result = await db.execute(sql`
       WITH livraisons_periode AS (
-        SELECT l.poids_kg, l.nombre_sacs, l.membre_id
+        SELECT l.poids_kg, l.nombre_sacs, sp.certification_cacao
         FROM livraisons l
-        JOIN membres m ON m.id = l.membre_id
+        JOIN sessions_pesee sp ON sp.livraison_id = l.id
+        LEFT JOIN membres m ON m.id = l.membre_id
+        LEFT JOIN fournisseurs_externes fe ON fe.id = l.fournisseur_id
         WHERE m.cooperative_id = ${cooperativeId}
           AND ${filtreDate}
-          AND l.membre_id IS NOT NULL
-      ),
-      certif_par_membre AS (
-        SELECT DISTINCT cm.membre_id, c.type
-        FROM certifications_membres cm
-        JOIN certifications c ON c.id = cm.certification_id
-        WHERE c.cooperative_id = ${cooperativeId}
-          AND cm.statut_conformite = 'certifie'
+          AND sp.certification_cacao IS NOT NULL
+          AND sp.certification_cacao <> ''
       )
       SELECT
-        COALESCE(cpm.type, 'sans_certification')          AS type,
-        COALESCE(SUM(lp.poids_kg::numeric), 0)::float     AS tonnage_kg,
-        COALESCE(SUM(lp.nombre_sacs), 0)::int             AS nombre_sacs
+        lp.certification_cacao                         AS type,
+        COALESCE(SUM(lp.poids_kg::numeric), 0)::float  AS tonnage_kg,
+        COALESCE(SUM(lp.nombre_sacs), 0)::int          AS nombre_sacs
       FROM livraisons_periode lp
-      LEFT JOIN certif_par_membre cpm ON cpm.membre_id = lp.membre_id
-      GROUP BY cpm.type
+      GROUP BY lp.certification_cacao
       ORDER BY tonnage_kg DESC
     `);
 
