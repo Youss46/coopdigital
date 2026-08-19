@@ -273,4 +273,10 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     cloturer:   ["pca", "directeur"],
     voir_bilan: ["pca", "directeur", "comptable", "auditeur"],
   },
+
+  commissions_delegues: {
+    lire:       ["pca", "directeur", "comptable", "auditeur"],
+    gerer_taux: ["pca", "directeur", "comptable"],
+    payer:      ["pca", "directeur", "comptable"],
+  },
 };

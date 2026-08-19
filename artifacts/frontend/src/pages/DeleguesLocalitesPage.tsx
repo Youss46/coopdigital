@@ -172,7 +172,8 @@ export default function DeleguesLocalitesPage() {
   const isMagasinier = utilisateur?.role === "magasinier";
   const peutOctroyer   = usePermission("avances", "octroyer");
   const peutRembourser = usePermission("avances", "rembourser");
-  const peutModifier   = usePermission("delegues", "modifier");
+  const peutPayerCommissions = usePermission("commissions_delegues", "payer");
+  const peutGererTaux = usePermission("commissions_delegues", "gerer_taux");
 
   const [onglet, setOnglet] = useState<Onglet>("membres");
   const [search, setSearch] = useState("");
@@ -768,7 +769,7 @@ export default function DeleguesLocalitesPage() {
                       <td className="px-4 py-3 text-right text-gray-600">{formaterMontant(r.totalPayeFcfa)}</td>
                       <td className="px-4 py-3 text-right text-gray-500">{r.nb}</td>
                       <td className="px-4 py-3 text-right">
-                        {r.enAttenteFcfa > 0 && peutModifier && (
+                        {r.enAttenteFcfa > 0 && peutPayerCommissions && (
                           <button
                             onClick={() => ouvrirModalCommission(r)}
                             className="flex items-center gap-1 text-xs font-medium text-[#1a4731] hover:underline ml-auto"
@@ -793,7 +794,7 @@ export default function DeleguesLocalitesPage() {
             <p className="text-sm text-gray-600">
               Taux de commission FCFA/kg appliqués aux délégués de localités lors de la pesée.
             </p>
-            {!showTauxForm && (
+            {!showTauxForm && peutGererTaux && (
               <button
                 onClick={ouvrirNouveauTaux}
                 className="flex items-center justify-center gap-1.5 rounded-lg bg-[#1a4731] px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#123525]"
@@ -962,22 +963,26 @@ export default function DeleguesLocalitesPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => ouvrirEditionTaux(t)}
-                            className="text-gray-400 hover:text-[#1a4731] p-1 rounded"
-                            title="Modifier le taux"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (window.confirm("Supprimer ce taux de commission ?")) mutSupprimerTaux.mutate(t.id);
-                            }}
-                            className="text-red-400 hover:text-red-600 p-1 rounded"
-                            title="Supprimer le taux"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          {peutGererTaux && (
+                            <>
+                              <button
+                                onClick={() => ouvrirEditionTaux(t)}
+                                className="text-gray-400 hover:text-[#1a4731] p-1 rounded"
+                                title="Modifier le taux"
+                              >
+                                <Pencil size={13} />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm("Supprimer ce taux de commission ?")) mutSupprimerTaux.mutate(t.id);
+                                }}
+                                className="text-red-400 hover:text-red-600 p-1 rounded"
+                                title="Supprimer le taux"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

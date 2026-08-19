@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { MoneyInput } from "@/components/ui/money-input";
+import { usePermission } from "@/hooks/usePermission";
 
 // ─── Types commissions ─────────────────────────────────────────────────────
 interface Campagne {
@@ -117,6 +118,7 @@ function BadgePaiement({ nb }: { nb: number }) {
 export default function DeleguesPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const peutGererTaux = usePermission("commissions_delegues", "gerer_taux");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showAppro, setShowAppro] = useState<number | null>(null);
   const [montant, setMontant] = useState("");
@@ -560,16 +562,18 @@ export default function DeleguesPage() {
                     <div style={{ fontWeight: 700, fontSize: "1rem" }}>Taux de commission (FCFA/kg)</div>
                     <div style={{ fontSize: ".82rem", color: "#6b7280" }}>Les taux s'appliquent au poids net collecté par le délégué responsable du membre.</div>
                   </div>
-                  <button
-                    onClick={() => {
-                      const active = campagnes.find(c => c.statut === "en_cours");
-                      setEditTaux({ campagneId: active?.id ?? null, dateDebut: new Date().toISOString().slice(0, 10) });
-                      setShowTauxForm(true);
-                    }}
-                    style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: ".85rem", cursor: "pointer" }}
-                  >
-                    + Nouveau taux
-                  </button>
+                  {peutGererTaux && (
+                    <button
+                      onClick={() => {
+                        const active = campagnes.find(c => c.statut === "en_cours");
+                        setEditTaux({ campagneId: active?.id ?? null, dateDebut: new Date().toISOString().slice(0, 10) });
+                        setShowTauxForm(true);
+                      }}
+                      style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: ".85rem", cursor: "pointer" }}
+                    >
+                      + Nouveau taux
+                    </button>
+                  )}
                 </div>
 
                 {tauxLoading ? (
@@ -606,10 +610,12 @@ export default function DeleguesPage() {
                               </span>
                             </td>
                             <td style={{ padding: "10px 14px" }}>
-                              <div style={{ display: "flex", gap: 6 }}>
-                                <button onClick={() => { setEditTaux(t); setShowTauxForm(true); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontSize: ".78rem", cursor: "pointer", fontWeight: 600 }}>Modifier</button>
-                                <button onClick={() => { if (confirm("Supprimer ce taux ?")) deleteTaux.mutate(t.id); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #fca5a5", color: "#dc2626", background: "#fff", fontSize: ".78rem", cursor: "pointer", fontWeight: 600 }}>Supprimer</button>
-                              </div>
+                              {peutGererTaux && (
+                                <div style={{ display: "flex", gap: 6 }}>
+                                  <button onClick={() => { setEditTaux(t); setShowTauxForm(true); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontSize: ".78rem", cursor: "pointer", fontWeight: 600 }}>Modifier</button>
+                                  <button onClick={() => { if (confirm("Supprimer ce taux ?")) deleteTaux.mutate(t.id); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #fca5a5", color: "#dc2626", background: "#fff", fontSize: ".78rem", cursor: "pointer", fontWeight: 600 }}>Supprimer</button>
+                                </div>
+                              )}
                             </td>
                           </tr>
                         ))}

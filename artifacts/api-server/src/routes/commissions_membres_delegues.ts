@@ -12,18 +12,17 @@ import { authMiddleware } from "../middlewares/auth.js";
 
 const router = Router();
 
-// Taux de commission
-// Même modèle que les délégués terrain : un utilisateur coopératif authentifié
-// peut administrer les taux sans dépendre du module de permissions « delegues ».
-router.get("/delegues-localites/commissions/taux",            authMiddleware, listTauxHandler);
-router.post("/delegues-localites/commissions/taux",           authMiddleware, upsertTauxHandler);
-router.delete("/delegues-localites/commissions/taux/:tauxId", authMiddleware, deleteTauxHandler);
+// Taux de commission : consultation pour les auditeurs, administration réservée
+// aux responsables opérationnels et financiers.
+router.get("/delegues-localites/commissions/taux",            authMiddleware, checkPermission("commissions_delegues", "lire"),       listTauxHandler);
+router.post("/delegues-localites/commissions/taux",           authMiddleware, checkPermission("commissions_delegues", "gerer_taux"), upsertTauxHandler);
+router.delete("/delegues-localites/commissions/taux/:tauxId", authMiddleware, checkPermission("commissions_delegues", "gerer_taux"), deleteTauxHandler);
 
 // Récapitulatif global
-router.get("/delegues-localites/commissions/recap",           checkPermission("delegues", "lire"),    getRecapHandler);
+router.get("/delegues-localites/commissions/recap",           checkPermission("commissions_delegues", "lire"),  getRecapHandler);
 
 // Par membre délégué
-router.get("/delegues-localites/:membreId/commissions",       checkPermission("delegues", "lire"),    getCommissionsHandler);
-router.post("/delegues-localites/:membreId/commissions/payer", checkPermission("delegues", "modifier"), payerHandler);
+router.get("/delegues-localites/:membreId/commissions",       checkPermission("commissions_delegues", "lire"),  getCommissionsHandler);
+router.post("/delegues-localites/:membreId/commissions/payer", checkPermission("commissions_delegues", "payer"), payerHandler);
 
 export default router;

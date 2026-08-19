@@ -50,10 +50,10 @@ router.get("/delegues/avances-reportees",  authMiddleware, checkPermission("avan
 router.get("/delegues",                    authMiddleware, listDeleguesHandler);
 
 // ─── Taux de commission (admin) ───────────────────────────────────────────────
-router.get("/delegues/commissions/recap",         authMiddleware, getRecapCommissionsHandler);
-router.get("/delegues/commissions/taux",         authMiddleware, listTauxHandler);
-router.post("/delegues/commissions/taux",        authMiddleware, upsertTauxHandler);
-router.delete("/delegues/commissions/taux/:tauxId", authMiddleware, deleteTauxHandler);
+router.get("/delegues/commissions/recap",         authMiddleware, checkPermission("commissions_delegues", "lire"),       getRecapCommissionsHandler);
+router.get("/delegues/commissions/taux",          authMiddleware, checkPermission("commissions_delegues", "lire"),       listTauxHandler);
+router.post("/delegues/commissions/taux",         authMiddleware, checkPermission("commissions_delegues", "gerer_taux"), upsertTauxHandler);
+router.delete("/delegues/commissions/taux/:tauxId", authMiddleware, checkPermission("commissions_delegues", "gerer_taux"), deleteTauxHandler);
 
 // ─── Routes paramétrées délégué (doivent rester APRÈS les routes spécifiques) ─
 router.get("/delegues/:agentId/caisse",             authMiddleware, getDetailCaisseHandler);

@@ -38,6 +38,12 @@ const BTN =
 
 type Tab = "campagnes" | "cloture" | "bilans";
 
+function getQueryErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+  return "La liste des campagnes n’a pas pu être chargée. Vérifiez votre connexion puis réessayez.";
+}
+
 function StatutBadge({ statut }: { statut: string }) {
     if (statut === "programmee") return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
@@ -166,7 +172,13 @@ export default function CampagnesPage() {
   const [confirmText, setConfirmText] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const { data: campagnes, isLoading } = useListCampagnes();
+  const {
+    data: campagnes,
+    isLoading,
+    isError: campagnesError,
+    error: campagnesQueryError,
+    refetch: refetchCampagnes,
+  } = useListCampagnes();
   const { data: active } = useGetCampagneActive();
   const activeId = active?.id ?? 0;
 
@@ -523,7 +535,28 @@ export default function CampagnesPage() {
           )}
 
           {/* Timeline des campagnes */}
-          {isLoading ? (
+          {campagnesError ? (
+            <div
+              role="alert"
+              className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900"
+            >
+              <AlertTriangle className="w-5 h-5 shrink-0 text-red-600" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Impossible de charger les campagnes</p>
+                <p className="mt-1 break-words text-sm text-red-700">
+                  {getQueryErrorMessage(campagnesQueryError)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void refetchCampagnes()}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Réessayer
+              </button>
+            </div>
+          ) : isLoading ? (
             <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-green-600" /></div>
           ) : (
             <div className="relative pl-6">

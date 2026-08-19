@@ -162,6 +162,13 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_bilan: ["pca", "directeur", "comptable", "auditeur"],
   },
 
+  // TAUX ET PAIEMENT DES COMMISSIONS DES DÉLÉGUÉS
+  commissions_delegues: {
+    lire:        ["pca", "directeur", "comptable", "auditeur"],
+    gerer_taux:  ["pca", "directeur", "comptable"],
+    payer:       ["pca", "directeur", "comptable"],
+  },
+
   // MODULE PARTS SOCIALES
   parts_sociales: {
     lire:               ["pca", "directeur", "comptable", "delegue", "auditeur"],
