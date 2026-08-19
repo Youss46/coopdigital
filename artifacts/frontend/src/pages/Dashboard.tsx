@@ -766,6 +766,7 @@ export default function Dashboard() {
                   : "Cacao collecté"
               }
               onClick={() => setShowTonnageDetail(true)}
+              actionLabel="Voir le détail"
             />
             <CarteKpi
               titre={`Paiements — ${periodeLabel}`}
