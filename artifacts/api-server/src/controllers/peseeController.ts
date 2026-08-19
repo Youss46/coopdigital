@@ -1,4 +1,5 @@
 import { type Request, type Response } from "express";
+import { apiError } from "../lib/apiError.js";
 import { generateBordereauAchatSession } from "../services/pdfService.js";
 import {
   createSession,
@@ -404,7 +405,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       return;
     }
     req.log.error(err, "handleCreateSession");
-    res.status(500).json({ erreur: (err as Error).message ?? "Erreur création session" });
+    res.status(500).json({ erreur: apiError(err, "Erreur création session") });
   }
 }
 
