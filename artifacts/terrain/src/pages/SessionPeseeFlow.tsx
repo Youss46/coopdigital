@@ -558,11 +558,22 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     // React may not re-render between two rapid taps.
     if (convertirInProgressRef.current) return;
     convertirInProgressRef.current = true;
+    // Keep a local snapshot: converting a completed session must never replace
+    // its validated passages with an empty recap while the request is in flight.
+    const sessionAvantConversion = sessionTerminee;
 
     setConvertirLoading(true);
     setErreur("");
     try {
       const result = await convertirSessionEnLivraison(sessionTerminee.id);
+      setSessionTerminee((current) => {
+        const poidsActuel = parseFloat(String(current?.poidsTotalKg ?? 0));
+        const sessionValide = Number.isFinite(poidsActuel) && poidsActuel > 0;
+        return {
+          ...(sessionValide && current ? current : sessionAvantConversion),
+          livraisonId: result.livraisonId,
+        };
+      });
       setLivraisonResult(result);
       setConfirmConvertir(false);
     } catch (err) {

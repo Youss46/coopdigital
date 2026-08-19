@@ -748,6 +748,7 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
   }
 
   // ── Session membre classique ──────────────────────────────────────────────
+  let livraisonId = detail.livraisonId;
   const [updated] = await db
     .update(sessionsPeseeTable)
     .set({ statut: "terminee", dateFin: new Date() })
@@ -844,6 +845,7 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
                 .update(sessionsPeseeTable)
                 .set({ livraisonId: livraison.id })
                 .where(eq(sessionsPeseeTable.id, sessionId));
+              livraisonId = livraison.id;
 
               // Paiement en attente
               const numeroRecu = await genererNumeroRecu(cooperativeId);
@@ -896,7 +898,12 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
       .where(eq(bonsReceptionMembresDeleguesTable.id, detail.bonReceptionId));
   }
 
-  return { ...detail, statut: "terminee" as const, dateFin: updated?.dateFin };
+  return {
+    ...detail,
+    statut: "terminee" as const,
+    dateFin: updated?.dateFin,
+    livraisonId,
+  };
 }
 
 // ─── Finalisation atomique (dans une transaction) ────────────────────────────
