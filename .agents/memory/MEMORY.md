@@ -49,6 +49,7 @@
 - [Commissions délégués — architecture](commissions-delegues-arch.md) — Option A (délégué du membre via membres.delegue_id); 2 tables; hook dans enregistrerCollecte; résolution taux par priorité.
 - [Rôle Peseur — pattern ajout terrain role](terrain-peseur-role.md) — peseur = 4e rôle terrain (phone auth); 6 fichiers à toucher; backend delegueOnly guard déjà protège avance/paiement.
 - [Contrôle de licence](licence-guard-dev-testing.md) — tenantGuard priorise une licence encore valable; les checks négatifs sont cachés en mémoire.
+- [Période campagne du tableau de bord](dashboard-campaign-filter.md) — « Toute la campagne » doit être un mode API explicite, pas une absence de dates.
 - [Avances membres — plan déduction flexible](avances-membres-plan.md) — planType/montantPartielFcfa/reportDate sur avancesTable; remboursementsAvancesMembresTable pour historique; livraisonsController itère TOUTES les avances en_cours par dateOctroi ASC (pas limit 1).
 - [Avances délégués — architecture](avances-delegues-arch.md) — table dédiée avances_delegues; retenue automatique dans payerCommissions (même transaction); planType integral/partiel/reporte; UI onglet 4 dans DeleguesPage.
 - [Bons réception membres délégués — architecture](bons-reception-membres-delegues-arch.md) — table dédiée créée j-j par le magasinier; peseur voit dans onglet "Membres délégués" de ReceptionsTransfertsPage; session liée via bonReceptionId; frais transport déduits du net bordereau.

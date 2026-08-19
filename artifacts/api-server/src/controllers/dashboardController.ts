@@ -11,7 +11,9 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    // Période par défaut : mois en cours. Paramètres optionnels pour filtrer.
+    // Période par défaut : mois en cours. La vue « Toute la campagne »
+    // utilise la campagne active, plutôt que de retomber silencieusement
+    // sur le mois courant quand aucune date n'est envoyée.
     const debutMois = new Date();
     debutMois.setDate(1);
     debutMois.setHours(0, 0, 0, 0);
@@ -19,8 +21,32 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
 
     const rawDebut = typeof req.query.dateDebut === "string" ? req.query.dateDebut : null;
     const rawFin   = typeof req.query.dateFin   === "string" ? req.query.dateFin   : null;
-    const periodeDebut = rawDebut ?? debutMoisStr;
-    const periodeFin   = rawFin   ?? new Date().toISOString().split("T")[0]!;
+    const periodeCampagne = req.query.periode === "campagne";
+    const [campagneActive] = periodeCampagne
+      ? await db
+          .select({
+            id: campagnesTable.id,
+            dateOuverture: campagnesTable.dateOuverture,
+            dateFermeture: campagnesTable.dateFermeture,
+          })
+          .from(campagnesTable)
+          .where(and(
+            eq(campagnesTable.cooperativeId, cooperativeId),
+            eq(campagnesTable.statut, "ouverte"),
+          ))
+          .orderBy(desc(campagnesTable.dateOuverture))
+          .limit(1)
+      : [null];
+
+    const periodeDebut = rawDebut ?? campagneActive?.dateOuverture ?? debutMoisStr;
+    const periodeFin   = rawFin ?? campagneActive?.dateFermeture ?? new Date().toISOString().split("T")[0]!;
+    const finPaiements = new Date(`${periodeFin}T23:59:59.999Z`);
+    const filtreLivraisonsPeriode = campagneActive
+      ? eq(livraisonsTable.campagneId, campagneActive.id)
+      : and(
+          gte(livraisonsTable.dateLivraison, periodeDebut),
+          lte(livraisonsTable.dateLivraison, periodeFin),
+        );
 
     const debutPaiements = new Date(periodeDebut + "T00:00:00.000Z");
 
@@ -57,8 +83,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
         .where(and(
           eq(membresTable.cooperativeId, cooperativeId),
-          gte(livraisonsTable.dateLivraison, periodeDebut),
-          sql`${livraisonsTable.dateLivraison} <= ${periodeFin}`,
+          filtreLivraisonsPeriode,
         )),
       db
         .select({ total: sql<number>`coalesce(sum(montant_fcfa),0)::int` })
@@ -68,6 +93,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
           eq(membresTable.cooperativeId, cooperativeId),
           sql`${paiementsTable.statut} IN ('confirme','effectue','en_cours')`,
           gte(paiementsTable.createdAt, debutPaiements),
+          lte(paiementsTable.createdAt, finPaiements),
         )),
       db
         .select({ total: sql<number>`coalesce(sum(solde_du_fcfa),0)::int` })
@@ -80,8 +106,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
         .where(and(
           eq(membresTable.cooperativeId, cooperativeId),
-          gte(livraisonsTable.dateLivraison, periodeDebut),
-          sql`${livraisonsTable.dateLivraison} <= ${periodeFin}`,
+          filtreLivraisonsPeriode,
         )),
     ]);
 

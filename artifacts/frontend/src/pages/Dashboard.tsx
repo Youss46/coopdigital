@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useGetDashboard, useGetDashboardLivraisons, useGetDashboardAvancesRetard } from "@workspace/api-client-react";
+import { useGetDashboardLivraisons, useGetDashboardAvancesRetard } from "@workspace/api-client-react";
 import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation, Settings, CalendarDays, Award, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Redirect } from "wouter";
@@ -507,6 +507,17 @@ function BlocCertificationsRT() {
 
 type Preset = "mois" | "mois_prec" | "campagne" | "perso";
 
+interface DashboardKpi {
+  membresActifs: number;
+  membresHommes: number;
+  membresFemmes: number;
+  avancesEnCoursMontant: number;
+  tonnageMois: number;
+  nombreSacsMois: number;
+  paiementsMois: number;
+  creancesExportateurs: number;
+}
+
 function getPeriodeParams(preset: Preset, persoDebut: string, persoFin: string): { dateDebut?: string; dateFin?: string; label: string } {
   const today = new Date();
   const fmt = (d: Date) => d.toISOString().split("T")[0]!;
@@ -537,7 +548,19 @@ export default function Dashboard() {
     [preset, persoDebut, persoFin],
   );
 
-  const { data: kpi, isLoading: kpiChargement } = useGetDashboard({ dateDebut, dateFin });
+  const { data: kpi, isLoading: kpiChargement } = useQuery<DashboardKpi>({
+    queryKey: ["dashboard-kpi", preset, dateDebut, dateFin],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateDebut) params.set("dateDebut", dateDebut);
+      if (dateFin) params.set("dateFin", dateFin);
+      if (preset === "campagne") params.set("periode", "campagne");
+
+      const response = await apiFetch(`/api/dashboard${params.size ? `?${params.toString()}` : ""}`);
+      if (!response.ok) throw new Error("Impossible de charger le tableau de bord");
+      return response.json() as Promise<DashboardKpi>;
+    },
+  });
   const { data: livraisons } = useGetDashboardLivraisons();
   const { data: avancesRetard } = useGetDashboardAvancesRetard();
 
