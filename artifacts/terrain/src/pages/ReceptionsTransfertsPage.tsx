@@ -55,7 +55,9 @@ type Onglet = "transferts" | "membres";
 
 export default function ReceptionsTransfertsPage() {
   const { user } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const query = new URLSearchParams(window.location.search);
+  const bonIdCible = Number(query.get("bonId")) || null;
 
   const [onglet, setOnglet] = useState<Onglet>("transferts");
 
@@ -87,6 +89,25 @@ export default function ReceptionsTransfertsPage() {
   }
 
   useEffect(() => { void reloadTransferts(); void reloadBons(); }, []);
+
+  // L'accueil peut ouvrir directement le bon de réception affiché dans son badge.
+  useEffect(() => {
+    const ongletDemande = new URLSearchParams(window.location.search).get("onglet");
+    if (ongletDemande === "membres" || ongletDemande === "transferts") {
+      setOnglet(ongletDemande);
+    }
+  }, [location]);
+
+  useEffect(() => {
+    if (!bonIdCible || loadingB || !bons.some((bon) => bon.id === bonIdCible)) return;
+    const animationFrame = requestAnimationFrame(() => {
+      document.getElementById(`bon-reception-${bonIdCible}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+    return () => cancelAnimationFrame(animationFrame);
+  }, [bonIdCible, bons, loadingB]);
 
   // ── Actions transferts ──────────────────────────────────────────────────
   async function handleSignalerArrivee(t: TransfertEnAttente) {
@@ -359,10 +380,24 @@ export default function ReceptionsTransfertsPage() {
             {bons.map((bon) => {
               const sc = STATUT_BON[bon.statut] ?? { label: bon.statut, color: "var(--t-muted)", bg: "var(--t-bg)" };
               const isBusy = busyB === bon.id;
+              const isBonCible = bon.id === bonIdCible;
               const fraisTotal = (bon.fraisCarburantFcfa ?? 0) + (bon.autresChargesFcfa ?? 0);
 
               return (
-                <div key={bon.id} style={{ background: "var(--t-card)", borderRadius: 16, marginBottom: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04)", overflow: "hidden" }}>
+                <div
+                  key={bon.id}
+                  id={`bon-reception-${bon.id}`}
+                  style={{
+                    background: "var(--t-card)",
+                    borderRadius: 16,
+                    marginBottom: 12,
+                    boxShadow: isBonCible
+                      ? "0 0 0 3px rgba(217,119,6,.35), 0 4px 14px rgba(0,0,0,.12)"
+                      : "0 2px 10px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04)",
+                    overflow: "hidden",
+                    scrollMarginTop: 16,
+                  }}
+                >
                   {/* Header carte */}
                   <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--t-border)", display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: "var(--t-warning-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>

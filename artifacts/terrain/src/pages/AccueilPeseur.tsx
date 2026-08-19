@@ -11,7 +11,12 @@ import { useOffline } from "../contexts/OfflineContext";
 import { getBilan, getSessionsEnCours, getSessionsAConvertir, getTransfertsEnAttentePesee, getBonsReceptionEnAttente } from "../lib/api";
 import { getBrouillons } from "../lib/idb";
 import BottomNavPeseur from "../components/BottomNavPeseur";
-import type { BilanJour, SessionPesee, BrouillonPesee } from "../lib/types";
+import type {
+  BilanJour,
+  SessionPesee,
+  BrouillonPesee,
+  BonReceptionMembre,
+} from "../lib/types";
 
 function fmtPoids(kg: number): string {
   if (kg >= 1000) return (kg / 1000).toFixed(2) + " T";
@@ -35,6 +40,7 @@ export default function AccueilPeseur() {
   const [brouillons, setBrouillons] = useState<BrouillonPesee[]>([]);
   const [nbTransferts, setNbTransferts] = useState(0);
   const [nbBons, setNbBons]             = useState(0);
+  const [bonsEnAttente, setBonsEnAttente] = useState<BonReceptionMembre[]>([]);
 
   useEffect(() => {
     if (isOnline) {
@@ -76,6 +82,7 @@ export default function AccueilPeseur() {
         if (!cancelled) {
           setNbTransferts(transferts.length);
           setNbBons(bons.length);
+          setBonsEnAttente(bons);
         }
       } catch {
         // silencieux — pas de badge si hors-ligne
@@ -85,6 +92,10 @@ export default function AccueilPeseur() {
     const interval = setInterval(() => void fetchCounts(), 60_000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [user?.delegueId, isOnline]);
+
+  const receptionHref = nbTransferts === 0 && bonsEnAttente.length > 0
+    ? `/receptions?onglet=membres${bonsEnAttente.length === 1 ? `&bonId=${bonsEnAttente[0]!.id}` : ""}`
+    : "/receptions";
 
   return (
     <div className="t-app">
@@ -324,7 +335,7 @@ export default function AccueilPeseur() {
           if (nbTransferts > 0) parties.push(`${nbTransferts} transfert${nbTransferts > 1 ? "s" : ""}`);
           if (nbBons > 0)       parties.push(`${nbBons} membre${nbBons > 1 ? "s" : ""} délégué${nbBons > 1 ? "s" : ""}`);
           return (
-            <Link href="/receptions">
+            <Link href={receptionHref}>
               <div className="t-session-card" style={{ marginBottom: 14 }}>
                 <div className="t-session-card__stripe" style={{ background: "var(--t-peseur)" }} />
                 <div className="t-session-card__body">
