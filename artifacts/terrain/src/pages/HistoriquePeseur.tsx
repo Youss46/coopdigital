@@ -11,9 +11,25 @@ import BottomNavPeseur from "../components/BottomNavPeseur";
 
 const CACHE_KEY = "peseur_collectes_cache";
 
+type DateFilters = {
+  dateDebut?: string;
+  dateFin?: string;
+};
+
 function formatDate(d: string) {
   const [y, m, day] = d.split("-");
   return `${day}/${m}/${y?.slice(2)}`;
+}
+
+function filterCachedCollectes(collectes: PeseurCollecte[], filters: DateFilters): PeseurCollecte[] {
+  return collectes.filter((collecte) => (
+    (!filters.dateDebut || collecte.dateLivraison >= filters.dateDebut)
+    && (!filters.dateFin || collecte.dateLivraison <= filters.dateFin)
+  ));
+}
+
+function hasDateFilter(filters: DateFilters): boolean {
+  return Boolean(filters.dateDebut || filters.dateFin);
 }
 
 function statutChip(s: string): { color: string; bg: string; label: string } {
@@ -31,20 +47,27 @@ export default function HistoriquePeseur() {
   const [fromCache, setFromCache] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [downloadErreur, setDownloadErreur] = useState<string | null>(null);
+  const [dateDebutSaisie, setDateDebutSaisie] = useState("");
+  const [dateFinSaisie, setDateFinSaisie] = useState("");
+  const [filtresActifs, setFiltresActifs] = useState<DateFilters>({});
+  const [filtreErreur, setFiltreErreur] = useState<string | null>(null);
 
   const charger = useCallback(async () => {
     setLoading(true);
     setErreur(null);
     try {
-      const data = await getPeseurCollectes();
+      const data = await getPeseurCollectes(filtresActifs);
       setCollectes(data);
       setFromCache(false);
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch {}
+      if (!hasDateFilter(filtresActifs)) {
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch {}
+      }
     } catch (e) {
       try {
         const cached = localStorage.getItem(CACHE_KEY);
         if (cached) {
-          setCollectes(JSON.parse(cached) as PeseurCollecte[]);
+          const cachedCollectes = JSON.parse(cached) as PeseurCollecte[];
+          setCollectes(filterCachedCollectes(cachedCollectes, filtresActifs));
           setFromCache(true);
           return;
         }
@@ -53,19 +76,40 @@ export default function HistoriquePeseur() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filtresActifs]);
 
   useEffect(() => {
     try {
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
-        setCollectes(JSON.parse(cached) as PeseurCollecte[]);
+        const cachedCollectes = JSON.parse(cached) as PeseurCollecte[];
+        setCollectes(filterCachedCollectes(cachedCollectes, filtresActifs));
         setFromCache(true);
         setLoading(false);
       }
     } catch {}
     void charger();
-  }, [charger]);
+  }, [charger, filtresActifs]);
+
+  function appliquerFiltre() {
+    if (dateDebutSaisie && dateFinSaisie && dateDebutSaisie > dateFinSaisie) {
+      setFiltreErreur("La date de début doit être antérieure ou égale à la date de fin.");
+      return;
+    }
+    setFiltreErreur(null);
+    const dateUnique = dateDebutSaisie || dateFinSaisie;
+    setFiltresActifs({
+      dateDebut: dateDebutSaisie || dateUnique || undefined,
+      dateFin: dateFinSaisie || dateUnique || undefined,
+    });
+  }
+
+  function reinitialiserFiltre() {
+    setDateDebutSaisie("");
+    setDateFinSaisie("");
+    setFiltreErreur(null);
+    setFiltresActifs({});
+  }
 
   const totalPoids   = collectes.reduce((s, c) => s + c.poidsKg, 0);
   const totalMontant = collectes.filter((c) => c.type !== "reception_transfert").reduce((s, c) => s + c.montantNetFcfa, 0);
@@ -114,6 +158,76 @@ export default function HistoriquePeseur() {
             {isOnline ? "Données en cache — actualisation en cours…" : "Hors ligne — données en cache"}
           </div>
         )}
+
+        {/* Filtre date / période */}
+        <section style={{
+          background: "var(--t-card)", borderRadius: 12, marginBottom: 14,
+          padding: "12px", boxShadow: "0 1px 4px rgba(0,0,0,.06)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: ".82rem", fontWeight: 700, color: "var(--t-text)" }}>Filtrer par date</div>
+              <div style={{ fontSize: ".69rem", color: "var(--t-muted)", marginTop: 1 }}>
+                Une date pour la journée, deux dates pour une période
+              </div>
+            </div>
+            {hasDateFilter(filtresActifs) && (
+              <button
+                onClick={reinitialiserFiltre}
+                style={{
+                  border: "none", background: "transparent", color: "var(--t-primary)",
+                  fontSize: ".72rem", fontWeight: 700, cursor: "pointer", padding: "4px 0",
+                }}
+              >
+                Tout afficher
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <label style={{ display: "grid", gap: 4, fontSize: ".7rem", color: "var(--t-muted)", fontWeight: 600 }}>
+              Du
+              <input
+                type="date"
+                value={dateDebutSaisie}
+                max={dateFinSaisie || undefined}
+                onChange={(event) => { setDateDebutSaisie(event.target.value); setFiltreErreur(null); }}
+                style={{
+                  width: "100%", minWidth: 0, padding: "8px", borderRadius: 8,
+                  border: "1px solid var(--t-border)", color: "var(--t-text)",
+                  background: "var(--t-bg)", fontSize: ".78rem",
+                }}
+              />
+            </label>
+            <label style={{ display: "grid", gap: 4, fontSize: ".7rem", color: "var(--t-muted)", fontWeight: 600 }}>
+              Au
+              <input
+                type="date"
+                value={dateFinSaisie}
+                min={dateDebutSaisie || undefined}
+                onChange={(event) => { setDateFinSaisie(event.target.value); setFiltreErreur(null); }}
+                style={{
+                  width: "100%", minWidth: 0, padding: "8px", borderRadius: 8,
+                  border: "1px solid var(--t-border)", color: "var(--t-text)",
+                  background: "var(--t-bg)", fontSize: ".78rem",
+                }}
+              />
+            </label>
+          </div>
+
+          {filtreErreur && (
+            <div style={{ marginTop: 7, color: "var(--t-danger)", fontSize: ".7rem" }}>{filtreErreur}</div>
+          )}
+
+          <button
+            onClick={appliquerFiltre}
+            disabled={loading || (!dateDebutSaisie && !dateFinSaisie)}
+            className="t-btn t-btn--primary"
+            style={{ width: "100%", minHeight: 38, marginTop: 10, fontSize: ".78rem" }}
+          >
+            {loading ? "Chargement…" : "Appliquer le filtre"}
+          </button>
+        </section>
 
         {/* KPI band */}
         {collectes.length > 0 && (
@@ -194,7 +308,9 @@ export default function HistoriquePeseur() {
             <div className="t-empty__icon">
               <Scale size={44} color="var(--t-muted)" strokeWidth={1.2} />
             </div>
-            <div className="t-empty__text">Aucune collecte enregistrée</div>
+            <div className="t-empty__text">
+              {hasDateFilter(filtresActifs) ? "Aucune collecte pour cette période" : "Aucune collecte enregistrée"}
+            </div>
           </div>
         )}
 

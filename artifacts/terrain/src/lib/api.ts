@@ -313,8 +313,17 @@ export async function getHistoriqueAgent(): Promise<MissionTerrain[]> {
 
 // ─── Missions d'enquête ────────────────────────────────────────────────────────
 
-export async function getPeseurCollectes(): Promise<import("./types").PeseurCollecte[]> {
-  return apiGet<import("./types").PeseurCollecte[]>("/peseur/collectes");
+export function getPeseurCollectes(filters: {
+  dateDebut?: string;
+  dateFin?: string;
+} = {}): Promise<import("./types").PeseurCollecte[]> {
+  const params = new URLSearchParams();
+  if (filters.dateDebut) params.set("dateDebut", filters.dateDebut);
+  if (filters.dateFin) params.set("dateFin", filters.dateFin);
+  const query = params.toString();
+  return apiGet<import("./types").PeseurCollecte[]>(
+    `/peseur/collectes${query ? `?${query}` : ""}`,
+  );
 }
 
 // ─── Avances du délégué (lecture depuis peseur / délégué) ─────────────────────

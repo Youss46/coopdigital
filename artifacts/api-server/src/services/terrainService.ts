@@ -5,7 +5,7 @@ import {
   caissesTable, mouvementsCaisseTable, sessionsPeseeTable,
   cooperativesTable, transfertsStockTable, entrepotsDeleguesTable,
 } from "@workspace/db";
-import { and, eq, sql, desc, or, isNull } from "drizzle-orm";
+import { and, eq, sql, desc, or, isNull, gte, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 // commissionService — creerCommissionSiTaux retiré : commissions calculées à la pesée centrale
 import { genererNumeroRecu, genererNumeroLivraison } from "./recuService.js";
@@ -953,7 +953,16 @@ export async function syncOperations(
 
 // ─── Historique collectes peseur ─────────────────────────────────────────
 
-export async function getPeseurCollectes(agentId: number, cooperativeId: number) {
+export async function getPeseurCollectes(
+  agentId: number,
+  cooperativeId: number,
+  dateDebut?: string,
+  dateFin?: string,
+) {
+  const livraisonDateFilters = [
+    ...(dateDebut ? [gte(livraisonsTable.dateLivraison, dateDebut)] : []),
+    ...(dateFin ? [lte(livraisonsTable.dateLivraison, dateFin)] : []),
+  ];
   const rows = await db
     .select({
       id: livraisonsTable.id,
@@ -986,6 +995,7 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
           eq(membresTable.cooperativeId, cooperativeId),
           eq(fournisseursTable.cooperativeId, cooperativeId),
         ),
+        ...livraisonDateFilters,
       ),
     )
     .orderBy(desc(livraisonsTable.dateLivraison), desc(livraisonsTable.id))
@@ -1006,6 +1016,10 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
   }));
 
   // Sessions de réception de transfert terminées par ce peseur
+  const sessionDateFilters = [
+    ...(dateDebut ? [gte(sessionsPeseeTable.dateFin, new Date(`${dateDebut}T00:00:00.000Z`))] : []),
+    ...(dateFin ? [lte(sessionsPeseeTable.dateFin, new Date(`${dateFin}T23:59:59.999Z`))] : []),
+  ];
   const transfertRows = await db
     .select({
       id:               sessionsPeseeTable.id,
@@ -1022,6 +1036,7 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
       eq(sessionsPeseeTable.cooperativeId, cooperativeId),
       sql`${sessionsPeseeTable.operation} = 'reception_transfert'`,
       sql`${sessionsPeseeTable.statut} = 'terminee'`,
+      ...sessionDateFilters,
     ))
     .orderBy(desc(sessionsPeseeTable.dateFin))
     .limit(100);
@@ -1060,6 +1075,7 @@ export async function getPeseurCollectes(agentId: number, cooperativeId: number)
       sql`${sessionsPeseeTable.fournisseurId} IS NOT NULL`,
       sql`${sessionsPeseeTable.statut} = 'terminee'`,
       isNull(sessionsPeseeTable.livraisonId),
+      ...sessionDateFilters,
     ))
     .orderBy(desc(sessionsPeseeTable.dateFin))
     .limit(100);

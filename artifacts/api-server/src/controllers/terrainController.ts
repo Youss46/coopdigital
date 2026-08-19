@@ -299,8 +299,24 @@ export async function changePasswordHandler(req: Request, res: Response): Promis
 export async function getPeseurCollectesHandler(req: Request, res: Response): Promise<void> {
   const { id, cooperativeId } = getAgent(req);
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée à l'agent" }); return; }
+  const rawDateDebut = typeof req.query["dateDebut"] === "string" ? req.query["dateDebut"] : undefined;
+  const rawDateFin = typeof req.query["dateFin"] === "string" ? req.query["dateFin"] : undefined;
+  const dateDebut = rawDateDebut || undefined;
+  const dateFin = rawDateFin || undefined;
+  const isValidDate = (value: string | undefined): boolean => {
+    if (!value) return true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  };
+  if (!isValidDate(dateDebut) || !isValidDate(dateFin)) {
+    res.status(400).json({ erreur: "Les dates doivent être au format AAAA-MM-JJ" }); return;
+  }
+  if (dateDebut && dateFin && dateDebut > dateFin) {
+    res.status(400).json({ erreur: "La date de début doit être antérieure ou égale à la date de fin" }); return;
+  }
   try {
-    const collectes = await terrainService.getPeseurCollectes(id, cooperativeId);
+    const collectes = await terrainService.getPeseurCollectes(id, cooperativeId, dateDebut, dateFin);
     res.json(collectes);
   } catch (err) {
     req.log.error({ err }, "Erreur historique collectes peseur");
