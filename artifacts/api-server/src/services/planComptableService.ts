@@ -292,10 +292,10 @@ const OHADA_DEFAULTS: Record<string, { compteDebit: string; compteCredit: string
   // Commissions délégués
   "commissions_delegues:paiement_commission": { compteDebit: "6322", compteCredit: "521", libelle: "Commission délégué – {delegue}" },
   // Règlement intégré des membres délégués de localités depuis le bon réception.
-  "receptions_membres_delegues:frais_carburant":      { compteDebit: "6042", compteCredit: "521", libelle: "Carburant avancé – {membre}" },
-  "receptions_membres_delegues:retenue_carburant":    { compteDebit: "401",  compteCredit: "758", libelle: "Retenue carburant – {membre}" },
-  "receptions_membres_delegues:autres_charges":       { compteDebit: "618",  compteCredit: "521", libelle: "Autres charges avancées – {membre}" },
-  "receptions_membres_delegues:retenue_autres_charges": { compteDebit: "401", compteCredit: "758", libelle: "Retenue autres charges – {membre}" },
+  "receptions_membres_delegues:frais_carburant":      { compteDebit: "4091", compteCredit: "521",  libelle: "Carburant avancé pour le membre – {membre}" },
+  "receptions_membres_delegues:retenue_carburant":    { compteDebit: "401",  compteCredit: "4091", libelle: "Récupération carburant sur règlement – {membre}" },
+  "receptions_membres_delegues:autres_charges":       { compteDebit: "4091", compteCredit: "521",  libelle: "Autres charges avancées pour le membre – {membre}" },
+  "receptions_membres_delegues:retenue_autres_charges": { compteDebit: "401", compteCredit: "4091", libelle: "Récupération autres charges sur règlement – {membre}" },
 };
 
 export async function modifierParams(cooperativeId: number, id: number, payload: {

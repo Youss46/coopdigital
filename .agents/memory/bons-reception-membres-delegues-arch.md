@@ -76,3 +76,25 @@ l'immatriculation et le nom du chauffeur dans les champs de saisie externe.
 **How to apply:** tout générateur de document lié à un bon doit lire les
 valeurs manuelles en priorité, puis joindre véhicule et chauffeur par leurs
 identifiants lorsque nécessaire.
+
+## Comptabilisation des charges avancées
+
+Le carburant et les autres charges payés par la coopérative au titre du bon
+sont des créances sur le membre, pas des charges propres de la coopérative.
+L'avance débite un compte fournisseur débiteur 409x, puis la récupération sur
+le règlement débite la dette producteur et crédite exactement ce compte 409x.
+La récupération ne doit jamais créditer un compte de produit 758.
+
+Le compte de dette producteur utilisé lors de l'achat doit être figé sur la
+livraison et réutilisé par les retenues et le paiement final, même si la
+configuration comptable change entre-temps.
+
+**Why:** relire la configuration courante au paiement peut débiter un autre
+401x que celui crédité à la livraison et laisser une dette artificiellement
+ouverte. Une charge supérieure au règlement doit rester une créance ouverte,
+pas devenir une charge ou un produit de la coopérative.
+
+**How to apply:** tout nouveau flux qui réduit ou règle une dette de livraison
+doit partir du compte figé sur cette livraison; les comptes de retenue ne
+doivent jamais être résolus indépendamment des écritures qui ont créé la dette
+et la créance.

@@ -32,6 +32,9 @@ export const livraisonsTable = pgTable("livraisons", {
   avanceDeduiteFcfa: integer("avance_deduite_fcfa").notNull().default(0),
   intrantsDeduitsFcfa: integer("intrants_deduits_fcfa").notNull().default(0),
   montantNetFcfa: integer("montant_net_fcfa").notNull(),
+  // Compte fournisseur crédité lors de l'achat, figé pour que le paiement
+  // ultérieur solde la même dette même si le paramétrage comptable change.
+  compteDetteProducteur: text("compte_dette_producteur"),
   // Ventilation immuable des règlements issus d'un bon de réception membre délégué.
   // Les montants avancés restent auditables, même lorsqu'une part ne peut pas
   // être récupérée sur le paiement du producteur.

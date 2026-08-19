@@ -3,7 +3,7 @@ import { db, paiementsTable, membresTable, livraisonsTable, fournisseursTable, u
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
-import { proposerEcriture } from "../services/comptabiliteService.js";
+import { proposerEcriture, resolveCompteDetteProducteur } from "../services/comptabiliteService.js";
 import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvement, getSessionActive } from "../services/caisseService.js";
 import { notifierParRole } from "../services/notificationService.js";
 import { logger } from "../lib/logger.js";
@@ -276,6 +276,7 @@ const SELECT_FIELDS = {
   avanceDeduiteFcfa: livraisonsTable.avanceDeduiteFcfa,
   intrantsDeduitsFcfa: livraisonsTable.intrantsDeduitsFcfa,
   montantNetFcfa: livraisonsTable.montantNetFcfa,
+  compteDetteProducteur: livraisonsTable.compteDetteProducteur,
   agentId: livraisonsTable.agentId,
   // Attribution proxy gérant
   agentSaisiseurId: paiementsTable.agentSaisiseurId,
@@ -680,9 +681,12 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
 
     // 4–7. Déterminer si c'est un bon carburant (impacte les comptes OHADA)
     const isBonCarburant = !!row.paiement.bonCarburantId;
+    const compteDebitPaiement = isBonCarburant
+      ? "6042"
+      : await resolveCompteDetteProducteur(cooperativeId, row.compteDetteProducteur);
     const caisseOpts = isBonCarburant
       ? { compteDebitOverride: "6042", libelle: `Carburant — règlement #${id}` }
-      : undefined;
+      : { compteDebitOverride: compteDebitPaiement };
 
     // 4. Débiter la caisse principale du délégué si paiement espèces
     //    (hors tx DB car enregistrerMouvement gère sa propre cohérence interne)
@@ -724,12 +728,12 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
 
     // 7. Écriture comptable décaissement (mobile / chèque uniquement)
     //    Espèces : enregistrerMouvement l'a déjà créée (avec compteDebitOverride si carburant)
-    //    Producteur mobile  → 401/552  |  Producteur chèque → 401/521
+    //    Producteur mobile  → dette producteur/552
+    //    Producteur chèque  → dette producteur/521
     //    Carburant mobile   → 6042/552 |  Carburant chèque  → 6042/521
     if (mode !== "especes") {
       const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
       const compteCredit = isMobile ? "552" : "521";
-      const compteDebit  = isBonCarburant ? "6042" : "401";
       const dateStr = new Date().toISOString().slice(0, 10);
       const libelle = isBonCarburant
         ? `Carburant – Bon PAI-${id}`
@@ -738,7 +742,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         source: "paiement",
         sourceId: id,
         libelle,
-        compteDebit,
+        compteDebit: compteDebitPaiement,
         compteCredit,
         montantFcfa: row.paiement.montantFcfa,
         date: dateStr,

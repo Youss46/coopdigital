@@ -163,7 +163,7 @@ export interface MouvementInput {
   libelle?: string;
   referenceOperation?: string;
   userId?: number;
-  /** Remplace le compte débit calculé depuis le motif (ex: "6042" pour charges carburant) */
+  /** Remplace le compte débit calculé depuis le motif (ex: dette producteur configurée ou 6042) */
   compteDebitOverride?: string;
 }
 

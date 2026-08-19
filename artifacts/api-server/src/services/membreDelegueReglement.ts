@@ -23,7 +23,7 @@ export function calculerReglementMembreDelegue(
   const avanceDemandeeFcfa = fcfa(ventilation.avanceDeduiteFcfa);
   const montantAvantRetenuesFcfa = valeurProduitFcfa;
   // Le montant du règlement ne peut devenir négatif : carburant en premier,
-  // puis autres charges. L'excédent non récupérable reste une charge de la coop.
+  // puis autres charges. L'excédent non récupéré reste une créance sur le membre.
   const fraisCarburantFcfa = Math.min(fraisCarburantDemandesFcfa, montantAvantRetenuesFcfa);
   const autresChargesFcfa = Math.min(
     autresChargesDemandeesFcfa,
@@ -41,6 +41,16 @@ export function calculerReglementMembreDelegue(
     0,
     montantAvantRetenuesFcfa - totalChargesFcfa - avanceDeduiteFcfa,
   );
+  const fraisCarburantNonRecupereFcfa = Math.max(
+    0,
+    fraisCarburantDemandesFcfa - fraisCarburantFcfa,
+  );
+  const autresChargesNonRecupereesFcfa = Math.max(
+    0,
+    autresChargesDemandeesFcfa - autresChargesFcfa,
+  );
+  const creanceChargesRestanteFcfa =
+    fraisCarburantNonRecupereFcfa + autresChargesNonRecupereesFcfa;
 
   return {
     valeurProduitFcfa,
@@ -53,5 +63,8 @@ export function calculerReglementMembreDelegue(
     avanceDeduiteFcfa,
     montantAvantRetenuesFcfa,
     montantNetFcfa,
+    fraisCarburantNonRecupereFcfa,
+    autresChargesNonRecupereesFcfa,
+    creanceChargesRestanteFcfa,
   };
 }

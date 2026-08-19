@@ -6,7 +6,7 @@
  * - En mode automatique (config activé) → insère directement dans ecritures_comptables
  * - En mode manuel (config désactivé) → met en attente dans ecritures_en_attente
  */
-import { db, ecrituresComptablesTable, configComptableTable, ecrituresEnAttenteTable } from "@workspace/db";
+import { db, ecrituresComptablesTable, configComptableTable, ecrituresEnAttenteTable, livraisonsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { assignerNumeroPiece } from "../lib/numeroPiece";
@@ -181,6 +181,25 @@ async function resolveComptes(
   return { compteDebit: fallbackDebit, compteCredit: fallbackCredit };
 }
 
+/**
+ * Compte fournisseur producteur effectivement crédité lors de l'achat cacao.
+ * Les retenues et le paiement final doivent tous débiter ce même compte.
+ */
+export async function resolveCompteDetteProducteur(
+  cooperativeId: number,
+  compteFige?: string | null,
+): Promise<string> {
+  if (compteFige?.trim()) return compteFige.trim();
+  const comptes = await resolveComptes(
+    cooperativeId,
+    "livraisons",
+    "achat_cacao_producteur",
+    "601",
+    "401",
+  );
+  return comptes.compteCredit;
+}
+
 // Variante : ne résoudre que le compte débit (crédit déterminé par le mode de paiement).
 async function resolveCompteDebit(
   cooperativeId: number,
@@ -204,7 +223,7 @@ async function resolveCompteDebit(
  *
  * Mode fonds_propres (défaut) :
  *   1) 601 / 401 = montantBrut  (achat cacao — dette envers le producteur)
- *   2) charge / trésorerie puis 401 / produit de récupération = charges avancées
+ *   2) 4091 / trésorerie puis 401 / 4091 = charges payées pour le compte du membre
  *   3) 401 / 4091 = avanceDéduite (imputation créance avance)
  *
  * Mode caisse_cooperative (caisse coopérative pré-alimentée) :
@@ -300,53 +319,96 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
     }));
   }
 
-  // ── Part nouvelle (601 / 401) — financée par le délégué ou mode fonds propres ─
+  // Résoudre une seule fois l'écriture qui crée la dette producteur. Toutes les
+  // retenues doivent débiter exactement le compte crédité ici.
+  const comptesAchatProducteur = restePayable > 0
+    ? await resolveComptes(cooperativeId, "livraisons", "achat_cacao_producteur", "601", "401")
+    : null;
+  const compteDetteProducteur = comptesAchatProducteur?.compteCredit ?? "401";
   if (restePayable > 0) {
-    const c = await resolveComptes(cooperativeId, "livraisons", "achat_cacao_producteur", "601", "401");
+    await db
+      .update(livraisonsTable)
+      .set({ compteDetteProducteur })
+      .where(eq(livraisonsTable.id, livraisonId));
+  }
+
+  // ── Part nouvelle (601 / 401) — financée par le délégué ou mode fonds propres ─
+  if (restePayable > 0 && comptesAchatProducteur) {
     promises.push(proposerEcriture(cooperativeId, {
       source: "livraison", sourceId: livraisonId,
       libelle: `Achat cacao – ${membreNom}`,
-      compteDebit: c.compteDebit, compteCredit: c.compteCredit,
+      compteDebit: comptesAchatProducteur.compteDebit,
+      compteCredit: comptesAchatProducteur.compteCredit,
       montantFcfa: restePayable, date: dateLivraison, numeroPiece: piece,
       tiersId, tiersType,
     }));
   }
 
-  // ── Charges avancées au titre du bon de réception ──────────────────────────
-  // Chaque charge est comptabilisée au compte configuré de la coopérative, puis
-  // récupérée explicitement sur le compte du membre. Cette seconde écriture
-  // explique pourquoi le solde 401 rejoint exactement le montant du paiement.
+  // ── Créances sur le membre au titre du bon de réception ────────────────────
+  // La coopérative paie ces dépenses pour le compte du membre : ce ne sont ni
+  // ses propres charges, ni un produit lors de la récupération. L'avance crée
+  // une créance 4091, puis la retenue sur le règlement solde cette créance par
+  // le compte 401. Toute part non retenue reste ouverte au débit du 4091.
   const ajouterChargeBon = async (
     montantAvanceFcfa: number,
     montantRetenuFcfa: number,
     libelle: string,
-    operationCharge: string,
+    operationCreance: string,
     operationRetenue: string,
-    compteChargeDefaut: string,
   ) => {
     const montantAvance = Math.max(0, Math.round(montantAvanceFcfa));
     const montantRetenu = Math.min(montantAvance, Math.max(0, Math.round(montantRetenuFcfa)));
     if (montantAvance === 0 || !membreId) return;
 
-    const charge = await resolveComptes(
+    const comptesCreanceConfigures = await resolveComptes(
       cooperativeId,
       "receptions_membres_delegues",
-      operationCharge,
-      compteChargeDefaut,
+      operationCreance,
+      "4091",
       "521",
     );
-    const retenue = await resolveComptes(
+    // Une ancienne personnalisation peut encore pointer vers un compte de
+    // charge (604x/618) malgré la migration. Ne jamais réintroduire ce modèle :
+    // les avances pour un fournisseur membre restent dans la famille 409.
+    const compteCreance = comptesCreanceConfigures.compteDebit.startsWith("409")
+      ? comptesCreanceConfigures.compteDebit
+      : "4091";
+    if (compteCreance !== comptesCreanceConfigures.compteDebit) {
+      logger.warn({
+        cooperativeId,
+        operation: operationCreance,
+        compteConfigure: comptesCreanceConfigures.compteDebit,
+        compteUtilise: compteCreance,
+      }, "Compte incompatible ignoré pour une créance de charges membre");
+    }
+    // Les deux côtés de la récupération sont dérivés des écritures sources :
+    // dette créée par l'achat et créance créée par l'avance. Les anciens
+    // paramètres restent consultés uniquement pour signaler une incohérence.
+    const comptesRetenueConfigures = await resolveComptes(
       cooperativeId,
       "receptions_membres_delegues",
       operationRetenue,
-      "401",
-      "758",
+      compteDetteProducteur,
+      compteCreance,
     );
+    if (
+      comptesRetenueConfigures.compteDebit !== compteDetteProducteur ||
+      comptesRetenueConfigures.compteCredit !== compteCreance
+    ) {
+      logger.warn({
+        cooperativeId,
+        operation: operationRetenue,
+        comptesConfigures: comptesRetenueConfigures,
+        compteDetteUtilise: compteDetteProducteur,
+        compteCreanceUtilise: compteCreance,
+      }, "Comptes de retenue réalignés sur la dette et la créance membre");
+    }
     promises.push(
       proposerEcriture(cooperativeId, {
         source: "livraison", sourceId: livraisonId,
         libelle: `${libelle} avancé – ${membreNom}`,
-        compteDebit: charge.compteDebit, compteCredit: charge.compteCredit,
+        compteDebit: compteCreance,
+        compteCredit: comptesCreanceConfigures.compteCredit,
         montantFcfa: montantAvance, date: dateLivraison, numeroPiece: piece,
         tiersId: membreId, tiersType: "membre",
       }),
@@ -355,7 +417,8 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
       promises.push(proposerEcriture(cooperativeId, {
         source: "livraison", sourceId: livraisonId,
         libelle: `Retenue ${libelle.toLowerCase()} – ${membreNom}`,
-        compteDebit: retenue.compteDebit, compteCredit: retenue.compteCredit,
+        compteDebit: compteDetteProducteur,
+        compteCredit: compteCreance,
         montantFcfa: montantRetenu, date: dateLivraison, numeroPiece: piece,
         tiersId: membreId, tiersType: "membre",
       }));
@@ -368,7 +431,6 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
     "Carburant",
     "frais_carburant",
     "retenue_carburant",
-    "6042",
   );
   await ajouterChargeBon(
     autresChargesAvanceFcfa,
@@ -376,16 +438,23 @@ export async function generateEcrituresLivraison(cooperativeId: number, params: 
     params.autresChargesLibelle?.trim() || "Autres charges",
     "autres_charges",
     "retenue_autres_charges",
-    "618",
   );
 
   // ── Déduction avance (401 / 4091) — membres seulement ───────────────────────
   if (avanceImputableFcfa > 0 && membreId) {
     const c = await resolveComptes(cooperativeId, "avances", "remboursement_avance", "401", "4091");
+    if (c.compteDebit !== compteDetteProducteur) {
+      logger.warn({
+        cooperativeId,
+        operation: "remboursement_avance",
+        compteConfigure: c.compteDebit,
+        compteUtilise: compteDetteProducteur,
+      }, "Compte de remboursement d'avance réaligné sur la dette producteur");
+    }
     promises.push(proposerEcriture(cooperativeId, {
       source: "livraison", sourceId: livraisonId,
       libelle: `Déduction avance sur livraison – ${membreNom}`,
-      compteDebit: c.compteDebit, compteCredit: c.compteCredit,
+      compteDebit: compteDetteProducteur, compteCredit: c.compteCredit,
       montantFcfa: avanceImputableFcfa, date: dateLivraison, numeroPiece: piece,
       tiersId: membreId, tiersType: "membre",
     }));

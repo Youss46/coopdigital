@@ -13,6 +13,7 @@ describe("calculerReglementMembreDelegue", () => {
     expect(reglement.totalChargesFcfa).toBe(20_000);
     expect(reglement.montantAvantRetenuesFcfa).toBe(180_000);
     expect(reglement.montantNetFcfa).toBe(135_000);
+    expect(reglement.creanceChargesRestanteFcfa).toBe(0);
   });
 
   it("ne produit jamais un paiement négatif lorsque les retenues dépassent la valeur", () => {
@@ -29,5 +30,8 @@ describe("calculerReglementMembreDelegue", () => {
     expect(reglement.totalChargesFcfa).toBe(10_000);
     expect(reglement.avanceDeduiteFcfa).toBe(0);
     expect(reglement.avanceDemandeeFcfa).toBe(4_000);
+    expect(reglement.fraisCarburantNonRecupereFcfa).toBe(0);
+    expect(reglement.autresChargesNonRecupereesFcfa).toBe(4_000);
+    expect(reglement.creanceChargesRestanteFcfa).toBe(4_000);
   });
 });
