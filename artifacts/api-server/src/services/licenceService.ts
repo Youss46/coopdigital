@@ -80,6 +80,7 @@ export async function verifierLicenceActive(cooperativeId: number): Promise<Lice
   const cached = getCached(cooperativeId);
   if (cached) return cached;
 
+  const today = new Date();
   const rows = await db
     .select({
       id: licencesTable.id,
@@ -95,10 +96,23 @@ export async function verifierLicenceActive(cooperativeId: number): Promise<Lice
     .from(licencesTable)
     .leftJoin(plansAbonnementTable, eq(licencesTable.planId, plansAbonnementTable.id))
     .where(eq(licencesTable.cooperativeId, cooperativeId))
-    .orderBy(desc(licencesTable.createdAt))
-    .limit(1);
+    .orderBy(desc(licencesTable.createdAt));
 
-  const licence = rows[0];
+  // Une coopérative peut conserver une ancienne période d'essai après
+  // l'activation d'une licence payante. La plus récente ne doit donc pas
+  // masquer une licence encore valable.
+  const licence = rows.find((candidate) => {
+    if (candidate.statut !== "active" && candidate.statut !== "trial") return false;
+
+    const candidateRefDate = candidate.statut === "trial"
+      && candidate.trialActif
+      && candidate.dateFinTrial
+      ? candidate.dateFinTrial
+      : candidate.dateExpiration;
+
+    return !candidateRefDate
+      || Math.floor((new Date(candidateRefDate).getTime() - today.getTime()) / (24 * 3600 * 1000)) >= 0;
+  }) ?? rows[0];
 
   if (!licence) {
     const result: LicenceCheck = {
@@ -111,7 +125,6 @@ export async function verifierLicenceActive(cooperativeId: number): Promise<Lice
     return result;
   }
 
-  const today = new Date();
   // N'utiliser dateFinTrial que si la licence est encore en période d'essai.
   // Après activation d'un abonnement (statut="active"), toujours utiliser dateExpiration
   // même si trialActif n'a pas été remis à false lors de la migration.
