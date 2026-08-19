@@ -550,6 +550,9 @@ export default function SessionsPeseePage() {
                         {s.membreNom ? `${s.membreNom} ${s.membrePrenoms ?? ""}` : <span style={{ color: "#94a3b8" }}>—</span>}
                       </div>
                       <div style={{ fontSize: ".72rem", color: "#94a3b8", marginTop: 1 }}>{s.produit}</div>
+                      <div className="sessions-pesee-mobile-sacs">
+                        {s.nbSacsTotal} sac{s.nbSacsTotal !== 1 ? "s" : ""}
+                      </div>
                   </div>
 
                     {/* Date début */}

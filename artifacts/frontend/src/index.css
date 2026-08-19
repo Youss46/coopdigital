@@ -18,9 +18,21 @@
   min-width: 760px;
 }
 
+.sessions-pesee-mobile-sacs {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .sessions-pesee-page {
     padding: 16px !important;
+  }
+
+  .sessions-pesee-mobile-sacs {
+    display: block;
+    margin-top: 3px;
+    color: #0369a1;
+    font-size: .72rem;
+    font-weight: 700;
   }
 
   .sessions-pesee-table-scroll {
