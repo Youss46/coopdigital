@@ -755,8 +755,11 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
     .where(eq(sessionsPeseeTable.id, sessionId))
     .returning();
 
-  // Commission pour les membres délégués de localités
-  // Déclenchée si le membre a categorie_membre = 'délégué de localités'
+  // Commission + livraison + paiement pour les membres délégués de localités.
+  // Déclenchée si :
+  //   - la session est issue d'un bon de réception membres-délégués (bonReceptionId), OU
+  //   - le membre a categorie_membre = 'délégué de localités' (sessions sans bon).
+  // Le critère bonReceptionId prime : il ne dépend pas du remplissage du champ categorieMembre.
   if (detail.membreId) {
     const [membre] = await db
       .select({ categorieMembre: membresTable.categorieMembre })
@@ -764,7 +767,7 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
       .where(eq(membresTable.id, detail.membreId))
       .limit(1);
 
-    if (membre?.categorieMembre === "délégué de localités") {
+    if (detail.bonReceptionId || membre?.categorieMembre === "délégué de localités") {
       const poidsKg = parseFloat(String(detail.poidsTotalKg ?? 0));
       if (poidsKg > 0) {
         // Récupérer la campagne active + prix bord-champ pour la livraison
