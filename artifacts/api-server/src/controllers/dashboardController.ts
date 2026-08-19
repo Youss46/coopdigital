@@ -620,7 +620,6 @@ export async function getDashboardTonnageCertif(req: Request, res: Response): Pr
         FROM livraisons l
         JOIN sessions_pesee sp ON sp.livraison_id = l.id
         LEFT JOIN membres m ON m.id = l.membre_id
-        LEFT JOIN fournisseurs_externes fe ON fe.id = l.fournisseur_id
         WHERE m.cooperative_id = ${cooperativeId}
           AND ${filtreDate}
           AND sp.certification_cacao IS NOT NULL

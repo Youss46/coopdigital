@@ -553,7 +553,7 @@ function ModalTonnageCertif({
   dateFin,
   preset,
 }: { onClose: () => void; periodeLabel: string; dateDebut?: string; dateFin?: string; preset: string }) {
-  const { data, isLoading } = useQuery<{ parCertification: TonnageCertifRow[] }>({
+  const { data, isLoading, isError } = useQuery<{ parCertification: TonnageCertifRow[] }>({
     queryKey: ["tonnage-certif", preset, dateDebut, dateFin],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -595,6 +595,10 @@ function ModalTonnageCertif({
             Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-12 bg-gray-100 rounded-lg animate-pulse" />
             ))
+          ) : isError ? (
+            <p className="text-center text-red-500 text-sm py-6">
+              Impossible de charger la répartition par certification. Réessayez dans un instant.
+            </p>
           ) : rows.length === 0 ? (
             <p className="text-center text-gray-400 text-sm py-6">Aucune livraison sur cette période</p>
           ) : (
