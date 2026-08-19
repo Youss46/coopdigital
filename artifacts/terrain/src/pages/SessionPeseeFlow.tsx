@@ -230,6 +230,12 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
           // Session clôturée — aller directement à l'écran de succès pour permettre la conversion
           setSessionTerminee(detail);
           setStep("succes");
+        } else if (detail.statut === "annulee") {
+          // Ne jamais afficher le formulaire de saisie pour une session annulée.
+          // Le bon associé peut être redémarré depuis l'écran Réceptions.
+          setSession(null);
+          setErreur("Cette session a été annulée. Retournez à la réception pour démarrer une nouvelle pesée.");
+          setStep("membre");
         } else {
           setSession(detail);
           setStep("session");
