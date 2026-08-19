@@ -58,6 +58,7 @@ describe("création de session depuis un bon de réception", () => {
         bonReceptionId: 42,
         produit: "cacao",
         operation: "reception_membre_delegue",
+        certificationCacao: "RA",
       },
       log: { error: vi.fn() },
     } as unknown as Request;
@@ -69,6 +70,7 @@ describe("création de session depuis un bon de réception", () => {
       bonReceptionId: 42,
       produit: "cacao",
       operation: "reception_membre_delegue",
+      certificationCacao: "RA",
     }));
     expect(response.status).toHaveBeenCalledWith(201);
   });
@@ -86,6 +88,26 @@ describe("création de session depuis un bon de réception", () => {
     expect(response.status).toHaveBeenCalledWith(400);
     expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
       erreur: expect.stringContaining("bon de réception"),
+    }));
+  });
+
+  it("refuse de démarrer une pesée sans certification cacao", async () => {
+    const request = {
+      agent: { id: 7, cooperativeId: 3, role: "peseur", delegueId: null },
+      body: {
+        bonReceptionId: 42,
+        produit: "cacao",
+        operation: "reception_membre_delegue",
+      },
+      log: { error: vi.fn() },
+    } as unknown as Request;
+
+    await handleCreateSession(request, response);
+
+    expect(createSession).not.toHaveBeenCalled();
+    expect(response.status).toHaveBeenCalledWith(400);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      erreur: expect.stringContaining("certification"),
     }));
   });
 });

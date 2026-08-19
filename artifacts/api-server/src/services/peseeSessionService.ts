@@ -26,6 +26,7 @@ import { genererNumeroRecu } from "./recuService.js";
 import { creerCommissionTransfert, deduireAvancesApresCommission } from "./commissionService.js";
 import { creerCommissionMembreSiTaux } from "./commissionMembreDelegueService.js";
 import { logger } from "../lib/logger.js";
+import { isCertificationCacao, type CertificationCacao } from "../lib/certificationCacao.js";
 
 // ─── Création batch (sync hors-ligne) ────────────────────────────────────────
 
@@ -42,6 +43,7 @@ export async function creerSessionBatch(
     membreId: number;
     produit: string;
     operation: string;
+    certificationCacao: CertificationCacao;
     lignes: Array<{ localId: string; nbSacs: number; poidsBrutKg: number; tareKg: number; notes?: string }>;
     statut: "terminee" | "en_cours";
   },
@@ -76,6 +78,7 @@ export async function creerSessionBatch(
         operation: data.operation,
         peseurId,
         notes: offlineTag,
+        certificationCacao: data.certificationCacao,
       });
     } catch (err) {
       // Race condition : une session en cours existe déjà pour ce membre
@@ -200,6 +203,10 @@ export async function createSession(
     certificationCacao?: string;
   },
 ) {
+  if (!isCertificationCacao(data.certificationCacao)) {
+    throw new Error("Le type de certification du cacao est obligatoire avant de démarrer la pesée");
+  }
+
   if (data.operation === "reception_membre_delegue" && !data.bonReceptionId) {
     throw new Error("Un bon de réception est obligatoire pour démarrer la pesée d'un membre délégué");
   }
@@ -243,6 +250,7 @@ export async function createSession(
         balanceId:      data.balanceId,
         notes:          data.notes,
         bonReceptionId: bonId,
+        certificationCacao: data.certificationCacao,
       })
       .returning();
 
@@ -312,6 +320,7 @@ export async function createSession(
           balanceId: data.balanceId,
           notes: data.notes,
           transfertId,
+          certificationCacao: data.certificationCacao,
         })
         .returning();
 

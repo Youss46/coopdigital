@@ -52,6 +52,11 @@ const STATUT_BON: Record<string, { label: string; color: string; bg: string }> =
 // ─── Onglets ──────────────────────────────────────────────────────────────────
 
 type Onglet = "transferts" | "membres";
+const CERTIFICATIONS_CACAO = ["RA", "FAIRTRADE", "ASR_1000", "ORDINAIRE"] as const;
+
+type DemarrageCible =
+  | { type: "transfert"; transfert: TransfertEnAttente }
+  | { type: "bon"; bon: BonReceptionMembre };
 
 export default function ReceptionsTransfertsPage() {
   const { user } = useAuth();
@@ -72,6 +77,8 @@ export default function ReceptionsTransfertsPage() {
   const [loadingB, setLoadingB]         = useState(true);
   const [errorB, setErrorB]             = useState<string | null>(null);
   const [busyB, setBusyB]               = useState<number | null>(null);
+  const [demarrageCible, setDemarrageCible] = useState<DemarrageCible | null>(null);
+  const [certificationCacao, setCertificationCacao] = useState("");
 
   // ── Loaders ────────────────────────────────────────────────────────────
   async function reloadTransferts() {
@@ -117,11 +124,16 @@ export default function ReceptionsTransfertsPage() {
     finally { setBusyT(null); }
   }
 
-  async function handleDemarrerPeseeTransfert(t: TransfertEnAttente) {
+  async function handleDemarrerPeseeTransfert(t: TransfertEnAttente, certification: string) {
     if (t.sessionPeseeId) { navigate(`/pesee-session/${t.sessionPeseeId}`); return; }
     setBusyT(t.id);
     try {
-      const session = await createSessionPesee({ produit: "cacao", operation: "reception_transfert", transfertId: t.id });
+      const session = await createSessionPesee({
+        produit: "cacao",
+        operation: "reception_transfert",
+        transfertId: t.id,
+        certificationCacao: certification,
+      });
       navigate(`/pesee-session/${session.id}`);
     } catch (e) {
       if (e instanceof SessionTransfertExistanteError) { navigate(`/pesee-session/${e.sessionId}`); return; }
@@ -130,7 +142,7 @@ export default function ReceptionsTransfertsPage() {
   }
 
   // ── Actions bons membres délégués ───────────────────────────────────────
-  async function handleDemarrerPeseeBon(bon: BonReceptionMembre) {
+  async function handleDemarrerPeseeBon(bon: BonReceptionMembre, certification: string) {
     if (bon.sessionPeseeId) { navigate(`/pesee-session/${bon.sessionPeseeId}`); return; }
     setBusyB(bon.id);
     try {
@@ -138,6 +150,7 @@ export default function ReceptionsTransfertsPage() {
         produit: "cacao",
         operation: "reception_membre_delegue",
         bonReceptionId: bon.id,
+        certificationCacao: certification,
       });
       navigate(`/pesee-session/${session.id}`);
     } catch (e) {
@@ -148,6 +161,22 @@ export default function ReceptionsTransfertsPage() {
       }
       alert("Erreur : " + err.message);
     } finally { setBusyB(null); }
+  }
+
+  function demanderCertification(cible: DemarrageCible) {
+    setCertificationCacao("");
+    setDemarrageCible(cible);
+  }
+
+  async function confirmerDemarrage() {
+    if (!demarrageCible || !certificationCacao) return;
+    const cible = demarrageCible;
+    setDemarrageCible(null);
+    if (cible.type === "transfert") {
+      await handleDemarrerPeseeTransfert(cible.transfert, certificationCacao);
+    } else {
+      await handleDemarrerPeseeBon(cible.bon, certificationCacao);
+    }
   }
 
   // ── Compteurs pour les onglets ──────────────────────────────────────────
@@ -319,7 +348,7 @@ export default function ReceptionsTransfertsPage() {
                       </button>
                     )}
                     {t.statut === "arrive" && t.sessionPeseeId == null && (
-                      <button onClick={() => void handleDemarrerPeseeTransfert(t)} disabled={isBusy} className="t-btn t-btn--primary" style={{ width: "100%", marginTop: 8, height: 52, background: "linear-gradient(135deg, var(--t-peseur-dark) 0%, var(--t-peseur) 100%)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                      <button onClick={() => demanderCertification({ type: "transfert", transfert: t })} disabled={isBusy} className="t-btn t-btn--primary" style={{ width: "100%", marginTop: 8, height: 52, background: "linear-gradient(135deg, var(--t-peseur-dark) 0%, var(--t-peseur) 100%)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                         {isBusy ? <RefreshCw size={16} style={{ animation: "t-spin .8s linear infinite" }} /> : <Play size={16} fill="#fff" />}
                         {isBusy ? "Démarrage…" : "Démarrer la pesée"}
                       </button>
@@ -467,7 +496,7 @@ export default function ReceptionsTransfertsPage() {
                     {/* Action : démarrer la pesée */}
                     {bon.statut === "en_attente_pesee" && (
                       <button
-                        onClick={() => void handleDemarrerPeseeBon(bon)}
+                        onClick={() => demanderCertification({ type: "bon", bon })}
                         disabled={isBusy}
                         className="t-btn t-btn--primary"
                         style={{
@@ -506,6 +535,79 @@ export default function ReceptionsTransfertsPage() {
           </>
         )}
       </main>
+
+      {demarrageCible && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="certification-dialog-title"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setDemarrageCible(null);
+          }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            display: "flex", alignItems: "flex-end",
+            background: "rgba(15, 23, 42, .52)",
+          }}
+        >
+          <div style={{
+            width: "100%", background: "var(--t-card)", borderRadius: "20px 20px 0 0",
+            padding: "20px 16px max(24px, env(safe-area-inset-bottom))",
+            boxShadow: "0 -12px 32px rgba(0,0,0,.18)",
+          }}>
+            <div style={{ width: 38, height: 4, borderRadius: 99, background: "var(--t-border)", margin: "0 auto 18px" }} />
+            <div id="certification-dialog-title" style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--t-text)" }}>
+              Certification du cacao
+            </div>
+            <p style={{ margin: "5px 0 18px", fontSize: ".82rem", lineHeight: 1.45, color: "var(--t-muted)" }}>
+              Sélectionnez le type de cacao avant de démarrer la pesée. Cette information figurera sur le bordereau d’achat.
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {CERTIFICATIONS_CACAO.map((certification) => {
+                const selected = certificationCacao === certification;
+                return (
+                  <button
+                    key={certification}
+                    onClick={() => setCertificationCacao(certification)}
+                    style={{
+                      minHeight: 52, borderRadius: 12, cursor: "pointer",
+                      border: `2px solid ${selected ? "var(--t-peseur)" : "var(--t-border)"}`,
+                      background: selected ? "var(--t-peseur-bg)" : "var(--t-card)",
+                      color: selected ? "var(--t-peseur-dark)" : "var(--t-text)",
+                      fontSize: ".86rem", fontWeight: 800,
+                    }}
+                  >
+                    {certification}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+              <button
+                onClick={() => setDemarrageCible(null)}
+                className="t-btn t-btn--ghost"
+                style={{ flex: 1, height: 48 }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => void confirmerDemarrage()}
+                disabled={!certificationCacao}
+                className="t-btn t-btn--primary"
+                style={{
+                  flex: 1, height: 48,
+                  opacity: certificationCacao ? 1 : .5,
+                  cursor: certificationCacao ? "pointer" : "not-allowed",
+                }}
+              >
+                Commencer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <BottomNavPeseur delegueId={user?.delegueId} />
     </div>

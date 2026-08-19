@@ -288,6 +288,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
       membrePrenoms: b.membrePrenoms,
       produit: b.produit,
       operation: b.operation,
+      certificationCacao: b.certificationCacao,
       statut: b.statut === "annulee" ? "annulee" : b.statut === "terminee" ? "terminee" : "en_cours",
       poidsTotalKg: String(b.poidsTotalKg.toFixed(3)),
       nbSacsTotal: b.nbSacsTotal,
@@ -362,12 +363,16 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   async function handleConfirmerCertif() {
     if (!fournisseur) return;
     setErreur("");
+    if (!certificationCacao) {
+      setErreur("Sélectionnez le type de certification du cacao avant de commencer la pesée.");
+      return;
+    }
 
     if (!isOnline) {
       try {
         const newBrouillon = await createBrouillon({
           membreId: fournisseur.id, membreNom: fournisseur.nom, membrePrenoms: fournisseur.prenoms,
-          membreCode: fournisseur.code, produit: "cacao", operation: "reception",
+          membreCode: fournisseur.code, produit: "cacao", operation: "reception", certificationCacao,
         });
         setBrouillon(newBrouillon);
         setSession(brouillonToSyntheticSession(newBrouillon));
@@ -381,8 +386,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     try {
       const isExterne = fournisseur.typeMembre === "externe";
       const sessionPayload = isExterne
-        ? { fournisseurId: fournisseur.id, produit: "cacao", operation: "reception", certificationCacao: certificationCacao || undefined }
-        : { membreId: fournisseur.id, produit: "cacao", operation: "reception", certificationCacao: certificationCacao || undefined };
+        ? { fournisseurId: fournisseur.id, produit: "cacao", operation: "reception", certificationCacao }
+        : { membreId: fournisseur.id, produit: "cacao", operation: "reception", certificationCacao };
       const s = await createSessionPesee(sessionPayload);
       const detail = await getSessionDetail(s.id);
       setSession(detail);
@@ -799,7 +804,12 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             <button
               onClick={handleConfirmerCertif}
               className="t-btn t-btn--primary"
-              style={{ width: "100%", marginBottom: 10 }}
+              disabled={!certificationCacao}
+              style={{
+                width: "100%", marginBottom: 10,
+                opacity: certificationCacao ? 1 : .5,
+                cursor: certificationCacao ? "pointer" : "not-allowed",
+              }}
             >
               {certificationCacao ? `Commencer — ${certificationCacao}` : "Commencer la pesée"}
             </button>

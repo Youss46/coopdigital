@@ -325,6 +325,8 @@ export interface BrouillonPesee {
   membreCode: string;
   produit: string;
   operation: string;
+  /** Certification déclarée par le peseur avant le démarrage hors ligne */
+  certificationCacao: string;
   statut: "en_cours" | "terminee" | "annulee";
   syncStatus: "pending" | "syncing" | "synced" | "error";
   lignes: BrouillonLigne[];

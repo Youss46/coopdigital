@@ -14,6 +14,7 @@ import {
   SessionEnCoursError,
   SessionTransfertExistanteError,
 } from "../services/peseeSessionService";
+import { isCertificationCacao } from "../lib/certificationCacao.js";
 import {
   CreateBalanceBody,
   UpdateBalanceBody,
@@ -301,17 +302,22 @@ export async function handleBatchCreateSession(req: Request, res: Response): Pro
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const peseurId = req.agent!.id;
 
-  const { localId, membreId, produit, operation, lignes, statut } = req.body as {
+  const { localId, membreId, produit, operation, certificationCacao, lignes, statut } = req.body as {
     localId?: string;
     membreId?: number;
     produit?: string;
     operation?: string;
+    certificationCacao?: string;
     lignes?: Array<{ localId: string; nbSacs: number; poidsBrutKg: number; tareKg: number; notes?: string }>;
     statut?: "terminee" | "en_cours";
   };
 
   if (!localId || !membreId || !Array.isArray(lignes) || lignes.length === 0) {
     res.status(400).json({ erreur: "localId, membreId et au moins une ligne sont requis" });
+    return;
+  }
+  if (!isCertificationCacao(certificationCacao)) {
+    res.status(400).json({ erreur: "Sélectionnez le type de certification du cacao avant de démarrer la pesée" });
     return;
   }
 
@@ -321,6 +327,7 @@ export async function handleBatchCreateSession(req: Request, res: Response): Pro
       membreId: Number(membreId),
       produit: produit ?? "cacao",
       operation: operation ?? "reception",
+      certificationCacao,
       lignes,
       statut: statut ?? "terminee",
     });
@@ -343,6 +350,10 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
     res.status(400).json({ erreur: "Un bon de réception est obligatoire pour démarrer la pesée d'un membre délégué" });
     return;
   }
+  if (!isCertificationCacao(certificationCacao)) {
+    res.status(400).json({ erreur: "Sélectionnez le type de certification du cacao avant de démarrer la pesée" });
+    return;
+  }
 
   // ── Guard : seul le peseur central (delegueId === null) peut démarrer une session de réception de transfert
   if (transfertId != null) {
@@ -361,7 +372,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       peseurId: actorId,
       transfertId: transfertId ? Number(transfertId) : undefined,
       bonReceptionId: bonReceptionId ? Number(bonReceptionId) : undefined,
-      certificationCacao: certificationCacao || undefined,
+      certificationCacao,
     });
     res.status(201).json(session);
   } catch (err) {
