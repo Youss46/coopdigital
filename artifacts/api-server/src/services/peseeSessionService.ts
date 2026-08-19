@@ -25,6 +25,7 @@ import { creerNotification, notifierParRole } from "./notificationService.js";
 import { genererNumeroRecu } from "./recuService.js";
 import { creerCommissionTransfert, deduireAvancesApresCommission } from "./commissionService.js";
 import { creerCommissionMembreSiTaux } from "./commissionMembreDelegueService.js";
+import { entrerStockSiDelegue } from "./entrepotDelegueService.js";
 import { logger } from "../lib/logger.js";
 import { isCertificationCacao, type CertificationCacao } from "../lib/certificationCacao.js";
 
@@ -850,6 +851,28 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
                 .where(eq(sessionsPeseeTable.id, sessionId));
               livraisonId = livraison.id;
 
+              // ── Entrée stock entrepôt central ─────────────────────────────
+              // Le cacao du bon de réception entre directement au magasin central.
+              try {
+                const [entrepotCentral] = await db
+                  .select({ id: entrepotsTable.id })
+                  .from(entrepotsTable)
+                  .where(eq(entrepotsTable.cooperativeId, cooperativeId))
+                  .orderBy(entrepotsTable.id)
+                  .limit(1);
+                if (entrepotCentral) {
+                  await db.insert(mouvementsStockTable).values({
+                    entrepotId: entrepotCentral.id,
+                    type:       "entree",
+                    poidsKg:    String(poidsKg),
+                    motif:      `Livraison membre-délégué — session #${sessionId}`,
+                    agentId:    null,
+                  });
+                }
+              } catch (stockErr) {
+                logger.warn({ stockErr, sessionId }, "[membreDelegue] Entrée stock central non créée (non bloquant)");
+              }
+
               // Paiement en attente
               const numeroRecu = await genererNumeroRecu(cooperativeId);
               await db.insert(paiementsTable).values({
@@ -1256,6 +1279,17 @@ export async function creerLivraisonDepuisSession(
       }
     })();
   }
+
+  // ── Entrée stock entrepôt du délégué — fire-and-forget ──────────────────
+  // Pour les sessions membres et fournisseurs converties manuellement via
+  // « Convertir en livraison » : le poids net entre dans l'entrepôt rattaché
+  // à l'agent (délégué ou peseur autonome).
+  void entrerStockSiDelegue(
+    result.livraison.agentId,
+    cooperativeId,
+    parseFloat(String(result.livraison.poidsKg)),
+    result.livraison.id,
+  );
 
   return result;
 }
