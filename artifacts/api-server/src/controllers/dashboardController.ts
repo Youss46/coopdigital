@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable, fournisseursTable } from "@workspace/db";
+import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable, fournisseursTable, certificationsTable, certificationsMembresTable } from "@workspace/db";
 import { eq, sql, desc, gte, lte, and, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -564,6 +564,94 @@ export async function getDeleguesPeseursCollectes(req: Request, res: Response): 
     res.json({ peseurs, collectes, stats });
   } catch (err) {
     req.log.error({ err }, "Erreur getDeleguesPeseursCollectes");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── Tonnage par type de certification ────────────────────────────────────────
+const CERTIF_LABELS: Record<string, string> = {
+  fairtrade:          "Fairtrade",
+  bio:                "Agriculture biologique",
+  rainforest:         "Rainforest Alliance",
+  utz:                "UTZ",
+  sans_certification: "Non certifié",
+};
+
+export async function getDashboardTonnageCertif(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  try {
+    const rawDebut = typeof req.query.dateDebut === "string" ? req.query.dateDebut : null;
+    const rawFin   = typeof req.query.dateFin   === "string" ? req.query.dateFin   : null;
+    const periodeCampagne = req.query.periode === "campagne";
+
+    const debutMois = new Date();
+    debutMois.setDate(1);
+    debutMois.setHours(0, 0, 0, 0);
+    const debutMoisStr = debutMois.toISOString().split("T")[0]!;
+
+    const [campagneActive] = periodeCampagne
+      ? await db
+          .select({ id: campagnesTable.id, dateOuverture: campagnesTable.dateOuverture, dateFermeture: campagnesTable.dateFermeture })
+          .from(campagnesTable)
+          .where(and(eq(campagnesTable.cooperativeId, cooperativeId), eq(campagnesTable.statut, "ouverte")))
+          .orderBy(desc(campagnesTable.dateOuverture))
+          .limit(1)
+      : [null];
+
+    const periodeDebut = rawDebut ?? campagneActive?.dateOuverture ?? debutMoisStr;
+    const periodeFin   = rawFin   ?? campagneActive?.dateFermeture ?? new Date().toISOString().split("T")[0]!;
+
+    const filtreDate = campagneActive
+      ? sql`l.campagne_id = ${campagneActive.id}`
+      : sql`l.date_livraison >= ${periodeDebut} AND l.date_livraison <= ${periodeFin}`;
+
+    // Tonnage par type de certification
+    // Un membre peut avoir plusieurs certifications → sa livraison apparaît dans chaque type.
+    // Livraisons de membres sans certification → 'sans_certification'.
+    const result = await db.execute(sql`
+      WITH livraisons_periode AS (
+        SELECT l.poids_kg, l.nombre_sacs, l.membre_id
+        FROM livraisons l
+        JOIN membres m ON m.id = l.membre_id
+        WHERE m.cooperative_id = ${cooperativeId}
+          AND ${filtreDate}
+          AND l.membre_id IS NOT NULL
+      ),
+      certif_par_membre AS (
+        SELECT DISTINCT cm.membre_id, c.type
+        FROM certifications_membres cm
+        JOIN certifications c ON c.id = cm.certification_id
+        WHERE c.cooperative_id = ${cooperativeId}
+          AND cm.statut_conformite = 'certifie'
+      )
+      SELECT
+        COALESCE(cpm.type, 'sans_certification')          AS type,
+        COALESCE(SUM(lp.poids_kg::numeric), 0)::float     AS tonnage_kg,
+        COALESCE(SUM(lp.nombre_sacs), 0)::int             AS nombre_sacs
+      FROM livraisons_periode lp
+      LEFT JOIN certif_par_membre cpm ON cpm.membre_id = lp.membre_id
+      GROUP BY cpm.type
+      ORDER BY tonnage_kg DESC
+    `);
+
+    type Row = { type: string; tonnage_kg: number; nombre_sacs: number };
+    const rows = (result.rows ?? result) as Row[];
+
+    res.json({
+      parCertification: rows.map((r) => ({
+        type:      r.type,
+        label:     CERTIF_LABELS[r.type] ?? r.type,
+        tonnageKg: r.tonnage_kg,
+        nombreSacs: r.nombre_sacs,
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Erreur getDashboardTonnageCertif");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

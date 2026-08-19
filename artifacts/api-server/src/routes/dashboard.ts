@@ -7,6 +7,7 @@ import {
   getDashboardTracabilite,
   getDashboardDelegue,
   getDeleguesPeseursCollectes,
+  getDashboardTonnageCertif,
 } from "../controllers/dashboardController";
 import {
   requirePca,
@@ -25,6 +26,7 @@ router.get("/dashboard/avances-retard", getDashboardAvancesRetard);
 router.get("/dashboard/tracabilite", getDashboardTracabilite);
 router.get("/dashboard/delegue", getDashboardDelegue);
 router.get("/dashboard/peseurs-collectes", getDeleguesPeseursCollectes);
+router.get("/dashboard/tonnage-certif", getDashboardTonnageCertif);
 
 router.get("/dashboard/pca/synthese", requirePca, getSynthesePca);
 router.get("/dashboard/pca/alertes-prioritaires", requirePca, getAlertesPrioritairesPca);

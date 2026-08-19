@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useGetDashboardLivraisons, useGetDashboardAvancesRetard } from "@workspace/api-client-react";
-import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation, Settings, CalendarDays, Award, RefreshCw } from "lucide-react";
+import { Users, Package, Banknote, AlertTriangle, Clock, MapPinned, MapPin, CheckCircle2, Navigation, Settings, CalendarDays, Award, RefreshCw, X, Award as CertifIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Redirect } from "wouter";
 import { CarteKpi } from "@/components/CarteKpi";
@@ -536,12 +536,117 @@ function getPeriodeParams(preset: Preset, persoDebut: string, persoFin: string):
   return { dateDebut: persoDebut || undefined, dateFin: persoFin || undefined, label: "Période perso." };
 }
 
+// ── Couleurs par type de certification ────────────────────────────────────────
+const CERTIF_COLORS: Record<string, string> = {
+  fairtrade:          "#00A8A6",
+  bio:                "#4caf50",
+  rainforest:         "#6dbf6d",
+  utz:                "#a06be3",
+  sans_certification: "#9ca3af",
+};
+
+interface TonnageCertifRow { type: string; label: string; tonnageKg: number; nombreSacs: number }
+
+function ModalTonnageCertif({
+  onClose,
+  periodeLabel,
+  dateDebut,
+  dateFin,
+  preset,
+}: { onClose: () => void; periodeLabel: string; dateDebut?: string; dateFin?: string; preset: string }) {
+  const { data, isLoading } = useQuery<{ parCertification: TonnageCertifRow[] }>({
+    queryKey: ["tonnage-certif", preset, dateDebut, dateFin],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateDebut) params.set("dateDebut", dateDebut);
+      if (dateFin)   params.set("dateFin", dateFin);
+      if (preset === "campagne") params.set("periode", "campagne");
+      const r = await apiFetch(`/api/dashboard/tonnage-certif${params.size ? `?${params}` : ""}`);
+      if (!r.ok) throw new Error("Impossible de charger les données");
+      return r.json();
+    },
+  });
+
+  const rows = data?.parCertification ?? [];
+  const maxKg = Math.max(...rows.map((r) => r.tonnageKg), 1);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-0 sm:px-4" onClick={onClose}>
+      <div
+        className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <Package size={16} className="text-blue-600" />
+            <div>
+              <h3 className="font-bold text-gray-900 text-sm">Tonnage par certification</h3>
+              <p className="text-xs text-gray-400">{periodeLabel}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Corps */}
+        <div className="px-5 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-12 bg-gray-100 rounded-lg animate-pulse" />
+            ))
+          ) : rows.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm py-6">Aucune livraison sur cette période</p>
+          ) : (
+            rows.map((r) => {
+              const pct = Math.round((r.tonnageKg / maxKg) * 100);
+              const couleur = CERTIF_COLORS[r.type] ?? "#6b7280";
+              const tonnesAff = r.tonnageKg >= 1000
+                ? `${(r.tonnageKg / 1000).toFixed(2)} T`
+                : `${r.tonnageKg.toFixed(1)} kg`;
+              return (
+                <div key={r.type} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: couleur }} />
+                      <span className="text-sm font-medium text-gray-800">{r.label}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-gray-900">{tonnesAff}</span>
+                      {r.nombreSacs > 0 && (
+                        <span className="text-xs text-gray-400 ml-2">{r.nombreSacs.toLocaleString("fr-FR")} sacs</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${pct}%`, backgroundColor: couleur }}
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
+          {rows.length > 0 && (
+            <p className="text-[10px] text-gray-400 pt-1">
+              Un membre certifié dans plusieurs types est comptabilisé dans chacun.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { utilisateur } = useAuth();
   const [preset, setPreset] = useState<Preset>("mois");
   const [persoDebut, setPersoDebut] = useState("");
   const [persoFin, setPersoFin]   = useState("");
   const [showPerso, setShowPerso] = useState(false);
+  const [showTonnageDetail, setShowTonnageDetail] = useState(false);
 
   const { dateDebut, dateFin, label: periodeLabel } = useMemo(
     () => getPeriodeParams(preset, persoDebut, persoFin),
@@ -661,6 +766,7 @@ export default function Dashboard() {
                   ? `${(kpi as typeof kpi & { nombreSacsMois?: number }).nombreSacsMois} sacs collectés`
                   : "Cacao collecté"
               }
+              onClick={() => setShowTonnageDetail(true)}
             />
             <CarteKpi
               titre={`Paiements — ${periodeLabel}`}
@@ -738,6 +844,16 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {showTonnageDetail && (
+        <ModalTonnageCertif
+          onClose={() => setShowTonnageDetail(false)}
+          periodeLabel={periodeLabel}
+          dateDebut={dateDebut}
+          dateFin={dateFin}
+          preset={preset}
+        />
+      )}
     </div>
   );
 }

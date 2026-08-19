@@ -13,6 +13,7 @@ interface CarteKpiProps {
   couleur: string;
   sousTitre?: string;
   badge?: Badge;
+  onClick?: () => void;
 }
 
 const badgeClasses: Record<Badge["type"], string> = {
@@ -28,11 +29,15 @@ export function CarteKpi({
   couleur,
   sousTitre,
   badge,
+  onClick,
 }: CarteKpiProps) {
   const valeurAnimee = useCountUp(valeur);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-5 flex items-start gap-2 sm:gap-4 transition-shadow duration-200 hover:shadow-md">
+    <div
+      className={`bg-white rounded-xl border border-gray-200 p-3 sm:p-5 flex items-start gap-2 sm:gap-4 transition-shadow duration-200 hover:shadow-md ${onClick ? "cursor-pointer active:scale-[0.98]" : ""}`}
+      onClick={onClick}
+    >
       <div className="rounded-lg p-2 sm:p-2.5 flex-shrink-0" style={{ backgroundColor: couleur + "18" }}>
         <Icone size={18} style={{ color: couleur }} />
       </div>
