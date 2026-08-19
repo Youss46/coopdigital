@@ -19,6 +19,7 @@ vi.mock("../services/pdfHeaderService.js", () => ({
 }));
 
 const generateRecuLivraison = vi.fn();
+const generateBordereauAchatSession = vi.fn();
 vi.mock("../services/pdfService.js", () => ({
   generateFicheMembre: vi.fn(),
   generateRapportMensuel: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock("../services/pdfService.js", () => ({
   generateCompteResultatOHADA: vi.fn(),
   generateFluxTresoreiriePdf: vi.fn(),
   generateRecuLivraison,
+  generateBordereauAchatSession,
   generateRecuPaiement: vi.fn(),
   generateBulletinPaie: vi.fn(),
   generateBordereauPesee: vi.fn(),
@@ -61,6 +63,7 @@ describe("terrain delivery receipt authorization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     generateRecuLivraison.mockResolvedValue(Buffer.from("pdf"));
+    generateBordereauAchatSession.mockResolvedValue(Buffer.from("bordereau"));
   });
 
   it("allows the peseur who created a grouped session to download its receipt", async () => {
@@ -97,5 +100,24 @@ describe("terrain delivery receipt authorization", () => {
     expect(generateRecuLivraison).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith({ erreur: "Accès non autorisé à cette livraison" });
+  });
+
+  it("returns the purchase statement for a delivery created from a reception bon", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(selectChain([
+      { agentId: 42, peseurId: 7, sessionPeseurId: 7, sessionId: 88, bonReceptionId: 12 },
+    ]) as never);
+    const res = makeResponse();
+    const req = {
+      params: { id: "123" },
+      agent: { id: 7, role: "peseur", cooperativeId: 3 },
+      log: { error: vi.fn() },
+    };
+
+    await getTerrainRecuLivraison(req as never, res as never);
+
+    expect(generateBordereauAchatSession).toHaveBeenCalledWith(88, 3);
+    expect(generateRecuLivraison).not.toHaveBeenCalled();
+    expect(res.setHeader).toHaveBeenCalledWith("Content-Disposition", 'attachment; filename="bordereau_achat_88.pdf"');
+    expect(res.end).toHaveBeenCalledWith(Buffer.from("bordereau"));
   });
 });

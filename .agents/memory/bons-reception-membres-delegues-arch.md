@@ -60,3 +60,7 @@ bruts de façon directement vérifiable.
 **How to apply:** toute évolution du PDF de session avec `bonReceptionId` doit
 préserver ces champs et ce libellé de synthèse pour les membres dont la
 catégorie est « délégué de localités ».
+
+Depuis l'historique Terrain, le téléchargement d'une livraison liée à cette
+session doit sélectionner automatiquement le bordereau d'achat plutôt que le
+reçu de livraison générique.

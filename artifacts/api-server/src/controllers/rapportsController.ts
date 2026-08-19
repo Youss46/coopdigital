@@ -18,6 +18,7 @@ import {
   generateCompteResultatOHADA,
   generateFluxTresoreiriePdf,
   generateRecuLivraison,
+  generateBordereauAchatSession,
   generateRecuPaiement,
   generateBulletinPaie,
   generateBordereauPesee,
@@ -127,28 +128,31 @@ export async function getTerrainRecuLivraison(req: Request, res: Response): Prom
   // For peseur: verify ownership using the same join/fields as getPeseurCollectes history.
   // A grouped delivery can be assigned to the delegue (agentId) while its peseur is
   // recorded separately on the livraison or the source session.
-  if (agent?.role === "peseur") {
-    const [livraison] = await db
-      .select({
-        agentId: livraisonsTable.agentId,
-        peseurId: livraisonsTable.peseurId,
-        sessionPeseurId: sessionsPeseeTable.peseurId,
-      })
-      .from(livraisonsTable)
-      .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
-      .leftJoin(fournisseursTable, eq(fournisseursTable.id, livraisonsTable.fournisseurId))
-      .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
-      .where(
-        and(
-          eq(livraisonsTable.id, id),
-          or(
-            eq(membresTable.cooperativeId, cooperativeId),
-            eq(fournisseursTable.cooperativeId, cooperativeId),
-          ),
+  const [livraison] = await db
+    .select({
+      agentId: livraisonsTable.agentId,
+      peseurId: livraisonsTable.peseurId,
+      sessionPeseurId: sessionsPeseeTable.peseurId,
+      sessionId: sessionsPeseeTable.id,
+      bonReceptionId: sessionsPeseeTable.bonReceptionId,
+    })
+    .from(livraisonsTable)
+    .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+    .leftJoin(fournisseursTable, eq(fournisseursTable.id, livraisonsTable.fournisseurId))
+    .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
+    .where(
+      and(
+        eq(livraisonsTable.id, id),
+        or(
+          eq(membresTable.cooperativeId, cooperativeId),
+          eq(fournisseursTable.cooperativeId, cooperativeId),
         ),
-      )
-      .limit(1);
-    if (!livraison) { res.status(404).json({ erreur: "Livraison introuvable" }); return; }
+      ),
+    )
+    .limit(1);
+  if (!livraison) { res.status(404).json({ erreur: "Livraison introuvable" }); return; }
+
+  if (agent?.role === "peseur") {
     const isOwner = livraison.agentId === agent.id
       || livraison.peseurId === agent.id
       || livraison.sessionPeseurId === agent.id;
@@ -158,8 +162,17 @@ export async function getTerrainRecuLivraison(req: Request, res: Response): Prom
   }
 
   try {
-    const buffer = await generateRecuLivraison(id, cooperativeId);
-    sendPdf(res, buffer, `recu_livraison_${id}.pdf`);
+    const bordereauAchat = livraison.bonReceptionId != null && livraison.sessionId != null;
+    const buffer = bordereauAchat
+      ? await generateBordereauAchatSession(livraison.sessionId, cooperativeId)
+      : await generateRecuLivraison(id, cooperativeId);
+    sendPdf(
+      res,
+      buffer,
+      bordereauAchat
+        ? `bordereau_achat_${livraison.sessionId}.pdf`
+        : `recu_livraison_${id}.pdf`,
+    );
   } catch (err) {
     req.log.error({ err }, "Erreur getTerrainRecuLivraison");
     if (err instanceof Error && err.message.includes("introuvable")) {
