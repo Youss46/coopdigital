@@ -10,7 +10,12 @@ import { useState, useEffect } from "react";
 import { useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Package, Truck, Plus, X, CheckCircle2, Clock, Scale, RefreshCw, AlertCircle, ChevronRight } from "lucide-react";
-import { useGetVehicules, useGetChauffeurs } from "@workspace/api-client-react";
+import {
+  getGetChauffeursQueryKey,
+  getGetVehiculesQueryKey,
+  useGetVehicules,
+  useGetChauffeurs,
+} from "@workspace/api-client-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok  = () => localStorage.getItem("coop_token") ?? "";
@@ -68,9 +73,6 @@ interface BonReception {
   sessionPeseeId: number | null;
   createdAt: string;
 }
-
-interface Vehicule { id: number; immatriculation: string; marque: string | null; modele: string | null; typeVehicule: string | null; }
-interface Chauffeur { id: number; nom: string; prenoms: string | null; telephone: string | null; }
 
 const STATUT_CONF = {
   en_attente_pesee: { label: "En attente de pesée", color: "#d97706", bg: "#fffbeb" },
@@ -132,11 +134,21 @@ export default function BonsReceptionMembresDeleguesPage() {
   });
   const membres = membresData ?? [];
 
-  const { data: vehiculesData } = useGetVehicules({ query: { enabled: form.typeTransport === "cooperatif" } });
-  const vehicules = (vehiculesData as Vehicule[] | undefined) ?? [];
+  const { data: vehiculesData } = useGetVehicules({
+    query: {
+      queryKey: getGetVehiculesQueryKey(),
+      enabled: form.typeTransport === "cooperatif",
+    },
+  });
+  const vehicules = vehiculesData?.vehicules ?? [];
 
-  const { data: chauffeursData } = useGetChauffeurs({ query: { enabled: form.typeTransport === "cooperatif" } });
-  const chauffeurs = (chauffeursData as Chauffeur[] | undefined) ?? [];
+  const { data: chauffeursData } = useGetChauffeurs({
+    query: {
+      queryKey: getGetChauffeursQueryKey(),
+      enabled: form.typeTransport === "cooperatif",
+    },
+  });
+  const chauffeurs = chauffeursData?.chauffeurs ?? [];
 
   const statutsQuery = filtreStatut === "actifs"
     ? "en_attente_pesee,en_pesee"
