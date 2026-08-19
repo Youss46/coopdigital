@@ -462,6 +462,36 @@ export async function getBonsReceptionEnAttente(): Promise<import("./types").Bon
   return apiPeseeFetch<import("./types").BonReceptionMembre[]>("/terrain/bons-reception/en-attente");
 }
 
+export interface CreateBonReceptionTerrainInput {
+  membreDelegueId: number;
+  poidsDeclaraKg?: number | null;
+  nombreSacsDeclares?: number | null;
+  typeTransport: "cooperatif" | "externe";
+  vehiculeId?: number | null;
+  chauffeurId?: number | null;
+  typeVehicule?: string | null;
+  immatriculation?: string | null;
+  nomChauffeur?: string | null;
+  telephoneChauffeur?: string | null;
+  fraisCarburantFcfa?: number;
+  autresChargesFcfa?: number;
+  autresChargesLibelle?: string | null;
+  notes?: string | null;
+}
+
+export async function getBonReceptionCreationOptions(): Promise<import("./types").BonReceptionCreationOptions> {
+  return apiPeseeFetch<import("./types").BonReceptionCreationOptions>("/terrain/bons-reception/options");
+}
+
+export async function createBonReceptionTerrain(
+  data: CreateBonReceptionTerrainInput,
+): Promise<import("./types").BonReceptionMembre> {
+  return apiPeseeFetch<import("./types").BonReceptionMembre>("/terrain/bons-reception", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function getTransfertsEnAttentePesee(): Promise<import("./types").TransfertEnAttente[]> {
   return apiPeseeFetch<import("./types").TransfertEnAttente[]>("/terrain/transferts/en_attente_pesee");
 }

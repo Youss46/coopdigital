@@ -820,6 +820,20 @@
       "when": 1788481300000,
       "tag": "0116_compte_dette_producteur_livraison",
       "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1788481400000,
+      "tag": "0117_traçabilite_createur_bon_reception",
+      "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1788481500000,
+      "tag": "0118_session_pesee_bon_reception_unique",
+      "breakpoints": true
     }
   ]
 }

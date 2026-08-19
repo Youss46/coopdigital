@@ -98,3 +98,31 @@ pas devenir une charge ou un produit de la coopérative.
 doit partir du compte figé sur cette livraison; les comptes de retenue ne
 doivent jamais être résolus indépendamment des écritures qui ont créé la dette
 et la créance.
+
+## Création par le peseur
+
+Un bon de réception peut être créé par le magasinier ou par le peseur central
+quand le magasinier est absent. La création doit garder l'identité et le rôle
+réels de son auteur, plutôt que de renseigner un peseur dans un champ métier
+réservé au magasinier.
+
+**Why:** l'historique du bon doit rester fiable pour les contrôles et les
+litiges; une attribution erronée au magasinier rendrait l'audit trompeur.
+
+**How to apply:** tout nouveau parcours de création du bon doit utiliser les
+champs génériques du créateur, vérifier le périmètre coopératif des ressources
+sélectionnées, puis réutiliser le même cycle de pesée que le bon créé au
+magasin.
+
+## Unicité de la pesée par bon
+
+Un bon de réception ne peut appartenir qu'à une seule session de pesée. La
+création de session doit revendiquer le bon de façon conditionnelle dans une
+transaction, et la base doit imposer cette relation unique.
+
+**Why:** deux demandes arrivant en même temps peuvent autrement créer deux
+sessions puis deux livraisons, paiements et écritures pour le même cacao.
+
+**How to apply:** lors de tout démarrage ou traitement d'une session liée à un
+bon, vérifier que la session est bien celle enregistrée sur le bon; conserver
+la contrainte d'unicité côté base en complément du contrôle applicatif.

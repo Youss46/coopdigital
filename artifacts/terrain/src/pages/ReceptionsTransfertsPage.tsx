@@ -11,7 +11,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   ChevronLeft, Truck, Scale, Package, RefreshCw,
-  AlertTriangle, CheckCircle, Play, RotateCcw, Users,
+  AlertTriangle, CheckCircle, Play, RotateCcw, Users, Plus,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -19,10 +19,14 @@ import {
   signalerArriveePhysique,
   createSessionPesee,
   getBonsReceptionEnAttente,
+  getBonReceptionCreationOptions,
+  createBonReceptionTerrain,
+  type CreateBonReceptionTerrainInput,
   SessionTransfertExistanteError,
 } from "../lib/api";
-import type { TransfertEnAttente, BonReceptionMembre } from "../lib/types";
+import type { TransfertEnAttente, BonReceptionMembre, BonReceptionCreationOptions } from "../lib/types";
 import BottomNavPeseur from "../components/BottomNavPeseur";
+import CreateBonReceptionSheet from "../components/CreateBonReceptionSheet";
 
 function fmtPoids(kg: string | number): string {
   const n = typeof kg === "string" ? parseFloat(kg) : kg;
@@ -79,6 +83,12 @@ export default function ReceptionsTransfertsPage() {
   const [busyB, setBusyB]               = useState<number | null>(null);
   const [demarrageCible, setDemarrageCible] = useState<DemarrageCible | null>(null);
   const [certificationCacao, setCertificationCacao] = useState("");
+  const [creationOuverte, setCreationOuverte] = useState(false);
+  const [optionsCreation, setOptionsCreation] = useState<BonReceptionCreationOptions | null>(null);
+  const [loadingOptionsCreation, setLoadingOptionsCreation] = useState(false);
+  const [errorCreation, setErrorCreation] = useState<string | null>(null);
+  const [creationEnCours, setCreationEnCours] = useState(false);
+  const isPeseurCentral = user?.role === "peseur" && user.delegueId == null;
 
   // ── Loaders ────────────────────────────────────────────────────────────
   async function reloadTransferts() {
@@ -95,7 +105,50 @@ export default function ReceptionsTransfertsPage() {
     finally { setLoadingB(false); }
   }
 
-  useEffect(() => { void reloadTransferts(); void reloadBons(); }, []);
+  async function chargerOptionsCreation() {
+    setLoadingOptionsCreation(true);
+    setErrorCreation(null);
+    try {
+      setOptionsCreation(await getBonReceptionCreationOptions());
+    } catch (e) {
+      setOptionsCreation(null);
+      setErrorCreation((e as Error).message);
+    } finally {
+      setLoadingOptionsCreation(false);
+    }
+  }
+
+  function ouvrirCreationBon() {
+    setCreationOuverte(true);
+    void chargerOptionsCreation();
+  }
+
+  async function creerBonDepuisTerrain(data: CreateBonReceptionTerrainInput) {
+    setCreationEnCours(true);
+    setErrorCreation(null);
+    try {
+      const bonCree = await createBonReceptionTerrain(data);
+      const bonsActualises = await getBonsReceptionEnAttente();
+      setBons(bonsActualises);
+      setCreationOuverte(false);
+      const bonPourPesee = bonsActualises.find((bon) => bon.id === bonCree.id);
+      if (bonPourPesee) demanderCertification({ type: "bon", bon: bonPourPesee });
+    } catch (e) {
+      setErrorCreation((e as Error).message);
+    } finally {
+      setCreationEnCours(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!isPeseurCentral) return;
+    void reloadTransferts();
+    void reloadBons();
+  }, [isPeseurCentral]);
+
+  useEffect(() => {
+    if (user && !isPeseurCentral) navigate("/");
+  }, [user, isPeseurCentral, navigate]);
 
   // L'accueil peut ouvrir directement le bon de réception affiché dans son badge.
   useEffect(() => {
@@ -182,6 +235,8 @@ export default function ReceptionsTransfertsPage() {
   // ── Compteurs pour les onglets ──────────────────────────────────────────
   const nbTransferts = transferts.length;
   const nbBons       = bons.length;
+
+  if (user && !isPeseurCentral) return null;
 
   // ─── Rendu ────────────────────────────────────────────────────────────────
 
@@ -382,9 +437,18 @@ export default function ReceptionsTransfertsPage() {
               borderRadius: 10, padding: "10px 14px", marginBottom: 16,
               fontSize: ".78rem", color: "#92400e", lineHeight: 1.5,
             }}>
-              Le magasinier crée un bon de réception quand un membre délégué arrive avec son cacao.
-              Démarrez la pesée depuis chaque bon.
+              Créez le bon dès l’arrivée du cacao, puis démarrez immédiatement la pesée.
             </div>
+
+            {isPeseurCentral && (
+              <button
+                onClick={ouvrirCreationBon}
+                className="t-btn t-btn--primary"
+                style={{ width: "100%", height: 50, marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+              >
+                <Plus size={18} /> Créer un bon de réception
+              </button>
+            )}
 
             {loadingB && <div style={{ textAlign: "center", padding: "40px 0" }}><div className="t-spinner" style={{ margin: "0 auto" }} /></div>}
 
@@ -402,7 +466,7 @@ export default function ReceptionsTransfertsPage() {
                   <CheckCircle size={28} color="var(--t-success)" />
                 </div>
                 <div style={{ fontWeight: 700, color: "var(--t-text)", marginBottom: 4 }}>Aucun bon en attente</div>
-                <div style={{ fontSize: ".78rem", color: "var(--t-muted)" }}>Le magasinier crée un bon quand un membre délégué arrive avec son cacao.</div>
+                <div style={{ fontSize: ".78rem", color: "var(--t-muted)" }}>Créez un bon dès qu’un membre délégué arrive avec son cacao.</div>
               </div>
             )}
 
@@ -608,6 +672,17 @@ export default function ReceptionsTransfertsPage() {
           </div>
         </div>
       )}
+
+      <CreateBonReceptionSheet
+        open={creationOuverte}
+        options={optionsCreation}
+        loadingOptions={loadingOptionsCreation}
+        error={errorCreation}
+        submitting={creationEnCours}
+        onClose={() => { if (!creationEnCours) setCreationOuverte(false); }}
+        onRetry={() => { void chargerOptionsCreation(); }}
+        onSubmit={(data) => { void creerBonDepuisTerrain(data); }}
+      />
 
       <BottomNavPeseur delegueId={user?.delegueId} />
     </div>

@@ -216,57 +216,67 @@ export async function createSession(
   // ── Cas 0 : session liée à un bon de réception membre délégué ────────────
   if (data.bonReceptionId) {
     const bonId = data.bonReceptionId;
-
-    const [bon] = await db
-      .select({
-        id:               bonsReceptionMembresDeleguesTable.id,
-        statut:           bonsReceptionMembresDeleguesTable.statut,
-        membreDelegueId:  bonsReceptionMembresDeleguesTable.membreDelegueId,
-        sessionPeseeId:   bonsReceptionMembresDeleguesTable.sessionPeseeId,
-        cooperativeId:    bonsReceptionMembresDeleguesTable.cooperativeId,
-      })
-      .from(bonsReceptionMembresDeleguesTable)
-      .where(and(
-        eq(bonsReceptionMembresDeleguesTable.id, bonId),
-        eq(bonsReceptionMembresDeleguesTable.cooperativeId, cooperativeId),
-      ))
-      .limit(1);
-
-    if (!bon) throw new Error("Bon de réception introuvable");
-    if (bon.statut !== "en_attente_pesee") {
-      if (bon.sessionPeseeId) throw new SessionBonExistanteError(bon.sessionPeseeId);
-      throw new Error(`Le bon doit être en statut 'en_attente_pesee' pour démarrer une pesée (statut actuel : ${bon.statut})`);
-    }
-
     const numeroSession = await generateNumeroSession(cooperativeId);
-    const [session] = await db
-      .insert(sessionsPeseeTable)
-      .values({
-        cooperativeId,
-        numeroSession,
-        membreId:       bon.membreDelegueId,
-        fournisseurId:  null,
-        produit:        data.produit ?? "cacao",
-        operation:      "reception_membre_delegue",
-        peseurId:       data.peseurId,
-        balanceId:      data.balanceId,
-        notes:          data.notes,
-        bonReceptionId: bonId,
-        certificationCacao: data.certificationCacao,
-      })
-      .returning();
+    const session = await db.transaction(async (tx: any) => {
+      const [bon] = await tx
+        .select({
+          statut: bonsReceptionMembresDeleguesTable.statut,
+          membreDelegueId: bonsReceptionMembresDeleguesTable.membreDelegueId,
+          sessionPeseeId: bonsReceptionMembresDeleguesTable.sessionPeseeId,
+        })
+        .from(bonsReceptionMembresDeleguesTable)
+        .where(and(
+          eq(bonsReceptionMembresDeleguesTable.id, bonId),
+          eq(bonsReceptionMembresDeleguesTable.cooperativeId, cooperativeId),
+        ))
+        .limit(1);
 
-    // Lier le bon à la session (optimiste — si une race condition survient, le peseur verra l'erreur)
-    await db
-      .update(bonsReceptionMembresDeleguesTable)
-      .set({ statut: "en_pesee", sessionPeseeId: session!.id, updatedAt: new Date() })
-      .where(and(
-        eq(bonsReceptionMembresDeleguesTable.id, bonId),
-        eq(bonsReceptionMembresDeleguesTable.statut, "en_attente_pesee"),
-      ));
+      if (!bon) throw new Error("Bon de réception introuvable");
+      if (bon.statut !== "en_attente_pesee") {
+        if (bon.sessionPeseeId) throw new SessionBonExistanteError(bon.sessionPeseeId);
+        throw new Error(`Le bon doit être en statut 'en_attente_pesee' pour démarrer une pesée (statut actuel : ${bon.statut})`);
+      }
 
-    logger.info({ bonId, sessionId: session!.id }, "Session pesée créée depuis bon réception membre délégué");
-    return session!;
+      const [created] = await tx
+        .insert(sessionsPeseeTable)
+        .values({
+          cooperativeId,
+          numeroSession,
+          membreId: bon.membreDelegueId,
+          fournisseurId: null,
+          produit: data.produit ?? "cacao",
+          operation: "reception_membre_delegue",
+          peseurId: data.peseurId,
+          balanceId: data.balanceId,
+          notes: data.notes,
+          bonReceptionId: bonId,
+          certificationCacao: data.certificationCacao,
+        })
+        .returning();
+
+      const claimed = await tx
+        .update(bonsReceptionMembresDeleguesTable)
+        .set({ statut: "en_pesee", sessionPeseeId: created!.id, updatedAt: new Date() })
+        .where(and(
+          eq(bonsReceptionMembresDeleguesTable.id, bonId),
+          eq(bonsReceptionMembresDeleguesTable.statut, "en_attente_pesee"),
+          isNull(bonsReceptionMembresDeleguesTable.sessionPeseeId),
+        ))
+        .returning({ id: bonsReceptionMembresDeleguesTable.id });
+
+      if (claimed.length === 0) {
+        const [rival] = await tx
+          .select({ sessionPeseeId: bonsReceptionMembresDeleguesTable.sessionPeseeId })
+          .from(bonsReceptionMembresDeleguesTable)
+          .where(eq(bonsReceptionMembresDeleguesTable.id, bonId))
+          .limit(1);
+        throw new SessionBonExistanteError(rival?.sessionPeseeId ?? 0);
+      }
+      return created!;
+    });
+
+    logger.info({ bonId, sessionId: session.id }, "Session pesée créée depuis bon réception membre délégué");
+    return session;
   }
 
   // ── Cas 1 : session de réception de transfert (atomique) ─────────────────
@@ -712,8 +722,24 @@ async function deduireAvancesMembreDelegue(
 export async function terminerSession(cooperativeId: number, sessionId: number) {
   const detail = await getSessionDetail(cooperativeId, sessionId);
   if (!detail) throw new Error("Session introuvable");
+  // Une répétition réseau sur un bon déjà finalisé est idempotente : elle rend
+  // le même résultat sans relancer livraison, paiement ni stock.
+  if (detail.statut === "terminee" && detail.bonReceptionId) return detail;
   if (detail.statut !== "en_cours") throw new Error("Session déjà terminée ou annulée");
   if ((detail.lignes?.length ?? 0) === 0) throw new Error("Aucune pesée enregistrée dans cette session");
+  if (detail.bonReceptionId) {
+    const [bon] = await db
+      .select({ sessionPeseeId: bonsReceptionMembresDeleguesTable.sessionPeseeId })
+      .from(bonsReceptionMembresDeleguesTable)
+      .where(and(
+        eq(bonsReceptionMembresDeleguesTable.id, detail.bonReceptionId),
+        eq(bonsReceptionMembresDeleguesTable.cooperativeId, cooperativeId),
+      ))
+      .limit(1);
+    if (bon?.sessionPeseeId !== sessionId) {
+      throw new Error("Cette session n'est pas celle liée au bon de réception");
+    }
+  }
 
   // ── Réception de transfert : finalisation atomique dans une transaction ───
   // IMPORTANT: poidsPeseKg est calculé depuis les lignes DANS la transaction (pas depuis
@@ -754,8 +780,16 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
   const [updated] = await db
     .update(sessionsPeseeTable)
     .set({ statut: "terminee", dateFin: new Date() })
-    .where(eq(sessionsPeseeTable.id, sessionId))
+    .where(and(
+      eq(sessionsPeseeTable.id, sessionId),
+      eq(sessionsPeseeTable.statut, "en_cours"),
+    ))
     .returning();
+  if (!updated) {
+    const current = await getSessionDetail(cooperativeId, sessionId);
+    if (current?.statut === "terminee" && current.bonReceptionId) return current;
+    throw new Error("Session déjà terminée ou annulée");
+  }
 
   // Commission + livraison + paiement pour les membres délégués de localités.
   // Déclenchée si :
@@ -1169,6 +1203,7 @@ export async function creerLivraisonDepuisSession(
         produit: sessionsPeseeTable.produit,
         livraisonId: sessionsPeseeTable.livraisonId,
         dateFin: sessionsPeseeTable.dateFin,
+        bonReceptionId: sessionsPeseeTable.bonReceptionId,
       })
       .from(sessionsPeseeTable)
       .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.cooperativeId, cooperativeId)))
@@ -1179,6 +1214,20 @@ export async function creerLivraisonDepuisSession(
     if (session.statut !== "terminee") throw new Error("La session doit être terminée avant d'être convertie en livraison");
     if (session.livraisonId) throw new Error("Une livraison a déjà été créée pour cette session");
     if (!session.membreId && !session.fournisseurId) throw new Error("La session ne comporte pas de membre ou fournisseur — impossible de créer une livraison");
+    if (session.bonReceptionId) {
+      const [bon] = await tx
+        .select({ sessionPeseeId: bonsReceptionMembresDeleguesTable.sessionPeseeId })
+        .from(bonsReceptionMembresDeleguesTable)
+        .where(and(
+          eq(bonsReceptionMembresDeleguesTable.id, session.bonReceptionId),
+          eq(bonsReceptionMembresDeleguesTable.cooperativeId, cooperativeId),
+        ))
+        .for("update")
+        .limit(1);
+      if (bon?.sessionPeseeId !== sessionId) {
+        throw new Error("Cette session n'est pas celle liée au bon de réception");
+      }
+    }
 
     const isFournisseur = !session.membreId && !!session.fournisseurId;
 

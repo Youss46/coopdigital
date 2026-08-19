@@ -355,11 +355,12 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
     return;
   }
 
-  // ── Guard : seul le peseur central (delegueId === null) peut démarrer une session de réception de transfert
-  if (transfertId != null) {
+  // ── Les réceptions physiques au magasin central ne peuvent être traitées
+  // que par le peseur central, y compris celles liées à un bon membre délégué.
+  if (transfertId != null || operation === "reception_membre_delegue" || bonReceptionId != null) {
     const isCentralPeseur = req.agent?.role === "peseur" && (req.agent.delegueId == null);
     if (!isCentralPeseur) {
-      res.status(403).json({ erreur: "Seul le peseur central peut démarrer une session de réception de transfert" });
+      res.status(403).json({ erreur: "Seul le peseur central peut démarrer cette réception" });
       return;
     }
   }
@@ -418,7 +419,15 @@ export async function handleGetSessions(req: Request, res: Response): Promise<vo
       dateDebut: date_debut,
       dateFin: date_fin,
     });
-    res.json(sessions);
+    const isCentralPeseur = req.agent?.role === "peseur" && req.agent.delegueId == null;
+    const visibleSessions = req.agent && !isCentralPeseur
+      ? sessions.filter((session) =>
+        session.operation !== "reception_transfert"
+        && session.operation !== "reception_membre_delegue"
+        && session.bonReceptionId == null,
+      )
+      : sessions;
+    res.json(visibleSessions);
   } catch (err) {
     req.log.error(err, "handleGetSessions");
     res.status(500).json({ erreur: "Erreur récupération sessions" });
@@ -432,6 +441,14 @@ export async function handleGetSession(req: Request, res: Response): Promise<voi
   try {
     const session = await getSessionDetail(cooperativeId, sessionId);
     if (!session) { res.status(404).json({ erreur: "Session introuvable" }); return; }
+    const isCentralReception = session.operation === "reception_transfert"
+      || session.operation === "reception_membre_delegue"
+      || session.bonReceptionId != null;
+    const isCentralPeseur = req.agent?.role === "peseur" && req.agent.delegueId == null;
+    if (req.agent && isCentralReception && !isCentralPeseur) {
+      res.status(403).json({ erreur: "Réservé au peseur central" });
+      return;
+    }
     res.json(session);
   } catch (err) {
     req.log.error(err, "handleGetSession");
@@ -439,15 +456,15 @@ export async function handleGetSession(req: Request, res: Response): Promise<voi
   }
 }
 
-async function guardCentralPeseurForTransfertSession(
+async function guardCentralPeseurForReceptionSession(
   req: Request, res: Response, cooperativeId: number, sessionId: number,
 ): Promise<boolean> {
   const s = await getSessionDetail(cooperativeId, sessionId);
   if (!s) { res.status(404).json({ erreur: "Session introuvable" }); return false; }
-  if (s.operation === "reception_transfert") {
+  if (s.operation === "reception_transfert" || s.operation === "reception_membre_delegue" || s.bonReceptionId != null) {
     const isCentralPeseur = req.agent?.role === "peseur" && (req.agent.delegueId == null);
     if (!isCentralPeseur) {
-      res.status(403).json({ erreur: "Seul le peseur central peut modifier une session de réception de transfert" });
+      res.status(403).json({ erreur: "Seul le peseur central peut modifier cette session de réception" });
       return false;
     }
   }
@@ -462,7 +479,7 @@ export async function handleAddLigne(req: Request, res: Response): Promise<void>
     nbSacs?: number; poidsBrutKg?: number; tareKg?: number; notes?: string;
   };
   if (!poidsBrutKg || poidsBrutKg <= 0) { res.status(400).json({ erreur: "Poids invalide" }); return; }
-  if (!await guardCentralPeseurForTransfertSession(req, res, cooperativeId, sessionId)) return;
+  if (!await guardCentralPeseurForReceptionSession(req, res, cooperativeId, sessionId)) return;
   try {
     const ligne = await addLigne(cooperativeId, sessionId, {
       nbSacs: nbSacs ?? 0,
@@ -484,7 +501,7 @@ export async function handleDeleteLigne(req: Request, res: Response): Promise<vo
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
   const ligneId = parseInt(String(req.params["ligneId"] ?? "0"));
-  if (!await guardCentralPeseurForTransfertSession(req, res, cooperativeId, sessionId)) return;
+  if (!await guardCentralPeseurForReceptionSession(req, res, cooperativeId, sessionId)) return;
   try {
     await deleteLigne(cooperativeId, sessionId, ligneId);
     const session = await getSessionDetail(cooperativeId, sessionId);
@@ -500,7 +517,7 @@ export async function handleTerminerSession(req: Request, res: Response): Promis
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
-  if (!await guardCentralPeseurForTransfertSession(req, res, cooperativeId, sessionId)) return;
+  if (!await guardCentralPeseurForReceptionSession(req, res, cooperativeId, sessionId)) return;
   try {
     const session = await terminerSession(cooperativeId, sessionId);
     res.json(session);
@@ -515,7 +532,7 @@ export async function handleAnnulerSession(req: Request, res: Response): Promise
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
-  if (!await guardCentralPeseurForTransfertSession(req, res, cooperativeId, sessionId)) return;
+  if (!await guardCentralPeseurForReceptionSession(req, res, cooperativeId, sessionId)) return;
   try {
     await annulerSession(cooperativeId, sessionId);
     res.json({ ok: true });
@@ -534,6 +551,7 @@ export async function handleConvertirSessionEnLivraison(req: Request, res: Respo
   const effectiveAgentId = req.agent?.delegueId ?? actorId;
   const peseurId = req.agent?.delegueId ? req.agent.id : undefined;
   const sessionId = parseInt(String(req.params["id"] ?? "0"));
+  if (!await guardCentralPeseurForReceptionSession(req, res, cooperativeId, sessionId)) return;
   try {
     const result = await creerLivraisonDepuisSession(cooperativeId, sessionId, {
       agentId: effectiveAgentId,
@@ -565,6 +583,16 @@ export async function handleGetBordereauSession(req: Request, res: Response): Pr
   const sessionId = Number(req.params.id);
   if (!sessionId) { res.status(400).json({ erreur: "ID session invalide" }); return; }
   try {
+    const session = await getSessionDetail(cooperativeId, sessionId);
+    if (!session) { res.status(404).json({ erreur: "Session introuvable" }); return; }
+    const isCentralReception = session.operation === "reception_transfert"
+      || session.operation === "reception_membre_delegue"
+      || session.bonReceptionId != null;
+    const isCentralPeseur = req.agent?.role === "peseur" && req.agent.delegueId == null;
+    if (req.agent && isCentralReception && !isCentralPeseur) {
+      res.status(403).json({ erreur: "Réservé au peseur central" });
+      return;
+    }
     const buf = await generateBordereauAchatSession(sessionId, cooperativeId);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="bordereau-pesee-${sessionId}.pdf"`);

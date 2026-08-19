@@ -8,8 +8,8 @@ import { vehiculesTable }    from "./transport";
 import { chauffeursTable }   from "./transport";
 
 /**
- * Bon de réception créé par le magasinier quand un membre délégué de localités
- * arrive au magasin central avec son cacao.
+ * Bon de réception créé par un magasinier ou un peseur quand un membre délégué
+ * de localités arrive au magasin central avec son cacao.
  *
  * Statuts :
  *   en_attente_pesee → en_pesee → terminee
@@ -26,7 +26,11 @@ export const bonsReceptionMembresDeleguesTable = pgTable("bons_reception_membres
   id:                   serial("id").primaryKey(),
   cooperativeId:        integer("cooperative_id").notNull().references(() => cooperativesTable.id),
   membreDelegueId:      integer("membre_delegue_id").notNull().references(() => membresTable.id),
+  /** Champ historique conservé pour les bons créés avant la traçabilité générique. */
   magasinierId:         integer("magasinier_id").references(() => usersTable.id),
+  /** Identité et rôle de la personne qui a effectivement enregistré le bon. */
+  creeParId:            integer("cree_par_id").references(() => usersTable.id),
+  creeParRole:          text("cree_par_role"),
 
   // ── Statut ────────────────────────────────────────────────────────────────
   statut: text("statut").notNull().default("en_attente_pesee"),

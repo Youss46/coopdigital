@@ -406,6 +406,27 @@ export interface BonReceptionMembre {
   createdAt: string;
 }
 
+export interface BonReceptionCreationOptions {
+  membres: Array<{
+    id: number;
+    nom: string;
+    prenoms: string | null;
+    section: string | null;
+  }>;
+  vehicules: Array<{
+    id: number;
+    immatriculation: string;
+    marque: string | null;
+    modele: string | null;
+  }>;
+  chauffeurs: Array<{
+    id: number;
+    nom: string;
+    prenoms: string | null;
+    telephone: string | null;
+  }>;
+}
+
 // ─── Sessions de pesée ────────────────────────────────────────────────────────
 
 export interface LignePesee {

@@ -1,8 +1,12 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth";
-import { terrainAuthMiddleware, peseurOrDelegueOnly, flexAuthMiddleware } from "../middlewares/terrainAuth.js";
+import { terrainAuthMiddleware, peseurOrDelegueOnly, peseurOnly, flexAuthMiddleware } from "../middlewares/terrainAuth.js";
 import type { Request, Response } from "express";
 import { listerBonsReception } from "../services/bonReceptionService.js";
+import {
+  creerBonTerrainHandler,
+  getBonReceptionOptionsTerrainHandler,
+} from "../controllers/bonReceptionController.js";
 import {
   handleGetBalancesAlertes,
   handleGetBalances,
@@ -68,7 +72,9 @@ router.put("/pesee/sessions/:id/livraison",           terrainAuthMiddleware, pes
 router.get("/pesee/sessions/:id/bordereau",           flexAuthMiddleware, handleGetBordereauSession);
 
 // ── Bons de réception membres délégués (peseur terrain central) ───────────────
-router.get("/terrain/bons-reception/en-attente", terrainAuthMiddleware, peseurOrDelegueOnly,
+router.get("/terrain/bons-reception/options", terrainAuthMiddleware, peseurOnly, getBonReceptionOptionsTerrainHandler);
+router.post("/terrain/bons-reception", terrainAuthMiddleware, peseurOnly, creerBonTerrainHandler);
+router.get("/terrain/bons-reception/en-attente", terrainAuthMiddleware, peseurOnly,
   async (req: Request, res: Response) => {
     const cooperativeId = req.agent?.cooperativeId;
     if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }

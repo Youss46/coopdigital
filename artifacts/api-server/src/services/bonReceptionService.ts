@@ -17,6 +17,7 @@ import {
   chauffeursTable,
 } from "@workspace/db";
 import { and, eq, inArray, desc } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { logger } from "../lib/logger.js";
 import { notifierParRole } from "./notificationService.js";
 
@@ -26,7 +27,7 @@ function toNum(v: unknown): number { return Number(v ?? 0); }
 
 export async function creerBonReception(
   cooperativeId: number,
-  magasinierId: number,
+  createur: { id: number; role: string },
   data: {
     membreDelegueId: number;
     poidsDeclaraKg?: number | null;
@@ -71,12 +72,33 @@ export async function creerBonReception(
     throw new Error("Ce membre n'est pas actif");
   }
 
+  if (data.typeTransport === "cooperatif") {
+    if (!data.vehiculeId || !data.chauffeurId) {
+      throw new Error("Un véhicule et un chauffeur de la coopérative sont obligatoires");
+    }
+    const [[vehicule], [chauffeur]] = await Promise.all([
+      db.select({ id: vehiculesTable.id })
+        .from(vehiculesTable)
+        .where(and(eq(vehiculesTable.id, data.vehiculeId), eq(vehiculesTable.cooperativeId, cooperativeId)))
+        .limit(1),
+      db.select({ id: chauffeursTable.id })
+        .from(chauffeursTable)
+        .where(and(eq(chauffeursTable.id, data.chauffeurId), eq(chauffeursTable.cooperativeId, cooperativeId)))
+        .limit(1),
+    ]);
+    if (!vehicule || !chauffeur) {
+      throw new Error("Le véhicule ou le chauffeur sélectionné n'appartient pas à cette coopérative");
+    }
+  }
+
   const [bon] = await db
     .insert(bonsReceptionMembresDeleguesTable)
     .values({
       cooperativeId,
       membreDelegueId: data.membreDelegueId,
-      magasinierId,
+      magasinierId: createur.role === "magasinier" ? createur.id : null,
+      creeParId: createur.id,
+      creeParRole: createur.role,
       statut: "en_attente_pesee",
       poidsDeclaraKg: data.poidsDeclaraKg != null ? String(data.poidsDeclaraKg) : null,
       nombreSacsDeclares: data.nombreSacsDeclares ?? null,
@@ -98,18 +120,58 @@ export async function creerBonReception(
 
   const nomMembre = `${membre.prenoms ?? ""} ${membre.nom}`.trim();
 
-  // Notifier les peseurs centraux
-  void notifierParRole(cooperativeId, ["peseur" as never], {
-    titre: "Nouveau cacao à peser",
-    message: `${nomMembre} (délégué de localités) est arrivé. Bon de réception #${bon.id} créé.`,
-    gravite: "info" as never,
-    type: "COLLECTE" as never,
-  }).catch((err) =>
-    logger.warn({ err }, "Erreur notification peseur bon réception")
-  );
+  // Un bon créé par le magasinier doit avertir les peseurs. Le peseur qui le
+  // crée lui-même le voit immédiatement dans son parcours Terrain.
+  if (createur.role !== "peseur") {
+    void notifierParRole(cooperativeId, ["peseur" as never], {
+      titre: "Nouveau cacao à peser",
+      message: `${nomMembre} (délégué de localités) est arrivé. Bon de réception #${bon.id} créé.`,
+      gravite: "info" as never,
+      type: "COLLECTE" as never,
+    }).catch((err) =>
+      logger.warn({ err }, "Erreur notification peseur bon réception")
+    );
+  }
 
-  logger.info({ bonId: bon.id, membreDelegueId: data.membreDelegueId, cooperativeId }, "Bon de réception créé");
+  logger.info({ bonId: bon.id, membreDelegueId: data.membreDelegueId, cooperativeId, createurId: createur.id, createurRole: createur.role }, "Bon de réception créé");
   return bon;
+}
+
+export async function getOptionsCreationBonReception(cooperativeId: number) {
+  const [membres, vehicules, chauffeurs] = await Promise.all([
+    db.select({
+      id: membresTable.id,
+      nom: membresTable.nom,
+      prenoms: membresTable.prenoms,
+      section: membresTable.section,
+    })
+      .from(membresTable)
+      .where(and(
+        eq(membresTable.cooperativeId, cooperativeId),
+        eq(membresTable.categorieMembre, "délégué de localités"),
+        eq(membresTable.statut, "actif"),
+      ))
+      .orderBy(membresTable.nom),
+    db.select({
+      id: vehiculesTable.id,
+      immatriculation: vehiculesTable.immatriculation,
+      marque: vehiculesTable.marque,
+      modele: vehiculesTable.modele,
+    })
+      .from(vehiculesTable)
+      .where(and(eq(vehiculesTable.cooperativeId, cooperativeId), eq(vehiculesTable.statut, "disponible")))
+      .orderBy(vehiculesTable.immatriculation),
+    db.select({
+      id: chauffeursTable.id,
+      nom: chauffeursTable.nom,
+      prenoms: chauffeursTable.prenoms,
+      telephone: chauffeursTable.telephone,
+    })
+      .from(chauffeursTable)
+      .where(and(eq(chauffeursTable.cooperativeId, cooperativeId), eq(chauffeursTable.statut, "actif")))
+      .orderBy(chauffeursTable.nom),
+  ]);
+  return { membres, vehicules, chauffeurs };
 }
 
 // ─── Listing ──────────────────────────────────────────────────────────────────
@@ -120,6 +182,7 @@ export async function listerBonsReception(
 ) {
   const statuts = opts?.statuts ?? ["en_attente_pesee", "en_pesee", "terminee"];
 
+  const createursTable = alias(usersTable, "createurs_bons_reception");
   const rows = await db
     .select({
       bon:           bonsReceptionMembresDeleguesTable,
@@ -128,10 +191,14 @@ export async function listerBonsReception(
       membreTel:     membresTable.telephone,
       membreSection: membresTable.section,
       magasinierNom: usersTable.nom,
+      magasinierPrenoms: usersTable.prenoms,
+      createurNom: createursTable.nom,
+      createurPrenoms: createursTable.prenoms,
     })
     .from(bonsReceptionMembresDeleguesTable)
     .leftJoin(membresTable,  eq(membresTable.id,  bonsReceptionMembresDeleguesTable.membreDelegueId))
     .leftJoin(usersTable,    eq(usersTable.id,    bonsReceptionMembresDeleguesTable.magasinierId))
+    .leftJoin(createursTable, eq(createursTable.id, bonsReceptionMembresDeleguesTable.creeParId))
     .where(and(
       eq(bonsReceptionMembresDeleguesTable.cooperativeId, cooperativeId),
       inArray(bonsReceptionMembresDeleguesTable.statut, statuts),
@@ -148,6 +215,9 @@ export async function listerBonsReception(
     membreTel:          r.membreTel,
     membreSection:      r.membreSection,
     magasinierNom:      r.magasinierNom,
+      createurNom:        r.createurNom ?? r.magasinierNom,
+      createurPrenoms:    r.createurPrenoms ?? r.magasinierPrenoms,
+      createurRole:       r.bon.creeParRole ?? (r.magasinierNom ? "magasinier" : null),
   }));
 }
 

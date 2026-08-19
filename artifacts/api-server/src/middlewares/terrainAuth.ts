@@ -68,6 +68,15 @@ export function peseurOrDelegueOnly(req: Request, res: Response, next: NextFunct
   next();
 }
 
+/** Réservé au peseur central pour les opérations du magasin de réception. */
+export function peseurOnly(req: Request, res: Response, next: NextFunction): void {
+  if (req.agent?.role !== "peseur" || req.agent.delegueId != null) {
+    res.status(403).json({ erreur: "Réservé au peseur central" });
+    return;
+  }
+  next();
+}
+
 /** Autorise délégué ET peseur (collecte de livraisons) */
 export function collecteAllowed(req: Request, res: Response, next: NextFunction): void {
   const role = req.agent?.role;
