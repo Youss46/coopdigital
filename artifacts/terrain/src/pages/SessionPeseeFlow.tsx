@@ -465,8 +465,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             return;
           }
           if (refreshed.statut === "annulee") {
-            setSession(null);
-            setErreur("La session a été annulée. Retournez à la réception pour démarrer une nouvelle pesée.");
+            quitterSessionAnnulee(refreshed);
             return;
           }
         } catch {
@@ -539,18 +538,25 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   async function handleAnnuler() {
     if (brouillon) {
       try { await annulerBrouillon(brouillon.localId); } catch { /* silencieux */ }
-      setLocation("/");
+      quitterSessionAnnulee();
       return;
     }
     if (!session) return;
     setAnnulerLoading(true);
     try {
       await annulerSessionPesee(session.id);
-      setLocation("/");
+      quitterSessionAnnulee(session);
     } catch (err) {
-      setErreur((err as Error).message);
-      setAnnulerLoading(false);
-      setConfirmAnnuler(false);
+      const message = (err as Error).message;
+      // Si une autre action a déjà annulé ou clôturé cette session, le résultat
+      // attendu reste de quitter ce formulaire devenu inutilisable.
+      if (/session déjà terminée|session déjà annulée/i.test(message)) {
+        quitterSessionAnnulee(session);
+      } else {
+        setErreur(message);
+        setAnnulerLoading(false);
+        setConfirmAnnuler(false);
+      }
     }
   }
 
@@ -706,6 +712,26 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     setAvancePlanEdits({});
     setPlansSaved(false);
     setPlansSaving(false);
+  }
+
+  /**
+   * Retire immédiatement le formulaire d'une session qui n'est plus exploitable,
+   * même si une réponse API arrive après que son statut a déjà changé.
+   */
+  function quitterSessionAnnulee(sessionAnnulee?: SessionDetail | null) {
+    const retourReceptions =
+      sessionAnnulee?.operation === "reception_membre_delegue"
+      || sessionAnnulee?.operation === "reception_transfert";
+
+    setConfirmAnnuler(false);
+    setAnnulerLoading(false);
+    setSession(null);
+    setSessionTerminee(null);
+    setBrouillon(null);
+    setFournisseur(null);
+    setErreur("");
+    setStep("membre");
+    setLocation(retourReceptions ? "/receptions" : "/");
   }
 
   const poidsNet = (parseFloat(poidsBrut) || 0) - (parseFloat(tare) || 0);
