@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, campagnesTable, usersTable, livraisonsTable, membresTable, rapportsIaTable, fournisseursTable } from "@workspace/db";
+import { db, campagnesTable, usersTable, livraisonsTable, membresTable, rapportsIaTable, fournisseursTable, sessionsPeseeTable } from "@workspace/db";
 import { and, eq, desc, or } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
 import PDFDocument from "pdfkit";
@@ -125,14 +125,19 @@ export async function getTerrainRecuLivraison(req: Request, res: Response): Prom
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
 
   // For peseur: verify ownership using the same join/fields as getPeseurCollectes history.
-  // Must check agentId (the field used when a peseur records a delivery) and scope to
-  // the agent's cooperative via membresTable (livraisons has no direct cooperativeId column).
+  // A grouped delivery can be assigned to the delegue (agentId) while its peseur is
+  // recorded separately on the livraison or the source session.
   if (agent?.role === "peseur") {
     const [livraison] = await db
-      .select({ agentId: livraisonsTable.agentId })
+      .select({
+        agentId: livraisonsTable.agentId,
+        peseurId: livraisonsTable.peseurId,
+        sessionPeseurId: sessionsPeseeTable.peseurId,
+      })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
       .leftJoin(fournisseursTable, eq(fournisseursTable.id, livraisonsTable.fournisseurId))
+      .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
       .where(
         and(
           eq(livraisonsTable.id, id),
@@ -144,7 +149,10 @@ export async function getTerrainRecuLivraison(req: Request, res: Response): Prom
       )
       .limit(1);
     if (!livraison) { res.status(404).json({ erreur: "Livraison introuvable" }); return; }
-    if (livraison.agentId !== agent.id) {
+    const isOwner = livraison.agentId === agent.id
+      || livraison.peseurId === agent.id
+      || livraison.sessionPeseurId === agent.id;
+    if (!isOwner) {
       res.status(403).json({ erreur: "Accès non autorisé à cette livraison" }); return;
     }
   }

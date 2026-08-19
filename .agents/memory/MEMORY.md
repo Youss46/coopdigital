@@ -21,6 +21,7 @@
 - [Avances table has no cooperative_id](avances-no-coop-id.md) — avancesTable only has membreId; to filter by cooperative, join with membresTable on eq(membresTable.id, avancesTable.membreId) then filter by membresTable.cooperativeId.
 - [Grand livre tiers — architecture](grand-livre-tiers.md) — tiers_id/tiers_type dans ecritures_comptables; endpoint GET /comptabilite/tiers/:id/grand-livre; onglet MembreFiche.
 - [Terrain offline arch — raw IDB, no idb package](terrain-offline-arch.md) — terrain uses raw IndexedDB API (no `idb` npm package); SW in public/sw.js registered PROD-only in main.tsx; sync via batch endpoint /api/terrain/sync; retry tracked with `tentatives` field on PendingOp.
+- [Reçus de pesée groupée — autorisation](terrain-grouped-receipt-access.md) — l’accès au reçu doit suivre le même périmètre que l’historique : agent, peseur de livraison ou peseur de session.
 - [Sessions de pesée — architecture](sessions-pesee-arch.md) — 2 tables (sessions_pesee, lignes_pesee) + enum session_pesee_statut; endpoints /api/pesee/sessions (separate PESEE_BASE in terrain api.ts); online-only; terminer clôture sans auto-livraison.
 - [Conversion de pesée — poids minimum](pesee-conversion-poids-minimum.md) — une livraison ne peut être créée que si la session totalise un poids net strictement positif; l’interface doit l’expliquer avant toute confirmation.
 - [Peseur rattaché délégué](peseur-delegue.md) — users.delegue_id (FK self-ref); JwtPayload sans section → fetch DB dans createPeseurParDelegue; role "peseur" casté as any (hors USER_ROLES const).
