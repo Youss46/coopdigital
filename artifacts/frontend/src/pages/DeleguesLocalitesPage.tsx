@@ -5,7 +5,7 @@ import {
   Users, Search, Phone, MapPin, Wallet, PlusCircle, X,
   ChevronRight, AlertCircle, CalendarDays, TrendingUp, Settings,
   CheckCircle2, Clock, Banknote, Trash2, ArrowDownCircle, Package,
-  Download, ShoppingCart, Truck,
+  Download, ShoppingCart, Truck, Pencil,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
@@ -97,6 +97,13 @@ interface TauxCommission {
   actif: boolean;
   membreNom: string | null;
   membrePrenoms: string | null;
+  campagneLibelle: string | null;
+}
+
+interface Campagne {
+  id: number;
+  libelle: string;
+  statut: string;
 }
 
 interface LivraisonMembre {
@@ -143,6 +150,18 @@ function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function TableauChargement({ colonnes }: { colonnes: number }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <table className="w-full">
+        <tbody>
+          <TableSkeleton colonnes={colonnes} />
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 type Onglet = "membres" | "commissions" | "taux" | "livraisons";
 type FiltreStatutLivraison = "tous" | "EN_ATTENTE" | "PAYÉ";
 
@@ -178,7 +197,9 @@ export default function DeleguesLocalitesPage() {
 
   // ── Taux : formulaire ─────────────────────────────────────────────────────
   const [showTauxForm, setShowTauxForm] = useState(false);
+  const [tauxEnEditionId, setTauxEnEditionId] = useState<number | null>(null);
   const [formTaux, setFormTaux] = useState({
+    campagneId: "" as string,
     membreDelegueId: "" as string,
     tauxFcfaParKg: "",
     dateDebut: new Date().toISOString().split("T")[0]!,
@@ -256,6 +277,13 @@ export default function DeleguesLocalitesPage() {
     staleTime: 30_000,
   });
 
+  const { data: campagnes = [] } = useQuery<Campagne[]>({
+    queryKey: ["campagnes"],
+    queryFn: () => apiFetch<Campagne[]>("/api/campagnes"),
+    enabled: onglet === "taux",
+    staleTime: 30_000,
+  });
+
   const { data: livraisonsDelegues = [], isLoading: loadLivraisonsDelegues } = useQuery<LivraisonDelegue[]>({
     queryKey: ["livraisons-membres-delegues"],
     queryFn: () => apiFetch(`/api/livraisons?categorie_membre_delegue=true`),
@@ -315,6 +343,8 @@ export default function DeleguesLocalitesPage() {
 
   const mutAjouterTaux = useMutation({
     mutationFn: () => apiPost("/api/delegues-localites/commissions/taux", {
+      id: tauxEnEditionId ?? undefined,
+      campagneId: formTaux.campagneId ? Number(formTaux.campagneId) : null,
       membreDelegueId: formTaux.membreDelegueId ? Number(formTaux.membreDelegueId) : null,
       tauxFcfaParKg: Number(formTaux.tauxFcfaParKg),
       dateDebut: formTaux.dateDebut,
@@ -324,7 +354,8 @@ export default function DeleguesLocalitesPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["commissions-membres-delegues-taux"] });
       setShowTauxForm(false);
-      setFormTaux({ membreDelegueId: "", tauxFcfaParKg: "", dateDebut: new Date().toISOString().split("T")[0]!, dateFin: "", actif: true });
+      setTauxEnEditionId(null);
+      setFormTaux({ campagneId: "", membreDelegueId: "", tauxFcfaParKg: "", dateDebut: new Date().toISOString().split("T")[0]!, dateFin: "", actif: true });
       setErrTaux("");
     },
     onError: (e: Error) => setErrTaux(e.message),
@@ -333,7 +364,43 @@ export default function DeleguesLocalitesPage() {
   const mutSupprimerTaux = useMutation({
     mutationFn: (id: number) => apiDelete(`/api/delegues-localites/commissions/taux/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["commissions-membres-delegues-taux"] }),
+    onError: (e: Error) => setErrTaux(e.message),
   });
+
+  function ouvrirNouveauTaux() {
+    const campagneActive = campagnes.find(c => c.statut === "en_cours");
+    setTauxEnEditionId(null);
+    setFormTaux({
+      campagneId: campagneActive ? String(campagneActive.id) : "",
+      membreDelegueId: "",
+      tauxFcfaParKg: "",
+      dateDebut: new Date().toISOString().split("T")[0]!,
+      dateFin: "",
+      actif: true,
+    });
+    setErrTaux("");
+    setShowTauxForm(true);
+  }
+
+  function ouvrirEditionTaux(taux: TauxCommission) {
+    setTauxEnEditionId(taux.id);
+    setFormTaux({
+      campagneId: taux.campagneId ? String(taux.campagneId) : "",
+      membreDelegueId: taux.membreDelegueId ? String(taux.membreDelegueId) : "",
+      tauxFcfaParKg: String(taux.tauxFcfaParKg),
+      dateDebut: taux.dateDebut,
+      dateFin: taux.dateFin ?? "",
+      actif: taux.actif,
+    });
+    setErrTaux("");
+    setShowTauxForm(true);
+  }
+
+  function fermerFormulaireTaux() {
+    setShowTauxForm(false);
+    setTauxEnEditionId(null);
+    setErrTaux("");
+  }
 
   // ── Chargement détail commissions pour modal paiement ─────────────────────
   async function ouvrirModalCommission(recap: CommissionRecap) {
@@ -417,7 +484,7 @@ export default function DeleguesLocalitesPage() {
           </div>
 
           {isLoading ? (
-            <TableSkeleton colonnes={4} />
+            <TableauChargement colonnes={4} />
           ) : filtres.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200">
               <EmptyState
@@ -562,7 +629,7 @@ export default function DeleguesLocalitesPage() {
 
             {/* Tableau */}
             {loadLivraisonsDelegues ? (
-              <TableSkeleton colonnes={5} />
+              <TableauChargement colonnes={5} />
             ) : filtrées.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-200">
                 <EmptyState
@@ -661,7 +728,7 @@ export default function DeleguesLocalitesPage() {
           )}
 
           {loadRecap ? (
-            <TableSkeleton colonnes={4} />
+            <TableauChargement colonnes={4} />
           ) : recapCommissions.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200">
               <EmptyState
@@ -726,21 +793,43 @@ export default function DeleguesLocalitesPage() {
             <p className="text-sm text-gray-600">
               Taux de commission FCFA/kg appliqués aux délégués de localités lors de la pesée.
             </p>
-            {peutModifier && !showTauxForm && (
+            {!showTauxForm && (
               <button
-                onClick={() => setShowTauxForm(true)}
-                className="flex items-center gap-1.5 text-sm font-medium text-[#1a4731] hover:underline"
+                onClick={ouvrirNouveauTaux}
+                className="flex items-center justify-center gap-1.5 rounded-lg bg-[#1a4731] px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#123525]"
               >
                 <PlusCircle size={14} /> Nouveau taux
               </button>
             )}
           </div>
+          {errTaux && !showTauxForm && (
+            <p className="text-xs text-red-600 flex items-center gap-1">
+              <AlertCircle size={12} /> {errTaux}
+            </p>
+          )}
 
-          {/* Formulaire nouveau taux */}
+          {/* Formulaire taux — même périmètre que les délégués terrain */}
           {showTauxForm && (
             <div className="bg-white border border-[#1a4731]/20 rounded-xl p-5 space-y-4">
-              <p className="text-sm font-semibold text-[#1a4731]">Nouveau taux de commission</p>
+              <p className="text-sm font-semibold text-[#1a4731]">
+                {tauxEnEditionId ? "Modifier le taux de commission" : "Nouveau taux de commission"}
+              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Campagne</label>
+                  <select
+                    value={formTaux.campagneId}
+                    onChange={e => setFormTaux(f => ({ ...f, campagneId: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                  >
+                    <option value="">— Toutes les campagnes —</option>
+                    {campagnes.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.libelle}{c.statut === "en_cours" ? " ✓ En cours" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Délégué spécifique (laisser vide pour taux global)</label>
                   <select
@@ -786,6 +875,15 @@ export default function DeleguesLocalitesPage() {
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
                   />
                 </div>
+                <label className="flex items-center gap-2 self-end pb-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formTaux.actif}
+                    onChange={e => setFormTaux(f => ({ ...f, actif: e.target.checked }))}
+                    className="accent-[#1a4731]"
+                  />
+                  Taux actif
+                </label>
               </div>
               {errTaux && (
                 <p className="text-xs text-red-600 flex items-center gap-1">
@@ -801,7 +899,7 @@ export default function DeleguesLocalitesPage() {
                   {mutAjouterTaux.isPending ? "Enregistrement…" : "Enregistrer"}
                 </button>
                 <button
-                  onClick={() => { setShowTauxForm(false); setErrTaux(""); }}
+                  onClick={fermerFormulaireTaux}
                   className="px-4 text-sm text-gray-500 hover:text-gray-700"
                 >
                   Annuler
@@ -811,7 +909,7 @@ export default function DeleguesLocalitesPage() {
           )}
 
           {loadTaux ? (
-            <TableSkeleton colonnes={4} />
+            <TableauChargement colonnes={4} />
           ) : taux.length === 0 && !showTauxForm ? (
             <div className="bg-white rounded-xl border border-gray-200">
               <EmptyState
@@ -822,11 +920,12 @@ export default function DeleguesLocalitesPage() {
             </div>
           ) : taux.length > 0 ? (
             <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-              <table className="w-full min-w-[620px] text-sm">
+              <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Délégué</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Taux</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Campagne</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Période</th>
                     <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
                     <th className="px-4 py-3" />
@@ -847,6 +946,9 @@ export default function DeleguesLocalitesPage() {
                       <td className="px-4 py-3 text-right font-semibold text-[#1a4731]">
                         {t.tauxFcfaParKg} F/kg
                       </td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">
+                        {t.campagneLibelle ?? <span className="text-gray-400">Toutes</span>}
+                      </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">
                         À partir du {formaterDate(t.dateDebut)}
                         {t.dateFin && ` → ${formaterDate(t.dateFin)}`}
@@ -859,14 +961,24 @@ export default function DeleguesLocalitesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {peutModifier && (
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => mutSupprimerTaux.mutate(t.id)}
+                            onClick={() => ouvrirEditionTaux(t)}
+                            className="text-gray-400 hover:text-[#1a4731] p-1 rounded"
+                            title="Modifier le taux"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm("Supprimer ce taux de commission ?")) mutSupprimerTaux.mutate(t.id);
+                            }}
                             className="text-red-400 hover:text-red-600 p-1 rounded"
+                            title="Supprimer le taux"
                           >
                             <Trash2 size={13} />
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -123,9 +123,11 @@ export async function listTauxMembres(cooperativeId: number) {
       taux: tauxCommissionsMembresDeleguesTable,
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
+      campagneLibelle: campagnesTable.libelle,
     })
     .from(tauxCommissionsMembresDeleguesTable)
     .leftJoin(membresTable, eq(membresTable.id, tauxCommissionsMembresDeleguesTable.membreDelegueId))
+    .leftJoin(campagnesTable, eq(campagnesTable.id, tauxCommissionsMembresDeleguesTable.campagneId))
     .where(eq(tauxCommissionsMembresDeleguesTable.cooperativeId, cooperativeId))
     .orderBy(desc(tauxCommissionsMembresDeleguesTable.createdAt));
 
@@ -134,6 +136,7 @@ export async function listTauxMembres(cooperativeId: number) {
     tauxFcfaParKg: toNum(r.taux.tauxFcfaParKg),
     membreNom: r.membreNom,
     membrePrenoms: r.membrePrenoms,
+    campagneLibelle: r.campagneLibelle,
   }));
 }
 

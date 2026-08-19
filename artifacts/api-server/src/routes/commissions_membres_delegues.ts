@@ -8,13 +8,16 @@ import {
   payerHandler,
 } from "../controllers/commissionMembreDelegueController.js";
 import { checkPermission } from "../middlewares/permissions.js";
+import { authMiddleware } from "../middlewares/auth.js";
 
 const router = Router();
 
 // Taux de commission
-router.get("/delegues-localites/commissions/taux",            checkPermission("delegues", "lire"),    listTauxHandler);
-router.post("/delegues-localites/commissions/taux",           checkPermission("delegues", "modifier"), upsertTauxHandler);
-router.delete("/delegues-localites/commissions/taux/:tauxId", checkPermission("delegues", "modifier"), deleteTauxHandler);
+// Même modèle que les délégués terrain : un utilisateur coopératif authentifié
+// peut administrer les taux sans dépendre du module de permissions « delegues ».
+router.get("/delegues-localites/commissions/taux",            authMiddleware, listTauxHandler);
+router.post("/delegues-localites/commissions/taux",           authMiddleware, upsertTauxHandler);
+router.delete("/delegues-localites/commissions/taux/:tauxId", authMiddleware, deleteTauxHandler);
 
 // Récapitulatif global
 router.get("/delegues-localites/commissions/recap",           checkPermission("delegues", "lire"),    getRecapHandler);
