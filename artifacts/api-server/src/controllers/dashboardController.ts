@@ -616,14 +616,17 @@ export async function getDashboardTonnageCertif(req: Request, res: Response): Pr
     // différer du lot réellement pesé.
     const result = await db.execute(sql`
       WITH livraisons_periode AS (
-        SELECT l.poids_kg, l.nombre_sacs, sp.certification_cacao
+        SELECT
+          l.poids_kg,
+          l.nombre_sacs,
+          COALESCE(l.certification_cacao, sp.certification_cacao) AS certification_cacao
         FROM livraisons l
-        JOIN sessions_pesee sp ON sp.livraison_id = l.id
+        LEFT JOIN sessions_pesee sp ON sp.livraison_id = l.id
         LEFT JOIN membres m ON m.id = l.membre_id
         WHERE m.cooperative_id = ${cooperativeId}
           AND ${filtreDate}
-          AND sp.certification_cacao IS NOT NULL
-          AND sp.certification_cacao <> ''
+          AND COALESCE(l.certification_cacao, sp.certification_cacao) IS NOT NULL
+          AND COALESCE(l.certification_cacao, sp.certification_cacao) <> ''
       )
       SELECT
         lp.certification_cacao                         AS type,

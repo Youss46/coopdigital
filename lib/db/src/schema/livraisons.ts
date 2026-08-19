@@ -27,6 +27,8 @@ export const livraisonsTable = pgTable("livraisons", {
 
   // Champs existants
   poidsKg: numeric("poids_kg", { precision: 8, scale: 2 }).notNull(),
+  /** Certification déclarée pour le lot lors de la pesée, figée sur la livraison. */
+  certificationCacao: text("certification_cacao"),
   prixUnitaireFcfa: integer("prix_unitaire_fcfa").notNull(),
   montantBrutFcfa: integer("montant_brut_fcfa").notNull(),
   avanceDeduiteFcfa: integer("avance_deduite_fcfa").notNull().default(0),

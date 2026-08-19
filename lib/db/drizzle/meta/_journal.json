@@ -841,6 +841,13 @@
       "when": 1788481600000,
       "tag": "0119_session_pesee_bon_reception_repair",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1788481700000,
+      "tag": "0120_livraison_certification_cacao",
+      "breakpoints": true
     }
   ]
 }
