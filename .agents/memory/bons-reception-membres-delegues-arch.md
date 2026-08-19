@@ -45,4 +45,18 @@ Si pas de bon (pesée sans bon), plafond = commission brut entière.
 
 **Bug corrigé en passant** : `creerCommissionTransfert` (commissionService.ts) avait return type `number | null` mais retournait `{ id, montantFcfa: montantNet }` avec `montantNet` indéfini → corrigé en `{ id: number; montantFcfa: number } | null` retournant `montantBrut`.
 
-**À faire** : le bordereau PDF utilise encore un calcul estimatif (`min(soldeAvances, fraisCollecte)`) pour `retenueAvancesFcfa`. Il devrait lire les lignes réelles de `remboursements_avances_membres` pour ce membre/session pour afficher le montant exact.
+## Présentation du bordereau
+
+Pour une session d'un membre délégué issue d'un bon de réception, le bordereau
+d'achat doit garder le format de réception centralisée : identité du délégué,
+numéro de camion et chauffeur du bon, détail de chaque passage, puis les frais
+de collecte, carburant, autres charges éventuelles, retenue d'avance et solde.
+Ne pas afficher une ligne intermédiaire « Frais collecte net » dans ce cas.
+
+**Why:** le bon de réception est la source contractuelle des informations de
+transport et le bordereau validé par l'utilisateur doit présenter ces frais
+bruts de façon directement vérifiable.
+
+**How to apply:** toute évolution du PDF de session avec `bonReceptionId` doit
+préserver ces champs et ce libellé de synthèse pour les membres dont la
+catégorie est « délégué de localités ».

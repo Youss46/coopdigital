@@ -4302,8 +4302,9 @@ export async function generateBordereauAchatSession(
   fieldRow("Délégué",       `${deleguePrenoms} ${delegueNom}`.trim());
   fieldRow("Téléphone",     delegueTel);
   fieldRow("Section",       delegueZone);
-  // Camion & chauffeur : uniquement pour les sessions avec transfert (délégués terrain)
-  if (!estDelegueMembre) {
+  // Les bons de réception des membres délégués portent également le camion
+  // et le chauffeur : les afficher comme sur le bordereau de référence.
+  if (!estDelegueMembre || session.bonReceptionId) {
     fieldRow("N° Camion",     immatriculation);
     fieldRow("Nom Chauffeur", nomChauffeur);
   }
@@ -4374,7 +4375,12 @@ export async function generateBordereauAchatSession(
     ...(autresChargesFcfa > 0
       ? [{ label: "AUTRES\nCHARGES", valeur: autresChargesFcfa }]
       : []),
-    { label: "FRAIS COLLECTE\nNET", valeur: fraisCollecteNet, net: true },
+    // Pour un membre délégué issu d'un bon de réception, le bordereau de
+    // référence affiche les frais bruts et le carburant, sans ligne
+    // intermédiaire « frais collecte net ».
+    ...(!estDelegueMembre
+      ? [{ label: "FRAIS COLLECTE\nNET", valeur: fraisCollecteNet, net: true }]
+      : []),
     { label: "RETENUE\nAVANCE",     valeur: retenueAvancesFcfa },
     { label: "SOLDE SUR\nAVANCES",  valeur: soldeAvancesFcfa },
   ];
