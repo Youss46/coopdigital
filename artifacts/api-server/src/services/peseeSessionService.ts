@@ -824,12 +824,20 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
                   : String(updated.dateFin).split("T")[0]!)
               : new Date().toISOString().split("T")[0]!;
 
+            // Poids brut = somme des poidsBrutKg des lignes (avant déduction tare)
+            const [lignesBrut] = await db
+              .select({ total: sql<number>`coalesce(sum(${lignesPeseeTable.poidsBrutKg}::numeric), 0)::float` })
+              .from(lignesPeseeTable)
+              .where(eq(lignesPeseeTable.sessionId, sessionId));
+            const poidsBrutKg = (lignesBrut?.total ?? 0) > 0 ? lignesBrut!.total : null;
+
             const [livraison] = await db
               .insert(livraisonsTable)
               .values({
                 membreId:            detail.membreId,
                 campagneId,
                 poidsKg:             String(poidsKg),
+                produitBrutKg:       poidsBrutKg != null ? String(poidsBrutKg) : undefined,
                 prixUnitaireFcfa:    prixBordChampFcfa,
                 montantBrutFcfa:     montantBrut,
                 avanceDeduiteFcfa:   avanceDeduiteFcfa,
@@ -1145,6 +1153,13 @@ export async function creerLivraisonDepuisSession(
     const poidsKg = parseFloat(String(session.poidsTotalKg ?? 0));
     if (poidsKg <= 0) throw new Error("Le poids total de la session est invalide (0 kg)");
 
+    // Poids brut = somme des poidsBrutKg des lignes (avant déduction tare)
+    const [lignesBrut] = await tx
+      .select({ total: sql<number>`coalesce(sum(${lignesPeseeTable.poidsBrutKg}::numeric), 0)::float` })
+      .from(lignesPeseeTable)
+      .where(eq(lignesPeseeTable.sessionId, sessionId));
+    const poidsBrutKgSession = (lignesBrut?.total ?? 0) > 0 ? lignesBrut!.total : null;
+
     const montantBrut = Math.round(poidsKg * prixBordChampFcfa);
     const dateStr = session.dateFin
       ? (typeof session.dateFin === "string" ? session.dateFin : (session.dateFin as Date).toISOString().split("T")[0]!)
@@ -1181,21 +1196,22 @@ export async function creerLivraisonDepuisSession(
     const [livraison] = await tx
       .insert(livraisonsTable)
       .values({
-        membreId:      isFournisseur ? null : session.membreId,
-        fournisseurId: isFournisseur ? session.fournisseurId : null,
+        membreId:           isFournisseur ? null : session.membreId,
+        fournisseurId:      isFournisseur ? session.fournisseurId : null,
         campagneId,
-        poidsKg: String(poidsKg),
-        prixUnitaireFcfa: prixBordChampFcfa,
-        montantBrutFcfa: montantBrut,
-        avanceDeduiteFcfa: avanceDeduite,
+        poidsKg:            String(poidsKg),
+        produitBrutKg:      poidsBrutKgSession != null ? String(poidsBrutKgSession) : undefined,
+        prixUnitaireFcfa:   prixBordChampFcfa,
+        montantBrutFcfa:    montantBrut,
+        avanceDeduiteFcfa:  avanceDeduite,
         intrantsDeduitsFcfa: intrantsDeduits,
-        montantNetFcfa: montantNet,
-        retenueKg: "0",
-        nombreSacs: session.nbSacsTotal ?? null,
-        produit: session.produit ?? "cacao",
-        dateLivraison: dateStr,
-        agentId: data.agentId ?? null,
-        peseurId: data.peseurId ?? null,
+        montantNetFcfa:     montantNet,
+        retenueKg:          "0",
+        nombreSacs:         session.nbSacsTotal ?? null,
+        produit:            session.produit ?? "cacao",
+        dateLivraison:      dateStr,
+        agentId:            data.agentId ?? null,
+        peseurId:           data.peseurId ?? null,
       })
       .returning();
 
