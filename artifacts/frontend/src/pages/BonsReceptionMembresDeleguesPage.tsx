@@ -7,9 +7,9 @@
  * Il est ensuite traité par le peseur depuis son app terrain.
  */
 import { useState, useEffect } from "react";
-import { useSearch } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Package, Truck, Plus, X, CheckCircle2, Clock, Scale, RefreshCw, AlertCircle, ChevronRight } from "lucide-react";
+import { ArrowLeft, Package, Truck, Plus, X, CheckCircle2, Clock, Scale, RefreshCw, AlertCircle, ChevronRight } from "lucide-react";
 import {
   getGetChauffeursQueryKey,
   getGetVehiculesQueryKey,
@@ -106,6 +106,7 @@ const FORM_INIT = {
 
 export default function BonsReceptionMembresDeleguesPage() {
   const qc = useQueryClient();
+  const [, navigate] = useLocation();
   const search = useSearch();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(FORM_INIT);
@@ -201,6 +202,20 @@ export default function BonsReceptionMembresDeleguesPage() {
 
   return (
     <div style={{ padding: "24px", maxWidth: 900, margin: "0 auto" }}>
+      <button
+        type="button"
+        onClick={() => navigate("/dashboard")}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 7,
+          marginBottom: 16, padding: "8px 12px", borderRadius: 9,
+          border: "1px solid #d1d5db", background: "#fff", color: "#374151",
+          fontSize: ".8rem", fontWeight: 700, cursor: "pointer",
+        }}
+      >
+        <ArrowLeft size={15} />
+        Retour à l’accueil
+      </button>
+
       {/* ── En-tête ─────────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
