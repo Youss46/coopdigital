@@ -54,7 +54,7 @@ export async function listExportateurs(req: Request, res: Response): Promise<voi
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Erreur listExportateurs");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -80,7 +80,7 @@ export async function createExportateur(req: Request, res: Response): Promise<vo
     res.status(201).json({ ...exp, soldeTotalDuFcfa: 0 });
   } catch (err) {
     req.log.error({ err }, "Erreur createExportateur");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -130,7 +130,7 @@ export async function getExportateurById(req: Request, res: Response): Promise<v
     res.json({ exportateur: exp, ventes, soldeTotalDuFcfa: exp.soldeTotalDuFcfa });
   } catch (err) {
     req.log.error({ err }, "Erreur getExportateurById");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -162,7 +162,7 @@ export async function listVentes(req: Request, res: Response): Promise<void> {
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Erreur listVentes");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -238,7 +238,7 @@ export async function createVente(req: Request, res: Response): Promise<void> {
     res.status(201).json(detail);
   } catch (err) {
     req.log.error({ err }, "Erreur createVente");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -310,7 +310,7 @@ export async function encaisserVente(req: Request, res: Response): Promise<void>
     res.json(detail);
   } catch (err) {
     req.log.error({ err }, "Erreur encaisserVente");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -352,7 +352,7 @@ export async function getCreances(req: Request, res: Response): Promise<void> {
     res.json({ totalDuFcfa, enRetardFcfa, aEchoirSemaineFcfa, ventes });
   } catch (err) {
     req.log.error({ err }, "Erreur getCreances");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -472,6 +472,6 @@ export async function signalerRefus(req: Request, res: Response): Promise<void> 
     res.status(201).json({ refus, vente: null });
   } catch (err) {
     req.log.error({ err }, "Erreur signalerRefus");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

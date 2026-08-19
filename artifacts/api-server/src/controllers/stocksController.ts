@@ -78,7 +78,7 @@ export async function getEntrepots(req: Request, res: Response): Promise<void> {
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur getEntrepots");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -174,7 +174,7 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
     res.json(rows.rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getMouvements");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -214,7 +214,7 @@ export async function getTonnageCertification(req: Request, res: Response): Prom
     res.json(rows.rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getTonnageCertification");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -290,7 +290,7 @@ export async function entreeStock(req: Request, res: Response): Promise<void> {
     res.status(201).json(withNom);
   } catch (err) {
     req.log.error({ err }, "Erreur entreeStock");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -315,7 +315,7 @@ export async function updateEntrepot(req: Request, res: Response): Promise<void>
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur updateEntrepot");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -335,7 +335,7 @@ export async function deleteEntrepot(req: Request, res: Response): Promise<void>
     res.status(204).end();
   } catch (err) {
     req.log.error({ err }, "Erreur deleteEntrepot");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -443,7 +443,7 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
     res.status(201).json(withNom);
   } catch (err) {
     req.log.error({ err }, "Erreur sortieStock");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -485,7 +485,7 @@ export async function createEntrepot(req: Request, res: Response): Promise<void>
     res.status(201).json(entrepot);
   } catch (err) {
     req.log.error({ err }, "Erreur createEntrepot");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -531,7 +531,7 @@ export async function getAlertes(req: Request, res: Response): Promise<void> {
     res.json(alertes);
   } catch (err) {
     req.log.error({ err }, "Erreur getAlertes");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -565,6 +565,6 @@ export async function getLotissementStats(req: Request, res: Response): Promise<
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getLotissementStats");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

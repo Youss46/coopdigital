@@ -24,7 +24,7 @@ export async function handleProchainNumero(req: Request, res: Response): Promise
     res.json({ numero });
   } catch (err) {
     req.log.error({ err }, "handleProchainNumero");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -43,7 +43,7 @@ export async function handleListExpeditions(req: Request, res: Response): Promis
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "handleListExpeditions");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -55,7 +55,7 @@ export async function handleGetStats(req: Request, res: Response): Promise<void>
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "handleGetStats");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -69,7 +69,7 @@ export async function handleGetExpedition(req: Request, res: Response): Promise<
     res.json(exp);
   } catch (err) {
     req.log.error({ err }, "handleGetExpedition");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -124,7 +124,7 @@ export async function handleChangerStatut(req: Request, res: Response): Promise<
     res.json(result);
   } catch (err: unknown) {
     req.log.error({ err }, "handleChangerStatut");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }
@@ -139,7 +139,7 @@ export async function handleConfirmerReception(req: Request, res: Response): Pro
     res.json(result);
   } catch (err: unknown) {
     req.log.error({ err }, "handleConfirmerReception");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }
@@ -154,7 +154,7 @@ export async function handleGetLotsDisponibles(req: Request, res: Response): Pro
     res.json(lots);
   } catch (err) {
     req.log.error({ err }, "handleGetLotsDisponibles");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -168,7 +168,7 @@ export async function handleRattacherLot(req: Request, res: Response): Promise<v
     const row = await rattacherLot(expeditionId, lotId, cooperativeId);
     res.status(201).json(row);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }
@@ -181,7 +181,7 @@ export async function handleDetacherLot(req: Request, res: Response): Promise<vo
     await detacherLot(expeditionLotId, expeditionId);
     res.json({ ok: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }
@@ -194,7 +194,7 @@ export async function handleGetFlotteVehicules(req: Request, res: Response): Pro
     res.json(vehicules);
   } catch (err) {
     req.log.error({ err }, "handleGetFlotteVehicules");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -206,7 +206,7 @@ export async function handleGetFlotteChauffeurs(req: Request, res: Response): Pr
     res.json(chauffeurs);
   } catch (err) {
     req.log.error({ err }, "handleGetFlotteChauffeurs");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -219,7 +219,7 @@ export async function handleRapportEudr(req: Request, res: Response): Promise<vo
     res.json(rapport);
   } catch (err: unknown) {
     req.log.error({ err }, "handleRapportEudr");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }
@@ -239,7 +239,7 @@ export async function handleRapportEudrPdf(req: Request, res: Response): Promise
     res.end(pdfBuffer);
   } catch (err: unknown) {
     req.log.error({ err }, "handleRapportEudrPdf");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }
@@ -259,7 +259,7 @@ export async function handleBonLivraison(req: Request, res: Response): Promise<v
     res.end(pdfBuffer);
   } catch (err: unknown) {
     req.log.error({ err }, "handleBonLivraison");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }
@@ -279,7 +279,7 @@ export async function handleConstatReception(req: Request, res: Response): Promi
     res.end(pdfBuffer);
   } catch (err: unknown) {
     req.log.error({ err }, "handleConstatReception");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }

@@ -17,7 +17,7 @@ export async function getStats(req: Request, res: Response): Promise<void> {
     res.json(await statsGlobales(cooperativeId));
   } catch (err) {
     req.log.error({ err }, "Erreur getStats primes");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -31,7 +31,7 @@ export async function listRecept(req: Request, res: Response): Promise<void> {
     res.json(await listReceptions(cooperativeId, campagneId));
   } catch (err) {
     req.log.error({ err }, "Erreur listReceptions");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -43,7 +43,7 @@ export async function createRecept(req: Request, res: Response): Promise<void> {
     res.status(201).json(rec);
   } catch (err: unknown) {
     req.log.error({ err }, "Erreur createReception");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }
@@ -58,7 +58,7 @@ export async function getRecept(req: Request, res: Response): Promise<void> {
     res.json(rec);
   } catch (err) {
     req.log.error({ err }, "Erreur getReception");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -72,7 +72,7 @@ export async function listDist(req: Request, res: Response): Promise<void> {
     res.json(await listDistributions(cooperativeId, campagneId));
   } catch (err) {
     req.log.error({ err }, "Erreur listDistributions");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -84,7 +84,7 @@ export async function createDist(req: Request, res: Response): Promise<void> {
     res.status(201).json(dist);
   } catch (err: unknown) {
     req.log.error({ err }, "Erreur creerDistribution");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }
@@ -99,7 +99,7 @@ export async function getDist(req: Request, res: Response): Promise<void> {
     res.json(dist);
   } catch (err) {
     req.log.error({ err }, "Erreur getDistribution");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -112,7 +112,7 @@ export async function validerDist(req: Request, res: Response): Promise<void> {
     res.json(dist);
   } catch (err: unknown) {
     req.log.error({ err }, "Erreur validerDistribution");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }
@@ -126,7 +126,7 @@ export async function payerTous(req: Request, res: Response): Promise<void> {
     res.json({ ok: true });
   } catch (err: unknown) {
     req.log.error({ err }, "Erreur payerBulk");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }
@@ -142,7 +142,7 @@ export async function payerMembrePrime(req: Request, res: Response): Promise<voi
     res.json(pm);
   } catch (err: unknown) {
     req.log.error({ err }, "Erreur payerMembre prime");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }

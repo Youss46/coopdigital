@@ -69,7 +69,7 @@ export async function getBilan(req: Request, res: Response): Promise<void> {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getBilan");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -133,7 +133,7 @@ export async function getCompteResultat(req: Request, res: Response): Promise<vo
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getCompteResultat");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -183,7 +183,7 @@ export async function getFluxTresorerie(req: Request, res: Response): Promise<vo
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getFluxTresorerie");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -282,7 +282,7 @@ export async function getComparatifCampagnes(req: Request, res: Response): Promi
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getComparatifCampagnes");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -344,6 +344,6 @@ export async function getMargeCampagnes(req: Request, res: Response): Promise<vo
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getMargeCampagnes");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

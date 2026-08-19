@@ -26,7 +26,7 @@ export async function getNotifications(req: Request, res: Response): Promise<voi
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur getNotifications");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -39,7 +39,7 @@ export async function getNotificationsCount(req: Request, res: Response): Promis
     res.json(counts);
   } catch (err) {
     req.log.error({ err }, "Erreur getNotificationsCount");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -56,7 +56,7 @@ export async function marquerLue(req: Request, res: Response): Promise<void> {
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Erreur marquerLue");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -69,7 +69,7 @@ export async function marquerToutLu(req: Request, res: Response): Promise<void> 
     res.json({ marquees: nb });
   } catch (err) {
     req.log.error({ err }, "Erreur marquerToutLu");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -86,7 +86,7 @@ export async function supprimerNotification(req: Request, res: Response): Promis
     res.status(204).end();
   } catch (err) {
     req.log.error({ err }, "Erreur supprimerNotification");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -136,7 +136,7 @@ export async function getPreferences(req: Request, res: Response): Promise<void>
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getPreferences");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -184,6 +184,6 @@ export async function updatePreferences(req: Request, res: Response): Promise<vo
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur updatePreferences");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

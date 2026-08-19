@@ -19,7 +19,7 @@ export async function tableauBord(req: Request, res: Response) {
     return res.json(data);
   } catch (err) {
     req.log.error({ err }, "tableauBord investissements");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -35,7 +35,7 @@ export async function listeProjets(req: Request, res: Response) {
     return res.json(projets);
   } catch (err) {
     req.log.error({ err }, "listeProjets");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -51,7 +51,7 @@ export async function detailProjet(req: Request, res: Response) {
     return res.json(projet);
   } catch (err) {
     req.log.error({ err }, "detailProjet");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -89,7 +89,7 @@ export async function creerProjet(req: Request, res: Response) {
     return res.status(201).json(projet);
   } catch (err) {
     req.log.error({ err }, "creerProjet");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -123,7 +123,7 @@ export async function modifierProjet(req: Request, res: Response) {
     return res.json(updated);
   } catch (err) {
     req.log.error({ err }, "modifierProjet");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -139,7 +139,7 @@ export async function supprimerProjet(req: Request, res: Response) {
     return res.status(204).end();
   } catch (err) {
     req.log.error({ err }, "supprimerProjet");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -173,10 +173,10 @@ export async function ajouterDepenseCtrl(req: Request, res: Response) {
     return res.status(201).json(depense);
   } catch (err: unknown) {
     req.log.error({ err }, "ajouterDepense");
-    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    const msg = apiError(err);
     if (msg.includes("Projet introuvable") || msg.includes("Impossible")) {
       return res.status(400).json({ error: msg });
     }
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }

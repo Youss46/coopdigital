@@ -122,7 +122,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboard");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -159,7 +159,7 @@ export async function getDashboardLivraisons(req: Request, res: Response): Promi
     res.json(livraisons);
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboardLivraisons");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -197,7 +197,7 @@ export async function getDashboardAvancesRetard(req: Request, res: Response): Pr
     res.json(avances);
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboardAvancesRetard");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -292,7 +292,7 @@ export async function getDashboardTracabilite(req: Request, res: Response): Prom
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboardTracabilite");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -457,7 +457,7 @@ export async function getDashboardDelegue(req: Request, res: Response): Promise<
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboardDelegue");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -564,7 +564,7 @@ export async function getDeleguesPeseursCollectes(req: Request, res: Response): 
     res.json({ peseurs, collectes, stats });
   } catch (err) {
     req.log.error({ err }, "Erreur getDeleguesPeseursCollectes");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -648,6 +648,6 @@ export async function getDashboardTonnageCertif(req: Request, res: Response): Pr
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboardTonnageCertif");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

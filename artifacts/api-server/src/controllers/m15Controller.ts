@@ -50,7 +50,7 @@ export async function loginM15Handler(req: Request, res: Response): Promise<void
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur login M15");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -62,7 +62,7 @@ export async function getDashboardHandler(req: Request, res: Response): Promise<
     res.json(data);
   } catch (err) {
     req.log.error({ err }, "Erreur dashboard M15");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -74,7 +74,7 @@ export async function getCooperativesHandler(req: Request, res: Response): Promi
     res.json(data);
   } catch (err) {
     req.log.error({ err }, "Erreur liste coops M15");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -132,7 +132,7 @@ export async function getCooperativeHandler(req: Request, res: Response): Promis
     res.json(data);
   } catch (err) {
     req.log.error({ err }, "Erreur détail coop M15");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -148,7 +148,7 @@ export async function getPlansHandler(req: Request, res: Response): Promise<void
     res.json(plans);
   } catch (err) {
     req.log.error({ err }, "Erreur plans M15");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -182,7 +182,7 @@ export async function updatePlanHandler(req: Request, res: Response): Promise<vo
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur mise à jour plan M15");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -228,7 +228,7 @@ export async function genererLicenceHandler(req: Request, res: Response): Promis
     res.status(201).json({ licence, cleLicence, dateExpiration: dateExpiration ?? null });
   } catch (err) {
     req.log.error({ err }, "Erreur génération licence M15");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -279,7 +279,7 @@ export async function toggleRenouvellementAutoHandler(req: Request, res: Respons
     res.json({ message: activer ? "Renouvellement automatique activé" : "Renouvellement automatique désactivé" });
   } catch (err) {
     req.log.error({ err }, "Erreur toggle renouvellement auto");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -362,6 +362,6 @@ export async function getHistoriqueLicenceHandler(req: Request, res: Response): 
     res.json(historique);
   } catch (err) {
     req.log.error({ err }, "Erreur historique licence M15");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

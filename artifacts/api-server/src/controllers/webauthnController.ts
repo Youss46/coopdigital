@@ -150,7 +150,7 @@ export async function getAuthenticationOptions(req: Request, res: Response): Pro
     res.json(options);
   } catch (err) {
     req.log.error({ err }, "Erreur génération options WebAuthn (connexion)");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 

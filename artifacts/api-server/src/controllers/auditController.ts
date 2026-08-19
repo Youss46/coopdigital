@@ -27,7 +27,7 @@ export async function getJournal(req: Request, res: Response): Promise<void> {
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur getJournal");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -41,7 +41,7 @@ export async function getEntiteHistorique(req: Request, res: Response): Promise<
     res.json({ entries });
   } catch (err) {
     req.log.error({ err }, "Erreur getEntiteHistorique");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -55,7 +55,7 @@ export async function getUserActions(req: Request, res: Response): Promise<void>
     res.json({ entries });
   } catch (err) {
     req.log.error({ err }, "Erreur getUserActions");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -68,7 +68,7 @@ export async function getSessions(req: Request, res: Response): Promise<void> {
     res.json({ sessions });
   } catch (err) {
     req.log.error({ err }, "Erreur getSessions");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -80,7 +80,7 @@ export async function getStats(req: Request, res: Response): Promise<void> {
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "Erreur getStats");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -142,6 +142,6 @@ export async function getModifications(req: Request, res: Response): Promise<voi
     res.json({ modifications });
   } catch (err) {
     req.log.error({ err }, "Erreur getModifications");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

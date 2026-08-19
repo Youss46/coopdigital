@@ -88,7 +88,7 @@ export async function envoyerMessage(req: Request, res: Response): Promise<void>
     res.status(201).json({ id: msg!.id, nbDestinataires: userIds.length });
   } catch (err) {
     req.log.error({ err }, "Erreur envoyerMessage");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -118,7 +118,7 @@ export async function getMessagesEnvoyes(req: Request, res: Response): Promise<v
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getMessagesEnvoyes");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -166,7 +166,7 @@ export async function getMessagesRecus(req: Request, res: Response): Promise<voi
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getMessagesRecus");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -187,7 +187,7 @@ export async function marquerLu(req: Request, res: Response): Promise<void> {
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Erreur marquerLu");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -227,6 +227,6 @@ export async function getNonLus(req: Request, res: Response): Promise<void> {
     res.json({ count: row?.count ?? 0 });
   } catch (err) {
     req.log.error({ err }, "Erreur getNonLus");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

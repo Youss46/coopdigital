@@ -27,7 +27,7 @@ export async function loginTerrainHandler(req: Request, res: Response): Promise<
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur login terrain");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -39,7 +39,7 @@ export async function getProfilHandler(req: Request, res: Response): Promise<voi
     res.json(profil);
   } catch (err) {
     req.log.error({ err }, "Erreur profil terrain");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -51,7 +51,7 @@ export async function getPrixHandler(req: Request, res: Response): Promise<void>
     res.json(prix);
   } catch (err) {
     req.log.error({ err }, "Erreur prix terrain");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -78,7 +78,7 @@ export async function getFournisseursHandler(req: Request, res: Response): Promi
     res.json(fournisseurs);
   } catch (err) {
     req.log.error({ err }, "Erreur fournisseurs terrain");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -93,7 +93,7 @@ export async function getFournisseurRecapHandler(req: Request, res: Response): P
     res.json(recap);
   } catch (err) {
     req.log.error({ err }, "Erreur recap fournisseur");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -105,7 +105,7 @@ export async function getDeleguesCentrauxHandler(req: Request, res: Response): P
     res.json(delegues);
   } catch (err) {
     req.log.error({ err }, "Erreur liste délégués centraux");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -239,7 +239,7 @@ export async function getBilanJourHandler(req: Request, res: Response): Promise<
     res.json(bilan);
   } catch (err) {
     req.log.error({ err }, "Erreur bilan jour terrain");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -278,7 +278,7 @@ export async function postSyncHandler(req: Request, res: Response): Promise<void
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur sync terrain");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -320,7 +320,7 @@ export async function getPeseurCollectesHandler(req: Request, res: Response): Pr
     res.json(collectes);
   } catch (err) {
     req.log.error({ err }, "Erreur historique collectes peseur");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -332,7 +332,7 @@ export async function postRapportHandler(req: Request, res: Response): Promise<v
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "Erreur rapport terrain");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 

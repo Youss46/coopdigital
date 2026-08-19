@@ -35,7 +35,7 @@ export async function getAnomaliesIA(req: Request, res: Response): Promise<void>
     const nbNouvelles = rows.rows.filter(r => r.statut === "nouvelle").length;
     res.json({ anomalies: rows.rows, nbNouvelles });
   } catch (err) {
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -55,7 +55,7 @@ export async function marquerLue(req: Request, res: Response): Promise<void> {
       ));
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -74,6 +74,6 @@ export async function marquerToutesLues(req: Request, res: Response): Promise<vo
       ));
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

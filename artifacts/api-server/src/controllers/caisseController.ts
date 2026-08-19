@@ -36,7 +36,7 @@ export async function getCaisses(req: Request, res: Response): Promise<void> {
     res.json(caisses);
   } catch (err) {
     req.log.error({ err }, "getCaisses");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -49,7 +49,7 @@ export async function postCaisse(req: Request, res: Response): Promise<void> {
     };
     if (!nom) { res.status(400).json({ error: "nom requis" }); return; }
     res.status(201).json(await svc.creerCaisse({ nom, typeCaisse, responsableId, soldeinitial, fondMinimum }, cooperativeId));
-  } catch (err) { req.log.error({ err }, "postCaisse"); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (err) { req.log.error({ err }, "postCaisse"); res.status(500).json({ erreur: apiError(err) }); }
 }
 
 export async function putCaisse(req: Request, res: Response): Promise<void> {
@@ -60,7 +60,7 @@ export async function putCaisse(req: Request, res: Response): Promise<void> {
     const row = await svc.updateCaisse(id, req.body, cooperativeId);
     if (!row) { res.status(404).json({ error: "Caisse introuvable" }); return; }
     res.json(row);
-  } catch (err) { req.log.error({ err }, "putCaisse"); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (err) { req.log.error({ err }, "putCaisse"); res.status(500).json({ erreur: apiError(err) }); }
 }
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export async function getSessionActive(req: Request, res: Response): Promise<voi
     const id = parseInt(String(req.params["id"]), 10);
     const session = await svc.getSessionActive(id);
     res.json(session ?? null);
-  } catch (err) { req.log.error({ err }, "getSessionActive"); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (err) { req.log.error({ err }, "getSessionActive"); res.status(500).json({ erreur: apiError(err) }); }
 }
 
 export async function postOuvrir(req: Request, res: Response): Promise<void> {
@@ -80,7 +80,7 @@ export async function postOuvrir(req: Request, res: Response): Promise<void> {
     const session = await svc.ouvrirSession(id, userId);
     res.status(201).json(session);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    const msg = apiError(err);
     req.log.error({ err }, "postOuvrir");
     res.status(400).json({ error: msg });
   }
@@ -102,7 +102,7 @@ export async function postMouvement(req: Request, res: Response): Promise<void> 
     const result = await svc.enregistrerMouvement(id, { type, motif, montantFcfa, libelle, referenceOperation, userId });
     res.status(201).json(result);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    const msg = apiError(err);
     req.log.error({ err }, "postMouvement");
     res.status(400).json({ error: msg });
   }
@@ -120,7 +120,7 @@ export async function putFermer(req: Request, res: Response): Promise<void> {
     }
     res.json(await svc.fermerSession(id, Math.round(soldeReel), userId, observations));
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    const msg = apiError(err);
     req.log.error({ err }, "putFermer");
     res.status(400).json({ error: msg });
   }
@@ -143,7 +143,7 @@ export async function postTransfert(req: Request, res: Response): Promise<void> 
     const result = await svc.transfererFonds(sourceCaisseId, destCaisseId, montantFcfa, libelle, userId, cooperativeId);
     res.status(201).json(result);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    const msg = apiError(err);
     req.log.error({ err }, "postTransfert");
     res.status(400).json({ error: msg });
   }
@@ -156,7 +156,7 @@ export async function getJournal(req: Request, res: Response): Promise<void> {
     const id = parseInt(String(req.params["id"]), 10);
     const { date_debut, date_fin } = req.query as Record<string, string | undefined>;
     res.json(await svc.getJournal(id, { dateDebut: date_debut, dateFin: date_fin }));
-  } catch (err) { req.log.error({ err }, "getJournal"); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (err) { req.log.error({ err }, "getJournal"); res.status(500).json({ erreur: apiError(err) }); }
 }
 
 // ─── Rapport PDF ──────────────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ export async function getRapportPdf(req: Request, res: Response): Promise<void> 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="rapport-caisse-${date}.pdf"`);
     res.send(buffer);
-  } catch (err) { req.log.error({ err }, "getRapportPdf"); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (err) { req.log.error({ err }, "getRapportPdf"); res.status(500).json({ erreur: apiError(err) }); }
 }
 
 // ─── Soldes & Alertes ─────────────────────────────────────────────────────────
@@ -178,14 +178,14 @@ export async function getSoldes(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   try { res.json(await svc.getSoldes(cooperativeId)); }
-  catch (err) { req.log.error({ err }, "getSoldes"); res.status(500).json({ error: "Erreur serveur" }); }
+  catch (err) { req.log.error({ err }, "getSoldes"); res.status(500).json({ erreur: apiError(err) }); }
 }
 
 export async function getAlertes(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   try { res.json(await svc.getAlertes(cooperativeId)); }
-  catch (err) { req.log.error({ err }, "getAlertes"); res.status(500).json({ error: "Erreur serveur" }); }
+  catch (err) { req.log.error({ err }, "getAlertes"); res.status(500).json({ erreur: apiError(err) }); }
 }
 
 // ─── Comptes bancaires disponibles ───────────────────────────────────────────
@@ -194,7 +194,7 @@ export async function getComptesBancaires(req: Request, res: Response): Promise<
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
   try { res.json(await svc.getComptesBancairesCoop(cooperativeId)); }
-  catch (err) { req.log.error({ err }, "getComptesBancairesCaisse"); res.status(500).json({ error: "Erreur serveur" }); }
+  catch (err) { req.log.error({ err }, "getComptesBancairesCaisse"); res.status(500).json({ erreur: apiError(err) }); }
 }
 
 // ─── Virement Caisse → Banque ─────────────────────────────────────────────────
@@ -217,7 +217,7 @@ export async function postVirementBanque(req: Request, res: Response): Promise<v
     });
     res.status(201).json(result);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    const msg = apiError(err);
     req.log.error({ err }, "postVirementBanqueCaisse");
     res.status(400).json({ error: msg });
   }
@@ -230,7 +230,7 @@ export async function getSessions(req: Request, res: Response): Promise<void> {
     const id = parseInt(String(req.params["id"]), 10);
     const { date_debut, date_fin } = req.query as Record<string, string | undefined>;
     res.json(await svc.listSessions(id, { dateDebut: date_debut, dateFin: date_fin }));
-  } catch (err) { req.log.error({ err }, "getSessions caisse"); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (err) { req.log.error({ err }, "getSessions caisse"); res.status(500).json({ erreur: apiError(err) }); }
 }
 
 // ─── Transfert vers banque (dépôt) ────────────────────────────────────────────
@@ -243,7 +243,7 @@ export async function postTransfertBanque(req: Request, res: Response): Promise<
     if (!montant) { res.status(400).json({ error: "montant requis" }); return; }
     res.json(await svc.transfertVersBanque(id, Math.round(montant), userId, libelle));
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    const msg = apiError(err);
     req.log.error({ err }, "postTransfertBanque");
     res.status(400).json({ error: msg });
   }

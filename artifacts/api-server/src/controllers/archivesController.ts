@@ -23,7 +23,7 @@ export async function handleListArchives(req: Request, res: Response): Promise<v
     res.json(await getArchivesCampagnes(cid));
   } catch (err) {
     req.log.error({ err }, "handleListArchives");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -36,7 +36,7 @@ export async function handleGetArchive(req: Request, res: Response): Promise<voi
     res.json(await getArchiveCampagne(cid, campagneId));
   } catch (err) {
     req.log.error({ err }, "handleGetArchive");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(404).json({ erreur: msg });
   }
 }
@@ -55,7 +55,7 @@ export async function handleArchiveLivraisons(req: Request, res: Response): Prom
     }));
   } catch (err) {
     req.log.error({ err }, "handleArchiveLivraisons");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -74,7 +74,7 @@ export async function handleArchiveMembres(req: Request, res: Response): Promise
     }));
   } catch (err) {
     req.log.error({ err }, "handleArchiveMembres");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -87,7 +87,7 @@ export async function handleComparerCampagnes(req: Request, res: Response): Prom
     res.json(await comparerCampagnes(cid, ids));
   } catch (err) {
     req.log.error({ err }, "handleComparerCampagnes");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -100,7 +100,7 @@ export async function handleVerifierIntegrite(req: Request, res: Response): Prom
     res.json(await verifierIntegrite(cid, campagneId));
   } catch (err) {
     req.log.error({ err }, "handleVerifierIntegrite");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(404).json({ erreur: msg });
   }
 }
@@ -116,7 +116,7 @@ export async function handleArchiverCampagne(req: Request, res: Response): Promi
     res.json({ ok: true, message: "Campagne archivée avec succès" });
   } catch (err) {
     req.log.error({ err }, "handleArchiverCampagne");
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }

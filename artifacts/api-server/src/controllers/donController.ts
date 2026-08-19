@@ -23,7 +23,7 @@ export async function getStatsDonsHandler(req: Request, res: Response): Promise<
     const stats = await donService.getStatsDons(cooperativeId, campagneId);
     res.json(stats);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(500).json({ erreur: `Impossible de charger les statistiques : ${msg}` });
   }
 }

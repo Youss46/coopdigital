@@ -90,7 +90,7 @@ export async function handleQrTokenBonStation(
     res.json({ payload, sig, spki: PUBLIC_KEY_SPKI_B64 });
   } catch (err) {
     req.log.error({ err }, "Erreur qrTokenBonStation");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -128,7 +128,7 @@ export async function handleVerifierBonStation(
     });
   } catch (err) {
     req.log.error({ err }, "Erreur verifierBonStation");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -283,6 +283,6 @@ export async function handleLivrerBonStation(
     res.json({ success: true, statut: "utilise", numero: row.bon.numero });
   } catch (err) {
     req.log.error({ err }, "Erreur livrerBonStation");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

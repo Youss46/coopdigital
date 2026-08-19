@@ -11,7 +11,7 @@ export async function getZones(req: Request, res: Response): Promise<void> {
     res.json(zones);
   } catch (err) {
     req.log.error({ err }, "getZones");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -31,7 +31,7 @@ export async function postZone(req: Request, res: Response): Promise<void> {
     res.status(201).json(zone);
   } catch (err) {
     req.log.error({ err }, "postZone");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -45,7 +45,7 @@ export async function putZone(req: Request, res: Response): Promise<void> {
     res.json(zone);
   } catch (err) {
     req.log.error({ err }, "putZone");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -58,7 +58,7 @@ export async function deleteZone(req: Request, res: Response): Promise<void> {
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "deleteZone");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -78,7 +78,7 @@ export async function getPlannings(req: Request, res: Response): Promise<void> {
     res.json(plannings);
   } catch (err) {
     req.log.error({ err }, "getPlannings");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -90,7 +90,7 @@ export async function getPlanningsSemaine(req: Request, res: Response): Promise<
     res.json(plannings);
   } catch (err) {
     req.log.error({ err }, "getPlanningsSemaine");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -118,7 +118,7 @@ export async function postPlanning(req: Request, res: Response): Promise<void> {
     res.status(201).json(planning);
   } catch (err) {
     req.log.error({ err }, "postPlanning");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -132,7 +132,7 @@ export async function putPlanning(req: Request, res: Response): Promise<void> {
     res.json(planning);
   } catch (err) {
     req.log.error({ err }, "putPlanning");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -146,7 +146,7 @@ export async function demarrerPlanning(req: Request, res: Response): Promise<voi
     res.json(planning);
   } catch (err) {
     req.log.error({ err }, "demarrerPlanning");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -159,7 +159,7 @@ export async function terminerPlanning(req: Request, res: Response): Promise<voi
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "terminerPlanning");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -173,7 +173,7 @@ export async function annulerPlanning(req: Request, res: Response): Promise<void
     res.json(planning);
   } catch (err) {
     req.log.error({ err }, "annulerPlanning");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -186,7 +186,7 @@ export async function notifierMembres(req: Request, res: Response): Promise<void
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "notifierMembres");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -200,7 +200,7 @@ export async function getRapportPlanning(req: Request, res: Response): Promise<v
     res.json(rapport);
   } catch (err) {
     req.log.error({ err }, "getRapportPlanning");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -212,7 +212,7 @@ export async function getStatsPlannings(req: Request, res: Response): Promise<vo
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "getStatsPlannings");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -224,6 +224,6 @@ export async function getStatsZones(req: Request, res: Response): Promise<void> 
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "getStatsZones");
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

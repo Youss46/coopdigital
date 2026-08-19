@@ -368,7 +368,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     res.json(paiements);
   } catch (err) {
     req.log.error({ err }, "Erreur listPaiements");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -465,7 +465,7 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
     });
   } catch (err) {
     req.log.error({ err }, "Erreur statsPaiements");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -763,7 +763,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur validerPaiement");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -852,6 +852,6 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Erreur rejeterPaiement");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

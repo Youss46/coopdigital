@@ -15,7 +15,7 @@ export async function listDeleguesEntrepotsHandler(req: Request, res: Response):
     res.json(await svc.listDeleguesCooperative(coop));
   } catch (err) {
     req.log.error({ err }, "listDeleguesCooperative");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -28,7 +28,7 @@ export async function getStatsHandler(req: Request, res: Response): Promise<void
     res.json(await svc.getStatsConsolideesDirection(coop));
   } catch (err) {
     req.log.error({ err }, "getStats entrepôts");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -39,7 +39,7 @@ export async function listEntrepotsHandler(req: Request, res: Response): Promise
     res.json(await svc.listEntrepots(coop));
   } catch (err) {
     req.log.error({ err }, "listEntrepots");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -139,7 +139,7 @@ export async function listTransfertsHandler(req: Request, res: Response): Promis
     res.json(await svc.listTransferts(coop, { statut, limit: 100 }));
   } catch (err) {
     req.log.error({ err }, "listTransferts");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -265,7 +265,7 @@ export async function listTransfertsEnAttentePeseeHandler(req: Request, res: Res
     res.json(transferts);
   } catch (err) {
     req.log.error({ err }, "listTransfertsEnAttentePesee");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -281,7 +281,7 @@ export async function getMonEntrepotHandler(req: Request, res: Response): Promis
     res.json({ ...entrepot, stockActuelSacs });
   } catch (err) {
     req.log.error({ err }, "getMonEntrepot");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -294,7 +294,7 @@ export async function getMesMouvementsHandler(req: Request, res: Response): Prom
     res.json(await svc.getMouvementsDelegue(agent.id, agent.cooperativeId, { limit, offset }));
   } catch (err) {
     req.log.error({ err }, "getMesMouvements");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -305,7 +305,7 @@ export async function getMesTransfertsHandler(req: Request, res: Response): Prom
     res.json(await svc.listTransfertsDelegue(agent.id, agent.cooperativeId));
   } catch (err) {
     req.log.error({ err }, "getMesTransferts");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 

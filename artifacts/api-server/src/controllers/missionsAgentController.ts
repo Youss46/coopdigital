@@ -18,7 +18,7 @@ export async function getMissionsHandler(req: Request, res: Response): Promise<v
     res.json(missions);
   } catch (err) {
     req.log.error({ err }, "Erreur getMissionsAgent");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -33,7 +33,7 @@ export async function getMissionDetailHandler(req: Request, res: Response): Prom
     res.json(detail);
   } catch (err) {
     req.log.error({ err }, "Erreur getMissionDetail");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -114,7 +114,7 @@ export async function sendMessageHandler(req: Request, res: Response): Promise<v
     res.status(201).json(msg);
   } catch (err) {
     req.log.error({ err }, "Erreur sendMessage");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -126,7 +126,7 @@ export async function getStatsAgentHandler(req: Request, res: Response): Promise
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "Erreur getStatsAgent");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -139,6 +139,6 @@ export async function getHistoriqueAgentHandler(req: Request, res: Response): Pr
     res.json(historique);
   } catch (err) {
     req.log.error({ err }, "Erreur getHistoriqueAgent");
-    res.status(500).json({ erreur: "Erreur interne" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }

@@ -270,7 +270,7 @@ export async function getConstatRefoulementPdf(req: Request, res: Response) {
     });
     res.end(pdfBuffer);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Erreur interne";
+    const msg = apiError(err);
     res.status(400).json({ erreur: msg });
   }
 }

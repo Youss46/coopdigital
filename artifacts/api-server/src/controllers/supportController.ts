@@ -58,7 +58,7 @@ export async function creerTicketHandler(req: Request, res: Response) {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "creerTicket");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -73,7 +73,7 @@ export async function mesTicketsHandler(req: Request, res: Response) {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "mesTickets");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -94,7 +94,7 @@ export async function detailTicketHandler(req: Request, res: Response) {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "detailTicket");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -120,9 +120,9 @@ export async function ajouterMessageHandler(req: Request, res: Response) {
     return res.status(201).json(msg);
   } catch (err: unknown) {
     req.log.error({ err }, "ajouterMessage");
-    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    const msg = apiError(err);
     if (msg.includes("Ticket") || msg.includes("fermé")) return res.status(400).json({ error: msg });
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -143,7 +143,7 @@ export async function fermerTicketHandler(req: Request, res: Response) {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "fermerTicket");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -159,7 +159,7 @@ export async function tousLesTicketsM15Handler(req: Request, res: Response) {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "tousLesTicketsM15");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -174,7 +174,7 @@ export async function detailTicketM15Handler(req: Request, res: Response) {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "detailTicketM15");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -198,9 +198,9 @@ export async function repondreM15Handler(req: Request, res: Response) {
     return res.status(201).json(msg);
   } catch (err: unknown) {
     req.log.error({ err }, "repondreM15");
-    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    const msg = apiError(err);
     if (msg.includes("Ticket") || msg.includes("fermé")) return res.status(400).json({ error: msg });
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -216,7 +216,7 @@ export async function prendreEnChargeHandler(req: Request, res: Response) {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "prendreEnCharge");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -231,6 +231,6 @@ export async function marquerResoluHandler(req: Request, res: Response) {
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "marquerResolu");
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ erreur: apiError(err) });
   }
 }
