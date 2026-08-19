@@ -379,7 +379,7 @@ export default function SessionsPeseePage() {
   const nbStale    = sessions.filter((s) => s.statut === "en_cours" && isStale(s.dateDebut)).length;
 
   return (
-    <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto" }}>
+    <div className="sessions-pesee-page" style={{ padding: "24px", maxWidth: 1100, margin: "0 auto" }}>
       {/* En-tête */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
@@ -509,92 +509,101 @@ export default function SessionsPeseePage() {
         </div>
       ) : (
         <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
-          {/* Header */}
-          <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 110px 90px 80px 100px 40px", padding: "10px 16px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-            {["N° Session", "Membre", "Date début", "Passages", "Sacs", "Poids net", ""].map((h) => (
-              <div key={h} style={{ fontSize: ".7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".05em" }}>{h}</div>
-            ))}
-          </div>
-
-          {filtered.map((s, idx) => {
-            const stale = s.statut === "en_cours" && isStale(s.dateDebut);
-            return (
-              <div
-                key={s.id}
-                onClick={() => setSelectedId(s.id)}
-                style={{
-                  display: "grid", gridTemplateColumns: "160px 1fr 110px 90px 80px 100px 40px",
-                  padding: "12px 16px", cursor: "pointer", alignItems: "center",
-                  borderTop: idx === 0 ? "none" : "1px solid #f1f5f9",
-                  transition: "background .12s",
-                  background: stale ? "#fffbeb" : undefined,
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = stale ? "#fef3c7" : "#f8fafc")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = stale ? "#fffbeb" : "#fff")}
-              >
-                {/* N° session */}
-                <div style={{ fontFamily: "monospace", fontSize: ".78rem", color: "#374151", fontWeight: 600 }}>
-                  {s.numeroSession}
-                </div>
-
-                {/* Membre */}
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
-                    {s.membreNom ? `${s.membreNom} ${s.membrePrenoms ?? ""}` : <span style={{ color: "#94a3b8" }}>—</span>}
-                  </div>
-                  <div style={{ fontSize: ".72rem", color: "#94a3b8", marginTop: 1 }}>{s.produit}</div>
-                </div>
-
-                {/* Date début */}
-                <div style={{ fontSize: ".78rem", color: "#64748b" }}>
-                  {new Date(s.dateDebut).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
-                  <div style={{ fontSize: ".68rem", color: "#94a3b8" }}>
-                    {new Date(s.dateDebut).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                </div>
-
-                {/* Passages */}
-                <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
-                  {s.nbLignes} <span style={{ color: "#94a3b8", fontWeight: 400, fontSize: ".72rem" }}>pass.</span>
-                </div>
-
-                {/* Sacs */}
-                <div style={{ fontWeight: 600, fontSize: ".88rem" }}>{s.nbSacsTotal}</div>
-
-                {/* Statut / Poids + badge stale */}
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <StatutBadge statut={s.statut} />
-                    {stale && (
-                      <span title="Session abandonnée depuis >8h">
-                        <AlertTriangle size={13} color="#92400e" />
-                      </span>
-                    )}
-                  </div>
-                  {s.statut !== "en_cours" && (
-                    <div style={{ fontSize: ".78rem", fontWeight: 700, color: "#15803d", marginTop: 3 }}>
-                      {fmtKg(s.poidsTotalKg)}
-                    </div>
-                  )}
-                </div>
-
-                {/* Chevron */}
-                <div style={{ textAlign: "right" }}>
-                  <ChevronRight size={16} color="#cbd5e1" />
-                </div>
+          <div
+            className="sessions-pesee-table-scroll"
+            role="region"
+            aria-label="Liste des sessions de pesée"
+            tabIndex={0}
+          >
+            <div className="sessions-pesee-table-content">
+              {/* Header */}
+              <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 110px 90px 80px 100px 40px", padding: "10px 16px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                {["N° Session", "Membre", "Date début", "Passages", "Sacs", "Poids net", ""].map((h) => (
+                  <div key={h} style={{ fontSize: ".7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".05em" }}>{h}</div>
+                ))}
               </div>
-            );
-          })}
 
-          {/* Footer count */}
-          <div style={{ padding: "10px 16px", borderTop: "1px solid #f1f5f9", fontSize: ".75rem", color: "#94a3b8", textAlign: "right" }}>
-            {filtered.length} session{filtered.length > 1 ? "s" : ""}
-            {search && ` sur ${sessions.length}`}
-            {nbStale > 0 && (
-              <span style={{ marginLeft: 8, color: "#92400e", fontWeight: 600 }}>
-                · {nbStale} abandonnée{nbStale > 1 ? "s" : ""}
-              </span>
-            )}
+              {filtered.map((s, idx) => {
+                const stale = s.statut === "en_cours" && isStale(s.dateDebut);
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => setSelectedId(s.id)}
+                    style={{
+                      display: "grid", gridTemplateColumns: "160px 1fr 110px 90px 80px 100px 40px",
+                      padding: "12px 16px", cursor: "pointer", alignItems: "center",
+                      borderTop: idx === 0 ? "none" : "1px solid #f1f5f9",
+                      transition: "background .12s",
+                      background: stale ? "#fffbeb" : undefined,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = stale ? "#fef3c7" : "#f8fafc")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = stale ? "#fffbeb" : "#fff")}
+                  >
+                    {/* N° session */}
+                    <div style={{ fontFamily: "monospace", fontSize: ".78rem", color: "#374151", fontWeight: 600 }}>
+                      {s.numeroSession}
+                    </div>
+
+                    {/* Membre */}
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
+                        {s.membreNom ? `${s.membreNom} ${s.membrePrenoms ?? ""}` : <span style={{ color: "#94a3b8" }}>—</span>}
+                      </div>
+                      <div style={{ fontSize: ".72rem", color: "#94a3b8", marginTop: 1 }}>{s.produit}</div>
+                  </div>
+
+                    {/* Date début */}
+                    <div style={{ fontSize: ".78rem", color: "#64748b" }}>
+                      {new Date(s.dateDebut).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                      <div style={{ fontSize: ".68rem", color: "#94a3b8" }}>
+                        {new Date(s.dateDebut).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </div>
+
+                    {/* Passages */}
+                    <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
+                      {s.nbLignes} <span style={{ color: "#94a3b8", fontWeight: 400, fontSize: ".72rem" }}>pass.</span>
+                    </div>
+
+                    {/* Sacs */}
+                    <div style={{ fontWeight: 600, fontSize: ".88rem" }}>{s.nbSacsTotal}</div>
+
+                    {/* Statut / Poids + badge stale */}
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <StatutBadge statut={s.statut} />
+                        {stale && (
+                          <span title="Session abandonnée depuis >8h">
+                            <AlertTriangle size={13} color="#92400e" />
+                          </span>
+                        )}
+                      </div>
+                      {s.statut !== "en_cours" && (
+                        <div style={{ fontSize: ".78rem", fontWeight: 700, color: "#15803d", marginTop: 3 }}>
+                          {fmtKg(s.poidsTotalKg)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Chevron */}
+                    <div style={{ textAlign: "right" }}>
+                      <ChevronRight size={16} color="#cbd5e1" />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Footer count */}
+              <div style={{ padding: "10px 16px", borderTop: "1px solid #f1f5f9", fontSize: ".75rem", color: "#94a3b8", textAlign: "right" }}>
+                {filtered.length} session{filtered.length > 1 ? "s" : ""}
+                {search && ` sur ${sessions.length}`}
+                {nbStale > 0 && (
+                  <span style={{ marginLeft: 8, color: "#92400e", fontWeight: 600 }}>
+                    · {nbStale} abandonnée{nbStale > 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

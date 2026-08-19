@@ -4,6 +4,32 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* The sessions grid is intentionally wider than a phone so every column
+   stays readable. Keep the overflow inside the card instead of clipping it
+   against the dashboard viewport. */
+.sessions-pesee-table-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.sessions-pesee-table-content {
+  min-width: 760px;
+}
+
+@media (max-width: 640px) {
+  .sessions-pesee-page {
+    padding: 16px !important;
+  }
+
+  .sessions-pesee-table-scroll {
+    max-height: clamp(220px, calc(100dvh - 520px), 420px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
