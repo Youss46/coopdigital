@@ -211,7 +211,7 @@ export default function DeleguesLocalitesPage() {
 
   const { data: toutesAvances = [] } = useQuery<Avance[]>({
     queryKey: ["avances-delegues-localites"],
-    queryFn: () => apiFetch(`/api/avances`),
+    queryFn: () => apiFetch<{ avances: Avance[]; total: number }>(`/api/avances`).then(r => r.avances ?? []),
     enabled: !isMagasinier,
     staleTime: 30_000,
   });
@@ -230,7 +230,7 @@ export default function DeleguesLocalitesPage() {
 
   const { data: avancesModal = [], isLoading: loadAvances } = useQuery<Avance[]>({
     queryKey: ["avances-membre", modalMembre?.id],
-    queryFn: () => apiFetch(`/api/avances?membre_id=${modalMembre!.id}`),
+    queryFn: () => apiFetch<{ avances: Avance[]; total: number; soldeTotal: number }>(`/api/avances?membre_id=${modalMembre!.id}`).then(r => r.avances ?? []),
     enabled: !!modalMembre && !isMagasinier,
     staleTime: 0,
   });
@@ -343,7 +343,7 @@ export default function DeleguesLocalitesPage() {
     try {
       const [commData, avancesData] = await Promise.all([
         apiFetch<Commission[]>(`/api/delegues-localites/${recap.membreId}/commissions`),
-        apiFetch<Avance[]>(`/api/avances?membre_id=${recap.membreId}`),
+        apiFetch<{ avances: Avance[]; total: number; soldeTotal: number }>(`/api/avances?membre_id=${recap.membreId}`).then(r => r.avances ?? []),
       ]);
       setDetailCommissions(commData.filter(c => c.statut === "en_attente"));
       setAvancesModalComm(avancesData.filter(a => a.statut !== "rembourse"));
